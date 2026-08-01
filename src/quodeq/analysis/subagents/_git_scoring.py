@@ -1,9 +1,10 @@
 """Git-based file scoring -- churn and recency signals for file prioritization."""
 from __future__ import annotations
 
-import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from quodeq.data.git_cli import stream_log_names
 
 _GIT_LOG_TIMEOUT_S = 10
 _GIT_HASH_LENGTH = 40
@@ -30,48 +31,16 @@ def _has_git(src: Path) -> bool:
     return False
 
 
-def _run_git_log(src: Path, months: int = 3) -> str | None:
-    """Run git log and return raw output, or None if git unavailable.
+def _iter_git_log(src: Path, months: int = 3):
+    """Yield git log lines one at a time (streaming, no full materialization).
 
-    This function (together with ``_iter_git_log``) is the git abstraction
-    layer: all git subprocess calls are funnelled through these two helpers,
-    making it straightforward to swap in a different git backend or mock
-    git access in tests.
+    Process execution lives in ``data/git_cli.stream_log_names``; this
+    wrapper keeps the scoring-local seam that tests patch by name, and the
+    repo pre-check that skips non-git sources without spawning anything.
     """
     if not _has_git(src):
-        return None
-    try:
-        result = subprocess.run(
-            ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
-            cwd=str(src), capture_output=True, text=True, encoding="utf-8", timeout=_GIT_LOG_TIMEOUT_S,
-        )
-        return result.stdout if result.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-
-
-def _iter_git_log(src: Path, months: int = 3):
-    """Yield git log lines one at a time via streaming Popen, avoiding full materialization."""
-    if not _has_git(src):
         return
-    try:
-        proc = subprocess.Popen(
-            ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
-            cwd=str(src), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
-        )
-    except OSError:
-        return
-    try:
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            yield line
-    finally:
-        proc.stdout.close()  # type: ignore[union-attr]
-        try:
-            proc.wait(timeout=_GIT_LOG_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+    yield from stream_log_names(src, months=months, timeout=_GIT_LOG_TIMEOUT_S)
 
 
 def compute_git_scores(files: list[str], src: Path, config: dict | None = None) -> dict[str, float]:

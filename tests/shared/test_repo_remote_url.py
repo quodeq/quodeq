@@ -1,8 +1,10 @@
-"""Tests for git_remote_url and project_name_from_repo edge cases."""
-from __future__ import annotations
+"""Tests for the pure repo-URL helpers in shared/_repo.
 
-import subprocess
-from unittest.mock import patch
+``normalize_remote_url`` is a pure string function (no git, no patching);
+the process side lives in ``data/git_cli.py`` and is covered by
+``tests/data/test_git_cli.py`` against real repositories.
+"""
+from __future__ import annotations
 
 
 def test_project_name_resolves_dot_to_basename(tmp_path, monkeypatch):
@@ -19,51 +21,27 @@ def test_project_name_url_unchanged():
     assert project_name_from_repo("https://github.com/quodeq/quodeq.git") == "quodeq"
 
 
-def test_git_remote_url_normalizes_https():
-    from quodeq.shared._repo import git_remote_url
-    mock = subprocess.CompletedProcess(["git"], 0, stdout="https://github.com/quodeq/quodeq.git\n", stderr="")
-    with patch("subprocess.run", return_value=mock):
-        assert git_remote_url("/any/path") == "github.com/quodeq/quodeq"
+def test_normalize_https():
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("https://github.com/quodeq/quodeq.git") == "github.com/quodeq/quodeq"
 
 
-def test_git_remote_url_normalizes_ssh():
-    from quodeq.shared._repo import git_remote_url
-    mock = subprocess.CompletedProcess(["git"], 0, stdout="git@github.com:quodeq/quodeq.git\n", stderr="")
-    with patch("subprocess.run", return_value=mock):
-        assert git_remote_url("/any/path") == "github.com/quodeq/quodeq"
+def test_normalize_ssh_colon_form():
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("git@github.com:quodeq/quodeq.git") == "github.com/quodeq/quodeq"
 
 
-def test_git_remote_url_normalizes_ssh_scheme():
-    from quodeq.shared._repo import git_remote_url
-    mock = subprocess.CompletedProcess(
-        ["git"], 0, stdout="ssh://git@github.com/quodeq/quodeq.git\n", stderr=""
-    )
-    with patch("subprocess.run", return_value=mock):
-        assert git_remote_url("/any/path") == "github.com/quodeq/quodeq"
+def test_normalize_ssh_scheme():
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("ssh://git@github.com/quodeq/quodeq.git") == "github.com/quodeq/quodeq"
 
 
-def test_git_remote_url_strips_trailing_slash_and_git():
-    from quodeq.shared._repo import git_remote_url
-    mock = subprocess.CompletedProcess(["git"], 0, stdout="https://github.com/quodeq/quodeq/\n", stderr="")
-    with patch("subprocess.run", return_value=mock):
-        assert git_remote_url("/any/path") == "github.com/quodeq/quodeq"
+def test_normalize_strips_trailing_slash_and_git():
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("https://github.com/quodeq/quodeq/") == "github.com/quodeq/quodeq"
 
 
-def test_git_remote_url_returns_none_when_not_a_repo():
-    from quodeq.shared._repo import git_remote_url
-    error = subprocess.CalledProcessError(128, ["git"], stderr="not a git repo")
-    with patch("subprocess.run", side_effect=error):
-        assert git_remote_url("/any/path") is None
-
-
-def test_git_remote_url_returns_none_when_git_missing():
-    from quodeq.shared._repo import git_remote_url
-    with patch("subprocess.run", side_effect=FileNotFoundError):
-        assert git_remote_url("/any/path") is None
-
-
-def test_git_remote_url_returns_none_on_empty_output():
-    from quodeq.shared._repo import git_remote_url
-    mock = subprocess.CompletedProcess(["git"], 0, stdout="\n", stderr="")
-    with patch("subprocess.run", return_value=mock):
-        assert git_remote_url("/any/path") is None
+def test_normalize_empty_returns_none():
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("") is None
+    assert normalize_remote_url("   ") is None

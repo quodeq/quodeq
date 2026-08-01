@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.data.git_cli import remote_origin_url_raw
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.data.fs.repo_validation import validate_remote_url
 from quodeq.services._fs_clone import run_git_clone
@@ -54,15 +54,8 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
 
 def _read_origin_remote(repo_dir: Path) -> str | None:
     """Best-effort ``git remote get-url origin`` for a local working copy."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "remote", "get-url", "origin"],
-            capture_output=True, text=True, encoding="utf-8", timeout=10,
-        )
-    except (subprocess.SubprocessError, OSError):
-        return None
-    origin = result.stdout.strip()
-    if result.returncode != 0 or not origin:
+    origin = remote_origin_url_raw(repo_dir)
+    if not origin:
         return None
     return _strip_credentials(origin)
 
