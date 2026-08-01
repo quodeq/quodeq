@@ -8,6 +8,7 @@ import { useSharedProjects } from '../hooks/useSharedProjects.js';
 import { usePublish } from '../hooks/usePublish.js';
 import { useMergedProjects } from '../hooks/useMergedProjects.js';
 import Badge from '../../../components/Badge.jsx';
+import { t } from '../../../strings/index.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -62,14 +63,14 @@ function GradeChip({ grade, score }) {
 
 function LanguageNumbers({ stats, filesCount }) {
   if (!stats || Object.keys(stats).length === 0) {
-    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString()}</span> <span className="project-stat-label">files</span></span>;
+    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString()}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>;
     return null;
   }
   const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 4);
   const total = filesCount || sorted.reduce((s, [, c]) => s + c, 0);
   return (
     <div className="project-lang-row">
-      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString()}</span> <span className="project-stat-label">files</span></span>
+      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString()}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>
       {sorted.map(([lang, count]) => (
         <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extDisplayName(lang)}</span></span>
       ))}
@@ -82,7 +83,7 @@ function LanguageNumbers({ stats, filesCount }) {
 // shared repo), REMOTE (shared repo only). `chips` comes straight from the
 // merged entry (see useMergedProjects), which still speaks in locations —
 // the state wording is purely presentational.
-const BADGE_LABELS = { local: 'LOCAL', both: 'PUBLISHED', shared: 'REMOTE' };
+const BADGE_LABELS = { local: t('projects.badgeLocal'), both: t('projects.badgePublished'), shared: t('projects.badgeRemote') };
 const BADGE_TONES = { local: 'neutral', both: 'success', shared: 'info' };
 
 function ProjectCardChips({ chips }) {
@@ -98,7 +99,7 @@ function PublishedMeta({ publishedBy, publishedAt }) {
   const rel = relativeTime(publishedAt);
   return (
     <div className="project-card-published-meta">
-      published by {publishedBy}{rel ? ` · ${rel}` : ''}
+      {t('projects.publishedBy', { name: publishedBy })}{rel ? ` · ${rel}` : ''}
     </div>
   );
 }
@@ -112,7 +113,7 @@ function LocalPublishedMeta({ publishedAt }) {
   if (!publishedAt) return null;
   const rel = relativeTime(publishedAt);
   if (!rel) return null;
-  return <div className="project-card-published-meta">published {rel}</div>;
+  return <div className="project-card-published-meta">{t('projects.published', { time: rel })}</div>;
 }
 
 function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips, publishedAt }) {
@@ -145,9 +146,9 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
               <Badge
                 variant="tag"
                 tone="warning"
-                title="This project was added by URL but has no local copy. Complete setup to evaluate."
+                title={t('projects.setupIncompleteTitle')}
               >
-                setup incomplete
+                {t('projects.setupIncomplete')}
               </Badge>
             )}
             {project.onboardingCompletedAt === null && onResumeSetup && (
@@ -159,7 +160,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
                   onResumeSetup(id);
                 }}
               >
-                Resume setup
+                {t('projects.resumeSetup')}
               </button>
             )}
             {project.scopePath && <span className="scope-badge">{project.scopePath}</span>}
@@ -168,7 +169,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
           <div className="project-card-top-right">
             <ProjectCardChips chips={chips} />
             {discipline && <span className="project-meta-tag">{discipline}</span>}
-            <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
+            <span className="project-meta-item">{project.runsCount === 1 ? t('projects.runsOne', { count: project.runsCount }) : t('projects.runsMany', { count: project.runsCount })}</span>
             {date && <span className="project-meta-date">{date}</span>}
           </div>
         </div>
@@ -239,9 +240,9 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publi
   if (confirming === name) {
     return (
       <div className="project-card-actions">
-        <span className="project-delete-confirm-label">Delete?</span>
-        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onDelete?.(name); setConfirming(null); }}>Yes</button>
-        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); setConfirming(null); }}>No</button>
+        <span className="project-delete-confirm-label">{t('projects.deleteConfirm')}</span>
+        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onDelete?.(name); setConfirming(null); }}>{t('projects.yes')}</button>
+        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); setConfirming(null); }}>{t('projects.no')}</button>
       </div>
     );
   }
@@ -267,11 +268,13 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publi
             aria-disabled={publishDisabled || undefined}
             onClick={(e) => { e.stopPropagation(); onPublish?.(name); }}
           >
-            {isThisPublishing ? 'publishing...' : action}
+            {isThisPublishing
+              ? t('projects.publishing')
+              : action === 'publish' ? t('projects.actionPublish') : action === 'update' ? t('projects.actionUpdate') : action}
           </button>
         )}
-        <button type="button" className="project-delete-btn" title="Download project reports" aria-label="Download project reports" onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
-        <button type="button" className="project-delete-btn" title="Delete project" aria-label="Delete project" onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
+        <button type="button" className="project-delete-btn" title={t('projects.downloadReportsTitle')} aria-label={t('projects.downloadReportsTitle')} onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
+        <button type="button" className="project-delete-btn" title={t('projects.deleteProjectTitle')} aria-label={t('projects.deleteProjectTitle')} onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
       </div>
       {showError && <p className="inline-error project-card-footer-error">{publishError}</p>}
     </>
@@ -286,14 +289,14 @@ function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
     return (
       <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
         <input className="project-relocate-input" value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }} placeholder="/new/path/to/repo" autoFocus />
-        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>Save</button>
-        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
+        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>{t('projects.save')}</button>
+        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>{t('common.cancel')}</button>
       </div>
     );
   }
   return (
     <div className="project-path-row">
-      {pathMissing && <span className="project-path-missing">Path not found</span>}
+      {pathMissing && <span className="project-path-missing">{t('projects.pathNotFound')}</span>}
       {p.location === 'online' && p.path ? (
         <span onClick={(e) => e.stopPropagation()}>
           <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
@@ -302,11 +305,11 @@ function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
         path && <div className="project-card-path">{path}</div>
       )}
       {pathMissing && (
-        <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>Relocate</button>
+        <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>{t('projects.relocate')}</button>
       )}
       {subprojectCount > 0 && (
         <Badge variant="pill" tone="neutral" className="project-subprojects-tag">
-          subprojects <span className="project-subprojects-tag-count">{subprojectCount}</span>
+          {t('projects.subprojects')} <span className="project-subprojects-tag-count">{subprojectCount}</span>
         </Badge>
       )}
     </div>
@@ -382,7 +385,7 @@ function useRelocateDialog(onRelocate) {
   return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
 }
 
-const EVAL_BLOCKED_TITLE = 'Cannot add a project while an evaluation is running';
+const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
 function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   // The button stays clickable while evaluating so the handler can fire a
@@ -390,9 +393,9 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   // preserve the disabled affordance without swallowing the click.
   return (
     <div className="projects-empty projects-empty--cta">
-      <h3 className="projects-empty__title">Add your first project</h3>
+      <h3 className="projects-empty__title">{t('projects.addFirstTitle')}</h3>
       <p className="projects-empty__hint">
-        Point quodeq at a local repository or paste a Git URL to get started.
+        {t('projects.addFirstHint')}
       </p>
       <div className="projects-empty__cta-row">
         <button
@@ -402,7 +405,7 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
           aria-disabled={isEvaluating || undefined}
           title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
         >
-          <span aria-hidden="true">▸</span> add project
+          <span aria-hidden="true">▸</span> {t('projects.addProject')}
         </button>
         {onImportProject && (
           <button
@@ -410,9 +413,9 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
             className={`projects-page__import-btn projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
             onClick={onImportProject}
             aria-disabled={isEvaluating || undefined}
-            title={isEvaluating ? EVAL_BLOCKED_TITLE : 'Import a previously-exported project'}
+            title={isEvaluating ? EVAL_BLOCKED_TITLE : t('projects.importTitle')}
           >
-            import project
+            {t('projects.importProject')}
           </button>
         )}
       </div>
@@ -429,9 +432,9 @@ function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCa
   if (pullConflict) {
     return (
       <div className="project-card-actions">
-        <span className="project-delete-confirm-label">already exists.</span>
-        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onConfirmCopy(projectId); }}>copy</button>
-        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); onCancelConflict(projectId); }}>cancel</button>
+        <span className="project-delete-confirm-label">{t('projects.alreadyExists')}</span>
+        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onConfirmCopy(projectId); }}>{t('projects.copy')}</button>
+        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); onCancelConflict(projectId); }}>{t('evaluate.cancelBtn')}</button>
       </div>
     );
   }
@@ -440,12 +443,12 @@ function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCa
   if (pulled) {
     return (
       <div className="project-card-actions">
-        <span className="project-delete-confirm-label">pulled to local</span>
+        <span className="project-delete-confirm-label">{t('projects.pulledToLocal')}</span>
       </div>
     );
   }
   return (
-    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>pull local copy</button>
+    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>{t('projects.pullLocalCopy')}</button>
   );
 }
 
@@ -484,7 +487,7 @@ function FilterPill({ label, value, options, valueLabels = {}, onChange }) {
         {label}: <b>{display(value)}</b> <span className="projects-filter-pill-caret">▾</span>
       </button>
       {open && (
-        <div className="projects-filter-pill-menu" role="menu" aria-label={`${label} filter`}>
+        <div className="projects-filter-pill-menu" role="menu" aria-label={t('projects.filterMenuAria', { label })}>
           {options.map((opt) => (
             <button
               key={opt}
@@ -510,25 +513,25 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced
       <input
         type="text"
         className="projects-toolbar-search"
-        placeholder="filter by name"
-        aria-label="filter projects by name"
+        placeholder={t('projects.searchPlaceholder')}
+        aria-label={t('projects.searchAria')}
         value={query}
         onChange={(e) => set({ query: e.target.value })}
       />
       {configured && (
         <FilterPill
-          label="location"
+          label={t('projects.filterLocation')}
           value={location}
           options={['all', 'local', 'shared']}
-          valueLabels={{ shared: 'remote' }}
+          valueLabels={{ all: t('projects.optAll'), local: t('projects.optLocal'), shared: t('projects.optRemote') }}
           onChange={(loc) => set({ location: loc })}
         />
       )}
       <FilterPill
-        label="sort"
+        label={t('projects.filterSort')}
         value={sort}
         options={['activity', 'name', 'score']}
-        valueLabels={{ activity: 'recent activity' }}
+        valueLabels={{ activity: t('projects.optActivity'), name: t('projects.optName'), score: t('projects.optScore') }}
         onChange={(s) => set({ sort: s })}
       />
       <SyncedIndicator configured={configured} lastSynced={lastSynced} stale={stale} error={error} refreshing={refreshing} onRefresh={onRefresh} />
@@ -550,19 +553,19 @@ function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced
 function SyncedIndicator({ configured, lastSynced, stale, error, refreshing, onRefresh }) {
   if (!configured) return null;
   const label = refreshing
-    ? 'syncing…'
+    ? t('projects.syncing')
     : error
-      ? 'sync failed · retry'
+      ? t('projects.syncFailedRetry')
       : lastSynced == null
-        ? 'not synced yet'
-        : `synced ${relativeTime(lastSynced)}${stale ? ' · stale' : ''}`;
+        ? t('projects.notSyncedYet')
+        : `${t('projects.synced', { time: relativeTime(lastSynced) })}${stale ? ` · ${t('projects.stale')}` : ''}`;
   return (
     <span className="projects-toolbar-sync">
       <span className="projects-toolbar-sync-label">{label}</span>
       <button
         type="button"
         className="projects-page__import-btn"
-        aria-label="refresh"
+        aria-label={t('projects.refreshAria')}
         onClick={onRefresh}
         aria-disabled={refreshing || undefined}
       >
@@ -730,7 +733,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
       if (err?.status === 409) {
         setPullConflictId(id);
       } else {
-        alert(`Failed to pull project: ${err?.message || 'unknown error'}`);
+        alert(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
       }
     }
   }
@@ -741,7 +744,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
       setPulledIds((prev) => new Set(prev).add(id));
       await onProjectsReload?.();
     } catch (err) {
-      alert(`Failed to pull project: ${err?.message || 'unknown error'}`);
+      alert(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
     } finally {
       setPullConflictId(null);
     }
@@ -762,11 +765,13 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
     <section className="projects-page projects-page--terminal">
       <div className="projects-page__header">
         <TermHeader
-          name="repositories"
+          name={t('projects.termName')}
           sub={
             projectsLoaded
-              ? `${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`
-              : 'loading…'
+              ? (projects.length === 1
+                  ? t('projects.reposEvaluatedOne', { count: projects.length })
+                  : t('projects.reposEvaluatedMany', { count: projects.length }))
+              : t('overview.loading')
           }
         />
         {!isEmpty && (
@@ -776,11 +781,11 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
                 type="button"
                 className={`projects-page__import-btn${isEvaluating ? ' is-disabled' : ''}`}
                 onClick={onImportProject}
-                aria-label="Import project"
+                aria-label={t('projects.importAria')}
                 aria-disabled={isEvaluating || undefined}
-                title={isEvaluating ? EVAL_BLOCKED_TITLE : 'Import a previously-exported project'}
+                title={isEvaluating ? EVAL_BLOCKED_TITLE : t('projects.importTitle')}
               >
-                import project
+                {t('projects.importProject')}
               </button>
             )}
             {onAddProject && (
@@ -788,11 +793,11 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
                 type="button"
                 className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
                 onClick={onAddProject}
-                aria-label="Add project"
+                aria-label={t('projects.addAria')}
                 aria-disabled={isEvaluating || undefined}
                 title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
               >
-                <span aria-hidden="true">▸</span> add project
+                <span aria-hidden="true">▸</span> {t('projects.addProject')}
               </button>
             )}
           </div>
@@ -815,7 +820,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
             onRefresh={shared.refresh}
           />
           {visibleEntries.length === 0 ? (
-            <div className="projects-empty">no projects match your filters.</div>
+            <div className="projects-empty">{t('projects.noMatches')}</div>
           ) : (
             <div className="projects-cards">
               {visibleEntries.map((entry) => {
