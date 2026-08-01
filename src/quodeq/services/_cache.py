@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.data.fs.report_parser.runs import read_run_data
+from quodeq.data.fs.run_files import count_eval_files, read_run_state
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)
@@ -47,15 +48,10 @@ def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
 
     Used to detect a stale cache: if the cached dim list has a different
     count from what's currently on disk, the cache is wrong and must be
-    evicted. One ``listdir`` per cached lookup -- cheap.
+    evicted. One ``listdir`` per cached lookup -- cheap. The read itself
+    lives in the data layer; a missing directory counts as 0 here.
     """
-    eval_dir = reports_root / project / run_id / "evaluation"
-    if not eval_dir.is_dir():
-        return 0
-    try:
-        return sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
-    except OSError:
-        return 0
+    return count_eval_files(reports_root / project / run_id) or 0
 
 
 def _run_is_in_progress(reports_root: Path, project: str, run_id: str) -> bool:
@@ -67,15 +63,8 @@ def _run_is_in_progress(reports_root: Path, project: str, run_id: str) -> bool:
     run that crashed without flipping its state reads fresh forever, which is
     the safe direction for a cache guard.
     """
-    status_path = reports_root / project / run_id / "status.json"
-    if not status_path.is_file():
-        return False
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    state = data.get("state") if isinstance(data, dict) else None
-    return isinstance(state, str) and state not in _TERMINAL_RUN_STATES
+    state = read_run_state(reports_root / project / run_id)
+    return state is not None and state not in _TERMINAL_RUN_STATES
 
 
 def _cached_entry_is_stale(
@@ -86,10 +75,10 @@ def _cached_entry_is_stale(
     Anchored on the evaluation/ directory existing: without disk state to
     compare against (unit tests that pre-seed the cache), the entry is trusted.
     """
-    eval_dir = reports_root / project / run_id / "evaluation"
-    if not eval_dir.is_dir():
+    on_disk = count_eval_files(reports_root / project / run_id)
+    if on_disk is None:
         return False
-    return len(cached) != _count_eval_files(reports_root, project, run_id)
+    return len(cached) != on_disk
 
 
 def _fetch_dimensions_from_disk(
