@@ -4,6 +4,8 @@
 
 import { useState } from 'react';
 import { gradeColorClass } from '../../../utils/formatters.js';
+import { t } from '../../../strings/index.js';
+import { severityLabel } from '../../../strings/labels.js';
 
 function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }) {
   return (
@@ -14,7 +16,7 @@ function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }
       tabIndex={onViolationClick ? 0 : undefined}
       onKeyDown={onViolationClick ? handleViolationKeyDown(v) : undefined}
     >
-      <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+      <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>
       <span className="violation-row-file">{v.file || '—'}</span>
       {onViolationClick && <span className="violation-row-arrow">›</span>}
     </div>
@@ -24,31 +26,31 @@ function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }
 function MetricsSection({ metrics }) {
   return (
     <div className="principle-section metrics-section">
-      <h4>Metrics</h4>
+      <h4>{t('principle.metrics')}</h4>
       <div className="metrics-grid">
         {metrics.instancesExamined && (
           <div className="metric">
             <span className="metric-value">{metrics.instancesExamined}</span>
-            <span className="metric-label">Instances Examined</span>
+            <span className="metric-label">{t('principle.instancesExamined')}</span>
           </div>
         )}
         {metrics.complianceRate && (
           <div className="metric">
             <span className="metric-value">{metrics.complianceRate}%</span>
-            <span className="metric-label">Compliance Rate</span>
+            <span className="metric-label">{t('principle.complianceRate')}</span>
           </div>
         )}
         {metrics.confidenceLevel && (
           <div className="metric">
             <span className="metric-value">{metrics.confidenceLevel}</span>
-            <span className="metric-label">Confidence</span>
+            <span className="metric-label">{t('principle.confidence')}</span>
           </div>
         )}
       </div>
       <div className="severity-breakdown">
-        <span className="severity-item critical">{metrics.severity?.critical || 0} critical</span>
-        <span className="severity-item major">{metrics.severity?.major || 0} major</span>
-        <span className="severity-item minor">{metrics.severity?.minor || 0} minor</span>
+        <span className="severity-item critical">{t('principle.severityCritical', { count: metrics.severity?.critical || 0 })}</span>
+        <span className="severity-item major">{t('principle.severityMajor', { count: metrics.severity?.major || 0 })}</span>
+        <span className="severity-item minor">{t('principle.severityMinor', { count: metrics.severity?.minor || 0 })}</span>
       </div>
     </div>
   );
@@ -59,7 +61,7 @@ function AccordionContent({ principle, onViolationClick, handleViolationKeyDown,
     <div id={contentId} className="principle-accordion-content">
       {principle.compliance?.length > 0 && (
         <div className="principle-section">
-          <h4>Compliance Evidence</h4>
+          <h4>{t('principle.complianceEvidence')}</h4>
           {principle.compliance.map((code, i) => (
             <pre key={i} className="code-snippet compliance">{code}</pre>
           ))}
@@ -67,7 +69,7 @@ function AccordionContent({ principle, onViolationClick, handleViolationKeyDown,
       )}
       {principle.violations?.length > 0 && (
         <div className="principle-section">
-          <h4>Violations Found</h4>
+          <h4>{t('principle.violationsFound')}</h4>
           <div className="violation-list">
             {principle.violations.map((v, i) => (
               <ViolationRow key={i} v={v} principle={principle} onViolationClick={onViolationClick} handleViolationKeyDown={handleViolationKeyDown} />
@@ -77,13 +79,13 @@ function AccordionContent({ principle, onViolationClick, handleViolationKeyDown,
       )}
       {principle.justification && (
         <div className="principle-section">
-          <h4>Grade Justification</h4>
+          <h4>{t('principle.gradeJustification')}</h4>
           <p>{principle.justification}</p>
         </div>
       )}
       {principle.recommendations?.length > 0 && (
         <div className="principle-section">
-          <h4>Recommendations</h4>
+          <h4>{t('principle.recommendations')}</h4>
           <ol>
             {principle.recommendations.map((rec, i) => (<li key={i}>{rec}</li>))}
           </ol>

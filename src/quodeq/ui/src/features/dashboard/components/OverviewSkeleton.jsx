@@ -1,4 +1,5 @@
 import { TermHeader, StatStrip, SectionLabel } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
 
 // Skeleton frame for the Overview's guaranteed content: the stat-strip hero
 // and the quality-dimensions grid. Rides the same classes the real
@@ -70,7 +71,7 @@ export default function OverviewSkeleton({ projectName }) {
     <div className="overview-skeleton" aria-busy="true">
       <section className="acc-eval-panel acc-eval-panel--terminal">
         <div className="acc-eval-panel__top">
-          <TermHeader name="overview" sub={projectName ? `loading ${projectName}…` : 'loading…'} />
+          <TermHeader name={t('overview.termName')} sub={projectName ? t('overview.loadingProject', { name: projectName }) : t('overview.loading')} />
         </div>
         <StatStrip cards>
           {STAT_SLOTS.map((slot) => <SkeletonStat key={slot} slot={slot} />)}
@@ -78,7 +79,7 @@ export default function OverviewSkeleton({ projectName }) {
       </section>
       <section className="quality-dimensions" aria-hidden="true">
         <div className="quality-dimensions__head">
-          <SectionLabel>quality_dimensions</SectionLabel>
+          <SectionLabel>{t('overview.qualityDimensionsLabel')}</SectionLabel>
         </div>
         <div className="dimensions-panel">
           <div className="dimensions-grid">

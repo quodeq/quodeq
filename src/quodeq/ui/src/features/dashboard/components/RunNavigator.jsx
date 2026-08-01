@@ -3,6 +3,8 @@
 // Hover handlers (onPrevHover, etc.) are optional — when wired they prefetch the
 // adjacent run's dashboard so the click feels instant.
 
+import { t } from '../../../strings/index.js';
+
 export default function RunNavigator({
   currentRun, isLatest, isOldest,
   actions: { onPrev, onNext, onLatest, onView, onPrevHover, onNextHover, onLatestHover } = {},
@@ -16,9 +18,9 @@ export default function RunNavigator({
         onMouseEnter={onLatestHover}
         onFocus={onLatestHover}
         disabled={isLatest}
-        title="Go to latest run"
+        title={t('runNav.latestTitle')}
       >
-        Latest
+        {t('runNav.latest')}
       </button>
 
       <div className="run-nav-pager">
@@ -29,8 +31,8 @@ export default function RunNavigator({
           onMouseEnter={onPrevHover}
           onFocus={onPrevHover}
           disabled={isOldest}
-          aria-label="Older evaluation"
-          title="Older evaluation"
+          aria-label={t('runNav.older')}
+          title={t('runNav.older')}
         >
           ‹
         </button>
@@ -42,8 +44,8 @@ export default function RunNavigator({
           onMouseEnter={onNextHover}
           onFocus={onNextHover}
           disabled={isLatest}
-          aria-label="Newer evaluation"
-          title="Newer evaluation"
+          aria-label={t('runNav.newer')}
+          title={t('runNav.newer')}
         >
           ›
         </button>
@@ -54,9 +56,9 @@ export default function RunNavigator({
           type="button"
           className="run-nav-action run-nav-action--outline"
           onClick={onView}
-          title="Open this run"
+          title={t('runNav.openRunTitle')}
         >
-          View →
+          {t('runNav.view')}
         </button>
       )}
     </div>

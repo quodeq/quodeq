@@ -5,6 +5,7 @@
 
 import { memo } from 'react';
 import { GridTable, GridRow, GridCell, SevBadge } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
 
 function basenameOf(filepath) {
   if (!filepath) return '';
@@ -25,9 +26,9 @@ const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onF
   return (
     <GridTable columns="minmax(0, 1fr) 64px 180px" dense>
       <GridRow header>
-        <GridCell>FILE</GridCell>
-        <GridCell align="right">N</GridCell>
-        <GridCell>SEV</GridCell>
+        <GridCell>{t('overview.fileCol')}</GridCell>
+        <GridCell align="right">{t('overview.countCol')}</GridCell>
+        <GridCell>{t('overview.sevCol')}</GridCell>
       </GridRow>
 
       {list.map((f, idx) => (

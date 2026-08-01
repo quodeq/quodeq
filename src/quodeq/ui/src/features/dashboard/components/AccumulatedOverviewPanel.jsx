@@ -17,6 +17,7 @@ import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filt
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
+import { t } from '../../../strings/index.js';
 
 // Sparkline history length for the per-dimension period series (matches the
 // old DimensionScorePanel SPARKLINE_LIMIT).
@@ -101,37 +102,37 @@ export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accu
     <section className="acc-eval-panel acc-eval-panel--terminal">
       <div className="acc-eval-panel__top">
         <TermHeader
-          name="overview"
-          sub={buildLanguageSub(projectInfo) || (lastDate ? `last_evaluated · ${lastDate}` : null)}
+          name={t('overview.termName')}
+          sub={buildLanguageSub(projectInfo) || (lastDate ? t('overview.lastEvaluated', { date: lastDate }) : null)}
           badge={selectedSource === 'shared' ? <SharedReadOnlyBadge publishedBy={projectInfo?.publishedBy} /> : null}
         />
         <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />
       </div>
       <StatStrip cards>
         <Stat
-          label="SCORE"
+          label={t('overview.statScore')}
           value={scoreDisplay}
           trailing={scoreDelta !== null ? <TrendBadge delta={scoreDelta} showLabel={false} /> : null}
-          hint={grade ? `grade ${gradeLetter(grade)}` : null}
+          hint={grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null}
         />
         <Stat
-          label="VIOLATIONS"
+          label={t('overview.statViolations')}
           value={violations}
           hint={<SeverityBadgeRow severity={summary?.severity} onSeverityClick={handleSeverity} />}
           onClick={violations > 0 ? handleViolations : undefined}
-          ariaLabel={violations > 0 ? 'Show all violations' : undefined}
+          ariaLabel={violations > 0 ? t('overview.showAllViolationsAria') : undefined}
         />
         <Stat
-          label="COMPLIANCE"
+          label={t('overview.statCompliance')}
           value={compliance}
-          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+          hint={totalChecks > 0 ? t('overview.passingChecks', { count: totalChecks }) : null}
           onClick={handleCompliance}
-          ariaLabel={compliance > 0 ? 'Show compliance entries' : undefined}
+          ariaLabel={compliance > 0 ? t('overview.showComplianceAria') : undefined}
         />
         <Stat
-          label="RATIO"
+          label={t('overview.statRatio')}
           value={ratio}
-          hint="compliance : violations"
+          hint={t('overview.ratioHint')}
         />
       </StatStrip>
     </section>
@@ -142,12 +143,12 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
   return (
     <section
       className={`quality-dimensions${pending ? ' quality-dimensions--pending' : ''}`}
-      aria-label="Quality dimensions"
+      aria-label={t('overview.qualityDimensionsAria')}
       aria-busy={pending || undefined}
     >
       <div className="quality-dimensions__head">
-        <SectionLabel>quality_dimensions · {sortedDimensions.length}</SectionLabel>
-        {pending && <span className="quality-dimensions__pending">updating…</span>}
+        <SectionLabel>{t('overview.qualityDimensionsLabel')} · {sortedDimensions.length}</SectionLabel>
+        {pending && <span className="quality-dimensions__pending">{t('overview.updating')}</span>}
       </div>
       <div className="dimensions-panel">
         <DimensionCardsGrid
@@ -259,7 +260,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     return {
       id: `report:overview:${reportProjectName}`,
       type: 'report',
-      title: `${reportProjectName} report`,
+      title: t('overview.reportTitle', { name: reportProjectName }),
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `code-quality-report-${reportProjectName}.md`, body: buildMarkdown() }),
@@ -313,10 +314,10 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       />
 
       {topFiles.length > 0 && (
-        <section className="qd-cards-panel offending-panel" aria-label="Violations by file">
+        <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
           <div className="qd-cards-panel__head">
-            <SectionLabel>{`violations_by_file · ${topFiles.length}`}</SectionLabel>
-            <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
+            <SectionLabel>{t('overview.violationsByFileLabel')} · {topFiles.length}</SectionLabel>
+            <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
           </div>
           <TopOffendingFilesTable
             files={topFiles}

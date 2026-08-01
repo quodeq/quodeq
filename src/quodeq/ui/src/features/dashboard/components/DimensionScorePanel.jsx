@@ -1,6 +1,7 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
+import { t } from '../../../strings/index.js';
 
 function violationCount(dim) {
   if (typeof dim.totalViolations === 'number') return dim.totalViolations;
@@ -27,7 +28,7 @@ function DimensionRow({ dim, onBarClick, delta, scores }) {
       </span>
       <span className="dim-score-value">{score.toFixed(1)}</span>
       <span className="dim-score-trend"><TrendBadge delta={delta} /></span>
-      <span className="dim-score-viol">{violations}v</span>
+      <span className="dim-score-viol">{t('overview.violationsAbbrev', { count: violations })}</span>
     </div>
   );
 }
@@ -38,8 +39,8 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, dimTr
   const sorted = [...dimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
 
   return (
-    <section className="dim-score-panel dim-score-panel--terminal panel" aria-label="Dimension scores">
-      <header className="dim-score-panel__header">DIMENSIONS</header>
+    <section className="dim-score-panel dim-score-panel--terminal panel" aria-label={t('overview.dimensionScoresAria')}>
+      <header className="dim-score-panel__header">{t('overview.dimensionsHeader')}</header>
       <div className="dim-score-rows">
         {sorted.map((dim) => {
           const entry = dimTrends?.[(dim.dimension || '').toLowerCase()];

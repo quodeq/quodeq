@@ -8,6 +8,7 @@ import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { exitReasonLabel, exitReasonHint } from '../../../models/exitReason.js';
+import { t } from '../../../strings/index.js';
 
 /**
  * Build a coverage record for the gauge card's footer line.
@@ -40,16 +41,16 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
     typeof filesRead === 'number' &&
     typeof sourceFileCount === 'number' &&
     sourceFileCount > 0;
-  const parts = ['Partial run'];
+  const parts = [t('overview.partialRun')];
   if (hasCounts) {
-    parts.push(`${filesRead.toLocaleString()} of ${sourceFileCount.toLocaleString()} files`);
+    parts.push(t('overview.filesOf', { read: filesRead.toLocaleString(), total: sourceFileCount.toLocaleString() }));
   }
   if (typeof exitReason === 'string') {
-    parts.push(`stopped: ${exitReasonLabel(exitReason)}`);
+    parts.push(t('overview.stoppedReason', { reason: exitReasonLabel(exitReason) }));
     // A failure-streak (circuit-breaker) dimension is salvaged and shown with a
     // provisional score, but kept out of the overall grade. Say so explicitly.
     if (exitReason === 'failure_streak') {
-      parts.push('excluded from grade');
+      parts.push(t('overview.excludedFromGrade'));
     }
     const hint = exitReasonHint(exitReason);
     if (hint) parts.push(hint);
@@ -68,12 +69,12 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
  */
 function UnmappedSegment({ count }) {
   if (!count) return null;
-  const noun = count === 1 ? 'finding' : 'findings';
+  const tooltipKey = count === 1 ? 'overview.unmappedTooltipOne' : 'overview.unmappedTooltipMany';
   return (
     <> · <span
       className="dim-gauge-card__unmapped"
-      title={`${count.toLocaleString()} ${noun} excluded from scoring: the principle named is not in this dimension's standard`}
-    >{count.toLocaleString()} unmapped</span></>
+      title={t(tooltipKey, { count: count.toLocaleString() })}
+    >{t('overview.unmappedCount', { count: count.toLocaleString() })}</span></>
   );
 }
 
@@ -152,7 +153,7 @@ export default function DimensionGaugeCard({
       tabIndex={0}
       onClick={activate}
       onKeyDown={(e) => handleKey(e, activate)}
-      aria-label={`${item.dimension} dimension details`}
+      aria-label={t('overview.dimensionDetailsAria', { name: item.dimension })}
     >
       <div className="dim-gauge-card__head">
         <span className="dim-gauge-card__name">{item.dimension}</span>
@@ -170,10 +171,10 @@ export default function DimensionGaugeCard({
                 strokeDasharray="3 4"
               />
               <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
-              <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>INSUFFICIENT</text>
+              <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>{t('overview.insufficientGrade')}</text>
             </svg>
           </div>
-          <div className="dim-gauge-card__insuf-line">insufficient evidence</div>
+          <div className="dim-gauge-card__insuf-line">{t('overview.insufficientEvidence')}</div>
         </>
       ) : (
         <>
@@ -205,7 +206,7 @@ export default function DimensionGaugeCard({
           </div>
 
           <div className="dim-gauge-card__meta">
-            VIOL · {violationCount} · {ratio}
+            {t('overview.violAbbrev')} · {violationCount} · {ratio}
           </div>
 
           <div className="dim-gauge-card__sev-row">
