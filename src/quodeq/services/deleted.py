@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -154,10 +153,11 @@ def delete_all_dismissed(project_dir: Path) -> int:
 def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
     """Undismiss every dismissed finding whose ``(dimension, principle, file)`` matches *key*.
 
-    Reads from each run's evaluation.db to find dismissed findings that match
-    the deletion key, then appends FindingUndismissedEvent to actions.jsonl for each.
+    Reads from each run's evaluation.db (via the data layer's
+    ``find_dismissed_matching``) to find dismissed findings that match the
+    deletion key, then appends FindingUndismissedEvent to actions.jsonl for each.
     """
-    from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
+    from quodeq.data.sqlite.findings_queries import find_dismissed_matching  # noqa: PLC0415
 
     dimension, principle, file = key
     if not project_dir.is_dir():
@@ -167,24 +167,11 @@ def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        db_path = run_dir / "evaluation.db"
-        if not db_path.is_file():
-            continue
-        try:
-            with open_evaluation_db(run_dir) as conn:
-                for row in conn.execute(
-                    "SELECT requirement, file, line FROM findings "
-                    "WHERE verdict = 'dismissed' AND dimension = ? "
-                    "AND practice_id = ? AND file = ?",
-                    (dimension, principle, file),
-                ):
-                    matching.append((row[0] or "", row[1] or "", int(row[2] or 0)))
-        except (sqlite3.Error, OSError):
-            _logger.warning(
-                "Skipping unreadable evaluation.db while undismissing in %s",
-                run_dir, exc_info=True,
+        matching.extend(
+            find_dismissed_matching(
+                run_dir, dimension=dimension, practice_id=principle, file=file,
             )
-            continue
+        )
 
     if not matching:
         return 0
