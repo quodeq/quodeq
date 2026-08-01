@@ -25,7 +25,7 @@ DECLARED_WIRE_BOUNDARIES: dict[str, str] = {
     "services/_projects_cache.py": "cache stores the final wire payload it serves",
     "services/dashboard.py": "run-dim LRU stores wire payloads — burn-down: WS5/scoring reader",
     "services/_fs_reports.py": "violation responses cached in wire shape — burn-down: WS5",
-    "services/scoring/__init__.py": "scoring payloads flow into SSE + caches in wire shape — burn-down: WS5/scoring reader",
+    "services/scoring/_response_builders.py": "scoring payloads flow into SSE + caches in wire shape — burn-down: WS5/scoring reader",
 }
 
 
