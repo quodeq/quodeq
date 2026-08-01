@@ -8,6 +8,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Protocol
 
+from quodeq.data.fs.standards_store import (
+    read_standard_payload, resolve_jailed_standard_path, write_standard_payload,
+)
+
 # NOTE: logging in inner layer — tracked for middleware extraction
 logger = logging.getLogger(__name__)
 
@@ -59,13 +63,13 @@ class StandardsLibraryClient:
         data = self.fetch_standard(file_path)
         self._validate_id(data.get("id", ""))
         content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:_HASH_PREFIX_LEN]
-        evaluators_dir.mkdir(parents=True, exist_ok=True)
-        dest = (evaluators_dir / f"{data['id']}.json").resolve()
-        if not dest.is_relative_to(evaluators_dir.resolve()):
-            raise ValueError(f"Invalid standard ID from library: {data['id']}")
+        try:
+            dest = resolve_jailed_standard_path(evaluators_dir, data["id"])
+        except ValueError:
+            raise ValueError(f"Invalid standard ID from library: {data['id']}") from None
         # Check for collision with existing standard
-        if dest.is_file():
-            existing = json.loads(dest.read_text(encoding="utf-8"))
+        existing = read_standard_payload(dest)
+        if existing is not None:
             if existing.get("origin") == file_path:
                 # Same origin — update in place
                 pass
@@ -79,5 +83,5 @@ class StandardsLibraryClient:
         data["managed"] = True
         data["origin"] = file_path
         data["origin_hash"] = content_hash
-        dest.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        write_standard_payload(dest, data)
         return dest

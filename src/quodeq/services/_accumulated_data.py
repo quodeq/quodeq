@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
+from quodeq.data.fs.run_files import run_fingerprint  # noqa: F401 — facade re-export
 from quodeq.data.fs.report_parser.runs import RunInfo, read_run_data
 from quodeq.core.types import DimensionResult
 
@@ -16,8 +17,6 @@ from quodeq.core.types import DimensionResult
 # SQL grade tables that overlay_sql_grades reads back, so the fingerprint has
 # to cover the database (and its write-ahead log, which absorbs writes long
 # before a checkpoint touches the main file) alongside the JSON.
-_FINGERPRINT_DIRS = ("evaluation", "evidence")
-_FINGERPRINT_FILES = ("evaluation.db", "evaluation.db-wal", "events.jsonl")
 
 
 @dataclass
@@ -67,32 +66,6 @@ def _classify_dimension(
         buckets.prev_run_latest_map[dim_name] = dim
 
 
-def run_fingerprint(run_dir: Path) -> str:
-    """Cheap content fingerprint for the inputs ``read_run_data`` reads.
-
-    Stat-based rather than hash-based: the point is to be far cheaper than the
-    read it guards, while still changing whenever a run's data is rewritten in
-    place (see :data:`_FINGERPRINT_FILES`).
-    """
-    parts: list[str] = []
-    for sub in _FINGERPRINT_DIRS:
-        try:
-            entries = sorted((run_dir / sub).iterdir())
-        except OSError:
-            continue
-        for path in entries:
-            try:
-                stat = path.stat()
-            except OSError:
-                continue
-            parts.append(f"{sub}/{path.name}:{stat.st_mtime_ns}:{stat.st_size}")
-    for name in _FINGERPRINT_FILES:
-        try:
-            stat = (run_dir / name).stat()
-        except OSError:
-            continue
-        parts.append(f"{name}:{stat.st_mtime_ns}:{stat.st_size}")
-    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
 def _strip_findings(dimensions: list[DimensionResult]) -> list[DimensionResult]:
