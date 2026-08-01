@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
+import { t } from '../../../strings/index.js';
 import {
   ComposedChart,
   Bar,
@@ -167,17 +168,17 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
   const kbdItems = onBarClick
     ? data.map((d, i) => ({
         key: d.runId ?? i,
-        text: `${d.dateLabel}: ${Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?'}, grade ${gradeLetter(d.overallGrade)}${d.runId === selectedRunId ? ' (selected)' : ''}`,
+        text: `${t('history.kbdRunItem', { date: d.dateLabel, score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
         onActivate: () => d.runId && onBarClick(d.runId),
       }))
     : [];
 
   return (
-    <section className="run-history-panel run-history-panel--terminal panel" aria-label="Score history chart">
+    <section className="run-history-panel run-history-panel--terminal panel" aria-label={t('overview.scoreHistoryAria')}>
       <div className="run-history-panel__header">
-        <span className="term-section-label__text">SCORE_HISTORY</span>
+        <span className="term-section-label__text">{t('history.scoreHistoryHeader')}</span>
         <span className="run-history-panel__stats">
-          LATEST {fmt(latest)} · AVG {fmt(avg)} · MIN {fmt(min)} · MAX {fmt(max)}
+          {t('history.latestAvgMinMax', { latest: fmt(latest), avg: fmt(avg), min: fmt(min), max: fmt(max) })}
         </span>
       </div>
       <div className="chart-with-kbd">
@@ -185,7 +186,7 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
           data={data}
           interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
         />
-        <ChartKeyboardControls label="Score history runs. Tab to a run, Enter to open it" items={kbdItems} />
+        <ChartKeyboardControls label={t('history.kbdRunsLabel')} items={kbdItems} />
       </div>
     </section>
   );
