@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { t } from '../../../strings/index.js';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
@@ -75,30 +76,30 @@ export default function CleanScanToggle({ value, onChange, disabled = false }) {
         disabled={disabled}
         title={
           value === 'permanent'
-            ? 'Clean scan: always (click to disable)'
+            ? t('evaluate.cleanAlwaysTitle')
             : value === 'once'
-              ? 'Clean scan: just this scan (click to disable)'
-              : 'Clean scan: drops carry-forward; every file goes through the LLM again'
+              ? t('evaluate.cleanOnceTitle')
+              : t('evaluate.cleanOffTitle')
         }
         aria-pressed={isOn}
       >
-        Clean scan
+        {t('evaluate.cleanScan')}
         {value === 'permanent' && <span className="clean-scan-toggle__dot" aria-hidden="true" />}
       </button>
 
       {confirmOpen && (
         <div className="qd-confirm-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) cancel(); }}>
           <div className="qd-confirm-dialog">
-            <h3 className="qd-confirm-title">Clean scan</h3>
+            <h3 className="qd-confirm-title">{t('evaluate.cleanScan')}</h3>
             <div className="qd-confirm-message">
-              <p>Reanalyze every file from scratch. Slower than a normal scan, but findings will reflect your current standards and settings.</p>
-              <p>Use this after you change a standard, or whenever you want a fresh second opinion.</p>
+              <p>{t('evaluate.cleanDialogP1')}</p>
+              <p>{t('evaluate.cleanDialogP2')}</p>
             </div>
             <div className="qd-confirm-actions clean-scan-confirm-actions">
-              <button type="button" className="qd-confirm-btn qd-confirm-btn--cancel" onClick={cancel}>Cancel</button>
-              <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm" onClick={pickOnce}>Just this scan</button>
+              <button type="button" className="qd-confirm-btn qd-confirm-btn--cancel" onClick={cancel}>{t('common.cancel')}</button>
+              <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm" onClick={pickOnce}>{t('evaluate.justThisScan')}</button>
               <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--danger" onClick={pickPermanent}>
-                Always <span className="clean-scan-confirm-meta">(all projects)</span>
+                {t('evaluate.alwaysCap')} <span className="clean-scan-confirm-meta">{t('evaluate.allProjects')}</span>
               </button>
             </div>
           </div>

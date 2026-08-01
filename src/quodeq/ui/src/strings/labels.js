@@ -15,3 +15,9 @@ const KNOWN_GRANULARITIES = new Set(['day', 'week', 'month']);
 export function granularityLabel(granularity) {
   return KNOWN_GRANULARITIES.has(granularity) ? t(`granularity.${granularity}`) : granularity;
 }
+
+const KNOWN_JOB_STATUSES = new Set(['running', 'done', 'completed', 'failed', 'cancelled', 'lost']);
+
+export function jobStatusLabel(status) {
+  return KNOWN_JOB_STATUSES.has(status) ? t(`status.${status}`) : status;
+}
