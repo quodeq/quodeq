@@ -6,7 +6,6 @@
 </p>
 
 <h2 align="center">AI-powered code quality and security scanner</h2>
-<p align="center"><strong>v1.8.1</strong></p>
 <p align="center">
   <a href="https://github.com/quodeq/quodeq/actions/workflows/test.yml"><img src="https://github.com/quodeq/quodeq/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
   <a href="https://github.com/quodeq/quodeq/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
@@ -14,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=Ie7rAiPBDQE&list=PLJjpl8sE7W-U1HMePWdGis7w834NPYD3R&index=1">Watch the demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
+  <a href="https://www.youtube.com/watch?v=Ie7rAiPBDQE&list=PLJjpl8sE7W-U1HMePWdGis7w834NPYD3R&index=1">Watch the demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/discussions">Discussions</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
 </p>
 
 ---
@@ -54,6 +53,9 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 
 ### 1. Prerequisites
 
+> **On macOS you can skip this step** by installing through Homebrew (see step 2). The
+> formula pulls in its own Python.
+
 | OS | Command |
 |---|---|
 | **macOS** | `brew install python pipx` |
@@ -70,10 +72,20 @@ Minimum versions: Python 3.12+. (The dashboard UI ships pre-built inside the whe
 
 ### 2. Install quodeq
 
+**Homebrew** (macOS, and the shortest path):
+
+```bash
+brew install quodeq/tap/quodeq
+```
+
+**pipx / pip** (every platform):
+
 ```bash
 pipx install quodeq    # isolated, recommended
 # or: pip install quodeq
 ```
+
+Prefer a desktop app to the CLI? See [Desktop apps](#desktop-apps) below.
 
 ### 3. Pick an AI provider
 
@@ -101,15 +113,29 @@ The dashboard opens at `http://127.0.0.1:7863`. Use **Settings → AI Provider**
 
 If the native window doesn't show up (common on Linux without GTK), run `quodeq --browser` instead.
 
-### macOS App (beta)
+<a id="desktop-apps"></a>
 
-Download the `.dmg` from [Releases](https://github.com/quodeq/quodeq/releases/latest), open it, and drag `Quodeq.app` to Applications. On first launch:
+### Desktop apps (beta)
+
+Every release attaches three prebuilt apps to [Releases](https://github.com/quodeq/quodeq/releases/latest). They bundle their own Python, so none of the prerequisites above apply.
+
+| Download | Platform | What it is |
+|---|---|---|
+| `Quodeq-<version>-macOS.dmg` | macOS | The dashboard in a native window |
+| `QuodeqBar-<version>-macOS.dmg` | macOS | Menu bar app that starts and stops the dashboard, with an icon that reflects whether a scan is running |
+| `Quodeq-<version>-Windows.zip` | Windows | The dashboard in a native window (WebView2) |
+
+**macOS.** Open the `.dmg` and drag the app to Applications. The apps are unsigned, so
+the first launch needs one of:
 
 ```bash
-xattr -cr /Applications/Quodeq.app    # Required for unsigned apps
+xattr -cr /Applications/Quodeq.app       # or /Applications/QuodeqBar.app
 ```
 
 Or right-click the app, select Open, then click Open in the dialog.
+
+**Windows.** Unzip anywhere and run `Quodeq.exe`. SmartScreen will warn about an
+unrecognized publisher on first launch: choose **More info** then **Run anyway**.
 
 ---
 
