@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
+from quodeq.data.fs.project_files import write_scan_json
 from quodeq.data.git_cli import list_branches
 
 _logger = logging.getLogger(__name__)
@@ -108,7 +109,5 @@ def _list_modules(project_dir: Path) -> list[str]:
 
 
 def _write_scan_json(scan: ScanData, output_dir: Path) -> None:
-    """Persist scan data as JSON."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    payload = dataclasses.asdict(scan)
-    (output_dir / "scan.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    """Persist scan data as JSON (delegates to the data layer)."""
+    write_scan_json(scan, output_dir)
