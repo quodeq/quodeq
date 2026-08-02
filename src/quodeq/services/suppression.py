@@ -31,7 +31,9 @@ from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
     is_dismissed,
 )
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
+from quodeq.data.fs.suppression_rules import (  # noqa: F401 — re-exported API
+    load_suppression_rules,
+)
 
 _TYPE_VIOLATION = "violation"
 
