@@ -174,7 +174,10 @@ function convertSection(body) {
     }
     if ((m = s.match(/^\s*<KeyTable rows=\{\[([\s\S]*?)\]\}\s*\/>/))) {
       const rows = parseRows(m[1]);
-      const esc = (x) => x.replace(/\|/g, '\\|');
+      // Escape backslashes FIRST: doing pipes alone turns an input `\|` into
+      // `\\|`, an escaped backslash followed by a live pipe, which splits the
+      // cell. Order matters, not just coverage.
+      const esc = (x) => x.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
       out.push([
         '| Key | Value |', '| --- | --- |',
         ...rows.map(([k, v]) => `| ${esc(k)} | ${esc(v)} |`),
