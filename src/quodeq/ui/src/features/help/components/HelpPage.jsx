@@ -1,65 +1,39 @@
 import { useState } from 'react';
-import {
-  Philosophy,
-  GettingStarted,
-  Projects,
-  SharedRepository,
-  Providers,
-  Evaluations,
-  Overview,
-  Dimensions,
-  Violations,
-  CodeMap,
-  History,
-  GradeFormula,
-  Standards,
-  Assistant,
-  Terminal,
-  Settings,
-  CommandLine,
-} from './HelpSections.jsx';
+import HelpMarkdown from './HelpMarkdown.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import BrandCarousel from '../../../components/BrandCarousel.jsx';
+import { t } from '../../../strings/index.js';
 
+// Help content is per-locale markdown. Swapping languages later means adding
+// content/<locale>/ and picking the directory here; nothing else moves.
+const SECTION_SOURCES = import.meta.glob('../content/en/*.md', {
+  query: '?raw', import: 'default', eager: true,
+});
+
+function sourceFor(id) {
+  return SECTION_SOURCES[`../content/en/${id}.md`] ?? '';
+}
+
+// id -> markdown file stem in content/<locale>/, and the nav label key.
 const SECTIONS = [
-  { id: 'philosophy', label: 'Philosophy' },
-  { id: 'getting-started', label: 'Getting Started' },
-  { id: 'projects', label: 'Projects' },
-  { id: 'shared-repo', label: 'Shared Repository' },
-  { id: 'providers', label: 'AI Providers' },
-  { id: 'evaluations', label: 'Running Evaluations' },
-  { id: 'overview', label: 'Overview' },
-  { id: 'dimensions', label: 'Quality Dimensions' },
-  { id: 'violations', label: 'Violations & Fix Plans' },
-  { id: 'map', label: 'Code Map' },
-  { id: 'history', label: 'History & Trends' },
-  { id: 'grade-formula', label: 'Grade Formula' },
-  { id: 'standards', label: 'Custom Standards' },
-  { id: 'assistant', label: 'Assistant' },
-  { id: 'terminal', label: 'Terminal' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'cli', label: 'Command Line & CI' },
+  { id: 'philosophy', labelKey: 'help.navPhilosophy' },
+  { id: 'getting-started', labelKey: 'help.navGettingStarted' },
+  { id: 'projects', labelKey: 'help.navProjects' },
+  { id: 'shared-repo', labelKey: 'help.navSharedRepo' },
+  { id: 'providers', labelKey: 'help.navProviders' },
+  { id: 'evaluations', labelKey: 'help.navEvaluations' },
+  { id: 'overview', labelKey: 'help.navOverview' },
+  { id: 'dimensions', labelKey: 'help.navDimensions' },
+  { id: 'violations', labelKey: 'help.navViolations' },
+  { id: 'map', labelKey: 'help.navMap' },
+  { id: 'history', labelKey: 'help.navHistory' },
+  { id: 'grade-formula', labelKey: 'help.navGradeFormula' },
+  { id: 'standards', labelKey: 'help.navStandards' },
+  { id: 'assistant', labelKey: 'help.navAssistant' },
+  { id: 'terminal', labelKey: 'help.navTerminal' },
+  { id: 'settings', labelKey: 'help.navSettings' },
+  { id: 'cli', labelKey: 'help.navCli' },
 ];
-
-const SECTION_COMPONENTS = {
-  'philosophy': Philosophy,
-  'getting-started': GettingStarted,
-  'projects': Projects,
-  'shared-repo': SharedRepository,
-  'providers': Providers,
-  'evaluations': Evaluations,
-  'overview': Overview,
-  'dimensions': Dimensions,
-  'violations': Violations,
-  'map': CodeMap,
-  'history': History,
-  'grade-formula': GradeFormula,
-  'standards': Standards,
-  'assistant': Assistant,
-  'terminal': Terminal,
-  'settings': Settings,
-  'cli': CommandLine,
-};
 
 function SectionNav({ active, onSelect }) {
   return (
@@ -71,7 +45,7 @@ function SectionNav({ active, onSelect }) {
           onClick={() => onSelect(s.id)}
           aria-pressed={active === s.id}
         >
-          {s.label}
+          {t(s.labelKey)}
         </button>
       ))}
     </nav>
@@ -80,21 +54,20 @@ function SectionNav({ active, onSelect }) {
 
 export default function HelpPage() {
   const [activeSection, setActiveSection] = useState('philosophy');
-  const Section = SECTION_COMPONENTS[activeSection] || Philosophy;
 
   return (
     <div className="help-page help-page--terminal">
       <div className="help-header">
         <TermHeader
-          name="help"
-          sub="how quodeq works and how to get the most out of it"
+          name={t('help.termName')}
+          sub={t('help.termSub')}
         />
         <BrandCarousel />
       </div>
       <div className="help-layout">
         <SectionNav active={activeSection} onSelect={setActiveSection} />
         <div className="help-content">
-          <Section />
+          <HelpMarkdown source={sourceFor(activeSection)} />
         </div>
       </div>
     </div>
