@@ -1,6 +1,7 @@
 import useTerminalSettings from '../hooks/useTerminalSettings.js';
 import { killTerminal } from '../../../api/terminal.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { t } from '../../../strings/index.js';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
@@ -17,16 +18,16 @@ export default function TerminalSection() {
   };
   return (
     <section className="panel settings-section">
-      <div className="panel-header"><SectionLabel marker="▶">Terminal</SectionLabel></div>
+      <div className="panel-header"><SectionLabel marker="▶">{t('settings.terminalLabel')}</SectionLabel></div>
       <div className={`settings-row${enabled ? '' : ' settings-row--last'}`}>
         <div className="settings-row-label">
-          <span className="settings-label">Enable terminal</span>
+          <span className="settings-label">{t('settings.terminalEnable')}</span>
           <span className="settings-description">
-            Shows a shell (❯_) in the toolbar drawer. Ctrl+Shift+` opens it. Localhost only; on by default.
+            {t('settings.terminalEnableDesc')}
           </span>
         </div>
         <div className="settings-pill-group" role="tablist">
-          {[{ v: true, l: 'On' }, { v: false, l: 'Off' }].map(({ v, l }) => (
+          {[{ v: true, l: t('settings.on') }, { v: false, l: t('settings.off') }].map(({ v, l }) => (
             <button key={l} type="button" role="tab" aria-selected={enabled === v}
               className={`settings-pill${enabled === v ? ' settings-pill--active' : ''}`}
               onClick={() => setEnabled(v)}>{l}</button>
@@ -36,10 +37,10 @@ export default function TerminalSection() {
       {enabled && (
         <div className="settings-row settings-row--last">
           <span className="settings-description">
-            One persistent shell, started in your home directory. Restart kills it and opens a fresh, empty shell.
+            {t('settings.terminalRestartDesc')}
           </span>
           <button type="button" className="settings-pill" onClick={restart}>
-            Restart terminal
+            {t('settings.restartTerminal')}
           </button>
         </div>
       )}

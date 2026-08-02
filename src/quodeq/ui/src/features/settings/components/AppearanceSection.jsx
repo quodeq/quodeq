@@ -1,9 +1,13 @@
+import { t } from '../../../strings/index.js';
+
 const MODE_OPTIONS = [
-  { value: 'system',   label: 'System' },
-  { value: 'light',    label: 'Light' },
-  { value: 'dark',     label: 'Dark' },
+  { value: 'system',   label: t('settings.themeModeSystem') },
+  { value: 'light',    label: t('settings.themeModeLight') },
+  { value: 'dark',     label: t('settings.themeModeDark') },
 ];
 
+// Theme family names are product identity (each palette has a proper name),
+// not translatable prose.
 const FAMILY_OPTIONS = [
   { value: 'daruma',    label: 'Daruma' },
   { value: 'neo',       label: 'Neo' },
@@ -18,12 +22,12 @@ export default function AppearanceSection({ themeMode, themeFamily, onApplyMode,
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <SectionLabel marker="▶">Appearance</SectionLabel>
+        <SectionLabel marker="▶">{t('settings.appearanceLabel')}</SectionLabel>
       </div>
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Mode</span>
-          <span className="settings-description">Choose light, dark, or follow your system</span>
+          <span className="settings-label">{t('settings.modeLabel')}</span>
+          <span className="settings-description">{t('settings.modeDesc')}</span>
         </div>
         <div className="settings-pill-group">
           {MODE_OPTIONS.map(({ value, label }) => (
@@ -41,8 +45,8 @@ export default function AppearanceSection({ themeMode, themeFamily, onApplyMode,
       </div>
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Theme</span>
-          <span className="settings-description">Pick a color palette</span>
+          <span className="settings-label">{t('settings.themeLabel')}</span>
+          <span className="settings-description">{t('settings.themeDesc')}</span>
         </div>
         <div className="settings-pill-group">
           {FAMILY_OPTIONS.map(({ value, label }) => (

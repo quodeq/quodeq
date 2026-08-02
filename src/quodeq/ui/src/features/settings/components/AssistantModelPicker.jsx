@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { settingsKeys } from '../../../api/queryKeys.js';
 import { classifyProvider } from './providerUtils.js';
+import { t } from '../../../strings/index.js';
 
 const LOCAL_API_CONFIG = {
   ollama: { apiFn: 'getOllamaModels', queryKey: settingsKeys.ollamaModels(), errorLabel: 'Ollama' },
@@ -24,14 +25,14 @@ function LocalApiModelSelect({ providerId, value, onChange }) {
         className={`settings-model-input${value ? '' : ' settings-model-input--required'}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        aria-label="Assistant model"
+        aria-label={t('settings.assistantModelAria')}
       >
-        <option value="">Pick a model</option>
+        <option value="">{t('settings.pickAModel')}</option>
         {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
       </select>
       {error && (
         <span className="settings-error">
-          We couldn&apos;t load your {cfg.errorLabel} models. Make sure {cfg.errorLabel} is running.
+          {t('settings.localApiModelsLoadFailed', { provider: cfg.errorLabel })}
         </span>
       )}
     </div>
@@ -46,9 +47,9 @@ function ModelTextInput({ value, onChange }) {
         type="text"
         className="settings-model-input"
         value={value || ''}
-        placeholder="Type model id"
+        placeholder={t('settings.typeModelId')}
         onChange={(e) => onChange(e.target.value)}
-        aria-label="Assistant model"
+        aria-label={t('settings.assistantModelAria')}
         autoCapitalize="off"
         autoCorrect="off"
         autoComplete="off"

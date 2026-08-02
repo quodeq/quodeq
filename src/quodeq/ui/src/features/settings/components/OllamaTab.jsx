@@ -8,12 +8,10 @@ import { useOllamaServerStatus } from '../hooks/useOllamaServerStatus.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_OLLAMA } from './ProviderSettings.jsx';
 import { useOllamaLog } from '../ollama-log/OllamaLogContext.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
-const OLLAMA_MODEL_HINT = (
-  <>
-    This list comes straight from your local Ollama server. To add a model, download it with Ollama itself (for example, <code>ollama pull gemma4:26b</code>). As soon as the download finishes, it shows up here.
-  </>
-);
+const OLLAMA_MODEL_HINT = tRich('settings.ollamaModelHint');
 
 
 // Local-API tabs default to a single subagent; clamp commits to [MIN, MAX]
@@ -30,10 +28,10 @@ function ModelSelector({ value, models, onChange }) {
   return (
     <div className="settings-model-field">
       <select className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Pick a model</option>
+        <option value="">{t('settings.pickAModel')}</option>
         {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
       </select>
-      {needsModel && <span className="settings-model-hint">You&apos;ll need a model before you can run an evaluation.</span>}
+      {needsModel && <span className="settings-model-hint">{t('settings.needModelBeforeEval')}</span>}
     </div>
   );
 }
@@ -52,7 +50,7 @@ export default function OllamaTab({ state, update }) {
     queryFn: () => getOllamaModels(),
   });
   const modelsError = modelsQueryError
-    ? 'We couldn’t load your Ollama models. Make sure Ollama is running.'
+    ? t('settings.ollamaModelsLoadFailed')
     : null;
 
   // When Ollama transitions offline → online, the cached models query is
@@ -75,7 +73,7 @@ export default function OllamaTab({ state, update }) {
       const result = await testOllamaConcurrency(state.model);
       setTestResult(result);
       if (result.recommended) update('subagents', String(result.recommended));
-    } catch (err) { console.warn('Ollama concurrency test failed', err); setTestResult(null); setTestError('The concurrency test didn’t finish. Make sure Ollama is running and your model is loaded.'); }
+    } catch (err) { console.warn('Ollama concurrency test failed', err); setTestResult(null); setTestError(t('settings.concurrencyTestFailedOllama')); }
     setTesting(false);
   };
 
@@ -84,44 +82,40 @@ export default function OllamaTab({ state, update }) {
       <ServerStatusPill
         status={ollamaStatus?.status ?? 'offline'}
         address={ollamaStatus?.address}
-        offlineMessage={
-          <span>
-            Ollama isn&apos;t running. Start it with <code>ollama serve</code>, or open the Ollama app.
-          </span>
-        }
+        offlineMessage={<span>{tRich('settings.ollamaOffline')}</span>}
         onToggleConsole={() => (ollamaLog.open ? ollamaLog.closeLog() : ollamaLog.openLog())}
         consoleOpen={ollamaLog.open}
       />
-      {modelsError && <div className="settings-row"><span className="settings-error">We couldn&apos;t load your Ollama models. Make sure Ollama is running.</span></div>}
+      {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Model</span>
-            <HelpHint label="Model help">{OLLAMA_MODEL_HINT}</HelpHint>
+            <span className="settings-label">{t('settings.modelLabel')}</span>
+            <HelpHint label={t('settings.modelHelpAria')}>{OLLAMA_MODEL_HINT}</HelpHint>
           </span>
-          <span className="settings-description">This model handles every step of your evaluation.</span>
+          <span className="settings-description">{t('settings.thisModelEveryStep')}</span>
         </div>
         <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} />
       </div>
       <TimeLimitSetting state={state} update={update} providerType="local-api" />
       <details className="settings-advanced">
-        <summary className="settings-advanced-toggle">Advanced</summary>
+        <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
         <div className="settings-advanced-content">
           <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label-row">
-                <span className="settings-label">Max parallel agents</span>
-                <HelpHint label="Max parallel agents help">{SUBAGENTS_HINT_OLLAMA}</HelpHint>
+                <span className="settings-label">{t('settings.maxParallelAgents')}</span>
+                <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_OLLAMA}</HelpHint>
               </span>
-              <span className="settings-description">We make a guess based on your VRAM. Run a quick test for a more accurate number.</span>
+              <span className="settings-description">{t('settings.ollamaSubagentsDesc')}</span>
             </div>
             <div className="settings-budget-control">
               <input type="number" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }} />
               <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !state.model}>
-                {testing ? 'Testing...' : 'Auto-detect'}
+                {testing ? t('settings.testing') : t('settings.autoDetect')}
               </button>
             </div>
-            {testResult && <span className="settings-description">Recommended: {testResult.recommended} agents</span>}
+            {testResult && <span className="settings-description">{t('settings.recommendedAgents', { count: testResult.recommended })}</span>}
             {testError && <span className="settings-error">{testError}</span>}
           </div>
           <AdvancedAnalysisSettings state={state} update={update} />

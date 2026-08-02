@@ -8,11 +8,13 @@ import { useLlamacppServerStatus } from '../hooks/useLlamacppServerStatus.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_OLLAMA } from './ProviderSettings.jsx';
 import { useLlamaCppLog } from '../llamacpp-log/LlamaCppLogContext.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
 const LLAMACPP_MODEL_HINT = (
   <>
-    <p>llama-server runs one model at a time, fixed at launch by the <code>-m</code> flag. Whatever you started it with is what shows up here.</p>
-    <p>To switch models, stop llama-server and relaunch it with a different GGUF file. For speculative decoding (MTP), pair the target model with a smaller drafter via <code>--model-draft</code>.</p>
+    <p>{tRich('settings.llamacppModelHintP1')}</p>
+    <p>{tRich('settings.llamacppModelHintP2')}</p>
   </>
 );
 
@@ -28,11 +30,11 @@ function clampSubagents(raw) {
 
 function LoadedModel({ models }) {
   if (!models.length) {
-    return <span className="settings-model-hint">No model loaded yet. Start llama-server with a GGUF file.</span>;
+    return <span className="settings-model-hint">{t('settings.llamacppNoModel')}</span>;
   }
   return (
     <div className="settings-model-field">
-      <input className="settings-model-input" value={models[0].name} readOnly aria-label="Loaded model" />
+      <input className="settings-model-input" value={models[0].name} readOnly aria-label={t('settings.loadedModelAria')} />
     </div>
   );
 }
@@ -51,7 +53,7 @@ export default function LlamaCppTab({ state, update }) {
     queryFn: () => getLlamacppModels(),
   });
   const modelsError = modelsQueryError
-    ? 'We couldn’t reach llama-server. Make sure it is running on port 8080.'
+    ? t('settings.llamacppLoadFailed')
     : null;
 
   // When llama-server transitions offline -> online, refresh the models query
@@ -82,7 +84,7 @@ export default function LlamaCppTab({ state, update }) {
     } catch (err) {
       console.warn('llama.cpp concurrency test failed', err);
       setTestResult(null);
-      setTestError('The concurrency test didn’t finish. Make sure llama-server is running.');
+      setTestError(t('settings.concurrencyTestFailedLlamacpp'));
     }
     setTesting(false);
   };
@@ -92,11 +94,7 @@ export default function LlamaCppTab({ state, update }) {
       <ServerStatusPill
         status={llamacppStatus?.status ?? 'offline'}
         address={llamacppStatus?.address}
-        offlineMessage={
-          <span>
-            llama-server isn&apos;t running. Start it with <code>llama-server -m model.gguf --port 8080</code>.
-          </span>
-        }
+        offlineMessage={<span>{tRich('settings.llamacppOffline')}</span>}
         onToggleConsole={
           llamacppLog.available
             ? () => (llamacppLog.open ? llamacppLog.closeLog() : llamacppLog.openLog())
@@ -108,32 +106,32 @@ export default function LlamaCppTab({ state, update }) {
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Loaded model</span>
-            <HelpHint label="Loaded model help">{LLAMACPP_MODEL_HINT}</HelpHint>
+            <span className="settings-label">{t('settings.loadedModel')}</span>
+            <HelpHint label={t('settings.loadedModelHelpAria')}>{LLAMACPP_MODEL_HINT}</HelpHint>
           </span>
-          <span className="settings-description">The GGUF currently loaded by llama-server.</span>
+          <span className="settings-description">{t('settings.loadedModelDesc')}</span>
         </div>
         <LoadedModel models={models} />
       </div>
       <TimeLimitSetting state={state} update={update} providerType="local-api" />
       <details className="settings-advanced">
-        <summary className="settings-advanced-toggle">Advanced</summary>
+        <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
         <div className="settings-advanced-content">
           <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label-row">
-                <span className="settings-label">Max parallel agents</span>
-                <HelpHint label="Max parallel agents help">{SUBAGENTS_HINT_OLLAMA}</HelpHint>
+                <span className="settings-label">{t('settings.maxParallelAgents')}</span>
+                <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_OLLAMA}</HelpHint>
               </span>
-              <span className="settings-description">Estimated from your VRAM. Run a quick test for a more accurate number.</span>
+              <span className="settings-description">{t('settings.llamacppSubagentsDesc')}</span>
             </div>
             <div className="settings-budget-control">
-              <input type="number" aria-label="Max parallel agents" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }} />
+              <input type="number" aria-label={t('settings.maxParallelAgents')} className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }} />
               <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !models.length}>
-                {testing ? 'Testing...' : 'Auto-detect'}
+                {testing ? t('settings.testing') : t('settings.autoDetect')}
               </button>
             </div>
-            {testResult && <span className="settings-description">Recommended: {testResult.recommended} agents</span>}
+            {testResult && <span className="settings-description">{t('settings.recommendedAgents', { count: testResult.recommended })}</span>}
             {testError && <span className="settings-error">{testError}</span>}
           </div>
           <AdvancedAnalysisSettings state={state} update={update} />

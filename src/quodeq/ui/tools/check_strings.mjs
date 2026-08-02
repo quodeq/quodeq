@@ -11,7 +11,7 @@
 // file instead of line-keyed entries so unrelated edits don't churn it.
 //
 // Also validates the catalog itself: no em-dashes in user-facing strings.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { ESLint } from 'eslint';
@@ -62,6 +62,36 @@ function checkCatalog() {
   return offenders.length === 0;
 }
 
+// t('some.key') with no matching catalog entry renders the key itself, so the
+// UI silently shows "settings.needModelBeforeEval" where a sentence belongs.
+// The jsx-no-literals ratchet cannot see this (there is no literal left), and
+// tests only catch it where they assert on the exact copy -- so check it here.
+const T_CALL = /\bt(?:Rich)?\(\s*'([a-zA-Z0-9_.]+)'/g;
+
+function sourceFiles(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) sourceFiles(p, out);
+    else if (/\.jsx?$/.test(entry.name) && !/\.test\.jsx?$/.test(entry.name)) out.push(p);
+  }
+  return out;
+}
+
+function checkKeysResolve() {
+  const catalog = JSON.parse(readFileSync(CATALOG_PATH, 'utf8'));
+  const missing = [];
+  for (const file of sourceFiles(path.join(UI_ROOT, 'src'))) {
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(T_CALL)) {
+      if (!(m[1] in catalog)) missing.push([m[1], path.relative(UI_ROOT, file)]);
+    }
+  }
+  for (const [key, file] of missing) {
+    console.error(`missing catalog key: "${key}" used in ${file} (it would render as the key itself)`);
+  }
+  return missing.length === 0;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const update = args.includes('--update');
@@ -71,7 +101,7 @@ async function main() {
     return 2;
   }
 
-  const catalogOk = checkCatalog();
+  const catalogOk = checkCatalog() && checkKeysResolve();
   const counts = await collectCounts();
 
   if (update) {

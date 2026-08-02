@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
 
 export default function SharedRepoSection({ onDisconnected }) {
   const { getSharedStatus, connectShared, disconnectShared } = useApi();
@@ -46,7 +47,7 @@ export default function SharedRepoSection({ onDisconnected }) {
         await refetchStatus();
         return result;
       } catch (err) {
-        const errorMsg = err?.message || 'failed to connect to repository';
+        const errorMsg = err?.message || t('settings.connectFailed');
         setError(errorMsg);
         throw err;
       } finally {
@@ -79,7 +80,7 @@ export default function SharedRepoSection({ onDisconnected }) {
         // the user on a broken view.
         onDisconnected?.();
       } catch (err) {
-        const errorMsg = err?.message || 'failed to disconnect from repository';
+        const errorMsg = err?.message || t('settings.disconnectFailed');
         setError(errorMsg);
         throw err;
       } finally {
@@ -119,20 +120,20 @@ export default function SharedRepoSection({ onDisconnected }) {
     <section className="panel settings-section">
       <div className="panel-header">
         <span className="settings-label-row">
-          <SectionLabel marker="▶">shared repository</SectionLabel>
+          <SectionLabel marker="▶">{t('settings.sharedRepoLabel')}</SectionLabel>
         </span>
       </div>
 
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Repository URL</span>
+          <span className="settings-label">{t('settings.repositoryUrl')}</span>
           <span className="settings-description">
             {isLoading && !status ? (
-              <>Checking…</>
+              t('settings.checkingEllipsis')
             ) : configured ? (
-              <>Configured: <code>{currentUrl}</code></>
+              <>{t('settings.configuredPrefix')} <code>{currentUrl}</code></>
             ) : (
-              <>Not configured</>
+              t('settings.notConfigured')
             )}
           </span>
         </div>
@@ -146,7 +147,7 @@ export default function SharedRepoSection({ onDisconnected }) {
           value={newUrl}
           onChange={(e) => setNewUrl(e.target.value)}
           disabled={isSaving || isDisconnecting}
-          aria-label="shared repository url"
+          aria-label={t('settings.sharedRepoUrlAria')}
         />
         <button
           type="button"
@@ -155,7 +156,7 @@ export default function SharedRepoSection({ onDisconnected }) {
           disabled={isSaving || isDisconnecting}
           aria-disabled={isSaving || isDisconnecting || undefined}
         >
-          {isSaving ? 'saving...' : 'save'}
+          {isSaving ? t('settings.saving') : t('settings.save')}
         </button>
       </div>
 
@@ -174,14 +175,14 @@ export default function SharedRepoSection({ onDisconnected }) {
             disabled={isSaving || isDisconnecting}
             aria-disabled={isSaving || isDisconnecting || undefined}
           >
-            disconnect
+            {t('settings.disconnect')}
           </button>
         </div>
       )}
 
       {configured && confirming && (
         <div className="settings-row settings-row--last">
-          <span className="settings-row-confirm-label">disconnect?</span>
+          <span className="settings-row-confirm-label">{t('settings.disconnectConfirm')}</span>
           <button
             type="button"
             className="settings-pill settings-pill--confirm"
@@ -189,7 +190,7 @@ export default function SharedRepoSection({ onDisconnected }) {
             disabled={isDisconnecting}
             aria-disabled={isDisconnecting || undefined}
           >
-            {isDisconnecting ? 'disconnecting...' : 'yes'}
+            {isDisconnecting ? t('settings.disconnecting') : t('settings.yes')}
           </button>
           <button
             type="button"
@@ -198,7 +199,7 @@ export default function SharedRepoSection({ onDisconnected }) {
             disabled={isDisconnecting}
             aria-disabled={isDisconnecting || undefined}
           >
-            no
+            {t('settings.no')}
           </button>
         </div>
       )}

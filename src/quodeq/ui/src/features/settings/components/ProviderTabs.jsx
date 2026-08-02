@@ -10,31 +10,21 @@ import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
 const PROVIDER_HINT = (
   <>
-    <p>Quodeq works with several AI providers, but you need to install each one before you can use it.</p>
-    <p>For the CLI tools (Claude Code, Codex, Gemini), install them on your machine and they show up here ready to go. Ollama needs to be running locally. Cloud providers like OpenRouter need an API key set up.</p>
-    <p>Greyed out tabs below mean that provider isn&apos;t installed yet.</p>
+    <p>{t('settings.providerHintP1')}</p>
+    <p>{t('settings.providerHintP2')}</p>
+    <p>{t('settings.providerHintP3')}</p>
   </>
 );
 
 const INSTALL_INSTRUCTIONS = {
-  claude: (
-    <>
-      Install Claude Code from Anthropic&apos;s official documentation, then restart Quodeq. Once <code>claude</code> is on your PATH, this tab will be ready to use.
-    </>
-  ),
-  codex: (
-    <>
-      Install the OpenAI Codex CLI from the official OpenAI documentation, then restart Quodeq. Once <code>codex</code> is on your PATH, this tab will be ready to use.
-    </>
-  ),
-  gemini: (
-    <>
-      Install the Gemini CLI from Google&apos;s official documentation, then restart Quodeq. Once <code>gemini</code> is on your PATH, this tab will be ready to use.
-    </>
-  ),
+  claude: tRich('settings.installHintClaude'),
+  codex: tRich('settings.installHintCodex'),
+  gemini: tRich('settings.installHintGemini'),
 };
 
 const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
@@ -135,7 +125,7 @@ export default function ProviderTabs({ providerConfigs }) {
         localStorage.setItem(ACTIVE_PROVIDER_KEY, firstInstalled.id);
       }
       setClientsError(null);
-    }).catch(() => { setClients([]); setClientsError('We couldn’t load your AI providers. Make sure the server is running.'); });
+    }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });
   }, []);
 
   const selectTab = (id) => {
@@ -151,16 +141,16 @@ export default function ProviderTabs({ providerConfigs }) {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <SectionLabel marker="▶">Analysis</SectionLabel>
+        <SectionLabel marker="▶">{t('settings.analysisLabel')}</SectionLabel>
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">AI Provider</span>
-            <HelpHint label="AI provider help">{PROVIDER_HINT}</HelpHint>
+            <span className="settings-label">{t('settings.aiProvider')}</span>
+            <HelpHint label={t('settings.aiProviderHelpAria')}>{PROVIDER_HINT}</HelpHint>
           </span>
-          <span className="settings-description">Choose which AI runs your evaluations.</span>
+          <span className="settings-description">{t('settings.providerRunsDesc')}</span>
         </div>
         <div className="settings-pill-group" role="tablist">
           {clients.map((c) => {
@@ -172,7 +162,7 @@ export default function ProviderTabs({ providerConfigs }) {
                 role="tab"
                 aria-selected={c.id === activeTab}
                 aria-disabled={!installed}
-                title={installed ? undefined : `${c.label} isn’t installed yet`}
+                title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
                 className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
                 onClick={() => selectTab(c.id)}
               >
@@ -185,8 +175,8 @@ export default function ProviderTabs({ providerConfigs }) {
       {active && active.installed === false && (
         <div className="settings-row">
           <div className="settings-install-hint">
-            <strong>{active.label} isn&apos;t installed yet.</strong>{' '}
-            {INSTALL_INSTRUCTIONS[active.id] || <>Install this provider on your machine and restart Quodeq, and this tab will be ready to use.</>}
+            <strong>{t('settings.providerNotInstalled', { name: active.label })}</strong>{' '}
+            {INSTALL_INSTRUCTIONS[active.id] || t('settings.installGeneric')}
           </div>
         </div>
       )}

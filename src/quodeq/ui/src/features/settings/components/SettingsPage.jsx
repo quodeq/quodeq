@@ -11,13 +11,14 @@ import ServerSection from './ServerSection.jsx';
 import SharedRepoSection from './SharedRepoSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { t } from '../../../strings/index.js';
 
-const _SETTINGS_PHRASES = [
-  'quode with cuore ♥',
-  'human aligned quode',
-  'quode safe',
-  'navigate your quode to excellence',
-  'code quality compass',
+const _SETTINGS_PHRASE_KEYS = [
+  'settingsPhrase.cuore',
+  'settingsPhrase.humanAligned',
+  'settingsPhrase.safe',
+  'settingsPhrase.navigate',
+  'settingsPhrase.compass',
 ];
 
 export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDisconnected }) {
@@ -27,7 +28,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
   const [providerConfigs, setProviderConfigs] = useState({});
 
   useEffect(() => {
-    setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
+    setSettingsPhrase(t(_SETTINGS_PHRASE_KEYS[Math.floor(Math.random() * _SETTINGS_PHRASE_KEYS.length)]));
     getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
     getProviderConfigs().then(setProviderConfigs).catch(() => setProviderConfigs({}));
   }, []);
@@ -35,8 +36,8 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
   return (
     <div className="settings-page settings-page--terminal">
       <TermHeader
-        name="settings"
-        sub="manage your quodeq preferences"
+        name={t('settings.termName')}
+        sub={t('settings.termSub')}
       />
       <div className="settings-grid">
         <ProviderTabs providerConfigs={providerConfigs} />
@@ -47,17 +48,17 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
         <SharedRepoSection onDisconnected={onSharedDisconnected} />
         <section className="panel settings-section">
           <div className="panel-header">
-            <SectionLabel marker="▶">Grade formula</SectionLabel>
+            <SectionLabel marker="▶">{t('settings.gradeFormula')}</SectionLabel>
           </div>
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">Grade formula</span>
+              <span className="settings-label">{t('settings.gradeFormula')}</span>
               <span className="settings-description">
-                Tune how violations and compliance turn into grades. Changes rescore all runs.
+                {t('settings.gradeFormulaDesc')}
               </span>
             </div>
             <button type="button" className="settings-pill" onClick={onOpenGradeFormula}>
-              open editor
+              {t('settings.openEditor')}
             </button>
           </div>
         </section>
