@@ -123,12 +123,12 @@ def should_respawn(
 _DEFAULT_AGENT_FAILURE_STREAK = 5
 
 
-def _agent_failure_streak_limit() -> int:
+def _agent_failure_streak_limit(env: dict[str, str] | None = None) -> int:
     """Consecutive whole-agent failures tolerated before the run is cancelled.
 
     Env override QUODEQ_AGENT_FAILURE_STREAK; 0 disables the backstop.
     """
-    raw = os.environ.get("QUODEQ_AGENT_FAILURE_STREAK", "").strip()
+    raw = (env if env is not None else os.environ).get("QUODEQ_AGENT_FAILURE_STREAK", "").strip()
     try:
         return int(raw) if raw else _DEFAULT_AGENT_FAILURE_STREAK
     except ValueError:

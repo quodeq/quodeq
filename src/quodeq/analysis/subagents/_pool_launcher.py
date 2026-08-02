@@ -18,8 +18,6 @@ from quodeq.shared.utils import get_ai_cmd
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
-_NON_SCOUT_PROVIDERS = tuple(os.environ.get("QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini").split(","))
-
 # Auto-scale the IMPLICIT default time limit so large queues don't get
 # killed mid-run: a fixed 600s budget chokes any dim with a queue larger
 # than ~80 files (observed throughput ≈ 7-12 s/file with 8 agents) and
@@ -32,6 +30,13 @@ _SECONDS_PER_FILE_AUTOSCALE = 12
 _MAX_AUTO_POOL_BUDGET = 7200  # 2 hours
 # time_limit = 0 means "unlimited"; respect that and never scale it.
 _UNLIMITED_BUDGET = 0
+
+
+def _non_scout_providers(env: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Providers that skip scout mode (no per-token billing), read per call."""
+    raw = (env if env is not None else os.environ).get(
+        "QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini")
+    return tuple(p.strip() for p in raw.split(",") if p.strip())
 
 
 def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
@@ -142,7 +147,7 @@ def _launch_pool(
     # Skip scout mode for providers without per-token billing (e.g. Codex with
     # ChatGPT subscription).  Launch all agents immediately for faster results.
     ai_cmd = get_ai_cmd()
-    use_scout = ai_cmd not in _NON_SCOUT_PROVIDERS
+    use_scout = ai_cmd not in _non_scout_providers()
 
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,

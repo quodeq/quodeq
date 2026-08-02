@@ -40,22 +40,22 @@ class TestProviderConfigType:
         assert configs["custom"]["type"] == "api"
         assert "${AI_MODEL}" in configs["custom"]["model"]
 
-    def test_cache_loads_from_file(self, tmp_path):
+    def test_cache_loads_from_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "providers.json"
         cfg_file.write_text(json.dumps({
             "test-cli": {"type": "cli", "cmd": "test", "base_args": "--print"},
             "test-api": {"type": "api", "model": "gpt-4o", "api_base": "http://localhost:8000/v1"},
         }))
-        cache = _ProviderConfigCache()
-        with patch("quodeq.analysis._provider_cache._AI_PROVIDERS_PATH", cfg_file):
-            result = cache.get()
+        # The path resolves per read via the shared env seam, so the test
+        # sets the real env var instead of patching a module constant.
+        monkeypatch.setenv("QUODEQ_AI_PROVIDERS_PATH", str(cfg_file))
+        result = _ProviderConfigCache().get()
         assert result["test-cli"]["type"] == "cli"
         assert result["test-api"]["type"] == "api"
 
-    def test_fallback_configs_have_type(self):
+    def test_fallback_configs_have_type(self, monkeypatch):
         """Fallback configs used when JSON is unreadable must also have type."""
-        cache = _ProviderConfigCache()
-        with patch("quodeq.analysis._provider_cache._AI_PROVIDERS_PATH", Path("/nonexistent")):
-            result = cache.get()
+        monkeypatch.setenv("QUODEQ_AI_PROVIDERS_PATH", "/nonexistent/providers.json")
+        result = _ProviderConfigCache().get()
         for name, cfg in result.items():
             assert "type" in cfg, f"Fallback provider '{name}' missing 'type'"

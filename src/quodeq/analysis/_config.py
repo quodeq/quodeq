@@ -1,7 +1,7 @@
 """Analysis configuration dataclasses and type aliases."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -15,8 +15,14 @@ HeartbeatCallback = Callable[[int, dict], None]
 
 _DEFAULT_MAX_FILES_PER_AGENT = 30
 
-_DEFAULT_MAX_TURNS = _env_int("QUODEQ_DEFAULT_MAX_TURNS", 200)
-_DEFAULT_MAX_DURATION = _env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800)  # 30 minutes
+def _default_max_turns(env: dict[str, str] | None = None) -> int:
+    """Turn ceiling per agent, resolved per construction (not at import)."""
+    return _env_int("QUODEQ_DEFAULT_MAX_TURNS", 200, env=env)
+
+
+def _default_max_duration(env: dict[str, str] | None = None) -> int:
+    """Wall-clock ceiling per agent in seconds (30 min), resolved per construction."""
+    return _env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800, env=env)
 _MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
 _MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
 _MCP_TOOL_MARK_FILE_DONE = "mcp__findings__mark_file_done"
@@ -31,8 +37,8 @@ class AnalysisConfig:
     heartbeat_callback: HeartbeatCallback | None = None
     ai_cmd: str | None = None
     ai_model: str | None = None
-    max_turns: int | None = _DEFAULT_MAX_TURNS
-    max_duration: int | None = _DEFAULT_MAX_DURATION
+    max_turns: int | None = field(default_factory=_default_max_turns)
+    max_duration: int | None = field(default_factory=_default_max_duration)
     time_limit: int = DEFAULT_TIME_LIMIT
     deadline_at: float | None = None
     """Absolute monotonic-clock deadline for the whole run. None = unlimited."""

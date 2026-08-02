@@ -31,22 +31,22 @@ _DISABLE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
 _DEFAULT_CLONE_TIMEOUT_S = 300
 
 
-def cache_root() -> Path:
+def cache_root(env: dict[str, str] | None = None) -> Path:
     """Return the cache root, creating it if needed.
 
     Defaults to ``~/.quodeq/cache``; override with ``QUODEQ_CACHE_ROOT``
     so tests can point at a sandbox without touching the user's real cache.
     """
-    raw = os.environ.get(_CACHE_ENV, "").strip()
+    raw = (env if env is not None else os.environ).get(_CACHE_ENV, "").strip()
     base = Path(raw) if raw else Path.home() / ".quodeq" / "cache"
     online = base / "online"
     online.mkdir(parents=True, exist_ok=True)
     return online
 
 
-def cache_disabled() -> bool:
+def cache_disabled(env: dict[str, str] | None = None) -> bool:
     """True when the user has flipped the kill switch."""
-    return os.environ.get(_DISABLE_ENV, "").strip() in {"1", "true", "yes"}
+    return (env if env is not None else os.environ).get(_DISABLE_ENV, "").strip() in {"1", "true", "yes"}
 
 
 def _url_hash(url: str) -> str:
