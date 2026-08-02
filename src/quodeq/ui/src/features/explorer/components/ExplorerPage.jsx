@@ -18,6 +18,7 @@ import PrinciplesCardsRow from './PrinciplesCardsRow.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import StatGrid2x2 from './StatGrid2x2.jsx';
 import { countBySeverity } from '../../../utils/severity.js';
+import { t } from '../../../strings/index.js';
 
 function buildRadialPrinciples(principleGrades) {
   return (principleGrades || []).map((pg) => {
@@ -86,7 +87,7 @@ export default function ExplorerPage({
 
   const reportSpec = useMemo(() => {
     if (!d.evalData) return null;
-    const dim = (d.evalData.dimension || 'unknown').toLowerCase();
+    const dim = (d.evalData.dimension || t('explorer.unknownDimension')).toLowerCase();
     const buildMarkdown = () => buildDimensionReport({
       evalData: d.evalData,
       principleGrades: d.principleGrades || [],
@@ -98,7 +99,7 @@ export default function ExplorerPage({
     return {
       id: `report:dimension:${dim}:${activeRunId ?? 'current'}`,
       type: 'report',
-      title: `${dim} report`,
+      title: t('overview.reportTitle', { name: dim }),
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-report.md`, body: buildMarkdown() }),
@@ -108,12 +109,12 @@ export default function ExplorerPage({
 
   const fixPlanSpec = useMemo(() => {
     if (!d.evalData || d.allViolations.length === 0) return null;
-    const dim = (d.evalData.dimension || 'unknown').toLowerCase();
+    const dim = (d.evalData.dimension || t('explorer.unknownDimension')).toLowerCase();
     const buildMarkdown = () => buildDimensionPlanFromViolations(d.evalData.dimension, d.allViolations);
     return {
       id: `fixplan:dimension:${dim}:${activeRunId ?? 'current'}`,
       type: 'fixplan',
-      title: `${dim} fix plan`,
+      title: t('overview.fixPlanTitle', { name: dim }),
       render: () => <ReportContent markdown={buildMarkdown()} />,
       copy: () => buildMarkdown(),
       download: () => ({ filename: `${dim}-fix-plan.md`, body: buildMarkdown() }),
@@ -122,7 +123,7 @@ export default function ExplorerPage({
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
   if (d.loading) return <LoadingScreen />;
-  if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
+  if (d.error) return <div className="inline-error">{t('explorer.loadFailed')}</div>;
   if (d.waiting) {
     // 202 from the backend: the run exists but this dimension's report
     // isn't written (still running, or the run stopped before reaching it).
@@ -130,12 +131,12 @@ export default function ExplorerPage({
     // clean pass.
     return (
       <div className="empty-state">
-        <h2>Report not ready</h2>
-        <p>This dimension has no written report yet. The run may still be in progress, or it stopped before this dimension was scored.</p>
+        <h2>{t('explorer.reportNotReadyTitle')}</h2>
+        <p>{t('explorer.reportNotReadyBody')}</p>
       </div>
     );
   }
-  if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
+  if (!d.evalData) return <div className="empty-state"><h2>{t('explorer.noDataFound')}</h2></div>;
 
   const dim = String(d.evalData.dimension || '').toLowerCase();
   const radialPrinciples = buildRadialPrinciples(d.principleGrades);
@@ -172,12 +173,12 @@ export default function ExplorerPage({
         <div className="qd-top-left">
           <StatGrid2x2>
             <Stat
-              label="SCORE"
+              label={t('overview.statScore')}
               value={Number.isNaN(overallScoreNum) ? '—' : overallScoreNum.toFixed(1)}
-              hint={d.overallGrade?.grade ? `grade ${d.overallGrade.grade}` : null}
+              hint={d.overallGrade?.grade ? t('overview.gradeHint', { letter: d.overallGrade.grade }) : null}
             />
             <Stat
-              label="VIOLATIONS"
+              label={t('overview.statViolations')}
               value={d.allViolations.length}
               hint={(sev.critical || sev.major || sev.minor) ? (
                 <span className="principle-detail-sev-row">
@@ -187,19 +188,19 @@ export default function ExplorerPage({
                 </span>
               ) : null}
               onClick={onNavigate && d.allViolations.length > 0 ? () => handleCardNavigate('violations') : undefined}
-              ariaLabel={d.allViolations.length > 0 ? 'Show all violations' : undefined}
+              ariaLabel={d.allViolations.length > 0 ? t('overview.showAllViolationsAria') : undefined}
             />
             <Stat
-              label="COMPLIANCE"
+              label={t('overview.statCompliance')}
               value={d.totalCompliant}
-              hint={`passing / ${d.totalCompliant + d.allViolations.length} checks`}
+              hint={t('overview.passingChecks', { count: d.totalCompliant + d.allViolations.length })}
               onClick={onNavigate && d.totalCompliant > 0 ? () => handleCardNavigate('compliance') : undefined}
-              ariaLabel={d.totalCompliant > 0 ? 'Show compliance entries' : undefined}
+              ariaLabel={d.totalCompliant > 0 ? t('overview.showComplianceAria') : undefined}
             />
             <Stat
-              label="RATIO"
+              label={t('overview.statRatio')}
               value={complianceRatio(d.allViolations.length, d.totalCompliant)}
-              hint="compliance : violations"
+              hint={t('overview.ratioHint')}
             />
           </StatGrid2x2>
 
@@ -217,10 +218,10 @@ export default function ExplorerPage({
         </div>
 
         <div className="qd-top-right">
-          <section className="run-history-panel--terminal panel" aria-label="Principles radial">
+          <section className="run-history-panel--terminal panel" aria-label={t('explorer.principlesRadialAria')}>
             <div className="run-history-panel__header">
-              <SectionLabel>principles_radial · {radialPrinciples.length}</SectionLabel>
-              <span className="run-history-panel__stats">SCALE 0–10</span>
+              <SectionLabel>{t('explorer.principlesRadialLabel')} · {radialPrinciples.length}</SectionLabel>
+              <span className="run-history-panel__stats">{t('explorer.scale010')}</span>
             </div>
             <div className="qd-radial">
               <PrinciplesRadial
@@ -232,9 +233,9 @@ export default function ExplorerPage({
         </div>
       </div>
 
-      <section className="qd-cards-panel" aria-label="Principles">
+      <section className="qd-cards-panel" aria-label={t('explorer.principlesAria')}>
         <div className="qd-cards-panel__head">
-          <SectionLabel>{`principles · ${radialPrinciples.length}`}</SectionLabel>
+          <SectionLabel>{t('explorer.principlesLabel')} · {radialPrinciples.length}</SectionLabel>
         </div>
         <PrinciplesCardsRow
           principles={enrichedPrinciples}
@@ -242,10 +243,10 @@ export default function ExplorerPage({
         />
       </section>
 
-      <section className="qd-cards-panel offending-panel" aria-label="Violations by file">
+      <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
         <div className="qd-cards-panel__head">
-          <SectionLabel>{`violations_by_file · ${d.topFiles.length}`}</SectionLabel>
-          <span className="run-history-panel__stats">SORTED BY SEVERITY</span>
+          <SectionLabel>{t('overview.violationsByFileLabel')} · {d.topFiles.length}</SectionLabel>
+          <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
         </div>
         <TopOffendingFilesTable
           files={d.topFiles}

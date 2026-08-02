@@ -8,6 +8,7 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { usePrincipleData } from './explorerDataHooks.js';
+import { t } from '../../../strings/index.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
@@ -46,7 +47,7 @@ function ComplianceListSection({ compliance, principle }) {
   if (compliance.length === 0) return null;
   return (
     <div>
-      <SectionLabel>COMPLIANCE · {compliance.length}</SectionLabel>
+      <SectionLabel>{t('overview.statCompliance')} · {compliance.length}</SectionLabel>
       <div className="vlive-violations-group">
         {compliance.map((c, idx) => (
           <ComplianceCard
@@ -80,8 +81,8 @@ function PrincipleHeader({ data }) {
     : '—';
 
   const scoreHint = grade === 'Insufficient'
-    ? 'not enough evidence'
-    : grade ? `grade ${gradeLetter(grade)}` : null;
+    ? t('explorer.notEnoughEvidence')
+    : grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null;
 
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
@@ -93,10 +94,10 @@ function PrincipleHeader({ data }) {
         />
       </div>
       <StatStrip cards>
-        <Stat label="SCORE" value={scoreDisplay} hint={scoreHint} />
-        <Stat label="VIOLATIONS" value={violations.length} hint={<SevBadgeRow sevCounts={sevCounts} />} />
-        <Stat label="COMPLIANCE" value={compliance.length} />
-        <Stat label="RATIO" value={ratioDisplay} hint="compliance : violations" />
+        <Stat label={t('overview.statScore')} value={scoreDisplay} hint={scoreHint} />
+        <Stat label={t('overview.statViolations')} value={violations.length} hint={<SevBadgeRow sevCounts={sevCounts} />} />
+        <Stat label={t('overview.statCompliance')} value={compliance.length} />
+        <Stat label={t('overview.statRatio')} value={ratioDisplay} hint={t('overview.ratioHint')} />
       </StatStrip>
     </section>
   );

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { t } from '../../../strings/index.js';
 
 export default function FilePickerDialog({ files, selectedFile, onSelect, onClose }) {
   const [search, setSearch] = useState('');
@@ -13,15 +14,15 @@ export default function FilePickerDialog({ files, selectedFile, onSelect, onClos
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="file-picker-title" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
-          <h3 id="file-picker-title">Select file</h3>
-          <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">&times;</button>
+          <h3 id="file-picker-title">{t('explorer.selectFileTitle')}</h3>
+          <button type="button" className="dialog-close" onClick={onClose} aria-label={t('common.close')}>&times;</button>
         </div>
         <input
           className="dialog-search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search files..."
-          aria-label="Search files"
+          placeholder={t('explorer.searchFilesPlaceholder')}
+          aria-label={t('explorer.searchFilesAria')}
           autoFocus
         />
         <ul className="file-picker-list" role="listbox">
@@ -33,7 +34,7 @@ export default function FilePickerDialog({ files, selectedFile, onSelect, onClos
             onClick={() => { onSelect(''); onClose(); }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(''); onClose(); } }}
           >
-            All files (no filter)
+            {t('explorer.allFilesNoFilter')}
           </li>
           {filtered.map((file) => (
             <li
@@ -49,7 +50,7 @@ export default function FilePickerDialog({ files, selectedFile, onSelect, onClos
             </li>
           ))}
           {filtered.length === 0 && (
-            <li className="file-picker-empty">No files match &ldquo;{search}&rdquo;</li>
+            <li className="file-picker-empty">{t('explorer.noFilesMatch', { query: search })}</li>
           )}
         </ul>
       </div>
