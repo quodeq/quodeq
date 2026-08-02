@@ -31,6 +31,7 @@ from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
     is_dismissed,
 )
 from quodeq.shared.validation import validate_path_segment
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 _TYPE_VIOLATION = "violation"
 
@@ -42,12 +43,13 @@ class SuppressionMatcher:
     dimension: str
     dismissed: frozenset = frozenset()
     deleted: frozenset = frozenset()
+    rules: tuple = ()
     req_to_principle: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def active(self) -> bool:
         """False when nothing is suppressed -- callers can skip the scan."""
-        return bool(self.dismissed or self.deleted)
+        return bool(self.dismissed or self.deleted or self.rules)
 
     def principle_for(self, raw: str) -> str:
         """Map an evidence ``p`` (req ID or principle name) to a principle name."""
@@ -67,7 +69,7 @@ class SuppressionMatcher:
             return False
         file = row.get("file") or ""
         if is_dismissed(self.dismissed, req=row.get("req"), principle=raw,
-                        file=file, line=row.get("line")):
+                        file=file, line=row.get("line"), rules=self.rules):
             return True
         return is_deleted(self.deleted, dimension=self.dimension,
                           principle=self.principle_for(raw), file=file)
@@ -122,6 +124,7 @@ def build_matcher(
     deleted: frozenset,
     *,
     evaluators_dir: Path | None = None,
+    rules: tuple = (),
 ) -> SuppressionMatcher:
     """Attach already-loaded key sets to one dimension.
 
@@ -129,13 +132,14 @@ def build_matcher(
     run (the progress reader) pays for the store reads once, not once per
     dimension.
     """
-    if not dismissed and not deleted:
+    if not dismissed and not deleted and not rules:
         # Nothing to map against, so skip the evaluator read entirely.
         return SuppressionMatcher(dimension=dimension)
     return SuppressionMatcher(
         dimension=dimension,
         dismissed=dismissed,
         deleted=deleted,
+        rules=rules,
         req_to_principle=load_req_to_principle(dimension, evaluators_dir),
     )
 
@@ -145,4 +149,5 @@ def matcher_for(
 ) -> SuppressionMatcher:
     """Build the matcher for *dimension* from *project_dir*'s suppression stores."""
     dismissed, deleted = project_suppressions(project_dir)
-    return build_matcher(dimension, dismissed, deleted, evaluators_dir=evaluators_dir)
+    return build_matcher(dimension, dismissed, deleted, evaluators_dir=evaluators_dir,
+                         rules=load_suppression_rules(project_dir))
