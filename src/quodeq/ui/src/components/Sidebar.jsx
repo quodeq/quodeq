@@ -140,7 +140,7 @@ export default function Sidebar({
             type="button"
             className="sidebar-brand-icon sidebar-brand-icon--toggle"
             onClick={handleTogglePin}
-            aria-label={isPinned ? 'Close menu' : 'Open menu'}
+            aria-label={isPinned ? t('common.closeMenu') : t('common.openMenu')}
             aria-expanded={isPinned}
           >
             <Logo />

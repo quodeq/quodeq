@@ -70,8 +70,8 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
     }
     lines.push({ label: 'Compliance', value: totalC });
     return {
-      title: clusterCon?.label || (projectName ? `${projectName} System` : 'Project System'),
-      lines, hint: 'Click a dimension to explore', detailAction: null,
+      title: clusterCon?.label || (projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.projectSystem')),
+      lines, hint: t('map.clickDimension'), detailAction: null,
     };
   }
 
@@ -96,7 +96,7 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
     }
     dimLines.push({ label: 'Compliance', value: dim.compliance });
     return {
-      title: dim.name, lines: dimLines, hint: 'Click a principle to explore',
+      title: dim.name, lines: dimLines, hint: t('map.clickPrinciple'),
       detailAction: () => {
         const d = scene.stars[navRef.current.dim]?._raw;
         if (!d) return;

@@ -46,11 +46,11 @@ export default function TerminalHeader({ onCopy, onNewSession }) {
         <button type="button" className={`assistant-drawer-btn${copied ? ' tty-copy-btn--done' : ''}`}
           onClick={handleCopy}
           aria-label={t('terminal.copyOutput')}
-          title={copied ? 'Copied' : 'Copy selection (or visible output)'}>
+          title={copied ? t('common.copiedShort') : t('terminal.copySelection')}>
           <CopyIcon />
         </button>
         <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-          aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
+          aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
           aria-pressed={maximized}
           title={maximized ? 'Restore' : 'Maximize'}>
           {maximized ? <MinimizeIcon /> : <MaximizeIcon />}

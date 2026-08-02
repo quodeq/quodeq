@@ -11,7 +11,7 @@ const COL_VIOLATIONS = 'violations';
 const COL_HEALTH = 'health';
 
 const COLUMNS = [
-  { id: COL_NAME, label: 'File / Folder', align: 'left' },
+  { id: COL_NAME, label: t('map.colFileFolder'), align: 'left' },
   { id: COL_CRITICAL, label: 'Critical' },
   { id: COL_MAJOR, label: 'Major' },
   { id: COL_MINOR, label: 'Minor' },

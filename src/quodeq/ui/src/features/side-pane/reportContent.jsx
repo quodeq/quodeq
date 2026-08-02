@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { t } from '../../strings/index.js';
 
 const components = {
   a: ({ node, ...props }) => (
@@ -13,7 +14,7 @@ const components = {
   ),
 };
 
-export function ReportContent({ markdown, emptyMessage = 'No content yet.' }) {
+export function ReportContent({ markdown, emptyMessage = t('sidePane.noContent') }) {
   if (!markdown || !markdown.trim()) {
     return <p className="side-pane-md side-pane-md--empty">{emptyMessage}</p>;
   }

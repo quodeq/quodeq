@@ -7,6 +7,7 @@ import { resolveTerminalPaths, openInEditor } from '../../api/terminal.js';
 import { createUrlLinkProvider, createFileLinkProvider } from './terminalLinks.js';
 import { themeFromCss } from './xtermTheme.js';
 import { openExternal } from '../updates/openExternal.js';
+import { t } from '../../strings/index.js';
 
 // Two drawer chords are reserved for the host; return false so xterm lets them
 // bubble to the window handler instead of typing into the shell.
@@ -245,12 +246,12 @@ export default function TerminalSessionView({ sessionId, active, live, onGone, r
   // initial handshake resolves in milliseconds and a flash would be noise.
   // 'gone' is excluded too: the owner is already reconciling this view away.
   const overlay = {
-    reconnecting: { text: 'Terminal disconnected. Reconnecting…', btn: 'Retry now' },
+    reconnecting: { text: t('terminal.disconnected'), btn: t('terminal.retryNow') },
     // Only one window may hold a session's PTY. There is no takeover, so the
     // button offers an honest Retry (which succeeds once the other window is
     // closed) rather than a "Use it here" that silently does nothing.
-    busy: { text: 'Terminal is open in another window. Close it there, then retry.', btn: 'Retry' },
-    refused: { text: 'Terminal connection refused by the server.', btn: 'Retry' },
+    busy: { text: t('terminal.openElsewhere'), btn: t('terminal.retry') },
+    refused: { text: t('terminal.refused'), btn: t('terminal.retry') },
   }[status];
 
   return (

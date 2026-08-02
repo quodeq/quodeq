@@ -8,14 +8,14 @@ function clearSkip() {
 }
 
 export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = null, isEvaluating = false }) {
-  const blockedTitle = isEvaluating ? 'Cannot add a project while an evaluation is running' : undefined;
+  const blockedTitle = isEvaluating ? t('onboarding.cannotAddWhileRunning') : undefined;
   return (
     <section className="empty-state empty-state--with-tour">
-      <TermHeader name="projects" sub="no projects yet" />
+      <TermHeader name="projects" sub={t('map.subNoProjects')} />
       <p>
         {onBrowseRemote
-          ? 'no local projects yet. your team’s online repository has published projects you can browse, or set up your own.'
-          : 'set up your first repository. quodeq scans it locally and runs an evaluation against the standards you pick.'}
+          ? t('onboarding.noLocalProjectsShared')
+          : t('onboarding.noProjectsFirstRepo')}
       </p>
       <div className="empty-state__actions">
         {onBrowseRemote && (

@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SidePaneContext } from './SidePaneContext.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
 import { readString, removeKey, writeString } from '../../adapters/storage.js';
+import { t } from '../../strings/index.js';
 
 const STORAGE_KEY = 'quodeq.sidePaneWidth';
 const LEGACY_STORAGE_KEY = 'quodeq.reportPaneWidth';
 const DEFAULT_WIDTH_PX = 560;
 const MAX_WINDOWS = 3;
 const NOTICE_DISMISS_MS = 4000;
-const AT_CAP_MESSAGE = `Up to ${MAX_WINDOWS} panels can be open at once. Close one first.`;
+const AT_CAP_MESSAGE = t('sidePane.atCap', { max: MAX_WINDOWS });
 
 function SidePaneToast({ notice, onDismiss }) {
   useEffect(() => {

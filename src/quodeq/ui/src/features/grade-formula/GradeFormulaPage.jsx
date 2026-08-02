@@ -23,14 +23,14 @@ export default function GradeFormulaPage({ navigation }) {
 
   const onApply = async () => {
     const ok = window.confirm(
-      'Apply this formula? All runs and trends will be rescored with the new parameters.',
+      t('gradeFormula.confirmApply'),
     );
     if (ok) await apply();
   };
 
   const onReset = async () => {
     const ok = window.confirm(
-      'Reset to Q² defaults? All runs and trends will be rescored.',
+      t('gradeFormula.confirmReset'),
     );
     if (ok) await resetToDefaults();
   };
@@ -49,7 +49,7 @@ export default function GradeFormulaPage({ navigation }) {
     <div className="settings-page settings-page--terminal">
       <TermHeader
         name="grade formula"
-        sub={projectId ? `preview: ${projectId}` : 'no project selected for preview'}
+        sub={projectId ? t('gradeFormula.previewOf', { project: projectId }) : t('gradeFormula.noPreviewProject')}
       />
       <div className="gf-tabs">
         {TABS.map((t) => (
@@ -83,8 +83,8 @@ export default function GradeFormulaPage({ navigation }) {
       <PreviewStrip
         preview={preview}
         emptyHint={projectId
-          ? 'No evaluation with an event log yet. Run an evaluation to see a live preview.'
-          : 'Select a project to see a live preview.'}
+          ? t('gradeFormula.noEventLog')
+          : t('gradeFormula.selectForPreview')}
       />
       <div className="gf-actions">
         <button

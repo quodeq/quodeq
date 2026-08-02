@@ -2,6 +2,9 @@ import { useApi } from '../api/ApiContext.jsx';
 import { t } from '../strings/index.js';
 
 // The shell command to restart the server: identity, not translatable copy.
+// The literal command to type. Not copy: translating it would print a
+// command that does not exist.
+// eslint-disable-next-line i18n/no-prose-literals
 const RESTART_COMMAND = 'quodeq dashboard';
 
 export default function ServerDisconnectedOverlay({ onReconnect }) {

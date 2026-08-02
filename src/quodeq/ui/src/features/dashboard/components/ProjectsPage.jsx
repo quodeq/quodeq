@@ -10,6 +10,9 @@ import { useMergedProjects } from '../hooks/useMergedProjects.js';
 import Badge from '../../../components/Badge.jsx';
 import { t } from '../../../strings/index.js';
 
+// Technology and discipline names are proper nouns: a translator handed
+// "React Native" would be right to leave it, and wrong to change it.
+/* eslint-disable i18n/no-prose-literals */
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
   frontend_react: 'React',
@@ -28,6 +31,7 @@ const DISCIPLINE_LABEL = {
   devops: 'DevOps',
   data: 'Data',
 };
+/* eslint-enable i18n/no-prose-literals */
 
 function disciplineLabel(d) {
   if (!d) return null;

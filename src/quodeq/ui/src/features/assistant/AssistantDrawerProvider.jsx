@@ -3,6 +3,7 @@ import { createAssistantSession, fetchAssistantCatalog, fetchAssistantWorkspace,
 import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
 import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';
 import { useAssistantStream } from './useAssistantStream.js';
+import { t } from '../../strings/index.js';
 
 const STORAGE_KEY = 'cc-assistant-drawer-height';
 const DEFAULT_HEIGHT = 320;
@@ -261,7 +262,7 @@ export function AssistantDrawerProvider({ children }) {
       // Only surface the failure if this is still the context the user wants;
       // a superseded stale request shouldn't clobber a newer session's UI.
       if (latestKeyRef.current === key) {
-        setLocalError(`Couldn't start assistant session: ${err?.message || err}`);
+        setLocalError(t('assistant.startSessionFailed', { error: err?.message || err }));
       }
       return;
     }
@@ -319,7 +320,7 @@ export function AssistantDrawerProvider({ children }) {
     } catch (err) {
       // The optimistic user turn stays in the transcript; surface the failure
       // so the user knows the message didn't reach the assistant.
-      setLocalError(`Couldn't send message: ${err?.message || err}`);
+      setLocalError(t('assistant.sendFailed', { error: err?.message || err }));
       setTurnActive(false);
     }
   }, [sessionId, stream.messages.length, webEnabled, writeEnabled]);
@@ -332,7 +333,7 @@ export function AssistantDrawerProvider({ children }) {
     try {
       await stopAssistantTurn(sessionId);
     } catch (err) {
-      setLocalError(`Couldn't stop the turn: ${err?.message || err}`);
+      setLocalError(t('assistant.stopTurnFailed', { error: err?.message || err }));
     }
   }, [sessionId, turnActive]);
 

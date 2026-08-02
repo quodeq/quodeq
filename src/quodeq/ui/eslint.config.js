@@ -45,13 +45,14 @@ export default [
         },
       ],
       'i18n/no-literal-visible-attrs': 'error',
-      // NOT no-prose-literals here, though .jsx does carry the same two blind
-      // spots (prose in template literals, prose in props that ignoreProps
-      // skips). Measured 2026-08-02: turning it on flags 199, and the large
-      // majority are className lists, CSS transitions and rel="noopener
-      // noreferrer" that the .js-tuned shape filters do not recognise. Real
-      // findings are in there, so this is worth doing -- but it needs its own
-      // false-positive pass, not a flag flip that makes the gate untrustworthy.
+      // .jsx carries two blind spots jsx-no-literals cannot see: prose in
+      // template literals, and prose in props (ignoreProps skips those, and
+      // the visible-attribute rule above only covers title/placeholder/
+      // aria-label/alt on DOM elements, not `label=` on a component).
+      // Enabling this needed the structural-position filters in
+      // tools/i18n_rules.mjs first -- by shape alone, "chip small" is
+      // indistinguishable from copy.
+      'i18n/no-prose-literals': 'error',
     },
   },
   {
