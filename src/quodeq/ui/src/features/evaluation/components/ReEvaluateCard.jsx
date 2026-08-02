@@ -15,7 +15,7 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const EVAL_OPTIONS_HINT = (
@@ -59,7 +59,7 @@ function initialBudgetSeconds(storage = localStorage) {
 }
 
 function n(x) {
-  return typeof x === 'number' ? x.toLocaleString() : x;
+  return typeof x === 'number' ? x.toLocaleString(LOCALE) : x;
 }
 
 function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
@@ -346,7 +346,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
         const cached = isClean ? 0 : (est.cached ?? 0);
         if (count === 0) return [id, [t('evaluate.upToDate')]];
         const pct = Math.round((cached / total) * 100);
-        const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString() })];
+        const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString(LOCALE) })];
         if (pct > 0) lines.push(t('evaluate.pctAnalyzed', { pct }));
         return [id, lines];
       }))

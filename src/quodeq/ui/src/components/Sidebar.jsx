@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
 import { cloneElement } from 'react';
 import { BRAND_NAME } from '../strings/brand.js';
-import { t } from '../strings/index.js';
+import { t, LOCALE } from '../strings/index.js';
 
 // Folder glyph for the REPOSITORY row — same outline used in the file/folder
 // table on FileDetailPage, just sized up for the sidebar rail.
@@ -65,7 +65,7 @@ function formatLastEval(iso) {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleString(undefined, {
+    return d.toLocaleString(LOCALE, {
       day: '2-digit',
       month: 'short',
       hour: '2-digit',

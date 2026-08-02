@@ -1,6 +1,6 @@
 import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
 import { formatRunId, extDisplayName } from '../utils/formatters.js';
-import { t } from '../strings/index.js';
+import { t, LOCALE } from '../strings/index.js';
 
 const MAX_DISPLAYED_STATS = 5;
 
@@ -12,7 +12,7 @@ function LanguageStats({ stats, totalFiles }) {
     <div className="content-header-stats">
       {total && (
         <span className="content-stat">
-          <span className="content-stat-num">{total.toLocaleString()}</span>
+          <span className="content-stat-num">{total.toLocaleString(LOCALE)}</span>
           <span className="content-stat-label">{t('evaluate.filesLabel')}</span>
         </span>
       )}

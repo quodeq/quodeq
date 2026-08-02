@@ -19,7 +19,7 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 
 const TOAST_DISMISS_MS = 2600;
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
@@ -35,9 +35,13 @@ function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
   try {
     const d = new Date(dateISO);
-    // Short month (`Apr 14, 2026`) to match the reference mockup.
-    const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    // Short month, ordered by LOCALE. The mockup this was built from showed
+    // `Apr 14, 2026`, but the call passed `undefined` as the locale, so the
+    // order actually followed the viewer's OS -- US machines matched the
+    // mockup and nobody else did. It now agrees with formatPeriodLabel,
+    // which was already day-first and deterministic everywhere.
+    const date = d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     return { date, time };
   } catch {
     return { date: fallbackLabel || '', time: '' };
@@ -462,7 +466,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     if (entry?.dateISO) {
       try {
         const d = new Date(entry.dateISO);
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
       } catch { return entry.dateISO || ''; }
     }
     return entry?.dateLabel || currentOverviewRun;

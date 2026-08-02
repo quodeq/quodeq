@@ -1,5 +1,11 @@
 import { getGradeThresholds } from './gradeThresholds.js';
 import { isoWeekKey, localDayKey } from './dailyGrouping.js';
+import { LOCALE, t } from '../strings/index.js';
+
+// Intl formatters are comparatively expensive to construct, and these run in
+// list renders. Build once at module scope.
+const DAY_MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+const MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' });
 
 /**
  * Grade-to-CSS-class mapping.
@@ -129,7 +135,7 @@ export function formatShortDate(dateStr) {
   if (!dateStr) return dateStr;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return DAY_MONTH_YEAR.format(d);
 }
 
 /**
@@ -303,11 +309,6 @@ export function formatDurationCoarse(s) {
   return parts.join(' ');
 }
 
-const PERIOD_MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
 /**
  * Human label for a score-history bucket at the given grouping granularity.
  * - day   -> the entry's LOCAL date (e.g. "25 Mar 2026")
@@ -329,21 +330,21 @@ export function formatPeriodLabel(entry, granularity = 'day') {
   const fallback = entry?.dateLabel || iso;
   if (granularity === 'month') {
     const [y, m] = localDayKey(iso).slice(0, 7).split('-');
-    const idx = Number(m) - 1;
-    return (y && PERIOD_MONTH_NAMES[idx]) ? `${PERIOD_MONTH_NAMES[idx]} ${y}` : fallback;
+    if (!y || !m) return fallback;
+    // Format the local calendar day, not the raw instant: the bucket is a
+    // local-day key, so a run near midnight must name the bucket it sits in.
+    const d = new Date(Number(y), Number(m) - 1, 1);
+    return Number.isNaN(d.getTime()) ? fallback : MONTH_YEAR.format(d);
   }
   if (granularity === 'week') {
     const key = isoWeekKey(iso); // 'YYYY-Www' or ''
     const [y, w] = key.split('-W');
-    return (y && w) ? `Week ${Number(w)}, ${y}` : fallback;
+    // Intl has no week-of-year format, so this one stays a catalog pattern.
+    return (y && w) ? t('common.weekOfYear', { week: Number(w), year: y }) : fallback;
   }
   if (iso.length > 10) {
-    // Same "25 Mar 2026" shape the server's dateLabel uses, but from the
-    // LOCAL date so the label names the bucket the run actually sits in.
     const d = new Date(iso);
-    if (!Number.isNaN(d.getTime())) {
-      return `${d.getDate()} ${PERIOD_MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
-    }
+    if (!Number.isNaN(d.getTime())) return DAY_MONTH_YEAR.format(d);
   }
   return fallback;
 }
