@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import { AI_CMD_STORAGE_KEY } from '../../../constants.js';
+import { t } from '../../../strings/index.js';
 
 const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
 
@@ -16,8 +17,8 @@ function ClientSelector({ aiCmd = {}, availableClients }) {
     return (
       <div className="settings-row settings-row--last">
         <div className="settings-row-label">
-          <span className="settings-label">Client</span>
-          <span className="settings-description">Detecting...</span>
+          <span className="settings-label">{t('settings.clientLabel')}</span>
+          <span className="settings-description">{t('settings.detecting')}</span>
         </div>
       </div>
     );
@@ -30,8 +31,8 @@ function ClientSelector({ aiCmd = {}, availableClients }) {
     <>
       <div className={`settings-row${!value && apiClients.length === 0 ? ' settings-row--last' : ''}`}>
         <div className="settings-row-label">
-          <span className="settings-label">Client</span>
-          <span className="settings-description">CLI tool or API provider for analysis</span>
+          <span className="settings-label">{t('settings.clientLabel')}</span>
+          <span className="settings-description">{t('settings.clientDesc')}</span>
         </div>
         <div className="settings-pill-group">
           {cliClients.map(({ id, label }) => (
@@ -59,9 +60,9 @@ function ClientSelector({ aiCmd = {}, availableClients }) {
       {cliClients.length === 0 && apiClients.length === 0 && (
         <div className="settings-row settings-row--last settings-install-guide">
           <div className="settings-row-label">
-            <span className="settings-label">No providers detected</span>
+            <span className="settings-label">{t('settings.noProvidersDetected')}</span>
             <span className="settings-description">
-              Install a CLI tool or configure an API provider.
+              {t('settings.noProvidersDetectedDesc')}
             </span>
           </div>
         </div>
@@ -108,9 +109,9 @@ function ModelSettings({ aiCmd = {}, models }) {
     <>
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Model</span>
+          <span className="settings-label">{t('settings.modelLabel')}</span>
           <span className="settings-description">
-            Override the default model for all operations. Leave blank to use your client's default.
+            {t('settings.modelOverrideDesc')}
           </span>
         </div>
         <input
@@ -119,7 +120,7 @@ function ModelSettings({ aiCmd = {}, models }) {
           value={aiModel}
           placeholder="default"
           onChange={(e) => handleModelChange(null, e.target.value, onAiModelChange, AI_MODEL_STORAGE_KEY)}
-          aria-label="Model override"
+          aria-label={t('settings.modelOverrideAria')}
           autoCapitalize="off"
           autoCorrect="off"
           autoComplete="off"
@@ -128,15 +129,15 @@ function ModelSettings({ aiCmd = {}, models }) {
       </div>
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Analysis models</span>
+          <span className="settings-label">{t('settings.analysisModels')}</span>
           <span className="settings-description">
-            Override the AI model used by subagents during code evaluation. Leave blank to use the defaults.
+            {t('settings.analysisModelsDescLegacy')}
           </span>
         </div>
         <div className="settings-model-overrides">
-          <ModelOverrideInput label="Fast" value={fast} setter={onFastChange} level={MODEL_LEVEL_FAST} placeholder={DEFAULT_MODELS[MODEL_LEVEL_FAST]} />
-          <ModelOverrideInput label="Balanced" value={balanced} setter={onBalancedChange} level={MODEL_LEVEL_BALANCED} placeholder={DEFAULT_MODELS[MODEL_LEVEL_BALANCED]} />
-          <ModelOverrideInput label="Thorough" value={thorough} setter={onThoroughChange} level={MODEL_LEVEL_THOROUGH} placeholder={DEFAULT_MODELS[MODEL_LEVEL_THOROUGH]} />
+          <ModelOverrideInput label={t('settings.fast')} value={fast} setter={onFastChange} level={MODEL_LEVEL_FAST} placeholder={DEFAULT_MODELS[MODEL_LEVEL_FAST]} />
+          <ModelOverrideInput label={t('settings.balanced')} value={balanced} setter={onBalancedChange} level={MODEL_LEVEL_BALANCED} placeholder={DEFAULT_MODELS[MODEL_LEVEL_BALANCED]} />
+          <ModelOverrideInput label={t('settings.thorough')} value={thorough} setter={onThoroughChange} level={MODEL_LEVEL_THOROUGH} placeholder={DEFAULT_MODELS[MODEL_LEVEL_THOROUGH]} />
         </div>
       </div>
     </>

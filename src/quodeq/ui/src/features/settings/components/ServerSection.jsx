@@ -5,12 +5,10 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import { useServerLog } from '../server-log/ServerLogContext.js';
 import { systemKeys } from '../../../api/queryKeys.js';
 import { getHealth } from '../../../api/index.js';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
-const LOCAL_SERVER_HINT = (
-  <>
-    This server runs entirely on your own machine, so nothing leaves your computer. Quodeq is a local-first app that respects your privacy.
-  </>
-);
+const LOCAL_SERVER_HINT = t('settings.localServerHint');
 
 const HEALTH_POLL_MS = 10000;
 
@@ -30,8 +28,8 @@ export default function ServerSection() {
     <section className="panel settings-section">
       <div className="panel-header">
         <span className="settings-label-row">
-          <SectionLabel marker="▶">Local server</SectionLabel>
-          <HelpHint label="Local server help">{LOCAL_SERVER_HINT}</HelpHint>
+          <SectionLabel marker="▶">{t('settings.localServerLabel')}</SectionLabel>
+          <HelpHint label={t('settings.localServerHelpAria')}>{LOCAL_SERVER_HINT}</HelpHint>
         </span>
       </div>
 
@@ -40,8 +38,8 @@ export default function ServerSection() {
         address={health?.address}
         offlineMessage={
           status === 'checking'
-            ? <span>Checking…</span>
-            : <span>Connection lost</span>
+            ? <span>{t('settings.checkingEllipsis')}</span>
+            : <span>{t('settings.connectionLost')}</span>
         }
         onToggleConsole={() => (serverLog.open ? serverLog.closeLog() : serverLog.openLog())}
         consoleOpen={serverLog.open}
@@ -49,20 +47,20 @@ export default function ServerSection() {
 
       {status === 'online' && health && (
         <div className="server-details">
-          Port <strong>{health.port}</strong>
+          {t('settings.serverPortLabel')} <strong>{health.port}</strong>
           {' · '}
-          PID <strong>{health.pid}</strong>
+          {t('settings.serverPidLabel')} <strong>{health.pid}</strong>
           {' · '}
-          v{health.version}
+          {t('settings.serverVersion', { version: health.version })}
         </div>
       )}
 
       {status === 'offline' && (
         <div className="settings-row settings-row--last">
           <div className="settings-row-label">
-            <span className="settings-label">Restart</span>
+            <span className="settings-label">{t('settings.restart')}</span>
             <span className="settings-description">
-              Stop the server with <code>Ctrl+C</code> in the terminal, then run <code>quodeq dashboard</code> to restart. This page will reconnect automatically.
+              {tRich('settings.restartDesc')}
             </span>
           </div>
         </div>

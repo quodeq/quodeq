@@ -6,13 +6,10 @@ import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useOmlxServerStatus } from '../hooks/useOmlxServerStatus.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_OLLAMA } from './ProviderSettings.jsx';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
-const OMLX_MODEL_HINT = (
-  <>
-    This list comes from your local omlx server. To add a model, use the omlx admin UI at{' '}
-    <code>http://localhost:8000/admin</code> or pull a model with the omlx CLI. Models show up here as soon as they are downloaded.
-  </>
-);
+const OMLX_MODEL_HINT = tRich('settings.omlxModelHint');
 
 
 // Local-API tabs default to a single subagent; clamp commits to [MIN, MAX]
@@ -35,7 +32,7 @@ function ModelSelector({ value, models, onChange }) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
         >
-          <option value="">Pick a model</option>
+          <option value="">{t('settings.pickAModel')}</option>
           {models.map((m) => (
             <option key={m.name} value={m.name}>{m.name}</option>
           ))}
@@ -52,8 +49,8 @@ function ModelSelector({ value, models, onChange }) {
       {needsModel && (
         <span className="settings-model-hint">
           {hasModels
-            ? "You'll need a model before you can run an evaluation."
-            : "omlx didn't return any models. Enter the model name directly (e.g. from your omlx admin UI)."}
+            ? t('settings.needModelBeforeEval')
+            : t('settings.omlxNoModels')}
         </span>
       )}
     </div>
@@ -75,7 +72,7 @@ export default function OmlxTab({ state, update }) {
     queryFn: () => getOmlxModels(apiBase || undefined, apiKey || undefined),
   });
   const modelsError = modelsQueryError
-    ? "We couldn’t load your omlx models. Make sure omlx is running."
+    ? t('settings.omlxModelsLoadFailed')
     : null;
 
   const prevStatusRef = useRef(omlxStatus?.status ?? 'offline');
@@ -97,7 +94,7 @@ export default function OmlxTab({ state, update }) {
     } catch (err) {
       console.warn('omlx concurrency test failed', err);
       setTestResult(null);
-      setTestError("The concurrency test didn't finish. Make sure omlx is running and your model is loaded.");
+      setTestError(t('settings.concurrencyTestFailedOmlx'));
     }
     setTesting(false);
   };
@@ -107,35 +104,31 @@ export default function OmlxTab({ state, update }) {
       <ServerStatusPill
         status={omlxStatus?.status ?? 'offline'}
         address={omlxStatus?.address}
-        offlineMessage={
-          <span>
-            omlx isn&apos;t running. Start it with <code>omlx serve</code>, or open the omlx menu bar app.
-          </span>
-        }
+        offlineMessage={<span>{tRich('settings.omlxOffline')}</span>}
       />
       {modelsError && (
         <div className="settings-row">
-          <span className="settings-error">We couldn&apos;t load your omlx models. Make sure omlx is running.</span>
+          <span className="settings-error">{modelsError}</span>
         </div>
       )}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Model</span>
-            <HelpHint label="Model help">{OMLX_MODEL_HINT}</HelpHint>
+            <span className="settings-label">{t('settings.modelLabel')}</span>
+            <HelpHint label={t('settings.modelHelpAria')}>{OMLX_MODEL_HINT}</HelpHint>
           </span>
-          <span className="settings-description">This model handles every step of your evaluation.</span>
+          <span className="settings-description">{t('settings.thisModelEveryStep')}</span>
         </div>
         <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} />
       </div>
       <TimeLimitSetting state={state} update={update} providerType="local-api" />
       <details className="settings-advanced">
-        <summary className="settings-advanced-toggle">Advanced</summary>
+        <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
         <div className="settings-advanced-content">
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">Server address</span>
-              <span className="settings-description">Leave blank to use the default (<code>http://localhost:8000</code>).</span>
+              <span className="settings-label">{t('settings.serverAddress')}</span>
+              <span className="settings-description">{tRich('settings.serverAddressDesc')}</span>
             </div>
             <input
               type="text"
@@ -147,8 +140,8 @@ export default function OmlxTab({ state, update }) {
           </div>
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">API key</span>
-              <span className="settings-description">Leave blank to use the key from <code>~/.omlx/settings.json</code> (default <code>1234</code>).</span>
+              <span className="settings-label">{t('settings.apiKey')}</span>
+              <span className="settings-description">{tRich('settings.apiKeyDesc')}</span>
             </div>
             <input
               type="password"
@@ -161,10 +154,10 @@ export default function OmlxTab({ state, update }) {
           <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label-row">
-                <span className="settings-label">Max parallel agents</span>
-                <HelpHint label="Max parallel agents help">{SUBAGENTS_HINT_OLLAMA}</HelpHint>
+                <span className="settings-label">{t('settings.maxParallelAgents')}</span>
+                <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_OLLAMA}</HelpHint>
               </span>
-              <span className="settings-description">We make a guess based on your unified memory. Run a quick test for a more accurate number.</span>
+              <span className="settings-description">{t('settings.omlxSubagentsDesc')}</span>
             </div>
             <div className="settings-budget-control">
               <input
@@ -182,10 +175,10 @@ export default function OmlxTab({ state, update }) {
                 onClick={runTest}
                 disabled={testing || !state.model}
               >
-                {testing ? 'Testing...' : 'Auto-detect'}
+                {testing ? t('settings.testing') : t('settings.autoDetect')}
               </button>
             </div>
-            {testResult && <span className="settings-description">Recommended: {testResult.recommended} agents</span>}
+            {testResult && <span className="settings-description">{t('settings.recommendedAgents', { count: testResult.recommended })}</span>}
             {testError && <span className="settings-error">{testError}</span>}
           </div>
           <AdvancedAnalysisSettings state={state} update={update} />

@@ -4,43 +4,21 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
 const DEFAULT_POWER_LEVEL = 2;
 
 const MODEL_HINTS = {
-  claude: (
-    <>
-      Type <code>haiku</code>, <code>sonnet</code>, or <code>opus</code>. Claude Code will pick the latest version for you. If you want a specific version, just paste its full id. You can find them in Anthropic&apos;s docs.
-    </>
-  ),
-  codex: (
-    <>
-      Leave this blank to use the Codex CLI default, or type a model id that your Codex account supports.
-    </>
-  ),
-  gemini: (
-    <>
-      Type the model id you want, like <code>gemini-2.5-flash-lite</code>, <code>gemini-2.5-flash</code>, or <code>gemini-2.5-pro</code>. The full list is in Google&apos;s docs.
-    </>
-  ),
+  claude: tRich('settings.modelHintClaude'),
+  codex: tRich('settings.modelHintCodex'),
+  gemini: tRich('settings.modelHintGemini'),
 };
 
 const ANALYSIS_MODEL_HINTS = {
-  claude: (
-    <>
-      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). Type <code>haiku</code>, <code>sonnet</code>, or <code>opus</code>, and Claude Code picks the latest version. Anything you leave blank just uses the model you chose above.
-    </>
-  ),
-  codex: (
-    <>
-      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). Anything you leave blank uses the model above, and a blank model uses the Codex CLI default.
-    </>
-  ),
-  gemini: (
-    <>
-      Want a different model for different tasks? Pick one per tier (Fast, Balanced, Thorough). For example, <code>gemini-2.5-flash-lite</code> for Fast and <code>gemini-2.5-pro</code> for Thorough. Anything you leave blank just uses the model you chose above.
-    </>
-  ),
+  claude: tRich('settings.analysisModelsHintClaude'),
+  codex: tRich('settings.analysisModelsHintCodex'),
+  gemini: tRich('settings.analysisModelsHintGemini'),
 };
 
 function ModelTextInput({ label, value, placeholder, onChange, required }) {
@@ -53,9 +31,9 @@ function ModelTextInput({ label, value, placeholder, onChange, required }) {
         id={inputId}
         className={`settings-model-input${required && !value ? ' settings-model-input--required' : ''}`}
         value={value || ''}
-        placeholder={placeholder || 'Type model id'}
+        placeholder={placeholder || t('settings.typeModelId')}
         onChange={(e) => onChange(e.target.value)}
-        aria-label={label ? `${label} model` : 'Model'}
+        aria-label={label ? t('settings.modelNameAria', { label }) : t('settings.modelAria')}
         autoCapitalize="off"
         autoCorrect="off"
         autoComplete="off"
@@ -89,24 +67,24 @@ export default function CliProviderTab({ providerId, state, update }) {
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Model</span>
-            {hint && <HelpHint label="Model help">{hint}</HelpHint>}
+            <span className="settings-label">{t('settings.modelLabel')}</span>
+            {hint && <HelpHint label={t('settings.modelHelpAria')}>{hint}</HelpHint>}
           </span>
-          <span className="settings-description">Pick the model you want to use.</span>
+          <span className="settings-description">{t('settings.pickModelYouWant')}</span>
         </div>
         <div className="settings-model-field">
           <ModelTextInput value={state.model} onChange={(v) => update('model', v)} required />
-          {!state.model && <span className="settings-model-hint">Pick a model to get started.</span>}
+          {!state.model && <span className="settings-model-hint">{t('settings.pickModelToStart')}</span>}
         </div>
       </div>
       <TimeLimitSetting state={state} update={update} providerType="cli" />
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Max parallel agents</span>
-            <HelpHint label="Max parallel agents help">{SUBAGENTS_HINT_REMOTE}</HelpHint>
+            <span className="settings-label">{t('settings.maxParallelAgents')}</span>
+            <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_REMOTE}</HelpHint>
           </span>
-          <span className="settings-description">How many subagents work side by side. Pick a number from 1 to 10.</span>
+          <span className="settings-description">{t('settings.subagentsDescRemote')}</span>
         </div>
         <input
           type="number"
@@ -116,30 +94,30 @@ export default function CliProviderTab({ providerId, state, update }) {
           value={state.subagents ?? ''}
           onChange={(e) => update('subagents', e.target.value)}
           onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
-          aria-label="Max parallel agents"
+          aria-label={t('settings.maxParallelAgents')}
         />
       </div>
       <details className="settings-advanced">
-        <summary className="settings-advanced-toggle">Advanced</summary>
+        <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
         <div className="settings-advanced-content">
           <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label-row">
-                <span className="settings-label">Analysis models</span>
-                {analysisHint && <HelpHint label="Analysis models help">{analysisHint}</HelpHint>}
+                <span className="settings-label">{t('settings.analysisModels')}</span>
+                {analysisHint && <HelpHint label={t('settings.analysisModelsHelpAria')}>{analysisHint}</HelpHint>}
               </span>
-              <span className="settings-description">Optional. Anything you leave blank uses the model you chose above.</span>
+              <span className="settings-description">{t('settings.analysisModelsDesc')}</span>
             </div>
             <div className="settings-model-overrides">
-              <ModelTextInput label="Fast" value={state['model-fast']} onChange={(v) => update('model-fast', v)} />
-              <ModelTextInput label="Balanced" value={state['model-balanced']} onChange={(v) => update('model-balanced', v)} />
-              <ModelTextInput label="Thorough" value={state['model-thorough']} onChange={(v) => update('model-thorough', v)} />
+              <ModelTextInput label={t('settings.fast')} value={state['model-fast']} onChange={(v) => update('model-fast', v)} />
+              <ModelTextInput label={t('settings.balanced')} value={state['model-balanced']} onChange={(v) => update('model-balanced', v)} />
+              <ModelTextInput label={t('settings.thorough')} value={state['model-thorough']} onChange={(v) => update('model-thorough', v)} />
             </div>
           </div>
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">Analysis power</span>
-              <span className="settings-description">Pick which tier above the evaluation should use.</span>
+              <span className="settings-label">{t('settings.analysisPower')}</span>
+              <span className="settings-description">{t('settings.analysisPowerDesc')}</span>
             </div>
             <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
           </div>
