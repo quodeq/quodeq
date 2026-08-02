@@ -339,8 +339,18 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                     )
                     return jsonify(body), status
                 except ValueError:
-                    contained_dest = None
-                if contained_dest is None or not Path(contained_dest).is_dir():
+                    # Return here rather than falling through with a sentinel.
+                    # Every failure branch around a containment check has to
+                    # exit: continuing past a swallowed rejection leaves the
+                    # unguarded value live on one path, which is a real hole
+                    # and is also what CodeQL flags.
+                    body, status = error_response(
+                        "cloneDest must be an existing directory under your home folder",
+                        HTTPStatus.BAD_REQUEST,
+                        "INVALID_CLONE_DEST",
+                    )
+                    return jsonify(body), status
+                if not Path(contained_dest).is_dir():
                     body, status = error_response(
                         "cloneDest must be an existing directory under your home folder",
                         HTTPStatus.BAD_REQUEST,
