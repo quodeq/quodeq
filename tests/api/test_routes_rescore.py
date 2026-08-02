@@ -1,5 +1,6 @@
 """Tests for the /api/rescore endpoint."""
 import json
+import os
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -40,3 +41,23 @@ def test_rescore_returns_rescored_data(mock_rescore, mock_dismissed, mock_list_r
     data = resp.get_json()
     assert "dimensions" in data
     assert "summary" in data
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink semantics")
+def test_rescore_rejects_project_symlinked_outside_the_evaluations_root(tmp_path, client):
+    """A project name that is a symlink out of the root is refused.
+
+    The segment check alone passed this: "escape" holds no dots or
+    separators. Only containment on the *joined* path catches it.
+    """
+    eval_root = tmp_path / "evaluations"
+    eval_root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (eval_root / "escape").symlink_to(outside)
+
+    with patch("quodeq.api.routes_rescore._eval_dir_from_app", return_value=str(eval_root)):
+        resp = client.get("/api/rescore?project=escape")
+
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_PARAM"

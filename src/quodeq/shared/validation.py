@@ -4,7 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 
-from quodeq.core.utils.io import validate_path_segment  # noqa: F401 — moved inward to core
+from quodeq.core.utils.io import (  # noqa: F401 — moved inward to core
+    contained_path,
+    validate_path_segment,
+)
 
 
 def validate_relative_scope(scope: str) -> None:
@@ -22,10 +25,11 @@ def validate_relative_scope(scope: str) -> None:
         raise ValueError(f"Invalid scope path: {scope!r}. Parent-directory segments are not allowed.")
 
 
-def validate_resolved_within(path: Path, root: Path) -> None:
-    """Raise ValueError if *path* resolves outside *root*."""
-    if not path.resolve().is_relative_to(root.resolve()):
-        raise ValueError(
-            "Path escapes its root directory. "
-            "Ensure the path does not contain '..' segments or symlinks that resolve outside the project root."
-        )
+def validate_resolved_within(path: Path, root: Path) -> Path:
+    """Return *path* contained within *root*, raising ValueError if it escapes.
+
+    Thin ``Path``-typed wrapper over :func:`contained_path`. Use the returned
+    value, not the argument you passed in: the point of the check is that the
+    contained path is what flows onward.
+    """
+    return Path(contained_path(path, root))

@@ -12,7 +12,7 @@ from quodeq.services.deleted import deleted_keys as load_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.shared.utils import get_evaluations_dir
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import contained_path, validate_path_segment
 from quodeq.services.suppression import load_suppression_rules
 
 
@@ -30,14 +30,18 @@ def register_rescore_routes(app: Flask) -> None:
             body, status = error_response("project query parameter is required", HTTPStatus.BAD_REQUEST, "MISSING_PARAM")
             return jsonify(body), status
         run_id = request.args.get("run", "")
+        eval_dir = _eval_dir_from_app(app)
         try:
             validate_path_segment(project)
             if run_id and run_id != "latest":
                 validate_path_segment(run_id)
+            # Contain the joined path, not just the segment, and use what comes
+            # back: the contained value is what flows to the readers below.
+            project_dir = Path(contained_path(Path(eval_dir) / project, eval_dir))
         except ValueError:
             body, status = error_response("Invalid project or run parameter", HTTPStatus.BAD_REQUEST, "INVALID_PARAM")
             return jsonify(body), status
-        eval_dir = _eval_dir_from_app(app)
+        project = project_dir.name
 
         # Resolve run ID
         if not run_id or run_id == "latest":
@@ -53,7 +57,6 @@ def register_rescore_routes(app: Flask) -> None:
             body, status = error_response("Run data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
 
-        project_dir = Path(eval_dir) / project
         dismissed = load_dismissed_keys(project_dir)
         deleted = load_deleted_keys(project_dir)
 

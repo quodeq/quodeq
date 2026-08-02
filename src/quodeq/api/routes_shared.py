@@ -49,7 +49,7 @@ from quodeq.services.shared_settings import (
     write_settings,
 )
 from quodeq.services.verified import verified_entries
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import contained_path, validate_path_segment
 
 from .routes_common import reports_dir
 
@@ -130,11 +130,10 @@ def _validate_segment(*segments: str) -> tuple[Response, int] | None:
 
 def _shared_project_dir(eval_root: Path, project: str) -> Path | None:
     """Resolve *project* under *eval_root*; None if it would escape the root."""
-    base = eval_root.resolve()
-    resolved = (base / project).resolve()
-    if not resolved.is_relative_to(base):
+    try:
+        return Path(contained_path(eval_root / project, eval_root))
+    except ValueError:
         return None
-    return resolved
 
 
 def register_shared_routes(app: Flask) -> None:
