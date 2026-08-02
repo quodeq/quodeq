@@ -167,8 +167,22 @@ Three rules hold everywhere in this path:
 | Piece | File |
 |---|---|
 | Pure judgment logic | `src/quodeq/core/checks/` |
-| Import graph (the only I/O) | `src/quodeq/data/fs/import_graph.py` |
-| Registry + run wiring | `src/quodeq/analysis/checks/` |
+| Static facts off disk (the only I/O) | `src/quodeq/data/fs/import_graph.py`, `symbol_uses.py` |
+| Registry + fact memo + run wiring | `src/quodeq/analysis/checks/` |
+
+Shipped checkers, and the requirements they answer:
+
+| `check` | Requirements |
+|---|---|
+| `framework-imports` | CLEA-FRM-01, CLEA-DEP-06 |
+| `entity-imports` | CLEA-DEP-02 |
+| `config-reads` | CLEA-DEP-07 |
+
+Adding one is: a pure function in `core/checks/` returning `Judgment`s, an entry
+in `CHECKERS`, and a `"check"` key on the requirement. New facts (beyond the
+import graph and symbol uses) get their own collector in `data/fs/` and a lazy
+accessor on `CheckContext`, which memoises per context so several checkers
+share one walk of the tree.
 
 ## Key Design Rules
 
