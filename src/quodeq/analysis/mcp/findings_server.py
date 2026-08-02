@@ -16,10 +16,10 @@ from pathlib import Path
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
-from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
+from quodeq.data.fs.standards_loader import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
-from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
+from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
 from quodeq.data.fs.standards_prefs import load_project_overrides
 
 # Re-export public API so existing imports keep working.

@@ -36,8 +36,7 @@ if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
-from quodeq.core.standards.refs import load_compiled_requirements
-from quodeq.core.standards.refs import load_compiled_refs
+from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
