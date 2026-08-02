@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import json
-import os
 import threading
-from pathlib import Path
 
-_AI_PROVIDERS_PATH = Path(os.environ.get("QUODEQ_AI_PROVIDERS_PATH", str(Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json")))
+from quodeq.shared.provider_env import _providers_path
 
 # Fallback provider configs used when the primary JSON file
 # (data/config/ai_providers.json) cannot be loaded.
@@ -56,7 +54,7 @@ class _ProviderConfigCache:
             with self._lock:
                 if self._configs is None:
                     try:
-                        self._configs = json.loads(_AI_PROVIDERS_PATH.read_text(encoding="utf-8"))
+                        self._configs = json.loads(_providers_path().read_text(encoding="utf-8"))
                     except (OSError, json.JSONDecodeError):
                         self._configs = _PROVIDER_CONFIGS_FALLBACK
         return self._configs

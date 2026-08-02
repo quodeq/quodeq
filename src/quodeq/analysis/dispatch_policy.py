@@ -22,9 +22,9 @@ from quodeq.shared.utils import get_ai_cmd
 _DEFAULT_MAX_API_FILE_SIZE = 15000
 
 
-def api_file_size_cap() -> int:
+def api_file_size_cap(env: dict[str, str] | None = None) -> int:
     """Max file size (bytes, exclusive) an API provider will dispatch."""
-    raw = os.environ.get("QUODEQ_MAX_API_FILE_SIZE", "")
+    raw = (env if env is not None else os.environ).get("QUODEQ_MAX_API_FILE_SIZE", "")
     try:
         return int(raw) if raw else _DEFAULT_MAX_API_FILE_SIZE
     except ValueError:
