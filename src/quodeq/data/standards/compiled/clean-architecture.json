@@ -21,7 +21,8 @@
           "id": "CLEA-DEP-02",
           "text": "Entities must not import from use case or adapter layers",
           "description": "Domain entities should have zero imports from application or infrastructure code. Check import statements in entity files — they should only reference other entities, value objects, or standard library types",
-          "refs": []
+          "refs": [],
+          "check": "entity-imports"
         },
         {
           "id": "CLEA-DEP-03",
@@ -52,7 +53,8 @@
           "id": "CLEA-DEP-07",
           "text": "Configuration and environment variables are not read in inner layers",
           "description": "Entities and use cases must not read from os.environ, config files, or settings modules directly. Configuration is injected from the outermost layer through constructor parameters or interfaces",
-          "refs": []
+          "refs": [],
+          "check": "config-reads"
         },
         {
           "id": "CLEA-DEP-08",

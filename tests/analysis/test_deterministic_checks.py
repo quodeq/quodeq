@@ -370,4 +370,34 @@ class TestBundledStandard:
 
         assert checks["CLEA-FRM-01"] == "framework-imports"
         assert checks["CLEA-DEP-06"] == "framework-imports"
+        assert checks["CLEA-DEP-02"] == "entity-imports"
+        assert checks["CLEA-DEP-07"] == "config-reads"
         assert checks["CLEA-DEP-01"] is None, "the inward rule needs a declared layer map first"
+
+    def test_every_declared_checker_name_exists(self):
+        """A standard naming a checker we do not ship is silently inert."""
+        import json as _json
+
+        from quodeq.analysis.checks.registry import CHECKERS
+        from quodeq.config.paths import default_paths
+
+        compiled_dir = default_paths().standards_dir / "compiled"
+        declared = set()
+        for path in compiled_dir.glob("*.json"):
+            data = _json.loads(path.read_text(encoding="utf-8"))
+            for principle in data.get("principles", []):
+                for req in principle.get("requirements", []):
+                    if req.get("check"):
+                        declared.add(req["check"])
+
+        assert declared <= set(CHECKERS), f"unknown: {declared - set(CHECKERS)}"
+
+    def test_the_context_parses_the_tree_once_per_context(self, project):
+        """Three checkers over one context must not be three walks of the tree."""
+        from quodeq.analysis.checks.registry import CheckContext
+
+        context = CheckContext(root=project, source_files=SOURCES,
+                               dimension="clean-architecture")
+
+        assert context.graph() is context.graph()
+        assert context.config_symbol_uses() is context.config_symbol_uses()

@@ -17,13 +17,13 @@ from __future__ import annotations
 
 from collections import deque
 
+from quodeq.core.checks._judgments import compliance, violation
 from quodeq.core.checks.layers import is_inner_layer_path
 from quodeq.core.checks.model import ImportEdge, ImportGraph, top_level
 from quodeq.core.events.models import Judgment
 
 REQ_DIRECT = "CLEA-FRM-01"
 REQ_TRANSITIVE = "CLEA-DEP-06"
-_SEVERITY = "major"
 _SOURCE_SUFFIXES = (".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
 
 
@@ -131,29 +131,11 @@ def _transitive_frameworks(
     return found
 
 
-def _judgment(
-    *, req: str, dimension: str, file: str, line: int, reason: str, title: str,
-    verdict: str = "violation",
-) -> Judgment:
-    return Judgment(
-        practice_id=req, req=req, verdict=verdict, dimension=dimension,
-        file=file, line=line, reason=reason, title=title,
-        severity=_SEVERITY, confidence=100,
-    )
-
-
 def _clean_report(req: str, dimension: str, anchor: str, checked: int) -> Judgment:
-    """One compliance for a requirement the check covered and found clean.
-
-    Without this, a clean project produces no judgment for these requirements
-    and they stay exactly as unmeasured as they were before the checker
-    existed -- "no findings" would be indistinguishable from "never looked".
-    One instance, not one per file: the evidence is a single graph traversal,
-    and inflating the count would buy confidence the check has not earned.
-    """
+    """One compliance for a requirement the check covered and found clean."""
     label = "file" if checked == 1 else "files"
-    return _judgment(
-        req=req, dimension=dimension, file=anchor, line=1, verdict="compliance",
+    return compliance(
+        req=req, dimension=dimension, anchor=anchor,
         title="Inner layers are free of framework dependencies",
         reason=(
             f"Checked the import graph of {checked} inner-layer {label}: none "
@@ -186,7 +168,7 @@ def check_framework_dependencies(
     for file in inner:
         direct = _direct_frameworks(by_file[file], framework_packages)
         for package in sorted(direct):
-            judgments.append(_judgment(
+            judgments.append(violation(
                 req=REQ_DIRECT, dimension=dimension, file=file, line=direct[package],
                 title=f"Inner layer imports framework package '{package}'",
                 reason=(
@@ -203,7 +185,7 @@ def check_framework_dependencies(
             if package in direct:
                 continue  # already billed once, as a direct import
             line, path = transitive[package]
-            judgments.append(_judgment(
+            judgments.append(violation(
                 req=REQ_TRANSITIVE, dimension=dimension, file=file, line=line,
                 title=f"Inner layer depends on framework '{package}' transitively",
                 reason=(

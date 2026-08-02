@@ -24,7 +24,7 @@ _logger = logging.getLogger(__name__)
 _PY_SUFFIXES = (".py", ".pyi")
 
 
-def _relative_python_files(root: Path, files: Iterable[Path]) -> list[str]:
+def relative_python_files(root: Path, files: Iterable[Path]) -> list[str]:
     """Repo-relative posix paths of the readable Python files inside *root*.
 
     Paths outside *root* are dropped: a caller-supplied file list is not a
@@ -173,7 +173,7 @@ def build_import_graph(root: Path, files: Iterable[Path]) -> ImportGraph:
     tree or re-implements ignore handling.
     """
     root = Path(root).resolve()
-    rel_files = _relative_python_files(root, files)
+    rel_files = relative_python_files(root, files)
     if not rel_files:
         return ImportGraph()
     first_party, package_roots = _package_roots(root, rel_files)

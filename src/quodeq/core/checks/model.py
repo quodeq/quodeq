@@ -34,6 +34,19 @@ class ImportGraph:
         return frozenset(e.file for e in self.edges)
 
 
+@dataclass(frozen=True)
+class SymbolUse:
+    """One use of a watched symbol, resolved to its canonical dotted name.
+
+    ``import os as o`` followed by ``o.environ`` records ``os.environ``, as does
+    ``from os import environ``. Resolving aliases is why this is collected by
+    parsing rather than by searching for the text.
+    """
+    file: str
+    line: int
+    symbol: str
+
+
 def top_level(module: str) -> str:
     """The root package of a dotted module name (``a.b.c`` -> ``a``)."""
     return (module or "").split(".", 1)[0]
