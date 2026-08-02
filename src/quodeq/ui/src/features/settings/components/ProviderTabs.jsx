@@ -12,6 +12,7 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { readString, removeKey, writeString } from '../../../adapters/storage.js';
 
 const PROVIDER_HINT = (
   <>
@@ -88,16 +89,16 @@ function TabContent({ provider, providerConfig }) {
 function useMigrateLegacySettings(clients) {
   useEffect(() => {
     if (clients.length === 0) return;
-    if (localStorage.getItem(MIGRATION_DONE_KEY)) return;
-    const targetId = localStorage.getItem(LEGACY_AI_CMD_KEY) || clients[0].id;
+    if (readString(MIGRATION_DONE_KEY)) return;
+    const targetId = readString(LEGACY_AI_CMD_KEY) || clients[0].id;
     for (const [oldKey, newSuffix] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
-      const oldVal = localStorage.getItem(oldKey);
+      const oldVal = readString(oldKey);
       if (oldVal !== null) {
-        localStorage.setItem(`cc-${targetId}-${newSuffix}`, oldVal);
-        localStorage.removeItem(oldKey);
+        writeString(`cc-${targetId}-${newSuffix}`, oldVal);
+        removeKey(oldKey);
       }
     }
-    localStorage.setItem(MIGRATION_DONE_KEY, '1');
+    writeString(MIGRATION_DONE_KEY, '1');
   }, [clients]);
 }
 
@@ -105,7 +106,7 @@ export default function ProviderTabs({ providerConfigs }) {
   const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem(ACTIVE_PROVIDER_KEY) || '');
+  const [activeTab, setActiveTab] = useState(() => readString(ACTIVE_PROVIDER_KEY) || '');
 
   useMigrateLegacySettings(clients);
 
@@ -122,7 +123,7 @@ export default function ProviderTabs({ providerConfigs }) {
       if (!activeTab && list.length > 0) {
         const firstInstalled = list.find((c) => c.installed !== false) || list[0];
         setActiveTab(firstInstalled.id);
-        localStorage.setItem(ACTIVE_PROVIDER_KEY, firstInstalled.id);
+        writeString(ACTIVE_PROVIDER_KEY, firstInstalled.id);
       }
       setClientsError(null);
     }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });
@@ -130,7 +131,7 @@ export default function ProviderTabs({ providerConfigs }) {
 
   const selectTab = (id) => {
     setActiveTab(id);
-    localStorage.setItem(ACTIVE_PROVIDER_KEY, id);
+    writeString(ACTIVE_PROVIDER_KEY, id);
     // The assistant's Default mode follows the analysis provider — tell it to
     // re-read so its displayed provider/model updates live.
     notifyProviderSettingsChanged();

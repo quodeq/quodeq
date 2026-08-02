@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { t } from '../../../strings/index.js';
+import { isLowConfidence } from '../../../models/runRules.js';
 
-const LOW_CONFIDENCE_THRESHOLD = 50;
-
-export function isLowConfidence(violation) {
-  return typeof violation?.confidence === 'number' && violation.confidence < LOW_CONFIDENCE_THRESHOLD;
-}
+// The rule lives in models/runRules.js; re-exported here so existing
+// importers (FileDetailPage) keep their path.
+export { isLowConfidence };
 
 export default function LowConfidenceGroup({ violations, renderViolation }) {
   const [expanded, setExpanded] = useState(false);

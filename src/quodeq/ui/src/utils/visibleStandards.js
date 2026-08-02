@@ -47,14 +47,18 @@ export function readVisibleStandardIds(storage = localStorage) {
 // already landed a newer value, and this response is discarded instead of
 // clobbering it.
 //
-// The counter is module state, so it is only safe across tests because each
-// call compares against its own sample rather than an absolute value, AND
-// every caller awaits its in-flight hydrate before the next one starts. A
-// promise left dangling across a test boundary WOULD trip a later call's
-// check. That invariant is not enforced structurally; if a second caller of
-// hydrateVisibleStandardIds ever appears, or a test stops awaiting, export a
-// test-only reset rather than relying on it.
+// The counter is module state: each call compares against its own sample
+// rather than an absolute value, and every caller awaits its in-flight
+// hydrate before the next one starts. A promise left dangling across a test
+// boundary would otherwise trip a later call's check, so `resetWriteGeneration`
+// below exists as the structural escape hatch that note used to only ask for.
 let writeGeneration = 0;
+
+/** Reset the write generation. Test-isolation hook; returns the new value. */
+export function resetWriteGeneration() {
+  writeGeneration = 0;
+  return writeGeneration;
+}
 
 /** Write the selection to the local cache. The server is the source of truth. */
 export function writeVisibleStandardIds(ids, storage = localStorage) {

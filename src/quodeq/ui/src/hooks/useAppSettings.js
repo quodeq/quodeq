@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { resolveDataTheme } from '../utils/themeResolver.js';
+import { readString, removeKey, writeString } from '../adapters/storage.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
@@ -23,19 +24,19 @@ const MIGRATION_MAP = {
 
 function migrateOldTheme() {
   try {
-    const old = localStorage.getItem(OLD_THEME_KEY);
+    const old = readString(OLD_THEME_KEY);
     if (old === null) {
       // Migrate old family names to character names
-      const currentFamily = localStorage.getItem(FAMILY_KEY);
+      const currentFamily = readString(FAMILY_KEY);
       if (currentFamily && FAMILY_RENAMES[currentFamily]) {
-        localStorage.setItem(FAMILY_KEY, FAMILY_RENAMES[currentFamily]);
+        writeString(FAMILY_KEY, FAMILY_RENAMES[currentFamily]);
       }
       return;
     }
     const mapped = MIGRATION_MAP[old] || { mode: 'system', family: 'daruma' };
-    localStorage.setItem(MODE_KEY, mapped.mode);
-    localStorage.setItem(FAMILY_KEY, mapped.family);
-    localStorage.removeItem(OLD_THEME_KEY);
+    writeString(MODE_KEY, mapped.mode);
+    writeString(FAMILY_KEY, mapped.family);
+    removeKey(OLD_THEME_KEY);
   } catch (e) {
     console.warn('Theme migration failed:', e);
   }
@@ -53,7 +54,7 @@ function applyDataTheme(value) {
 
 export function useAppSettings() {
   function safeGet(key, fallback = '') {
-    try { return localStorage.getItem(key) || fallback; } catch (e) { console.warn('localStorage unavailable:', e); return fallback; }
+    return readString(key) || fallback;
   }
 
   // Run migration once before reading new keys
