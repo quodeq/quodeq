@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
+import { t } from '../../../strings/index.js';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+// File extension is product identity, not translatable prose.
+const QUODEQ_FILE_EXT = '.quodeq';
 const WARNINGS_MAX_HEIGHT = 200;
 const CONFLICT_MAX_HEIGHT = 120;
 const STEP = { PICK: 'pick', REVIEWING: 'reviewing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
@@ -13,11 +16,11 @@ function buildImportedCopyId(id) {
 function PickStep({ fileRef, onFile, onClose }) {
   return (
     <>
-      <h3 id="import-modal-title" className="modal-title">Import Evaluator</h3>
-      <p className="modal-body">Select a <strong>.quodeq</strong> file to import.</p>
+      <h3 id="import-modal-title" className="modal-title">{t('standards.importEvaluatorTitle')}</h3>
+      <p className="modal-body">{t('standards.selectFilePrefix')} <strong>{QUODEQ_FILE_EXT}</strong> {t('standards.selectFileSuffix')}</p>
       <input ref={fileRef} type="file" accept=".quodeq,.json" onChange={onFile} style={{ margin: '12px 0' }} />
       <div className="modal-actions">
-        <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
       </div>
     </>
   );
@@ -26,8 +29,8 @@ function PickStep({ fileRef, onFile, onClose }) {
 function ImportingStep() {
   return (
     <>
-      <h3 id="import-modal-title" className="modal-title">Importing...</h3>
-      <p className="modal-body">Validating and importing evaluator.</p>
+      <h3 id="import-modal-title" className="modal-title">{t('standards.importingTitle')}</h3>
+      <p className="modal-body">{t('standards.importingBody')}</p>
     </>
   );
 }
@@ -35,10 +38,10 @@ function ImportingStep() {
 function ErrorStep({ error, onClose }) {
   return (
     <>
-      <h3 id="import-modal-title" className="modal-title">Import Failed</h3>
+      <h3 id="import-modal-title" className="modal-title">{t('standards.importFailedTitle')}</h3>
       <p className="modal-body modal-body--warning">{error}</p>
       <div className="modal-actions">
-        <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
+        <button type="button" className="btn-secondary" onClick={onClose}>{t('common.close')}</button>
       </div>
     </>
   );
@@ -47,16 +50,16 @@ function ErrorStep({ error, onClose }) {
 function WarningsStep({ warnings, onClose, onProceed }) {
   return (
     <>
-      <h3 id="import-modal-title" className="modal-title">Security Warnings</h3>
+      <h3 id="import-modal-title" className="modal-title">{t('standards.securityWarningsTitle')}</h3>
       <p className="modal-body modal-body--warning">
-        This evaluator contains text that may attempt to manipulate the AI during analysis:
+        {t('standards.securityWarningsBody')}
       </p>
       <ul className="modal-body" style={{ fontSize: '0.85rem', maxHeight: WARNINGS_MAX_HEIGHT, overflow: 'auto' }}>
         {warnings.map((w, i) => <li key={i}>{w}</li>)}
       </ul>
       <div className="modal-actions">
-        <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-        <button type="button" className="btn-primary" onClick={onProceed}>Import Anyway</button>
+        <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="btn-primary" onClick={onProceed}>{t('standards.importAnyway')}</button>
       </div>
     </>
   );
@@ -66,15 +69,15 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
   const { onClose, onImportAsCopy, onOverwrite } = actions;
   return (
     <>
-      <h3 id="import-modal-title" className="modal-title">ID Already Exists</h3>
+      <h3 id="import-modal-title" className="modal-title">{t('standards.idExistsTitle')}</h3>
       <p className="modal-body">
-        A standard with ID <strong>{parsedData?.id}</strong> already exists
+        {t('standards.idExistsPrefix')} <strong>{parsedData?.id}</strong> {t('standards.idExistsSuffix')}
         {conflict?.name ? ` ("${conflict.name}")` : ''}.
       </p>
       {warnings.length > 0 && (
         <>
           <p className="modal-body modal-body--warning" style={{ fontSize: '0.85rem' }}>
-            Security warnings were also detected:
+            {t('standards.securityWarningsAlso')}
           </p>
           <ul className="modal-body" style={{ fontSize: '0.8rem', maxHeight: CONFLICT_MAX_HEIGHT, overflow: 'auto' }}>
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -82,9 +85,9 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
         </>
       )}
       <div className="modal-actions">
-        <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-        <button type="button" className="btn-secondary" onClick={onImportAsCopy}>Import as Copy</button>
-        <button type="button" className="btn-danger" onClick={onOverwrite}>Overwrite</button>
+        <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="btn-secondary" onClick={onImportAsCopy}>{t('standards.importAsCopy')}</button>
+        <button type="button" className="btn-danger" onClick={onOverwrite}>{t('standards.overwrite')}</button>
       </div>
     </>
   );
@@ -108,7 +111,7 @@ async function importEvaluator(data, force, onImported, state, importStandard) {
     }
     onImported();
   } catch (err) {
-    setError(err.message || 'Import failed');
+    setError(err.message || t('standards.importFailed'));
     setStep(STEP.ERROR);
   }
 }
@@ -118,7 +121,7 @@ async function handleFileInput(e, onImported, state, importStandard) {
   const file = e.target.files?.[0];
   if (!file) return;
   if (file.size > MAX_FILE_SIZE) {
-    setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`);
+    setError(t('standards.fileTooLarge', { size: (file.size / 1024).toFixed(0) }));
     setStep(STEP.ERROR);
     return;
   }
@@ -127,12 +130,12 @@ async function handleFileInput(e, onImported, state, importStandard) {
     const text = await file.text();
     data = JSON.parse(text);
   } catch {
-    setError('Invalid file: could not parse as JSON.');
+    setError(t('standards.invalidJson'));
     setStep(STEP.ERROR);
     return;
   }
   if (typeof data !== 'object' || Array.isArray(data)) {
-    setError('Invalid file: expected a JSON object.');
+    setError(t('standards.invalidJsonObject'));
     setStep(STEP.ERROR);
     return;
   }

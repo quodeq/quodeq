@@ -7,8 +7,9 @@ import StandardDetail from './StandardDetail.jsx';
 import ThresholdImpactDialog from './ThresholdImpactDialog.jsx';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { TermHeader } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
 
-const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: 'iso-25010', [STANDARD_TYPES.QUODEQ]: 'quodeq', [STANDARD_TYPES.COMMUNITY]: 'community', [STANDARD_TYPES.CUSTOM]: 'custom' };
+const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'), [STANDARD_TYPES.QUODEQ]: t('standards.baseQuodeq'), [STANDARD_TYPES.COMMUNITY]: t('standards.baseCommunity'), [STANDARD_TYPES.CUSTOM]: t('standards.baseCustom') };
 
 const MIN_TREE_WIDTH = 180;
 const MAX_TREE_WIDTH = 600;
@@ -60,14 +61,16 @@ function useResizable(defaultWidth) {
 function buildSubLine({ standard, dirty }) {
   const principles = standard?.principles?.length || 0;
   const requirements = (standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0);
-  const type = TYPE_LABELS[standard?.type] || 'custom';
-  const dirtyMark = dirty ? ' · unsaved' : '';
-  return `${principles} principle${principles === 1 ? '' : 's'} · ${requirements} requirement${requirements === 1 ? '' : 's'} · ${type}${dirtyMark}`;
+  const type = TYPE_LABELS[standard?.type] || t('standards.baseCustom');
+  const dirtyMark = dirty ? ` · ${t('standards.unsaved')}` : '';
+  const principlesPart = principles === 1 ? t('standards.principlesCountOne', { count: principles }) : t('standards.principlesCountMany', { count: principles });
+  const requirementsPart = requirements === 1 ? t('standards.requirementsCountOne', { count: requirements }) : t('standards.requirementsCountMany', { count: requirements });
+  return `${principlesPart} · ${requirementsPart} · ${type}${dirtyMark}`;
 }
 
 function EditorToolbar({ meta, dirty, editable, overridesDirty, customizedCount, onBack, onSave }) {
   const { isNew, standard, standardId } = meta;
-  const title = isNew ? 'new standard' : (standard?.name || standardId || 'standard').toLowerCase();
+  const title = isNew ? t('standards.newStandardTermName') : (standard?.name || standardId || t('standards.standardFallback')).toLowerCase();
   const sub = buildSubLine({ standard, dirty });
   const showSave = editable || overridesDirty;
   const saveDirty = dirty || overridesDirty;
@@ -76,16 +79,16 @@ function EditorToolbar({ meta, dirty, editable, overridesDirty, customizedCount,
       <TermHeader name={title} sub={sub} />
       <div className="standard-editor-actions">
         {customizedCount > 0 && (
-          <span className="standards-customized-badge">{customizedCount} thresholds customized</span>
+          <span className="standards-customized-badge">{t('standards.thresholdsCustomized', { count: customizedCount })}</span>
         )}
-        <button type="button" className="settings-pill" onClick={onBack}>← back</button>
+        <button type="button" className="settings-pill" onClick={onBack}>← {t('standards.back')}</button>
         {showSave && (
           <button
             type="button"
             className={`settings-pill${saveDirty ? ' settings-pill--active' : ''}`}
             onClick={onSave}
             disabled={!saveDirty}
-          >save</button>
+          >{t('standards.saveBtn')}</button>
         )}
       </div>
     </div>
@@ -109,12 +112,12 @@ function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
 }
 
 function EditorLoadingOrError({ loading, error, standard, onBack }) {
-  if (loading) return <div className="standard-editor-loading">Loading standard…</div>;
+  if (loading) return <div className="standard-editor-loading">{t('standards.loadingStandard')}</div>;
   if (error && !standard) {
     return (
       <div className="standard-editor-error">
         <p className="inline-error">{error}</p>
-        <button type="button" className="settings-pill" onClick={onBack}>← back</button>
+        <button type="button" className="settings-pill" onClick={onBack}>← {t('standards.back')}</button>
       </div>
     );
   }
@@ -177,7 +180,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved, onR
       if (onSaved) onSaved(standard?.id);
     } catch (err) {
       // Keep the draft so the user can retry; surface the error inline.
-      setOverridesSaveError(err?.message || 'Failed to save overrides');
+      setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
     }
   };
 
@@ -190,7 +193,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved, onR
       if (changed.length === 0) { await commitSave(); return; }
       setPendingImpact(changed);
     } catch (err) {
-      setOverridesSaveError(err?.message || 'Failed to save overrides');
+      setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
     }
   };
 
