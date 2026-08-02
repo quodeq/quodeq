@@ -2,6 +2,7 @@ import { useState } from 'react';
 import CloneTargetStep from '../../onboarding/components/steps/CloneTargetStep.jsx';
 import { registerProject } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
+import { writeString } from '../../../adapters/storage.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -24,9 +25,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
     try {
       const result = await registerProject({ repo: repoUrl, cloneDest, ephemeral });
       if (cloneDest) {
-        try { localStorage.setItem('quodeq.lastCloneRoot', cloneDest); } catch (_) {
-          // ignore (private mode, disabled storage, etc.)
-        }
+        writeString('quodeq.lastCloneRoot', cloneDest);
       }
       onComplete?.(result);
     } catch (err) {

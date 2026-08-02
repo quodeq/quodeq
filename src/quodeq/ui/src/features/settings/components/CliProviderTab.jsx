@@ -6,6 +6,7 @@ import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevel
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { readString, writeString } from '../../../adapters/storage.js';
 
 const DEFAULT_POWER_LEVEL = 2;
 
@@ -45,12 +46,12 @@ function ModelTextInput({ label, value, placeholder, onChange, required }) {
 
 export default function CliProviderTab({ providerId, state, update }) {
   const [power, setPower] = useState(() => {
-    try { return Number(localStorage.getItem(POWER_KEY)) || DEFAULT_POWER_LEVEL; } catch { return DEFAULT_POWER_LEVEL; }
+    return Number(readString(POWER_KEY)) || DEFAULT_POWER_LEVEL;
   });
 
   function persistPower(level) {
     setPower(level);
-    try { localStorage.setItem(POWER_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
+    writeString(POWER_KEY, String(level));
   }
 
   const hint = MODEL_HINTS[providerId];

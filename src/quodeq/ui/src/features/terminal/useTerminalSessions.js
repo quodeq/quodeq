@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listTerminalSessions, createTerminalSession, killTerminalSession } from '../../api/terminal.js';
+import { readString, writeString } from '../../adapters/storage.js';
 
 // Closing the drawer unmounts the pane (and this hook), so the selected tab
 // must survive outside React state or reopening always lands on the newest
@@ -9,7 +10,7 @@ import { listTerminalSessions, createTerminalSession, killTerminalSession } from
 const ACTIVE_SESSION_KEY = 'quodeq.terminal.activeSession';
 
 function readStoredActive() {
-  try { return window.localStorage.getItem(ACTIVE_SESSION_KEY); } catch { return null; }
+  return readString(ACTIVE_SESSION_KEY);
 }
 
 /**
@@ -68,7 +69,7 @@ export function useTerminalSessions({ enabled }) {
   // so the next mount of this hook starts from the same tab.
   useEffect(() => {
     if (!activeId) return;
-    try { window.localStorage.setItem(ACTIVE_SESSION_KEY, activeId); } catch { /* noop */ }
+    writeString(ACTIVE_SESSION_KEY, activeId);
   }, [activeId]);
 
   const openSession = useCallback(async () => {

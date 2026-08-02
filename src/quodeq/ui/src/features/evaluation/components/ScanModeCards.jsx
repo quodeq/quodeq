@@ -2,24 +2,17 @@ import { useEffect } from 'react';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { t } from '../../../strings/index.js';
+import { readString, removeKey, writeString } from '../../../adapters/storage.js';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
 function readPermanent() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return readString(STORAGE_KEY) === '1';
 }
 
 function writePermanent(on) {
-  try {
-    if (on) localStorage.setItem(STORAGE_KEY, '1');
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore quota / disabled storage */
-  }
+  if (on) writeString(STORAGE_KEY, '1');
+  else removeKey(STORAGE_KEY);
 }
 
 function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
