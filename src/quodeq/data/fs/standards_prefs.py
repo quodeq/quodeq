@@ -70,6 +70,19 @@ def load_project_overrides(project_root: str | Path | None) -> dict[str, dict]:
     return {req_id: vals for req_id, vals in overrides.items() if isinstance(vals, dict)}
 
 
+def save_project_overrides(project_root: str | Path, overrides: dict[str, dict]) -> None:
+    """Write ``{req_id: {param: value}}``, creating ``.quodeq/`` when needed."""
+    path = Path(project_root) / OVERRIDES_RELPATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps({"version": 1, "overrides": overrides}, indent=2) + "\n"
+    path.write_text(payload, encoding="utf-8")
+
+
+def clear_project_overrides(project_root: str | Path) -> None:
+    """Remove the overrides file. No-op when it does not exist."""
+    (Path(project_root) / OVERRIDES_RELPATH).unlink(missing_ok=True)
+
+
 def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
     """Collect ``{req_id: params_spec}`` across every compiled dimension file."""
     declared: dict[str, dict] = {}
