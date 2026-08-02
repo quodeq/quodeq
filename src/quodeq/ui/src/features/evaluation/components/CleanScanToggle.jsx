@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { t } from '../../../strings/index.js';
+import { readString, removeKey, writeString } from '../../../adapters/storage.js';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
 function readPermanent() {
   try {
-    return localStorage.getItem(STORAGE_KEY) === '1';
+    return readString(STORAGE_KEY) === '1';
   } catch {
     return false;
   }

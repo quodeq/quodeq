@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
+import { readString } from '../../../../adapters/storage.js';
 
 const STORAGE_KEY = 'quodeq.lastCloneRoot';
 
 function readInitialDest() {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) return stored;
-    }
-  } catch {
-    // ignore (private mode, disabled storage, etc.)
-  }
-  return '~';
+  return readString(STORAGE_KEY) || '~';
 }
 
 export default function CloneTargetStep({

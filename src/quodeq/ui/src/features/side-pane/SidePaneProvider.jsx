@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SidePaneContext } from './SidePaneContext.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
+import { readString, removeKey, writeString } from '../../adapters/storage.js';
 
 const STORAGE_KEY = 'quodeq.sidePaneWidth';
 const LEGACY_STORAGE_KEY = 'quodeq.reportPaneWidth';
@@ -29,31 +30,22 @@ function SidePaneToast({ notice, onDismiss }) {
 }
 
 function readStoredWidth() {
-  try {
-    if (typeof localStorage === 'undefined') return DEFAULT_WIDTH_PX;
-    let raw = localStorage.getItem(STORAGE_KEY);
-    if (raw == null) {
-      // One-time migration from the pre-rename key.
-      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (legacy != null) {
-        localStorage.setItem(STORAGE_KEY, legacy);
-        localStorage.removeItem(LEGACY_STORAGE_KEY);
-        raw = legacy;
-      }
+  let raw = readString(STORAGE_KEY);
+  if (raw == null) {
+    // One-time migration from the pre-rename key.
+    const legacy = readString(LEGACY_STORAGE_KEY);
+    if (legacy != null) {
+      writeString(STORAGE_KEY, legacy);
+      removeKey(LEGACY_STORAGE_KEY);
+      raw = legacy;
     }
-    const n = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : DEFAULT_WIDTH_PX;
-  } catch {
-    return DEFAULT_WIDTH_PX;
   }
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_WIDTH_PX;
 }
 
 function writeStoredWidth(px) {
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(STORAGE_KEY, String(px));
-  } catch {
-    /* quota / disabled — ignore */
-  }
+  writeString(STORAGE_KEY, String(px));
 }
 
 export function SidePaneProvider({ children }) {
