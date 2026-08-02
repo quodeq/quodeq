@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 // File extension is product identity, not translatable prose.
@@ -111,7 +112,7 @@ async function importEvaluator(data, force, onImported, state, importStandard) {
     }
     onImported();
   } catch (err) {
-    setError(err.message || t('standards.importFailed'));
+    setError(apiErrorMessage(err, 'standards.importFailed'));
     setStep(STEP.ERROR);
   }
 }

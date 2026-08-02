@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -244,7 +245,7 @@ export function usePublish({ enabled = true } = {}) {
       stopPolling();
       pollTimerRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
     } catch (err) {
-      setPublishError(err?.message || t('projects.publishStartFailed'));
+      setPublishError(apiErrorMessage(err, 'projects.publishStartFailed'));
       setPublishErrorProject(projectId);
     } finally {
       publishingRef.current = false;

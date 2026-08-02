@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 function FileIcon() {
   return (
@@ -125,7 +126,7 @@ async function navigateFolder(path, navigation, showFiles, browseDirectory) {
     const result = await browseDirectory(path || '', { files: showFiles });
     updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
-    setNavError(err.message || t('evaluate.folderLoadFailed'));
+    setNavError(apiErrorMessage(err, 'evaluate.folderLoadFailed'));
   } finally {
     setLoading(false);
   }
@@ -144,7 +145,7 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
       onClose();
       navigate(currentPath);
     } catch (err) {
-      setError(err.message || t('evaluate.folderCreateFailed'));
+      setError(apiErrorMessage(err, 'evaluate.folderCreateFailed'));
     }
   }
 

@@ -4,6 +4,7 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 export default function SharedRepoSection({ onDisconnected }) {
   const { getSharedStatus, connectShared, disconnectShared } = useApi();
@@ -47,7 +48,7 @@ export default function SharedRepoSection({ onDisconnected }) {
         await refetchStatus();
         return result;
       } catch (err) {
-        const errorMsg = err?.message || t('settings.connectFailed');
+        const errorMsg = apiErrorMessage(err, 'settings.connectFailed');
         setError(errorMsg);
         throw err;
       } finally {
@@ -80,7 +81,7 @@ export default function SharedRepoSection({ onDisconnected }) {
         // the user on a broken view.
         onDisconnected?.();
       } catch (err) {
-        const errorMsg = err?.message || t('settings.disconnectFailed');
+        const errorMsg = apiErrorMessage(err, 'settings.disconnectFailed');
         setError(errorMsg);
         throw err;
       } finally {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLibrary } from '../hooks/useLibrary.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 function LibraryCard({ standard, onImport, importing }) {
   const principleCount = standard.principles?.length ?? 0;
@@ -49,7 +50,7 @@ export default function LibraryBrowser({ onClose, onImported }) {
       onClose();
     } catch (err) {
       console.error('Import failed:', err);
-      setImportError(err.message || t('standards.importFailedRetry'));
+      setImportError(apiErrorMessage(err, 'standards.importFailedRetry'));
     }
   };
 

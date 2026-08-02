@@ -3,6 +3,7 @@ import { exportStandard } from '../../../api/index.js';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const BASE_LABELS = {
   [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'),
@@ -183,7 +184,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
             onDownload={() => {
               setDownloadError(null);
               downloadStandard(standard.id).catch((err) => {
-                setDownloadError(err?.message || t('standards.downloadFailed'));
+                setDownloadError(apiErrorMessage(err, 'standards.downloadFailed'));
               });
             }}
             onDelete={() => setShowDeleteModal(true)}

@@ -90,7 +90,12 @@ export async function importStandard(data, force = false) {
   }
   const body = await res.json().catch(() => ({}));
   if (res.status === 409) return { ...body, _conflict: true };
-  if (!res.ok) throw new Error(body.error || `Import failed: ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(body.error || `Import failed: ${res.status}`);
+    err.status = res.status;
+    err.code = body.code ?? null;
+    throw err;
+  }
   return body;
 }
 

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
@@ -29,7 +30,7 @@ export function useStandards() {
       setMutationError(null);
       await refresh();
     } catch (err) {
-      setMutationError(err.message || t('standards.deleteFailed'));
+      setMutationError(apiErrorMessage(err, 'standards.deleteFailed'));
     }
   }, [deleteStandard, refresh]);
 
@@ -39,7 +40,7 @@ export function useStandards() {
       setMutationError(null);
       await refresh();
     } catch (err) {
-      setMutationError(err.message || t('standards.duplicateFailed'));
+      setMutationError(apiErrorMessage(err, 'standards.duplicateFailed'));
     }
   }, [duplicateStandard, refresh]);
 
