@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
+import { isFrozenRun } from '../../../models/runRules.js';
 
 const EMPTY_TREND = [];
 
@@ -66,18 +67,16 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   // run deletion), and every one of those invalidates the project query
   // subtree — which forces a refetch regardless of staleTime. Freezing the
   // query here removes the routine time-based background refetch (and the
-  // dashboard-refreshing dim flash) on re-entering a run view. Unknown
-  // status counts as frozen: by the time a run detail is opened the runs
-  // list is already cached, and treating the brief unknown window as frozen
-  // avoids a spurious mount refetch.
-  const runStatus = (availableRuns || []).find((r) => r.runId === selectedRun)?.status;
-  const isFrozenRun = !!selectedRun && selectedRun !== "latest" && runStatus !== "in_progress";
+  // dashboard-refreshing dim flash) on re-entering a run view. The rule
+  // itself (including why an unknown run counts as frozen) lives in
+  // models/runRules.js.
+  const frozenRun = isFrozenRun(selectedRun, availableRuns);
 
   const dashboardQuery = useQuery({
     queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
-    staleTime: isFrozenRun ? Infinity : 60_000,
+    staleTime: frozenRun ? Infinity : 60_000,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
