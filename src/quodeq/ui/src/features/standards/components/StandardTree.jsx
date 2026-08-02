@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { resolveRequirementText } from '../resolveRequirementText.js';
+import { t } from '../../../strings/index.js';
 
 function TreeNodeRow({ node, actions, titles, expand }) {
   const { label, isSelected } = node;
@@ -36,14 +37,14 @@ function TreeNodeRow({ node, actions, titles, expand }) {
 
       <div className="tree-node-actions" onClick={(e) => e.stopPropagation()}>
         {onAdd && (
-          <button type="button" className="tree-action-btn" onClick={onAdd} title={addTitle || 'Add'}>
+          <button type="button" className="tree-action-btn" onClick={onAdd} title={addTitle || t('standards.add')}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
         )}
         {onRemove && (
-          <button type="button" className="tree-action-btn tree-action-btn--remove" onClick={onRemove} title={removeTitle || 'Remove'}>
+          <button type="button" className="tree-action-btn tree-action-btn--remove" onClick={onRemove} title={removeTitle || t('standards.remove')}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <path d="M5 12h14" />
             </svg>
@@ -98,17 +99,17 @@ function RequirementNode({ req, position, selectedNode, actions, confirmFn = win
     if (hasContent) {
       const label = resolvedText
         ? (resolvedText.length > MAX_LABEL_DISPLAY_LENGTH ? resolvedText.slice(0, MAX_LABEL_DISPLAY_LENGTH) + '...' : resolvedText)
-        : 'Untitled';
-      if (!confirmFn(`Delete requirement "${label}"?`)) return;
+        : t('standards.untitled');
+      if (!confirmFn(t('standards.deleteReqConfirm', { label }))) return;
     }
     onRemoveRequirement(pi, ri);
   };
   return (
     <TreeNode
       key={ri}
-      node={{ label: resolvedText || `Requirement ${ri + 1}`, isSelected: isReqSelected, depth: 2, customized: isCustomized }}
+      node={{ label: resolvedText || t('standards.requirementN', { n: ri + 1 }), isSelected: isReqSelected, depth: 2, customized: isCustomized }}
       actions={{ onClick: () => onSelectNode({ type: 'requirement', principleIndex: pi, reqIndex: ri }), onRemove: editable ? handleRemoveReq : undefined }}
-      titles={{ removeTitle: 'Remove Requirement' }}
+      titles={{ removeTitle: t('standards.removeRequirement') }}
     />
   );
 }
@@ -119,16 +120,20 @@ function PrincipleNode({ principle, pi, selectedNode, actions, confirmFn = windo
   const reqCount = principle.requirements?.length || 0;
   const handleRemovePrinciple = () => {
     if (reqCount > 0) {
-      if (!confirmFn(`Delete "${principle.name || 'Untitled'}" and its ${reqCount} requirement${reqCount !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+      const name = principle.name || t('standards.untitled');
+      const message = reqCount === 1
+        ? t('standards.deletePrincipleConfirmOne', { name, count: reqCount })
+        : t('standards.deletePrincipleConfirmMany', { name, count: reqCount });
+      if (!confirmFn(message)) return;
     }
     onRemovePrinciple(pi);
   };
   return (
     <TreeNode
       key={pi}
-      node={{ label: principle.name || `Principle ${pi + 1}`, isSelected: isPrincipleSelected, depth: 1, defaultExpanded: false }}
+      node={{ label: principle.name || t('standards.principleN', { n: pi + 1 }), isSelected: isPrincipleSelected, depth: 1, defaultExpanded: false }}
       actions={{ onClick: () => onSelectNode({ type: 'principle', index: pi }), onAdd: editable ? () => onAddRequirement(pi) : undefined, onRemove: editable ? handleRemovePrinciple : undefined }}
-      titles={{ addTitle: 'Add Requirement', removeTitle: 'Remove Principle' }}
+      titles={{ addTitle: t('standards.addRequirement'), removeTitle: t('standards.removePrinciple') }}
     >
       {(principle.requirements || []).map((req, ri) => (
         <RequirementNode key={ri} req={req} position={{ ri, pi }} selectedNode={selectedNode} actions={actions} confirmFn={confirmFn} customizedIds={customizedIds} overrides={overrides} />
@@ -153,9 +158,9 @@ export default function StandardTree({ standard, selectedNode, actions, confirmF
   return (
     <div className="standard-tree">
       <TreeNode
-        node={{ label: standard.name || 'Standard', isSelected: selectedNode?.type === 'root', depth: 0, alwaysExpanded: true }}
+        node={{ label: standard.name || t('standards.standardLabel'), isSelected: selectedNode?.type === 'root', depth: 0, alwaysExpanded: true }}
         actions={{ onClick: () => onSelectNode({ type: 'root' }), onAdd: editable ? onAddPrinciple : undefined }}
-        titles={{ addTitle: 'Add Principle' }}
+        titles={{ addTitle: t('standards.addPrinciple') }}
       >
         <PrinciplesList principles={standard.principles} selectedNode={selectedNode} actions={treeActions} confirmFn={confirmFn} customizedIds={customizedIds} overrides={overrides} />
       </TreeNode>

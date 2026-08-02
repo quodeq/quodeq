@@ -1,6 +1,7 @@
 import PrincipleForm from './PrincipleForm.jsx';
 import RequirementForm from './RequirementForm.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { t } from '../../../strings/index.js';
 
 function slugify(text) {
   return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -9,7 +10,7 @@ function slugify(text) {
 function EmptyState() {
   return (
     <p className="detail-empty-state">
-      Add your first principle from the tree on the left, then define requirements for each one.
+      {t('standards.emptyDetailHint')}
     </p>
   );
 }
@@ -24,8 +25,8 @@ function NameField({ standard, editable, isNew, onUpdateField }) {
   };
   return (
     <div className="form-group">
-      <label htmlFor="std-name">Name</label>
-      <input id="std-name" className="form-input" value={standard.name || ''} onChange={handleNameChange} disabled={!editable} placeholder="e.g. Clean Architecture" autoFocus={isNew} />
+      <label htmlFor="std-name">{t('standards.colName')}</label>
+      <input id="std-name" className="form-input" value={standard.name || ''} onChange={handleNameChange} disabled={!editable} placeholder={t('standards.namePlaceholder')} autoFocus={isNew} />
     </div>
   );
 }
@@ -33,8 +34,8 @@ function NameField({ standard, editable, isNew, onUpdateField }) {
 function DescriptionField({ standard, editable, onUpdateField }) {
   return (
     <div className="form-group">
-      <label htmlFor="std-description">Description</label>
-      <textarea id="std-description" className="form-textarea" value={standard.description || ''} onChange={(e) => onUpdateField(['description'], e.target.value)} disabled={!editable} placeholder="Describe this standard..." rows={4} />
+      <label htmlFor="std-description">{t('standards.descriptionLabel')}</label>
+      <textarea id="std-description" className="form-textarea" value={standard.description || ''} onChange={(e) => onUpdateField(['description'], e.target.value)} disabled={!editable} placeholder={t('standards.describeStandardPlaceholder')} rows={4} />
     </div>
   );
 }
@@ -42,8 +43,8 @@ function DescriptionField({ standard, editable, onUpdateField }) {
 function SourceField({ standard, editable, onUpdateField }) {
   return (
     <div className="form-group">
-      <label htmlFor="std-source">Source</label>
-      <input id="std-source" className="form-input" value={standard.source || ''} onChange={(e) => onUpdateField(['source'], e.target.value)} disabled={!editable} placeholder="e.g. https://example.com/standard" />
+      <label htmlFor="std-source">{t('standards.sourceLabel')}</label>
+      <input id="std-source" className="form-input" value={standard.source || ''} onChange={(e) => onUpdateField(['source'], e.target.value)} disabled={!editable} placeholder={t('standards.sourcePlaceholder')} />
     </div>
   );
 }
@@ -51,12 +52,12 @@ function SourceField({ standard, editable, onUpdateField }) {
 function RootDetail({ standard, onUpdateField, editable, isNew }) {
   return (
     <div className="standard-root-detail">
-      <SectionLabel marker="▶">Standard</SectionLabel>
+      <SectionLabel marker="▶">{t('standards.standardLabel')}</SectionLabel>
       <NameField standard={standard} editable={editable} isNew={isNew} onUpdateField={onUpdateField} />
       <input type="hidden" value={standard.id || ''} />
       <DescriptionField standard={standard} editable={editable} onUpdateField={onUpdateField} />
       <SourceField standard={standard} editable={editable} onUpdateField={onUpdateField} />
-      {standard.managed && <p className="detail-managed-notice">Managed standard. Fields are read-only to preserve upstream compatibility.</p>}
+      {standard.managed && <p className="detail-managed-notice">{t('standards.managedNotice')}</p>}
       {editable && (!standard.principles || standard.principles.length === 0) && <EmptyState />}
     </div>
   );

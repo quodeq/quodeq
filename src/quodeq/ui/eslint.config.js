@@ -27,7 +27,7 @@ export default [
           ignoreProps: true,
           noAttributeStrings: false,
           // Pure punctuation/symbol glyphs are not translatable text.
-          allowedStrings: [' ', '×', '·', '•', '…', ':', '(', ')', '[', ']', '/', ',', '-', '%', '—', '‹', '›', '→', '@', '↑', '+', '▸', '✓', '✕', '↻', 'Δ', '⟳', '▾'],
+          allowedStrings: [' ', '×', '·', '•', '…', ':', '(', ')', '[', ']', '/', ',', '-', '%', '—', '‹', '›', '→', '@', '↑', '+', '▸', '✓', '✕', '↻', 'Δ', '⟳', '▾', '?', '.', '←'],
         },
       ],
     },

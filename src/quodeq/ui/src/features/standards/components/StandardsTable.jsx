@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { exportStandard } from '../../../api/index.js';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
+import { t } from '../../../strings/index.js';
 
 const BASE_LABELS = {
-  [STANDARD_TYPES.BUILTIN]: 'iso-25010',
-  [STANDARD_TYPES.QUODEQ]: 'quodeq',
-  [STANDARD_TYPES.COMMUNITY]: 'community',
-  [STANDARD_TYPES.CUSTOM]: 'custom',
+  [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'),
+  [STANDARD_TYPES.QUODEQ]: t('standards.baseQuodeq'),
+  [STANDARD_TYPES.COMMUNITY]: t('standards.baseCommunity'),
+  [STANDARD_TYPES.CUSTOM]: t('standards.baseCustom'),
 };
 
 function ConfirmDeleteModal({ standardName, principleCount, requirementCount, onConfirm, onCancel }) {
@@ -19,21 +20,21 @@ function ConfirmDeleteModal({ standardName, principleCount, requirementCount, on
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">Delete Standard</h3>
+        <h3 className="modal-title">{t('standards.deleteStandardTitle')}</h3>
         {hasContent ? (
           <>
             <p className="modal-body modal-body--warning">
-              <strong>{standardName}</strong> contains <strong>{principleCount} principle{principleCount !== 1 ? 's' : ''}</strong> and <strong>{requirementCount} requirement{requirementCount !== 1 ? 's' : ''}</strong>. This action cannot be undone.
+              <strong>{standardName}</strong> {t('standards.contains')} <strong>{principleCount === 1 ? t('standards.principlesCountOne', { count: principleCount }) : t('standards.principlesCountMany', { count: principleCount })}</strong> {t('standards.and')} <strong>{requirementCount === 1 ? t('standards.requirementsCountOne', { count: requirementCount }) : t('standards.requirementsCountMany', { count: requirementCount })}</strong>. {t('standards.cannotBeUndone')}
             </p>
-            <p className="modal-body">Type <strong>{standardName}</strong> to confirm:</p>
+            <p className="modal-body">{t('standards.typePrefix')} <strong>{standardName}</strong> {t('standards.toConfirmSuffix')}</p>
             <input className="modal-input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={standardName} autoFocus />
           </>
         ) : (
-          <p className="modal-body">Are you sure you want to delete <strong>{standardName}</strong>?</p>
+          <p className="modal-body">{t('standards.deleteConfirmPrefix')} <strong>{standardName}</strong>?</p>
         )}
         <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
-          <button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>Delete</button>
+          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
+          <button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>{t('violations.delete')}</button>
         </div>
       </div>
     </div>
@@ -45,12 +46,12 @@ function DuplicateModal({ standardId, onConfirm, onCancel }) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">Duplicate Standard</h3>
-        <p className="modal-body">Enter an ID for the new standard:</p>
+        <h3 className="modal-title">{t('standards.duplicateStandardTitle')}</h3>
+        <p className="modal-body">{t('standards.enterNewId')}</p>
         <input className="modal-input" value={newId} onChange={(e) => setNewId(e.target.value)} autoFocus />
         <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={() => onConfirm(newId)} disabled={!newId.trim()}>Duplicate</button>
+          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
+          <button type="button" className="btn-primary" onClick={() => onConfirm(newId)} disabled={!newId.trim()}>{t('standards.duplicate')}</button>
         </div>
       </div>
     </div>
@@ -80,7 +81,7 @@ function StarToggle({ isVisible, standardId, onToggleVisibility }) {
     <button
       type="button"
       className={`standards-star-btn${isVisible ? ' standards-star-btn--on' : ''}`}
-      title={isVisible ? 'Enabled, click to disable' : 'Disabled, click to enable'}
+      title={isVisible ? t('standards.enabledTitle') : t('standards.disabledTitle')}
       onClick={(e) => { e.stopPropagation(); onToggleVisibility(standardId); }}
     >
       {isVisible ? ICON_STAR_FILLED : ICON_STAR_OUTLINE}
@@ -89,7 +90,7 @@ function StarToggle({ isVisible, standardId, onToggleVisibility }) {
 }
 
 function RowActions({ standard, isDeletable, isEditable, onOpen, onDuplicate, onDownload, onDelete }) {
-  const openLabel = isEditable ? 'Edit' : 'View';
+  const openLabel = isEditable ? t('standards.edit') : t('standards.view');
   return (
     <div className="standards-row-actions" onClick={(e) => e.stopPropagation()}>
       <button type="button" className="standards-row-action" onClick={onOpen} title={openLabel} aria-label={`${openLabel} ${standard.name}`}>
@@ -105,13 +106,13 @@ function RowActions({ standard, isDeletable, isEditable, onOpen, onDuplicate, on
           </svg>
         )}
       </button>
-      <button type="button" className="standards-row-action" onClick={onDuplicate} title="Duplicate" aria-label={`Duplicate ${standard.name}`}>
+      <button type="button" className="standards-row-action" onClick={onDuplicate} title={t('standards.duplicate')} aria-label={`${t('standards.duplicate')} ${standard.name}`}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </button>
-      <button type="button" className="standards-row-action" onClick={onDownload} title="Download" aria-label={`Download ${standard.name}`}>
+      <button type="button" className="standards-row-action" onClick={onDownload} title={t('standards.download')} aria-label={`${t('standards.download')} ${standard.name}`}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="7 10 12 15 17 10" />
@@ -119,7 +120,7 @@ function RowActions({ standard, isDeletable, isEditable, onOpen, onDuplicate, on
         </svg>
       </button>
       {isDeletable && (
-        <button type="button" className="standards-row-action standards-row-action--danger" onClick={onDelete} title="Delete" aria-label={`Delete ${standard.name}`}>
+        <button type="button" className="standards-row-action standards-row-action--danger" onClick={onDelete} title={t('violations.delete')} aria-label={`${t('violations.delete')} ${standard.name}`}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <polyline points="3 6 5 6 21 6" />
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -163,7 +164,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
           <span className={`standards-base-pill standards-base-pill--${standard.type}`}>{baseLabel}</span>
           {customizedCounts?.[standard.id] > 0 && (
             <span className="standards-customized-badge">
-              {customizedCounts[standard.id]} customized
+              {t('standards.customizedCount', { count: customizedCounts[standard.id] })}
             </span>
           )}
         </div>
@@ -182,7 +183,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
             onDownload={() => {
               setDownloadError(null);
               downloadStandard(standard.id).catch((err) => {
-                setDownloadError(err?.message || 'Download failed');
+                setDownloadError(err?.message || t('standards.downloadFailed'));
               });
             }}
             onDelete={() => setShowDeleteModal(true)}
@@ -191,7 +192,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
       </div>
       {downloadError && (
         <div role="alert" className="standards-row-error">
-          Could not download standard: {downloadError}
+          {t('standards.downloadError', { message: downloadError })}
         </div>
       )}
       {showDeleteModal && (
@@ -224,7 +225,7 @@ export default function StandardsTable({ grouped, actions, customizedCounts }) {
   if (all.length === 0) {
     return (
       <div className="standards-empty">
-        <p>No standards found. Import from the library or create a custom standard.</p>
+        <p>{t('standards.noStandardsFound')}</p>
       </div>
     );
   }
@@ -232,11 +233,11 @@ export default function StandardsTable({ grouped, actions, customizedCounts }) {
   return (
     <div className="standards-table" role="table">
       <div className="standards-table-head" role="row">
-        <div className="standards-cell standards-cell--name">Name</div>
-        <div className="standards-cell standards-cell--base">Base</div>
-        <div className="standards-cell standards-cell--num">Principles</div>
-        <div className="standards-cell standards-cell--num">Requirements</div>
-        <div className="standards-cell standards-cell--enabled">Enabled</div>
+        <div className="standards-cell standards-cell--name">{t('standards.colName')}</div>
+        <div className="standards-cell standards-cell--base">{t('standards.colBase')}</div>
+        <div className="standards-cell standards-cell--num">{t('standards.colPrinciples')}</div>
+        <div className="standards-cell standards-cell--num">{t('standards.colRequirements')}</div>
+        <div className="standards-cell standards-cell--enabled">{t('standards.colEnabled')}</div>
         <div className="standards-cell standards-cell--actions" />
       </div>
       <div className="standards-table-body">

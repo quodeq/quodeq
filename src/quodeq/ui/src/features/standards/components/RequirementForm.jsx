@@ -3,6 +3,7 @@ import ReferenceEditor from './ReferenceEditor.jsx';
 import ThresholdFields from './ThresholdFields.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { resolveRequirementText } from '../resolveRequirementText.js';
+import { t } from '../../../strings/index.js';
 
 export default function RequirementForm({ requirement, principleIndex, reqIndex, onUpdateField, editable,
                                           reqOverrides, onChangeParam }) {
@@ -20,10 +21,10 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
 
   return (
     <div className="requirement-form">
-      <SectionLabel marker="▶">Requirement</SectionLabel>
+      <SectionLabel marker="▶">{t('standards.requirementLabel')}</SectionLabel>
 
       <div className="form-group">
-        <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>Rule</label>
+        <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>{t('standards.ruleLabel')}</label>
         <input
           ref={ruleRef}
           id={`req-text-${principleIndex}-${reqIndex}`}
@@ -31,19 +32,19 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
           value={displayText}
           onChange={(e) => onUpdateField([...basePath, 'text'], e.target.value)}
           disabled={!editable}
-          placeholder="e.g. Source code dependencies must point inward only"
+          placeholder={t('standards.rulePlaceholder')}
         />
       </div>
 
       <div className="form-group">
-        <label htmlFor={`req-desc-${principleIndex}-${reqIndex}`}>Description</label>
+        <label htmlFor={`req-desc-${principleIndex}-${reqIndex}`}>{t('standards.descriptionLabel')}</label>
         <textarea
           id={`req-desc-${principleIndex}-${reqIndex}`}
           className="form-textarea"
           value={requirement.description || ''}
           onChange={(e) => onUpdateField([...basePath, 'description'], e.target.value)}
           disabled={!editable}
-          placeholder="Context and rationale for this rule..."
+          placeholder={t('standards.ruleDescPlaceholder')}
           rows={3}
         />
       </div>

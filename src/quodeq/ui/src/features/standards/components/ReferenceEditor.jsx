@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
 
 const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
 const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
@@ -40,13 +41,13 @@ function CweList({ filtered, onSelect, onClose }) {
           tabIndex={0}
         >
           <div className="cwe-browser-item-header">
-            <span className="cwe-browser-item-id">CWE-{c.id}</span>
+            <span className="cwe-browser-item-id">{t('standards.cweId', { id: c.id })}</span>
             <span className="cwe-browser-item-abstraction">{c.abstraction}</span>
           </div>
           <div className="cwe-browser-item-name">{c.name}</div>
         </div>
       ))}
-      {filtered.length === 0 && <div className="cwe-browser-empty">No CWEs match your search.</div>}
+      {filtered.length === 0 && <div className="cwe-browser-empty">{t('standards.noCweMatch')}</div>}
     </div>
   );
 }
@@ -57,7 +58,7 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
       <input
         ref={searchRef}
         className="cwe-browser-search"
-        placeholder="Search by ID or name..."
+        placeholder={t('standards.cweSearchPlaceholder')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -66,7 +67,7 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
         value={filterAbstraction}
         onChange={(e) => setFilterAbstraction(e.target.value)}
       >
-        <option value="">All types</option>
+        <option value="">{t('standards.allTypes')}</option>
         {ABSTRACTION_ORDER.map((a) => (
           <option key={a} value={a}>{a}</option>
         ))}
@@ -87,7 +88,7 @@ function CweBrowserModal({ onSelect, onClose }) {
   });
   const cwes = cwesData || [];
   const cweError = cwesQueryError
-    ? 'Failed to load CWE list. Check your connection and try again.'
+    ? t('standards.cweLoadFailed')
     : null;
 
   useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
@@ -102,12 +103,12 @@ function CweBrowserModal({ onSelect, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="cwe-browser-modal" onClick={(e) => e.stopPropagation()}>
         <div className="cwe-browser-header">
-          <h3 className="cwe-browser-title">Select CWE</h3>
+          <h3 className="cwe-browser-title">{t('standards.selectCweTitle')}</h3>
           <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
         </div>
         <CweFilterBar searchRef={searchRef} query={query} setQuery={setQuery} filterAbstraction={filterAbstraction} setFilterAbstraction={setFilterAbstraction} />
         {cweError && <div className="error-banner">{cweError}</div>}
-        <div className="cwe-browser-count">{filtered.length} of {cwes.length} CWEs</div>
+        <div className="cwe-browser-count">{t('standards.cweCount', { shown: filtered.length, total: cwes.length })}</div>
         <CweList filtered={filtered} onSelect={onSelect} onClose={onClose} />
       </div>
     </div>
@@ -125,7 +126,7 @@ function CweSelector({ value, name, onSelect, disabled }) {
         onClick={() => !disabled && setShowBrowser(true)}
         disabled={disabled}
       >
-        {value ? `CWE-${value}` : 'Select CWE...'}
+        {value ? t('standards.cweId', { id: value }) : t('standards.selectCwePlaceholder')}
       </button>
       {name && <span className="ref-cwe-name" title={name}>{name}</span>}
       {showBrowser && (
@@ -139,9 +140,9 @@ function CweSelector({ value, name, onSelect, disabled }) {
 }
 
 const NAME_PLACEHOLDERS = {
-  book: 'Title (e.g. Clean Architecture Ch.22)',
-  url: 'Description',
-  other: 'Description',
+  book: t('standards.refTitlePlaceholder'),
+  url: t('standards.refDescPlaceholder'),
+  other: t('standards.refDescPlaceholder'),
 };
 
 function CweRefInputs({ refData, onSelect, disabled }) {
@@ -154,11 +155,11 @@ function GenericRefInputs({ refData, onFieldChange, disabled }) {
       {refData.refId && <span className="ref-builtin-id">{refData.type.toUpperCase()}-{refData.refId}</span>}
       <input
         className="ref-name-input"
-        placeholder={NAME_PLACEHOLDERS[refData.type] || 'Description'}
+        placeholder={NAME_PLACEHOLDERS[refData.type] || t('standards.refDescPlaceholder')}
         value={refData.name}
         onChange={(e) => onFieldChange('name', e.target.value)}
         disabled={disabled}
-        aria-label="Reference name"
+        aria-label={t('standards.refNameAria')}
       />
     </>
   );
@@ -171,7 +172,7 @@ function RefTypeSelect({ refData, typeOptions, onTypeChange, disabled }) {
       value={typeOptions.includes(refData.type) ? refData.type : 'other'}
       onChange={(e) => onTypeChange(e.target.value)}
       disabled={disabled}
-      aria-label="Reference type"
+      aria-label={t('standards.refTypeAria')}
     >
       {typeOptions.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
     </select>
@@ -180,7 +181,7 @@ function RefTypeSelect({ refData, typeOptions, onTypeChange, disabled }) {
 
 function RefRemoveButton({ index, onRemove }) {
   return (
-    <button type="button" className="ref-remove-btn" onClick={() => onRemove(index)} aria-label="Remove reference" title="Remove">
+    <button type="button" className="ref-remove-btn" onClick={() => onRemove(index)} aria-label={t('standards.removeRefAria')} title={t('standards.remove')}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M18 6L6 18M6 6l12 12" />
       </svg>
@@ -214,11 +215,11 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
       }
       <input
         className="ref-url-input"
-        placeholder="URL (optional)"
+        placeholder={t('standards.refUrlPlaceholder')}
         value={ref.url}
         onChange={(e) => handleFieldChange('url', e.target.value)}
         disabled={disabled}
-        aria-label="Reference URL"
+        aria-label={t('standards.refUrlAria')}
       />
       {!disabled && <RefRemoveButton index={index} onRemove={onRemove} />}
     </div>
@@ -242,15 +243,15 @@ export default function ReferenceEditor({ refs, onChange, disabled }) {
   return (
     <div className="reference-editor">
       <div className="reference-editor-header">
-        <span className="reference-editor-label">References</span>
+        <span className="reference-editor-label">{t('standards.referencesLabel')}</span>
         {!disabled && (
           <button type="button" className="ref-add-btn" onClick={handleAdd}>
-            + Add Reference
+            {t('standards.addReference')}
           </button>
         )}
       </div>
       {refs.length === 0 && (
-        <p className="reference-editor-empty">No references yet.</p>
+        <p className="reference-editor-empty">{t('standards.noReferencesYet')}</p>
       )}
       {refs.map((ref, i) => (
         <ReferenceRow
