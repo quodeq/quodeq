@@ -4,6 +4,7 @@ import { useTerminalSessions } from './useTerminalSessions.js';
 import TerminalSessionView from './TerminalSessionView.jsx';
 import TerminalHeader from './TerminalHeader.jsx';
 import { LockIcon, PlusIcon, XIcon } from '../../components/CopyButton.jsx';
+import { t } from '../../strings/index.js';
 
 /**
  * The terminal panel: header, session tab strip, one TerminalSessionView per
@@ -108,14 +109,16 @@ export default function TerminalPane({ active }) {
       <div className="tty-statusbar">
         {shell && <span>{shell}</span>}
         {shell && <span className="tty-statusbar-sep" aria-hidden="true">·</span>}
-        <span>{sessions.length} session{sessions.length === 1 ? '' : 's'}</span>
+        <span>{sessions.length === 1
+          ? t('terminal.sessionsOne', { count: sessions.length })
+          : t('terminal.sessionsMany', { count: sessions.length })}</span>
         <span className="tty-statusbar-sep" aria-hidden="true">·</span>
         {/* The gate only ever admits loopback clients (terminal/gate.py); a
             shell in a browser deserves a visible, if quiet, answer to "who
             else can reach this?". */}
-        <span className="tty-statusbar-lock" title="The embedded terminal only works on localhost">
+        <span className="tty-statusbar-lock" title={t('terminal.localhostTitle')}>
           <LockIcon />
-          localhost only
+          {t('terminal.localhostOnly')}
         </span>
         <span className="tty-statusbar-spacer" />
         {activeSession?.cwd && <span className="tty-statusbar-cwd" title={activeSession.cwd}>{activeSession.cwd}</span>}

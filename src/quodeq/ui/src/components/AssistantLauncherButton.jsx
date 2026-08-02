@@ -1,6 +1,7 @@
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
 import useAssistantProvider from '../features/settings/hooks/useAssistantProvider.js';
 import { QMarkIcon } from './QMarkIcon.jsx';
+import { t } from '../strings/index.js';
 
 export function AssistantLauncherButton() {
   const { openPanels, toggleTopbar } = useAssistantDrawer();
@@ -26,7 +27,7 @@ export function AssistantLauncherButton() {
           viewBox edge-to-edge while stroke icons carry built-in padding, so
           equal pixel sizes read visually larger. */}
       <QMarkIcon size={11} />
-      <span className="topbar-btn__label">assistant</span>
+      <span className="topbar-btn__label">{t('common.assistant')}</span>
     </button>
   );
 }

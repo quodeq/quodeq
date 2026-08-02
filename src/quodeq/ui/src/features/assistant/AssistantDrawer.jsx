@@ -5,6 +5,7 @@ import { CommandMenu } from './CommandMenu.jsx';
 import { AssistantWelcome } from './AssistantWelcome.jsx';
 import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.js';
 import { StopIcon } from '../../components/CopyButton.jsx';
+import { t } from '../../strings/index.js';
 
 function SendIcon() {
   return (
@@ -137,7 +138,7 @@ export function AssistantPane({ uiState, active = true }) {
           )}
         </div>
         <div className="assistant-composer-hint">
-          Enter to send · Shift+Enter for newline · runs locally on your model
+          {t('assistant.inputHint')}
         </div>
       </div>
     </>

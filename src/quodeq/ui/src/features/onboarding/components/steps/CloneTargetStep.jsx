@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TermHeader } from '../../../../components/terminal/index.js';
+import { t } from '../../../../strings/index.js';
 
 const STORAGE_KEY = 'quodeq.lastCloneRoot';
 
@@ -37,12 +38,12 @@ export default function CloneTargetStep({
 
   return (
     <div className="onboarding-step onboarding-step--clone-target">
-      <TermHeader name="clone" sub={`step ${stepIndex} of ${stepTotal} · pick a clone destination`} />
-      <p className="onboarding-step__pitch">Where should we clone this repo?</p>
+      <TermHeader name={t('onboarding.termClone')} sub={t('onboarding.subClone', { step: stepIndex, total: stepTotal })} />
+      <p className="onboarding-step__pitch">{t('onboarding.cloneWhere')}</p>
       {repoUrl && <p className="onboarding-clone-target__repo-url"><code>{repoUrl}</code></p>}
 
       <form onSubmit={handleSubmit} className="onboarding-clone-target__form">
-        <label htmlFor="clone-dest-input" className="onboarding-clone-target__label">Clone destination</label>
+        <label htmlFor="clone-dest-input" className="onboarding-clone-target__label">{t('onboarding.cloneDestLabel')}</label>
         <input
           id="clone-dest-input"
           type="text"
@@ -53,7 +54,7 @@ export default function CloneTargetStep({
           autoFocus
         />
         <p className="onboarding-clone-target__hint">
-          The repo will be cloned into this folder. You manage it from here, like any local repo.
+          {t('onboarding.cloneDestDesc')}
         </p>
         {error && <p className="onboarding-clone-target__error" role="alert">{error}</p>}
 
@@ -63,7 +64,7 @@ export default function CloneTargetStep({
             className="term-btn term-btn--primary term-btn--filled"
             disabled={submitting || !cloneDest.trim()}
           >
-            {submitting ? 'cloning...' : 'clone and scan'}
+            {submitting ? t('onboarding.cloning') : t('onboarding.cloneAndScan')}
           </button>
           <button
             type="button"
@@ -71,7 +72,7 @@ export default function CloneTargetStep({
             onClick={onBack}
             disabled={submitting}
           >
-            back
+            {t('common.back')}
           </button>
         </div>
       </form>
@@ -83,7 +84,7 @@ export default function CloneTargetStep({
           onClick={handleEphemeral}
           disabled={submitting}
         >
-          Just run one evaluation, don't keep a copy
+          {t('onboarding.ephemeral')}
         </button>
       </div>
     </div>

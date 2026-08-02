@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
 import { cloneElement } from 'react';
+import { BRAND_NAME } from '../strings/brand.js';
+import { t } from '../strings/index.js';
 
 // Folder glyph for the REPOSITORY row — same outline used in the file/folder
 // table on FileDetailPage, just sized up for the sidebar rail.
@@ -143,8 +145,8 @@ export default function Sidebar({
           >
             <Logo />
           </button>
-          <span className="sidebar-brand-text">quodeq</span>
-          {version && <span className="sidebar-version">v{version}</span>}
+          <span className="sidebar-brand-text">{BRAND_NAME}</span>
+          {version && <span className="sidebar-version">{t('common.versionPrefix', { version })}</span>}
         </div>
 
         {showProjectTabs && (
@@ -178,7 +180,7 @@ export default function Sidebar({
           <div className="sidebar-status">
             {lastEvalStr && (
               <div className="sidebar-status-row">
-                <span className="sidebar-status-label">Last eval</span>
+                <span className="sidebar-status-label">{t('common.lastEval')}</span>
                 <span className="sidebar-status-value">{lastEvalStr}</span>
               </div>
             )}

@@ -1,17 +1,19 @@
 import { TermHeader } from '../../../../components/terminal/index.js';
+import { t } from '../../../../strings/index.js';
+import { BRAND_NAME } from '../../../../strings/brand.js';
 
 const PREVIEW_ITEMS = [
-  { label: 'connect a repository', sub: 'git url or local folder' },
-  { label: 'pick an ai provider', sub: 'local cli, ollama, or cloud' },
-  { label: 'pick a standard', sub: 'start with one, run more later' },
+  { label: t('onboarding.previewRepoLabel'), sub: t('onboarding.previewRepoSub') },
+  { label: t('onboarding.previewProviderLabel'), sub: t('onboarding.previewProviderSub') },
+  { label: t('onboarding.previewStandardLabel'), sub: t('onboarding.previewStandardSub') },
 ];
 
 export default function WelcomeStep({ onStart, onSkip }) {
   return (
     <div className="onboarding-step onboarding-step--welcome">
-      <TermHeader name="welcome" sub="pick a path" />
+      <TermHeader name={t('onboarding.termWelcome')} sub={t('onboarding.subPickPath')} />
       <h1 className="onboarding-welcome__title">
-        welcome to <span className="onboarding-welcome__title-accent">quodeq</span>
+        {t('onboarding.welcomeTo')} <span className="onboarding-welcome__title-accent">{BRAND_NAME}</span>
       </h1>
       <ul className="onboarding-welcome__preview">
         {PREVIEW_ITEMS.map((p) => (
@@ -25,8 +27,8 @@ export default function WelcomeStep({ onStart, onSkip }) {
         ))}
       </ul>
       <div className="onboarding-welcome__actions">
-        <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onStart}>get started</button>
-        <button type="button" className="term-btn term-btn--secondary" onClick={onSkip}>maybe later</button>
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onStart}>{t('onboarding.getStarted')}</button>
+        <button type="button" className="term-btn term-btn--secondary" onClick={onSkip}>{t('onboarding.maybeLater')}</button>
       </div>
     </div>
   );

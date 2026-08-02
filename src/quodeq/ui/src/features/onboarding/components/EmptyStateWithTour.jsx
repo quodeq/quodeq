@@ -1,4 +1,5 @@
 import { TermHeader } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
 
 const SKIPPED_STEPS_KEY = 'quodeq_onboarding_skipped';
 
@@ -23,7 +24,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
             className="term-btn--primary"
             onClick={onBrowseRemote}
           >
-            browse remote repositories
+            {t('onboarding.browseRemote')}
           </button>
         )}
         <button
@@ -33,7 +34,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
           aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
-          add a project
+          {t('onboarding.addProject')}
         </button>
         <button
           type="button"
@@ -42,7 +43,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
           aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
-          take the tour
+          {t('onboarding.takeTour')}
         </button>
       </div>
     </section>

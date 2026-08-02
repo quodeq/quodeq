@@ -1,4 +1,5 @@
 import Badge from './Badge.jsx';
+import { t } from '../strings/index.js';
 
 /**
  * SharedReadOnlyBadge — "remote · read-only" tag shown on a remote (team
@@ -12,11 +13,11 @@ import Badge from './Badge.jsx';
 export default function SharedReadOnlyBadge({ publishedBy }) {
   return (
     <span className="badge-shared-readonly-group">
-      <Badge variant="tag" tone="info" title="Remote projects are read-only in this app">
-        remote · read-only
+      <Badge variant="tag" tone="info" title={t('common.remoteReadOnlyTitle')}>
+        {t('common.remoteReadOnly')}
       </Badge>
       {publishedBy && (
-        <span className="badge-shared-readonly-pub">published by {publishedBy}</span>
+        <span className="badge-shared-readonly-pub">{t('common.publishedBy')} {publishedBy}</span>
       )}
     </span>
   );

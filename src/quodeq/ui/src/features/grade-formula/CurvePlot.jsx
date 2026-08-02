@@ -1,3 +1,4 @@
+import { t } from '../../strings/index.js';
 const W = 220;
 const H = 130;
 const PAD_L = 26;
@@ -61,7 +62,7 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
         fill="var(--color-text-muted)"
         textAnchor="middle"
       >
-        violations
+        {t('gradeFormula.violationsAxis')}
       </text>
     </svg>
   );

@@ -5,6 +5,7 @@ import PreviewStrip from './PreviewStrip.jsx';
 import {
   SeverityTab, CurveTab, BoundariesTab, DimensionsTab,
 } from './tabs.jsx';
+import { t } from '../../strings/index.js';
 
 const TABS = [
   { id: 'severity', label: 'SEVERITY', Body: SeverityTab },
@@ -92,21 +93,20 @@ export default function GradeFormulaPage({ navigation }) {
           disabled={!isDirty || busy}
           onClick={onApply}
         >
-          APPLY
+          {t('gradeFormula.apply')}
         </button>
         <button type="button" className="settings-pill" disabled={busy} onClick={onReset}>
-          RESET Q&#xB2;
+          {t('gradeFormula.resetQ')}
         </button>
         <span className="gf-dirty-hint">
-          {isDirty ? 'unsaved changes. APPLY rescores all runs.'
-            : isCustom ? 'custom formula active' : 'Q² defaults active'}
+          {isDirty ? t('gradeFormula.unsavedHint')
+            : isCustom ? t('gradeFormula.customActive') : t('gradeFormula.defaultsActive')}
         </span>
         {error ? <span className="gf-dirty-hint">{error}</span> : null}
         {partialNotice ? <span className="gf-dirty-hint" role="alert">{partialNotice}</span> : null}
       </div>
       <p className="settings-description" style={{ marginTop: 8 }}>
-        These parameters do not affect the insufficient-evidence gate. Principles with too
-        little evidence stay Insufficient regardless of formula settings.
+        {t('gradeFormula.insufficientNote')}
       </p>
     </div>
   );

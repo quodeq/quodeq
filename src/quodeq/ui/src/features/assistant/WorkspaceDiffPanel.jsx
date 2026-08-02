@@ -3,6 +3,7 @@ import {
   applyAssistantWorkspace, createAssistantWorkspacePr,
   discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
 } from '../../api/assistant.js';
+import { t } from '../../strings/index.js';
 
 export function classifyDiffLine(line) {
   if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) return 'wsdiff-file';
@@ -63,11 +64,11 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
     return (
       <div className="workspace-diff">
         <p className="workspace-diff-outcome" role="status" aria-live="polite">
-          {outcome.kind === 'applied' && 'Changes applied to your working tree (uncommitted). Review and commit them yourself.'}
-          {outcome.kind === 'discarded' && 'Changes discarded. The worktree and branch were removed.'}
+          {outcome.kind === 'applied' && t('assistant.outcomeApplied')}
+          {outcome.kind === 'discarded' && t('assistant.outcomeDiscarded')}
           {outcome.kind === 'pr' && (outcome.prUrl
-            ? <>PR created: <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a></>
-            : (outcome.message || 'Branch kept locally.'))}
+            ? <>{t('assistant.prCreated')} <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a></>
+            : (outcome.message || t('assistant.outcomeBranchKept')))}
         </p>
       </div>
     );
@@ -79,12 +80,12 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
     <div className="workspace-diff">
       {truncated && (
         <p className="workspace-diff-warning" role="alert">
-          Diff truncated at 2 MB for display. Apply and Create PR act on the full set of changes, which is larger than shown here.
+          {t('assistant.diffTruncated')}
         </p>
       )}
       {error && <p className="workspace-diff-error" role="alert">{error}</p>}
-      {diff === null && !error && <p aria-live="polite">Loading diff...</p>}
-      {empty && <p className="workspace-diff-empty">No changes in this worktree.</p>}
+      {diff === null && !error && <p aria-live="polite">{t('assistant.loadingDiff')}</p>}
+      {empty && <p className="workspace-diff-empty">{t('assistant.noChanges')}</p>}
       {diff !== null && !empty && (
         <pre className="workspace-diff-body">
           {diff.split('\n').map((line, i) => (
@@ -95,31 +96,31 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
       )}
       <div className="workspace-diff-actions">
         <button type="button" disabled={busy} onClick={() => loadDiff()}>
-          Refresh
+          {t('assistant.refresh')}
         </button>
         <button type="button" disabled={busy || !diff || empty}
           onClick={() => act(() => applyAssistantWorkspace(sessionId), 'applied')}>
-          Apply to repo
+          {t('assistant.applyToRepo')}
         </button>
         <button type="button" disabled={busy || !diff || empty}
           onClick={() => setPrOpen((v) => !v)} aria-expanded={prOpen}>
-          Create PR...
+          {t('assistant.createPrEllipsis')}
         </button>
         <button type="button" disabled={busy}
           onClick={() => act(() => discardAssistantWorkspace(sessionId), 'discarded')}>
-          Discard
+          {t('assistant.discard')}
         </button>
       </div>
       {prOpen && (
         <div className="workspace-diff-pr">
-          <input type="text" value={prTitle} placeholder="PR title" aria-label="PR title"
+          <input type="text" value={prTitle} placeholder={t('assistant.prTitlePlaceholder')} aria-label={t('assistant.prTitlePlaceholder')}
             onChange={(e) => setPrTitle(e.target.value)} />
-          <textarea value={prBody} placeholder="PR description" aria-label="PR description"
+          <textarea value={prBody} placeholder={t('assistant.prBodyPlaceholder')} aria-label={t('assistant.prBodyPlaceholder')}
             onChange={(e) => setPrBody(e.target.value)} rows={4} />
           <button type="button" disabled={busy || !prTitle.trim()}
             onClick={() => act(() => createAssistantWorkspacePr(sessionId,
               { title: prTitle, body: prBody }), 'pr')}>
-            Create PR
+            {t('assistant.createPr')}
           </button>
         </div>
       )}

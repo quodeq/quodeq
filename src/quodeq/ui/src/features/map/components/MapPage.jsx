@@ -10,6 +10,7 @@ import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
+import { t } from '../../../strings/index.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
@@ -57,13 +58,13 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
         type="button"
         className={`map-pill map-filter-btn${isFiltered ? ' is-filtered' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        title={isFiltered ? `${selectedDimensions.size} of ${allDimensions.length} dimensions` : 'All dimensions'}
-        aria-label={isFiltered ? `Dimensions (${selectedDimensions.size} of ${allDimensions.length} active)` : 'Dimensions'}
+        title={isFiltered ? t('map.dimensionsOf', { selected: selectedDimensions.size, total: allDimensions.length }) : t('map.allDimensions')}
+        aria-label={isFiltered ? t('map.dimensionsAria', { selected: selectedDimensions.size, total: allDimensions.length }) : t('map.dimensions')}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-        Dimensions
+        {t('map.dimensions')}
         {isFiltered && <span className="map-filter-btn__dot" aria-hidden="true" />}
       </button>
       {open && (
@@ -137,12 +138,12 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
       <div className="map-viz-toggles">
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
-          Labels
+          {t('map.labels')}
         </label>
         {!appIsDark && (
           <label className="map-label-toggle">
             <input type="checkbox" checked={!darkMode} onChange={(e) => setDarkMode(!e.target.checked)} />
-            Light
+            {t('map.light')}
           </label>
         )}
       </div>

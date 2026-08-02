@@ -1,3 +1,4 @@
+import { t } from '../../strings/index.js';
 /**
  * PeriodSelect — terminal-styled granularity selector for the score-history
  * chart. A native <select> (keyboard + a11y for free) re-skinned to the mono
@@ -14,11 +15,11 @@ export default function PeriodSelect({ value, onChange }) {
         className="term-period-select"
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
-        aria-label="Group score history by"
+        aria-label={t('common.groupHistoryBy')}
       >
-        <option value="day">Day</option>
-        <option value="week">Week</option>
-        <option value="month">Month</option>
+        <option value="day">{t('common.periodDay')}</option>
+        <option value="week">{t('common.periodWeek')}</option>
+        <option value="month">{t('common.periodMonth')}</option>
       </select>
       <span className="term-period-select__caret" aria-hidden="true">▾</span>
     </span>

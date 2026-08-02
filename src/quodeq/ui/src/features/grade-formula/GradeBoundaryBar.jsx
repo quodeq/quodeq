@@ -1,5 +1,8 @@
 import { useRef } from 'react';
 
+// Upper bound of the 0-10 score axis: a number, so it needs no translation.
+const SCALE_MAX = 10;
+
 const SEG_LABELS = ['CRITICAL', 'POOR', 'ADEQUATE', 'GOOD', 'EXEMPLARY'];
 const GRADE_COLOR_VARS = [
   'var(--color-grade-bottom-text)', 'var(--color-grade-low-text)',
@@ -82,7 +85,7 @@ export default function GradeBoundaryBar({ thresholds = [], onChange }) {
         {edges.slice(0, -1).map((edge, i) => (
           <span key={`tick${i}`} style={{ flex: edges[i + 1] - edge }}>{edge}</span>
         ))}
-        <span>10</span>
+        <span>{SCALE_MAX}</span>
       </div>
     </div>
   );
