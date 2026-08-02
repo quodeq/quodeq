@@ -23,7 +23,7 @@ from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress
-from quodeq.services.run_events import read_dimensions
+from quodeq.services.run_events import read_run_dim_states
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
@@ -81,8 +81,7 @@ def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     run_id = getattr(job, "output_run_id", None)
     if not project or not run_id:
         return {}
-    run_dir = Path(_reports_dir()) / project / run_id
-    return read_dimensions(run_dir).get("dimensions", {})
+    return read_run_dim_states(_reports_dir(), project, run_id)
 
 # Cap on /api/evaluations ?limit= so a client cannot ask the server to materialize
 # an unbounded list. limit=0 still means "no client cap" but we clamp the actual

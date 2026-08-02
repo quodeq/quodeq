@@ -5,7 +5,6 @@ The override file lives inside the analyzed repository
 """
 from __future__ import annotations
 
-import json
 import logging
 from http import HTTPStatus
 from pathlib import Path
@@ -21,8 +20,11 @@ from quodeq.core.standards.overrides import (
     validate_overrides,
 )
 from quodeq.services.standards_prefs import (
+    clear_project_overrides,
     collect_declared_params,
+    iter_compiled_standards,
     load_project_overrides,
+    save_project_overrides,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,15 +33,11 @@ logger = logging.getLogger(__name__)
 def _counts(overrides: dict, compiled_dir: Path) -> dict[str, int]:
     """Per-dimension count of overridden requirements, keyed by compiled id."""
     dim_by_req: dict[str, str] = {}
-    for path in sorted(compiled_dir.glob("*.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, UnicodeDecodeError):
-            continue
+    for stem, data in iter_compiled_standards(compiled_dir):
         for principle in data.get("principles", []):
             for req in principle.get("requirements", []):
                 if req.get("id"):
-                    dim_by_req[req["id"]] = data.get("id", path.stem)
+                    dim_by_req[req["id"]] = data.get("id", stem)
     counts: dict[str, int] = {}
     for req_id in overrides:
         dim = dim_by_req.get(req_id)
@@ -58,19 +56,18 @@ def _changed_dimensions(compiled_dir: Path, current: dict, proposed: dict) -> li
     only compiled/<dimension>.json), so custom evaluator-dir standards—whose
     cache keys never shift on override change—are symmetrically never reported."""
     changed: list[str] = []
-    for path in sorted(compiled_dir.glob("*.json")):
+    for stem, data in iter_compiled_standards(compiled_dir):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
             _, before = dimension_params(data, current)
             _, after = dimension_params(data, proposed)
-        except (OSError, ValueError, UnicodeDecodeError, AttributeError, TypeError):
+        except (AttributeError, TypeError):
             # A shape-invalid params block (spec not a dict, "params" not a
             # mapping, etc.) raises AttributeError/TypeError out of
             # dimension_params -- same degrade-and-skip as an unreadable or
             # unparseable compiled file, so a bad file never 500s the PUT.
             continue
         if before != after:
-            changed.append(data.get("id", path.stem))
+            changed.append(data.get("id", stem))
     return changed
 
 
@@ -126,12 +123,10 @@ def register_overrides_routes(app: Flask) -> None:
         dry_run = request.args.get("dryRun", "").lower() in ("1", "true")
         if dry_run:
             return jsonify({"overrides": clean, "changedDimensions": changed})
-        override_path = root / OVERRIDES_RELPATH
         if not clean:
-            override_path.unlink(missing_ok=True)
+            clear_project_overrides(root)
             logger.info("standards.overrides cleared project=%s", project_id)
             return jsonify({"overrides": {}, "changedDimensions": changed})
-        override_path.parent.mkdir(parents=True, exist_ok=True)
-        override_path.write_text(json.dumps({"version": 1, "overrides": clean}, indent=2) + "\n", encoding="utf-8")
+        save_project_overrides(root, clean)
         logger.info("standards.overrides saved project=%s reqs=%d", project_id, len(clean))
         return jsonify({"overrides": clean, "changedDimensions": changed})
