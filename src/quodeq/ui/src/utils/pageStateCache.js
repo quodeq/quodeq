@@ -44,3 +44,14 @@ export function writeCachedState(namespace, scope, patch) {
 export function resetCachedScope(namespace, scope) {
   storeFor(namespace).delete(scope || '__global__');
 }
+
+/**
+ * Drop every namespace and scope.
+ *
+ * Test-isolation hook: the store is module-scoped, so without this a page's
+ * cached state leaks into the next test in the same process. Production code
+ * uses `resetCachedScope` for the narrower "user clicked the tab" reset.
+ */
+export function clearAllCachedState() {
+  STORES.clear();
+}
