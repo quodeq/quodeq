@@ -330,7 +330,13 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                 return jsonify(body), status
             if not ephemeral and clone_dest:
                 try:
-                    contained_dest = contained_path(clone_dest, Path.home())
+                    # Containment and the directory check both live in the try
+                    # so every rejection exits here. Falling through past a
+                    # failed containment check on a sentinel would leave the
+                    # unguarded value live on one path.
+                    dest = Path(contained_path(clone_dest, Path.home()))
+                    if not dest.is_dir():
+                        raise ValueError("cloneDest is not an existing directory")
                 except OSError:
                     body, status = error_response(
                         "Invalid cloneDest path",
@@ -339,18 +345,6 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                     )
                     return jsonify(body), status
                 except ValueError:
-                    # Return here rather than falling through with a sentinel.
-                    # Every failure branch around a containment check has to
-                    # exit: continuing past a swallowed rejection leaves the
-                    # unguarded value live on one path, which is a real hole
-                    # and is also what CodeQL flags.
-                    body, status = error_response(
-                        "cloneDest must be an existing directory under your home folder",
-                        HTTPStatus.BAD_REQUEST,
-                        "INVALID_CLONE_DEST",
-                    )
-                    return jsonify(body), status
-                if not Path(contained_dest).is_dir():
                     body, status = error_response(
                         "cloneDest must be an existing directory under your home folder",
                         HTTPStatus.BAD_REQUEST,
@@ -360,7 +354,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                 # Hand the *contained* path to the cloner. The previous code
                 # resolved into a local and then passed the raw request string
                 # on, so the check guarded a value nothing downstream used.
-                clone_dest = contained_dest
+                clone_dest = str(dest)
         else:
             # For local repos, fail fast if the path doesn't exist — registering
             # a project for a missing directory would leave an orphan UUID dir
