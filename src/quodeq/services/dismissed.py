@@ -22,6 +22,7 @@ from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.data.actions_log import ActionLogWriter, read_action_events
 from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed
 from quodeq.data.sqlite.findings_queries import read_finding_details
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 
 def dismiss_finding(project_dir: Path, finding: dict) -> None:
@@ -247,14 +248,15 @@ def filter_dismissed_from_dimensions(
     Leaves compliance, principles, overall_score, overall_grade unchanged.
     """
     keys = dismissed_keys(project_dir)
-    if not keys:
+    rules = load_suppression_rules(project_dir)
+    if not keys and not rules:
         return dimensions
     result = []
     for dim in dimensions:
         filtered = [
             v for v in dim.violations
             if not is_dismissed(keys, req=v.req, principle=v.practice_id,
-                                file=v.file, line=v.line)
+                                file=v.file, line=v.line, rules=rules)
         ]
         if len(filtered) == len(dim.violations):
             result.append(dim)
