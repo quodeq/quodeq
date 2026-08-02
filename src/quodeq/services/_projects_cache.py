@@ -2,7 +2,8 @@
 
 The project list is read from disk on every dashboard refresh; caching it
 for a few seconds collapses bursts of identical requests without making
-edits feel stale.
+edits feel stale. The cache holds ``ProjectEntry`` entities — serialization
+to the camelCase wire shape happens at the route.
 """
 from __future__ import annotations
 
@@ -10,7 +11,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import to_camel_dict
 from quodeq.services import _fs_projects
 
 _DEFAULT_TTL_S = 5
@@ -32,7 +32,10 @@ class ProjectsCache:
         if self._is_fresh():
             return self._payload  # type: ignore[return-value]
         projects = _fs_projects.build_project_list(Path(reports_dir))
-        self._payload = {"projects": [to_camel_dict(p) for p in projects]}
+        # Entities, not wire dicts: the route serializes per request (WS6).
+        # The cached part is the expensive disk walk; camelCase mapping is
+        # cheap and belongs at the boundary.
+        self._payload = {"projects": projects}
         self._stamp = time.monotonic()
         return self._payload
 
