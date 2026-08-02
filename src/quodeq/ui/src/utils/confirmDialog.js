@@ -15,13 +15,14 @@
  *     title: 'Cancel evaluation?', checkboxLabel: 'Discard collected findings',
  *   });
  */
+import { t } from '../strings/index.js';
 const _ALLOWED_VARIANTS = new Set(['default', 'danger']);
 
 export function confirmDialog({
-  title = 'Confirm',
-  message = 'Are you sure?',
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  title = t('common.confirm'),
+  message = t('common.areYouSure'),
+  confirmLabel = t('common.confirm'),
+  cancelLabel = t('common.cancel'),
   variant = 'default', // 'default' | 'danger'
   checkboxLabel = null,
   checkboxHint = '',

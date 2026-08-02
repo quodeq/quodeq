@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
 
 /**
  * Manages per-project standards threshold overrides.
@@ -27,7 +28,7 @@ export function useStandardsOverrides(projectId) {
         setMutationError(null);
         await queryClient.invalidateQueries({ queryKey: standardsKeys.overrides(projectId) });
       } catch (err) {
-        setMutationError(err.message || 'Failed to save overrides');
+        setMutationError(err.message || t('standards.saveOverridesFailed'));
         throw err;
       }
     },

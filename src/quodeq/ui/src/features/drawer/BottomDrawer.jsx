@@ -56,7 +56,7 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
     <aside className={`bottom-drawer assistant-drawer${maximized ? ' bottom-drawer--maximized' : ''}`}
       style={maximized ? undefined : { height }}>
       <div className="assistant-drawer-drag" onPointerDown={handleDragStart}
-        role="separator" aria-orientation="horizontal" aria-label="Resize drawer" />
+        role="separator" aria-orientation="horizontal" aria-label={t('common.resizeDrawer')} />
       {openPanels.includes('assistant') && (
         <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
           <AssistantHeader selectedProject={projectName ?? uiState?.selectedProject} onOpenSettings={onOpenSettings} />

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { collapseCrumbs, isRunDateEntry } from './crumbModel.js';
+import { t } from '../../../strings/index.js';
 
 const PAGE_LABELS = {
   overview: 'overview',
@@ -84,7 +85,7 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
   };
 
   return (
-    <nav className="nav-breadcrumb" aria-label="Breadcrumb" ref={rootRef}>
+    <nav className="nav-breadcrumb" aria-label={t('explorer.breadcrumb')} ref={rootRef}>
       <ol className="nav-breadcrumb__crumbs">
         {display.map((seg, i) => {
           const sep = i > 0 && <li className="nav-breadcrumb__sep" aria-hidden="true">/</li>;
@@ -97,7 +98,7 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
                 <li className="nav-breadcrumb__crumb nav-breadcrumb__crumb--ellipsis">
                   <button
                     type="button"
-                    aria-label="Show hidden path segments"
+                    aria-label={t('explorer.showHiddenSegments')}
                     aria-haspopup="menu"
                     aria-expanded={open}
                     onClick={() => setOpenKey(open ? null : 'ellipsis')}
@@ -105,7 +106,7 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
                     …
                   </button>
                   {open && (
-                    <div className="nav-breadcrumb__menu" role="menu" aria-label="Hidden path segments">
+                    <div className="nav-breadcrumb__menu" role="menu" aria-label={t('explorer.hiddenSegments')}>
                       {seg.hidden.map((h) => (
                         <button
                           key={`${h.label}-${h.index}`}

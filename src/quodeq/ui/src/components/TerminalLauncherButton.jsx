@@ -12,7 +12,7 @@ export function TerminalLauncherButton() {
   return (
     <button type="button"
       className={`topbar-btn topbar-btn--icon topbar-btn--terminal${on ? ' topbar-btn--terminal--open' : ''}`}
-      aria-pressed={on} aria-label="Terminal (Ctrl+Shift+`)" title="Terminal (Ctrl+Shift+`)"
+      aria-pressed={on} aria-label={t('common.terminalShortcut')} title={t('common.terminalShortcut')}
       onClick={() => toggleTopbar('terminal')}>
       <TerminalIcon />
       <span className="topbar-btn__label">{t('common.terminal')}</span>

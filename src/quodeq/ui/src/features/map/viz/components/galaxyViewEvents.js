@@ -1,5 +1,6 @@
 import { rgb } from '../core/galaxyCore.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
+import { t } from '../../../../strings/index.js';
 
 /**
  * Build tooltip HTML and position it.
@@ -182,12 +183,12 @@ export function createKeyboardHandlers(refs, params) {
 
   function goUp() {
     const nav = navRef.current;
-    if (nav.depth === 2) { navigateTo(1, nav.dim); announce?.('Returned to principles'); }
-    else if (nav.depth === 1) { navigateTo(0); announce?.('Returned to galaxy overview'); }
+    if (nav.depth === 2) { navigateTo(1, nav.dim); announce?.(t('map.returnedToPrinciples')); }
+    else if (nav.depth === 1) { navigateTo(0); announce?.(t('map.returnedToOverview')); }
     else if (nav.clusterCx != null) {
       nav.clusterCx = null; nav.clusterCy = null;
       startTransition(true); saveNav();
-      announce?.('Returned to galaxy overview');
+      announce?.(t('map.returnedToOverview'));
     } else return false;
     focusedIdxRef.current = null;
     return true;

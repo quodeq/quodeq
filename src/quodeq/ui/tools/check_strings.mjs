@@ -20,19 +20,29 @@ const UI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BASELINE_PATH = path.join(UI_ROOT, 'tools', 'strings_baseline.json');
 const CATALOG_PATH = path.join(UI_ROOT, 'src', 'strings', 'en.json');
 
+// The three surfaces that carry user-visible English, each needing its own
+// detector: JSX text nodes, visible JSX attributes, and prose in plain-JS
+// logic. All three feed one per-file baseline -- the contract is "this file
+// has N grandfathered hardcoded strings", regardless of which shape they are.
+const RATCHET_RULES = new Set([
+  'react/jsx-no-literals',
+  'i18n/no-literal-visible-attrs',
+  'i18n/no-prose-literals',
+]);
+
 async function collectCounts() {
   const eslint = new ESLint({ cwd: UI_ROOT });
-  const results = await eslint.lintFiles(['src/**/*.jsx']);
+  const results = await eslint.lintFiles(['src/**/*.jsx', 'src/**/*.js']);
   const counts = {};
   for (const r of results) {
     const fatal = r.messages.filter((m) => m.fatal);
     if (fatal.length > 0) {
       throw new Error(`lint failed on ${r.filePath}: ${fatal[0].message}`);
     }
-    // Count only the ratchet rule itself. Stray messages from other sources
-    // (e.g. an eslint-disable comment naming a rule this single-rule config
+    // Count only the ratchet rules themselves. Stray messages from other
+    // sources (e.g. an eslint-disable comment naming a rule this config
     // doesn't define) must not masquerade as hardcoded strings.
-    const n = r.messages.filter((m) => m.ruleId === 'react/jsx-no-literals').length;
+    const n = r.messages.filter((m) => RATCHET_RULES.has(m.ruleId)).length;
     if (n > 0) {
       counts[path.relative(UI_ROOT, r.filePath).split(path.sep).join('/')] = n;
     }

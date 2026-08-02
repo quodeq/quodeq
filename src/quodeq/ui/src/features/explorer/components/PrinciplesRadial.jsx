@@ -13,6 +13,7 @@
  *     plotted vertices in axis order; insufficient axes produce stroke gaps.
  */
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
+import { t } from '../../../strings/index.js';
 const RING_LEVELS = [0.2, 0.4, 0.6, 0.8, 1.0]; // fraction of max
 const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
@@ -91,7 +92,7 @@ export default function PrinciplesRadial({
       preserveAspectRatio="xMidYMid meet"
       width="100%"
       role="img"
-      aria-label="Principles radial plot"
+      aria-label={t('explorer.principlesRadial')}
     >
       {/* Rings */}
       <g>

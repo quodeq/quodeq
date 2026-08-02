@@ -114,7 +114,7 @@ export function AssistantPane({ uiState, active = true }) {
           <textarea
             ref={inputRef}
             className="assistant-drawer-input"
-            placeholder="Ask the assistant, or type / for commands…"
+            placeholder={t('assistant.inputPlaceholder')}
             value={draft}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -124,7 +124,7 @@ export function AssistantPane({ uiState, active = true }) {
           {streaming ? (
             <button type="button" className="assistant-send-btn assistant-stop-btn"
               onClick={stopTurn}
-              aria-label="Stop generating" title="Stop generating">
+              aria-label={t('assistant.stopGenerating')} title={t('assistant.stopGenerating')}>
               <StopIcon />
             </button>
           ) : (
@@ -132,7 +132,7 @@ export function AssistantPane({ uiState, active = true }) {
               className={`assistant-send-btn${draft.trim() ? ' assistant-send-btn--ready' : ''}`}
               onClick={handleSend}
               disabled={!draft.trim()}
-              aria-label="Send" title="Send (Enter)">
+              aria-label={t('assistant.send')} title={t('assistant.sendHint')}>
               <SendIcon />
             </button>
           )}

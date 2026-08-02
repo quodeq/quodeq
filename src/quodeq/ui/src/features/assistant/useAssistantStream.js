@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { assistantEventsUrl } from '../../api/assistant.js';
+import { t } from '../../strings/index.js';
 
 const INACTIVITY_MS = 60000;
 // Max characters revealed per flush tick. Delta-streaming providers (ollama,
@@ -82,7 +83,7 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
       // EventSource with nothing left to reconnect it, wedging the drawer.
       // Leaving the connection open lets the next turn (or a heartbeat)
       // recover it.
-      inactivity.current = setTimeout(() => { setError('stream timed out'); endTurn(); }, INACTIVITY_MS);
+      inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, INACTIVITY_MS);
     };
     // First content frame of a turn: re-arm streaming and, once a turn
     // boundary has been crossed, clear any stale stream error from the prior

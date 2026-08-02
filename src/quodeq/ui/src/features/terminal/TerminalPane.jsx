@@ -76,7 +76,7 @@ export default function TerminalPane({ active }) {
     <div className="tty-shell">
       <TerminalHeader onCopy={handleCopy} onNewSession={showTabs ? null : openSession} />
       {showTabs && (
-        <div className="tty-tabs" role="tablist" aria-label="Terminal sessions">
+        <div className="tty-tabs" role="tablist" aria-label={t('terminal.sessions')}>
           {sessions.map((s) => (
             <div key={s.id} role="tab" aria-selected={s.id === activeId} tabIndex={0}
               className={`tty-tab${s.id === activeId ? ' tty-tab--active' : ''}`}
@@ -85,7 +85,7 @@ export default function TerminalPane({ active }) {
               <span className="tty-tab-dot" aria-hidden="true" />
               <span className="tty-tab-name">{s.name}</span>
               <button type="button" className="tty-tab-close"
-                aria-label={`Close ${s.name}`} title="Close session"
+                aria-label={`Close ${s.name}`} title={t('terminal.closeSession')}
                 onClick={(e) => { e.stopPropagation(); closeSession(s.id); }}>
                 <XIcon />
               </button>
@@ -93,7 +93,7 @@ export default function TerminalPane({ active }) {
           ))}
           <button type="button" className="tty-tab-add" onClick={openSession}
             disabled={sessions.length >= max}
-            aria-label="New session"
+            aria-label={t('terminal.newSession')}
             title={sessions.length >= max ? `Limit of ${max} sessions reached` : 'New session'}>
             <PlusIcon />
           </button>

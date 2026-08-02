@@ -5,6 +5,7 @@ import {
 } from '../../api/index.js';
 import { projectKeys } from '../../api/queryKeys.js';
 import { setGradeThresholds } from '../../utils/gradeThresholds.js';
+import { t } from '../../strings/index.js';
 
 const PREVIEW_DEBOUNCE_MS = 250;
 
@@ -43,7 +44,7 @@ export default function useGradeFormula(projectId) {
         setDefaults(d.defaults); setIsCustom(d.isCustom);
         loadedRef.current = true;
       })
-      .catch(() => setError('Could not load grade formula'));
+      .catch(() => setError(t('gradeFormula.loadFailed')));
   }, []);
 
   // Clear any pending debounced preview on unmount.
@@ -77,8 +78,11 @@ export default function useGradeFormula(projectId) {
     });
   }, [requestPreview]);
 
+  // Singular and plural are separate whole sentences, not a stem plus an
+  // "s": the verb agreement moves too ("shows" vs "show"), and plenty of
+  // languages inflect more of the sentence than English does.
   const noticeFor = (d) => (d.failed > 0
-    ? `Applied, but ${d.failed} run${d.failed === 1 ? '' : 's'} could not be rescored and still show the old formula. Try applying again.`
+    ? t(d.failed === 1 ? 'gradeFormula.partialRescoreOne' : 'gradeFormula.partialRescoreMany', { count: d.failed })
     : null);
 
   const apply = useCallback(async () => {
@@ -92,7 +96,7 @@ export default function useGradeFormula(projectId) {
       requestPreview(d.current);
       return d.applied;
     } catch {
-      setError('Apply failed');
+      setError(t('gradeFormula.applyFailed'));
       return null;
     } finally {
       setBusy(false);
@@ -109,7 +113,7 @@ export default function useGradeFormula(projectId) {
       invalidateScoreQueries();
       requestPreview(d.current);
     } catch {
-      setError('Reset failed');
+      setError(t('gradeFormula.resetFailed'));
     } finally {
       setBusy(false);
     }

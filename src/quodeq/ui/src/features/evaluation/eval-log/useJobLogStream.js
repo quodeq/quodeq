@@ -1,17 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../../../strings/index.js';
 
 const MAX_LINES = 5000;
 const READYSTATE_CLOSED = 2;
 const INACTIVITY_MS = 60000;
 
 const TERMINAL_STATE_LINE = {
-  cancelled: '── evaluation cancelled ──',
-  failed: '── evaluation failed ──',
-  lost: '── evaluation lost ──',
-  done: '── evaluation complete ──',
-  complete: '── evaluation complete ──',
-  completed: '── evaluation complete ──',
+  cancelled: t('evaluate.logCancelled'),
+  failed: t('evaluate.logFailed'),
+  lost: t('evaluate.logLost'),
+  done: t('evaluate.logComplete'),
+  complete: t('evaluate.logComplete'),
+  completed: t('evaluate.logComplete'),
 };
+
+/** The stream's `done` payload is arbitrary text, so look up own keys only:
+ *  TERMINAL_STATE_LINE['constructor'] is a function, and appending that to
+ *  the log would put a non-renderable value into the list. */
+function terminalLine(state) {
+  return Object.hasOwn(TERMINAL_STATE_LINE, state)
+    ? TERMINAL_STATE_LINE[state]
+    : t('evaluate.logComplete');
+}
 
 export function useJobLogStream(jobId) {
   const [logs, setLogs] = useState([]);
@@ -105,14 +115,14 @@ export function useJobLogStream(jobId) {
         inactivityRef.current = null;
       }
       const state = (e?.data || '').trim().toLowerCase();
-      append(TERMINAL_STATE_LINE[state] || '── evaluation complete ──');
+      append(terminalLine(state));
       setTerminalState(state || 'done');
       setStatus('done');
       es.close();
     });
     es.onerror = () => {
       if (es.readyState === READYSTATE_CLOSED) {
-        append('── stream disconnected ──');
+        append(t('evaluate.logDisconnected'));
         setStatus('error');
       }
     };

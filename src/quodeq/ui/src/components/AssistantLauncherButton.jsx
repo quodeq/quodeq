@@ -19,8 +19,8 @@ export function AssistantLauncherButton() {
       type="button"
       className={`topbar-btn topbar-btn--icon topbar-btn--assistant${on ? ' topbar-btn--assistant--open' : ''}`}
       aria-pressed={on}
-      aria-label="Assistant (Ctrl+`)"
-      title="Assistant (Ctrl+`)"
+      aria-label={t('common.assistantShortcut')}
+      title={t('common.assistantShortcut')}
       onClick={() => toggleTopbar('assistant')}
     >
       {/* 11px, not the 12px of the stroke icons: the Q fills its tight

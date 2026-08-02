@@ -201,7 +201,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
         tabIndex={0}
         onClick={handleBgClick}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); handleBgClick(); } }}
-        aria-label="Zoomable pack visualization of project compliance by folder and file"
+        aria-label={t('map.zoomablePackAria')}
       >
         <defs>
           <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">

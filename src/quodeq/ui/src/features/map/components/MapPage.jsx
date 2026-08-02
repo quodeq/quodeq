@@ -179,7 +179,7 @@ export default function MapPage(props) {
     return (
       <MapEmpty sub="no projects yet">
         <EmptyState
-          title="No projects yet"
+          title={t('map.noProjectsYet')}
           description="Add a project to start analyzing code quality."
           actionLabel="Add a project"
           onAction={() => onNavigate?.('projects')}
@@ -191,7 +191,7 @@ export default function MapPage(props) {
     return (
       <MapEmpty sub="no project selected">
         <EmptyState
-          title="No project selected"
+          title={t('map.noProjectSelected')}
           description="Pick a project to view its map."
           actionLabel="Choose project"
           onAction={() => onNavigate?.('projects')}
@@ -224,7 +224,7 @@ export default function MapPage(props) {
       return (
         <MapEmpty sub="error">
           <EmptyState
-            title="Couldn't load this project"
+            title={t('map.projectLoadFailed')}
             description={error}
             actionLabel="Retry"
             onAction={() => onRetry?.()}
@@ -240,7 +240,7 @@ export default function MapPage(props) {
       return (
         <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
           <EmptyState
-            title="No completed evaluation yet"
+            title={t('map.noCompletedEvaluation')}
             description="no completed evaluation in this remote project yet"
           />
         </MapEmpty>
@@ -249,7 +249,7 @@ export default function MapPage(props) {
     return (
       <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
         <EmptyState
-          title="No evaluations yet"
+          title={t('map.noEvaluationsYet')}
           description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
           actionLabel="Start evaluation"
           onAction={() => onNavigate?.('evaluate')}

@@ -93,8 +93,8 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
         )}
         <button type="button" className="assistant-drawer-btn"
           onClick={resetConversation}
-          aria-label="New conversation"
-          title="New conversation (clears the model context)"
+          aria-label={t('assistant.newConversation')}
+          title={t('assistant.newConversationHint')}
           disabled={streaming || !sessionReady}>
           <RotateCcwIcon />
         </button>
@@ -102,8 +102,8 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <button type="button" className="assistant-drawer-btn assistant-drawer-write"
             onClick={toggleWriteEnabled}
             aria-pressed={writeEnabled}
-            aria-label="Allow repository edits for this conversation"
-            title="Allow repository edits for this conversation (isolated worktree, you review before anything lands)"
+            aria-label={t('assistant.allowRepoEdits')}
+            title={t('assistant.allowRepoEditsHint')}
             disabled={streaming}>
             <PencilIcon />
           </button>
@@ -112,8 +112,8 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <button type="button" className="assistant-drawer-btn assistant-drawer-web"
             onClick={toggleWebEnabled}
             aria-pressed={webEnabled}
-            aria-label="Allow web access for this conversation"
-            title="Allow web access for this conversation"
+            aria-label={t('assistant.allowWebAccess')}
+            title={t('assistant.allowWebAccess')}
             disabled={streaming}>
             <GlobeIcon />
           </button>
@@ -128,7 +128,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
             in-flight assistant turn keeps running server-side; reopening the
             tab reattaches to it. */}
         <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-          aria-label="Hide tab" title="Hide (keeps running in the background)">
+          aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
           <ChevronDownIcon />
         </button>
       </div>

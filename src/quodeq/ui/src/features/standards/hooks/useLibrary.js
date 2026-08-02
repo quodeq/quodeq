@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
 
 export function useLibrary() {
   const { listLibrary, importFromLibrary } = useApi();
@@ -17,7 +18,7 @@ export function useLibrary() {
       await importFromLibrary(filePath);
       setImportError(null);
     } catch (err) {
-      setImportError(err.message || 'Failed to import standard');
+      setImportError(err.message || t('standards.importStandardFailed'));
       throw err;
     }
   }, [importFromLibrary]);

@@ -215,7 +215,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         <FolderBrowser
           onSelect={handleFolderSelect}
           onClose={() => setFolderBrowserOpen(false)}
-          title="Select Folder or File"
+          title={t('onboarding.selectFolderOrFile')}
           confirmText="Use this path"
           showFiles
         />

@@ -5,6 +5,7 @@ import {
   computeClusterPositions, buildMSTLines, applyRepulsionAndRecenter,
   buildSharedFileConnections, computeMaxExtent,
 } from './galaxyViewLayout.js';
+import { t } from '../../../../strings/index.js';
 
 /** Group violations and compliance by principle name, returning { [principleName]: { violations, compliance } } */
 export function groupByPrinciple(dim) {
@@ -52,7 +53,7 @@ export function computePrincipleScore(rawScore, grade, violationCount, complianc
 }
 
 export const CONSTELLATION_LABELS = {
-  builtin: 'ISO Standards', quodeq: 'Quodeq Standards', community: 'Community Standards', custom: 'Custom Standards', _default: '',
+  builtin: t('map.constellationBuiltin'), quodeq: t('map.constellationQuodeq'), community: t('map.constellationCommunity'), custom: t('map.constellationCustom'), _default: '',
 };
 
 export function buildScene(dimensions, W, H, standardTypes) {

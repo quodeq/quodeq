@@ -10,7 +10,7 @@ const ICON_FOLDER = cloneElement(BASE_ICON_FOLDER, { width: 18, height: 18 });
 
 function Logo() {
   return (
-    <svg viewBox="288 209 965 588" role="img" aria-label="Quodeq" width="32" height="32" style={{overflow:'visible'}}>
+    <svg viewBox="288 209 965 588" role="img" aria-label={BRAND_NAME} width="32" height="32" style={{overflow:'visible'}}>
       <defs>
         <filter id="chevron-glow" x="-25%" y="-25%" width="150%" height="150%">
           <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="var(--logo-chevron-hover)" floodOpacity="0.28" />
@@ -129,7 +129,7 @@ export default function Sidebar({
       <button
         type="button"
         className={`sidebar-scrim${isPinned ? ' sidebar-scrim--visible' : ''}`}
-        aria-label="Close menu"
+        aria-label={t('common.closeMenu')}
         aria-hidden={!isPinned}
         tabIndex={isPinned ? 0 : -1}
         onClick={() => setPinned(false)}
