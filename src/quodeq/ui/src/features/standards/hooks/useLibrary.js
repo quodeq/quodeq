@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 export function useLibrary() {
   const { listLibrary, importFromLibrary } = useApi();
@@ -18,7 +19,7 @@ export function useLibrary() {
       await importFromLibrary(filePath);
       setImportError(null);
     } catch (err) {
-      setImportError(err.message || t('standards.importStandardFailed'));
+      setImportError(apiErrorMessage(err, 'standards.importStandardFailed'));
       throw err;
     }
   }, [importFromLibrary]);

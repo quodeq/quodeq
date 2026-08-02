@@ -34,6 +34,11 @@ export async function request(path, options = {}) {
       // Callers branch on this (e.g. the cancel flow treats 409 as "job no
       // longer cancellable" but keeps the job on transient failures).
       err.status = res.status;
+      // The envelope's stable code, which used to be dropped here. err.message
+      // is the backend's English and is developer detail; `code` is the only
+      // part of the envelope that can be turned into translated copy, so it
+      // has to survive the boundary. See strings/apiErrors.js.
+      err.code = payload.code ?? null;
       throw err;
     }
 

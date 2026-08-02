@@ -16,6 +16,7 @@ import EmptyState from '../../../components/EmptyState.jsx';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import { resolveProviderSettings } from '../../../utils/effectiveProviderSettings.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const EVAL_OPTIONS_HINT = (
   <>
@@ -98,7 +99,7 @@ function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }
       setInfo(updated);
       setUrlInput('');
     } catch (err) {
-      setUrlError(err.message || t('evaluate.urlUpdateFailed'));
+      setUrlError(apiErrorMessage(err, 'evaluate.urlUpdateFailed'));
     } finally {
       setUrlSaving(false);
     }

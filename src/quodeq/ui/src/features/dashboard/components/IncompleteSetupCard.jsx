@@ -2,6 +2,7 @@ import { useState } from 'react';
 import CloneTargetStep from '../../onboarding/components/steps/CloneTargetStep.jsx';
 import { registerProject } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -30,7 +31,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
       }
       onComplete?.(result);
     } catch (err) {
-      setError(err?.message || t('overview.cloneFailed'));
+      setError(apiErrorMessage(err, 'overview.cloneFailed'));
     } finally {
       setSubmitting(false);
     }

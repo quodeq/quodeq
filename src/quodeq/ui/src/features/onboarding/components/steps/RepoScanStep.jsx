@@ -4,27 +4,16 @@ import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
 import { t } from '../../../../strings/index.js';
+import { apiErrorMessage } from '../../../../strings/apiErrors.js';
 
 const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
 const CLONE_DEST_STORAGE_KEY = 'quodeq.lastCloneRoot';
 
-// Map backend error codes (Task A8) to user-facing messages.
+// Map backend error codes (Task A8) to user-facing messages. The switch that
+// used to live here moved into strings/apiErrors.js so every screen resolves
+// codes the same way; the copy is unchanged, just translatable now.
 function friendlyCloneError(err) {
-  const code = err?.code;
-  switch (code) {
-    case 'AUTH_REQUIRED':
-      return "Couldn't clone. If this is a private repo, make sure `git clone <url>` works in your terminal first.";
-    case 'NETWORK_ERROR':
-      return "Couldn't reach the remote. Check your connection and try again.";
-    case 'REPO_NOT_FOUND':
-      return 'Repository not found. Check the URL and try again.';
-    case 'DEST_EXISTS':
-      return 'That folder already contains files. Pick a different location, or use the existing directory as a local-path project.';
-    case 'DISK_ERROR':
-      return err?.message || 'A disk error occurred. Check available space and permissions.';
-    default:
-      return err?.message || 'Clone failed.';
-  }
+  return apiErrorMessage(err, 'onboarding.cloneFailed');
 }
 
 export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {

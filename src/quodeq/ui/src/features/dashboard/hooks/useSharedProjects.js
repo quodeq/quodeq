@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 /**
  * useSharedProjects — shared-repo status + project list for the merged
@@ -173,7 +174,7 @@ export function useSharedProjects() {
       // toggles, since configured was already true before and after).
       await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     } catch (err) {
-      setConnectError(err?.message || t('projects.connectFailed'));
+      setConnectError(apiErrorMessage(err, 'projects.connectFailed'));
     } finally {
       connectingRef.current = false;
       setConnecting(false);
