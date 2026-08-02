@@ -92,3 +92,51 @@ def test_services_carry_no_database_dependency():
     for mod in (dismissed, deleted, run_keys):
         assert "sqlite3" not in vars(mod), mod.__name__
         assert "open_evaluation_db" not in vars(mod), mod.__name__
+
+
+class TestDismissedSnippetReaders:
+    """Precedent matching (context/precedent.py) used to inline these SELECTs."""
+
+    def test_read_dismissed_snippets_returns_pairs(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10, snippet="bad()")
+        _seed(tmp_path, req="X-2", file="src/b.py", line=20, practice_id="P2")
+        store = SQLiteStateStore(tmp_path)
+        store.update_verdict(req="X-1", file="src/a.py", line=10, verdict="dismissed")
+
+        assert read_dismissed_snippets(tmp_path) == [("X-1", "bad()")]
+
+    def test_read_dismissed_snippets_missing_db(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
+
+        assert read_dismissed_snippets(tmp_path) == []
+
+    def test_semantic_eligible_excludes_scoped_and_empty(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_semantic_eligible_dismissals
+
+        # eligible: line > 0, non-empty snippet, no scope
+        _seed(tmp_path, req="OK-1", file="a.py", line=5, snippet="real()")
+        # excluded: empty snippet
+        _seed(tmp_path, req="NO-1", file="b.py", line=5, snippet="   ", practice_id="P2")
+        # excluded: scope-level finding
+        _seed(tmp_path, req="NO-2", file="c.py", line=5, snippet="x()", scope="module", practice_id="P3")
+        store = SQLiteStateStore(tmp_path)
+        for req, f in [("OK-1", "a.py"), ("NO-1", "b.py"), ("NO-2", "c.py")]:
+            store.update_verdict(req=req, file=f, line=5, verdict="dismissed")
+
+        assert read_semantic_eligible_dismissals(tmp_path) == [("OK-1", "real()")]
+
+    def test_semantic_eligible_missing_db(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_semantic_eligible_dismissals
+
+        assert read_semantic_eligible_dismissals(tmp_path) == []
+
+
+def test_precedent_carries_no_database_dependency():
+    """context/precedent.py must not import the sqlite connection helper."""
+    import quodeq.context.precedent as precedent
+
+    src = open(precedent.__file__).read()
+    assert "open_evaluation_db" not in src
+    assert "FROM findings" not in src
