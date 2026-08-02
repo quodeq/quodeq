@@ -7,6 +7,7 @@ the evidence parser and standards loader can use them without reaching into
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import IO, Any
 
@@ -49,3 +50,33 @@ def validate_path_segment(*segments: str) -> None:
                 f"Invalid path segment: {seg!r}. "
                 f"Use only alphanumeric characters, hyphens, underscores, and dots."
             )
+
+
+def contained_path(candidate: str | Path, root: str | Path) -> str:
+    """Return *candidate* resolved, guaranteed to sit inside *root*.
+
+    Raises ValueError when it escapes. Symlinks are followed, so a link
+    pointing out of the root is rejected on its real target.
+
+    Two things about the implementation are deliberate and should survive
+    future cleanups:
+
+    1. It uses ``os.path.realpath`` + ``startswith(root + os.sep)`` rather than
+       the more idiomatic ``Path.resolve().is_relative_to()``. Both are correct,
+       but static analysers (CodeQL's ``py/path-injection`` among them) only
+       model the former as a containment barrier. Written the idiomatic way,
+       every guarded flow from a request parameter down to a file read still
+       reports as an unguarded path injection.
+    2. It *returns* the safe path instead of raising-only. Callers must use the
+       return value and discard their own variable. A validator that only
+       raises leaves the original tainted value flowing to the sink, so no
+       amount of checking inside it registers as a barrier.
+    """
+    real = os.path.realpath(str(candidate))
+    root_real = os.path.realpath(str(root))
+    if real != root_real and not real.startswith(root_real + os.sep):
+        raise ValueError(
+            f"Path escapes its root directory: {candidate!r} is not inside {root!r}. "
+            "Ensure the path has no '..' segments or symlinks leaving the root."
+        )
+    return real

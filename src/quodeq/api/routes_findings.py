@@ -28,7 +28,7 @@ from quodeq.services.mutation_rescore import (
 )
 from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import contained_path, validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _MAX_DISMISSED_LIMIT = 5000
@@ -61,11 +61,10 @@ def _invalid_body_fields(
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
     validate_path_segment(project)
-    base = Path(evaluations_dir).resolve()
-    resolved = (base / project).resolve()
-    if not resolved.is_relative_to(base):
+    try:
+        return Path(contained_path(Path(evaluations_dir) / project, evaluations_dir))
+    except ValueError:
         abort(400, description="Invalid project path")
-    return resolved
 
 
 def register_findings_routes(app: Flask) -> None:
