@@ -334,8 +334,8 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                     # so every rejection exits here. Falling through past a
                     # failed containment check on a sentinel would leave the
                     # unguarded value live on one path.
-                    dest = Path(contained_path(clone_dest, Path.home()))
-                    if not dest.is_dir():
+                    dest = contained_path(clone_dest, Path.home())
+                    if not os.path.isdir(dest):
                         raise ValueError("cloneDest is not an existing directory")
                 except OSError:
                     body, status = error_response(
@@ -354,7 +354,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                 # Hand the *contained* path to the cloner. The previous code
                 # resolved into a local and then passed the raw request string
                 # on, so the check guarded a value nothing downstream used.
-                clone_dest = str(dest)
+                clone_dest = dest
         else:
             # For local repos, fail fast if the path doesn't exist — registering
             # a project for a missing directory would leave an orphan UUID dir
