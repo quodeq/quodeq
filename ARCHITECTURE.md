@@ -4,7 +4,7 @@
 
 | Layer | Purpose | Dependencies |
 |-------|---------|--------------|
-| `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions | None (stdlib only) |
+| `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions, stream-event parsing | None (stdlib only) |
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
 | `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ |
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
