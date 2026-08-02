@@ -80,7 +80,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
             buttons; status badges stay on the left with the identity. */}
         {modelLabel && (
           <button type="button" className="assistant-model-chip"
-            title={`${modelLabel} — change in Settings`}
+            title={t('assistant.modelChangeHint', { model: modelLabel })}
             onClick={() => {
               // Jump to Settings AND tuck the panel away: the drawer would
               // otherwise cover the provider section the user is heading to.
@@ -119,7 +119,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           </button>
         )}
         <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-          aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
+          aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
           aria-pressed={maximized}
           title={maximized ? 'Restore' : 'Maximize'}>
           {maximized ? <MinimizeIcon /> : <MaximizeIcon />}

@@ -50,6 +50,7 @@ import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
+import { t } from './strings/index.js';
 
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
@@ -312,28 +313,28 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     prefetchHandlers: state.prefetchHandlers,
     onAddProject: () => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before adding a project.');
+        showToast(t('evaluate.busyAddProject'));
         return;
       }
       setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
     },
     onImportProject: () => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before importing a project.');
+        showToast(t('evaluate.busyImportProject'));
         return;
       }
       state.handleImportProject();
     },
     onTakeTour: () => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before starting the tour.');
+        showToast(t('evaluate.busyStartTour'));
         return;
       }
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     },
     onResumeSetup: (projectId) => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before resuming setup.');
+        showToast(t('evaluate.busyResumeSetup'));
         return;
       }
       setWizardEntry({

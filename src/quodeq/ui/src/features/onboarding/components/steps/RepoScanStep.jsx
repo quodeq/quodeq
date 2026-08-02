@@ -130,7 +130,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
           onChange={(value) => actions.setRepo({ value, source: 'url' })}
           onSubmit={handleSubmit}
           placeholder="git@github.com:org/repo.git"
-          ariaLabel="repository url or local path"
+          ariaLabel={t('onboarding.repoInputAria')}
         />
         <button
           type="button"
@@ -172,8 +172,8 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         return (
           <div className="onboarding-scan-summary">
             <StatStrip cards>
-              <Stat label="FILES" value={totalFiles} hint="all files in repo" />
-              <Stat label="CODE" value={codeFiles} hint="files the eval will analyse" />
+              <Stat label="FILES" value={totalFiles} hint={t('onboarding.allFilesHint')} />
+              <Stat label="CODE" value={codeFiles} hint={t('onboarding.codeFilesHint')} />
               <Stat label="LANGUAGES" value={langCount} />
               <Stat label="BRANCHES" value={branchCount} />
             </StatStrip>
@@ -205,7 +205,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
           onSelect={handleFolderSelect}
           onClose={() => setFolderBrowserOpen(false)}
           title={t('onboarding.selectFolderOrFile')}
-          confirmText="Use this path"
+          confirmText={t('onboarding.useThisPath')}
           showFiles
         />
       )}

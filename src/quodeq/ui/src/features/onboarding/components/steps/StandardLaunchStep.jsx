@@ -18,11 +18,11 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
 
   return (
     <div className="onboarding-step onboarding-step--standard-launch">
-      <TermHeader name="standard" sub={`step ${stepIndex} of ${stepTotal} · pick one to start`} />
+      <TermHeader name="standard" sub={t('onboarding.standardStepSub', { step: stepIndex, total: stepTotal })} />
       <p className="onboarding-step__pitch">
         {state.isFirstProject
-          ? 'Pick one for your first run. Smaller scope = faster, easier-to-read results. You can run more after.'
-          : 'We recommend starting with one for new repos. You can pick more if you know what you want.'}
+          ? t('onboarding.standardPickOne')
+          : t('onboarding.standardRecommendOne')}
       </p>
 
       <StatStrip>

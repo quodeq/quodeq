@@ -1,8 +1,9 @@
 import ConsoleButton from './ConsoleButton.jsx';
+import { t } from '../strings/index.js';
 
 const STATUS_LABEL = {
   online: 'Running',
-  offline: 'Connection lost',
+  offline: t('common.connectionLost'),
 };
 
 export default function ServerStatusPill({

@@ -20,7 +20,7 @@ const CONSOLE_ICON = (
  *   evaluation card to nudge first-time users.
  */
 export default function ConsoleButton({ open, onToggle, showDot = false }) {
-  const label = open ? 'Hide console' : 'Show console';
+  const label = open ? t('common.hideConsole') : t('common.showConsole');
   return (
     <button
       type="button"

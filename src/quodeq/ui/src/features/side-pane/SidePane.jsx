@@ -199,7 +199,7 @@ export function SidePane() {
               className="side-pane__row-divider"
               role="separator"
               aria-orientation="horizontal"
-              aria-label={`Resize between window ${i + 1} and ${i + 2}`}
+              aria-label={t('sidePane.resizeBetween', { first: i + 1, second: i + 2 })}
               aria-valuenow={Math.round((ratios[i] ?? 0.5) * 100)}
               aria-valuemin={0}
               aria-valuemax={100}

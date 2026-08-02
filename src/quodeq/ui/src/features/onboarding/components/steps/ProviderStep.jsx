@@ -5,6 +5,8 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../../constants.js';
 import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
 
+// Product names, not copy.
+/* eslint-disable i18n/no-prose-literals */
 const PROVIDER_LABELS = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
@@ -14,6 +16,7 @@ const PROVIDER_LABELS = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
 };
+/* eslint-enable i18n/no-prose-literals */
 
 function readActiveProviderState() {
   try {

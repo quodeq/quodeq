@@ -65,11 +65,100 @@ const NOT_PROSE = [
   /var\(--|^color-mix\(/,                  // CSS custom properties / color functions
   // Class list. Tokens may END in a separator: `qd-confirm-btn--` is a BEM
   // modifier prefix waiting for the interpolated half of a template.
-  /^[a-z0-9]+(?:[-_]{1,2}[a-z0-9]+)+[-_]{0,2}(?:\s+[a-z0-9]+(?:[-_]{1,2}[a-z0-9]+)+[-_]{0,2})*$/,
   /^https?:\/\//,
   /[<>]|style=|class(Name)?=/,             // hand-built markup fragments
   /^(rotate|translate|scale|matrix)\(/,    // SVG/CSS transform pieces
+  /\b\d*\.?\d+m?s\b/,                      // CSS duration: "transform 0.5s ease"
 ];
+
+// A class list may mix hyphenated and plain tokens ("badge badge--danger",
+// "chip small"). Require every token to look like an identifier AND at least
+// one to carry a separator, so ordinary two-word copy ("months ago", "grade
+// formula") is not swallowed.
+function isClassList(text) {
+  const tokens = text.split(/\s+/);
+  if (!tokens.every((tok) => /^[a-z0-9][a-z0-9_-]*$/.test(tok))) return false;
+  return tokens.some((tok) => /[-_]/.test(tok));
+}
+
+// Attributes and style-object keys whose value is structural no matter what
+// it looks like. Shape filters alone cannot cover these: "panel settings-
+// section" and "chip small" are class lists that read as two English words,
+// and "Server log" is real copy that reads like neither. Position in the
+// tree is the reliable signal; the shape filters stay as a backstop for
+// plain-.js code that has no JSX around it.
+const STRUCTURAL_ATTRS = new Set([
+  'className', 'class', 'style', 'rel', 'target', 'href', 'src', 'id', 'key',
+  'name', 'type', 'role', 'htmlFor', 'xmlns', 'viewBox', 'preserveAspectRatio',
+  'd', 'points', 'transform', 'clipPath', 'fill', 'stroke', 'strokeDasharray',
+  'strokeLinecap', 'strokeLinejoin', 'fontFamily', 'textAnchor', 'dominantBaseline',
+  'dataTestId', 'data-testid', 'autoComplete', 'inputMode', 'encType', 'method',
+]);
+
+const STRUCTURAL_STYLE_KEYS = new Set([
+  'transition', 'transform', 'font', 'fontFamily', 'clipPath', 'clip', 'animation',
+  'background', 'backgroundImage', 'filter', 'willChange', 'gridTemplateColumns',
+  'gridTemplateAreas', 'gridArea', 'boxShadow', 'cursor', 'content',
+]);
+
+/** Name of the enclosing JSX attribute, climbing through value wrappers. */
+function enclosingAttribute(node) {
+  let cur = node;
+  for (let depth = 0; cur && depth < 6; depth++) {
+    const parent = cur.parent;
+    if (!parent) return null;
+    if (parent.type === 'JSXAttribute') {
+      return parent.name?.type === 'JSXNamespacedName'
+        ? `${parent.name.namespace.name}:${parent.name.name.name}`
+        : parent.name?.name ?? null;
+    }
+    // Only climb through things that shape a value, so a string nested in an
+    // unrelated call does not inherit an attribute's exemption.
+    if (!['JSXExpressionContainer', 'TemplateLiteral', 'ConditionalExpression',
+      'LogicalExpression', 'BinaryExpression'].includes(parent.type)) return null;
+    cur = parent;
+  }
+  return null;
+}
+
+/** True when the literal is a value in a style-ish object under a CSS key. */
+function inStructuralStyleValue(node) {
+  let cur = node;
+  for (let depth = 0; cur && depth < 4; depth++) {
+    const parent = cur.parent;
+    if (!parent) return false;
+    if (parent.type === 'Property' && parent.value === cur) {
+      const key = parent.key?.name ?? parent.key?.value;
+      return typeof key === 'string' && STRUCTURAL_STYLE_KEYS.has(key);
+    }
+    if (!['TemplateLiteral', 'ConditionalExpression', 'LogicalExpression',
+      'BinaryExpression'].includes(parent.type)) return false;
+    cur = parent;
+  }
+  return false;
+}
+
+// Arguments to string matching are patterns, not copy: line.startsWith('diff
+// --git') is parsing, and translating it would break the parse.
+const MATCHER_METHODS = new Set([
+  'startsWith', 'endsWith', 'includes', 'indexOf', 'lastIndexOf',
+  'split', 'match', 'test', 'search', 'localeCompare',
+]);
+
+function isMatcherArgument(node) {
+  const parent = node.parent;
+  if (parent?.type !== 'CallExpression' || !parent.arguments.includes(node)) return false;
+  const callee = parent.callee;
+  return callee?.type === 'MemberExpression'
+    && MATCHER_METHODS.has(callee.property?.name);
+}
+
+function inStructuralPosition(node) {
+  if (isMatcherArgument(node)) return true;
+  const attr = enclosingAttribute(node);
+  if (attr && STRUCTURAL_ATTRS.has(attr)) return true;
+  return inStructuralStyleValue(node);
+}
 
 // Sentence-shaped: at least two words, one real lowercase word, long enough
 // that it is copy rather than a token. Deliberately loose -- anything it
@@ -80,6 +169,7 @@ function isProse(s) {
   if (text.length < 10) return false;
   if (text.split(/\s+/).length < 2) return false;
   if (!/[a-z]{3}/.test(text)) return false;
+  if (isClassList(text)) return false;
   return !NOT_PROSE.some((re) => re.test(text));
 }
 
@@ -119,6 +209,7 @@ const noProseLiterals = {
         if (node.parent?.type === 'Property' && node.parent.key === node) return;
         if (!isProse(node.value)) return;
         if (inDevChannel(node)) return;
+        if (inStructuralPosition(node)) return;
         context.report({
           node,
           message: `hardcoded user-visible string "${node.value.slice(0, 60)}" -- move it to en.json and render via t()`,
@@ -129,6 +220,7 @@ const noProseLiterals = {
       // not the whole template, so the message names the offending text.
       TemplateLiteral(node) {
         if (inDevChannel(node)) return;
+        if (inStructuralPosition(node)) return;
         for (const quasi of node.quasis) {
           const text = quasi.value.cooked ?? '';
           if (!isProse(text)) continue;

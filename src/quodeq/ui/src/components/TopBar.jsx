@@ -172,8 +172,8 @@ export default function TopBar({
             type="button"
             className="topbar-btn topbar-btn--icon topbar-btn--theme"
             onClick={onToggleTheme}
-            aria-label={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
+            title={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
           >
             {effectiveDark ? <SunIcon /> : <MoonIcon />}
             <span className="topbar-btn__label">{effectiveDark ? 'light' : 'dark'}</span>
@@ -243,7 +243,7 @@ export default function TopBar({
             className={`topbar-btn topbar-btn--evaluate${evaluating ? ' topbar-btn--evaluate--running' : ''}`}
             onClick={evaluating ? undefined : onEvaluate}
             aria-disabled={evaluating || undefined}
-            title={evaluating ? 'An evaluation is already running' : undefined}
+            title={evaluating ? t('evaluate.alreadyRunningShort') : undefined}
             aria-live="polite"
           >
             <span className="topbar-btn__play" aria-hidden="true">▸</span>

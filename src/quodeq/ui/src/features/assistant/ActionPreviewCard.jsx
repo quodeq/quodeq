@@ -8,7 +8,7 @@ function CardSummary({ actionType, summary }) {
     return (
       <div className="assistant-card-summary">
         <div className="assistant-card-name">
-          {isDismiss ? 'Dismiss finding' : 'Mark finding as verified'}
+          {isDismiss ? t('assistant.dismissFinding') : t('assistant.verifyFinding')}
         </div>
         <div className="assistant-card-meta">
           {summary.req} &middot; {summary.file}:{summary.line}

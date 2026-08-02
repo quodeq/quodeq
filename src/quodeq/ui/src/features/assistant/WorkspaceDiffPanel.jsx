@@ -20,7 +20,7 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState(null); // {kind, message, prUrl}
   const [prOpen, setPrOpen] = useState(false);
-  const [prTitle, setPrTitle] = useState('Quodeq assistant fix');
+  const [prTitle, setPrTitle] = useState(t('assistant.defaultPrTitle'));
   const [prBody, setPrBody] = useState('');
 
   const loadDiff = useCallback(() => {
@@ -46,7 +46,7 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
           setOutcome({ kind: 'pr', message: res.message || null, prUrl: null });
         } else {
           // Push failed: changes restored to the worktree; keep buttons to retry/apply/discard.
-          setError(res.message || 'Branch kept locally; PR was not created.');
+          setError(res.message || t('assistant.prNotCreated'));
         }
         onChanged?.();
         return;

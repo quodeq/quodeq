@@ -27,13 +27,13 @@ const VIEW_MODES = [
 ];
 
 const VIZ_STYLES = [
-  { id: 'zoompack', label: 'Circle Pack', enabled: true },
+  { id: 'zoompack', label: t('map.vizCirclePack'), enabled: true },
   { id: 'galaxy', label: 'Galaxy', enabled: true },
-  { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
+  { id: 'riskmatrix', label: t('map.vizRiskMatrix'), enabled: true },
 ];
 
 const GALAXY_MODES = [
-  { id: 'filesystem', label: 'File System' },
+  { id: 'filesystem', label: t('map.vizFileSystem') },
   { id: 'standards', label: 'Standards' },
 ];
 
@@ -108,7 +108,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
       )}
       <div className="map-pill-group">
         {VIZ_STYLES.map((s) => (
-          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''} aria-pressed={vizStyle === s.id}>
+          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? t('map.comingSoon') : ''} aria-pressed={vizStyle === s.id}>
             {s.label}
           </button>
         ))}
@@ -177,11 +177,11 @@ export default function MapPage(props) {
   if (!projectsLoaded) return <LoadingScreen />;
   if (projects.length === 0 && selectedSource !== 'shared') {
     return (
-      <MapEmpty sub="no projects yet">
+      <MapEmpty sub={t('map.subNoProjects')}>
         <EmptyState
           title={t('map.noProjectsYet')}
-          description="Add a project to start analyzing code quality."
-          actionLabel="Add a project"
+          description={t('map.addProjectDesc')}
+          actionLabel={t('map.addProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </MapEmpty>
@@ -189,11 +189,11 @@ export default function MapPage(props) {
   }
   if (!selectedProject) {
     return (
-      <MapEmpty sub="no project selected">
+      <MapEmpty sub={t('map.subNoProjectSelected')}>
         <EmptyState
           title={t('map.noProjectSelected')}
-          description="Pick a project to view its map."
-          actionLabel="Choose project"
+          description={t('map.pickProjectDesc')}
+          actionLabel={t('map.chooseProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </MapEmpty>
@@ -238,20 +238,20 @@ export default function MapPage(props) {
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
+        <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
           <EmptyState
             title={t('map.noCompletedEvaluation')}
-            description="no completed evaluation in this remote project yet"
+            description={t('map.noCompletedRemote')}
           />
         </MapEmpty>
       );
     }
     return (
-      <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
+      <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
         <EmptyState
           title={t('map.noEvaluationsYet')}
-          description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
-          actionLabel="Start evaluation"
+          description={t('map.runEvaluationDesc', { project: projectName || selectedProject })}
+          actionLabel={t('map.startEvaluation')}
           onAction={() => onNavigate?.('evaluate')}
         />
       </MapEmpty>

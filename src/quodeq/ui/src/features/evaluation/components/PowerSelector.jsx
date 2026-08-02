@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LEVELS, STORAGE_KEY } from './powerLevels.js';
+import { t } from '../../../strings/index.js';
 
 const DEFAULT_POWER_LEVEL = 2;
 
@@ -25,14 +26,14 @@ export default function PowerSelector({ value, onChange, onPersist, labelPositio
           className={`power-bar power-bar--${level}${level <= display ? ' active' : ''}`}
           onClick={() => handleClick(level)}
           onMouseEnter={() => setHover(level)}
-          aria-label={`Power level ${level}`}
+          aria-label={t('evaluate.powerLevelAria', { level })}
         />
       ))}
     </div>
   );
 
   return (
-    <div className="power-selector" title={`Analysis power: ${currentLevel?.label}`}>
+    <div className="power-selector" title={t('evaluate.analysisPower', { level: currentLevel?.label })}>
       {labelPosition === 'left' ? <>{label}{bars}</> : <>{bars}{label}</>}
     </div>
   );

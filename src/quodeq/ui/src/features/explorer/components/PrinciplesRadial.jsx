@@ -134,7 +134,7 @@ export default function PrinciplesRadial({
             r={VERT_RADIUS}
             role={onPrincipleClick ? 'button' : undefined}
             tabIndex={onPrincipleClick ? 0 : undefined}
-            aria-label={onPrincipleClick ? `drill into ${name}` : undefined}
+            aria-label={onPrincipleClick ? t('explorer.drillInto', { name }) : undefined}
             onClick={onPrincipleClick ? handleClick(name) : undefined}
             onKeyDown={onPrincipleClick ? handleKey(name) : undefined}
             style={onPrincipleClick ? { cursor: 'pointer' } : undefined}

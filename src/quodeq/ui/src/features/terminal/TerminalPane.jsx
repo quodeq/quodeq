@@ -26,7 +26,7 @@ export default function TerminalPane({ active }) {
       setReason(s.enabled ? null : s.reason);
       setShell(s.shell || '');
       setChecked(true);
-    }).catch(() => { if (alive) { setReason('Terminal unavailable'); setChecked(true); } });
+    }).catch(() => { if (alive) { setReason(t('terminal.unavailable')); setChecked(true); } });
     return () => { alive = false; };
   }, []);
 
@@ -94,7 +94,7 @@ export default function TerminalPane({ active }) {
           <button type="button" className="tty-tab-add" onClick={openSession}
             disabled={sessions.length >= max}
             aria-label={t('terminal.newSession')}
-            title={sessions.length >= max ? `Limit of ${max} sessions reached` : 'New session'}>
+            title={sessions.length >= max ? t('terminal.sessionLimit', { max }) : t('terminal.newSession')}>
             <PlusIcon />
           </button>
         </div>

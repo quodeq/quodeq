@@ -10,7 +10,7 @@ const PAGE_LABELS = {
   evaluate: 'evaluate',
   standards: 'standards',
   settings: 'settings',
-  'grade-formula': 'grade formula',
+  'grade-formula': t('explorer.crumbGradeFormula'),
   projects: 'repositories',
   help: 'help',
 };

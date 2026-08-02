@@ -4,6 +4,7 @@ import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
 import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 import { useLlamaCppLogStream } from './useLlamaCppLogStream.js';
 import { request } from '../../../api/request.js';
+import { t } from '../../../strings/index.js';
 
 const WINDOW_ID = 'llamacpp-log';
 
@@ -11,14 +12,14 @@ const STATUS_LABEL = {
   idle: '',
   streaming: ' · running',
   done: ' · stopped',
-  error: ' · unavailable',
+  error: t('settings.logUnavailable'),
 };
 
 function buildSpec(logs, status) {
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
-    title: `llama.cpp log${STATUS_LABEL[status] || ''}`,
+    title: `${t('settings.llamaCppLogTitle')}${STATUS_LABEL[status] || ''}`,
     render: () => <ConsoleLogViewer logs={logs} />,
   };
 }

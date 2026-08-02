@@ -9,12 +9,13 @@
  * Renders nothing until the status is known (`connected == null`) rather than
  * flashing a misleading dot during the first health check.
  */
+import { t } from '../strings/index.js';
 export default function ServerStatusDot({ connected, url }) {
   if (connected == null) return null;
   const host = url ? url.replace(/^https?:\/\//, '') : null;
   const label = connected
-    ? (host ? `Server running · ${host}` : 'Server running')
-    : 'Server offline';
+    ? (host ? t('common.serverRunningAt', { host }) : t('common.serverRunning'))
+    : t('common.serverOffline');
   return (
     <span className="topbar-status-dot" role="img" aria-label={label} title={label}>
       <span

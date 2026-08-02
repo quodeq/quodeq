@@ -70,6 +70,10 @@ js.run('no-prose-literals', plugin.rules['no-prose-literals'], {
     'const c2 = `topbar-btn topbar-btn--${kind}`;',
     'const h = `<div style="color:${col}">${escapeHtml(name)}</div>`;',
     "console.error(`importProject failed (${status})`);",
+    "const s = `transform 0.5s ease`;",
+    // Strings matched against are patterns, not copy.
+    "function f(line) { if (line.startsWith('diff --git')) return 1; return 0; }",
+    "const parts = value.split('some separator here');",
   ],
   invalid: [
     { code: "const msg = 'Failed to restore finding. Please try again.';", errors: 1 },
@@ -83,6 +87,34 @@ js.run('no-prose-literals', plugin.rules['no-prose-literals'], {
     // the Literal handler both miss entirely.
     { code: 'const m = `Run an evaluation for ${name} to populate this page.`;', errors: 2 },
     { code: 'alert(`Failed to import project: ${err.message}`);', errors: 1 },
+    // Two plain words are copy unless something marks them structural.
+    { code: "const s = 'months ago';", errors: 1 },
+  ],
+});
+
+// The .jsx surface: prose hiding in props and template literals, and the
+// structural positions (className, style, rel) that no shape filter can
+// separate from copy -- "panel settings-section" and "chip small" read as
+// ordinary English.
+jsx.run('no-prose-literals (jsx)', plugin.rules['no-prose-literals'], {
+  valid: [
+    'const a = <div className="panel settings-section" />;',
+    'const a = <div className={`chip small ${x}`} />;',
+    'const a = <a rel="noopener noreferrer" href={u} />;',
+    'const a = <div style={{ transition: "opacity 0.4s ease" }} />;',
+    'const a = <div style={{ clip: "rect(0 0 0 0)" }} />;',
+    'const a = <div style={{ transform: `rotate(${d}deg) scale(1.5)` }} />;',
+    "const a = <MapEmpty description={t('map.pickProjectDesc')} />;",
+  ],
+  invalid: [
+    // Props of a custom component: invisible to jsx-no-literals (ignoreProps)
+    // and out of scope for the visible-attribute rule, which only covers
+    // title/placeholder/aria-label/alt on DOM elements.
+    { code: 'const a = <MapEmpty description="Pick a project to view its map." />;', errors: 1 },
+    { code: 'const a = <Stat hint="files the eval will analyse" />;', errors: 1 },
+    { code: 'const a = <MapEmpty sub="no evaluations yet" />;', errors: 1 },
+    // Prose split across an interpolation inside a prop.
+    { code: 'const a = <MapEmpty description={`Run an evaluation for ${p} to populate this page.`} />;', errors: 2 },
   ],
 });
 
