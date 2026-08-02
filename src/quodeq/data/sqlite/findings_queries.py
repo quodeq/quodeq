@@ -85,6 +85,54 @@ def read_run_key_sets(run_dir: Path) -> tuple[set[tuple], set[tuple]]:
     return dismiss, cls
 
 
+_SEMANTIC_ELIGIBLE_SQL = (
+    "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed' "
+    "AND (scope IS NULL OR scope = '') "
+    "AND line > 0 "
+    "AND snippet IS NOT NULL AND TRIM(snippet) <> ''"
+)
+
+
+def read_dismissed_snippets(run_dir: Path) -> list[tuple[str | None, str | None]]:
+    """``(requirement, snippet)`` for every dismissed finding in *run_dir*.
+
+    Feeds precedent fingerprinting. Any read failure yields an empty list:
+    precedent matching degrades gracefully and never breaks a scan.
+    """
+    if not (run_dir / "evaluation.db").is_file():
+        return []
+    try:
+        with open_evaluation_db(run_dir) as conn:
+            return [
+                (row[0], row[1])
+                for row in conn.execute(
+                    "SELECT requirement, snippet FROM findings "
+                    "WHERE verdict = 'dismissed'"
+                )
+            ]
+    except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
+        _logger.warning("Could not read dismissed snippets from %s: %s", run_dir, exc)
+        return []
+
+
+def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, str | None]]:
+    """``(requirement, snippet)`` for dismissals eligible as semantic precedents.
+
+    Excludes scope-level dismissals and empty-snippet/line<=0 rows, mirroring
+    ``_semantic_eligible`` in ``analysis/mcp/enricher.py`` on the match side:
+    without the filter a single empty-snippet dismissal would cosine-match
+    every future finding under that requirement.
+    """
+    if not (run_dir / "evaluation.db").is_file():
+        return []
+    try:
+        with open_evaluation_db(run_dir) as conn:
+            return [(req, snippet) for req, snippet in conn.execute(_SEMANTIC_ELIGIBLE_SQL)]
+    except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
+        _logger.warning("Could not read dismissed texts from %s: %s", run_dir, exc)
+        return []
+
+
 def find_dismissed_matching(
     run_dir: Path, *, dimension: str, practice_id: str, file: str,
 ) -> list[tuple[str, str, int]]:

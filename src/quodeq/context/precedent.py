@@ -69,27 +69,16 @@ def load_precedent_fingerprints(project_dir: Path) -> set[str]:
     if not project_dir or not project_dir.is_dir():
         return set()
 
+    from quodeq.data.sqlite.findings_queries import read_dismissed_snippets  # noqa: PLC0415
+
     out: set[str] = set()
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        db_path = run_dir / "evaluation.db"
-        if not db_path.is_file():
-            continue
-        try:
-            from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-            with open_evaluation_db(run_dir) as conn:
-                for row in conn.execute(
-                    "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed'"
-                ):
-                    fp = fingerprint(row[0], row[1])
-                    if fp is not None:
-                        out.add(fp)
-        except Exception as exc:
-            _logger.warning(
-                "Could not read precedent corpus from %s: %s", db_path, exc
-            )
-            continue
+        for req, snippet in read_dismissed_snippets(run_dir):
+            fp = fingerprint(req, snippet)
+            if fp is not None:
+                out.add(fp)
     return out
 
 
@@ -177,14 +166,6 @@ class PrecedentCorpus:
             return None
 
 
-_SEMANTIC_ELIGIBLE_SQL = (
-    "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed' "
-    "AND (scope IS NULL OR scope = '') "
-    "AND line > 0 "
-    "AND snippet IS NOT NULL AND TRIM(snippet) <> ''"
-)
-
-
 def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     """Map fingerprint -> canonical text for every dismissed finding.
 
@@ -195,23 +176,21 @@ def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     future finding filed under that requirement, and corpus/match-side
     eligibility would be asymmetric.
     """
+    from quodeq.data.sqlite.findings_queries import (  # noqa: PLC0415
+        read_semantic_eligible_dismissals,
+    )
+
     out: dict[str, str] = {}
     if not project_dir or not project_dir.is_dir():
         return out
     for run_dir in project_dir.iterdir():
-        if not run_dir.is_dir() or not (run_dir / "evaluation.db").is_file():
+        if not run_dir.is_dir():
             continue
-        try:
-            from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-            with open_evaluation_db(run_dir) as conn:
-                for req, snippet in conn.execute(_SEMANTIC_ELIGIBLE_SQL):
-                    fp = fingerprint(req, snippet)
-                    text = precedent_text(req, snippet)
-                    if fp is not None and text is not None:
-                        out[fp] = text
-        except Exception as exc:
-            _logger.warning("Could not read dismissed texts from %s: %s", run_dir, exc)
-            continue
+        for req, snippet in read_semantic_eligible_dismissals(run_dir):
+            fp = fingerprint(req, snippet)
+            text = precedent_text(req, snippet)
+            if fp is not None and text is not None:
+                out[fp] = text
     return out
 
 
