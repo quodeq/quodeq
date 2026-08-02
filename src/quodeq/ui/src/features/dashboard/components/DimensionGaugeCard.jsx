@@ -8,7 +8,7 @@ import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { exitReasonLabel, exitReasonHint } from '../../../models/exitReason.js';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 
 /**
  * Build a coverage record for the gauge card's footer line.
@@ -43,7 +43,7 @@ function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
     sourceFileCount > 0;
   const parts = [t('overview.partialRun')];
   if (hasCounts) {
-    parts.push(t('overview.filesOf', { read: filesRead.toLocaleString(), total: sourceFileCount.toLocaleString() }));
+    parts.push(t('overview.filesOf', { read: filesRead.toLocaleString(LOCALE), total: sourceFileCount.toLocaleString(LOCALE) }));
   }
   if (typeof exitReason === 'string') {
     parts.push(t('overview.stoppedReason', { reason: exitReasonLabel(exitReason) }));
@@ -73,8 +73,8 @@ function UnmappedSegment({ count }) {
   return (
     <> · <span
       className="dim-gauge-card__unmapped"
-      title={t(tooltipKey, { count: count.toLocaleString() })}
-    >{t('overview.unmappedCount', { count: count.toLocaleString() })}</span></>
+      title={t(tooltipKey, { count: count.toLocaleString(LOCALE) })}
+    >{t('overview.unmappedCount', { count: count.toLocaleString(LOCALE) })}</span></>
   );
 }
 

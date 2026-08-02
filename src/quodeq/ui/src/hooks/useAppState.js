@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { LOCALE } from '../strings/index.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
@@ -90,7 +91,7 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
   const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
   if (entry?.dateISO) {
     try {
-      return new Date(entry.dateISO).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+      return new Date(entry.dateISO).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
     } catch { return entry.dateISO; }
   }
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;

@@ -1,11 +1,11 @@
 import { scoreColorClass, gradeLabel } from '../../../utils/formatters.js';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 
 function formatDate(dateISO) {
   if (!dateISO) return '';
   try {
     const d = new Date(dateISO);
-    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+    return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
   } catch { return ''; }
 }
 
@@ -13,7 +13,7 @@ function formatTime(dateISO) {
   if (!dateISO) return '';
   try {
     const d = new Date(dateISO);
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
   } catch { return ''; }
 }
 

@@ -147,6 +147,7 @@
   "common.unknownError": "unknown error",
   "common.versionPrefix": "v{version}",
   "common.viewRunningEvaluation": "View running evaluation",
+  "common.weekOfYear": "Week {week}, {year}",
   "common.yearsAgo": "{years} years ago",
   "common.yesterday": "yesterday",
   "dimension.clearFileFilterAria": "Clear file filter",

@@ -8,7 +8,7 @@ import { useSharedProjects } from '../hooks/useSharedProjects.js';
 import { usePublish } from '../hooks/usePublish.js';
 import { useMergedProjects } from '../hooks/useMergedProjects.js';
 import Badge from '../../../components/Badge.jsx';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 
 // Technology and discipline names are proper nouns: a translator handed
 // "React Native" would be right to leave it, and wrong to change it.
@@ -42,7 +42,7 @@ function disciplineLabel(d) {
 function formatDate(iso) {
   if (!iso) return null;
   try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
   } catch {
     return null;
   }
@@ -67,14 +67,14 @@ function GradeChip({ grade, score }) {
 
 function LanguageNumbers({ stats, filesCount }) {
   if (!stats || Object.keys(stats).length === 0) {
-    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString()}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>;
+    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString(LOCALE)}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>;
     return null;
   }
   const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 4);
   const total = filesCount || sorted.reduce((s, [, c]) => s + c, 0);
   return (
     <div className="project-lang-row">
-      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString()}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>
+      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString(LOCALE)}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>
       {sorted.map(([lang, count]) => (
         <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extDisplayName(lang)}</span></span>
       ))}
