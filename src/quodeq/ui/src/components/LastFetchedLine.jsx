@@ -1,3 +1,4 @@
+import { t } from '../strings/index.js';
 // Exported so other "N ago" displays (e.g. the Projects page's online-tab
 // sync status and published-by lines) reuse this exact formatter instead of
 // growing a second one.
@@ -24,5 +25,5 @@ export default function LastFetchedLine({ lastFetchedAt }) {
   if (!lastFetchedAt) return null;
   const rel = relativeTime(lastFetchedAt);
   if (rel === null) return null;
-  return <p className="last-fetched-line">Last updated {rel}.</p>;
+  return <p className="last-fetched-line">{t('common.lastUpdated')} {rel}.</p>;
 }

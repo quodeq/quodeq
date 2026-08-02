@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ActionPreviewCard } from './ActionPreviewCard.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+import { t } from '../../strings/index.js';
 
 // Q-mark avatar column next to assistant-authored content.
 function CompassAvatar({ thinking = false }) {
@@ -41,7 +42,7 @@ function MessageItem({ message }) {
     case 'tool':
       return (
         <div className="assistant-msg assistant-msg-tool">
-          ↳ used {message.name}{message.argsSummary ? ` · ${message.argsSummary}` : ''}
+          {t('assistant.toolUsed', { name: message.name })}{message.argsSummary ? ` · ${message.argsSummary}` : ''}
         </div>
       );
     case 'local':
@@ -87,8 +88,8 @@ export function MessageList({ messages, streaming }) {
       {streaming && (
         <div className="assistant-streaming-indicator" role="status" aria-live="polite">
           <CompassAvatar thinking />
-          <span className="assistant-streaming-text" aria-hidden="true">Consulting the project…</span>
-          <span className="sr-only">Assistant is responding…</span>
+          <span className="assistant-streaming-text" aria-hidden="true">{t('assistant.consulting')}</span>
+          <span className="sr-only">{t('assistant.responding')}</span>
         </div>
       )}
       <div ref={endRef} />

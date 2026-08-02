@@ -1,5 +1,6 @@
 import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import HelpHint from '../../../../components/HelpHint.jsx';
+import { t } from '../../../../strings/index.js';
 
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
@@ -65,9 +66,9 @@ export default function StandardLaunchStep({ state, actions, standards, onLaunch
           disabled={selectedIds.length === 0}
           onClick={() => onLaunch(selectedIds)}
         >
-          start evaluation
+          {t('onboarding.startEvaluation')}
         </button>
-        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>back</button>
+        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>
       </div>
     </div>
   );

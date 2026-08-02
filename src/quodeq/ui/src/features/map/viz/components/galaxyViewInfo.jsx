@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../../../../strings/index.js';
 
 /** Presentational component for the level info panel overlay */
 export function LevelInfoPanel({ levelInfo }) {
@@ -22,7 +23,7 @@ export function LevelInfoPanel({ levelInfo }) {
           style={{ marginTop: 10, width: '100%', padding: '6px 12px', background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', fontSize: 11, cursor: 'pointer', transition: 'all 0.2s' }}
           onMouseEnter={e => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 35%, transparent)'; }}
           onMouseLeave={e => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 20%, transparent)'; }}
-        >View Details</button>
+        >{t('map.viewDetails')}</button>
       )}
     </div>
   );

@@ -19,6 +19,7 @@ import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
 import ServerStatusDot from './ServerStatusDot.jsx';
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 import { TerminalLauncherButton } from './TerminalLauncherButton.jsx';
+import { t } from '../strings/index.js';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
   const ctx = useSidePane();
@@ -246,7 +247,7 @@ export default function TopBar({
             aria-live="polite"
           >
             <span className="topbar-btn__play" aria-hidden="true">▸</span>
-            <span>Evaluate</span>
+            <span>{t('common.evaluate')}</span>
           </button>
         )}
 

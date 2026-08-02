@@ -4,6 +4,7 @@ import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
 import {
   COPY_FEEDBACK_MS, ChevronDownIcon, CopyIcon, MaximizeIcon, MinimizeIcon, PlusIcon,
 } from '../../components/CopyButton.jsx';
+import { t } from '../../strings/index.js';
 
 /**
  * The terminal panel's own header: panel switcher, identity, the sandbox
@@ -30,7 +31,7 @@ export default function TerminalHeader({ onCopy, onNewSession }) {
       {openPanels.length < 2 && (
         <span className="tty-icon-block" aria-hidden="true">&gt;_</span>
       )}
-      <div className="tty-panel-title">Terminal</div>
+      <div className="tty-panel-title">{t('terminal.terminalLabel')}</div>
       {/* With a single session the tab strip is hidden and the "+" lives up
           here; creating a second session reveals the strip, which carries its
           own "+" from then on. */}
