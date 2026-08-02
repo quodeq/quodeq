@@ -136,6 +136,40 @@ Dashboard
   └─► opens  GET /api/jobs/<id>/logs/stream   (SSE: replay + tail; `event: done` on terminal)
 ```
 
+## Deterministic Requirement Checkers
+
+Some requirements are properties of the whole codebase rather than of any one
+file — "no transitive framework dependencies in core layers" cannot be judged
+by reading a single file, which is why they never produced a judgment at all.
+A requirement opts into a deterministic checker by naming it in the compiled
+standard:
+
+```json
+{ "id": "CLEA-DEP-06", "text": "...", "check": "framework-imports" }
+```
+
+At run time `analysis/checks/runner.py` resolves the named checkers, runs each
+once, filters the judgments back to the requirements that declared it, and
+folds the results into the dimension's evidence — as ordinary violations and
+compliances, so scoring, dismissal, the dashboard and the SQL projection need
+no special case. A checker that runs clean emits **one** compliance, because
+"no violations" and "never checked" must not look the same.
+
+Three rules hold everywhere in this path:
+
+- **Fail-soft.** A checker that raises, a standard that will not parse, a JSONL
+  that will not open — each costs the deterministic findings and nothing else.
+- **Forward compatible.** A `check` name this build does not know is skipped,
+  not an error: standards ship as data and outlive binaries.
+- **Never cached.** These are graph properties, and the per-file content cache
+  has no key that could express "the graph changed". They recompute per run.
+
+| Piece | File |
+|---|---|
+| Pure judgment logic | `src/quodeq/core/checks/` |
+| Import graph (the only I/O) | `src/quodeq/data/fs/import_graph.py` |
+| Registry + run wiring | `src/quodeq/analysis/checks/` |
+
 ## Key Design Rules
 
 1. **`status.json` is authoritative.** The index never holds state not derivable from `status.json` + filesystem signals. Delete `index.db` → next read rebuilds.

@@ -45,7 +45,8 @@
           "id": "CLEA-DEP-06",
           "text": "No transitive framework dependencies in core layers",
           "description": "Even indirect imports of framework packages in entities or use cases violate the rule. If entity A imports utility B, and utility B imports Flask, then entity A has a transitive framework dependency",
-          "refs": []
+          "refs": [],
+          "check": "framework-imports"
         },
         {
           "id": "CLEA-DEP-07",
@@ -117,7 +118,8 @@
           "id": "CLEA-FRM-01",
           "text": "Core business logic must not import framework packages",
           "description": "Use case and entity files should have zero imports from web frameworks, ORMs, or DI containers. Check the import section of every file in domain/ and usecases/ — any framework import is a violation",
-          "refs": []
+          "refs": [],
+          "check": "framework-imports"
         },
         {
           "id": "CLEA-FRM-02",

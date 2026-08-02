@@ -89,6 +89,27 @@ def extract_requirements(data: dict, overrides: dict[str, dict] | None = None) -
     return lookup
 
 
+def extract_requirement_checks(data: dict) -> dict[str, frozenset[str]]:
+    """Extract ``{check_name: {req_id, ...}}`` from a compiled-standards dict.
+
+    A requirement opts into a deterministic checker by naming it
+    (``"check": "framework-imports"``). Grouping by checker name lets the
+    caller run each one once no matter how many requirements it answers, then
+    filter the judgments back to the requirements that actually asked.
+
+    Requirements without a ``check`` are absent from the result, so a standard
+    that declares none costs nothing.
+    """
+    grouped: dict[str, set[str]] = {}
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            name = req.get("check")
+            req_id = req.get("id")
+            if isinstance(name, str) and name and req_id:
+                grouped.setdefault(name, set()).add(req_id)
+    return {name: frozenset(ids) for name, ids in grouped.items()}
+
+
 # ---------------------------------------------------------------------------
 # The one I/O function core still owns.
 #

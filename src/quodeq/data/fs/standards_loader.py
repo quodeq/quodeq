@@ -12,6 +12,7 @@ from pathlib import Path
 
 from quodeq.core.standards.refs import (
     _load_compiled_data,
+    extract_requirement_checks,
     extract_requirements,
     load_compiled_refs,
 )
@@ -66,6 +67,22 @@ def load_compiled_requirements(
     if not data:
         return {}
     return extract_requirements(data, overrides=overrides)
+
+
+def load_requirement_checks(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict[str, frozenset[str]]:
+    """Load ``{check_name: {req_id, ...}}`` for *dimension* from disk.
+
+    Empty when the dimension has no standard on disk or none of its
+    requirements declares a checker -- both mean "nothing deterministic to
+    run", which callers treat identically.
+    """
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    if not data:
+        return {}
+    return extract_requirement_checks(data)
 
 
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
