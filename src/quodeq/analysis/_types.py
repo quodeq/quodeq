@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from quodeq.analysis import dispatch_policy
 from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subprocess import HeartbeatCallback
@@ -103,8 +104,6 @@ class RunConfig:
             files, total = self.manifest.source_files, self.manifest.total_files
         else:
             return 0
-        # Late import: dispatch_policy reads provider config; keep _types a leaf.
-        from quodeq.analysis import dispatch_policy  # noqa: PLC0415
         if not files or not dispatch_policy.provider_is_api():
             return total
         dispatchable, _excluded = dispatch_policy.split_api_dispatchable(self.src, files)
