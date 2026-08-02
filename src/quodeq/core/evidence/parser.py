@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
-from quodeq.core.evidence._refs import build_req_refs_lookup, enrich_judgment, resolve_llm_refs
+from quodeq.core.evidence._refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import Judgment
 from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 # Re-export for backward compatibility (external code imports these from parser)
-__all__ = ["build_req_refs_lookup", "resolve_llm_refs", "EvidenceContext",
+__all__ = ["resolve_llm_refs", "EvidenceContext",
            "parse_jsonl_to_evidence", "parse_jsonl_to_evidence_by_dimension"]
 
 # Preserve private-name aliases used by tests

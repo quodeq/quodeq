@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from quodeq.core.standards.refs import (
+from quodeq.data.fs.standards_loader import (
     load_compiled_refs_multi,
     load_compiled_requirements_multi,
 )

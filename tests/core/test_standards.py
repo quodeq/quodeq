@@ -1,7 +1,7 @@
 from functools import partial
 
 from quodeq.config.paths import default_paths
-from quodeq.core.standards.loader import (
+from quodeq.data.fs.standards_loader import (
     load_asvs_l1 as _load_asvs_l1,
     load_cisq as _load_cisq,
     load_dimension as _load_dimension,
