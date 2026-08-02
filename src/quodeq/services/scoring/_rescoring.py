@@ -20,6 +20,7 @@ from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.services.scoring._summary import recompute_summary
 from quodeq.shared.validation import validate_path_segment
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 _logger = logging.getLogger(__name__)
 
@@ -49,7 +50,8 @@ def _rescore_runs_by_dimension(
             # basis for every dimension sourced from it.
             result = rescore_dimensions(
                 run_dims, dismissed, deleted, params=params,
-                run_dir=reports_root / project / run_id)
+                run_dir=reports_root / project / run_id,
+                rules=load_suppression_rules(reports_root / project))
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd
                 for rd in result.get("dimensions", [])

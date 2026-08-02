@@ -201,3 +201,56 @@ class TestReadPathsHonourRules:
             {"t": "violation", "req": "X-1", "p": "X-1", "file": "a.py", "line": 7})
         assert not matcher.is_suppressed(
             {"t": "violation", "req": "X-1", "p": "X-1", "file": "b.py", "line": 7})
+
+
+class TestRulesMoveTheGrade:
+    """The point of the feature: a rule must change the score, not just lists."""
+
+    def _dim(self):
+        from quodeq.core.types.dimension import DimensionResult
+        from quodeq.core.types.finding import Finding
+        return DimensionResult(
+            dimension="clean-architecture",
+            overall_score="5.0/10",
+            violations=[
+                Finding(req="CLEA-DEP-01", practice_id="Independence",
+                        file="src/quodeq/services/a.py", line=3, severity="major"),
+            ],
+        )
+
+    def test_rescore_drops_a_rule_matched_violation(self):
+        from quodeq.core.types.suppression_rule import SuppressionRule
+        from quodeq.services.rescore import rescore_dimensions
+
+        rules = (SuppressionRule(req="CLEA-DEP-01", file="src/quodeq/services/*",
+                                 reason="WS1"),)
+        out = rescore_dimensions([self._dim()], set(), set(), rules=rules)
+
+        assert out["dimensions"][0]["violations"] == []
+
+    def test_without_the_rule_the_violation_survives(self):
+        from quodeq.services.rescore import rescore_dimensions
+
+        out = rescore_dimensions([self._dim()], set(), set())
+
+        assert len(out["dimensions"][0]["violations"]) == 1
+
+    def test_scored_run_dimensions_loads_rules_from_the_project(self, tmp_path):
+        """End-to-end: the entry point reads the rules file itself."""
+        from quodeq.services.scoring import ScoringDeps, scored_run_dimensions
+
+        (tmp_path / "proj").mkdir()
+        (tmp_path / "proj" / "suppression_rules.json").write_text(json.dumps({
+            "rules": [{"req": "CLEA-DEP-01", "file": "src/quodeq/services/*",
+                       "reason": "WS1"}],
+        }), encoding="utf-8")
+        dim = self._dim()
+        deps = ScoringDeps(
+            read_run_data=lambda root, p, r: [dim],
+            dismissed_keys=lambda pd: set(),
+            deleted_keys=lambda pd: set(),
+        )
+
+        out = scored_run_dimensions(tmp_path, "proj", "run-1", deps=deps)
+
+        assert out[0].violations == [], "a project rule must reach the scoring path"

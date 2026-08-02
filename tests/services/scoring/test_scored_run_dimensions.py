@@ -107,7 +107,7 @@ def test_scored_run_dimensions_passes_the_run_dir_to_rescore():
     raw_dim = _make_dimension([_make_violation()], [_make_compliance()])
     seen: list[Path | None] = []
 
-    def fake_rescore(dim, dismissed, deleted=None, params=None, *, run_dir=None):
+    def fake_rescore(dim, dismissed, deleted=None, params=None, *, run_dir=None, rules=()):
         seen.append(run_dir)
         return dim
 

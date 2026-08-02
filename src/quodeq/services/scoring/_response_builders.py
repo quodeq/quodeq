@@ -22,6 +22,7 @@ from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.shared.validation import validate_path_segment
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 
 def _severity_bucket(severity: str) -> str:
@@ -234,7 +235,8 @@ def _build_response_from_eval_files(
 
     dims = base_fetcher(run_id)
     rescored = rescore_dimensions(
-        dims, dismissed, deleted, params=params, run_dir=project_dir / run_id)
+        dims, dismissed, deleted, params=params, run_dir=project_dir / run_id,
+        rules=load_suppression_rules(project_dir))
     return {
         "dimensions": rescored.get("dimensions", []),
         "summary": rescored.get("summary", {}),

@@ -31,7 +31,7 @@ def test_scored_run_dimensions_uses_injected_deps(tmp_path):
     rescored = replace(raw, overall_score="9.0/10")
     calls = {}
 
-    def fake_rescore(d, dismissed, deleted, *, params, run_dir):
+    def fake_rescore(d, dismissed, deleted, *, params, run_dir, rules=()):
         calls["args"] = (d, dismissed, deleted, run_dir)
         return rescored
 

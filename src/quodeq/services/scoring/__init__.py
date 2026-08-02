@@ -59,6 +59,7 @@ from quodeq.services.scoring._response_builders import (  # noqa: F401
     _build_totals_from_findings,
     _severity_bucket,
 )
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 from quodeq.services.scoring._rescoring import (  # noqa: F401
     _dims_expecting_rescore,
     _merge_rescored_dims,
@@ -205,12 +206,16 @@ def scored_run_dimensions(
     dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or deleted_keys)(project_dir)
     dims = (d.read_run_data or read_run_data)(reports_root, project, run_id)
-    if not dismissed and not deleted:
+    rules = load_suppression_rules(project_dir)
+    # Rules are suppression state too: skipping the rescore when only rules
+    # exist would silently return raw scores for a project whose ADRs are
+    # expressed as patterns rather than per-line dismissals.
+    if not dismissed and not deleted and not rules:
         return dims
     run_dir = project_dir / run_id
     rescore = d.rescore_dimension or _rescore_dimension
     return [
-        rescore(dim, dismissed, deleted, params=params, run_dir=run_dir)
+        rescore(dim, dismissed, deleted, params=params, run_dir=run_dir, rules=rules)
         for dim in dims
     ]
 

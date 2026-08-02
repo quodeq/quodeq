@@ -13,6 +13,7 @@ from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
+from quodeq.services.suppression import load_suppression_rules
 
 
 def _eval_dir_from_app(app: Flask) -> str:
@@ -59,5 +60,6 @@ def register_rescore_routes(app: Flask) -> None:
         # *dimensions* were read from this one run, so its directory is the
         # evidence basis for the rescore.
         result = rescore_dimensions(
-            dimensions, dismissed, deleted, run_dir=project_dir / run_id)
+            dimensions, dismissed, deleted, run_dir=project_dir / run_id,
+            rules=load_suppression_rules(project_dir))
         return jsonify(result)
