@@ -12,6 +12,8 @@ import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/termi
 import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import { t } from '../../../strings/index.js';
+import { severityLabel } from '../../../strings/labels.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
@@ -29,13 +31,13 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
-        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>
         {v.provenanceDowngrade && (
           <span
             className="provenance-downgrade-tag"
-            title="Provenance gate: de-escalated from critical to major because the finding named no reachable external input source."
+            title={t('explorer.provenanceDowngradeTitle')}
           >
-            downgraded from critical
+            {t('explorer.downgradedFromCritical')}
           </span>
         )}
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
@@ -51,15 +53,15 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
             onClick={() => { const spec = violationFixPlanSpec(v); if (spec) addWindow(spec); }}
           >
             <SparkleIcon />
-            Fix plan
+            {t('explorer.fixPlan')}
           </button>
           {onDismiss && (
             <button
               type="button"
               className="dismiss-btn"
               onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
-              title="Dismiss this finding (exclude from scoring)"
-              aria-label="Dismiss this finding (exclude from scoring)"
+              title={t('explorer.dismissFinding')}
+              aria-label={t('explorer.dismissFinding')}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
@@ -70,7 +72,7 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
         {(v.title || v.reason) && (
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
-              <span className="vlive-detail-section-label">Reason</span>
+              <span className="vlive-detail-section-label">{t('violations.reasonLabel')}</span>
               {linkedRefs.length > 0 &&
                 <span className="cwe-link-group">{linkedRefs.map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
@@ -79,7 +81,7 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
             </div>
             {v.title && <p className="vlive-detail-title">{v.title}</p>}
             {v.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
+              <span className="vlive-detail-section-label">{t('violations.detailLabel')}</span>
               <p className="vlive-detail-reason">{v.reason}</p>
             </>}
           </div>
@@ -111,22 +113,22 @@ function FileHeader({ file, sevCounts, totalViolations, totalCompliance, dimensi
       </div>
       <StatStrip cards>
         <Stat
-          label="VIOLATIONS"
+          label={t('overview.statViolations')}
           value={totalViolations}
           hint={<FileSevBadgeRow sevCounts={sevCounts} />}
         />
         <Stat
-          label="COMPLIANCE"
+          label={t('overview.statCompliance')}
           value={totalCompliance}
-          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+          hint={totalChecks > 0 ? t('overview.passingChecks', { count: totalChecks }) : null}
         />
         <Stat
-          label="RATIO"
+          label={t('overview.statRatio')}
           value={ratio}
-          hint="compliance : violations"
+          hint={t('overview.ratioHint')}
         />
         <Stat
-          label="DIMENSIONS"
+          label={t('explorer.dimensionsStat')}
           value={dimensionsCount}
         />
       </StatStrip>
@@ -151,10 +153,10 @@ function LowConfidenceToggle({ count, expanded, onToggle }) {
       aria-expanded={expanded}
       onClick={onToggle}
     >
-      <span className="violation-group-title">Low confidence</span>
+      <span className="violation-group-title">{t('violations.lowConfidence')}</span>
       <span className="violation-group-count">{count}</span>
       <span className="low-confidence-group-hint">
-        {expanded ? 'Hide' : 'Show'} likely false positives
+        {expanded ? t('violations.hideLikelyFp') : t('violations.showLikelyFp')}
       </span>
     </button>
   );
@@ -339,10 +341,12 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
 
   const renderItem = (item) => {
     switch (item.kind) {
-      case 'sev-header':
-        return <GroupHeader title={item.sev.charAt(0).toUpperCase() + item.sev.slice(1)} count={item.count} />;
+      case 'sev-header': {
+        const label = severityLabel(item.sev);
+        return <GroupHeader title={label.charAt(0).toUpperCase() + label.slice(1)} count={item.count} />;
+      }
       case 'compliance-header':
-        return <GroupHeader title="Compliance" count={item.count} />;
+        return <GroupHeader title={t('explorer.complianceHeader')} count={item.count} />;
       case 'low-conf-toggle':
         return <LowConfidenceToggle count={item.count} expanded={item.expanded} onToggle={() => setLowConfExpanded((v) => !v)} />;
       case 'violation':
