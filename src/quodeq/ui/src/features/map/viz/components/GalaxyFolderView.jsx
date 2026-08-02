@@ -9,6 +9,7 @@ import {
 } from './galaxyFolderDraw.js';
 import { createEventHandlers } from './galaxyFolderEvents.js';
 import GalaxyFolderPanel from './GalaxyFolderPanel.jsx';
+import { t } from '../../../../strings/index.js';
 
 const TRANS = 0.8;
 const FLY_DURATION = 1.4;
@@ -276,7 +277,7 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
         style={{ width: '100%', height: '100%', display: 'block' }}
         tabIndex={0}
         role="application"
-        aria-label="Galaxy folder visualization of project structure"
+        aria-label={t('map.galaxyFolderAria')}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}

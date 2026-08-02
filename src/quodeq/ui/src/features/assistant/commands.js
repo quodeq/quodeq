@@ -1,16 +1,17 @@
+import { t } from '../../strings/index.js';
 // Pure helpers for the assistant command layer: meta-command parsing,
 // autocomplete matching, and welcome/pill derivation. No React, no network.
 // META_COMMANDS mirrors RESERVED_COMMANDS in src/quodeq/assistant/skills.py
 // and doubles as the offline fallback when the catalog fetch fails.
 
 export const META_COMMANDS = [
-  { name: 'help', description: 'Show what the assistant can do here' },
-  { name: 'skills', description: 'List available skill commands' },
+  { name: 'help', description: t('assistant.cmdHelp') },
+  { name: 'skills', description: t('assistant.cmdSkills') },
   // Still answered locally if typed, but hidden from the welcome list,
   // /help, and autocomplete until the Phase 2 action registry gives it
   // more than one entry. The name stays reserved server-side.
-  { name: 'actions', description: 'List actions the assistant can draft', hidden: true },
-  { name: 'clear', description: 'Start a new conversation' },
+  { name: 'actions', description: t('assistant.cmdActions'), hidden: true },
+  { name: 'clear', description: t('assistant.cmdClear') },
 ];
 
 export const VISIBLE_META_COMMANDS = META_COMMANDS.filter((c) => !c.hidden);
@@ -46,17 +47,17 @@ function commandLines(catalog, readOnly) {
 export function buildMetaResponse(kind, catalog, { readOnly = false } = {}) {
   if (kind === 'skills') {
     const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
-    if (!skills.length) return 'No skill packs are installed.';
+    if (!skills.length) return t('assistant.noSkillPacks');
     return `**Skills**\n${skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`).join('\n')}`;
   }
   if (kind === 'actions') {
     const actions = catalog?.actions ?? [];
-    if (!actions.length) return 'No draftable actions are available.';
-    return `**Actions** (drafted as preview cards, applied only after you approve)\n${actions.map((a) => `- \`${a.type}\` ${a.description}`).join('\n')}`;
+    if (!actions.length) return t('assistant.noDraftableActions');
+    return `${t('assistant.actionsHeader')}\n${actions.map((a) => `- \`${a.type}\` ${a.description}`).join('\n')}`;
   }
   const intro = readOnly
-    ? 'I can explain scores and dig into findings for this remote project.'
-    : 'I can explain scores, dig into findings, and draft standards for this project.';
+    ? t('assistant.introReadOnly')
+    : t('assistant.intro');
   return `${intro}\n\n**Commands**\n${commandLines(catalog, readOnly)}`;
 }
 

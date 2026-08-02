@@ -10,6 +10,7 @@ import {
 } from '../../../api/index.js';
 import { applyMutationDelta } from '../../../api/applyMutationDelta.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { t } from '../../../strings/index.js';
 
 /**
  * @param {string} selectedProject
@@ -71,7 +72,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to restore finding:', err);
-      setRestoreError?.('Failed to restore finding. Please try again.');
+      setRestoreError?.(t('violations.restoreFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
@@ -84,7 +85,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to restore all findings:', err);
-      setRestoreError?.('Failed to restore all findings. Please try again.');
+      setRestoreError?.(t('violations.restoreAllFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
@@ -107,7 +108,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to delete finding:', err);
-      setRestoreError?.('Failed to delete finding. Please try again.');
+      setRestoreError?.(t('violations.deleteFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
@@ -115,8 +116,8 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     if (isShared) return;
     const count = dismissed.length;
     const ok = await confirmDialog({
-      title: 'Delete dismissed findings?',
-      message: `Are you sure you want to permanently delete those ${count} findings? This cannot be undone.`,
+      title: t('violations.deleteDismissedTitle'),
+      message: t('violations.deleteDismissedBody', { count }),
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       variant: 'danger',
@@ -129,7 +130,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to delete all findings:', err);
-      setRestoreError?.('Failed to delete all findings. Please try again.');
+      setRestoreError?.(t('violations.deleteAllFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
 

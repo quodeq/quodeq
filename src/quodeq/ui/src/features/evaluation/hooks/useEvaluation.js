@@ -33,6 +33,7 @@ import {
   LOCAL_API_PROVIDERS,
 } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
+import { t } from "../../../strings/index.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
@@ -67,12 +68,25 @@ export { LOCAL_API_PROVIDERS };
  * and the Evaluate header display. Throws a user-facing error if no
  * provider/model is configured.
  */
+/**
+ * An error whose message is meant for the user, not the console.
+ *
+ * The flag is what makes it safe to translate: the mutation's onError used
+ * to decide by sniffing the message text (`msg.startsWith("No ")`), which
+ * silently stops matching the moment the copy is translated or reworded.
+ */
+function userFacingError(key) {
+  const err = new Error(t(key));
+  err.userFacing = true;
+  return err;
+}
+
 function preparePayload(payload, storage = localStorage) {
   const provider = payload.aiCmd || storage.getItem(ACTIVE_PROVIDER_KEY) || "";
-  if (!provider) throw new Error("No provider selected. Go to Settings to configure one.");
+  if (!provider) throw userFacingError("evaluate.noProviderSelected");
   const get = (key) => storage.getItem(providerKey(provider, key));
   const model = payload.aiModel || get("model");
-  if (!model) throw new Error("No model selected. Go to Settings and select one.");
+  if (!model) throw userFacingError("evaluate.noModelSelected");
   const settings = resolveProviderSettings(provider, storage);
   const result = {
     ...payload,
@@ -222,10 +236,9 @@ export function useEvaluation() {
       queryClient.invalidateQueries({ queryKey: projectKeys.all() });
     },
     onError: (err) => {
-      const msg = err?.message || "Failed to start evaluation.";
-      setJobError(
-        msg.startsWith("No ") || msg.startsWith("Select ") ? msg : "Failed to start evaluation",
-      );
+      // Only our own prereq errors carry copy worth showing; anything else
+      // is a transport/server failure whose raw text would be noise.
+      setJobError(err?.userFacing ? err.message : t("evaluate.startFailed"));
     },
   });
 
@@ -260,8 +273,7 @@ export function useEvaluation() {
       // racing the ~33s server-side kill path) must KEEP the job: clearing
       // it hid a still-running scan and let a second concurrent scan start
       // on the same project.
-      const msg = err?.message || "Could not cancel evaluation";
-      setJobError(msg);
+      setJobError(t("evaluate.cancelFailed"));
       if (err?.status !== 409 && err?.status !== 404) return;
       const id = jobId;
       if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
@@ -281,12 +293,12 @@ export function useEvaluation() {
     // Only the destructive option ('discard') is rendered red; 'keep' and
     // 'dismiss' are neutral so they don't compete visually.
     const choice = await chooseDialog({
-      title: "Cancel evaluation?",
-      message: "The run will stop. Choose what happens to findings collected so far.",
-      cancelLabel: "Keep running",
+      title: t("evaluate.cancelTitle"),
+      message: t("evaluate.cancelBody"),
+      cancelLabel: t("evaluate.keepRunning"),
       actions: [
-        { key: "preserve", label: "Keep findings", variant: "default" },
-        { key: "discard", label: "Discard findings", variant: "danger" },
+        { key: "preserve", label: t("evaluate.keepFindings"), variant: "default" },
+        { key: "discard", label: t("evaluate.discardFindings"), variant: "danger" },
       ],
     });
     if (!choice) return;

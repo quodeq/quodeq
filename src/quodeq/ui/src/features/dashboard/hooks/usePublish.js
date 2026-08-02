@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -200,7 +201,7 @@ export function usePublish({ enabled = true } = {}) {
     const finishedProject = publish.project ?? publishingProjectRef.current;
     if (publish.state === 'error') {
       setPublishState('error');
-      setPublishError(publish.error || 'publish failed');
+      setPublishError(publish.error || t('projects.publishFailed'));
       setPublishErrorProject(finishedProject);
     } else {
       // 'done' (or an unexpected 'idle') -- refresh the shared list once so
@@ -243,7 +244,7 @@ export function usePublish({ enabled = true } = {}) {
       stopPolling();
       pollTimerRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
     } catch (err) {
-      setPublishError(err?.message || 'failed to start publish');
+      setPublishError(err?.message || t('projects.publishStartFailed'));
       setPublishErrorProject(projectId);
     } finally {
       publishingRef.current = false;
@@ -291,7 +292,7 @@ export function usePublish({ enabled = true } = {}) {
       stopPolling();
       if (publish.state === 'error') {
         setPublishState('error');
-        setPublishError(publish.error || 'publish failed');
+        setPublishError(publish.error || t('projects.publishFailed'));
         setPublishErrorProject(publish.project ?? publishingProjectRef.current);
       } else {
         setPublishState('done');

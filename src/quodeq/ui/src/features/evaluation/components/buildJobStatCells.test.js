@@ -127,7 +127,7 @@ test('buildJobStatCells: running files hint omits mode copy when mode is unknown
 });
 
 test('buildJobStatCells: running files hint says full rescan on clean scans', () => {
-  const cells = buildJobStatCells('running', { ...baseInputs, scanMode: 'clean scan' });
+  const cells = buildJobStatCells('running', { ...baseInputs, scanMode: 'clean' });
   assert.equal(cells[1].hint, '62% · full rescan');
 });
 
@@ -436,7 +436,7 @@ test('deriveScanMode: incremental with cached files, clean scan without', () => 
     filesCached: cached, filesProjectTotal: 100,
   });
   assert.equal(deriveScanMode({ dimensions: [dim(40)] }), 'incremental');
-  assert.equal(deriveScanMode({ dimensions: [dim(0)] }), 'clean scan');
+  assert.equal(deriveScanMode({ dimensions: [dim(0)] }), 'clean');
 });
 
 test('deriveScanMode: null when coverage is unknown', () => {

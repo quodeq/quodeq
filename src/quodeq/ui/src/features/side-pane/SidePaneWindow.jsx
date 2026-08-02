@@ -119,8 +119,8 @@ export function SidePaneWindow({ spec, onClose }) {
             type="button"
             className="side-pane-window__icon-btn"
             onClick={onClickClose}
-            aria-label="Close window"
-            title="Close window"
+            aria-label={t('common.closeWindow')}
+            title={t('common.closeWindow')}
           >✕</button>
         </div>
       </header>

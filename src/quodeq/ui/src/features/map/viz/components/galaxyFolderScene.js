@@ -2,6 +2,7 @@ import {
   TAU, scoreRGB, sevRGB,
   seedHash, seededRng,
 } from '../core/galaxyCore.js';
+import { t } from '../../../../strings/index.js';
 
 /* ── Position consistency engine ── */
 
@@ -291,7 +292,7 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
   return {
     title: isRoot ? (projectName || 'Project') : cn.name,
     lines,
-    hint: folderCount > 0 ? 'Click a folder to zoom in, click again to enter' : null,
+    hint: folderCount > 0 ? t('map.folderHint') : null,
     detailAction: !isRoot ? () => { if (onFileClick) onFileClick(cn); } : null,
   };
 }

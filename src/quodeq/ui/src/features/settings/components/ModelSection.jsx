@@ -118,7 +118,7 @@ function ModelSettings({ aiCmd = {}, models }) {
           type="text"
           className="settings-model-input"
           value={aiModel}
-          placeholder="default"
+          placeholder={t('settings.defaultPlaceholder')}
           onChange={(e) => handleModelChange(null, e.target.value, onAiModelChange, AI_MODEL_STORAGE_KEY)}
           aria-label={t('settings.modelOverrideAria')}
           autoCapitalize="off"

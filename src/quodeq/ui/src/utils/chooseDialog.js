@@ -13,13 +13,14 @@
  *   });
  *   if (choice === null) return; // user cancelled
  */
+import { t } from '../strings/index.js';
 const _ALLOWED_VARIANTS = new Set(['default', 'primary', 'danger']);
 
 export function chooseDialog({
-  title = 'Choose an option',
+  title = t('common.chooseAnOption'),
   message = '',
   actions = [],
-  cancelLabel = 'Cancel',
+  cancelLabel = t('common.cancel'),
 } = {}) {
   return new Promise((resolve) => {
     if (typeof document === 'undefined' || !Array.isArray(actions) || actions.length === 0) {

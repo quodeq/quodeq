@@ -5,6 +5,7 @@
  */
 import { useApi } from '../api/ApiContext.jsx';
 import { chooseDialog } from '../utils/chooseDialog.js';
+import { t } from '../strings/index.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
@@ -21,7 +22,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
     try {
       await deleteProject(projectId);
     } catch (err) {
-      alert(`Failed to delete project: ${err.message}`);
+      alert(t('projects.deleteProjectFailed', { error: err.message }));
       return;
     }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
@@ -51,7 +52,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
       await relocateProject(projectId, newPath);
     } catch (err) {
       console.error('Relocate failed:', err);
-      alert(`Failed to relocate project: ${err.message || 'unknown error'}. Check that the target path is writable and try again.`);
+      alert(t('projects.relocateFailed', { error: err.message || t('common.unknownError') }));
       return;
     }
     loadProjects();
@@ -67,21 +68,25 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
 
   async function _resolveImportConflict(file, err) {
     const isSameUuid = err.kind === 'same_uuid';
-    const projectLabel = err.projectName ? ` "${err.projectName}"` : '';
-    const message = isSameUuid
-      ? `A project${projectLabel} with this ID already exists. Replace it, import as a separate copy, or cancel.`
-      : `A project${projectLabel} for this repository already exists. Import as a separate copy or cancel.`;
+    // Four whole sentences rather than one with an optional ` "name"` spliced
+    // in: the quoting style is locale-dependent (guillemets, low-high quotes)
+    // and the name does not sit in the same place in every word order.
+    const named = Boolean(err.projectName);
+    const key = isSameUuid
+      ? (named ? 'projects.conflictSameIdNamed' : 'projects.conflictSameId')
+      : (named ? 'projects.conflictSameRepoNamed' : 'projects.conflictSameRepo');
+    const message = t(key, { name: err.projectName });
     // When Replace is offered alongside Copy, render Copy as a neutral
     // outline button so the destructive Replace is the only red one. When
     // Copy is the sole action (same_identity), keep it emphasized.
     const actions = isSameUuid
       ? [
-          { key: 'copy', label: 'Import as copy', variant: 'default' },
-          { key: 'replace', label: 'Replace', variant: 'danger' },
+          { key: 'copy', label: t('projects.importAsCopy'), variant: 'default' },
+          { key: 'replace', label: t('projects.replace'), variant: 'danger' },
         ]
-      : [{ key: 'copy', label: 'Import as copy', variant: 'primary' }];
+      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: 'primary' }];
     const choice = await chooseDialog({
-      title: 'Project already exists',
+      title: t('projects.alreadyExistsTitle'),
       message,
       actions,
     });
@@ -110,7 +115,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
       if (attempt === null) return; // user cancelled
     }
     if (!attempt.ok) {
-      alert(`Failed to import project: ${attempt.err.message || 'unknown error'}`);
+      alert(t('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') }));
       return;
     }
     loadProjects();

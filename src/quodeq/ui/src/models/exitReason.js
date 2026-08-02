@@ -7,28 +7,29 @@
  * Unknown codes fall back to the raw code so new backend reasons degrade
  * to the old verbatim behaviour instead of hiding information.
  */
+import { t } from '../strings/index.js';
 
 // Not an error: hitting the time budget is the user's own setting doing its
 // job. The hint just says what happens to the remainder.
 const TIME_LIMIT = {
-  label: 'time limit reached',
-  hint: 'Remaining files carry over to the next run. Raise the time limit to cover more in one run.',
+  label: t('exitReason.timeLimitLabel'),
+  hint: t('exitReason.timeLimitHint'),
 };
 
 const FAILURE_STREAK = {
-  label: 'repeated failures',
-  hint: 'Stopped after consecutive agent failures. Check that the AI provider is running and reachable, then run again.',
+  label: t('exitReason.failureStreakLabel'),
+  hint: t('exitReason.failureStreakHint'),
   // A run can finish `done` with this reason when the provider died after
   // partial progress; the UI should then warn that results are incomplete.
   warn: true,
 };
 
-const CANCELLED = { label: 'cancelled', hint: null };
+const CANCELLED = { label: t('exitReason.cancelledLabel'), hint: null };
 
 export const EXIT_REASON_INFO = {
   provider_fatal: {
-    label: 'AI provider error',
-    hint: 'The AI provider rejected every request: quota exhausted, out of credits, or an invalid API key. Check your plan, billing or API key, then run again.',
+    label: t('exitReason.providerFatalLabel'),
+    hint: t('exitReason.providerFatalHint'),
     warn: true,
   },
   failure_streak: FAILURE_STREAK,
@@ -45,7 +46,10 @@ export const EXIT_REASON_INFO = {
  */
 export function exitReasonInfo(code) {
   if (typeof code !== 'string') return null;
-  return EXIT_REASON_INFO[code] ?? null;
+  // hasOwn, not a plain lookup: exit_reason comes off the backend payload,
+  // and EXIT_REASON_INFO['constructor'] would return an inherited function
+  // rather than the null this contract promises for unknown codes.
+  return Object.hasOwn(EXIT_REASON_INFO, code) ? EXIT_REASON_INFO[code] : null;
 }
 
 /** Human label for a code; unknown codes pass through verbatim. */

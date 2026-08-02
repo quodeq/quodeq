@@ -5,6 +5,7 @@ import { buildScene, updateSceneLiveData } from './galaxyViewScene.js';
 import { updateTooltip, handleCanvasClick, createKeyboardHandlers } from './galaxyViewEvents.js';
 import { computeLevelInfo, buildBreadcrumb, LevelInfoPanel } from './galaxyViewInfo.jsx';
 import { useGalaxyCamera } from './useGalaxyCamera.js';
+import { t } from '../../../../strings/index.js';
 
 /* ── Custom hook: mouse/click handler setup ── */
 
@@ -148,7 +149,7 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleClick}
         tabIndex={0}
         role="application"
-        aria-label="Galaxy visualization of project compliance. Use arrow keys to move between nodes, Enter to open, Escape to go back."
+        aria-label={t('map.galaxyAria')}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         onBlur={handleBlur} />

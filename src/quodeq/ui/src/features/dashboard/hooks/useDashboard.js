@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
+import { t } from '../../../strings/index.js';
 
 const EMPTY_TREND = [];
 
@@ -203,7 +204,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // showing the previous selection's numbers until they land.
     scoresPending,
     error: dashboardQuery.isError
-      ? "Failed to load dashboard data. Check your connection and try refreshing."
+      ? t('overview.dashboardLoadFailed')
       : (scoresError || null),
     availableRuns,
     refreshDashboard,

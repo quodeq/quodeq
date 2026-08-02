@@ -129,7 +129,7 @@ export default function TopBar({
           type="button"
           className="topbar-back-btn"
           onClick={onBack}
-          aria-label="Go back"
+          aria-label={t('common.goBack')}
         >
           <BackIcon />
         </button>
@@ -146,7 +146,7 @@ export default function TopBar({
             type="button"
             className="topbar-mobile-project"
             onClick={onSelectProject}
-            title="Open projects"
+            title={t('common.openProjects')}
           >
             {projectName}
           </button>
@@ -190,7 +190,7 @@ export default function TopBar({
               type="button"
               className="topbar-pill topbar-pill--button"
               onClick={onProviderClick}
-              title="Open Settings to change provider or model"
+              title={t('common.openSettingsForModel')}
             >
               {provider && model
                 ? (
@@ -223,7 +223,7 @@ export default function TopBar({
             type="button"
             className="topbar-run-chip"
             onClick={onEvaluate}
-            title="View running evaluation"
+            title={t('common.viewRunningEvaluation')}
           >
             <span className="topbar-run-chip__dot" aria-hidden="true" />
             <span className="topbar-run-chip__dim">{runProgress?.dimension || 'evaluating…'}</span>
@@ -257,7 +257,7 @@ export default function TopBar({
             type="button"
             className="topbar-menu-btn"
             onClick={onMenuToggle}
-            aria-label="Open menu"
+            aria-label={t('common.openMenu')}
           >
             <BurgerIcon />
           </button>
