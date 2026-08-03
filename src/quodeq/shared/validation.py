@@ -6,6 +6,7 @@ from pathlib import Path
 
 from quodeq.core.utils.io import (  # noqa: F401 — moved inward to core
     contained_path,
+    resolve_child_dir,
     validate_path_segment,
 )
 

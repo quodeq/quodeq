@@ -49,7 +49,7 @@ from quodeq.services.shared_settings import (
     write_settings,
 )
 from quodeq.services.verified import verified_entries
-from quodeq.shared.validation import contained_path, validate_path_segment
+from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 from .routes_common import reports_dir
 
@@ -129,11 +129,15 @@ def _validate_segment(*segments: str) -> tuple[Response, int] | None:
 
 
 def _shared_project_dir(eval_root: Path, project: str) -> Path | None:
-    """Resolve *project* under *eval_root*; None if it would escape the root."""
-    try:
-        return Path(contained_path(eval_root / project, eval_root))
-    except ValueError:
-        return None
+    """Resolve *project* under *eval_root* by listing; None if there is no such entry.
+
+    *project* is matched against real directory entries rather than joined onto
+    *eval_root*, so a hostile value matches nothing instead of needing to be
+    contained afterwards. None means absent, not invalid: callers run
+    _validate_segment first, so a bad name is already a 400 by this point.
+    """
+    resolved = resolve_child_dir(eval_root, project)
+    return Path(resolved) if resolved is not None else None
 
 
 def register_shared_routes(app: Flask) -> None:
@@ -302,9 +306,6 @@ def register_shared_routes(app: Flask) -> None:
             return err
         project_path = _shared_project_dir(eval_root, project)
         if project_path is None:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
-        if not project_path.is_dir():
             body, status = error_response(
                 "Project not found in the shared repository", HTTPStatus.NOT_FOUND, "NOT_FOUND",
             )
@@ -526,8 +527,7 @@ def register_shared_routes(app: Flask) -> None:
             return err
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return jsonify([])
         raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
         limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
         offset = max(0, request.args.get("offset", 0, type=int))
@@ -542,6 +542,5 @@ def register_shared_routes(app: Flask) -> None:
             return err
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return jsonify([])
         return jsonify(verified_entries(project_dir))

@@ -52,6 +52,40 @@ def validate_path_segment(*segments: str) -> None:
             )
 
 
+def resolve_child_dir(root: str | Path, name: str) -> str | None:
+    """Return the child directory of *root* called *name*, or None if absent.
+
+    The returned path comes out of the directory listing; *name* is only ever
+    compared against entries that already exist, never concatenated onto
+    *root*. That is the entire point. A traversal segment, an absolute path,
+    or a symlink name simply fails to match any real entry, so there is no
+    hostile value to contain and no containment check to get wrong.
+
+    Symlinks are not followed. ``entry.is_dir(follow_symlinks=False)`` defaults to following them,
+    which would return ``root/escape`` for a link pointing out of the tree and
+    hand the caller an escape hatch. Listing-based resolution is only safe
+    when the entry is a real directory, so this asks for that explicitly.
+
+    Prefer this over ``contained_path(root / name, root)`` whenever *name*
+    comes from a request and names something that must already exist. Reach
+    for :func:`contained_path` only when the target may legitimately not exist
+    yet (new project registration, a clone destination), where matching
+    against a listing is impossible.
+
+    A None result means *absent*, not *invalid*: callers run
+    :func:`validate_path_segment` first, so a syntactically bad name is
+    already rejected upstream. Map None to "not found", not "bad request".
+    """
+    try:
+        with os.scandir(root) as entries:
+            for entry in entries:
+                if entry.name == name and entry.is_dir(follow_symlinks=False):
+                    return entry.path
+    except OSError:
+        return None
+    return None
+
+
 def contained_path(candidate: str | Path, root: str | Path) -> str:
     """Return *candidate* resolved, guaranteed to sit inside *root*.
 

@@ -12,7 +12,7 @@ from quodeq.services.deleted import deleted_keys as load_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.shared.utils import get_evaluations_dir
-from quodeq.shared.validation import contained_path, validate_path_segment
+from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 from quodeq.services.suppression import load_suppression_rules
 
 
@@ -35,12 +35,19 @@ def register_rescore_routes(app: Flask) -> None:
             validate_path_segment(project)
             if run_id and run_id != "latest":
                 validate_path_segment(run_id)
-            # Contain the joined path, not just the segment, and use what comes
-            # back: the contained value is what flows to the readers below.
-            project_dir = Path(contained_path(Path(eval_dir) / project, eval_dir))
         except ValueError:
             body, status = error_response("Invalid project or run parameter", HTTPStatus.BAD_REQUEST, "INVALID_PARAM")
             return jsonify(body), status
+
+        # Resolve by listing rather than joining: *project* is compared against
+        # real entries and never concatenated onto *eval_dir*, so a hostile
+        # value matches nothing instead of needing containment afterwards.
+        # A miss here is "no such project", which is a 404 like any other.
+        resolved_dir = resolve_child_dir(eval_dir, project)
+        if resolved_dir is None:
+            body, status = error_response("No runs found for project", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        project_dir = Path(resolved_dir)
         project = project_dir.name
 
         # Resolve run ID
