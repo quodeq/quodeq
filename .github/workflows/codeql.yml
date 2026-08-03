@@ -39,10 +39,34 @@ jobs:
           # tests/ and benchmarks/ contain intentionally vulnerable fixtures
           # (they exercise the scanner itself); scanning them would bury real
           # alerts in noise.
+          #
+          # py/path-injection is excluded deliberately. This codebase performs
+          # path containment through a shared helper (core/utils/io.py
+          # contained_path, realpath + startswith), but CodeQL's barrier
+          # reasoning is intraprocedural: the check sanitises the value inside
+          # the helper and does not follow the return value out to callers.
+          # Our route handlers guard at the entrypoint and hand off to sinks in
+          # data/fs and data/sqlite several calls away, so every guarded flow
+          # reports identically to an unguarded one.
+          #
+          # The cost of leaving it on was measured, not assumed: 152 alerts
+          # dismissed as false positives before 2026-08, then 33 more re-minted
+          # by the clean-architecture refactor because relocating dismissed code
+          # mints fresh alert numbers. Zero true positives in that time. The two
+          # genuine path defects we did find (PR #1014) were found by reading
+          # the guard code, and this query flagged neither.
+          #
+          # See PR #1014 for the full write-up, including the barrier shapes
+          # that were tried and rejected. Revisit if CodeQL gains interprocedural
+          # sanitiser propagation, or model contained_path as a barrier in a
+          # custom query pack.
           config: |
             paths-ignore:
               - tests
               - benchmarks
+            query-filters:
+              - exclude:
+                  id: py/path-injection
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4.37.3
