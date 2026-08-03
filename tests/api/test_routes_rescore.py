@@ -31,9 +31,11 @@ def test_rescore_requires_project(client):
 @patch("quodeq.api.routes_rescore.load_dismissed_keys")
 @patch("quodeq.api.routes_rescore.rescore_dimensions")
 def test_rescore_returns_rescored_data(mock_rescore, mock_dismissed, mock_list_runs, mock_read_run, tmp_path, client):
-    # The route resolves the project against the directory listing, so the
-    # evaluations root has to actually contain it.
-    (tmp_path / "test-project").mkdir()
+    # The route resolves both the project and the run against the directory
+    # listing, so the evaluations root has to actually contain them. list_runs
+    # is mocked to report this run; on disk a reported run always has a
+    # directory, and the fixture now matches that.
+    (tmp_path / "test-project" / _TEST_RUN_ID).mkdir(parents=True)
     mock_list_runs.return_value = [MagicMock(run_id=_TEST_RUN_ID, date_iso="2026-04-02", date_label=_TEST_DATE_LABEL)]
     mock_read_run.return_value = []
     mock_dismissed.return_value = set()

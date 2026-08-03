@@ -43,7 +43,14 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
         dims = read_run_data(Path("/reports"), "my-project", "20260301")
     """
     validate_path_segment(project, run_id)
-    run_dir = reports_root / project / run_id
+    # Resolve both segments by listing rather than joining, so neither name
+    # is ever concatenated onto a path. A miss raises the same
+    # FileNotFoundError callers already handle for an absent run.
+    project_dir = resolve_child_dir(reports_root, project)
+    resolved_run = resolve_child_dir(project_dir, run_id) if project_dir else None
+    if resolved_run is None:
+        raise FileNotFoundError(f"Run not found: {project}/{run_id}")
+    run_dir = Path(resolved_run)
     evaluations = load_evaluations(run_dir / "evaluation")
     evidence_map = load_evidence_map(run_dir / "evidence")
 
