@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.data.sqlite._index_sync import _is_pid_alive
 
 _PID_FILENAME = ".pid"
@@ -30,15 +31,22 @@ def is_safe_run_segment(value: str) -> bool:
     return bool(_SAFE_ID_RE.fullmatch(value)) and value not in (".", "..")
 
 
-def resolve_external_pid(project_uuid: str, run_id: str, reports_root: Path) -> int | None:
+def resolve_external_pid(project_dir: Path, run_id: str) -> int | None:
     """Find the PID of the process running an external job, for cancellation.
 
     Looks for a `.pid` file written by `quodeq evaluate` at run start. Returns
     None if not found or the process is already gone.
+
+    Takes the already-resolved project directory rather than a root plus a
+    name to rejoin: callers resolve once, and this stops rebuilding the same
+    path from raw parts three layers down.
     """
-    if not is_safe_run_segment(project_uuid) or not is_safe_run_segment(run_id):
+    if not is_safe_run_segment(run_id):
         return None
-    pid_file = reports_root / project_uuid / run_id / _PID_FILENAME
+    run_dir = resolve_child_dir(project_dir, run_id)
+    if run_dir is None:
+        return None
+    pid_file = Path(run_dir) / _PID_FILENAME
     if not pid_file.exists():
         return None
     try:

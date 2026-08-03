@@ -51,7 +51,7 @@ def test_in_progress_run_not_persisted_but_complete_run_is(tmp_path, monkeypatch
     assert dismissed_keys(reports / "proj"), "heavy (cached) path not activated"
 
     # Make the newer run look live: resolve_external_pid returns a pid for it.
-    def fake_pid(project, run_id, root):
+    def fake_pid(project_dir, run_id):
         return 4242 if run_id == live_run else None
     monkeypatch.setattr(_external_jobs, "resolve_external_pid", fake_pid)
     # list_runs binds the data-layer function at import time; patch its binding too.

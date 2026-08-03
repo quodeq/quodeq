@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
@@ -188,7 +189,13 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         runs = list_runs(Path("/reports"), "my-project", limit=5)
     """
     validate_path_segment(project)
-    project_dir = reports_root / project
+    # Resolve by listing, not by joining: the returned path comes from the
+    # directory enumeration, so *project* is only ever compared. No project
+    # directory means no runs, which is what a bad name produces too.
+    resolved = resolve_child_dir(reports_root, project)
+    if resolved is None:
+        return []
+    project_dir = Path(resolved)
     index_dates = project_run_dates(reports_root, project)
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
@@ -214,7 +221,7 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         if terminal_status is not None:
             status = terminal_status
         else:
-            pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
+            pid = resolve_external_pid(project_dir, entry.name)
             status = "in_progress" if pid is not None else "complete"
         cached = index_dates.get(entry.name)
         if cached is not None:
