@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 from quodeq.analysis._process import _kill_tree
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-exported API
     is_safe_run_segment,
     resolve_external_pid,
@@ -56,7 +57,10 @@ def cancel_external_run(
     from quodeq.data.sqlite._index_sync import _is_pid_alive
 
     grace = grace_period_s if grace_period_s is not None else _DEFAULT_GRACE_PERIOD_S
-    pid = resolve_external_pid(project_uuid, run_id, reports_root)
+    project_dir = resolve_child_dir(reports_root, project_uuid)
+    if project_dir is None:
+        return False
+    pid = resolve_external_pid(Path(project_dir), run_id)
     if pid is None:
         return False
 

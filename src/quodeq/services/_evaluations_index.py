@@ -303,10 +303,9 @@ class EvaluationsIndex:
             pid_file = run_dir / ".pid"
             if not pid_file.exists():
                 return True  # no PID file -> stale/crashed -> complete
-            project_uuid = run_dir.parent.name
-            run_id = run_dir.name
-            reports_root = run_dir.parent.parent
-            return resolve_external_pid(project_uuid, run_id, reports_root) is None
+            # run_dir is already resolved; pass its parent straight through
+            # instead of splitting it into names and rejoining them.
+            return resolve_external_pid(run_dir.parent, run_dir.name) is None
         snapshot = self._jobs.get_job(job_id)
         if snapshot is not None and snapshot.status in {"done", "failed", "cancelled"}:
             return True
