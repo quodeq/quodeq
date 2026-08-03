@@ -1,28 +1,26 @@
 """Shared helpers used across route modules."""
 from __future__ import annotations
 
-from http import HTTPStatus
-
-from flask import abort, jsonify, make_response, request
+import os
 
 from quodeq.shared.utils import get_evaluations_dir
-from quodeq.shared.validation import contained_path
 
 
-def reports_dir(default_path: str | None = None, request_args: dict | None = None) -> str:
-    """Resolve the reports directory from query params or *default_path*.
+def reports_dir() -> str:
+    """Resolve the reports directory from server configuration.
 
-    *request_args* overrides ``request.args`` when provided, allowing the
-    function to be called without a live Flask request context (e.g. in tests).
+    Takes no request input, deliberately. This used to accept an
+    ``?evaluations=`` query parameter that repointed the entire reports root,
+    guarded by a containment check against the configured directory. No
+    client, test, or documented workflow ever sent it: every one of the 36
+    call sites invokes ``reports_dir()`` bare. An unused parameter that
+    redirects the storage root is attack surface with no upside, so it is
+    gone rather than guarded.
+
+    The consequence worth knowing: this value is now server-controlled, so
+    every path built on top of it starts from a trusted root. Do not
+    reintroduce a request-supplied override here. If a future feature needs
+    multiple roots, resolve them from configuration and select by an opaque
+    identifier, never by a caller-supplied path.
     """
-    fallback = default_path if default_path is not None else get_evaluations_dir()
-    args = request_args if request_args is not None else request.args
-    raw = args.get("evaluations") or fallback
-    try:
-        return contained_path(raw, fallback)
-    except ValueError:
-        response = make_response(
-            jsonify({"error": "Access denied: path is outside the allowed directory", "code": "FORBIDDEN"}),
-            HTTPStatus.FORBIDDEN,
-        )
-        abort(response)
+    return os.path.realpath(get_evaluations_dir())
