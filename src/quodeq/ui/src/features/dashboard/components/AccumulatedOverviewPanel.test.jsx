@@ -25,6 +25,25 @@ function runHook(selectedRunId) {
   })).result.current;
 }
 
+// A tuned grade formula moves every score in the project at once and leaves no
+// other trace: same findings, same runs, different number. Setting the major
+// severity weight to 6.0 (shipped default 1.5) cost this project about a point
+// across every dimension for a month, and the Overview -- the one screen where
+// the grade is actually read -- said nothing.
+describe('AccumulatedHeroSection custom-formula warning', () => {
+  const ACC = { summary: { numericAverage: 5, overallGrade: 'Adequate', totalViolations: 3, totalCompliance: 1 } };
+
+  it('marks the score when a tuned formula produced it', () => {
+    render(<AccumulatedHeroSection accumulated={ACC} accumulatedDimensions={DIMS} customFormula />);
+    expect(screen.getByText(/custom formula/i)).toBeInTheDocument();
+  });
+
+  it('says nothing when the shipped formula produced it', () => {
+    render(<AccumulatedHeroSection accumulated={ACC} accumulatedDimensions={DIMS} customFormula={false} />);
+    expect(screen.queryByText(/custom formula/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('useAccumulatedComputations dimTrends (as-of)', () => {
   it('uses the full series at the latest run', () => {
     const { dimTrends } = runHook('t1');

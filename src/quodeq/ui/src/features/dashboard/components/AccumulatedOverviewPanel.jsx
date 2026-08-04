@@ -84,7 +84,7 @@ function buildLanguageSub(projectInfo) {
     .join('  ');
 }
 
-export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo, onCardNavigate, selectedSource }) {
+export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo, onCardNavigate, selectedSource, customFormula = false }) {
   const summary = accumulated?.summary;
   const scoreNum = parseFloat(summary?.numericAverage);
   const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
@@ -113,7 +113,13 @@ export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accu
           label={t('overview.statScore')}
           value={scoreDisplay}
           trailing={scoreDelta !== null ? <TrendBadge delta={scoreDelta} showLabel={false} /> : null}
-          hint={grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null}
+          // A tuned formula shifts every score at once with no other trace, so
+          // say so where the grade is read rather than only on the settings
+          // page that changed it.
+          hint={grade
+            ? t(customFormula ? 'overview.gradeHintCustomFormula' : 'overview.gradeHint',
+                { letter: gradeLetter(grade) })
+            : null}
         />
         <Stat
           label={t('overview.statViolations')}
@@ -288,6 +294,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         projectInfo={data.projectInfo}
         onCardNavigate={onCardNavigate}
         selectedSource={data.selectedSource}
+        customFormula={data.customFormula}
       />
 
       <div className="history-panels-row">

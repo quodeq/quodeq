@@ -659,6 +659,7 @@
   "overview.firstEvalTitle": "First evaluation in progress",
   "overview.fixPlanTitle": "{name} fix plan",
   "overview.gradeHint": "grade {letter}",
+  "overview.gradeHintCustomFormula": "grade {letter} · custom formula",
   "overview.incompleteSetupBody": "This project was added by URL and has no local copy. Clone it now to enable evaluation.",
   "overview.insufficientEvidence": "insufficient evidence",
   "overview.insufficientGrade": "INSUFFICIENT",
