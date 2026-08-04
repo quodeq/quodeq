@@ -106,7 +106,14 @@ def compute_principle_grade(
     floor = severity_grade_floor(vt_counts, params=params)
 
     raw = base + (10.0 - base) * lift
-    final = max(floor, min(ceil, raw))
+    # Floor first, ceiling last. The two guards cross when a principle carries a
+    # LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
+    # above the volume ceiling. Clamping the other way round handed back the
+    # floor and discarded the ceiling -- the one guard that encodes volume -- so
+    # a principle with 269 findings read "Good". Algebraically identical whenever
+    # floor <= ceil, so only the contradictory case moves.
+    # Keep byte-identical with services/rescore.py.
+    final = min(ceil, max(floor, raw))
     final = round(final, 1)
     grade = score_to_grade_label(final, params=params)
 
