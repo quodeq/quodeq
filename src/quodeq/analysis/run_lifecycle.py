@@ -110,7 +110,18 @@ class RunLifecycleContext:
                 if self._current_state != RunState.FINALIZING:
                     # Caller didn't explicitly call transition_to_finalizing(); do it now.
                     self._transition(RunState.FINALIZING)
-                self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
+                # The failure-streak breaker aborts the remaining dimensions from
+                # inside the pipeline, so a truncated run reaches this clean-exit
+                # path with dims still pending. Record that rather than reporting
+                # a done/None status that reads exactly like a full run — the
+                # skipped dims are dropped from the run average, and they tend to
+                # be the ones late in the order, not a random sample.
+                skipped = self._mark_unfinished_dims_incomplete("not_reached")
+                self._transition(
+                    RunState.DONE,
+                    exit_reason=self._pending_exit_reason
+                    or ("incomplete_dimensions" if skipped else None),
+                )
         elif issubclass(exc_type, SystemExit):
             # SystemExit raised by our signal handler; state already written there.
             if self._current_state not in TERMINAL_STATES:
@@ -242,8 +253,16 @@ class RunLifecycleContext:
             deadline = deadline.replace(tzinfo=timezone.utc)
         return datetime.now(timezone.utc) >= deadline
 
-    def _mark_running_dims_incomplete(self, reason: str) -> None:
-        """Flip still-running dims to INCOMPLETE so none sticks at 'running' forever."""
+    def _mark_unfinished_dims_incomplete(self, reason: str) -> int:
+        """Flip non-terminal dims to INCOMPLETE and return how many were flipped.
+
+        Covers ``pending`` as well as ``running``. A dimension the run never
+        got to is just as unfinished as one interrupted mid-flight, and the
+        state machine allows PENDING -> INCOMPLETE precisely for this. Leaving
+        them at ``pending`` made a truncated run indistinguishable from a
+        complete one: the scored dimensions were averaged into a run grade
+        with no record that the rest never ran.
+        """
         from quodeq.data.fs.dimensions_state_store import (  # noqa: PLC0415 — signal path
             DimState,
             read_dimensions,
@@ -252,13 +271,16 @@ class RunLifecycleContext:
         try:
             entries = read_dimensions(self._run_dir).get("dimensions", {})
         except Exception:  # noqa: BLE001 — a failing flip must not mask the exit
-            return
+            return 0
+        flipped = 0
         for dim, entry in entries.items():
-            if isinstance(entry, dict) and entry.get("state") == "running":
+            if isinstance(entry, dict) and entry.get("state") in {"running", "pending"}:
                 try:
                     write_dim_state(self._run_dir, dim, DimState.INCOMPLETE, reason=reason)
+                    flipped += 1
                 except Exception as exc:  # noqa: BLE001
                     _logger.warning("failed to mark dim %s incomplete: %s", dim, exc)
+        return flipped
 
     def _install_signal_handlers(self) -> None:
         def _handle(signum: int, frame: Any) -> None:
@@ -295,8 +317,11 @@ class RunLifecycleContext:
                 time_limit_s=self._time_limit_s,
             )
             self._current_state = RunState.CANCELLED
-            if deadline_enforced:
-                self._mark_running_dims_incomplete("time_limit")
+            # Close out every unfinished dim, not just on the deadline path: a
+            # plain cancel left the in-flight dimension stuck at 'running' and
+            # the untouched ones at 'pending' for the life of the run dir.
+            self._mark_unfinished_dims_incomplete(
+                "time_limit" if deadline_enforced else "cancelled")
             raise SystemExit(128 + signum)
 
         for sig in _SIGNALS_TO_HANDLE:
