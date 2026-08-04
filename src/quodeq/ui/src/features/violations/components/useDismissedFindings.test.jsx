@@ -89,6 +89,7 @@ describe('useDismissedFindings — restore handlers', () => {
 
   it('handleRestoreAll clears state on success and calls onReconcile', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(true);
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
     const onReconcile = vi.fn();
     const setRestoreError = vi.fn();
@@ -100,6 +101,43 @@ describe('useDismissedFindings — restore handlers', () => {
     expect(restoreAllFindings).toHaveBeenCalledWith('proj');
     expect(result.current.dismissed).toEqual([]);
     expect(onReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  // Restore-all un-suppresses every finding the user has ever triaged away, and
+  // the only undo is re-dismissing them one by one. It sits next to the
+  // per-item Restore button, so an unguarded click silently wiped 2045
+  // dismissals in the real project. Delete-all has always confirmed; this must
+  // too.
+  it('handleRestoreAll asks for confirmation before restoring', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(true);
+    restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'local', vi.fn()), withQueryClient());
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleRestoreAll(); });
+
+    expect(confirmDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Restore dismissed findings?',
+      confirmLabel: 'Restore all',
+      message: expect.stringContaining('2'),
+    }));
+    expect(restoreAllFindings).toHaveBeenCalledWith('proj');
+  });
+
+  it('handleRestoreAll does nothing when the user cancels', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(false);
+    const onReconcile = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'local', onReconcile), withQueryClient());
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
+
+    await act(async () => { await result.current.handleRestoreAll(); });
+
+    expect(confirmDialog).toHaveBeenCalledTimes(1);
+    expect(restoreAllFindings).not.toHaveBeenCalled();
+    expect(result.current.dismissed).toEqual([sampleA, sampleB]);
+    expect(onReconcile).not.toHaveBeenCalled();
   });
 });
 
@@ -251,6 +289,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
 
   it('handleRestoreAll calls onReconcile and leaves onRefresh untouched on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
+    confirmDialog.mockResolvedValueOnce(true);
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
     const onRefresh = vi.fn();
     const onReconcile = vi.fn();
