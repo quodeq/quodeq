@@ -30,7 +30,7 @@ from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import _make_run_dimension_fetcher
-from quodeq.services.grade_formula import load_params
+from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -310,12 +310,20 @@ def get_project_scores(
     d = deps or _NO_DEPS
     params = load_params()
 
+    # How the numbers were produced, not what they are. A tuned formula moves
+    # every score at once and leaves no other trace -- findings and runs are
+    # unchanged -- so the Overview has to be able to say so next to the grade.
+    # Computed outside the accumulated cache: it is a file-existence check, and
+    # keeping it out of the cached payload avoids another version input.
+    scoring_meta = {"customFormula": is_custom()}
+
     all_runs = list_runs(reports_root, project)
     if not all_runs:
         return {
             "accumulated": {"dimensions": [], "summary": {}},
             "trend": [],
             "availableRuns": [],
+            "scoring": scoring_meta,
         }
 
     # Build accumulated using the existing service (returns full data with
@@ -380,6 +388,7 @@ def get_project_scores(
         "accumulated": accumulated,
         "trend": trend,
         "availableRuns": available_runs,
+        "scoring": scoring_meta,
     }
 
 

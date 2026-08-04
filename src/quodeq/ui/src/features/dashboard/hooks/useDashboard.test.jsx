@@ -611,6 +611,36 @@ describe("useDashboard frozen historical runs", () => {
   });
 });
 
+// This hook returns an explicit key whitelist, so a new field on the scores
+// payload reaches the UI only if it is named here. That seam has silently
+// dropped payload keys before, and this one carries a warning: when it goes
+// missing the Overview shows a grade computed by a tuned formula with nothing
+// to say so, which is exactly the failure it exists to prevent.
+describe("useDashboard — scoring metadata crosses the whitelist", () => {
+  it("exposes customFormula from the scores payload", async () => {
+    const fakeApi = makeFakeApi();
+    fakeApi.getProjectScores = vi.fn(async () => ({
+      accumulated: { score: 90 }, trend: [], availableRuns: [],
+      scoring: { customFormula: true },
+    }));
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: withStableQueryApi(fakeApi) },
+    );
+    await waitFor(() => expect(result.current.customFormula).toBe(true));
+  });
+
+  it("defaults to false when the payload omits it", async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(
+      () => useDashboard({ selectedProject: "p1", selectedRun: null }),
+      { wrapper: withStableQueryApi(fakeApi) },
+    );
+    await waitFor(() => expect(result.current.accumulated).toBeTruthy());
+    expect(result.current.customFormula).toBe(false);
+  });
+});
+
 // Note: live grade SSE merging used to live here. It was deleted in the
 // move to mutation-returns-result — the dismiss HTTP response now carries
 // the rescored payload synchronously, and the dashboard refetches the

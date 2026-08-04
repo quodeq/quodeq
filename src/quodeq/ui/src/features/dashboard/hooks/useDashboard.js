@@ -193,6 +193,11 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
     latestAccumulated: latestScores?.accumulated || null,
+    // How the grade was produced, not what it is. A tuned formula moves every
+    // score at once with no other trace, so the Overview has to be able to say
+    // so next to the number. This return is an explicit whitelist -- dropping
+    // the key here silently removes the warning.
+    customFormula: Boolean(scores?.scoring?.customFormula),
     rescoreLookup: {},
     loading: dashboardQuery.isLoading || scoresLoading,
     // True during background refetch when we already have placeholder data
