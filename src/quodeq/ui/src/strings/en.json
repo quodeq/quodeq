@@ -512,6 +512,7 @@
   "history.dimensionScoresAria": "Dimension scores bar chart",
   "history.dimensionScoresTitle": "Dimension Scores",
   "history.dimsCount": "{count} dims",
+  "history.partialRefresh": "refreshed {count} of {total} dimensions",
   "history.evalsCountMany": "{count} evals",
   "history.evalsCountOne": "{count} eval",
   "history.evaluationsHeader": "EVALUATIONS",

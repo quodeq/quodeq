@@ -48,16 +48,30 @@ function buildTrendData(trend, selectedRunId, granularity = 'day') {
 }
 
 
-function RunHistoryTooltip({ active, payload }) {
+// Every point here is the PROJECT grade -- the latest known score for each
+// dimension, not the grade of that one scan. A scan that only measured
+// clean-architecture still plots a full project number, which is what makes
+// the line comparable across runs. The cost is that a point refreshed by 1 of
+// 7 dimensions looks identical to one backed by a full sweep, so say when the
+// refresh was partial. A complete scan needs no annotation.
+export function RunHistoryTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const entry = payload[0]?.payload;
   if (!entry) return null;
   const score = Number.isFinite(entry.numericAverage) ? entry.numericAverage.toFixed(1) : '—';
   const grade = gradeLetter(entry.overallGrade);
+  const refreshed = entry.dimensionsCount;
+  const total = entry.accumulatedDimensionsCount;
+  const partial = Number.isFinite(refreshed) && Number.isFinite(total) && refreshed < total;
   return (
     <div className="run-history-tooltip">
       <span className="rht-date">{entry.periodLabel || entry.dateLabel}</span>
       <span className="rht-score">{score} - {grade}</span>
+      {partial && (
+        <span className="rht-coverage">
+          {t('history.partialRefresh', { count: refreshed, total })}
+        </span>
+      )}
     </div>
   );
 }
