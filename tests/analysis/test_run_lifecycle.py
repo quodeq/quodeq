@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.core.run.dimensions import DimState
+from quodeq.data.fs.dimensions_state_store import write_dim_state
 from quodeq.data.fs.run_status_store import RunState, read_status
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
@@ -217,10 +219,17 @@ def test_set_exit_reason_persists_into_status_on_done(tmp_path: Path) -> None:
 
 def test_no_set_exit_reason_yields_null_on_done(tmp_path: Path) -> None:
     """Without set_exit_reason, a clean run still completes with
-    exit_reason=null (preserving today's contract for completed runs)."""
+    exit_reason=null (preserving today's contract for completed runs).
+
+    The declared dimension has to actually finish: a run that ends with a
+    dimension it never scored now reports ``incomplete_dimensions``, so
+    leaving 'flex' pending here would be testing the wrong contract.
+    """
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as ctx:
+        write_dim_state(run_dir, "flex", DimState.RUNNING)
+        write_dim_state(run_dir, "flex", DimState.DONE)
         ctx.transition_to_finalizing()
 
     status = read_status(run_dir)

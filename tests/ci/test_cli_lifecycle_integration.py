@@ -9,6 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quodeq.core.run.dimensions import DimState
+from quodeq.data.fs.dimensions_state_store import write_dim_state
+from quodeq.core.run.dimensions import DimState
 from quodeq.data.fs.run_status_store import read_status
 
 
@@ -134,6 +137,10 @@ def test_record_deadline_if_hit_noop_when_no_deadline(tmp_path: Path) -> None:
     with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as lifecycle:
         config = SimpleNamespace(options=SimpleNamespace(deadline_at=None))
         cli._record_deadline_if_hit(lifecycle, config)
+        # Finish the declared dimension: a run that ends without scoring one
+        # now reports incomplete_dimensions, which would mask what this asserts.
+        write_dim_state(run_dir, "flex", DimState.RUNNING)
+        write_dim_state(run_dir, "flex", DimState.DONE)
         lifecycle.transition_to_finalizing()
 
     status = read_status(run_dir)
@@ -155,6 +162,10 @@ def test_record_deadline_if_hit_noop_when_deadline_not_yet_reached(tmp_path: Pat
             options=SimpleNamespace(deadline_at=time.monotonic() + 3600.0),
         )
         cli._record_deadline_if_hit(lifecycle, config)
+        # Finish the declared dimension: a run that ends without scoring one
+        # now reports incomplete_dimensions, which would mask what this asserts.
+        write_dim_state(run_dir, "flex", DimState.RUNNING)
+        write_dim_state(run_dir, "flex", DimState.DONE)
         lifecycle.transition_to_finalizing()
 
     status = read_status(run_dir)
