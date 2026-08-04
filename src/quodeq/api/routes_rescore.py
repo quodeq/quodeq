@@ -58,6 +58,11 @@ def register_rescore_routes(app: Flask) -> None:
                 return jsonify(body), status
             run_id = runs[0].run_id
 
+        resolved_run_dir = resolve_child_dir(project_dir, run_id)
+        if resolved_run_dir is None:
+            body, status = error_response("Run data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+
         try:
             dimensions = read_run_data(Path(eval_dir), project, run_id)
         except FileNotFoundError:
@@ -70,6 +75,6 @@ def register_rescore_routes(app: Flask) -> None:
         # *dimensions* were read from this one run, so its directory is the
         # evidence basis for the rescore.
         result = rescore_dimensions(
-            dimensions, dismissed, deleted, run_dir=project_dir / run_id,
+            dimensions, dismissed, deleted, run_dir=Path(resolved_run_dir),
             rules=load_suppression_rules(project_dir))
         return jsonify(result)

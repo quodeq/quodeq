@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
@@ -94,19 +95,16 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     one whole run.
     """
     evaluations_root = Path(get_evaluations_dir())
-    # Jail the run dir to the evaluations root: a crafted project_id/run_id
-    # (e.g. "../..") must not resolve to a directory outside it. Mirrors the
-    # guard in services/_fs_projects.get_project_info (is_relative_to check)
-    # and routes_common.reports_dir. Store the RESOLVED path so the session
-    # column can never carry ".." segments.
-    run_dir = (evaluations_root / project_id / run_id).resolve()
-    try:
-        run_dir.relative_to(evaluations_root.resolve())
-    except ValueError:
+    # Resolve both segments against the directory listing rather than joining
+    # and then jailing the result. A crafted project_id/run_id ("../..")
+    # matches no entry, so there is nothing to contain afterwards. This
+    # replaces the old resolve() + relative_to() + is_dir() sequence: those
+    # three steps existed to undo a join we no longer perform.
+    project_dir = resolve_child_dir(evaluations_root, project_id)
+    run_dir = resolve_child_dir(project_dir, run_id) if project_dir else None
+    if run_dir is None:
         return None, None
-    if not run_dir.is_dir():
-        return None, None
-    return str(run_dir), resolve_repo_root(project_id)
+    return run_dir, resolve_repo_root(project_id)
 
 
 def resolve_shared_run_location(project_id: str, run_id: str) -> str | None:
@@ -121,12 +119,9 @@ def resolve_shared_run_location(project_id: str, run_id: str) -> str | None:
     if not settings.url:
         return None
     root = shared_evaluations_root(settings.url).resolve()
-    run_dir = (root / project_id / run_id).resolve()
-    try:
-        run_dir.relative_to(root)
-    except ValueError:
-        return None
-    if not run_dir.is_dir():
+    project_dir = resolve_child_dir(root, project_id)
+    run_dir = resolve_child_dir(project_dir, run_id) if project_dir else None
+    if run_dir is None:
         return None
     return str(run_dir)
 
