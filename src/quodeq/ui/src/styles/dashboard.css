@@ -2271,6 +2271,9 @@
 
 .rht-date  { color: var(--color-text-muted); }
 .rht-score { font-weight: 600; color: var(--color-text); }
+/* Only rendered when the scan refreshed some of the dimensions, so it must
+   read as a qualifier on the score above it, not as a third headline. */
+.rht-coverage { color: var(--color-text-muted); font-size: 0.72rem; }
 
 /* ── History panels row (Score History + Dimension Scores side-by-side) ── */
 
