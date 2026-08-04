@@ -1211,6 +1211,8 @@
   "violations.restore": "Restore",
   "violations.restoreAll": "Restore all",
   "violations.restoreAllFailed": "Failed to restore all findings. Please try again.",
+  "violations.restoreDismissedBody": "Restore those {count} dismissed findings? They stop being suppressed and count against your grades again.",
+  "violations.restoreDismissedTitle": "Restore dismissed findings?",
   "violations.restoreFailed": "Failed to restore finding. Please try again.",
   "violations.rootCrumb": "Root",
   "violations.showLikelyFp": "Show likely false positives",

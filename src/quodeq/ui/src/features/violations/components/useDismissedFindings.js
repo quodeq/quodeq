@@ -76,8 +76,19 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     }
   }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
+  // Restoring un-suppresses every finding the user ever triaged away, and the
+  // only undo is dismissing them again one by one. The button sits next to the
+  // per-item Restore, so a mis-click is cheap to make and expensive to reverse.
+  // Delete-all has always confirmed; this needs it at least as much.
   const handleRestoreAll = useCallback(async () => {
     if (isShared) return;
+    const count = dismissed.length;
+    const ok = await confirmDialog({
+      title: t('violations.restoreDismissedTitle'),
+      message: t('violations.restoreDismissedBody', { count }),
+      confirmLabel: t('violations.restoreAll'),
+    });
+    if (!ok) return;
     try {
       const result = await restoreAllFindings(selectedProject);
       applyDelta(result);
@@ -87,7 +98,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       console.error('Failed to restore all findings:', err);
       setRestoreError?.(t('violations.restoreAllFailed'));
     }
-  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
 
   const handleDelete = useCallback(async (d) => {
     if (isShared) return;
