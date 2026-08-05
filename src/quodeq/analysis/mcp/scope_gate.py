@@ -12,6 +12,14 @@ the process at all, and only that declaration gives this gate its authority --
 which is why an undeclared project resolves to
 ``trust_model.CONSERVATIVE`` and nothing here fires.
 
+The gate ships two rules: rule 1 relaxes an unproven-provenance path/key
+finding when the model declares no untrusted party can reach the process at
+all, and rule 2 relaxes a finding whose premise is a second trust principal
+when the model declares there is only one. (Rule 2 is evaluated first in
+code, because its evidence is more specific and would otherwise be masked by
+rule 1 -- see the comment on ``apply_scope_gate``.) There is no third,
+remote-ingress rule; the comment below ``_CROSS_PRINCIPAL_REQS`` records why.
+
 Every rule requires BOTH a gated requirement id AND evidence in the model's
 prose, the same two-condition shape ``provenance_gate`` uses. A finding that
 names no scope-dependent concept is never touched.
@@ -43,16 +51,14 @@ SCOPE_DOWNGRADE_MARKER = "scope_downgrade"
 _PATH_REQS: frozenset[str] = frozenset({"S-AUT-3", "S-INT-10"})
 _CROSS_PRINCIPAL_REQS: frozenset[str] = frozenset({"S-AUT-10", "S-AUT-3"})
 
-# Reqs whose OWN premise is remote reachability (S-INT-10 is literally titled
-# "externally controlled path"; S-AUT-10 covers cross-session/cross-tenant
-# hijack over a request). A named external source there is relaxed under
-# loopback, because the requirement's premise -- an untrusted party can reach
-# this -- is exactly what the declaration says is false. S-AUT-3 is
-# deliberately ABSENT: it is a general path/key-from-a-value finding with no
-# such premise, so a genuinely named source (e.g. "request body") is real
-# evidence that stays major regardless of the network declaration -- only its
-# sourceless case (rule 1) is scope-dependent.
-_INGRESS_REQS: frozenset[str] = frozenset({"S-INT-10", "S-AUT-10"})
+# There is deliberately no rule that relaxes a NAMED external source (e.g.
+# "request body", "query parameter") under loopback, even for reqs like
+# S-INT-10 whose own premise is remote reachability. A loopback bind is a
+# runtime setting (QUODEQ_ACTION_API_HOST), not a code property: the code
+# proves it reads attacker-controlled input regardless of how the process
+# happens to be bound today. Waiving that would silently evaporate the
+# moment someone rebinds the app to 0.0.0.0, and nothing would be left to
+# re-flag it. Only the SOURCELESS case (rule 1 above) is scope-dependent.
 
 # Concepts that only exist when there is more than one trust principal.
 _CROSS_PRINCIPAL_TERMS: frozenset[str] = frozenset({
@@ -109,9 +115,6 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
 
     if not model.relaxes_remote():
         return False
-
-    if req in _INGRESS_REQS and names_external_source(prose):
-        return _downgrade(finding, "remote_ingress")
 
     if (req in _PATH_REQS
             and not names_external_source(prose)

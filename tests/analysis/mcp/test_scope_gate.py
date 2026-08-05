@@ -89,16 +89,6 @@ def test_cross_principal_untouched_when_multi_tenant():
     assert f["severity"] == "major"
 
 
-# --- rule 3: remote ingress -----------------------------------------------
-
-def test_remote_ingress_capped_under_loopback():
-    f = _finding(req="S-INT-10",
-                 reason="The path is taken from a query parameter without validation.")
-    assert apply_scope_gate(f, LOCAL) is True
-    assert f["severity"] == "minor"
-    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "remote_ingress"
-
-
 # --- invariants -----------------------------------------------------------
 
 def test_never_touches_critical():
