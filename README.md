@@ -266,6 +266,33 @@ By default, Quodeq evaluates the six ISO 25010 dimensions. It also ships with **
 
 Numeric thresholds on the built-in standards (max function lines, max parameters, ...) can be tuned per project from the dashboard. Overrides live in `.quodeq/standards-overrides.json` at the repo root, so the whole team scans with the same numbers.
 
+### Threat model
+
+By default Quodeq scores a project as if it were a hosted multi-tenant service. For a
+local-first tool that produces noise: a file path built from a value the operator already
+controls gets reported as an attack surface, and the real findings get buried under it.
+
+A project can say what it actually is, in `.quodeq/project-profile.json` at the repo root:
+
+```json
+{
+  "version": 1,
+  "multiTenant": false,
+  "networkExposure": "loopback"
+}
+```
+
+`multiTenant` answers whether more than one user's data lives behind the same code.
+`networkExposure` is one of `loopback`, `lan`, or `public`, and answers whether an
+untrusted party can open a socket to the process.
+
+Findings the declared model rules out are capped at `minor` rather than dropped, and
+carry a marker naming the rule that moved them, so nothing becomes invisible. A finding
+whose evidence names a real remote source is never capped, whatever the profile says.
+
+The file is optional. Without it Quodeq infers what it can from your manifests and
+otherwise assumes the most pessimistic model, which is how it behaves today.
+
 ---
 
 ## Privacy

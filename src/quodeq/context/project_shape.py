@@ -167,10 +167,15 @@ def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]
     names = [_strip_dep_spec(d).lower() for d in raw if isinstance(d, str)]
     web = _matches_any(names, _PY_WEB_FRAMEWORKS)
     desktop = _matches_any(names, _PY_DESKTOP_HINTS)
-    if web and not desktop:
-        return Deployment.WEB_SERVICE, web, desktop
-    if desktop and not web:
+    # Desktop wins outright when both are present. A desktop app routinely
+    # embeds a web framework for its own UI (pywebview + flask, Electron +
+    # express); a hosted service does not pull in pywebview. Returning None
+    # here made detect_shape report UNKNOWN, which disables every downstream
+    # shape consumer -- see detect_shape's own priority comment.
+    if desktop:
         return Deployment.DESKTOP, web, desktop
+    if web:
+        return Deployment.WEB_SERVICE, web, desktop
     return None, web, desktop
 
 

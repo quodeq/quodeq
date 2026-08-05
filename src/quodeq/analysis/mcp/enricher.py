@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from quodeq.analysis.mcp.enrichment import enrich_code
-from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
+from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import (
     PrecedentCorpus,
@@ -21,6 +21,7 @@ from quodeq.context.precedent import (
     precedent_text as _precedent_text,
 )
 from quodeq.context.project_shape import Deployment, ProjectShape
+from quodeq.context.trust_model import TrustModel
 
 _logger = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ class CompiledContext:
     dimension: str | None = None
     work_dir: Path | None = None
     project_shape: ProjectShape | None = None
+    trust_model: TrustModel | None = None
     precedent_fingerprints: set[str] = field(default_factory=set)
     precedent_corpus: PrecedentCorpus | None = None
 
@@ -190,6 +192,7 @@ class FindingEnricher:
         self._dimension = context.dimension
         self._work_dir = context.work_dir
         self._project_shape = context.project_shape
+        self._trust_model = context.trust_model
         self._precedent_fingerprints = context.precedent_fingerprints
         self._precedent_corpus = context.precedent_corpus
         self._read_file: Callable[[Path], str] = file_reader or _default_read_file
@@ -244,6 +247,17 @@ class FindingEnricher:
         _apply_precedent_downweight(
             finding, self._precedent_fingerprints, self._precedent_corpus,
         )
-        apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
+        # Gates the LIVE path only: this method runs once per freshly-dispatched
+        # finding, before it ever reaches the cache. A cached finding replayed on
+        # a later run does NOT come back through here -- cache replay bypasses
+        # enrich() entirely and writes straight to the per-dim JSONL, and a
+        # deterministic checker never comes through here at all. Those two sinks
+        # (dimension_runner._write_findings, checks.runner) call the same helper
+        # for the same reason. Every call site is required: this one gates what
+        # the model just emitted, the others gate what a warm cache is about to
+        # replay and what a checker just computed, and skipping any one leaves a
+        # class of findings ungated. See severity_gates.py for why the sequence
+        # lives there rather than being repeated here.
+        apply_severity_gates(finding, self._trust_model)
 
         return finding

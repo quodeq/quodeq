@@ -1109,6 +1109,152 @@ class TestCacheReplayAppliesProvenanceGate:
         assert "provenance_downgrade" not in findings[0]
 
 
+class TestCacheReplayAppliesScopeGate:
+    """Task 4 follow-up: the scope gate must be re-applied on the replay
+    path too, exactly like the provenance gate is for issue #657.
+
+    ``FindingEnricher.enrich()`` calls ``apply_scope_gate`` right after
+    ``apply_provenance_gate`` on the live path, but that method only runs
+    once per freshly-dispatched finding -- cache replay writes straight to
+    the per-dim JSONL via ``_write_findings`` and never touches ``enrich()``.
+    Without re-gating here, a ``major`` finding already sitting in a warm
+    cache would never be re-capped after the operator declares a tighter
+    trust model in ``.quodeq/project-profile.json``, which on a repo with
+    warm caches is most findings -- the feature would be largely inert.
+    """
+
+    @staticmethod
+    def _cached_finding(file: str, req: str, severity: str, reason: str) -> dict:
+        return {
+            "file": file, "line": 1, "t": "violation",
+            "w": "Path built from an unvalidated value", "p": "Access Control",
+            "d": "security", "req": req, "severity": severity,
+            "snippet": "open(name)", "reason": reason,
+        }
+
+    @staticmethod
+    def _write_profile(src: Path, *, multi_tenant: bool, network_exposure: str) -> None:
+        profile_dir = src / ".quodeq"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        (profile_dir / "project-profile.json").write_text(json.dumps({
+            "version": 1,
+            "multiTenant": multi_tenant,
+            "networkExposure": network_exposure,
+        }))
+
+    @staticmethod
+    def _findings_in(jsonl: Path) -> list[dict]:
+        return [
+            json.loads(ln) for ln in jsonl.read_text().splitlines()
+            if ln.strip() and "_marker" not in ln
+        ]
+
+    def _replay_all_hits(
+        self, tmp_path: Path, cache: LocalFileBackend, finding: dict,
+        *, profile: tuple[bool, str] | None,
+    ) -> RunConfig:
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        if profile is not None:
+            multi_tenant, network_exposure = profile
+            self._write_profile(
+                src, multi_tenant=multi_tenant, network_exposure=network_exposure,
+            )
+        key = build_cache_key_for_file(config, "a.py", "security")
+        cache.put(key, CacheEntry(
+            key=key, schema_version=1,
+            findings=[finding],
+            files_read=1, file_path="a.py", dimension="security",
+            model_id="test-model",
+        ))
+        dispatcher = FakeDispatcher(src)
+        with patch(
+            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
+            new=dispatcher,
+        ):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+            )
+        assert dispatcher.calls == [], "all-hits path must not dispatch"
+        return config
+
+    def test_cached_major_scope_finding_is_capped_under_loopback_single_tenant(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # A cached major S-AUT-3 whose reason names no external or operator
+        # source -- the sourceless-path rule's exact target.
+        finding = self._cached_finding(
+            "a.py", "S-AUT-3", "major",
+            "Path built from a filename argument with no bounds check.",
+        )
+        config = self._replay_all_hits(
+            tmp_path, cache, finding,
+            profile=(False, "loopback"),
+        )
+
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        findings = self._findings_in(jsonl)
+        assert len(findings) == 1
+        assert findings[0]["severity"] == "minor", (
+            "a cache-replayed major S-AUT-3 finding must be capped to minor "
+            "once the project declares a loopback, single-tenant trust model "
+            "-- this is exactly the case a warm cache would otherwise hide"
+        )
+        assert findings[0].get("scope_downgrade", {}).get("rule") == "sourceless_path"
+
+    def test_cached_major_scope_finding_untouched_without_declared_trust_model(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # Same finding, but no .quodeq/project-profile.json -- resolution
+        # falls back to CONSERVATIVE, which relaxes nothing.
+        finding = self._cached_finding(
+            "a.py", "S-AUT-3", "major",
+            "Path built from a filename argument with no bounds check.",
+        )
+        config = self._replay_all_hits(tmp_path, cache, finding, profile=None)
+
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        findings = self._findings_in(jsonl)
+        assert len(findings) == 1
+        assert findings[0]["severity"] == "major", (
+            "without a declared trust model the conservative default must "
+            "not relax anything"
+        )
+        assert "scope_downgrade" not in findings[0]
+
+    def test_cached_critical_scope_gated_req_ends_at_minor_after_both_gates(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        # Cross-gate ordering: a critical S-AUT-3 naming no source must first
+        # be downgraded to major by the provenance gate, and THEN capped to
+        # minor by the scope gate -- the scope gate only ever acts on major,
+        # so running it before the provenance gate would leave this finding
+        # stuck at major (or, worse, unseen at critical). Assert the end
+        # state the finding settles at, not an intermediate severity.
+        finding = self._cached_finding(
+            "a.py", "S-AUT-3", "critical",
+            "Path built from a filename argument with no bounds check.",
+        )
+        config = self._replay_all_hits(
+            tmp_path, cache, finding,
+            profile=(False, "loopback"),
+        )
+
+        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
+        findings = self._findings_in(jsonl)
+        assert len(findings) == 1
+        assert findings[0]["severity"] == "minor", (
+            "a cache-replayed critical S-AUT-3 finding naming no source must "
+            "end at minor after passing through both gates in sequence under "
+            "a loopback single-tenant model"
+        )
+        # Both gates must have actually fired, proving the order: the
+        # provenance gate moved critical -> major, and the scope gate then
+        # moved major -> minor.
+        assert findings[0].get("provenance_downgrade") is True
+        assert findings[0].get("scope_downgrade", {}).get("rule") == "sourceless_path"
+
+
 class TestFilesReadReflectsAnalyzedCount:
     """files_read on the returned Evidence must equal the number of source
     files reproducible from cache at run end — NOT len(input_files)."""
