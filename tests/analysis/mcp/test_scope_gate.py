@@ -212,6 +212,77 @@ def test_cross_principal_evaluated_before_sourceless_path():
     assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
 
 
+# --- I2: symmetric / idempotent under a tightened model --------------------
+
+def test_scope_downgrade_is_restored_when_model_tightens():
+    # A team declared loopback, scanned, and now honestly tightens their
+    # profile to a hosted, multi-tenant model. A finding capped under the
+    # old declaration must come back to major, not stay silently minor.
+    f = _finding()
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+
+    tightened = TrustModel(multi_tenant=True, network_exposure="public")
+    assert apply_scope_gate(f, tightened) is True
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_cross_principal_downgrade_is_restored_when_model_tightens():
+    f = _finding(req="S-AUT-10", w="Session hijacking via IDOR",
+                 reason="No ownership verification, so one user can reach "
+                        "another user's terminal session.")
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+
+    tightened = TrustModel(multi_tenant=True, network_exposure="public")
+    assert apply_scope_gate(f, tightened) is True
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_restore_then_relax_again_downgrades_again():
+    # Full round trip: loosen -> tighten -> loosen must re-cap, proving the
+    # restore path does not leave the finding permanently major.
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    apply_scope_gate(f, CONSERVATIVE)
+    assert f["severity"] == "major"
+
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "sourceless_path"
+
+
+def test_repeated_application_stable_once_downgraded():
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    for _ in range(3):
+        assert apply_scope_gate(f, LOCAL) is False
+    assert f["severity"] == "minor"
+
+
+def test_repeated_application_stable_once_restored():
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    apply_scope_gate(f, CONSERVATIVE)
+    for _ in range(3):
+        assert apply_scope_gate(f, CONSERVATIVE) is False
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_marker_left_alone_when_model_is_none():
+    # Absence of model information must never move a score in either
+    # direction -- the same no-regression guarantee the rest of this module
+    # gives the forward (downgrade) direction.
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    assert apply_scope_gate(f, None) is False
+    assert f["severity"] == "minor"
+    assert SCOPE_DOWNGRADE_MARKER in f
+
+
 # --- integration: wired into FindingEnricher.enrich ------------------------
 
 from quodeq.analysis.mcp.enricher import CompiledContext, FindingEnricher

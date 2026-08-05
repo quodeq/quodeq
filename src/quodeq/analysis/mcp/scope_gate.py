@@ -35,6 +35,16 @@ names no scope-dependent concept is never touched.
 Caps ``major`` -> ``minor``; never drops. A team that later ships as a hosted
 service must be able to recover the list of what was waived, so the finding
 survives with a ``scope_downgrade`` marker naming the rule that moved it.
+
+The gate is SYMMETRIC. ``CacheKey`` deliberately excludes the trust model (see
+its own comment), so a finding this gate capped under one declaration can
+replay unchanged after the team tightens ``project-profile.json`` -- nothing
+else in the pipeline re-derives severity from a stale marker. So every call
+also checks the other direction: a finding already carrying a
+``scope_downgrade`` marker whose rule no longer fires under the model it is
+called with has its pre-gate severity restored and the marker removed. Both
+directions are idempotent: a finding already at the state its current model
+implies is left alone, so replaying the same model repeatedly is a no-op.
 """
 from __future__ import annotations
 
@@ -96,30 +106,13 @@ def _prose(finding: dict) -> str:
     return " ".join(str(finding.get(k) or "") for k in ("reason", "w"))
 
 
-def _downgrade(finding: dict, rule: str) -> bool:
-    finding[SCOPE_DOWNGRADE_MARKER] = {"rule": rule, "from": "major", "to": "minor"}
-    finding["severity"] = "minor"
-    _log.debug(
-        "scope gate: %s capped %s finding to minor (%s)",
-        rule, finding.get("req"), finding.get("file"),
-    )
-    return True
-
-
-def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
-    """Cap a ``major`` finding the declared trust model puts out of scope.
-
-    Returns True iff it downgraded. Only ever touches ``major`` violations on
-    a gated req: ``critical`` belongs to ``provenance_gate``, and letting both
-    gates write the same field at the same severity would make the outcome
-    depend on call order.
+def _matched_rule(finding: dict, model: TrustModel) -> str | None:
+    """Return the rule name that would relax *finding* under *model*, or
+    ``None``. Pure evidence check -- independent of the finding's CURRENT
+    severity, so :func:`apply_scope_gate` can reuse it both to decide whether
+    to downgrade a major finding and to decide whether a marker on an
+    already-minor finding is still earned.
     """
-    if model is None:
-        return False
-    if finding.get("t") != "violation":
-        return False
-    if finding.get("severity") != "major":
-        return False
     req = finding.get("req")
     prose = _prose(finding)
 
@@ -157,14 +150,76 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
             and req in _CROSS_PRINCIPAL_REQS
             and _CROSS_PATTERN.search(prose)
             and not names_external_source(prose)):
-        return _downgrade(finding, "cross_principal")
+        return "cross_principal"
 
     if not model.relaxes_remote():
-        return False
+        return None
 
     if (req in _PATH_REQS
             and not names_external_source(prose)
             and not names_operator_source(prose)):
-        return _downgrade(finding, "sourceless_path")
+        return "sourceless_path"
 
-    return False
+    return None
+
+
+def _downgrade(finding: dict, rule: str) -> bool:
+    finding[SCOPE_DOWNGRADE_MARKER] = {"rule": rule, "from": "major", "to": "minor"}
+    finding["severity"] = "minor"
+    _log.debug(
+        "scope gate: %s capped %s finding to minor (%s)",
+        rule, finding.get("req"), finding.get("file"),
+    )
+    return True
+
+
+def _restore(finding: dict, marker: dict) -> bool:
+    restored = marker.get("from", "major")
+    finding["severity"] = restored
+    del finding[SCOPE_DOWNGRADE_MARKER]
+    _log.debug(
+        "scope gate: restored %s finding to %s, marker %s no longer applies (%s)",
+        finding.get("req"), restored, marker.get("rule"), finding.get("file"),
+    )
+    return True
+
+
+def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
+    """Cap a ``major`` finding the declared trust model puts out of scope, or
+    restore one a PRIOR call capped that no longer qualifies under *model*.
+
+    Returns True iff it changed the finding's severity, in either direction.
+    The forward direction only ever touches ``major`` violations on a gated
+    req: ``critical`` belongs to ``provenance_gate``, and letting both gates
+    write the same field at the same severity would make the outcome depend
+    on call order.
+
+    A finding already carrying a ``scope_downgrade`` marker is checked
+    against *model* first (see the module docstring's SYMMETRIC section): if
+    the marker's rule no longer fires, its pre-gate severity is restored and
+    the marker removed. When ``model is None`` (no resolved trust model --
+    e.g. an unwired call site) the marker is left exactly as it is: absence
+    of information must never move a score in either direction, the same
+    no-regression guarantee :data:`quodeq.context.trust_model.CONSERVATIVE`
+    gives the forward direction.
+    """
+    if finding.get("t") != "violation":
+        return False
+
+    marker = finding.get(SCOPE_DOWNGRADE_MARKER)
+    severity = finding.get("severity")
+
+    if marker is not None and severity == "minor":
+        if model is not None and _matched_rule(finding, model) is None:
+            return _restore(finding, marker)
+        return False
+
+    if model is None:
+        return False
+    if severity != "major":
+        return False
+
+    rule = _matched_rule(finding, model)
+    if rule is None:
+        return False
+    return _downgrade(finding, rule)

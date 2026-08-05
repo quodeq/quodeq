@@ -34,10 +34,11 @@ from quodeq.analysis.cache import (
     LocalFileBackend,
     build_cache_key_for_file,
 )
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import _write_findings, process_dimension_with_cache
 from quodeq.analysis.cache._failure_streak import CircuitBreakerError
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
+from quodeq.context.trust_model import TrustModel
 from quodeq.core.evidence.model import Evidence
 
 
@@ -1253,6 +1254,66 @@ class TestCacheReplayAppliesScopeGate:
         # moved major -> minor.
         assert findings[0].get("provenance_downgrade") is True
         assert findings[0].get("scope_downgrade", {}).get("rule") == "sourceless_path"
+
+
+class TestWriteFindingsGatesUnconsolidated:
+    """Minor #1 in the final-review pass: ``_write_findings`` re-gates
+    ``findings`` (already-consolidated cache hits) and ``pending``
+    (unconsolidated entries no completed run has consolidated yet, from a
+    cancelled/failed run) in two SEPARATE loops. Every test above this class
+    only ever populates the ``findings`` list; deleting ``apply_scope_gate``
+    (or ``apply_provenance_gate``) from just the ``pending`` loop left the
+    full suite green. These call ``_write_findings`` directly with only
+    ``unconsolidated`` populated, so they can only pass if that second loop
+    actually gates.
+    """
+
+    def test_pending_loop_applies_scope_gate(self, tmp_path: Path):
+        jsonl = tmp_path / "security_evidence.jsonl"
+        finding = {
+            "file": "a.py", "line": 1, "t": "violation",
+            "w": "Path built from an unvalidated value", "p": "Access Control",
+            "d": "security", "req": "S-AUT-3", "severity": "major",
+            "snippet": "open(name)",
+            "reason": "Path built from a filename argument with no bounds check.",
+        }
+
+        _write_findings(
+            jsonl, [], append=False, emit_events=False,
+            unconsolidated=[finding],
+            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback"),
+        )
+
+        lines = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+        assert len(lines) == 1
+        assert lines[0]["severity"] == "minor", (
+            "the unconsolidated pending loop must be re-gated exactly like "
+            "the consolidated findings loop is"
+        )
+        assert lines[0]["scope_downgrade"]["rule"] == "sourceless_path"
+
+    def test_pending_loop_applies_provenance_gate(self, tmp_path: Path):
+        jsonl = tmp_path / "security_evidence.jsonl"
+        finding = {
+            "file": "a.py", "line": 1, "t": "violation",
+            "w": "Unguarded index access", "p": "Fault Tolerance",
+            "d": "security", "req": "R-FT-2", "severity": "critical",
+            "snippet": "arr[idx]",
+            "reason": "Index derived from a function argument with no bounds check.",
+        }
+
+        _write_findings(
+            jsonl, [], append=False, emit_events=False,
+            unconsolidated=[finding], trust_model=None,
+        )
+
+        lines = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
+        assert len(lines) == 1
+        assert lines[0]["severity"] == "major", (
+            "the unconsolidated pending loop must also get the provenance "
+            "gate, not just the scope gate"
+        )
+        assert lines[0].get("provenance_downgrade") is True
 
 
 class TestFilesReadReflectsAnalyzedCount:
