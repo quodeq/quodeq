@@ -210,3 +210,33 @@ def test_cross_principal_evaluated_before_sourceless_path():
     assert apply_scope_gate(f, LOCAL) is True
     assert f["severity"] == "minor"
     assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
+
+
+# --- integration: wired into FindingEnricher.enrich ------------------------
+
+from quodeq.analysis.mcp.enricher import CompiledContext, FindingEnricher
+
+
+def _enricher(model):
+    return FindingEnricher(CompiledContext(dimension="security", trust_model=model))
+
+
+def test_enrich_applies_scope_gate():
+    f = _enricher(LOCAL).enrich({
+        "t": "violation", "req": "S-AUT-3", "severity": "major",
+        "w": "Path traversal via job_id",
+        "reason": "The job_id is used to construct a file path without validation.",
+        "file": "src/app.py", "line": 10,
+    })
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "sourceless_path"
+
+
+def test_enrich_without_trust_model_is_unchanged():
+    f = _enricher(None).enrich({
+        "t": "violation", "req": "S-AUT-3", "severity": "major",
+        "w": "Path traversal via job_id",
+        "reason": "The job_id is used to construct a file path without validation.",
+        "file": "src/app.py", "line": 10,
+    })
+    assert f["severity"] == "major"

@@ -14,6 +14,7 @@ from typing import Callable, Protocol, runtime_checkable
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
+from quodeq.analysis.mcp.scope_gate import apply_scope_gate
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import (
     PrecedentCorpus,
@@ -21,6 +22,7 @@ from quodeq.context.precedent import (
     precedent_text as _precedent_text,
 )
 from quodeq.context.project_shape import Deployment, ProjectShape
+from quodeq.context.trust_model import TrustModel
 
 _logger = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ class CompiledContext:
     dimension: str | None = None
     work_dir: Path | None = None
     project_shape: ProjectShape | None = None
+    trust_model: TrustModel | None = None
     precedent_fingerprints: set[str] = field(default_factory=set)
     precedent_corpus: PrecedentCorpus | None = None
 
@@ -190,6 +193,7 @@ class FindingEnricher:
         self._dimension = context.dimension
         self._work_dir = context.work_dir
         self._project_shape = context.project_shape
+        self._trust_model = context.trust_model
         self._precedent_fingerprints = context.precedent_fingerprints
         self._precedent_corpus = context.precedent_corpus
         self._read_file: Callable[[Path], str] = file_reader or _default_read_file
@@ -245,5 +249,9 @@ class FindingEnricher:
             finding, self._precedent_fingerprints, self._precedent_corpus,
         )
         apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
+        # Runs at the SINK, after the cache: cached findings pass through here
+        # on every run, so editing .quodeq/project-profile.json re-caps existing
+        # results without touching CacheKey (which is deliberately permissive).
+        apply_scope_gate(finding, self._trust_model)
 
         return finding
