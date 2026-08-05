@@ -20,6 +20,19 @@ undeclared, and anything still unknown falls back to :data:`CONSERVATIVE`. That
 last step is the no-regression guarantee -- a project that declares nothing and
 detects as nothing is scored exactly as it was before this module existed.
 
+That per-field fallback is deliberately ASYMMETRIC between the two axes.
+``multi_tenant`` is a property a manifest can genuinely evidence -- a CLI's
+own entry point is real proof it has one caller. Network exposure is not: a
+loopback Flask app and a hosted one are byte-identical on disk, the same
+point made two paragraphs up. So ``_detected_fields`` may fill
+``multi_tenant``, but its exposure slot is always ``None`` -- detection is
+never allowed to waive a remote-reachability finding by itself. A Rust
+``axum`` service with only a ``main.rs``, a Django app that merely lists
+``pyinstaller`` in a dev extra, or an Express service with ``electron`` in
+``devDependencies`` all detect as desktop/CLI today; none of them may get
+``S-AUT-3``/``S-AUT-10`` waived on that basis alone. Only a human's
+declaration in ``project-profile.json`` may relax that axis.
+
 Nothing here may fail a scan. Every malformed-input branch warns and degrades.
 """
 from __future__ import annotations
@@ -122,12 +135,26 @@ def _declared_fields(data: dict) -> tuple[bool | None, str | None]:
 
 
 def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
-    """Derive the two axes from manifest detection; ``None`` where unknown.
+    """Derive ``multi_tenant`` from manifest detection. Exposure is NEVER
+    detected -- the second element of the returned tuple is always ``None``.
 
-    ``LIBRARY`` maps to unknown on purpose. ``_shape_irrelevant_to_hosted_service``
-    treats libraries as non-hosted, which is sound for concurrency findings and
-    wrong for trust boundaries: a library's paths may be fed from an HTTP
-    request in the consuming application, and the author cannot know.
+    Whether an untrusted party can open a socket to this process is a
+    deployment fact no manifest can prove: a loopback Flask app and a hosted
+    one are byte-identical on disk (see this module's own docstring). Filling
+    ``network_exposure`` from detection would let any project that merely
+    RESEMBLES a desktop app or single-user CLI on disk get its security
+    findings waived without a human declaring anything -- see the module
+    docstring for the four real hosted services (axum, chi, Django+pyinstaller,
+    Express+electron) that detect as desktop/CLI today. Only
+    ``.quodeq/project-profile.json``, via :func:`resolve_trust_model`, may set
+    that axis.
+
+    ``multi_tenant`` alone is safe to infer: a CLI's own entry point is real
+    evidence of a single caller. ``LIBRARY`` still maps to unknown on
+    purpose -- ``_shape_irrelevant_to_hosted_service`` treats libraries as
+    non-hosted, which is sound for concurrency findings and wrong here: a
+    library's paths may be fed from an HTTP request in the consuming
+    application, and the author cannot know.
     """
     try:
         shape = detect_shape(project_root)
@@ -145,11 +172,11 @@ def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
         _logger.warning("Project shape detection failed for %s: %s", project_root, exc)
         return None, None
     if shape.deployment is Deployment.WEB_SERVICE:
-        return True, "public"
+        return True, None
     if shape.deployment is Deployment.DESKTOP:
-        return False, "loopback"
+        return False, None
     if shape.deployment is Deployment.CLI and shape.is_single_user:
-        return False, "loopback"
+        return False, None
     return None, None
 
 
