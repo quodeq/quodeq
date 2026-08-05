@@ -229,3 +229,66 @@ def test_row_to_finding_valid_refs_json_still_parses():
     }
     finding = row_to_finding(row)
     assert [(r.label, r.url) for r in finding.req_refs] == [("R1", "https://x")]
+
+
+def test_finding_dict_to_row_sets_scope_downgrade_json():
+    # The scope gate stamps a dict marker (rule/from/to), not a bool -- it
+    # must persist as JSON so the rule name survives, not collapse to 1/0.
+    on = finding_dict_to_row({
+        "p": "P1", "t": "violation", "severity": "minor",
+        "scope_downgrade": {"rule": "sourceless_path", "from": "major", "to": "minor"},
+    })
+    assert json.loads(on["scope_downgrade_json"]) == {
+        "rule": "sourceless_path", "from": "major", "to": "minor",
+    }
+    off = finding_dict_to_row({"p": "P1", "t": "violation", "severity": "major"})
+    assert off["scope_downgrade_json"] is None
+
+
+def test_finding_dict_to_row_drops_malformed_scope_downgrade():
+    row = finding_dict_to_row({
+        "p": "P1", "t": "violation", "severity": "major", "scope_downgrade": "oops",
+    })
+    assert row["scope_downgrade_json"] is None
+
+
+def test_judgment_to_row_sets_scope_downgrade_json():
+    j = Judgment(
+        practice_id="P1", verdict="violation", dimension="d",
+        file="f.py", line=1, reason="r", severity="minor",
+        scope_downgrade={"rule": "cross_principal", "from": "major", "to": "minor"},
+    )
+    assert json.loads(judgment_to_row(j)["scope_downgrade_json"]) == {
+        "rule": "cross_principal", "from": "major", "to": "minor",
+    }
+
+
+def test_judgment_to_row_scope_downgrade_json_none_when_unset():
+    j = Judgment(
+        practice_id="P1", verdict="violation", dimension="d",
+        file="f.py", line=1, reason="r",
+    )
+    assert judgment_to_row(j)["scope_downgrade_json"] is None
+
+
+def test_row_to_finding_reads_scope_downgrade_json():
+    row = row_to_finding({
+        "practice_id": "P1", "verdict": "violation", "severity": "minor",
+        "file": "f.py", "line": 1,
+        "scope_downgrade_json": '{"rule": "sourceless_path", "from": "major", "to": "minor"}',
+    })
+    assert row.scope_downgrade == {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    # Legacy rows (pre-column, or never gated) default to None.
+    legacy = row_to_finding({
+        "practice_id": "P1", "verdict": "violation", "severity": "major",
+        "file": "f.py", "line": 1,
+    })
+    assert legacy.scope_downgrade is None
+
+
+def test_row_to_finding_malformed_scope_downgrade_json_falls_back_to_none():
+    row = row_to_finding({
+        "practice_id": "P1", "verdict": "violation",
+        "scope_downgrade_json": "{not valid json",
+    })
+    assert row.scope_downgrade is None

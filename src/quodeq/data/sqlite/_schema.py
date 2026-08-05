@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 EVALUATION_DDL = """
-PRAGMA user_version = 6;
+PRAGMA user_version = 7;
 
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +36,12 @@ CREATE TABLE findings (
     -- 1 when the deterministic provenance gate (#639) de-escalated this
     -- finding from critical to major; 0 otherwise. UI/DB audit marker (#656).
     provenance_downgrade INTEGER NOT NULL DEFAULT 0,
+    -- JSON-encoded {"rule", "from", "to"} when the deterministic scope gate
+    -- capped this finding from major to minor per the declared trust model;
+    -- NULL otherwise. A JSON blob, not a flag column, because the marker's
+    -- purpose is recovering WHICH rule waived the finding, mirroring
+    -- req_refs_json's shape for the same reason (structured, optional data).
+    scope_downgrade_json TEXT,
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -97,4 +103,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7

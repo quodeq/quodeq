@@ -1255,6 +1255,36 @@ class TestCacheReplayAppliesScopeGate:
         assert findings[0].get("provenance_downgrade") is True
         assert findings[0].get("scope_downgrade", {}).get("rule") == "sourceless_path"
 
+    def test_scope_downgrade_reaches_events_jsonl(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """End-to-end: a cached major finding the scope gate caps on replay
+        must carry its rule name all the way into events.jsonl, not just the
+        per-dim JSONL -- events.jsonl is what the SQL projection and the
+        dashboard actually read. A gap here would fix the JSONL forensic
+        record while leaving the dashboard showing an unexplained minor."""
+        finding = self._cached_finding(
+            "a.py", "S-AUT-3", "major",
+            "Path built from a filename argument with no bounds check.",
+        )
+        config = self._replay_all_hits(
+            tmp_path, cache, finding,
+            profile=(False, "loopback"),
+        )
+
+        events_log = (config.work_dir or config.src).parent / "events.jsonl"
+        events = [
+            json.loads(ln) for ln in events_log.read_text().splitlines()
+            if ln.strip()
+        ] if events_log.exists() else []
+        judgments = [e for e in events if e.get("event_type") == "JUDGMENT_CREATED"]
+        assert judgments, "cache replay must emit a JUDGMENT_CREATED event"
+        payload_marker = judgments[0]["payload"].get("scope_downgrade")
+        assert payload_marker is not None, (
+            "scope_downgrade must reach events.jsonl, not just the per-dim JSONL"
+        )
+        assert payload_marker["rule"] == "sourceless_path"
+
 
 class TestWriteFindingsGatesUnconsolidated:
     """Minor #1 in the final-review pass: ``_write_findings`` re-gates
