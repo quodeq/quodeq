@@ -15,10 +15,11 @@ which is why an undeclared project resolves to
 The gate ships two rules: rule 1 relaxes an unproven-provenance path/key
 finding when the model declares no untrusted party can reach the process at
 all, and rule 2 relaxes a finding whose premise is a second trust principal
-when the model declares there is only one. (Rule 2 is evaluated first in
-code, because its evidence is more specific and would otherwise be masked by
-rule 1 -- see the comment on ``apply_scope_gate``.) There is no third,
-remote-ingress rule; the comment below ``_CROSS_PRINCIPAL_REQS`` records why.
+when the model declares there is only one AND no untrusted party can reach
+the process. (Rule 2 is evaluated first in code, because its evidence is more
+specific and would otherwise be masked by rule 1 -- see the comment on
+``apply_scope_gate``.) There is no third, remote-ingress rule; the comment
+below ``_CROSS_PRINCIPAL_REQS`` records why.
 
 Every rule requires BOTH a gated requirement id AND evidence in the model's
 prose, the same two-condition shape ``provenance_gate`` uses. A finding that
@@ -60,11 +61,16 @@ _CROSS_PRINCIPAL_REQS: frozenset[str] = frozenset({"S-AUT-10", "S-AUT-3"})
 # moment someone rebinds the app to 0.0.0.0, and nothing would be left to
 # re-flag it. Only the SOURCELESS case (rule 1 above) is scope-dependent.
 
-# Concepts that only exist when there is more than one trust principal.
+# Concepts that only exist when there is more than one trust principal. Every
+# term already gets an automatic ``s?`` plural suffix below, so a plural form
+# ("other users") is never listed separately -- only distinct WORD forms
+# ("impersonate" / "impersonation", "hijack" / "hijacking" / "hijacked") need
+# their own entry.
 _CROSS_PRINCIPAL_TERMS: frozenset[str] = frozenset({
-    "other user", "another user", "other users", "idor",
+    "other user", "another user", "idor",
     "insecure direct object", "ownership verification", "ownership check",
-    "tenant", "tenancy", "impersonate", "impersonation", "hijack",
+    "tenant", "tenancy", "impersonate", "impersonation",
+    "hijack", "hijacking", "hijacked",
 })
 
 _CROSS_PATTERN = re.compile(
@@ -109,7 +115,19 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
 
     # Rule 2 first: a named cross-principal concept is more specific evidence
     # than the absence of a source, and would otherwise be masked by rule 1.
-    if (not model.multi_tenant and req in _CROSS_PRINCIPAL_REQS
+    #
+    # Both axes are required, not just ``multi_tenant``. ``multi_tenant=False``
+    # only says there is no SECOND user whose data could be reached -- it says
+    # nothing about whether a stranger can reach the process at all. S-AUT-10
+    # also covers "Authorization checks MUST be enforced on every request", so
+    # a public-facing single-user service with a missing authz check is still
+    # genuinely vulnerable: the attacker is an unauthenticated stranger, not a
+    # second tenant. Without ``relaxes_remote()`` here, this waiver would
+    # silently evaporate the moment the app becomes network-exposed, the same
+    # failure shape that got the old remote-ingress rule deleted (see the
+    # comment below ``_CROSS_PRINCIPAL_REQS``).
+    if (not model.multi_tenant and model.relaxes_remote()
+            and req in _CROSS_PRINCIPAL_REQS
             and _CROSS_PATTERN.search(prose)):
         return _downgrade(finding, "cross_principal")
 

@@ -1,8 +1,6 @@
 """Tests for the declared-threat-model severity gate."""
 from __future__ import annotations
 
-import pytest
-
 from quodeq.analysis.mcp.scope_gate import (
     SCOPE_DOWNGRADE_MARKER,
     apply_scope_gate,
@@ -11,6 +9,7 @@ from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
 LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
 LAN = TrustModel(multi_tenant=False, network_exposure="lan")
+PUBLIC = TrustModel(multi_tenant=False, network_exposure="public")
 
 
 def _finding(**kw) -> dict:
@@ -89,6 +88,43 @@ def test_cross_principal_untouched_when_multi_tenant():
     assert f["severity"] == "major"
 
 
+def test_cross_principal_untouched_when_public_single_tenant():
+    # multi_tenant=False only says there is no SECOND user whose data could
+    # be reached -- it says nothing about whether a stranger can reach the
+    # process. S-AUT-10 also covers "Authorization checks MUST be enforced
+    # on every request", so a public-facing single-user service missing an
+    # authz check is genuinely vulnerable to an unauthenticated attacker.
+    f = _finding(req="S-AUT-10", w="Session hijacking via IDOR",
+                 reason="No ownership verification, so one user can reach "
+                        "another user's terminal session.")
+    assert apply_scope_gate(f, PUBLIC) is False
+    assert f["severity"] == "major"
+
+
+def test_cross_principal_untouched_when_lan_single_tenant():
+    f = _finding(req="S-AUT-10", w="Session hijacking via IDOR",
+                 reason="No ownership verification, so one user can reach "
+                        "another user's terminal session.")
+    assert apply_scope_gate(f, LAN) is False
+    assert f["severity"] == "major"
+
+
+def test_cross_principal_matches_hijacking_gerund():
+    # "hijack" gets an automatic s? suffix, matching "hijack"/"hijacks" but
+    # not the -ing/-ed forms a real finding in the corpus uses ("Session
+    # hijacking via IDOR"). "hijacking" and "hijacked" must be their own
+    # terms, the same way "impersonate"/"impersonation" already are. This
+    # reason deliberately contains no other cross-principal term (no "other
+    # user", no "idor", no bare "hijack") so only the gerund can be doing
+    # the matching.
+    f = _finding(req="S-AUT-10", w="Session hijacking via session id reuse",
+                 reason="The session id is predictable, allowing session "
+                        "hijacking by a party who guesses it.")
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
+
+
 # --- invariants -----------------------------------------------------------
 
 def test_never_touches_critical():
@@ -126,3 +162,21 @@ def test_never_drops_a_finding():
     apply_scope_gate(f, LOCAL)
     assert f["severity"] in ("minor", "major")
     assert f.get("w"), "the finding must survive intact, only its severity moves"
+
+
+def test_cross_principal_evaluated_before_sourceless_path():
+    # S-AUT-3 is the only req in BOTH _PATH_REQS and _CROSS_PRINCIPAL_REQS.
+    # Construct prose that satisfies BOTH rules' evidence conditions at once:
+    # sourceless (no external/operator source named) AND cross-principal
+    # (names another user). Both rules would cap this the same way
+    # (major -> minor), so the only observable difference is which rule name
+    # lands in scope_downgrade["rule"] -- and that label is how someone later
+    # audits what was waived, so the documented order (cross_principal first,
+    # because it is more specific evidence) must actually hold in code, not
+    # just in the comment.
+    f = _finding(req="S-AUT-3",
+                 reason="No ownership check, so one user can reach another "
+                        "user's data via this path.")
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
