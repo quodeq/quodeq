@@ -77,7 +77,9 @@ def _score_principle(
     floor = severity_grade_floor(vt_counts, params=params)
 
     raw = base + (10.0 - base) * lift
-    final = max(floor, min(ceil, raw))
+    # Floor first, ceiling last -- see the note in core/scoring/projector_scoring.py.
+    # Keep byte-identical with it.
+    final = min(ceil, max(floor, raw))
     final = round(final, 1)
     grade = score_to_grade_label(final, params=params)
     return final, grade
