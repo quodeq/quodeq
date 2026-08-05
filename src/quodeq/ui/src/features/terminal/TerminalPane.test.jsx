@@ -151,9 +151,17 @@ it('shows a busy banner and an honest Retry (not a fake takeover) when another w
 
 it('resets xterm on every socket (re)open so a live-backend reconnect does not duplicate scrollback', async () => {
   fakeTerm.reset.mockClear();
+  fakeTerm.open.mockClear();
   fakeTerm.options = {};
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
+  // waitFor, not a plain assert: tty-root appears on the render commit, but
+  // the xterm instance is constructed in the view's mount EFFECT, which is
+  // what populates termRef. onOpen bails out silently on `if (!term) return`
+  // until that effect has run, so driving it straight after findByTestId
+  // races under CI load and reset() is never called. Third instance of the
+  // post-commit-effect flake the mount and focus tests above already carry.
+  await waitFor(() => expect(fakeTerm.open).toHaveBeenCalled());
   // Simulate the socket (re)opening: the view's onOpen must reset the screen
   // BEFORE the server's scrollback replay lands, and re-enable input.
   expect(typeof lastSocketOpts.onOpen).toBe('function');
