@@ -174,3 +174,29 @@ class TestDimensionParams:
     def test_requirements_without_params_are_absent(self):
         effective, _ = dimension_params(self.DIM, {})
         assert "M-ANA-3" not in effective
+
+
+def test_deeply_nested_overrides_file_degrades(tmp_path, deeply_nested_json):
+    """Sibling of the visibility-file regression, same root cause.
+
+    "a bad file never fails analysis" (core/standards/overrides.py) has to
+    survive RecursionError from the C JSON decoder, which is a RuntimeError
+    subclass and so escaped the narrow catch tuple.
+    """
+    path = tmp_path / OVERRIDES_RELPATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(deeply_nested_json, encoding="utf-8")
+
+    assert load_project_overrides(tmp_path) == {}
+
+
+def test_deeply_nested_declared_params_file_is_skipped(tmp_path, deeply_nested_json):
+    """collect_declared_params reads ~/.quodeq/evaluators/*.json, which users
+    hand-author. One pathological file must be skipped like any other
+    unparseable one, not abort the whole PUT that validates against it."""
+    (tmp_path / "broken.json").write_text(deeply_nested_json, encoding="utf-8")
+    (tmp_path / "good.json").write_text(json.dumps({
+        "principles": [{"requirements": [REQ]}],
+    }), encoding="utf-8")
+
+    assert collect_declared_params(tmp_path) == {"M-ANA-2": REQ["params"]}

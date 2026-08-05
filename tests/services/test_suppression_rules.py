@@ -94,6 +94,21 @@ class TestLoadSuppressionRules:
         (tmp_path / "suppression_rules.json").write_text("{nope", encoding="utf-8")
         assert load_suppression_rules(tmp_path) == ()
 
+    def test_deeply_nested_file_yields_no_rules(self, tmp_path, deeply_nested_json):
+        """"Malformed" has to mean every parse failure, not a chosen trio.
+
+        Deeply nested JSON overflows the C decoder's call stack and raises
+        RecursionError -- a RuntimeError subclass, so the narrow
+        (OSError, ValueError, UnicodeDecodeError) catch let it escape and fail
+        the scoring path that loads this file on every rescore.
+        """
+        from quodeq.data.fs.suppression_rules import load_suppression_rules
+
+        (tmp_path / "suppression_rules.json").write_text(
+            deeply_nested_json, encoding="utf-8")
+
+        assert load_suppression_rules(tmp_path) == ()
+
     def test_entries_missing_a_required_field_are_skipped(self, tmp_path):
         """A half-written rule must not silently suppress everything."""
         from quodeq.data.fs.suppression_rules import load_suppression_rules

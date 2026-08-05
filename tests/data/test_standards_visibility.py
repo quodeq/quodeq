@@ -125,3 +125,19 @@ def test_saved_file_is_pretty_printed_with_trailing_newline(tmp_path):
     save_visible_standard_ids(tmp_path, ["security"])
     text = (tmp_path / VISIBILITY_RELPATH).read_text(encoding="utf-8")
     assert text == '{\n  "version": 1,\n  "visibleStandardIds": [\n    "security"\n  ]\n}\n'
+
+
+def test_deeply_nested_file_degrades_to_defaults(tmp_path, deeply_nested_json):
+    """The documented contract holds for *any* parse failure, not a chosen trio.
+
+    Bracket nesting deep enough to overflow the C JSON decoder raises
+    RecursionError, a RuntimeError subclass that the narrow
+    (OSError, ValueError, UnicodeDecodeError) catch did not cover. It escaped
+    and failed the scan instead of degrading, which is what this file's own
+    docstring ("a malformed file never fails a read") promises it will not do.
+    """
+    path = tmp_path / VISIBILITY_RELPATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(deeply_nested_json, encoding="utf-8")
+
+    assert load_visible_standard_ids(tmp_path) == DEFAULT_VISIBLE_STANDARDS
