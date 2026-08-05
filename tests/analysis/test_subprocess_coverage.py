@@ -393,6 +393,46 @@ class TestRunApiAnalysisBridge:
 
         assert mock_api.call_args.kwargs["config"].n_subagents == 1
 
+    def test_trust_model_reaches_assemble_api_prompt(self, tmp_path):
+        """C2: subprocess.py:435 (``trust_model=trust_model``, fed from
+        subprocess.py:421's ``trust_model = resolve_trust_model(work_dir)``)
+        is one of three live wiring points for the declared trust model.
+        Nothing failed when a reviewer set all three to None at once and the
+        full suite stayed green -- this closes that gap by asserting the
+        resolved model, from a real declared profile, actually reaches
+        assemble_api_prompt's kwargs.
+
+        Patched at ``quodeq.analysis.subprocess.assemble_api_prompt``
+        (the name subprocess.py imported into its OWN namespace via
+        ``from ... import assemble_api_prompt``), not at
+        ``quodeq.analysis.api_prompt_assembly.assemble_api_prompt`` -- the
+        latter only rebinds the origin module's attribute and would silently
+        fail to intercept the call subprocess.py already bound at import
+        time.
+        """
+        stream = tmp_path / "stream.json"
+        jsonl = tmp_path / "evidence.jsonl"
+        (tmp_path / "main.py").write_text("x = 1")
+        profile_dir = tmp_path / ".quodeq"
+        profile_dir.mkdir()
+        (profile_dir / "project-profile.json").write_text(json.dumps({
+            "version": 1, "multiTenant": False, "networkExposure": "loopback",
+        }))
+
+        cfg = AnalysisConfig(ai_cmd="ollama", ai_model="llama3.1", jsonl_file=jsonl)
+        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
+
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
+             patch("quodeq.analysis.subprocess.assemble_api_prompt", return_value="prompt") as mock_assemble, \
+             patch("quodeq.analysis._api_runner.run_api_analysis"):
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+
+        mock_assemble.assert_called_once()
+        trust_model = mock_assemble.call_args.kwargs["trust_model"]
+        assert trust_model is not None
+        assert trust_model.multi_tenant is False
+        assert trust_model.network_exposure == "loopback"
+
 
 # ---------------------------------------------------------------------------
 # run_analysis dispatch

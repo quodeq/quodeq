@@ -336,6 +336,32 @@ class TestBuildRouterContext:
             ctx = _build_router_context(Path("/nonexistent"), "security", None, None, None)
         assert ctx is None
 
+    def test_resolves_declared_trust_model_from_work_dir(self, tmp_path):
+        """C2: _api_runner.py:464 (``trust_model = resolve_trust_model(work_dir)
+        if work_dir is not None else None``) is one of three live wiring
+        points for the declared trust model. Nothing failed when a reviewer
+        set all three to None at once and the full suite stayed green -- this
+        closes that gap by exercising _build_router_context directly against
+        a real declared profile, using a compiled_dir/dimension combination
+        that never touches disk for standards loading (dimension=None short-
+        circuits _load_compiled_data), so only the trust_model line is
+        exercised for real.
+        """
+        profile_dir = tmp_path / ".quodeq"
+        profile_dir.mkdir()
+        (profile_dir / "project-profile.json").write_text(json.dumps({
+            "version": 1, "multiTenant": False, "networkExposure": "loopback",
+        }))
+
+        ctx = _build_router_context(
+            Path("/nonexistent-compiled-dir"), None, tmp_path, None, None,
+        )
+
+        assert ctx is not None
+        assert ctx.trust_model is not None
+        assert ctx.trust_model.multi_tenant is False
+        assert ctx.trust_model.network_exposure == "loopback"
+
 
 # ---------------------------------------------------------------------------
 # run_api_analysis — appends to file
