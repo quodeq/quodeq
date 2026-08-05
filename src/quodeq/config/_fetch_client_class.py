@@ -14,6 +14,12 @@ from quodeq.shared.ssrf import is_private_address as _is_private_hostname
 
 _logger = logging.getLogger(__name__)
 
+# Ceiling on a single response body. ``timeout`` bounds how LONG a transfer may
+# run; without a byte bound, a hostile or broken endpoint on a fast link still
+# streams enough within that window to exhaust memory. Sized far above any real
+# payload this client fetches (standards documents, release metadata).
+_DEFAULT_MAX_BODY_BYTES = 10 * 1024 * 1024
+
 
 class FetchClient:
     """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
@@ -47,6 +53,7 @@ class FetchClient:
         self._CIRCUIT_THRESHOLD = int(_e.get("QUODEQ_CIRCUIT_THRESHOLD", "5"))
         self._MAX_RETRIES = int(_e.get("QUODEQ_MAX_RETRIES", "2"))
         self._RETRY_BACKOFF_S = float(_e.get("QUODEQ_RETRY_BACKOFF_S", "0.5"))
+        self._MAX_BODY_BYTES = int(_e.get("QUODEQ_MAX_RESPONSE_BYTES", str(_DEFAULT_MAX_BODY_BYTES)))
         if allow_private is not None:
             self._allow_private: bool = allow_private
         else:
@@ -79,8 +86,20 @@ class FetchClient:
                 req = urllib.request.Request(url, headers=headers or {})
                 _ctx = _ssl.create_default_context()
                 with urllib.request.urlopen(req, timeout=self._timeout, context=_ctx) as r:
-                    self._record_success()
-                    return r.read().decode("utf-8", errors="replace")
+                    # One byte over the cap is enough to prove it was exceeded,
+                    # and stops the read there rather than buffering the rest.
+                    body = r.read(self._MAX_BODY_BYTES + 1)
+                if len(body) > self._MAX_BODY_BYTES:
+                    # Deterministic property of the endpoint: a retry would only
+                    # re-download the cap, so fail now rather than looping.
+                    _logger.warning(
+                        "Blocked fetch: response body exceeds %d bytes: %s",
+                        self._MAX_BODY_BYTES, url,
+                    )
+                    self._record_failure(ValueError("response body over size cap"))
+                    return None
+                self._record_success()
+                return body.decode("utf-8", errors="replace")
             except (urllib.error.URLError, OSError, ValueError) as exc:
                 last_exc = exc
                 if retry < self._MAX_RETRIES - 1:
