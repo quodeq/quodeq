@@ -249,9 +249,15 @@ class FindingEnricher:
             finding, self._precedent_fingerprints, self._precedent_corpus,
         )
         apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
-        # Runs at the SINK, after the cache: cached findings pass through here
-        # on every run, so editing .quodeq/project-profile.json re-caps existing
-        # results without touching CacheKey (which is deliberately permissive).
+        # Gates the LIVE path only: this method runs once per freshly-dispatched
+        # finding, before it ever reaches the cache. A cached finding replayed on
+        # a later run does NOT come back through here -- cache replay bypasses
+        # enrich() entirely and writes straight to the per-dim JSONL. That path
+        # (dimension_runner._write_findings) applies apply_provenance_gate and
+        # apply_scope_gate itself, in the same order, for the same reason. Both
+        # call sites are required: this one gates what the model just emitted,
+        # the other re-gates what a warm cache is about to replay, and skipping
+        # either leaves a class of findings (fresh vs. cached) ungated.
         apply_scope_gate(finding, self._trust_model)
 
         return finding
