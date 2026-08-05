@@ -13,6 +13,7 @@ from quodeq.analysis.prompts.builder import _load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 from quodeq.context.path_role import Role, path_role
 from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
+from quodeq.context.trust_model import TrustModel
 
 _log = logging.getLogger(__name__)
 
@@ -72,16 +73,26 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
     return "\n\n".join(parts)
 
 
-def _format_shape_block(shape: ProjectShape) -> str:
-    """Render a project-shape briefing for the LLM, or empty when unknown.
+def _format_shape_block(
+    shape: ProjectShape, trust_model: TrustModel | None = None,
+) -> str:
+    """Render a project briefing for the LLM, or empty when nothing is known.
 
-    Skipped for ``UNKNOWN`` deployments: the heuristics didn't fire and we
-    don't want to plant a wrong assumption in the model's head.
+    A declared trust model is briefed even when shape detection returned
+    UNKNOWN: detection is a guess, the declaration is the team telling us the
+    answer, and suppressing it would waste the only reliable signal we have.
     """
-    if shape.deployment is Deployment.UNKNOWN:
+    relaxing = trust_model is not None and (
+        trust_model.relaxes_remote() or not trust_model.multi_tenant)
+    if shape.deployment is Deployment.UNKNOWN and not relaxing:
         return ""
-    parts: list[str] = [f"deployment={shape.deployment.value}",
-                        f"single_user={'true' if shape.is_single_user else 'false'}"]
+    parts: list[str] = []
+    if shape.deployment is not Deployment.UNKNOWN:
+        parts.append(f"deployment={shape.deployment.value}")
+        parts.append(f"single_user={'true' if shape.is_single_user else 'false'}")
+    if trust_model is not None:
+        parts.append(f"multi_tenant={'true' if trust_model.multi_tenant else 'false'}")
+        parts.append(f"network_exposure={trust_model.network_exposure}")
     if shape.runtime_langs:
         parts.append(f"runtime={'+'.join(shape.runtime_langs)}")
     if shape.web_frameworks:
@@ -107,6 +118,18 @@ def _format_shape_block(shape: ProjectShape) -> str:
             " This is a single-user CLI, not a hosted service. Concurrent"
             " caller and multi-tenant findings rarely apply."
         )
+    if trust_model is not None and trust_model.relaxes_remote():
+        note += (
+            " No untrusted party can open a socket to this process, so a file"
+            " path built from a value this process already controls is a"
+            " hardening gap, not a trust boundary crossing. Report it as"
+            " `minor` unless you can name a remote source that reaches the line."
+        )
+    if trust_model is not None and not trust_model.multi_tenant:
+        note += (
+            " There is exactly one user, so findings about reaching another"
+            " user's data, ownership checks, and tenant isolation do not apply."
+        )
     return f"## Project Shape\n\n**{summary}**.{note}"
 
 
@@ -118,19 +141,26 @@ def assemble_api_prompt(
     repo_name: str,
     repo_root: Path | None = None,
     project_shape: ProjectShape | None = None,
+    trust_model: TrustModel | None = None,
 ) -> str:
     """Assemble a complete evaluation prompt for the API runner.
 
     *project_shape* is computed from *repo_root* when not supplied; pass an
     explicit shape to skip detection (e.g. when a cached shape is being
-    reused across dimensions).
+    reused across dimensions). *trust_model* is never detected here -- it is
+    resolved by the caller (declared profile, then detection, then the
+    conservative default) and threaded through so the model is briefed on
+    the same trust boundary the deterministic scope gate enforces.
     """
     template = load_template(template_name="api_prompt.md")
     rules = _load_evaluation_rules()
     files_block = _build_files_block(source_files, repo_root=repo_root)
     if project_shape is None and repo_root is not None:
         project_shape = detect_shape(repo_root)
-    shape_block = _format_shape_block(project_shape) if project_shape else ""
+    # Fall back to an UNKNOWN shape rather than skipping the block outright:
+    # a declared trust model must still be briefed even without a shape
+    # verdict. _format_shape_block itself returns "" when nothing is known.
+    shape_block = _format_shape_block(project_shape or ProjectShape(), trust_model)
     return render_template(template, {
         "DIMENSION": dimension,
         "REPO_NAME": repo_name,
