@@ -28,14 +28,17 @@ Compliance uses the same scale to mark importance of what's done right.
 
 A missing null/undefined guard (R-FT-2) or a path/key built from a value (S-AUT-3) is `critical` only when a bad value can actually reach the flagged line. Name the source that delivers it. (The target language is named at the top of this prompt; read the patterns below in that language's idiom.)
 
-External source → stays `critical`. The value crosses a trust boundary: an HTTP request, query/route param, header, cookie, or body; a CLI argument; an environment variable; file, network, or message-queue payload; or any argument an untrusted caller controls.
+External source → stays `critical`. The value crosses a trust boundary an untrusted party can reach: an HTTP request, query/route param, header, cookie, or body; file, network, or message-queue payload; an upload; or any argument an untrusted caller controls.
+
+Operator-controlled source → NOT `critical` (`major` if 1–4 hold, else drop). The value is set by whoever starts the process: a CLI argument, or an environment variable. Anyone able to set these already runs code as that user, so a path built from one grants no access they did not already have. Report it as a hardening gap, never as a vulnerability.
 
 Internal source → NOT `critical`, a hardening gap (`major` if 1–4 hold and the guard is worth adding, else drop). The value cannot be attacker-controlled: a content hash or digest (e.g. a SHA-256 hex string); a literal, constant, or enum; a parameter with a default that every visible call site relies on or passes a literal; or a value already validated (charset-restricted, length-checked, allow-listed) before this line.
 
-If you cannot name an external source, treat the value as internal; do not assume one off-screen.
+If you cannot name a source, treat the value as internal; do not assume one off-screen. If both an external and an operator-controlled source reach the line, the external one decides.
 
 Worked example (any language). A line opens or dereferences `x` with no check:
-- `x` comes from a request field or CLI arg, e.g. `open(request["file"])` → external → `critical`.
+- `x` comes from a request field, e.g. `open(request["file"])` → external → `critical`.
+- `x` comes from a CLI arg or env var, e.g. `open(os.environ["OUT"])` → operator-controlled, the caller already owns the process → `major` or drop.
 - `x` is a digest, e.g. `open(cacheDir + "/" + sha256(content))` → internal, a hex digest no caller can choose → `major` or drop.
 
 Same code, opposite verdict: the source decides the severity.

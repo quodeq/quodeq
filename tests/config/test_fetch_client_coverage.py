@@ -120,3 +120,62 @@ class TestFetchRetry:
              patch("time.sleep"):
             c.fetch("https://example.com")
             assert c._failures == 1
+
+
+class TestFetchResponseSizeCap:
+    """A fetch must be bounded in BYTES, not only in seconds.
+
+    ``timeout`` bounds how long the transfer may run; on a fast link a hostile
+    or broken endpoint still streams enough in that window to exhaust memory.
+    These pin the byte cap so the guard cannot be silently dropped.
+    """
+
+    @staticmethod
+    def _resp(body: bytes):
+        m = MagicMock()
+        m.read.return_value = body
+        m.__enter__ = MagicMock(return_value=m)
+        m.__exit__ = MagicMock(return_value=False)
+        return m
+
+    def test_default_cap(self):
+        assert FetchClient(env={})._MAX_BODY_BYTES == 10 * 1024 * 1024
+
+    def test_cap_from_injected_env(self):
+        assert FetchClient(env={"QUODEQ_MAX_RESPONSE_BYTES": "2048"})._MAX_BODY_BYTES == 2048
+
+    def test_read_is_always_bounded(self):
+        # The regression guard: an unbounded r.read() would pass every other
+        # test in this class while still being the bug.
+        c = FetchClient(allow_private=True, env={})
+        resp = self._resp(b"ok")
+        with patch("urllib.request.urlopen", return_value=resp):
+            c.fetch("https://example.com")
+        args, _kwargs = resp.read.call_args
+        assert args, "r.read() called with no size limit"
+        assert args[0] == c._MAX_BODY_BYTES + 1
+
+    def test_body_at_cap_is_returned(self):
+        c = FetchClient(allow_private=True, env={"QUODEQ_MAX_RESPONSE_BYTES": "16"})
+        with patch("urllib.request.urlopen", return_value=self._resp(b"x" * 16)):
+            assert c.fetch("https://example.com") == "x" * 16
+
+    def test_body_over_cap_is_rejected(self):
+        c = FetchClient(allow_private=True, env={"QUODEQ_MAX_RESPONSE_BYTES": "16"})
+        with patch("urllib.request.urlopen", return_value=self._resp(b"x" * 17)):
+            assert c.fetch("https://example.com") is None
+
+    def test_oversize_counts_as_failure(self):
+        c = FetchClient(allow_private=True, env={"QUODEQ_MAX_RESPONSE_BYTES": "4"})
+        with patch("urllib.request.urlopen", return_value=self._resp(b"toolong")):
+            c.fetch("https://example.com")
+        assert c._failures == 1
+
+    def test_oversize_does_not_retry(self):
+        # Body size is a deterministic property of the endpoint; retrying only
+        # re-downloads the cap. One attempt, then give up.
+        c = FetchClient(allow_private=True, env={"QUODEQ_MAX_RESPONSE_BYTES": "4"})
+        opener = MagicMock(return_value=self._resp(b"toolong"))
+        with patch("urllib.request.urlopen", opener), patch("time.sleep"):
+            c.fetch("https://example.com")
+        assert opener.call_count == 1

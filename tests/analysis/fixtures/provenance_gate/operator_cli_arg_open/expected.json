@@ -1,0 +1,13 @@
+{
+  "case": "operator_cli_arg_open",
+  "dimension": "security",
+  "req": "S-AUT-3",
+  "display_file": "src/cli/export.py",
+  "target_line": 8,
+  "construct": "argv",
+  "provenance": "operator",
+  "expectation": "downgraded",
+  "baseline_severity": "critical",
+  "source": "synthetic",
+  "note": "Path built from a CLI argument. Reclassified from 'external' to 'operator': setting argv already requires execution as the user the process runs as, so the path grants no access the caller did not have. Still a real named source (unlike a digest), so it stays a major hardening gap, never critical."
+}
