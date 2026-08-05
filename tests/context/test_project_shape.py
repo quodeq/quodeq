@@ -64,11 +64,39 @@ dependencies = ["pywebview>=5.0"]
 dev = ["flask"]
 """)
     shape = detect_shape(tmp_path)
-    # Both signals present -> Python returns None (ambiguous), falling back
-    # to UNKNOWN unless something else votes. Desktop hint at the *project*
-    # priority pass wins below — but here pyproject is ambiguous, no other
-    # manifests exist, so verdict is UNKNOWN.
-    assert shape.deployment is Deployment.UNKNOWN
+    # Both signals present -> desktop wins outright (see _python_signals).
+    # This assertion used to be UNKNOWN, which was the bug: it made
+    # detect_shape discard a manifest that unambiguously ships a desktop
+    # app just because a web framework also showed up as a dev dependency.
+    assert shape.deployment is Deployment.DESKTOP
+
+
+def test_desktop_beats_web_in_one_manifest(tmp_path):
+    """A desktop app that embeds a web framework is DESKTOP, not UNKNOWN.
+
+    detect_shape's own comment says desktop signals beat web signals because
+    web hints show up in the dev dependencies of desktop apps. That priority
+    was unreachable: _python_signals collapsed the both-present case to None.
+    """
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "app"\n'
+        'dependencies = ["flask>=3.0", "pywebview>=6.2"]\n',
+        encoding="utf-8",
+    )
+    shape = detect_shape(tmp_path)
+    assert shape.deployment is Deployment.DESKTOP
+    assert shape.is_single_user is True
+    # The web framework is still reported; it is context, not a verdict.
+    assert "flask" in shape.web_frameworks
+
+
+def test_web_only_manifest_still_web_service(tmp_path):
+    """Guard against over-correcting: no desktop hint means no desktop verdict."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "svc"\ndependencies = ["flask>=3.0"]\n',
+        encoding="utf-8",
+    )
+    assert detect_shape(tmp_path).deployment is Deployment.WEB_SERVICE
 
 
 def test_package_json_express_is_web_service(tmp_path: Path) -> None:
