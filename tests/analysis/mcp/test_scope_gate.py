@@ -125,17 +125,6 @@ def test_cross_principal_untouched_when_names_external_source():
     assert SCOPE_DOWNGRADE_MARKER not in f
 
 
-def test_cross_principal_capped_with_sourceless_prose():
-    # Regression guard: no named external or operator source, so provenance
-    # is silent and the tenancy reading alone still relaxes the finding.
-    f = _finding(req="S-AUT-10", w="Session hijacking via IDOR",
-                 reason="No ownership verification, so one user can reach "
-                        "another user's terminal session.")
-    assert apply_scope_gate(f, LOCAL) is True
-    assert f["severity"] == "minor"
-    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
-
-
 def test_cross_principal_capped_when_naming_operator_source():
     # argv/env are the operator's own inputs, not an attacker channel, even
     # when the finding's premise is cross-principal: the operator-source

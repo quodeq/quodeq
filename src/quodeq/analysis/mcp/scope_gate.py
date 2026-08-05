@@ -16,10 +16,17 @@ The gate ships two rules: rule 1 relaxes an unproven-provenance path/key
 finding when the model declares no untrusted party can reach the process at
 all, and rule 2 relaxes a finding whose premise is a second trust principal
 when the model declares there is only one AND no untrusted party can reach
-the process. (Rule 2 is evaluated first in code, because its evidence is more
-specific and would otherwise be masked by rule 1 -- see the comment on
-``apply_scope_gate``.) There is no third, remote-ingress rule; the comment
-below ``_CROSS_PRINCIPAL_REQS`` records why.
+the process AND the finding's prose does not name an external source.
+(Rule 2 is evaluated first in code, because its evidence is more specific
+and would otherwise be masked by rule 1 -- see the comment on
+``apply_scope_gate``.) The third precondition for rule 2 exists because
+a finding whose prose names proven external ingress has a second reading the
+cross-principal phrasing hides: an unauthenticated attacker reaching the
+single user's own data via browser CSRF or DNS rebinding on the loopback
+bind. Multi-tenant=False rules out the second-tenant reading, but it says
+nothing about this one, so the finding must stay major when the prose
+names how the stranger gets in. There is no third, remote-ingress rule;
+the comment below ``_CROSS_PRINCIPAL_REQS`` records why.
 
 Every rule requires BOTH a gated requirement id AND evidence in the model's
 prose, the same two-condition shape ``provenance_gate`` uses. A finding that
