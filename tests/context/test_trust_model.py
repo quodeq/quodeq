@@ -146,3 +146,21 @@ def test_boolean_version_is_rejected(tmp_path):
     # `!= SUPPORTED_VERSION` check would accept "version": true as version 1.
     _write_profile(tmp_path, {"version": True, "networkExposure": "loopback"})
     assert resolve_trust_model(tmp_path) == CONSERVATIVE
+
+
+def test_deeply_nested_package_json_degrades(tmp_path):
+    # Same RecursionError overflow as the declared-side fix, but reached
+    # through detection: detect_shape parses package.json via _read_json,
+    # whose except json.JSONDecodeError does not catch RecursionError (a
+    # RuntimeError subclass). _detected_fields must degrade this too, not
+    # just the declared-profile path.
+    (tmp_path / "package.json").write_text(
+        "[" * 80000 + "]" * 80000, encoding="utf-8")
+    assert resolve_trust_model(tmp_path) == CONSERVATIVE
+
+
+def test_deeply_nested_pyproject_toml_degrades(tmp_path):
+    # Same class of bug, via tomllib on the pyproject.toml detection path.
+    (tmp_path / "pyproject.toml").write_text(
+        "a = " + "[" * 5000 + "]" * 5000, encoding="utf-8")
+    assert resolve_trust_model(tmp_path) == CONSERVATIVE

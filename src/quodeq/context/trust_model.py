@@ -131,7 +131,17 @@ def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
     """
     try:
         shape = detect_shape(project_root)
-    except OSError as exc:  # unreadable manifests must not fail a scan
+    except Exception as exc:  # noqa: BLE001 - unreadable/pathological manifests must not fail a scan
+        # detect_shape's own manifest readers (project_shape.py) only catch
+        # OSError/tomllib.TOMLDecodeError/json.JSONDecodeError, not every
+        # failure mode: deeply nested package.json/pyproject.toml/Cargo.toml
+        # content overflows the C JSON decoder's or tomllib's recursion limit
+        # and raises RecursionError, a RuntimeError subclass neither of those
+        # readers catches. project_root is analyzed, untrusted input with a
+        # well-defined conservative fallback, so any detection failure -- not
+        # just OSError -- must degrade here rather than escape and fail the
+        # scan. project_shape.py itself is out of scope for this fix; this
+        # catch is deliberately wide as the boundary that must not leak.
         _logger.warning("Project shape detection failed for %s: %s", project_root, exc)
         return None, None
     if shape.deployment is Deployment.WEB_SERVICE:
