@@ -4,6 +4,14 @@ Reads/writes ``<project root>/.quodeq/standards-visibility.json`` and reads
 ``standards-overrides.json`` + compiled dimension files. The pure logic
 (validation, partitioning, param resolution) stays in ``core/standards/``;
 the API layer goes through ``services/standards_prefs.py``.
+
+Every read here is advisory, hand-writable config with a well-defined default,
+so a parse failure of *any* kind degrades with a warning -- not just the
+well-behaved ``OSError``/``ValueError``/``UnicodeDecodeError`` trio. In
+particular, deeply nested JSON (tens of thousands of nested arrays, a ~160KB
+file a buggy generator produces by accident) overflows the C decoder's call
+stack and raises ``RecursionError``, which is a ``RuntimeError`` and would
+otherwise escape and fail the scan.
 """
 from __future__ import annotations
 
@@ -30,8 +38,9 @@ def load_visible_standard_ids(project_root: str | Path | None) -> tuple[str, ...
         return DEFAULT_VISIBLE_STANDARDS
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Ignoring malformed standards visibility %s: %s", path, exc)
+    except Exception as exc:  # noqa: BLE001 - config must never fail a scan; see module docstring
+        _logger.warning(
+            "Ignoring unreadable or malformed standards visibility %s: %s", path, exc)
         return DEFAULT_VISIBLE_STANDARDS
     ids = data.get("visibleStandardIds") if isinstance(data, dict) else None
     if not isinstance(ids, list):
@@ -60,8 +69,9 @@ def load_project_overrides(project_root: str | Path | None) -> dict[str, dict]:
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Ignoring malformed standards overrides %s: %s", path, exc)
+    except Exception as exc:  # noqa: BLE001 - config must never fail a scan; see module docstring
+        _logger.warning(
+            "Ignoring unreadable or malformed standards overrides %s: %s", path, exc)
         return {}
     overrides = data.get("overrides") if isinstance(data, dict) else None
     if not isinstance(overrides, dict):
@@ -89,7 +99,8 @@ def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
     for path in sorted(Path(compiled_dir).glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, UnicodeDecodeError):
+        except Exception as exc:  # noqa: BLE001 - one bad standard must not sink the rest
+            _logger.warning("Skipping unreadable declared params in %s: %s", path, exc)
             continue
         for principle in data.get("principles", []):
             for req in principle.get("requirements", []):
