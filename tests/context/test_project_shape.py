@@ -168,3 +168,65 @@ def test_unknown_deployment_is_single_user() -> None:
     shape = ProjectShape()
     assert shape.deployment is Deployment.UNKNOWN
     assert shape.is_single_user is True
+
+
+class TestPathologicalManifestsDegrade:
+    """detect_shape must never fail a scan over a manifest it cannot read.
+
+    Its contract is "fall back to UNKNOWN whenever signals are absent or
+    contradictory", and four callers (_api_runner, api_prompt_assembly,
+    mcp/findings_server, and context/__init__'s re-export) invoke it with no
+    guard of their own. Anything that escapes here fails the run.
+
+    The manifests below are all *analyzed*, untrusted input from the repo
+    under evaluation, not files Quodeq controls.
+    """
+
+    def test_deeply_nested_package_json(self, tmp_path: Path, deeply_nested_json: str) -> None:
+        # _read_json caught only json.JSONDecodeError. Nesting deep enough to
+        # exhaust the C decoder's call stack raises RecursionError instead --
+        # a RuntimeError subclass, so it escaped.
+        _write(tmp_path / "package.json", deeply_nested_json)
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
+    def test_deeply_nested_pyproject_toml(self, tmp_path: Path) -> None:
+        # Same class through tomllib, which is a pure-Python recursive-descent
+        # parser and so overflows at a much shallower depth than the C JSON
+        # decoder. _read_toml caught only OSError/TOMLDecodeError.
+        _write(tmp_path / "pyproject.toml", "a = " + "[" * 5000 + "]" * 5000)
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
+    def test_deeply_nested_cargo_toml(self, tmp_path: Path) -> None:
+        # _rust_signals shares _read_toml, so Cargo.toml is the same hole.
+        _write(tmp_path / "Cargo.toml", "a = " + "[" * 5000 + "]" * 5000)
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
+    def test_dependencies_that_are_not_a_list(self, tmp_path: Path) -> None:
+        """Not a RecursionError, and not fixed by widening the readers.
+
+        ``dependencies = 5`` parses as perfectly valid TOML, so every reader
+        succeeds; _python_signals then did ``list(deps_list)`` on an int and
+        raised TypeError. Guarding only the readers would leave this escape
+        open, which is the whole point of fixing detect_shape at the source
+        rather than wrapping each caller.
+        """
+        _write(tmp_path / "pyproject.toml", '[project]\nname = "x"\ndependencies = 5\n')
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
+    def test_a_readable_manifest_still_detects_after_a_broken_sibling(
+        self, tmp_path: Path, deeply_nested_json: str,
+    ) -> None:
+        """Degrading is per-manifest, not all-or-nothing.
+
+        A pathological package.json must not blank the verdict a perfectly
+        good pyproject.toml supports -- otherwise the fix trades a crash for
+        silent, total detection loss.
+        """
+        _write(tmp_path / "package.json", deeply_nested_json)
+        _write(
+            tmp_path / "pyproject.toml",
+            '[project]\nname = "x"\ndependencies = ["flask>=3.0"]\n',
+        )
+        shape = detect_shape(tmp_path)
+        assert shape.deployment is Deployment.WEB_SERVICE
+        assert shape.web_frameworks == ["flask"]
