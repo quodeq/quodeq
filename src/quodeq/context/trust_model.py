@@ -62,22 +62,35 @@ CONSERVATIVE = TrustModel(multi_tenant=True, network_exposure="public")
 
 
 def _read_profile(project_root: Path) -> dict:
-    """Parse the profile file; ``{}`` for absent, unreadable or malformed."""
+    """Parse the profile file; ``{}`` for absent, unreadable or malformed.
+
+    This is advisory data an operator hand-writes, with a well-defined
+    conservative fallback, so parsing failures of *any* kind degrade rather
+    than propagate -- not just the well-behaved ``OSError``/``ValueError``/
+    ``UnicodeDecodeError`` trio. In particular, deeply nested JSON (e.g. tens
+    of thousands of nested arrays) overflows the C decoder's call stack and
+    raises ``RecursionError``, which is a ``RuntimeError`` and would
+    otherwise escape and fail the scan.
+    """
     path = project_root / PROFILE_RELPATH
     if not path.is_file():
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Ignoring malformed project profile %s: %s", path, exc)
+    except Exception as exc:  # noqa: BLE001 - advisory data must never fail a scan
+        _logger.warning("Ignoring unreadable or malformed project profile %s: %s", path, exc)
         return {}
     if not isinstance(data, dict):
         _logger.warning("Ignoring project profile %s: not a JSON object", path)
         return {}
-    if data.get("version") != SUPPORTED_VERSION:
+    version = data.get("version")
+    # ``bool`` is a subclass of ``int`` in Python, so ``True == 1``: without the
+    # explicit bool exclusion, a profile declaring ``"version": true`` would
+    # silently pass this gate as version 1.
+    if isinstance(version, bool) or not isinstance(version, int) or version != SUPPORTED_VERSION:
         _logger.warning(
             "Ignoring project profile %s: unsupported version %r (expected %d)",
-            path, data.get("version"), SUPPORTED_VERSION,
+            path, version, SUPPORTED_VERSION,
         )
         return {}
     return data

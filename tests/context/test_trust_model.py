@@ -118,3 +118,31 @@ def test_permission_denied_profile_degrades(tmp_path):
         assert resolve_trust_model(tmp_path) == CONSERVATIVE
     finally:
         os.chmod(path, 0o644)
+
+
+def test_deeply_nested_profile_degrades(tmp_path):
+    # Bracket nesting deep enough to overflow the C JSON decoder's recursion
+    # limit raises RecursionError, a RuntimeError subclass that the narrow
+    # (OSError, ValueError, UnicodeDecodeError) catch does not cover. This is
+    # advisory data with a conservative fallback, so it must degrade like any
+    # other malformed profile, never escape and fail the scan.
+    path = tmp_path / PROFILE_RELPATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("[" * 80000 + "]" * 80000, encoding="utf-8")
+    assert resolve_trust_model(tmp_path) == CONSERVATIVE
+
+
+def test_declared_false_overrides_detected_true(tmp_path):
+    # A falsy declared value must still win over a truthy detected one. Without
+    # this, an `or`-chained resolution would pass the whole suite.
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "svc"\ndependencies = ["flask>=3.0"]\n', encoding="utf-8")
+    _write_profile(tmp_path, {"version": 1, "multiTenant": False})
+    assert resolve_trust_model(tmp_path).multi_tenant is False
+
+
+def test_boolean_version_is_rejected(tmp_path):
+    # bool is a subclass of int in Python, so True == 1: a naive
+    # `!= SUPPORTED_VERSION` check would accept "version": true as version 1.
+    _write_profile(tmp_path, {"version": True, "networkExposure": "loopback"})
+    assert resolve_trust_model(tmp_path) == CONSERVATIVE
