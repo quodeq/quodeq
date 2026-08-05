@@ -59,7 +59,10 @@ _CROSS_PRINCIPAL_REQS: frozenset[str] = frozenset({"S-AUT-10", "S-AUT-3"})
 # proves it reads attacker-controlled input regardless of how the process
 # happens to be bound today. Waiving that would silently evaporate the
 # moment someone rebinds the app to 0.0.0.0, and nothing would be left to
-# re-flag it. Only the SOURCELESS case (rule 1 above) is scope-dependent.
+# re-flag it. Both rules honor this: rule 1 only fires on a SOURCELESS
+# finding, and rule 2 (see its own comment in ``apply_scope_gate``) also
+# backs off the instant the prose names an external source, even though its
+# own trigger is a cross-principal concept, not provenance.
 
 # Concepts that only exist when there is more than one trust principal. Every
 # term already gets an automatic ``s?`` plural suffix below, so a plural form
@@ -126,9 +129,27 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
     # silently evaporate the moment the app becomes network-exposed, the same
     # failure shape that got the old remote-ingress rule deleted (see the
     # comment below ``_CROSS_PRINCIPAL_REQS``).
+    #
+    # The tenancy check alone is not enough either, which is why a provenance
+    # check joins it. "Another user's session" is ambiguous: it can describe a
+    # genuine second-tenant read (impossible once ``multi_tenant`` is False)
+    # OR it can describe an unauthenticated stranger reaching the SAME single
+    # user's own session -- still live on a loopback bind via browser CSRF or
+    # DNS rebinding -- when the finding also names how that stranger gets in
+    # (e.g. "query parameter"). The cross-principal phrasing cannot tell those
+    # two readings apart; ``names_external_source`` can, because it reads the
+    # ingress term instead of the relationship term. So both a tenancy check
+    # (rules out reading #1) and a provenance check (rules out reading #2) are
+    # required before this rule may relax anything.
+    #
+    # ``names_operator_source`` is deliberately NOT added alongside it: argv
+    # and the environment are the operator's own inputs, set by whoever
+    # launches the process, and carry no attacker reading here even when the
+    # finding's premise is cross-principal.
     if (not model.multi_tenant and model.relaxes_remote()
             and req in _CROSS_PRINCIPAL_REQS
-            and _CROSS_PATTERN.search(prose)):
+            and _CROSS_PATTERN.search(prose)
+            and not names_external_source(prose)):
         return _downgrade(finding, "cross_principal")
 
     if not model.relaxes_remote():

@@ -109,6 +109,47 @@ def test_cross_principal_untouched_when_lan_single_tenant():
     assert f["severity"] == "major"
 
 
+def test_cross_principal_untouched_when_names_external_source():
+    # The named ingress ("query parameter") supports a second reading the
+    # cross-principal phrasing hides: an unauthenticated attacker reaching
+    # the single user's own session via CSRF/DNS rebinding on the loopback
+    # bind. multi_tenant=False rules out the SECOND-TENANT reading, but it
+    # says nothing about this one, so the finding must stay major.
+    f = _finding(req="S-AUT-10", w="IDOR via session id in query parameter",
+                 reason="The session id is taken directly from a query "
+                        "parameter and used to look up a terminal session "
+                        "without ownership verification, allowing an "
+                        "attacker to reach another user's active session.")
+    assert apply_scope_gate(f, LOCAL) is False
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_cross_principal_capped_with_sourceless_prose():
+    # Regression guard: no named external or operator source, so provenance
+    # is silent and the tenancy reading alone still relaxes the finding.
+    f = _finding(req="S-AUT-10", w="Session hijacking via IDOR",
+                 reason="No ownership verification, so one user can reach "
+                        "another user's terminal session.")
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
+
+
+def test_cross_principal_capped_when_naming_operator_source():
+    # argv/env are the operator's own inputs, not an attacker channel, even
+    # when the finding's premise is cross-principal: the operator-source
+    # exclusion from rule 1 is deliberately NOT extended to this rule.
+    f = _finding(req="S-AUT-10", w="Session hijacking via IDOR",
+                 reason="The session id comes from a command-line argument "
+                        "and is used to look up a terminal session without "
+                        "ownership verification, allowing one user to reach "
+                        "another user's session.")
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
+
+
 def test_cross_principal_matches_hijacking_gerund():
     # "hijack" gets an automatic s? suffix, matching "hijack"/"hijacks" but
     # not the -ing/-ed forms a real finding in the corpus uses ("Session
