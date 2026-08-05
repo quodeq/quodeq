@@ -14,9 +14,13 @@ The fixtures under ``fixtures/provenance_gate/`` are a matrix of cases:
                 later code-hardening at c0edcd6f / 521f46c6) so the fixture is
                 the exact code that was rated critical. Expected: not critical.
   external_*  — synthetic code whose flagged value is genuinely ATTACKER-
-                CONTROLLED (an HTTP field, a CLI arg, a response header).
-                Expected: stays critical — the guard that the gate does not
-                over-relax.
+                CONTROLLED (an HTTP field, a response header). Expected: stays
+                critical — the guard that the gate does not over-relax.
+  operator_*  — synthetic code whose flagged value comes from argv or the
+                environment. A real named source, but reaching it already
+                requires execution as the process user, so it is not a trust
+                boundary. Expected: not critical — the guard that the gate
+                does not over-tighten on local-first CLIs and desktop apps.
 """
 from __future__ import annotations
 

@@ -7,9 +7,11 @@ from quodeq.analysis.mcp.enricher import CompiledContext, FindingEnricher
 from quodeq.analysis.mcp.provenance_gate import (
     DOWNGRADE_MARKER,
     EXTERNAL_SOURCE_TERMS,
+    OPERATOR_CONTROLLED_TERMS,
     PROVENANCE_GATED_REQS,
     apply_provenance_gate,
     names_external_source,
+    names_operator_source,
 )
 
 # Reasons that DO name a reachable external source -> external.
@@ -17,8 +19,6 @@ _EXTERNAL_REASONS = [
     "The filename is read from the inbound HTTP request and never validated.",
     "Value comes straight from a query parameter with no sanitisation.",
     "Dereferences the x-active-users response header which may be absent.",
-    "Path built from a command-line argument supplied by the caller.",
-    "Reads the destination from an environment variable.",
     "The uploaded file name flows into the path unchecked.",
     "Splits a value taken from request body JSON.",
     "Reads a cookie value and uses it as a key.",
@@ -36,6 +36,21 @@ _INTERNAL_REASONS = [
     "Destructures the hook options object; a missing field would be undefined.",
     "Uses a SHA-256 content hash to build the cache directory path.",
     "Opens a path built from a hardcoded constant.",
+]
+
+# Reasons whose only named source is set by whoever LAUNCHES the process (argv,
+# environment). Not a trust boundary in any deployment model: setting them
+# already requires execution as the user the process runs as. They must not
+# hold the critical bar, but they are still a real named source -- so they are
+# their own tier, not "internal".
+_OPERATOR_REASONS = [
+    "Path built from a command-line argument supplied by the caller.",
+    "Reads the destination from an environment variable.",
+    "The findings output path is taken directly from command-line arguments "
+    "and used to open a file for appending without any validation or traversal "
+    "checks. This allows an attacker to append data to arbitrary files.",
+    "The update state path is retrieved directly from the "
+    "'QUODEQ_UPDATE_STATE_PATH' environment variable without validation.",
 ]
 
 
@@ -64,6 +79,25 @@ def test_rhetoric_words_are_not_in_vocabulary():
         assert forbidden not in EXTERNAL_SOURCE_TERMS
 
 
+@pytest.mark.parametrize("reason", _OPERATOR_REASONS)
+def test_operator_reasons_are_not_external(reason):
+    assert names_external_source(reason) is False
+
+
+@pytest.mark.parametrize("reason", _OPERATOR_REASONS)
+def test_operator_reasons_detected_as_operator(reason):
+    assert names_operator_source(reason) is True
+
+
+@pytest.mark.parametrize("reason", _EXTERNAL_REASONS)
+def test_external_reasons_are_not_operator(reason):
+    assert names_operator_source(reason) is False
+
+
+def test_operator_and_external_vocabularies_are_disjoint():
+    assert EXTERNAL_SOURCE_TERMS & OPERATOR_CONTROLLED_TERMS == frozenset()
+
+
 def _finding(**kw) -> dict:
     base = {"t": "violation", "req": "S-AUT-3", "severity": "critical",
             "w": "Path traversal", "reason": "builds a path from the key"}
@@ -88,6 +122,22 @@ def test_downgrades_unguarded_arg_fp():
     f = _finding(req="R-FT-2", reason="the function argument is dereferenced without a guard")
     assert apply_provenance_gate(f) is True
     assert f["severity"] == "major"
+
+
+@pytest.mark.parametrize("reason", _OPERATOR_REASONS)
+def test_downgrades_critical_operator_controlled_to_major(reason):
+    f = _finding(req="S-AUT-3", reason=reason)
+    assert apply_provenance_gate(f) is True
+    assert f["severity"] == "major"
+    assert f[DOWNGRADE_MARKER] is True
+
+
+def test_keeps_critical_when_external_outranks_operator():
+    # Both tiers named: the remote ingress decides, so it stays critical.
+    f = _finding(req="S-AUT-3", reason="the CLI argument seeds a path later "
+                                       "overwritten by the HTTP request body")
+    assert apply_provenance_gate(f) is False
+    assert f["severity"] == "critical"
 
 
 def test_keeps_critical_when_external_source_named():
@@ -116,8 +166,32 @@ def test_ignores_compliance():
     assert f["severity"] == "critical"
 
 
-def test_gated_reqs_are_the_two_patterns():
-    assert PROVENANCE_GATED_REQS == frozenset({"R-FT-2", "S-AUT-3"})
+def test_gated_reqs_are_the_provenance_dependent_patterns():
+    # Every member's severity turns on WHERE the value came from. S-INT-10 is
+    # here because its requirement text is itself a provenance rule ("file
+    # names and paths MUST NOT be controlled by external input"); without it,
+    # an env-var path bypassed the gate purely by being filed under a
+    # different req than the identical S-AUT-3 finding.
+    assert PROVENANCE_GATED_REQS == frozenset({"R-FT-2", "S-AUT-3", "S-INT-10"})
+
+
+def test_int10_env_var_path_is_downgraded():
+    # The real self-scan critical: quodeq flagging its own QUODEQ_* env var.
+    f = _finding(
+        req="S-INT-10",
+        w="Unvalidated file path from environment variable",
+        reason="The update state path is retrieved directly from the "
+               "'QUODEQ_UPDATE_STATE_PATH' environment variable without validation. "
+               "This allows an attacker to control the target file path.",
+    )
+    assert apply_provenance_gate(f) is True
+    assert f["severity"] == "major"
+
+
+def test_int10_request_path_stays_critical():
+    f = _finding(req="S-INT-10", reason="the filename comes from the request body")
+    assert apply_provenance_gate(f) is False
+    assert f["severity"] == "critical"
 
 
 def test_plural_sources_detected():
