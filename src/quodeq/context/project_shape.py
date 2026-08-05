@@ -95,17 +95,38 @@ _JS_UI_LIBS = ("react", "vue", "svelte", "preact", "@angular/core", "solid-js")
 #: Cargo.toml nor package.json. Absence is the expected case and belongs at
 #: debug. A manifest that exists and still cannot be read -- no permission, a
 #: truncated file, a parser blowing its stack -- is a signal we meant to have
-#: and lost, so that stays at WARNING. Caught rather than pre-checked with
-#: ``is_file()`` so a file deleted mid-scan reads as absent too, not as a
-#: warning about a race nobody can act on.
+#: and lost, so that stays at WARNING.
+#:
+#: The exception type cannot carry that split on its own: opening a directory
+#: raises IsADirectoryError on POSIX but PermissionError (WinError 5) on
+#: Windows, which is indistinguishable from a genuine permission denial. So
+#: the not-a-file cases are settled up front by ``_manifest_missing`` (the
+#: same ``is_file()`` gate ``trust_model._read_profile`` uses) and the catch
+#: below only has to cover a file that disappears between the check and the
+#: open -- a race nobody can act on, so it stays quiet too.
 _ABSENT_MANIFEST = (FileNotFoundError, IsADirectoryError, NotADirectoryError)
 
 
+def _manifest_missing(path: Path) -> bool:
+    """True when *path* is not a readable regular file, on any platform.
+
+    ``Path.is_file()`` swallows its own OSError and answers False for a
+    missing entry, a directory and a broken symlink alike, which is exactly
+    the set that means "this project does not ship this manifest".
+    """
+    if path.is_file():
+        return False
+    _logger.debug("No manifest at %s", path)
+    return True
+
+
 def _read_text(path: Path) -> str | None:
+    if _manifest_missing(path):
+        return None
     try:
         return path.read_text(encoding="utf-8")
     except _ABSENT_MANIFEST:
-        _logger.debug("No manifest at %s", path)
+        _logger.debug("Manifest %s vanished mid-scan", path)
         return None
     except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
         _logger.warning("Ignoring unreadable manifest %s: %s", path, exc)
@@ -113,11 +134,13 @@ def _read_text(path: Path) -> str | None:
 
 
 def _read_toml(path: Path) -> dict[str, object] | None:
+    if _manifest_missing(path):
+        return None
     try:
         with path.open("rb") as fh:
             return tomllib.load(fh)
     except _ABSENT_MANIFEST:
-        _logger.debug("No manifest at %s", path)
+        _logger.debug("Manifest %s vanished mid-scan", path)
         return None
     except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
         # Wider than OSError/TOMLDecodeError on purpose: tomllib is a
