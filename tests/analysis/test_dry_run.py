@@ -293,6 +293,42 @@ class TestDryRunPipeline:
             jsonl_path = evidence_dir / f"{dim}_evidence.jsonl"
             assert jsonl_path.exists(), f"Expected evidence file {jsonl_path} to exist"
 
+    def test_dim_states_marked_done(self, tmp_path):
+        """Dry-run must close out dim states like the real loops do.
+
+        The lifecycle flips any dim still pending/running at exit to
+        INCOMPLETE and stamps the run exit_reason=incomplete_dimensions.
+        A dry run completes every dimension, so each must end at DONE or
+        the run reads as truncated.
+        """
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (tmp_path / "evidence").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "src").mkdir(parents=True, exist_ok=True)
+        config = RunConfig(
+            src=tmp_path / "src",
+            language="python",
+            work_dir=tmp_path / "evidence",
+            run_dir=run_dir,
+            dimensions_data=_make_dims_data("security", "reliability"),
+            options=AnalysisOptions(dry_run=True),
+        )
+
+        with patch("quodeq.analysis._pipeline.emit_marker"), \
+             patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
+            dims = ["security", "reliability"]
+            ctx = MagicMock()
+            ctx.total = 2
+            mock_ctx.return_value = (dims, ctx)
+
+            from quodeq.analysis._pipeline import run_per_dimension
+            run_per_dimension(config)
+
+        from quodeq.data.fs.dimensions_state_store import read_dimensions
+        entries = read_dimensions(run_dir).get("dimensions", {})
+        states = {dim: entry.get("state") for dim, entry in entries.items()}
+        assert states == {"security": "done", "reliability": "done"}
+
     def test_does_not_raise_zero_findings_error(self, tmp_path):
         """Dry-run with source files present must not raise zero-findings EvaluationError."""
         config = RunConfig(
