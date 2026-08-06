@@ -82,3 +82,24 @@ class TestOnReloadGuard:
         on_reload, window = self._make_handler()
         on_reload("file:///etc/passwd")
         window.load_url.assert_not_called()
+
+    def test_focus_reloads_the_window_own_url(self):
+        """The empty-URL focus case reloads in place and never navigates away."""
+        on_reload, window = self._make_handler()
+        window.get_current_url.return_value = "http://127.0.0.1:7863/#/overview"
+        on_reload("")
+        window.load_url.assert_called_once_with("http://127.0.0.1:7863/#/overview")
+
+    def test_focus_still_raises_when_the_url_is_unavailable(self):
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = RuntimeError("no backend yet")
+        on_reload("")
+        window.load_url.assert_not_called()
+        assert window.on_top is False  # raised, then released
+
+    def test_focus_will_not_reload_an_unsafe_current_url(self):
+        """Defence in depth: even self-reported URLs go through the guard."""
+        on_reload, window = self._make_handler()
+        window.get_current_url.return_value = "http://evil.example.com/"
+        on_reload("")
+        window.load_url.assert_not_called()
