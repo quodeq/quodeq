@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 
 const DEFAULT_PAGE = 'overview';
 
@@ -53,7 +53,7 @@ function handlePopState(e, setNavStack, entriesByIndex) {
   });
 }
 
-function createNavActions(setNavStack, navStackRef, history, entriesByIndex) {
+function createNavActions(setNavStack, navStackRef, history, entriesByIndex, startNavTransition) {
   function rememberEntry(index, entry) {
     entriesByIndex.set(index, entry);
     // pushState/swap truncated the browser's forward history — entries past
@@ -65,7 +65,16 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex) {
 
   function navPush(entry) {
     const next = [...navStackRef.current, entry];
-    setNavStack(next);
+    // Transition, not a plain set: a detail page can take hundreds of ms to
+    // render (pretext layout effects per card, and the WebKit webview is
+    // slower at it than Chromium), and a blocking render freezes the page
+    // with the click seemingly ignored. In a transition React time-slices
+    // the incoming page while the current one stays interactive, and the
+    // exposed navPending drives a visible progress bar — the user feedback
+    // a synchronous render can never paint.
+    startNavTransition(() => {
+      setNavStack(next);
+    });
     rememberEntry(next.length - 1, entry);
     history.pushState({ navIndex: next.length - 1, entry: toHistoryEntry(entry) }, '');
   }
@@ -122,7 +131,11 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex) {
     // Spread params first so page/_tabKey stay authoritative and can't be
     // clobbered by a caller-supplied params key.
     const entry = { ...params, page, _tabKey: prevKey + 1 };
-    setNavStack([entry]);
+    // Same transition rationale as navPush: tab targets (Violations on a
+    // large project, the keyed tab-fade remount) render heavy too.
+    startNavTransition(() => {
+      setNavStack([entry]);
+    });
     rememberEntry(0, entry);
     if (stepsBack > 0) history.go(-stepsBack);
   }
@@ -138,18 +151,24 @@ export function useNavStack({ historyAdapter } = {}) {
   // Full entries (object payloads included) by stack index, for forward
   // restores — see toHistoryEntry for why history state can't hold them.
   const entriesByIndexRef = useRef(new Map([[0, { page: DEFAULT_PAGE }]]));
+  // navPending is true while a navigation's target page is still rendering
+  // in a transition — the caller's cue to show progress feedback.
+  const [navPending, startNavTransition] = useTransition();
 
   useEffect(() => {
     history.replaceState({ navIndex: 0, entry: { page: DEFAULT_PAGE } }, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const handler = (e) => handlePopState(e, setNavStack, entriesByIndexRef.current);
+    // Back/forward render the same heavy pages a push does; same transition.
+    const handler = (e) => startNavTransition(() => {
+      handlePopState(e, setNavStack, entriesByIndexRef.current);
+    });
     window.addEventListener('popstate', handler);
     return () => window.removeEventListener('popstate', handler);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab } = createNavActions(setNavStack, navStackRef, history, entriesByIndexRef.current);
+  const { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab } = createNavActions(setNavStack, navStackRef, history, entriesByIndexRef.current, startNavTransition);
   const activePage = navStack[navStack.length - 1];
 
   useEffect(() => {
@@ -161,5 +180,5 @@ export function useNavStack({ historyAdapter } = {}) {
     else window.scrollTo({ top: 0 });
   }, [activePage]);
 
-  return { navStack, activePage, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
+  return { navStack, activePage, navPending, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
 }
