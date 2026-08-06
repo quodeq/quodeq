@@ -19,6 +19,7 @@ from quodeq.data.sqlite._row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.core.scoring.projector_scoring import (
+    GRADE_ALGO_VERSION,
     compute_dimension_score,
     compute_principle_grade,
 )
@@ -151,3 +152,6 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
 
     store = SQLiteStateStore(run_dir)
     store.batch_rewrite_grades(principle_rows, dimension_rows)
+    # Stamp the math these tables now embody, so ensure_projected can tell a
+    # run graded with older scoring apart from one that is merely unchanged.
+    store.save_grades_algo_version(GRADE_ALGO_VERSION)
