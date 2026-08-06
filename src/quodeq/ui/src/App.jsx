@@ -99,8 +99,7 @@ function useNativeTitlebarSync(effectiveDark) {
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
-  const { connected, setConnected } = serverHealth;
+function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
   // The in-progress card describes the running job's own project, which can
@@ -116,7 +115,6 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
     : null;
   return (
     <>
-      {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
         context={{ selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims }}
@@ -691,7 +689,7 @@ export const ROUTE_RENDERERS = {
     if (isSharedSource(props.navigation.selectedSource)) {
       return ROUTE_RENDERERS.overview(params, props);
     }
-    return <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
+    return <EvaluateCase evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
   },
   file: (params, props) => (
     <FileDetailPage
@@ -1291,6 +1289,14 @@ export default function App() {
           }
           content={
             <Suspense fallback={<LoadingScreen />}>
+              {/* Every route, not just Evaluate. A dead backend is the one
+                  failure no page can render around: the Overview's own wall
+                  falls back to a bare loading spinner that never resolves, so
+                  a killed server read as "quodeq won't start" with nothing
+                  on screen to say why or to retry from. */}
+              {!state.serverConnected && (
+                <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
+              )}
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>

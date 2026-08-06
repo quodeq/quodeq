@@ -86,6 +86,49 @@ class InstanceController:
 
     # ── Public API ──
 
+    def probe_existing(self) -> bool:
+        """Return True if a live primary instance is already listening.
+
+        Unlike ``try_acquire`` this never binds, so the caller can leave the
+        socket free for a *child* process to own — which is what the native
+        path does: the webview window process is the one that must react to a
+        reload, so it owns the listener (see ``_server._serve_native``). A
+        socket/port file left behind by a crashed instance is removed here, so
+        the follow-up bind by that child still succeeds.
+        """
+        if _IS_WIN32:
+            return self._probe_tcp()
+        return self._probe_unix()
+
+    def _probe_unix(self) -> bool:
+        if not self._sock_path.exists():
+            return False
+        try:
+            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            probe.settimeout(_SOCK_TIMEOUT)
+            self._connect_to_sock(probe)
+            probe.close()
+            return True
+        except (ConnectionRefusedError, OSError):
+            _logger.debug("Removing stale socket %s", self._sock_path)
+            self._sock_path.unlink(missing_ok=True)
+            return False
+
+    def _probe_tcp(self) -> bool:
+        if not self._port_file.exists():
+            return False
+        try:
+            port = int(self._port_file.read_text(encoding="utf-8").strip())
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(_SOCK_TIMEOUT)
+                probe.connect((_TCP_LOCALHOST, port))
+            self._tcp_port = port
+            return True
+        except (ConnectionRefusedError, OSError, ValueError):
+            _logger.debug("Removing stale port file %s", self._port_file)
+            self._port_file.unlink(missing_ok=True)
+            return False
+
     def try_acquire(self) -> bool:
         """Try to become the primary instance. Return True if acquired."""
         if _IS_WIN32:
@@ -93,16 +136,8 @@ class InstanceController:
         return self._try_acquire_unix()
 
     def _try_acquire_unix(self) -> bool:
-        if self._sock_path.exists():
-            try:
-                probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                probe.settimeout(_SOCK_TIMEOUT)
-                self._connect_to_sock(probe)
-                probe.close()
-                return False
-            except (ConnectionRefusedError, OSError):
-                _logger.debug("Removing stale socket %s", self._sock_path)
-                self._sock_path.unlink(missing_ok=True)
+        if self._probe_unix():
+            return False
 
         self._server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._bind_server_sock()
@@ -112,17 +147,8 @@ class InstanceController:
 
     def _try_acquire_tcp(self) -> bool:
         """Windows: use TCP localhost with port stored in a file."""
-        if self._port_file.exists():
-            try:
-                port = int(self._port_file.read_text(encoding="utf-8").strip())
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                    probe.settimeout(_SOCK_TIMEOUT)
-                    probe.connect((_TCP_LOCALHOST, port))
-                self._tcp_port = port
-                return False
-            except (ConnectionRefusedError, OSError, ValueError):
-                _logger.debug("Removing stale port file %s", self._port_file)
-                self._port_file.unlink(missing_ok=True)
+        if self._probe_tcp():
+            return False
 
         self._server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_sock.bind((_TCP_LOCALHOST, 0))
@@ -132,8 +158,23 @@ class InstanceController:
         self._port_file.write_text(str(self._tcp_port), encoding="utf-8")
         return True
 
-    def start_listening(self, on_reload: Callable[[str], None]) -> None:
-        """Start a background thread that listens for reload commands."""
+    def start_listening(self, on_reload: Callable[[str], None]) -> bool:
+        """Start a background thread that listens for reload commands.
+
+        Returns False (and starts nothing) when this controller never acquired
+        the socket. Without that guard every ``accept()`` raises
+        ``AttributeError`` on the ``None`` socket, the thread dies on the first
+        iteration, and the traceback is the only trace — which is exactly how
+        the reload channel stayed silently dead: the caller had no way to tell
+        listening from not-listening.
+        """
+        if self._server_sock is None:
+            _logger.warning(
+                "Not listening for reloads: socket was never acquired "
+                "(call try_acquire first)",
+            )
+            return False
+
         def _listen() -> None:
             while not self._shutdown_event.is_set():
                 try:
@@ -153,6 +194,7 @@ class InstanceController:
 
         self._listen_thread = threading.Thread(target=_listen, daemon=True)
         self._listen_thread.start()
+        return True
 
     def send_reload(self, url: str) -> None:
         """Send a reload command to the running instance."""
@@ -170,7 +212,15 @@ class InstanceController:
                 sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
 
     def shutdown(self) -> None:
-        """Stop listening and clean up."""
+        """Stop listening and clean up.
+
+        Only removes the socket/port file if this controller actually bound it.
+        A controller that merely probed (``probe_existing``) or lost the race
+        must not delete the live instance's socket — doing so would strip the
+        winner of its reload channel and leave the next launch unable to find
+        it.
+        """
+        owns_socket = self._server_sock is not None
         self._shutdown_event.set()
         if self._server_sock:
             try:
@@ -179,6 +229,8 @@ class InstanceController:
                 pass
         if self._listen_thread:
             self._listen_thread.join(timeout=0.5)
+        if not owns_socket:
+            return
         if _IS_WIN32:
             self._port_file.unlink(missing_ok=True)
         else:
