@@ -37,6 +37,8 @@ from __future__ import annotations
 import logging
 import re
 
+from quodeq.core.finding_markers import PROVENANCE_DOWNGRADE
+
 _log = logging.getLogger(__name__)
 
 # The standard requirement IDs whose critical bar depends on reachable input
@@ -47,7 +49,10 @@ _log = logging.getLogger(__name__)
 PROVENANCE_GATED_REQS: frozenset[str] = frozenset({"R-FT-2", "S-AUT-3", "S-INT-10"})
 
 # Marker stamped on a finding the gate de-escalates (additive output field).
-DOWNGRADE_MARKER = "provenance_downgrade"
+# The name comes from the marker registry rather than a literal here: the
+# registry is what the persistence guard enumerates, so a marker defined only
+# at its producer is a marker nothing checks the seams for.
+DOWNGRADE_MARKER = PROVENANCE_DOWNGRADE
 
 # Language-neutral trust-boundary INGRESS-CHANNEL concepts. Matched as whole
 # words/phrases. NEVER code syntax, never rhetoric, never the FP pattern's words.
