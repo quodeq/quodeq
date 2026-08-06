@@ -13,7 +13,7 @@ import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 import { t } from '../../../strings/index.js';
-import { severityLabel } from '../../../strings/labels.js';
+import { severityLabel, scopeGateRuleLabel } from '../../../strings/labels.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
@@ -38,6 +38,14 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
             title={t('explorer.provenanceDowngradeTitle')}
           >
             {t('explorer.downgradedFromCritical')}
+          </span>
+        )}
+        {v.scopeDowngrade && (
+          <span
+            className="scope-downgrade-tag"
+            title={t('explorer.scopeDowngradeTitle')}
+          >
+            {t('explorer.scopeDowngradeBadge', { rule: scopeGateRuleLabel(v.scopeDowngrade.rule) })}
           </span>
         )}
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}

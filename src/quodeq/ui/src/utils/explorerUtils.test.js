@@ -212,6 +212,29 @@ test('buildTopOffendingFiles preserves provenanceDowngrade on aggregated violati
   assert.equal(majors[1].provenanceDowngrade, false);
 });
 
+test('buildTopOffendingFiles preserves scopeDowngrade on aggregated violations', () => {
+  // Same aggregator bug as #656, other marker: if the object literal does
+  // not copy scopeDowngrade, the FileDetailPage "capped by scope gate"
+  // badge silently never renders on the top-offending-files navigation path.
+  const marker = { rule: 'sourceless_path', from: 'major', to: 'minor' };
+  const dims = [
+    {
+      dimension: 'Security',
+      violations: [
+        { file: 'd.py', severity: 'minor', principle: 'P', scopeDowngrade: marker },
+        { file: 'd.py', severity: 'minor', principle: 'P', scopeDowngrade: null },
+      ],
+    },
+  ];
+  const result = buildTopOffendingFiles(dims, {});
+  const entry = result.find(r => r.file === 'd.py');
+  assert.ok(entry);
+  const minors = entry.violationsBySeverity.minor;
+  assert.equal(minors.length, 2);
+  assert.deepEqual(minors[0].scopeDowngrade, marker);
+  assert.equal(minors[1].scopeDowngrade, null);
+});
+
 test('buildTopOffendingFiles includes sorted dimensions array on each item', () => {
   const result = buildTopOffendingFiles(dimensions, {});
   const aEntry = result.find(r => r.file === 'lib/a.sh');
