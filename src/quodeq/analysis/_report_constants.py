@@ -29,10 +29,16 @@ _VIOLATION_FIELDS = (
     # Without this entry the cache-replay marker is dropped the moment a
     # dimension finishes and its report is written.
     "carried_forward",
-    # Same reasoning: without this entry the scope gate's marker (which
-    # rule capped the finding from major to minor) is dropped the moment a
-    # dimension finishes and its report is written, leaving a waived finding
-    # indistinguishable from an ordinary minor in evaluation/<dim>.json.
+    # Same reasoning: without this entry the provenance gate's marker (that it
+    # de-escalated the finding from critical to major for naming no external
+    # source) is dropped the moment a dimension finishes and its report is
+    # written, leaving a downgraded finding indistinguishable from an ordinary
+    # major in evaluation/<dim>.json.
+    "provenance_downgrade",
+    # Same reasoning again for the scope gate's marker, which records WHICH
+    # rule capped the finding from major to minor. Without it a waived finding
+    # is indistinguishable from an ordinary minor, and the restore-on-tighten
+    # path has no `from` to read back.
     "scope_downgrade",
 )
 _COMPLIANCE_FIELDS = (

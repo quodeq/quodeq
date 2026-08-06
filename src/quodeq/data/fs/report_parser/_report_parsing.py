@@ -39,6 +39,10 @@ def build_finding(item: dict, *, include_severity: bool) -> Finding:
         context=item.get("context"),
         scope=item.get("scope"),
         include_severity=include_severity,
+        provenance_downgrade=bool(item.get("provenance_downgrade")),
+        # Coerced to dict-or-None rather than passed through: the scope gate's
+        # restore path reads `from` off this marker and writes it to severity,
+        # so a non-dict arriving here must not reach it.
         scope_downgrade=item.get("scope_downgrade") if isinstance(item.get("scope_downgrade"), dict) else None,
         carried_forward=bool(item.get("carried_forward")),
     ))
