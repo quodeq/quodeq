@@ -37,6 +37,15 @@ class _FakeStore:
     def get_projected_size(self):
         return self.projected_size
 
+    def get_grades_algo_version(self):
+        # Report current so grades_stale stays False — these tests exercise
+        # the event/actions projection seams, not grade reconciliation.
+        from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
+        return GRADE_ALGO_VERSION
+
+    def save_grades_algo_version(self, version):
+        pass
+
     def record_finding(self, payload):
         self.findings.append(payload)
 
