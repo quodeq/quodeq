@@ -178,7 +178,14 @@ it('disables stdin while disconnected so keystrokes are not silently swallowed',
   fakeTerm.options = {};
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
-  expect(fakeTerm.options.disableStdin).toBe(true);
+  // waitFor, not a plain assert: disableStdin is written by an effect in
+  // TerminalSessionView that bails on `if (!term) return` until the mount
+  // effect has constructed the xterm instance and populated termRef. tty-root
+  // lands on the render commit, so asserting straight after findByTestId reads
+  // fakeTerm.options before either effect has run and sees undefined, not
+  // false. Fourth instance of the post-commit-effect flake the tests above
+  // already carry; it took down an unrelated PR's ui job.
+  await waitFor(() => expect(fakeTerm.options.disableStdin).toBe(true));
 });
 
 // ── multi-session ────────────────────────────────────────────────────────
