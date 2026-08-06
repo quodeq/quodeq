@@ -4,6 +4,13 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+  # Manual escape hatch when event delivery is down, see test.yml. This one
+  # matters most: check-source is the only REQUIRED context on main, so when
+  # no run is ever created the PR shows a lone "Expected - Waiting for status
+  # to be reported" row that nothing can ever satisfy. Dispatch against the
+  # release branch itself; the check run lands on that branch's head commit,
+  # which is the PR head.
+  workflow_dispatch:
 
 jobs:
   check-source:
@@ -13,8 +20,11 @@ jobs:
         # SOURCE is passed via env (not ${{ }} interpolation) so bash treats
         # the branch name as data — prevents script injection if a branch
         # name contains shell metacharacters.
+        # head_ref is set only for pull_request events; on a manual dispatch it
+        # is empty, which would fail the check against its own escape hatch.
+        # ref_name is the dispatched branch, so the same rule still applies.
         env:
-          SOURCE: ${{ github.head_ref }}
+          SOURCE: ${{ github.head_ref || github.ref_name }}
         run: |
           if [ "$SOURCE" = "develop" ] || [[ "$SOURCE" == release/* ]]; then
             echo "Source branch '$SOURCE' is allowed. OK."

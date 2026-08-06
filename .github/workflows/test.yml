@@ -5,6 +5,13 @@ on:
     branches: [develop, main]
   push:
     branches: [develop]
+  # Manual escape hatch. On 2026-08-06 a GitHub incident stopped delivering
+  # pull_request/push events to Actions: runs were never created, so a PR sat
+  # with zero checks and no way to produce them. Run creation and the runners
+  # themselves were fine, only event delivery was down. workflow_dispatch goes
+  # through the API instead of the event pipeline, and its check runs attach to
+  # the dispatched ref's head commit, which is where branch protection looks.
+  workflow_dispatch:
 
 jobs:
   test:
