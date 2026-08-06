@@ -29,6 +29,12 @@ _VIOLATION_FIELDS = (
     # Without this entry the cache-replay marker is dropped the moment a
     # dimension finishes and its report is written.
     "carried_forward",
+    # Same reasoning: without this entry the provenance gate's marker (that it
+    # de-escalated the finding from critical to major for naming no external
+    # source) is dropped the moment a dimension finishes and its report is
+    # written, leaving a downgraded finding indistinguishable from an ordinary
+    # major in evaluation/<dim>.json.
+    "provenance_downgrade",
 )
 _COMPLIANCE_FIELDS = (
     "file", "line", "end_line", "title", "reason",
