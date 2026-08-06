@@ -106,6 +106,34 @@ def _start_action_api(
     )
 
 
+def _handed_off_to_running_instance(config: DashboardConfig) -> bool:
+    """Give a relaunch to the window that is already open. True if handled.
+
+    Checked before the API starts, which is the only order that works: the
+    launch used to spawn a second backend, notice the running instance, and
+    terminate that backend on the way out — so the running window was competing
+    with a launch that had already killed a server on its behalf. Nothing is
+    spawned and no PID file is rewritten when this returns True.
+
+    Runs after the UI build so a ``--dev`` relaunch still rebuilds, and the
+    focused window reloads into the fresh bundle it serves.
+    """
+    if not (config.build.use_native and config.build.open_browser):
+        return False  # --browser / --no-open have no window to hand off to
+    from quodeq.dashboard._instance import InstanceController
+
+    instance = InstanceController()
+    if not instance.probe_existing():
+        return False
+    try:
+        instance.send_focus()
+    except (ConnectionRefusedError, OSError):
+        log_warning("Could not reach the running instance — starting a new one")
+        return False
+    log_info("quodeq is already running — brought its window to the front.")
+    return True
+
+
 def _kick_update_check() -> None:
     """Fire a throttled, non-blocking update check. Fail-silent — never delays launch."""
     try:
@@ -130,6 +158,9 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
         environ = os.environ
     if config.build.verbose:
         environ["QUODEQ_VERBOSE"] = "1"
+
+    if _handed_off_to_running_instance(config):
+        return 0
 
     log_info("Starting dashboard...")
     log_info(f"Reports: {config.reports_dir}")

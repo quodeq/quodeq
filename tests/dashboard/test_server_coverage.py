@@ -221,18 +221,24 @@ class TestServeNative:
 
     @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
-    def test_send_reload_to_existing(self, mock_popen, mock_backend):
+    def test_focuses_existing_instead_of_retargeting_it(self, mock_popen, mock_backend):
+        """The running window keeps its own backend.
+
+        stop_children kills the API this launch spawned, so sending that URL
+        would hand the window a server about to die.
+        """
         from quodeq.dashboard._server import _serve_native
         mock_instance = MagicMock()
         mock_instance.probe_existing.return_value = True
-        mock_instance.send_reload.return_value = None
+        mock_instance.send_focus.return_value = None
         mock_stop = MagicMock()
 
         with self._fake_webview_ctx(), \
              patch("quodeq.dashboard._instance.InstanceController", return_value=mock_instance):
             _serve_native("http://localhost:8000", MagicMock(), mock_stop)
 
-        mock_instance.send_reload.assert_called_once_with("http://localhost:8000")
+        mock_instance.send_focus.assert_called_once_with()
+        mock_instance.send_reload.assert_not_called()
         mock_stop.assert_called_once()
         mock_popen.assert_not_called()
 
@@ -248,7 +254,7 @@ class TestServeNative:
     @patch("quodeq.dashboard._server.subprocess.Popen")
     @patch("quodeq.dashboard._server.subprocess_cmd", return_value=["quodeq-webview"])
     @pytest.mark.parametrize("failure", [ConnectionRefusedError(), OSError("refused")])
-    def test_reload_failure_opens_own_window(self, mock_cmd, mock_popen, mock_backend, failure):
+    def test_focus_failure_opens_own_window(self, mock_cmd, mock_popen, mock_backend, failure):
         """An instance that answers the probe but dies before the send.
 
         The launch must still produce a window rather than exiting silently —
@@ -257,7 +263,7 @@ class TestServeNative:
         from quodeq.dashboard._server import _serve_native
         mock_instance = MagicMock()
         mock_instance.probe_existing.return_value = True
-        mock_instance.send_reload.side_effect = failure
+        mock_instance.send_focus.side_effect = failure
         mock_instance._sock_path = Path("/tmp/test.sock")
 
         mock_proc = MagicMock()

@@ -26,6 +26,19 @@ from quodeq.core.scoring.params import (
 )
 from quodeq.core.types.finding import Finding
 
+# Version of the grade math projected into each run's SQLite grade tables.
+# Bump it whenever a change here (or in the scoring internals this module
+# calls) alters the numbers an ALREADY-SCANNED run would produce — the
+# projector re-derives that run's grades on next contact instead of serving
+# the old math forever. Without the stamp, the clamp-order fix (floor no
+# longer beats ceiling) left projected runs on the old ordering while fresh
+# rescores used the new one: the same principle read 8.0 on one screen and
+# 7.3 on another. Same pattern as the ``algo`` salt in services/score_cache.
+#
+# 1: implicit pre-stamp state (any DB without the run_meta key).
+# 2: ceiling beats floor in the principle-score clamp.
+GRADE_ALGO_VERSION = 2
+
 
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
     """Convert Finding to the dict shape scoring internals expect.

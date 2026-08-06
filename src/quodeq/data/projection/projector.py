@@ -118,7 +118,16 @@ class Projector:
                 current_actions_size = actions_log.stat().st_size if actions_log.is_file() else 0
                 actions_changed = current_actions_size != last_actions_size
 
-            if not events_changed and not actions_changed:
+            # Grade tables embody the scoring math that computed them. When
+            # that math changes (see GRADE_ALGO_VERSION), a run whose logs are
+            # untouched still carries grades no fresh rescore would produce —
+            # the same principle read differently depending on which screen's
+            # read path served it. Re-derive from the already-projected
+            # findings; no event replay needed.
+            from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
+            grades_stale = store.get_grades_algo_version() != GRADE_ALGO_VERSION
+
+            if not events_changed and not actions_changed and not grades_stale:
                 return ProjectionResult(events_projected=0, rebuilt=False)
 
             # Project events first (so new findings exist before action events touch them).
@@ -132,9 +141,11 @@ class Projector:
             if actions_log is not None and (actions_changed or events_changed):
                 self._engine.update_actions(actions_log, run_dir, force=events_changed)
 
-            # Grade tables are derived from findings + dismissals. Recompute whenever
-            # either source changed.
-            if events_changed or actions_changed:
+            # Grade tables are derived from findings + dismissals. Recompute
+            # whenever either source changed, or when the stored grades were
+            # computed with an older version of the math (recompute_grades
+            # stamps the current one).
+            if events_changed or actions_changed or grades_stale:
                 from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
                 recompute_grades(run_dir)
 
