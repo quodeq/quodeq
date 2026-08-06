@@ -8,6 +8,7 @@ this module pins the return-value contract, which is the part a well-meaning
 """
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -142,3 +143,44 @@ def test_resolve_child_dir_refuses_a_symlink_even_to_a_real_directory(tmp_path: 
 
 def test_resolve_child_dir_on_a_missing_root_is_none(tmp_path: Path) -> None:
     assert resolve_child_dir(tmp_path / "no-such-root", "anything") is None
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink semantics")
+def test_skipped_symlinked_dir_warns_instead_of_failing_silently(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Refusing a symlinked dir must be diagnosable.
+
+    An owner who relocates a project dir and symlinks it back sees the name
+    in every listing while the app renders the project empty. The refusal
+    stands (policy), but it has to say so: one warning naming the link and
+    its target.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "moved-project").symlink_to(outside)
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.core.utils.io"):
+        assert resolve_child_dir(root, "moved-project") is None
+
+    assert any(
+        "moved-project" in rec.getMessage() and "symlink" in rec.getMessage().lower()
+        for rec in caplog.records
+    )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink semantics")
+def test_symlink_to_a_file_stays_silent(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Only the relocated-directory case warns; a link to a file is just absent."""
+    target = tmp_path / "afile"
+    target.write_text("x")
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "filelink").symlink_to(target)
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.core.utils.io"):
+        assert resolve_child_dir(root, "filelink") is None
+
+    assert not caplog.records

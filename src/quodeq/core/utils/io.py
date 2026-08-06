@@ -7,9 +7,12 @@ the evidence parser and standards loader can use them without reaching into
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import IO, Any
+
+_logger = logging.getLogger(__name__)
 
 TEXT_ENCODING = "utf-8"
 """Standard text encoding used across the codebase for file I/O."""
@@ -65,6 +68,11 @@ def resolve_child_dir(root: str | Path, name: str) -> str | None:
     which would return ``root/escape`` for a link pointing out of the tree and
     hand the caller an escape hatch. Listing-based resolution is only safe
     when the entry is a real directory, so this asks for that explicitly.
+    A matching entry that IS a symlinked directory logs a warning before the
+    None: an owner who relocated a data dir and symlinked it back would
+    otherwise see their project silently render as empty, with nothing
+    anywhere saying why (the policy plus the fix for that silence is this
+    function; the decision record is PR #1062).
 
     Prefer this over ``contained_path(root / name, root)`` whenever *name*
     comes from a request and names something that must already exist. Reach
@@ -79,8 +87,27 @@ def resolve_child_dir(root: str | Path, name: str) -> str | None:
     try:
         with os.scandir(root) as entries:
             for entry in entries:
-                if entry.name == name and entry.is_dir(follow_symlinks=False):
+                if entry.name != name:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
                     return entry.path
+                if entry.is_symlink() and entry.is_dir():
+                    # The exact case a user hits after relocating a data dir
+                    # and leaving a symlink behind: the name they asked for is
+                    # right there in the listing, but resolution refuses it.
+                    # Without this line the refusal is indistinguishable from
+                    # "no such project/run" — the UI just renders empty.
+                    _logger.warning(
+                        "Not following symlinked directory %s -> %s: symlinks "
+                        "are excluded from path resolution by policy. Replace "
+                        "the symlink with a real directory (or move the data "
+                        "back) to make %r visible again.",
+                        os.path.join(str(root), name),
+                        os.path.realpath(entry.path),
+                        name,
+                    )
+                # Names are unique within a directory — nothing else can match.
+                return None
     except OSError:
         return None
     return None
