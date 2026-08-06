@@ -56,11 +56,15 @@ from quodeq.analysis.mcp.provenance_gate import (
     names_operator_source,
 )
 from quodeq.context.trust_model import TrustModel
+from quodeq.core.finding_markers import SCOPE_DOWNGRADE
 
 _log = logging.getLogger(__name__)
 
-#: Additive output field describing why a severity moved.
-SCOPE_DOWNGRADE_MARKER = "scope_downgrade"
+#: Additive output field describing why a severity moved. The name comes from
+#: the marker registry rather than a literal here: the registry is what the
+#: persistence guard enumerates, so a marker defined only at its producer is a
+#: marker nothing checks the seams for.
+SCOPE_DOWNGRADE_MARKER = SCOPE_DOWNGRADE
 
 # Path-shaped requirements. R-FT-2 is deliberately ABSENT: it is the
 # null-guard pattern, its severity does not turn on network exposure, and
