@@ -80,6 +80,7 @@ function aggregateViolationEntry(bucket, dimension, entry) {
     severity,
     confidence: typeof entry.confidence === 'number' ? entry.confidence : 100,
     provenanceDowngrade: entry.provenanceDowngrade ?? false,
+    scopeDowngrade: entry.scopeDowngrade ?? null,
     ...(entry.cwe ? { cwe: entry.cwe } : {}),
   });
 

@@ -33,6 +33,21 @@ def _safe_int(value: Any, default: int) -> int:
         return default
 
 
+def _coerce_scope_downgrade(raw: Any) -> dict[str, str] | None:
+    """Coerce a wire value to the scope-gate marker shape.
+
+    The marker is always ``{"rule": str, "from": str, "to": str}`` when the
+    gate stamps it (see scope_gate.py). Anything else -- missing, wrong
+    type, or a dict with non-string values -- is dropped rather than raised,
+    mirroring wire_dict_to_judgment's documented never-raises contract.
+    """
+    if not isinstance(raw, dict):
+        return None
+    if not all(isinstance(v, str) for v in raw.values()):
+        return None
+    return raw
+
+
 def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
     """Lift a short-key LLM/FindingsRouter wire dict into a Judgment.
 
@@ -62,6 +77,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         req_refs=_coerce_req_refs(d.get("req_refs")),
         cwe=d.get("cwe"),
         provenance_downgrade=bool(d.get("provenance_downgrade")),
+        scope_downgrade=_coerce_scope_downgrade(d.get("scope_downgrade")),
         carried_forward=bool(d.get("carried_forward")),
     )
 
@@ -92,6 +108,7 @@ def judgment_to_finding(j: Judgment, *, dismissed: bool = False) -> Finding:
         scope=j.scope,
         confidence=j.confidence,
         provenance_downgrade=j.provenance_downgrade,
+        scope_downgrade=j.scope_downgrade,
     )
 
 
@@ -114,4 +131,5 @@ def finding_to_response_dict(f: Finding) -> dict[str, Any]:
         "req": f.req,
         "req_refs": req_refs,
         "provenance_downgrade": f.provenance_downgrade,
+        "scope_downgrade": f.scope_downgrade,
     }

@@ -45,6 +45,13 @@ class Finding:
     # True when the deterministic provenance gate (#639) de-escalated this
     # finding from critical to major. Audit marker surfaced in the DB/UI (#656).
     provenance_downgrade: bool = False
+    # Set (dict: {"rule", "from", "to"}) when the deterministic scope gate
+    # capped this finding's severity from major to minor per the declared
+    # trust model. None when not gated. Unlike provenance_downgrade this is
+    # a dict, not a bool: the marker exists to let a team later shipping as a
+    # hosted service recover WHICH rule waived the finding, not just that
+    # something did.
+    scope_downgrade: dict[str, str] | None = None
     # True when this finding was replayed from the content-addressed cache
     # rather than produced by the running scan (see Judgment.carried_forward).
     carried_forward: bool = False

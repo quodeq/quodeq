@@ -104,6 +104,59 @@ class TestProvenanceDowngradeRoundTrip:
         j, _ = result
         assert j.req == "R-FT-1"
 
+
+class TestScopeDowngradeRoundTrip:
+    """The scope gate's ``scope_downgrade`` marker (a dict naming the rule
+    plus the ``from``/``to`` severities) must survive the JSONL -> Judgment ->
+    PrincipleEvidence-dict round-trip so it reaches the report JSON, exactly
+    like ``provenance_downgrade`` above -- but as a dict, not a bool, because
+    the whole point is recovering WHICH rule moved the finding."""
+
+    def test_parse_reads_scope_downgrade(self):
+        line = json.dumps({
+            "p": "S-AUT-3", "t": "violation", "d": "security",
+            "file": "f.py", "line": 1, "reason": "r", "severity": "minor",
+            "scope_downgrade": {"rule": "sourceless_path", "from": "major", "to": "minor"},
+        })
+        result = _parse_jsonl_line(line)
+        assert result is not None
+        j, _ = result
+        assert j.scope_downgrade == {"rule": "sourceless_path", "from": "major", "to": "minor"}
+
+    def test_parse_defaults_scope_downgrade_none(self):
+        result = _parse_jsonl_line(_evidence_line())
+        assert result is not None
+        j, _ = result
+        assert j.scope_downgrade is None
+
+    def test_parse_drops_malformed_scope_downgrade(self):
+        line = json.dumps({
+            "p": "P1", "t": "violation", "scope_downgrade": ["not", "a", "dict"],
+        })
+        result = _parse_jsonl_line(line)
+        assert result is not None
+        j, _ = result
+        assert j.scope_downgrade is None
+
+    def test_judgment_to_dict_emits_marker_only_when_set(self):
+        from quodeq.core.events.models import Judgment
+        from quodeq.core.evidence._jsonl import judgment_to_dict
+
+        downgraded = Judgment(
+            practice_id="S-AUT-3", verdict="violation", dimension="security",
+            file="f.py", line=1, reason="r", severity="minor",
+            scope_downgrade={"rule": "sourceless_path", "from": "major", "to": "minor"},
+        )
+        assert judgment_to_dict(downgraded)["scope_downgrade"] == {
+            "rule": "sourceless_path", "from": "major", "to": "minor",
+        }
+
+        normal = Judgment(
+            practice_id="P1", verdict="violation", dimension="d",
+            file="f.py", line=1, reason="r",
+        )
+        assert "scope_downgrade" not in judgment_to_dict(normal)
+
     def test_refs_parsed(self):
         result = _parse_jsonl_line(_evidence_line(refs=["CWE-391", "ERR05-J"]))
         assert result is not None

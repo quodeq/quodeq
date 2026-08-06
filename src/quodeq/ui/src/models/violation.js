@@ -27,6 +27,7 @@
  * @property {string|null}   dimension
  * @property {string|null}   violationType
  * @property {boolean}       provenanceDowngrade  true when the provenance gate (#639) de-escalated this from critical to major
+ * @property {Object|null}   scopeDowngrade  {rule, from, to} when the scope gate capped this from major to minor per the declared trust model; null when not gated
  * @property {boolean}       carriedForward  true when replayed from the incremental cache rather than produced by the running scan
  */
 
@@ -58,6 +59,7 @@ export function createViolation(raw) {
     dimension:     raw.dimension ?? null,
     violationType: raw.violationType ?? raw.violation_type ?? null,
     provenanceDowngrade: raw.provenanceDowngrade ?? raw.provenance_downgrade ?? false,
+    scopeDowngrade: raw.scopeDowngrade ?? raw.scope_downgrade ?? null,
     carriedForward: raw.carriedForward ?? raw.carried_forward ?? false,
   };
 }

@@ -30,8 +30,12 @@ def test_evaluation_ddl_includes_provenance_downgrade_column():
     assert "provenance_downgrade" in _schema.EVALUATION_DDL
 
 
-def test_schema_version_is_6() -> None:
-    assert SCHEMA_VERSION == 6
+def test_evaluation_ddl_includes_scope_downgrade_json_column():
+    assert "scope_downgrade_json" in _schema.EVALUATION_DDL
+
+
+def test_schema_version_is_7() -> None:
+    assert SCHEMA_VERSION == 7
 
 
 def test_principle_grades_table_exists(tmp_path: Path) -> None:

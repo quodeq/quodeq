@@ -29,8 +29,8 @@ def test_fresh_db_dimension_scores_has_exit_reason_column(tmp_path: Path):
         conn.close()
 
 
-def test_schema_version_bumped_to_6():
-    assert SCHEMA_VERSION == 6
+def test_schema_version_bumped_to_7():
+    assert SCHEMA_VERSION == 7
 
 
 def test_upgrade_from_v4_adds_exit_reason(tmp_path: Path):
