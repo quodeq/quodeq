@@ -59,15 +59,11 @@ def spawn_action_api(
         stderr=None if verbose else subprocess.DEVNULL,
         **_popen_platform_kwargs(),
     )
+    record = json.dumps(
+        {"pid": proc.pid, "host": env[_ENV_ACTION_API_HOST], "port": port},
+    )
     try:
-        pid_file_path.write_text(
-            json.dumps({
-                "pid": proc.pid,
-                "host": env[_ENV_ACTION_API_HOST],
-                "port": port,
-            }),
-            encoding="utf-8",
-        )
+        pid_file_path.write_text(record, encoding="utf-8")
     except (OSError, AttributeError, TypeError) as exc:
         log_warning(f"Could not write PID file: {exc}")
     return proc
