@@ -175,9 +175,14 @@ def _serve_native(
     # because it is the only one that can act on a reload. Binding it here
     # would leave the child unable to bind, its listener dead, and every
     # relaunch's reload dropped into a socket nobody reads.
+    # Focus, not send_reload(action_api_url): stop_children below kills the API
+    # that URL names, so handing it to the running window would point it at a
+    # server about to die. It keeps the backend it already has. (The runner's
+    # pre-spawn hand-off normally catches this case before any API exists;
+    # this is the late-race fallback for an instance that appeared since.)
     if instance.probe_existing():
         try:
-            instance.send_reload(action_api_url)
+            instance.send_focus()
         except (ConnectionRefusedError, OSError):
             # The instance answered the probe but died before the send. Fall
             # through and open our own window; its try_acquire clears the

@@ -221,3 +221,97 @@ def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
     # run_dashboard copies the env dict, so original is not mutated;
     # verify that os.environ is not polluted by verbose=True
     assert os.environ.get("QUODEQ_VERBOSE") != "1"
+
+
+class TestHandoffToRunningInstance:
+    """A relaunch must reach the open window without disturbing its backend.
+
+    The launch used to spawn a second action API, notice the running instance,
+    and terminate that API on the way out — after _kill_stale_action_api had
+    already killed the *running* instance's one. The open window was left with a
+    dead server and an unresolvable loading screen.
+    """
+
+    @staticmethod
+    def _config(tmp_path: Path, **build_overrides) -> DashboardConfig:
+        (tmp_path / "reports").mkdir(exist_ok=True)
+        static_dist = tmp_path / "ui/web/dist"
+        static_dist.mkdir(parents=True, exist_ok=True)
+        (static_dist / "index.html").write_text("ok")
+        build = {"open_browser": True, "no_build": True, "reinstall": False, "use_native": True}
+        build.update(build_overrides)
+        return _make_config(tmp_path, static_dist=static_dist, build=BuildConfig(**build))
+
+    @staticmethod
+    def _patch_launch_path(monkeypatch, instance):
+        """Stub everything past the handoff so a real launch is never attempted."""
+        calls = {"killed": False, "spawned": False}
+
+        def fake_kill(*_a, **_k):
+            calls["killed"] = True
+
+        def fake_ensure(*_a, **_k):
+            calls["spawned"] = True
+            return f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()
+
+        monkeypatch.setattr(runner, "_kill_stale_action_api", fake_kill)
+        monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
+        monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: None)
+        monkeypatch.setattr(runner._server_mod, "serve_and_wait", lambda *a, **k: None)
+        monkeypatch.setattr(
+            "quodeq.dashboard._instance.InstanceController", lambda *a, **k: instance,
+        )
+        return calls
+
+    def test_running_instance_is_focused_and_left_alone(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock
+        instance = MagicMock()
+        instance.probe_existing.return_value = True
+        calls = self._patch_launch_path(monkeypatch, instance)
+
+        config = self._config(tmp_path)
+        monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: config.static_dist)
+
+        assert run_dashboard(config) == 0
+        instance.send_focus.assert_called_once_with()
+        assert calls["killed"] is False, "the running instance's API must survive"
+        assert calls["spawned"] is False, "no second API should be spawned just to kill it"
+
+    def test_cold_start_proceeds_to_launch(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock
+        instance = MagicMock()
+        instance.probe_existing.return_value = False
+        calls = self._patch_launch_path(monkeypatch, instance)
+
+        config = self._config(tmp_path)
+        monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: config.static_dist)
+
+        assert run_dashboard(config) == 0
+        instance.send_focus.assert_not_called()
+        assert calls["spawned"] is True
+
+    def test_unreachable_instance_falls_back_to_launching(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock
+        instance = MagicMock()
+        instance.probe_existing.return_value = True
+        instance.send_focus.side_effect = ConnectionRefusedError()
+        calls = self._patch_launch_path(monkeypatch, instance)
+
+        config = self._config(tmp_path)
+        monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: config.static_dist)
+
+        assert run_dashboard(config) == 0
+        assert calls["spawned"] is True
+
+    def test_browser_mode_has_no_window_to_hand_off_to(self, tmp_path, monkeypatch):
+        from unittest.mock import MagicMock
+        instance = MagicMock()
+        instance.probe_existing.return_value = True
+        calls = self._patch_launch_path(monkeypatch, instance)
+
+        config = self._config(tmp_path, use_native=False)
+        monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: config.static_dist)
+
+        assert run_dashboard(config) == 0
+        instance.send_focus.assert_not_called()
+        assert calls["spawned"] is True

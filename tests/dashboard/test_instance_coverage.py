@@ -171,7 +171,11 @@ class TestConnectToSock:
 
 
 class TestDefaultPaths:
-    def test_default_sock_path(self):
+    def test_default_sock_path(self, monkeypatch):
+        # The suite-wide conftest points QUODEQ_RUN_DIR at a tmp dir (so no
+        # dashboard test can reach the developer's live instance); this test
+        # is specifically about the env-less fallback, so drop it again.
+        monkeypatch.delenv("QUODEQ_RUN_DIR", raising=False)
         from quodeq.dashboard._instance import _default_sock_path
         path = _default_sock_path()
         assert path.name == "dashboard.sock"

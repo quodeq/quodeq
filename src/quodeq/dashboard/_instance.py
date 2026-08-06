@@ -198,18 +198,32 @@ class InstanceController:
 
     def send_reload(self, url: str) -> None:
         """Send a reload command to the running instance."""
+        self._send(f"{_RELOAD_PREFIX}{url}")
+
+    def send_focus(self) -> None:
+        """Ask the running instance to surface the window it already has.
+
+        A relaunch must not hand the running window a *new* URL: the launch
+        that would supply one tears its own API down immediately afterwards,
+        so the window would be sent to a dead server. Encoded as a reload with
+        an empty URL, which older windows discard through their reload-URL
+        guard — a no-op there rather than a broken navigation.
+        """
+        self._send(_RELOAD_PREFIX)
+
+    def _send(self, payload: str) -> None:
         if _IS_WIN32:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(_SOCK_TIMEOUT)
             with sock:
                 sock.connect((_TCP_LOCALHOST, self._tcp_port))
-                sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
+                sock.sendall(payload.encode("utf-8"))
         else:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(_SOCK_TIMEOUT)
             with sock:
                 self._connect_to_sock(sock)
-                sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
+                sock.sendall(payload.encode("utf-8"))
 
     def shutdown(self) -> None:
         """Stop listening and clean up.
