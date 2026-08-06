@@ -8,6 +8,7 @@ import pytest
 
 from quodeq.services.violations import (
     ViolationContext,
+    _ResolveOptions,
     aggregate_violations,
     resolve_dimension_eval,
 )
@@ -134,3 +135,120 @@ class TestAggregateUnknownSeverity:
         assert summary.minor == 2
         f = summary.files[0]
         assert f.critical + f.major + f.minor == f.count
+
+
+def _compiled_dir_with(tmp_path, *dims):
+    """Build a compiled-standards dir containing one empty <dim>.json per dim."""
+    compiled_dir = tmp_path / "compiled"
+    compiled_dir.mkdir()
+    for dim in dims:
+        (compiled_dir / f"{dim}.json").write_text("{}")
+    return compiled_dir
+
+
+class TestResolveDimensionEvalRejectsTraversal:
+    """dimension is a request path segment (action API "eval" routes). These
+    prove a traversal value is rejected before any of resolve_dimension_eval's
+    five path-construction sites run, and that the file it reaches for is
+    provably real (not merely absent) -- proof the guard, not luck, stopped it.
+    """
+
+    def test_dot_dot_segment_cannot_reach_eval_json_outside_run(self, tmp_path):
+        base = tmp_path / "run-1"
+        (base / "evaluation").mkdir(parents=True)
+        (base / "evidence").mkdir()
+        secret_dir = tmp_path / "secret"
+        secret_dir.mkdir()
+        (secret_dir / "leaked.json").write_text(
+            json.dumps({"dimension": "leaked", "overallGrade": "A", "principles": {}})
+        )
+        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+
+        result = resolve_dimension_eval(
+            base, "proj", "run-1", "../../secret/leaked", options=options,
+        )
+
+        assert result is None
+        assert (secret_dir / "leaked.json").is_file()  # untouched, genuinely reachable
+
+    def test_dot_dot_segment_cannot_reach_evidence_json_outside_run(self, tmp_path):
+        base = tmp_path / "run-1"
+        (base / "evaluation").mkdir(parents=True)
+        (base / "evidence").mkdir()
+        secret_dir = tmp_path / "secret"
+        secret_dir.mkdir()
+        (secret_dir / "leaked_evidence.json").write_text(
+            json.dumps({"principles": {"p1": {"violations": [{"file": "x.py", "reason": "leak"}]}}})
+        )
+        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+
+        result = resolve_dimension_eval(
+            base, "proj", "run-1", "../../secret/leaked", options=options,
+        )
+
+        assert result is None
+        assert (secret_dir / "leaked_evidence.json").is_file()
+
+    def test_absolute_path_dimension_cannot_reach_arbitrary_file(self, tmp_path):
+        base = tmp_path / "run-1"
+        (base / "evaluation").mkdir(parents=True)
+        (base / "evidence").mkdir()
+        secret_eval = tmp_path / "secret_eval.json"
+        secret_eval.write_text(json.dumps({"dimension": "secret_eval", "overallGrade": "A", "principles": {}}))
+        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+
+        absolute_dimension = str(tmp_path / "secret_eval")  # ".json" appended by the code
+        result = resolve_dimension_eval(
+            base, "proj", "run-1", absolute_dimension, options=options,
+        )
+
+        assert result is None
+        assert secret_eval.is_file()
+
+    def test_null_byte_in_dimension_is_rejected(self, tmp_path):
+        base = tmp_path / "run-1"
+        (base / "evaluation").mkdir(parents=True)
+        (base / "evidence").mkdir()
+        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+
+        result = resolve_dimension_eval(
+            base, "proj", "run-1", "security\0../../../etc/passwd", options=options,
+        )
+
+        assert result is None
+
+
+class TestResolveDimensionEvalValidDimensionsStillResolve:
+    def test_builtin_dimension_still_resolves(self, tmp_path):
+        base = tmp_path / "run-1"
+        eval_dir = base / "evaluation"
+        eval_dir.mkdir(parents=True)
+        (eval_dir / "security.json").write_text(
+            json.dumps({"dimension": "security", "overallGrade": "B", "principles": {}})
+        )
+        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+
+        result = resolve_dimension_eval(base, "proj", "run-1", "security", options=options)
+
+        assert result is not None
+
+    def test_custom_imported_dimension_still_resolves(self, tmp_path):
+        base = tmp_path / "run-1"
+        eval_dir = base / "evaluation"
+        eval_dir.mkdir(parents=True)
+        (eval_dir / "my-custom-standard.json").write_text(
+            json.dumps({"dimension": "my-custom-standard", "overallGrade": "C", "principles": {}})
+        )
+        evaluators_dir = tmp_path / "evaluators"
+        evaluators_dir.mkdir()
+        (evaluators_dir / "my-custom-standard.json").write_text("{}")
+        options = _ResolveOptions(
+            compiled_dir=_compiled_dir_with(tmp_path, "security"),
+            evaluators_dir=evaluators_dir,
+        )
+
+        result = resolve_dimension_eval(
+            base, "proj", "run-1", "my-custom-standard", options=options,
+        )
+
+        assert result is not None
