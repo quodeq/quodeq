@@ -461,6 +461,15 @@ class TestSeverityGates:
         assert wire["severity"] == "minor"
         assert wire["scope_downgrade"]["rule"] == "sourceless_path"
 
+        events = jsonl.parent.parent / "events.jsonl"
+        payload = json.loads(events.read_text(encoding="utf-8").splitlines()[0])["payload"]
+        assert payload["severity"] == "minor", "the SQL projection reads events.jsonl"
+        assert payload["scope_downgrade"]["rule"] == "sourceless_path", (
+            "_gate must carry the marker onto the Judgment too, not just the "
+            "wire row -- events.jsonl is what the SQL projection and the "
+            "dashboard actually read, and _persist mirrors judgments, not rows"
+        )
+
     def test_a_conservative_trust_model_caps_nothing(
         self, project, compiled, tmp_path, monkeypatch,
     ):

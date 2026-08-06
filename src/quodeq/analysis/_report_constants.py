@@ -35,6 +35,11 @@ _VIOLATION_FIELDS = (
     # written, leaving a downgraded finding indistinguishable from an ordinary
     # major in evaluation/<dim>.json.
     "provenance_downgrade",
+    # Same reasoning again for the scope gate's marker, which records WHICH
+    # rule capped the finding from major to minor. Without it a waived finding
+    # is indistinguishable from an ordinary minor, and the restore-on-tighten
+    # path has no `from` to read back.
+    "scope_downgrade",
 )
 _COMPLIANCE_FIELDS = (
     "file", "line", "end_line", "title", "reason",

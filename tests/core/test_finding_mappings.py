@@ -228,6 +228,71 @@ class TestProvenanceDowngradeField:
         assert finding_to_response_dict(f)["provenance_downgrade"] is False
 
 
+class TestScopeDowngradeField:
+    """The scope gate stamps ``scope_downgrade`` (a dict naming the rule,
+    ``from`` and ``to`` severities) on a finding it caps from major to minor.
+    Unlike ``provenance_downgrade`` (a bool), the whole point of this marker
+    is to name WHICH rule moved it, so it must survive as a dict, not
+    collapse to a boolean, at every seam it crosses.
+    """
+
+    def test_wire_dict_carries_downgrade_marker(self):
+        j = wire_dict_to_judgment({
+            "p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,
+            "reason": "r",
+            "scope_downgrade": {"rule": "sourceless_path", "from": "major", "to": "minor"},
+        })
+        assert j.scope_downgrade == {"rule": "sourceless_path", "from": "major", "to": "minor"}
+
+    def test_wire_dict_defaults_downgrade_to_none_when_absent(self):
+        j = wire_dict_to_judgment({"p": "P1", "t": "violation"})
+        assert j.scope_downgrade is None
+
+    def test_wire_dict_drops_malformed_scope_downgrade(self):
+        # A non-dict value must never raise -- wire_dict_to_judgment's
+        # documented contract is "never raises on malformed input".
+        j = wire_dict_to_judgment({"p": "P1", "t": "violation", "scope_downgrade": "not-a-dict"})
+        assert j.scope_downgrade is None
+
+    def test_judgment_to_finding_carries_downgrade(self):
+        j = Judgment(
+            practice_id="P1", verdict="violation", dimension="D",
+            file="f", line=1, reason="r",
+            scope_downgrade={"rule": "cross_principal", "from": "major", "to": "minor"},
+        )
+        f = judgment_to_finding(j)
+        assert f.scope_downgrade == {"rule": "cross_principal", "from": "major", "to": "minor"}
+
+    def test_finding_to_response_dict_includes_downgrade(self):
+        f = Finding(
+            practice_id="P1", verdict="violation", file="f", line=1,
+            reason="r", severity="minor",
+            scope_downgrade={"rule": "sourceless_path", "from": "major", "to": "minor"},
+        )
+        assert finding_to_response_dict(f)["scope_downgrade"] == {
+            "rule": "sourceless_path", "from": "major", "to": "minor",
+        }
+
+    def test_response_dict_downgrade_none_by_default(self):
+        f = Finding(practice_id="P1", verdict="violation", file="f", line=1)
+        assert finding_to_response_dict(f)["scope_downgrade"] is None
+
+    def test_round_trip_names_the_rule(self):
+        """Full wire -> Judgment -> Finding -> response round trip must still
+        name the rule -- a marker that only says "something moved this" does
+        not let anyone recover what was waived."""
+        d = {
+            "p": "P1", "t": "violation", "d": "Security", "file": "f", "line": 1,
+            "reason": "r", "severity": "minor",
+            "scope_downgrade": {"rule": "sourceless_path", "from": "major", "to": "minor"},
+        }
+        j = wire_dict_to_judgment(d)
+        f = judgment_to_finding(j)
+        response = finding_to_response_dict(f)
+        assert response["scope_downgrade"]["rule"] == "sourceless_path"
+        assert response["scope_downgrade"]["from"] == "major"
+
+
 class TestRoundTrip:
     def test_wire_dict_to_finding_via_judgment(self):
         d = {

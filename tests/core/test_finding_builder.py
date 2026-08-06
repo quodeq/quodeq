@@ -59,6 +59,14 @@ class TestBuildFindingBase:
     def test_provenance_downgrade_defaults_false(self):
         assert build_finding_base(FindingSpec(practice_id="P1")).provenance_downgrade is False
 
+    def test_scope_downgrade_carried(self):
+        marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+        spec = FindingSpec(practice_id="P1", scope_downgrade=marker)
+        assert build_finding_base(spec).scope_downgrade == marker
+
+    def test_scope_downgrade_defaults_none(self):
+        assert build_finding_base(FindingSpec(practice_id="P1")).scope_downgrade is None
+
     def test_severity_defaults_minor_when_none(self):
         spec = FindingSpec(practice_id="P1", severity=None)
         finding = build_finding_base(spec)

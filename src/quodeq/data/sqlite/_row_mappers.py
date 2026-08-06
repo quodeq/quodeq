@@ -36,6 +36,18 @@ def _coerce_confidence(value: Any, default: int = 100) -> int:
     return coerced
 
 
+def _scope_downgrade_json(raw: Any) -> str | None:
+    """Encode a scope-gate marker dict to JSON for SQL bind, or None.
+
+    Mirrors req_refs_json's shape (structured optional data as a JSON TEXT
+    column). Anything that isn't a plain dict is dropped rather than raised,
+    matching the wire-boundary coercion in core/finding_mappings.py.
+    """
+    if not isinstance(raw, dict):
+        return None
+    return json.dumps(raw)
+
+
 def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
     """Translate a FindingsRouter wire dict into a row dict ready for SQL bind."""
     practice_id = finding.get("p", "")
@@ -65,6 +77,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "dedup_key": _dedup_key(practice_id, file, line, verdict),
         "confidence": _coerce_confidence(finding.get("confidence")),
         "provenance_downgrade": 1 if finding.get("provenance_downgrade") else 0,
+        "scope_downgrade_json": _scope_downgrade_json(finding.get("scope_downgrade")),
     }
 
 
@@ -95,6 +108,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
         "dedup_key": _dedup_key(j.practice_id, j.file, j.line, j.verdict),
         "confidence": _coerce_confidence(j.confidence),
         "provenance_downgrade": 1 if j.provenance_downgrade else 0,
+        "scope_downgrade_json": json.dumps(j.scope_downgrade) if j.scope_downgrade else None,
     }
 
 
@@ -110,6 +124,21 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
         )
         raw_refs = []
     req_refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in raw_refs if isinstance(r, dict)]
+
+    scope_downgrade_json = row.get("scope_downgrade_json")
+    scope_downgrade: dict[str, Any] | None = None
+    if scope_downgrade_json:
+        try:
+            parsed = json.loads(scope_downgrade_json)
+        except json.JSONDecodeError:
+            _logger.warning(
+                "Malformed scope_downgrade_json for finding %s (%s); dropping marker",
+                row.get("practice_id"), row.get("file"),
+            )
+        else:
+            if isinstance(parsed, dict):
+                scope_downgrade = parsed
+
     return Finding(
         practice_id=row["practice_id"],
         verdict=row.get("verdict", "violation"),
@@ -128,4 +157,5 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
         scope=row.get("scope", ""),
         confidence=_coerce_confidence(row.get("confidence")),
         provenance_downgrade=bool(row.get("provenance_downgrade")),
+        scope_downgrade=scope_downgrade,
     )

@@ -59,6 +59,19 @@ def test_insert_finding_persists_provenance_downgrade(tmp_path: Path):
     assert by_id["P-normal"].provenance_downgrade is False
 
 
+def test_insert_finding_persists_scope_downgrade(tmp_path: Path):
+    # A finding the scope gate downgraded must round-trip its rule/from/to
+    # through the INSERT + SELECT column lists, not silently fall back to
+    # None. A missing column in either list would regress it here.
+    repo = SqliteFindingsRepository(tmp_path)
+    marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    repo.insert_finding(_finding(p="S-AUT-3", severity="minor", scope_downgrade=marker))
+    repo.insert_finding(_finding(p="P-normal", line=2, severity="major"))
+    by_id = {f.practice_id: f for f in repo.list_all()}
+    assert by_id["S-AUT-3"].scope_downgrade == marker
+    assert by_id["P-normal"].scope_downgrade is None
+
+
 def test_search_uses_fts5(tmp_path: Path):
     repo = SqliteFindingsRepository(tmp_path)
     repo.insert_finding(_finding(p="P1", reason="missing input validation"))

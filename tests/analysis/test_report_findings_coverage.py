@@ -173,3 +173,28 @@ class TestBuildPrincipleRows:
         }
         _, _, _, sev = build_principle_rows(evidence, {})
         assert sev == {"critical": 0, "major": 0, "minor": 0}
+
+    def test_scope_downgrade_survives_flatten(self):
+        # _VIOLATION_FIELDS whitelists what _flatten_findings keeps when
+        # writing evaluation/<dim>.json. Without a scope_downgrade entry,
+        # the report JSON silently loses which rule waived the finding.
+        evidence = {
+            "principles": {
+                "auth": {
+                    "display_name": "Access Control",
+                    "violations": [
+                        {
+                            "file": "a.py", "severity": "minor",
+                            "scope_downgrade": {
+                                "rule": "sourceless_path", "from": "major", "to": "minor",
+                            },
+                        },
+                    ],
+                    "compliance": [],
+                },
+            },
+        }
+        _, viols, _, _ = build_principle_rows(evidence, {})
+        assert viols[0]["scope_downgrade"] == {
+            "rule": "sourceless_path", "from": "major", "to": "minor",
+        }

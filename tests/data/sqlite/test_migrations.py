@@ -339,6 +339,82 @@ def test_upgrade_v5_to_v6_idempotent_when_column_already_present():
     assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
+# Findings table as it existed at SCHEMA_VERSION=6, before this fix added
+# the scope_downgrade_json column. Used to verify the v6 -> v7 upgrade path.
+_V6_FINDINGS_DDL = """
+    PRAGMA user_version = 6;
+    CREATE TABLE findings (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        schema_version  INTEGER NOT NULL DEFAULT 1,
+        practice_id     TEXT NOT NULL,
+        dimension       TEXT NOT NULL DEFAULT '',
+        requirement     TEXT,
+        verdict         TEXT NOT NULL CHECK (verdict IN ('violation','compliance','dismissed')),
+        severity        TEXT NOT NULL CHECK (severity IN ('critical','major','high','medium','low','minor')),
+        file            TEXT NOT NULL DEFAULT '',
+        line            INTEGER NOT NULL DEFAULT 0,
+        end_line        INTEGER NOT NULL DEFAULT 0,
+        title           TEXT NOT NULL DEFAULT '',
+        reason          TEXT NOT NULL DEFAULT '',
+        snippet         TEXT NOT NULL DEFAULT '',
+        violation_type  TEXT NOT NULL DEFAULT '',
+        context         TEXT NOT NULL DEFAULT '',
+        scope           TEXT NOT NULL DEFAULT '',
+        req_refs_json   TEXT,
+        dedup_key       TEXT NOT NULL UNIQUE,
+        confidence      INTEGER NOT NULL DEFAULT 100,
+        provenance_downgrade INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+"""
+
+
+def test_fresh_db_has_scope_downgrade_json_column_at_default_null():
+    conn = sqlite3.connect(":memory:")
+    apply_evaluation_schema(conn)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    assert "scope_downgrade_json" in columns
+    conn.execute(
+        "INSERT INTO findings (practice_id, verdict, severity, dedup_key) "
+        "VALUES ('P1', 'violation', 'major', 'k')",
+    )
+    assert conn.execute(
+        "SELECT scope_downgrade_json FROM findings WHERE practice_id='P1'"
+    ).fetchone()[0] is None
+
+
+def test_upgrade_v6_to_v7_adds_scope_downgrade_json_column():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(_V6_FINDINGS_DDL)
+    conn.execute(
+        "INSERT INTO findings (practice_id, verdict, severity, dedup_key) "
+        "VALUES ('P-6', 'violation', 'major', 'k6')",
+    )
+
+    apply_evaluation_schema(conn)
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    assert "scope_downgrade_json" in columns
+    # Pre-existing rows inherit the default (no marker).
+    assert conn.execute(
+        "SELECT scope_downgrade_json FROM findings WHERE practice_id='P-6'"
+    ).fetchone()[0] is None
+
+
+def test_upgrade_v6_to_v7_idempotent_when_column_already_present():
+    """Same self-heal guarantee as the other ALTER-based upgrades: a crash
+    between the ALTER and the user_version bump must not raise 'duplicate
+    column name' on retry."""
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(EVALUATION_DDL)        # full v7 schema: column present
+    conn.execute("PRAGMA user_version = 6")   # pretend the version bump never landed
+
+    apply_evaluation_schema(conn)             # must not raise
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+
+
 def test_apply_evaluation_schema_rejects_unknown_version_with_no_upgrade_path():
     conn = sqlite3.connect(":memory:")
     # Set user_version to a non-zero value with no upgrade path defined.

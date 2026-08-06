@@ -7,6 +7,7 @@ import sys
 
 import pytest
 
+from quodeq.analysis.mcp.scope_gate import apply_scope_gate
 from quodeq.context.trust_model import (
     CONSERVATIVE,
     PROFILE_RELPATH,
@@ -53,10 +54,54 @@ def test_detection_fills_undeclared_fields(tmp_path):
 
 
 def test_detection_used_when_no_profile(tmp_path):
+    # multi_tenant is safe to infer from a manifest. network_exposure is not
+    # (see the C1 tests below) and falls back to the conservative default
+    # even though detection confidently says "desktop".
     _desktop_manifest(tmp_path)
     resolved = resolve_trust_model(tmp_path)
     assert resolved.multi_tenant is False
-    assert resolved.network_exposure == "loopback"
+    assert resolved.network_exposure == "public"
+
+
+def test_desktop_detection_alone_never_relaxes_remote(tmp_path):
+    # C1: detection may fill multi_tenant but must NEVER fill
+    # network_exposure -- only a human declaration in
+    # .quodeq/project-profile.json may waive a remote-reachability finding.
+    # A real Rust axum service (src/main.rs, no lib.rs) or a Django service
+    # that merely lists pyinstaller in a dev extra both detect as
+    # desktop/cli today; none of them may get S-AUT-3 waived on that basis
+    # alone.
+    _desktop_manifest(tmp_path)
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.network_exposure == "public"
+    assert resolved.relaxes_remote() is False
+
+    finding = {
+        "t": "violation", "req": "S-AUT-3", "severity": "major",
+        "w": "Path traversal via job_id",
+        "reason": "The job_id is used to construct a file path without validation.",
+    }
+    assert apply_scope_gate(finding, resolved) is False
+    assert finding["severity"] == "major"
+
+
+def test_cli_detection_alone_never_relaxes_remote(tmp_path):
+    # Same guarantee via the CLI detection path (a Go service with no web
+    # framework import detects as a single-user CLI).
+    (tmp_path / "go.mod").write_text("module example.com/tool\n\ngo 1.21\n", encoding="utf-8")
+    (tmp_path / "main.go").write_text("package main\n\nfunc main() {}\n", encoding="utf-8")
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.multi_tenant is False
+    assert resolved.network_exposure == "public"
+    assert resolved.relaxes_remote() is False
+
+    finding = {
+        "t": "violation", "req": "S-AUT-3", "severity": "major",
+        "w": "Path traversal via job_id",
+        "reason": "The job_id is used to construct a file path without validation.",
+    }
+    assert apply_scope_gate(finding, resolved) is False
+    assert finding["severity"] == "major"
 
 
 def test_library_does_not_relax(tmp_path):

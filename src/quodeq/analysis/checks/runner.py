@@ -14,6 +14,7 @@ from pathlib import Path
 
 from quodeq.analysis.checks.registry import CHECKERS, CheckContext
 from quodeq.analysis.mcp.provenance_gate import DOWNGRADE_MARKER
+from quodeq.analysis.mcp.scope_gate import SCOPE_DOWNGRADE_MARKER
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
@@ -127,10 +128,12 @@ def _gate(j: Judgment, trust_model: TrustModel | None) -> tuple[Judgment, dict]:
     """Run one judgment through the shared severity gates.
 
     Returns the judgment at its gated severity and the wire row that produced
-    it. Both, because they carry different amounts of the result: ``Judgment``
-    is frozen and has no ``scope_downgrade`` field, so the scope gate's audit
-    marker survives only on the row. The severity itself -- the part that
-    reaches the score -- lands on both.
+    it. Both are updated with whichever markers fired, because they feed two
+    different sinks downstream: ``_persist`` writes the row verbatim to the
+    per-dim JSONL, and mirrors the judgment (not the row) into events.jsonl,
+    which is what the SQL projection and the dashboard actually read. A
+    marker set on the row alone would reach the report file but never the
+    live feed, the DB, or the UI.
 
     ``_to_wire`` is what makes this cheap: it already emits the short-key shape
     (``t``/``req``/``severity``/``reason``/``w``) the gates read at the other
@@ -143,6 +146,8 @@ def _gate(j: Judgment, trust_model: TrustModel | None) -> tuple[Judgment, dict]:
     update: dict = {"severity": row["severity"]}
     if row.get(DOWNGRADE_MARKER):
         update["provenance_downgrade"] = True
+    if row.get(SCOPE_DOWNGRADE_MARKER):
+        update["scope_downgrade"] = row[SCOPE_DOWNGRADE_MARKER]
     return j.model_copy(update=update), row
 
 
@@ -154,8 +159,10 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
     dashboard and the CLI end up disagreeing about the same run.
 
     *rows* are the gated wire rows from :func:`_gate`, written rather than
-    re-derived from *judgments*: re-deriving would silently drop the scope
-    gate's marker, which has no field on ``Judgment`` to be re-derived from.
+    re-derived from *judgments*: ``_to_wire`` never emits the downgrade
+    markers, so re-deriving would silently drop them from the per-dim JSONL
+    even though both markers now also live on the ``Judgment`` itself for
+    the events.jsonl mirror below.
     """
     try:
         with jsonl_path.open("a", encoding="utf-8") as out:

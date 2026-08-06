@@ -249,12 +249,21 @@ def _write_findings(
     # which cache replay bypasses just like the provenance gate. CacheKey
     # deliberately does not fingerprint the declared trust model (that would
     # defeat the point of gating at replay time instead of at the cache key),
-    # so a cached ``major`` finding survives untouched across a
-    # ``.quodeq/project-profile.json`` edit unless something re-caps it on
+    # so a cached finding survives untouched across a
+    # ``.quodeq/project-profile.json`` edit unless something re-gates it on
     # every replay -- this is that something. The practical effect: editing
     # the profile to declare, say, ``networkExposure: loopback`` re-caps
-    # already-cached findings on the very next run, without a cache miss or
-    # a CacheKey change.
+    # already-cached ``major`` findings on the very next run, without a cache
+    # miss or a CacheKey change.
+    #
+    # apply_scope_gate is symmetric (see its own module docstring): the same
+    # call also restores a finding this gate previously capped to ``minor``
+    # once the profile is TIGHTENED enough that the rule that capped it no
+    # longer fires. Without that other direction, a team that declares
+    # loopback, scans, then honestly ships hosted and widens the profile back
+    # to ``{"networkExposure": "public"}`` would see every already-cached
+    # finding stay stuck at ``minor`` forever -- the exact same staleness
+    # problem this whole re-gating pass exists to prevent, just in reverse.
     #
     # apply_severity_gates owns the sequence and the order it must run in
     # (see severity_gates.py); this call site owns only the decision to
