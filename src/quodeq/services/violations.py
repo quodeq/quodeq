@@ -1,12 +1,14 @@
 """Violation resolution and aggregation for the filesystem action provider."""
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
+from quodeq.core.standards.refs import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
@@ -17,6 +19,8 @@ from quodeq.services.violations_parsing import (
     parse_violations_from_jsonl,
     parse_violations_from_stream,
 )
+
+_logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_VIOLATION_FILES = 20
 
@@ -34,6 +38,7 @@ class _ResolveOptions:
     exists_fn: Callable[[Path], bool] = Path.exists
     stat_fn: Callable[[Path], Any] = Path.stat
     compiled_dir: Path | None = None
+    evaluators_dir: Path | None = None
 
 
 def _dismissed_key_for_violation(v: dict) -> tuple:
@@ -179,11 +184,27 @@ def resolve_dimension_eval(
 
     *options* bundles injectable filesystem callbacks and the compiled
     standards directory for testing without a real FS.
+
+    *dimension* arrives here from the action API's per-dimension routes
+    (a request path segment), so before any of the paths below are built it
+    is checked against :func:`is_known_dimension` -- the installed set
+    derived from ``compiled_dir``/``evaluators_dir`` -- whenever *options*
+    supplies at least one of those directories. An unknown dimension is
+    treated exactly like a dimension with no matching file: this returns
+    ``None``, same as every other "nothing found" branch below. When neither
+    directory is configured (e.g. a caller testing file-resolution logic in
+    isolation) the check is skipped, preserving prior behaviour.
     """
     opts = options or _ResolveOptions()
     _exists = opts.exists_fn
     _stat = opts.stat_fn
     compiled_dir = opts.compiled_dir
+    evaluators_dir = opts.evaluators_dir
+    if (compiled_dir or evaluators_dir) and not is_known_dimension(
+        dimension, compiled_dir, evaluators_dir,
+    ):
+        _logger.warning("Rejected unknown dimension for eval resolution: %r", dimension)
+        return None
     dkeys = _dismissed_keys(base.parent)
     delkeys = _deleted_keys(base.parent)
 

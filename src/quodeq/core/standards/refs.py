@@ -110,6 +110,53 @@ def extract_requirement_checks(data: dict) -> dict[str, frozenset[str]]:
     return {name: frozenset(ids) for name, ids in grouped.items()}
 
 
+def known_dimension_ids(
+    compiled_dir: str | Path | None, evaluators_dir: str | Path | None = None,
+) -> frozenset[str]:
+    """Return the dimension ids actually installed on disk.
+
+    A dimension is "known" when a same-named ``<id>.json`` file sits
+    directly inside *compiled_dir* (built-in, compiled standards) or
+    *evaluators_dir* (custom, user-imported standards) -- the two places a
+    standard's definition can live. The set is rebuilt from a directory
+    listing every call rather than cached, so a newly imported custom
+    standard is recognised immediately.
+
+    Listing is the point, not joining: a traversal segment or absolute path
+    never matches a real directory entry, so there is nothing to sanitise --
+    the caller compares the candidate dimension against this set before
+    building any path from it.
+    """
+    ids: set[str] = set()
+    for directory in (compiled_dir, evaluators_dir):
+        if not directory:
+            continue
+        path = Path(directory)
+        if not path.is_dir():
+            continue
+        ids.update(p.stem for p in path.glob("*.json"))
+    return frozenset(ids)
+
+
+def is_known_dimension(
+    dimension: str | None,
+    compiled_dir: str | Path | None,
+    evaluators_dir: str | Path | None = None,
+) -> bool:
+    """True if *dimension* names a standard actually installed on disk.
+
+    Comparison is case-insensitive, matching every other place dimension ids
+    are compared in this codebase (see
+    ``core.standards.visibility.normalize_ids``): older eval payloads and
+    request values may carry ``"Security"`` where a fresh compile writes
+    ``security.json``, and both must be recognised as the same dimension.
+    """
+    if not dimension:
+        return False
+    known_lower = {d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)}
+    return dimension.lower() in known_lower
+
+
 # ---------------------------------------------------------------------------
 # The one I/O function core still owns.
 #
@@ -127,8 +174,20 @@ def _load_compiled_data(
     """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
 
     Falls back to *evaluators_dir* for custom evaluators when provided.
+
+    *dimension* is request-reachable (routed here from the action API's
+    per-dimension endpoints), so it is checked against
+    :func:`is_known_dimension` before it ever reaches a path join. A
+    dimension outside that installed set is treated the same as one with no
+    compiled data at all: this returns ``None`` rather than raising, matching
+    every other failure mode in this function.
     """
     if not dimension:
+        return None
+    if (compiled_dir or evaluators_dir) and not is_known_dimension(
+        dimension, compiled_dir, evaluators_dir,
+    ):
+        _logger.warning("Rejected unknown dimension for compiled standards lookup: %r", dimension)
         return None
     if compiled_dir:
         path = Path(compiled_dir) / f"{dimension}.json"
