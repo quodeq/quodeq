@@ -457,7 +457,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           the wait legible instead of looking like the page hung. runMode only
           -- the Overview shows the OverviewSkeleton (inside .dashboard-page,
           see showOverviewSkeleton) instead. */}
-      {isLoading && runMode && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+      {isLoading && runMode && <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />}
       <div className={`dashboard-page dashboard-fade ${isDimmed ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
