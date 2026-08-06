@@ -1,8 +1,9 @@
 """Verify the MCP findings server wires EventLogWriter into FindingsRouter."""
 import io
+import json
 from pathlib import Path
 
-from quodeq.analysis.mcp.findings_server import _build_router
+from quodeq.analysis.mcp.findings_server import _build_compiled_context, _build_router
 from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.analysis.mcp.args import ServerArgs
 from quodeq.core.events.models import EventType
@@ -113,6 +114,42 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
 
     assert calls == [(project_dir, project_dir / "run-1")]
     assert ctx.precedent_corpus is sentinel
+
+
+class TestBuildCompiledContextResolvesTrustModel:
+    """C2: findings_server.py:47 (``trust_model = resolve_trust_model(work_dir)
+    if work_dir is not None else None``) is one of three live wiring points
+    for the declared trust model. Nothing failed when a reviewer set all
+    three to None at once and the full suite stayed green -- these tests
+    close that gap by exercising ``_build_compiled_context`` directly against
+    a real declared profile, so they fail if that line is ever neutered.
+    """
+
+    def test_resolves_declared_trust_model_from_work_dir(self, tmp_path: Path):
+        profile_dir = tmp_path / ".quodeq"
+        profile_dir.mkdir()
+        (profile_dir / "project-profile.json").write_text(json.dumps({
+            "version": 1, "multiTenant": False, "networkExposure": "loopback",
+        }))
+
+        sa = ServerArgs()
+        sa.work_dir = str(tmp_path)
+
+        ctx = _build_compiled_context(sa)
+
+        assert ctx.trust_model is not None
+        assert ctx.trust_model.multi_tenant is False
+        assert ctx.trust_model.network_exposure == "loopback"
+
+    def test_no_work_dir_means_no_trust_model(self, tmp_path: Path):
+        # Sanity check on the ``if work_dir is not None else None`` guard
+        # itself -- without a work dir there is nothing to resolve against.
+        sa = ServerArgs()
+        sa.work_dir = None
+
+        ctx = _build_compiled_context(sa)
+
+        assert ctx.trust_model is None
 
 
 def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):

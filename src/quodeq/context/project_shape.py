@@ -185,8 +185,10 @@ def _matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
 def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]]:
     """Return ``(deployment_hint, web_frameworks, desktop_hints)`` from pyproject.
 
-    A deployment hint is only set when the manifest is unambiguous; the
-    caller fuses signals across all manifests before settling on a verdict.
+    A deployment hint is not only set when the manifest is unambiguous: when a
+    manifest lists BOTH web and desktop dependencies, desktop wins outright
+    (see the comment below) rather than the hint going unset. The caller
+    still fuses hints across all manifests before settling on a verdict.
     """
     pyproject = _read_toml(repo / "pyproject.toml")
     if pyproject is None:

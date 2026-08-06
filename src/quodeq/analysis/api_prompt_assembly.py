@@ -118,17 +118,28 @@ def _format_shape_block(
             " This is a single-user CLI, not a hosted service. Concurrent"
             " caller and multi-tenant findings rarely apply."
         )
+    # Both notes below mirror scope_gate.py's own two rules, deliberately at
+    # the same preconditions, so the prompt never advises something the
+    # deterministic gate would not also do. Neither ever tells the model a
+    # category "does not apply" -- that invites the model to omit the
+    # finding, which is unrecoverable, unlike a severity cap. Always report;
+    # only the severity guidance changes.
     if trust_model is not None and trust_model.relaxes_remote():
         note += (
-            " No untrusted party can open a socket to this process, so a file"
-            " path built from a value this process already controls is a"
-            " hardening gap, not a trust boundary crossing. Report it as"
-            " `minor` unless you can name a remote source that reaches the line."
+            " No untrusted party can open a socket to this process. For a"
+            " path or key finding whose source you cannot name, still report"
+            " it, at `minor` instead of `major`. Do not omit it."
         )
-    if trust_model is not None and not trust_model.multi_tenant:
+    # The second axis check requires relaxes_remote() too, same as the
+    # gate's cross_principal rule: multi_tenant=False alone says nothing
+    # about whether a stranger can reach the process, so on a public,
+    # single-tenant project an authorization finding stays fully in scope.
+    if (trust_model is not None and not trust_model.multi_tenant
+            and trust_model.relaxes_remote()):
         note += (
-            " There is exactly one user, so findings about reaching another"
-            " user's data, ownership checks, and tenant isolation do not apply."
+            " There is exactly one user account. For an authorization"
+            " finding whose only issue is reaching another user's data, still"
+            " report it, at `minor` instead of `major`. Do not omit it."
         )
     return f"## Project Shape\n\n**{summary}**.{note}"
 
