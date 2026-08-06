@@ -7,7 +7,12 @@ from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
-from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
+from quodeq.analysis._loops import (
+    _run_dir_for,
+    _safe_write_dim_state,
+    run_incremental_loop,
+    run_per_dimension_loop,
+)
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
@@ -15,6 +20,7 @@ from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
+from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_warning
@@ -66,7 +72,12 @@ def _run_dry_run(
     result: dict[str, Evidence] = {}
     date_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
     evidence_dir = config.work_dir or config.src
+    run_dir = _run_dir_for(config)
     for idx, dimension in enumerate(dimensions, 1):
+        # Dim states must move to DONE here just like the real loops: the
+        # lifecycle flips anything still pending at exit to INCOMPLETE and
+        # stamps the run exit_reason=incomplete_dimensions.
+        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
         log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
         emit_marker("analyzing", dimension=dimension)
         ev = Evidence(
@@ -85,6 +96,7 @@ def _run_dry_run(
             jsonl_path.touch()
         emit_marker("scoring", dimension=dimension)
         result[dimension] = ev
+        _safe_write_dim_state(run_dir, dimension, DimState.DONE)
         if on_dimension_done:
             on_dimension_done(dimension, ev)
     return result
