@@ -669,6 +669,7 @@ export const ROUTE_RENDERERS = {
       dimension={params.dimension}
       runId={params.runId}
       dateLabel={params.dateLabel}
+      sourceTab={params.sourceTab}
       selectedSource={props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}

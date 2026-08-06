@@ -61,6 +61,7 @@ export default function ExplorerPage({
   dimension,
   runId,
   dateLabel,
+  sourceTab,
   selectedSource = 'local',
   onNavigate,
   refreshSignal,
@@ -141,7 +142,11 @@ export default function ExplorerPage({
   const dim = String(d.evalData.dimension || '').toLowerCase();
   const radialPrinciples = buildRadialPrinciples(d.principleGrades);
   const enrichedPrinciples = buildEnrichedPrinciples(d.principleGrades, d.allViolations, d.complianceByPrinciple);
-  const onPrincipleClick = (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name) });
+  // Thread sourceTab through: without it a principle click from a
+  // Violations-tab drill-in falls back to the Overview tab, force-remounting
+  // the whole content subtree (App.jsx keys it on activeTab) and jumping the
+  // sidebar highlight.
+  const onPrincipleClick = (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name), sourceTab });
 
   const overallScoreNum = parseFloat(d.overallGrade?.score);
   const sev = d.severityCounts;
@@ -161,7 +166,7 @@ export default function ExplorerPage({
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
     const severityFilter = kind === 'violations' ? 'all' : kind;
-    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel });
+    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab });
   };
   const onSeverityBadge = (level) => () => handleCardNavigate(level);
 
@@ -250,7 +255,7 @@ export default function ExplorerPage({
         </div>
         <TopOffendingFilesTable
           files={d.topFiles}
-          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel })}
+          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab })}
         />
       </section>
     </div>
