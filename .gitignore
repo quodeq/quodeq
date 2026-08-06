@@ -1,8 +1,9 @@
 .claude/
 .worktrees/
 .DS_Store
-node_modules/
-src/quodeq/ui/node_modules/
+# No trailing slash: that form matches directories only, so a symlink named
+# node_modules slips past it and gets committed. Bare name covers both.
+node_modules
 src/quodeq/ui/dist/
 src/quodeq/static/
 dist/
