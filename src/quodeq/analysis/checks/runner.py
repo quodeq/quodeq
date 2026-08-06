@@ -13,6 +13,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from quodeq.analysis.checks.registry import CHECKERS, CheckContext
+from quodeq.analysis.mcp.provenance_gate import DOWNGRADE_MARKER
+from quodeq.analysis.mcp.severity_gates import apply_severity_gates
+from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
 from quodeq.core.evidence._jsonl import judgment_to_dict
 from quodeq.core.evidence._req_mapping import build_principle_resolver
@@ -120,17 +123,44 @@ def _merge_into_evidence(evidence: Evidence, judgments: list[Judgment],
     return added
 
 
-def _persist(jsonl_path: Path, judgments: list[Judgment]) -> None:
+def _gate(j: Judgment, trust_model: TrustModel | None) -> tuple[Judgment, dict]:
+    """Run one judgment through the shared severity gates.
+
+    Returns the judgment at its gated severity and the wire row that produced
+    it. Both, because they carry different amounts of the result: ``Judgment``
+    is frozen and has no ``scope_downgrade`` field, so the scope gate's audit
+    marker survives only on the row. The severity itself -- the part that
+    reaches the score -- lands on both.
+
+    ``_to_wire`` is what makes this cheap: it already emits the short-key shape
+    (``t``/``req``/``severity``/``reason``/``w``) the gates read at the other
+    two sinks, so a checker finding is gated on exactly the evidence an LLM
+    finding would be.
+    """
+    row = _to_wire(j)
+    if not apply_severity_gates(row, trust_model):
+        return j, row
+    update: dict = {"severity": row["severity"]}
+    if row.get(DOWNGRADE_MARKER):
+        update["provenance_downgrade"] = True
+    return j.model_copy(update=update), row
+
+
+def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> None:
     """Append to the per-dim JSONL and mirror into the run's event log.
 
     Both stores, always. The SQL projection runs off ``events.jsonl`` while
     the report path reads the per-dim JSONL; writing only one is how the
     dashboard and the CLI end up disagreeing about the same run.
+
+    *rows* are the gated wire rows from :func:`_gate`, written rather than
+    re-derived from *judgments*: re-deriving would silently drop the scope
+    gate's marker, which has no field on ``Judgment`` to be re-derived from.
     """
     try:
         with jsonl_path.open("a", encoding="utf-8") as out:
-            for j in judgments:
-                out.write(json.dumps(_to_wire(j)) + "\n")
+            for row in rows:
+                out.write(json.dumps(row) + "\n")
     except OSError:
         _logger.warning("checks: could not append to %s", jsonl_path, exc_info=True)
 
@@ -153,6 +183,7 @@ def apply_deterministic_checks(
     compiled_dir: Path | None,
     jsonl_path: Path | None,
     evaluators_dir: Path | None = None,
+    trust_model: TrustModel | None = None,
 ) -> int:
     """Run *dimension*'s checkers and fold the findings into *evidence*.
 
@@ -167,10 +198,21 @@ def apply_deterministic_checks(
     if not judgments:
         return 0
 
+    # Gate BEFORE the evidence merge, not just before the write. The evidence
+    # is what the score is computed from, so gating only on the way to disk
+    # would leave the grade reflecting the ungated severity while the stored
+    # finding disagreed with it.
+    gated: list[Judgment] = []
+    rows: list[dict] = []
+    for raw in judgments:
+        judgment, row = _gate(raw, trust_model)
+        gated.append(judgment)
+        rows.append(row)
+
     resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir)
-    added = _merge_into_evidence(evidence, judgments, resolver)
+    added = _merge_into_evidence(evidence, gated, resolver)
     if added and jsonl_path is not None:
-        _persist(jsonl_path, judgments)
+        _persist(jsonl_path, gated, rows)
     return added
 
 
@@ -204,6 +246,13 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
             return 0
         standards_dir = config.standards_dir
         evidence_dir = config.work_dir or config.src
+        # Resolved once per dimension and threaded down, the same way
+        # process_dimension_with_cache does it: resolution reads the project
+        # profile and walks the manifests, which is per-project work, not
+        # per-finding work. Guarding on ``config.src`` rather than assuming it
+        # keeps apply_scope_gate's no-op explicit -- resolve_trust_model would
+        # degrade to CONSERVATIVE on None, which is a different statement.
+        trust_model = resolve_trust_model(config.src) if config.src is not None else None
         return apply_deterministic_checks(
             evidence,
             root=Path(config.src),
@@ -212,6 +261,7 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
             compiled_dir=(Path(standards_dir) / "compiled") if standards_dir else None,
             evaluators_dir=config.evaluators_dir,
             jsonl_path=Path(evidence_dir) / f"{dimension}_evidence.jsonl",
+            trust_model=trust_model,
         )
     except Exception:  # a check must never fail a dimension that already succeeded
         _logger.warning("checks: skipped for %s", dimension, exc_info=True)

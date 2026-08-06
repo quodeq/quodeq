@@ -12,9 +12,8 @@ from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from quodeq.analysis.mcp.enrichment import enrich_code
-from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
-from quodeq.analysis.mcp.scope_gate import apply_scope_gate
+from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import (
     PrecedentCorpus,
@@ -248,16 +247,17 @@ class FindingEnricher:
         _apply_precedent_downweight(
             finding, self._precedent_fingerprints, self._precedent_corpus,
         )
-        apply_provenance_gate(finding)  # deterministic critical-severity gate (#639)
         # Gates the LIVE path only: this method runs once per freshly-dispatched
         # finding, before it ever reaches the cache. A cached finding replayed on
         # a later run does NOT come back through here -- cache replay bypasses
-        # enrich() entirely and writes straight to the per-dim JSONL. That path
-        # (dimension_runner._write_findings) applies apply_provenance_gate and
-        # apply_scope_gate itself, in the same order, for the same reason. Both
-        # call sites are required: this one gates what the model just emitted,
-        # the other re-gates what a warm cache is about to replay, and skipping
-        # either leaves a class of findings (fresh vs. cached) ungated.
-        apply_scope_gate(finding, self._trust_model)
+        # enrich() entirely and writes straight to the per-dim JSONL, and a
+        # deterministic checker never comes through here at all. Those two sinks
+        # (dimension_runner._write_findings, checks.runner) call the same helper
+        # for the same reason. Every call site is required: this one gates what
+        # the model just emitted, the others gate what a warm cache is about to
+        # replay and what a checker just computed, and skipping any one leaves a
+        # class of findings ungated. See severity_gates.py for why the sequence
+        # lives there rather than being repeated here.
+        apply_severity_gates(finding, self._trust_model)
 
         return finding

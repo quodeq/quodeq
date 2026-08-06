@@ -32,19 +32,44 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.3
+        uses: github/codeql-action/init@v4.37.5
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           # tests/ and benchmarks/ contain intentionally vulnerable fixtures
           # (they exercise the scanner itself); scanning them would bury real
           # alerts in noise.
+          #
+          # py/path-injection is excluded because it has never been right here.
+          # 292 alerts to date: 153 triaged and dismissed as false positives,
+          # 118 closed by rewrites or by code simply moving, 21 open. No true
+          # positives. The two genuine traversal defects we did find (the
+          # rescore symlink escape, cloneDest passing a raw request string) came
+          # from reading the guard code, not from this query. Quodeq is a
+          # single-operator desktop app, so its "user-provided value" is the
+          # local user's own project path, and they already own the filesystem.
+          #
+          # It is also unfixable rather than merely noisy. Five PRs of
+          # structural rewrites (#1014, #1016, #1017, #1018, #1019) moved the
+          # count 33 -> 22, and #1019 minted a fresh alert on the os.scandir
+          # call inside resolve_child_dir, the helper written to eliminate path
+          # injection by never concatenating. The remaining sinks are the
+          # generic I/O wrappers in core/utils/io.py, where every caller's taint
+          # converges by design, and the registration flow, where the target
+          # directory legitimately does not exist yet so listing cannot apply.
+          #
+          # Traversal is covered behaviourally instead, by
+          # tests/api/test_codeql_triage_guards.py. Extend that when adding a
+          # route that takes a path segment; do not re-enable this query.
           config: |
             paths-ignore:
               - tests
               - benchmarks
+            query-filters:
+              - exclude:
+                  id: py/path-injection
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.3
+        uses: github/codeql-action/analyze@v4.37.5
         with:
           category: "/language:${{ matrix.language }}"

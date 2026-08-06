@@ -9,6 +9,12 @@ Best-effort like its siblings: an absent, unreadable or malformed file yields
 no rules. Individual entries are validated and skipped rather than raising —
 one half-written rule must never suppress everything, and a suppression store
 that fails closed is safer than one that fails open.
+
+"Malformed" covers every parse failure, not the well-behaved
+``OSError``/``ValueError``/``UnicodeDecodeError`` trio: deeply nested JSON
+overflows the C decoder's call stack and raises ``RecursionError``, a
+``RuntimeError`` subclass that would otherwise escape. Every rescore loads
+this file, so an escape here fails the whole scoring path.
 """
 from __future__ import annotations
 
@@ -29,8 +35,9 @@ def load_suppression_rules(project_dir: Path) -> tuple[SuppressionRule, ...]:
         return ()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Ignoring malformed suppression rules %s: %s", path, exc)
+    except Exception as exc:  # noqa: BLE001 - a bad rules file must never fail a rescore
+        _logger.warning(
+            "Ignoring unreadable or malformed suppression rules %s: %s", path, exc)
         return ()
     raw_rules = data.get("rules") if isinstance(data, dict) else None
     if not isinstance(raw_rules, list):

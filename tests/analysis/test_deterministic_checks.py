@@ -62,10 +62,10 @@ def project(tmp_path):
 
 @pytest.fixture
 def compiled(tmp_path):
-    def _write(standard):
+    def _write(standard, dimension="clean-architecture"):
         compiled_dir = tmp_path / "compiled"
         compiled_dir.mkdir(exist_ok=True)
-        (compiled_dir / "clean-architecture.json").write_text(
+        (compiled_dir / f"{dimension}.json").write_text(
             json.dumps(standard), encoding="utf-8")
         return compiled_dir
     return _write
@@ -354,6 +354,205 @@ class TestRunWiring:
             DimensionRunner().run(MagicMock(), "clean-architecture", 1, MagicMock())
 
         applied.assert_not_called()
+
+
+class TestSeverityGates:
+    """A checker's findings go through the same severity gates as everyone else.
+
+    The checks path is the third finding sink, after ``FindingEnricher.enrich``
+    (live) and ``_write_findings`` (cache replay). It used to write straight to
+    the evidence and the JSONL, so a checker declared on a gated requirement
+    would land at whatever severity it assigned -- the same "code path nobody
+    enumerated" shape as issue #657.
+
+    No shipped standard declares a ``check`` on a gated requirement today, so
+    these use a fake checker on ``S-AUT-3``: the point is that the wiring holds
+    the moment one does.
+    """
+
+    GATED = {
+        "id": "security",
+        "principles": [{
+            "name": "Authentication",
+            "requirements": [{"id": "S-AUT-3", "text": "paths built from values",
+                              "check": "fake-gated"}],
+        }],
+    }
+
+    def _checker(self, monkeypatch, *, severity, reason):
+        from quodeq.analysis.checks import registry
+        from quodeq.core.events.models import Judgment
+
+        def fake(_context):
+            return [Judgment(
+                practice_id="S-AUT-3", req="S-AUT-3", verdict="violation",
+                dimension="security", file="app/utils/text.py", line=1,
+                severity=severity, reason=reason, title="Path built from a value",
+            )]
+
+        monkeypatch.setitem(registry.CHECKERS, "fake-gated", fake)
+
+    def _apply(self, project, compiled, tmp_path, *, trust_model=None):
+        from quodeq.analysis.checks.runner import apply_deterministic_checks
+
+        jsonl = tmp_path / "run" / "evidence" / "security_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        evidence = Evidence(repository="r", language="python", date="d",
+                            source_file_count=3, files_read=3, coverage_pct=100.0)
+        added = apply_deterministic_checks(
+            evidence, root=project, source_files=SOURCES, dimension="security",
+            compiled_dir=compiled(self.GATED, "security"), jsonl_path=jsonl,
+            trust_model=trust_model,
+        )
+        return added, evidence, jsonl
+
+    def _violation(self, evidence):
+        return evidence.principles["Authentication"].violations[0]
+
+    def test_a_critical_naming_no_external_source_is_downgraded(
+        self, project, compiled, tmp_path, monkeypatch,
+    ):
+        """The provenance gate (#639) must reach a checker finding too."""
+        self._checker(monkeypatch, severity="critical",
+                      reason="Path is built from a caller-supplied value.")
+
+        added, evidence, jsonl = self._apply(project, compiled, tmp_path)
+
+        assert added == 1
+        violation = self._violation(evidence)
+        assert violation["severity"] == "major", "evidence drives the score"
+        assert violation["provenance_downgrade"] is True
+
+        wire = json.loads(jsonl.read_text(encoding="utf-8").splitlines()[0])
+        assert wire["severity"] == "major", "the JSONL is what the report reads"
+
+        events = jsonl.parent.parent / "events.jsonl"
+        payload = json.loads(events.read_text(encoding="utf-8").splitlines()[0])["payload"]
+        assert payload["severity"] == "major", "the SQL projection reads events.jsonl"
+        assert payload["provenance_downgrade"] is True
+
+    def test_a_critical_naming_a_real_external_source_is_left_alone(
+        self, project, compiled, tmp_path, monkeypatch,
+    ):
+        """The gate must not flatten a genuine critical."""
+        self._checker(monkeypatch, severity="critical",
+                      reason="Path is built from the request body.")
+
+        _added, evidence, _jsonl = self._apply(project, compiled, tmp_path)
+
+        assert self._violation(evidence)["severity"] == "critical"
+
+    def test_a_major_out_of_the_declared_scope_is_capped(
+        self, project, compiled, tmp_path, monkeypatch,
+    ):
+        """The scope gate must reach a checker finding too."""
+        from quodeq.context.trust_model import TrustModel
+
+        self._checker(monkeypatch, severity="major",
+                      reason="Path is built from a value with no validation.")
+
+        _added, evidence, jsonl = self._apply(
+            project, compiled, tmp_path,
+            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback"),
+        )
+
+        assert self._violation(evidence)["severity"] == "minor"
+        wire = json.loads(jsonl.read_text(encoding="utf-8").splitlines()[0])
+        assert wire["severity"] == "minor"
+        assert wire["scope_downgrade"]["rule"] == "sourceless_path"
+
+    def test_a_conservative_trust_model_caps_nothing(
+        self, project, compiled, tmp_path, monkeypatch,
+    ):
+        from quodeq.context.trust_model import CONSERVATIVE
+
+        self._checker(monkeypatch, severity="major",
+                      reason="Path is built from a value with no validation.")
+
+        _added, evidence, _jsonl = self._apply(
+            project, compiled, tmp_path, trust_model=CONSERVATIVE)
+
+        assert self._violation(evidence)["severity"] == "major"
+
+    def test_the_gates_run_in_order_so_a_critical_can_fall_twice(
+        self, project, compiled, tmp_path, monkeypatch,
+    ):
+        """Provenance first (critical -> major), then scope (major -> minor).
+
+        Reversing the order loses the second hop entirely: apply_scope_gate
+        only ever looks at ``major``, so it would see a ``critical`` and pass.
+        """
+        from quodeq.context.trust_model import TrustModel
+
+        self._checker(monkeypatch, severity="critical",
+                      reason="Path is built from a value with no validation.")
+
+        _added, evidence, _jsonl = self._apply(
+            project, compiled, tmp_path,
+            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback"),
+        )
+
+        violation = self._violation(evidence)
+        assert violation["severity"] == "minor"
+        assert violation["provenance_downgrade"] is True
+
+    def test_a_compliance_is_never_touched(
+        self, project, compiled, tmp_path, monkeypatch,
+    ):
+        from quodeq.analysis.checks.runner import deterministic_judgments
+        from quodeq.analysis.checks import registry
+        from quodeq.core.events.models import Judgment
+
+        def fake(_context):
+            return [Judgment(practice_id="S-AUT-3", req="S-AUT-3",
+                             verdict="compliance", dimension="security",
+                             file="app/utils/text.py", line=1, severity="critical",
+                             reason="No path is built from a value here.")]
+
+        monkeypatch.setitem(registry.CHECKERS, "fake-gated", fake)
+        judgments = deterministic_judgments(
+            root=project, source_files=SOURCES, dimension="security",
+            compiled_dir=compiled(self.GATED, "security"))
+
+        assert [j.severity for j in judgments] == ["critical"]
+
+
+class TestTrustModelWiring:
+    """``apply_checks_for_run`` resolves the trust model the way the cache path does."""
+
+    def _config(self, project, compiled_dir, tmp_path):
+        from types import SimpleNamespace
+
+        from quodeq.analysis._types import RunConfig
+
+        work_dir = tmp_path / "run" / "evidence"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return RunConfig(
+            src=project, language="python", standards_dir=compiled_dir.parent,
+            work_dir=work_dir, manifest=SimpleNamespace(source_files=list(SOURCES)),
+        )
+
+    def test_the_trust_model_is_resolved_once_per_dimension(
+        self, project, compiled, tmp_path,
+    ):
+        """Resolution reads the profile and walks the manifests; doing it per
+        finding would repeat that work for every judgment."""
+        from unittest.mock import patch
+
+        from quodeq.analysis.checks.runner import apply_checks_for_run
+        from quodeq.context.trust_model import CONSERVATIVE
+
+        config = self._config(project, compiled(STANDARD), tmp_path)
+        evidence = Evidence(repository="r", language="python", date="d",
+                            source_file_count=3, files_read=3, coverage_pct=100.0)
+
+        with patch("quodeq.analysis.checks.runner.resolve_trust_model",
+                   return_value=CONSERVATIVE) as resolve:
+            added = apply_checks_for_run(config, "clean-architecture", evidence)
+
+        assert added == 2, "two findings"
+        assert resolve.call_count == 1
+        assert resolve.call_args.args[0] == project
 
 
 class TestBundledStandard:

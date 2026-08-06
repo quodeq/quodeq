@@ -53,8 +53,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
-from quodeq.analysis.mcp.scope_gate import apply_scope_gate
+from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
     DimensionCallbacks,
@@ -266,16 +265,13 @@ def _write_findings(
     # finding stay stuck at ``minor`` forever -- the exact same staleness
     # problem this whole re-gating pass exists to prevent, just in reverse.
     #
-    # Order matters, same as in enrich(): apply_provenance_gate first,
-    # because it can rewrite ``critical`` down to ``major``, and
-    # apply_scope_gate only ever acts on ``major``. Reversing the order
-    # would miss every finding that starts as ``critical``.
+    # apply_severity_gates owns the sequence and the order it must run in
+    # (see severity_gates.py); this call site owns only the decision to
+    # re-gate on replay at all.
     for finding in findings:
-        apply_provenance_gate(finding)
-        apply_scope_gate(finding, trust_model)
+        apply_severity_gates(finding, trust_model)
     for finding in pending:
-        apply_provenance_gate(finding)
-        apply_scope_gate(finding, trust_model)
+        apply_severity_gates(finding, trust_model)
     # Every caller of this function is a cache replay -- the dispatcher
     # writes its own fresh findings and never comes through here. Stamp the
     # origin so the live evaluation feed can show only what this scan is

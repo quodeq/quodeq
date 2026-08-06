@@ -8,15 +8,30 @@ assumption.
 The shape is the single biggest source of false positives in the current
 audit corpus (~40%) because the scanner defaults to "hosted multi-tenant
 web service" assumptions on what is in fact a desktop / CLI / library.
+
+Every manifest here is *analyzed*, untrusted input from the repository under
+evaluation, and detection is advisory with a well-defined UNKNOWN fallback.
+So nothing in this module may raise: a manifest that cannot be read or whose
+shape is nonsense degrades that one signal and leaves the rest intact. That
+has to hold against every failure mode, not the well-behaved ones -- deeply
+nested JSON or TOML overflows the parser's call stack and raises
+``RecursionError``, a ``RuntimeError`` subclass, and a scalar where a list
+belongs raises ``TypeError`` with every parser succeeding. ``detect_shape``
+has four callers that guard nothing (``_api_runner``, ``api_prompt_assembly``,
+``mcp/findings_server``, and the ``context`` re-export), so an escape here
+fails the whole run.
 """
 from __future__ import annotations
 
 import json
+import logging
 import re
 import tomllib
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 class Deployment(str, Enum):
@@ -75,28 +90,79 @@ _JS_MOBILE_HINTS = (
 _JS_UI_LIBS = ("react", "vue", "svelte", "preact", "@angular/core", "solid-js")
 
 
+#: Detection probes every manifest it knows about, so most repos miss most of
+#: them: a Python project has no Cargo.toml, and Quodeq's own root has neither
+#: Cargo.toml nor package.json. Absence is the expected case and belongs at
+#: debug. A manifest that exists and still cannot be read -- no permission, a
+#: truncated file, a parser blowing its stack -- is a signal we meant to have
+#: and lost, so that stays at WARNING.
+#:
+#: The exception type cannot carry that split on its own: opening a directory
+#: raises IsADirectoryError on POSIX but PermissionError (WinError 5) on
+#: Windows, which is indistinguishable from a genuine permission denial. So
+#: the not-a-file cases are settled up front by ``_manifest_missing`` (the
+#: same ``is_file()`` gate ``trust_model._read_profile`` uses) and the catch
+#: below only has to cover a file that disappears between the check and the
+#: open -- a race nobody can act on, so it stays quiet too.
+_ABSENT_MANIFEST = (FileNotFoundError, IsADirectoryError, NotADirectoryError)
+
+
+def _manifest_missing(path: Path) -> bool:
+    """True when *path* is not a readable regular file, on any platform.
+
+    ``Path.is_file()`` swallows its own OSError and answers False for a
+    missing entry, a directory and a broken symlink alike, which is exactly
+    the set that means "this project does not ship this manifest".
+    """
+    if path.is_file():
+        return False
+    _logger.debug("No manifest at %s", path)
+    return True
+
+
 def _read_text(path: Path) -> str | None:
+    if _manifest_missing(path):
+        return None
     try:
         return path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+    except _ABSENT_MANIFEST:
+        _logger.debug("Manifest %s vanished mid-scan", path)
+        return None
+    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+        _logger.warning("Ignoring unreadable manifest %s: %s", path, exc)
         return None
 
 
 def _read_toml(path: Path) -> dict[str, object] | None:
+    if _manifest_missing(path):
+        return None
     try:
         with path.open("rb") as fh:
             return tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
+    except _ABSENT_MANIFEST:
+        _logger.debug("Manifest %s vanished mid-scan", path)
+        return None
+    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+        # Wider than OSError/TOMLDecodeError on purpose: tomllib is a
+        # recursive-descent parser, so deeply nested tables overflow the stack
+        # and raise RecursionError. It bottoms out far shallower than the C
+        # JSON decoder -- a few thousand levels, not tens of thousands.
+        _logger.warning("Ignoring unreadable TOML manifest %s: %s", path, exc)
         return None
 
 
 def _read_json(path: Path) -> dict[str, object] | None:
+    # Absence is already handled quietly by _read_text, so reaching the handler
+    # below means the file exists and its contents are unusable.
     text = _read_text(path)
     if text is None:
         return None
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
+    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+        # Wider than json.JSONDecodeError: deeply nested arrays exhaust the C
+        # decoder's call stack and raise RecursionError, a RuntimeError.
+        _logger.warning("Ignoring unreadable JSON manifest %s: %s", path, exc)
         return None
     return data if isinstance(data, dict) else None
 
@@ -129,14 +195,19 @@ def _python_signals(repo: Path) -> tuple[Deployment | None, list[str], list[str]
         return None, [], []
     project_raw = pyproject.get("project") or {}
     project = project_raw if isinstance(project_raw, dict) else {}
-    deps_list = project.get("dependencies") or []
+    # isinstance, not `or []`: a scalar `dependencies = 5` is valid TOML, so
+    # every reader above succeeds and `list(5)` raised TypeError straight out
+    # of detect_shape. Same guard the optional-dependencies branch already
+    # uses -- a nonsense value drops that one signal, it does not fail a scan.
+    deps_raw = project.get("dependencies")
+    deps_list = deps_raw if isinstance(deps_raw, list) else []
     optional_deps = project.get("optional-dependencies") or {}
     optional_flat: list[str] = []
     if isinstance(optional_deps, dict):
         for group in optional_deps.values():
             if isinstance(group, list):
                 optional_flat.extend(group)
-    raw = list(deps_list) + optional_flat
+    raw = deps_list + optional_flat
     names = [_strip_dep_spec(d).lower() for d in raw if isinstance(d, str)]
     web = _matches_any(names, _PY_WEB_FRAMEWORKS)
     desktop = _matches_any(names, _PY_DESKTOP_HINTS)

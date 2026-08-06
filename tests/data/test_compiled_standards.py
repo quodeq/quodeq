@@ -33,6 +33,18 @@ class TestIterCompiledStandards:
 
         assert [stem for stem, _ in iter_compiled_standards(tmp_path)] == ["good"]
 
+    def test_skips_a_deeply_nested_file(self, tmp_path, deeply_nested_json):
+        """A hand-edited standard must never 500 a request, RecursionError
+        included: the C JSON decoder overflows its call stack on deeply nested
+        input and raises a RuntimeError subclass, which the narrow
+        (OSError, ValueError, UnicodeDecodeError) catch let escape."""
+        from quodeq.data.fs.compiled_standards import iter_compiled_standards
+
+        _write(tmp_path, "good", {"id": "good"})
+        (tmp_path / "nested.json").write_text(deeply_nested_json, encoding="utf-8")
+
+        assert [stem for stem, _ in iter_compiled_standards(tmp_path)] == ["good"]
+
     def test_missing_dir_yields_nothing(self, tmp_path):
         from quodeq.data.fs.compiled_standards import iter_compiled_standards
 
