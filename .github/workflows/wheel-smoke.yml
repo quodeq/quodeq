@@ -22,6 +22,10 @@ on:
       - '.github/workflows/wheel-smoke.yml'
   push:
     branches: [develop, main]
+  # Manual escape hatch when event delivery is down, see test.yml. Note
+  # workflow_dispatch ignores the paths filter above, so a manual run always
+  # builds the wheel rather than deciding it has nothing to do.
+  workflow_dispatch:
 
 jobs:
   smoke:
