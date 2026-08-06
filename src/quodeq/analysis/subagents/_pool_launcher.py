@@ -60,13 +60,16 @@ def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
 def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
     """Ratchet the run-level deadline forward to cover this pool's budget.
 
-    The granted (possibly auto-scaled) pool budget can exceed the run
-    deadline computed from the user's original limit; without this, the
-    job watchdog SIGTERMs a healthy run at original-limit+grace while the
-    pool believes it has hours left. Never shortens the deadline, and
-    leaves unlimited runs (no deadline) alone. Emits a marker so the job
-    watchdog follows, and notifies the lifecycle (via the CLI-wired
-    callback) so status.json and the dashboard countdown follow too.
+    AUTO-SCALED budgets only (the caller gates on time_limit=None): the
+    granted pool budget can exceed a deadline pre-set by an outer caller;
+    without this, the job watchdog SIGTERMs a healthy run at
+    original-limit+grace while the pool believes it has hours left. Never
+    call this with an explicit user budget — that budget is a run-wide
+    hard cap, and re-extending it per dim launch defeats it. Never
+    shortens the deadline, and leaves unlimited runs (no deadline) alone.
+    Emits a marker so the job watchdog follows, and notifies the lifecycle
+    (via the CLI-wired callback) so status.json and the dashboard
+    countdown follow too.
     """
     if time_limit == _UNLIMITED_BUDGET or options.deadline_at is None:
         return
@@ -127,7 +130,12 @@ def _launch_pool(
     # Must happen BEFORE base_ac is built: the pool snapshots deadline_at,
     # and every deadline consumer (watchdog, drain checks, dashboard
     # countdown) must agree on the granted budget, not the pre-scale one.
-    _extend_run_deadline(config.options, time_limit)
+    # Only the AUTO-SCALED budget may ratchet the deadline. An explicit
+    # time_limit is a run-wide HARD CAP: extending it here handed every
+    # dim's pool a fresh full budget, so a 1h run kept running for
+    # "1h after the LAST dim launch" (observed: run 838d807e).
+    if config.options.time_limit is None:
+        _extend_run_deadline(config.options, time_limit)
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
