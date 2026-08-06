@@ -1,5 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER, parseFileRef, complianceRatio } from '../../../utils/formatters.js';
@@ -12,6 +11,7 @@ import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/termi
 import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel, scopeGateRuleLabel } from '../../../strings/labels.js';
 
@@ -170,68 +170,34 @@ function LowConfidenceToggle({ count, expanded, onToggle }) {
   );
 }
 
-// Virtualizer extracted into its own component so the parent can remount it
-// (via `key={activeFilter}`) when the filter changes. A fresh virtualizer
-// starts with empty measurement caches, sidestepping the class of bugs
-// where stale heights at recycled indices cause row overlap.
-function VirtualList({ items, scrollElement, renderItem }) {
-  const virtualizer = useVirtualizer({
-    count: items.length,
-    getScrollElement: () => scrollElement,
-    estimateSize: (i) => {
-      const item = items[i];
-      if (!item) return 140;
-      if (item.kind === 'sev-header' || item.kind === 'compliance-header') return 36;
-      if (item.kind === 'low-conf-toggle') return 36;
-      return 160;
-    },
-    overscan: 6,
-    getItemKey: (i) => {
-      const item = items[i];
-      if (!item) return i;
-      if (item.kind === 'sev-header') return `h-${item.sev}`;
-      if (item.kind === 'compliance-header') return 'h-compliance';
-      if (item.kind === 'low-conf-toggle') return 'h-lowconf';
-      if (item.kind === 'violation') {
-        return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
-      }
-      if (item.kind === 'low-conf-row') {
-        return `lc-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
-      }
-      if (item.kind === 'compliance') {
-        return `c-${item.c.dimension || ''}:${item.c.file || ''}:${item.c.line ?? ''}:${item.c.principle || ''}`;
-      }
-      return i;
-    },
-  });
+function estimateItemSize(items) {
+  return (i) => {
+    const item = items[i];
+    if (!item) return 140;
+    if (item.kind === 'sev-header' || item.kind === 'compliance-header') return 36;
+    if (item.kind === 'low-conf-toggle') return 36;
+    return 160;
+  };
+}
 
-  const totalSize = virtualizer.getTotalSize();
-  const virtualItems = virtualizer.getVirtualItems();
-
-  return (
-    <div className="vlive-violations-virtual" style={{ position: 'relative', width: '100%', height: totalSize }}>
-      {virtualItems.map((virtualRow) => {
-        const item = items[virtualRow.index];
-        if (!item) return null;
-        return (
-          <div
-            key={virtualRow.key}
-            data-index={virtualRow.index}
-            ref={virtualizer.measureElement}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${virtualRow.start}px)`,
-            }}
-          >
-            {renderItem(item)}
-          </div>
-        );
-      })}
-    </div>
-  );
+function itemKey(items) {
+  return (i) => {
+    const item = items[i];
+    if (!item) return i;
+    if (item.kind === 'sev-header') return `h-${item.sev}`;
+    if (item.kind === 'compliance-header') return 'h-compliance';
+    if (item.kind === 'low-conf-toggle') return 'h-lowconf';
+    if (item.kind === 'violation') {
+      return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
+    }
+    if (item.kind === 'low-conf-row') {
+      return `lc-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
+    }
+    if (item.kind === 'compliance') {
+      return `c-${item.c.dimension || ''}:${item.c.file || ''}:${item.c.line ?? ''}:${item.c.principle || ''}`;
+    }
+    return i;
+  };
 }
 
 const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss, severityFilter }) {
@@ -302,12 +268,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
     return arr;
   }, [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, file.compliance, totalCompliance]);
 
-  // The dashboard's main column owns vertical scroll; tanstack-virtual needs
-  // a ref to that ancestor to track scroll position.
-  const [scrollElement, setScrollElement] = useState(null);
-  useLayoutEffect(() => {
-    setScrollElement(document.querySelector('.app-shell__main-column > .dashboard'));
-  }, []);
+  const scrollElement = useDashboardScrollElement();
 
   // Snap to top whenever the filter changes so a giant list doesn't dump the
   // user mid-scroll into a freshly-mounted virtualizer.
@@ -394,7 +355,14 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
         />
       )}
 
-      <VirtualList key={virtualKey} items={items} scrollElement={scrollElement} renderItem={renderItem} />
+      <VirtualList
+        key={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        estimateSize={estimateItemSize(items)}
+        getItemKey={itemKey(items)}
+        renderItem={renderItem}
+      />
     </>
   );
 });
