@@ -1298,6 +1298,12 @@ export default function App() {
               {!state.serverConnected && (
                 <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
               )}
+              {/* Route pushes render the target page in a transition
+                  (useNavStack); this bar is the feedback while that render
+                  runs. Without it a heavy detail page (or a slow webview
+                  engine) leaves the click looking ignored — there is no
+                  yield point where a spinner could otherwise paint. */}
+              {state.navPending && <div className="nav-pending-bar" aria-hidden="true" />}
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>

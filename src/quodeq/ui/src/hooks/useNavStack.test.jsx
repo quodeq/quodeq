@@ -325,6 +325,33 @@ describe('useNavStack navReplace (repositories tab flips must not grow history)'
   });
 });
 
+describe('useNavStack navPending', () => {
+  let historyAdapter;
+
+  beforeEach(() => {
+    historyAdapter = {
+      pushState: vi.fn(),
+      replaceState: vi.fn(),
+      back: vi.fn(),
+      go: vi.fn(),
+    };
+  });
+
+  it('exposes a boolean pending flag that settles false after a push', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+    expect(result.current.navPending).toBe(false);
+
+    act(() => { result.current.navPush({ page: 'evalprinciple' }); });
+
+    // act() flushes the transition; the navigation itself must have landed.
+    expect(result.current.navPending).toBe(false);
+    expect(result.current.navStack.at(-1).page).toBe('evalprinciple');
+  });
+});
+
 describe('useNavStack history-state payload stripping', () => {
   let historyAdapter;
 
