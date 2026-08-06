@@ -65,6 +65,18 @@ updates:
       tanstack:
         patterns:
           - "@tanstack/*"
+    # eslint majors are not ours to take. eslint.config.js exists for exactly
+    # one rule, eslint-plugin-react's react/jsx-no-literals, which drives the
+    # i18n string ratchet in tools/check_strings.mjs. The plugin's latest
+    # release (7.37.5) caps its peer range at eslint ^9.7, so eslint 10 fails
+    # `npm ci` with ERESOLVE and takes the whole UI build down with it, not
+    # just linting (#1036). Same class as the react/tanstack groups above, but
+    # ungroupable: no published plugin version accepts eslint 10, so there is
+    # no combination Dependabot could open that would install. Drop this ignore
+    # once eslint-plugin-react widens its peer range.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
