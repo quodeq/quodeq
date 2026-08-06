@@ -173,13 +173,40 @@ def _downgrade(finding: dict, rule: str) -> bool:
     return True
 
 
-def _restore(finding: dict, marker: dict) -> bool:
-    restored = marker.get("from", "major")
-    finding["severity"] = restored
+def _restore(finding: dict, marker: object) -> bool:
+    """Restore *finding*'s severity from a ``scope_downgrade`` *marker*, but
+    only when the marker is one this gate could plausibly have written
+    itself.
+
+    ``_downgrade`` only ever writes ``{"rule": ..., "from": "major", "to":
+    "minor"}``, so anything else reaching here is corrupt or hostile: the
+    marker survives a round trip through seams that only validate "dict
+    whose values are all strings" (``finding_mappings._coerce_scope_downgrade``
+    and its twin in ``core/evidence/_jsonl.py``), plus a live
+    ``report_finding`` MCP call can set the field directly. Trusting it would
+    let unvalidated input dictate ``severity`` -- including a promotion to
+    ``critical`` that never passed ``apply_provenance_gate``, or a value like
+    ``"blocker"`` that fails the ``findings.severity`` CHECK constraint and
+    silently drops the row on insert (see ``_upgrade_v3_to_v4``'s docstring).
+
+    When the marker doesn't check out, drop it and leave ``severity`` exactly
+    as found -- this gate must never raise, and must never write a severity
+    it did not itself previously stamp.
+    """
+    if not isinstance(marker, dict) or marker.get("from") != "major":
+        del finding[SCOPE_DOWNGRADE_MARKER]
+        _log.debug(
+            "scope gate: dropped an unrecognized scope_downgrade marker on "
+            "%s finding, severity left at %s (%s)",
+            finding.get("req"), finding.get("severity"), finding.get("file"),
+        )
+        return False
+
+    finding["severity"] = "major"
     del finding[SCOPE_DOWNGRADE_MARKER]
     _log.debug(
-        "scope gate: restored %s finding to %s, marker %s no longer applies (%s)",
-        finding.get("req"), restored, marker.get("rule"), finding.get("file"),
+        "scope gate: restored %s finding to major, marker %s no longer applies (%s)",
+        finding.get("req"), marker.get("rule"), finding.get("file"),
     )
     return True
 
@@ -213,6 +240,18 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
         if model is not None and _matched_rule(finding, model) is None:
             return _restore(finding, marker)
         return False
+
+    # A marker surviving on a finding that is not (or is no longer) minor is
+    # stale: it documents a cap this gate is not currently enforcing, and left
+    # in place it would render in the UI as "capped to minor" on a finding
+    # that plainly isn't. Clear it once the model says the rule that would
+    # justify it does not fire. Same no-regression rule as everywhere else in
+    # this module: model is None means no information, so nothing is cleared.
+    # This does not count as changing the finding's severity, so it never
+    # causes this function to return True on its own.
+    if (marker is not None and model is not None
+            and _matched_rule(finding, model) is None):
+        del finding[SCOPE_DOWNGRADE_MARKER]
 
     if model is None:
         return False

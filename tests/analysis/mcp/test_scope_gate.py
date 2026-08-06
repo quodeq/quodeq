@@ -1,6 +1,8 @@
 """Tests for the declared-threat-model severity gate."""
 from __future__ import annotations
 
+import pytest
+
 from quodeq.analysis.mcp.scope_gate import (
     SCOPE_DOWNGRADE_MARKER,
     apply_scope_gate,
@@ -281,6 +283,111 @@ def test_marker_left_alone_when_model_is_none():
     assert apply_scope_gate(f, None) is False
     assert f["severity"] == "minor"
     assert SCOPE_DOWNGRADE_MARKER in f
+
+
+# --- CRITICAL: _restore must reject a marker it did not write --------------
+#
+# ``scope_downgrade`` round-trips through the evidence JSONL, the cache,
+# evaluation/<dim>.json, events.jsonl, and SQLite -- and every read seam on
+# that path (finding_mappings._coerce_scope_downgrade, its twin in
+# core/evidence/_jsonl.py, _report_parsing.build_finding,
+# violations_parsing) only checks "dict" (some also require string values,
+# but never checks WHICH string). A live report_finding MCP call can also
+# set the field directly. Any of those seams can hand _restore a marker this
+# gate never wrote. It must never raise, and must never write a severity
+# other than "major" from it.
+
+_TIGHTENED = TrustModel(multi_tenant=True, network_exposure="public")
+
+
+@pytest.mark.parametrize("marker", [
+    {"from": "critical"},   # would promote past what the gate ever put here,
+                             # and past apply_provenance_gate
+    {"from": "blocker"},    # not in the sqlite CHECK constraint's allowed set
+    {"from": None},         # NOT NULL violation on insert
+    {"from": 42},           # NOT NULL violation on insert
+    {"rule": "sourceless_path", "to": "minor"},  # missing "from" entirely
+    "sourceless_path",      # marker is a bare string, not a dict
+    ["sourceless_path"],    # marker is a list
+    True,                   # marker is a bool
+], ids=[
+    "from-critical", "from-blocker", "from-none", "from-42",
+    "missing-from", "string-marker", "list-marker", "bool-marker",
+])
+def test_restore_rejects_a_marker_it_did_not_write(marker):
+    f = _finding(severity="minor")
+    f[SCOPE_DOWNGRADE_MARKER] = marker
+
+    # Nothing must raise, severity must not move, and the untrustworthy
+    # marker must not survive to be checked again on the next replay.
+    assert apply_scope_gate(f, _TIGHTENED) is False
+    assert f["severity"] == "minor"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_restore_accepts_the_marker_the_gate_actually_writes():
+    # The one shape _downgrade ever produces must still restore correctly --
+    # the rejection above must not have turned into a blanket no-op.
+    f = _finding()
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+
+    assert apply_scope_gate(f, _TIGHTENED) is True
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+# --- IMPORTANT: a stale marker on a non-minor finding is cleared -----------
+
+def test_stale_marker_cleared_on_major_finding_when_rule_no_longer_fires():
+    # A finding was capped to minor, then something outside this gate (a
+    # corrupt cache entry, a hand-edited JSONL, a merge with a fresh live
+    # finding at the same location) put its severity back to major without
+    # going through _restore. The marker is now stale: it still claims the
+    # finding was "capped to minor" even though it plainly isn't.
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    assert f["severity"] == "minor"
+    f["severity"] = "major"
+
+    assert apply_scope_gate(f, _TIGHTENED) is False
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_stale_marker_cleared_on_critical_finding_when_rule_no_longer_fires():
+    f = _finding(severity="critical")
+    f[SCOPE_DOWNGRADE_MARKER] = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+
+    assert apply_scope_gate(f, _TIGHTENED) is False
+    assert f["severity"] == "critical"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_stale_marker_on_major_finding_left_alone_when_model_is_none():
+    # Same no-regression guarantee as the restore direction: absence of
+    # model information must not clear a marker either.
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    f["severity"] = "major"
+
+    assert apply_scope_gate(f, None) is False
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER in f
+
+
+def test_stale_marker_on_major_finding_refreshed_not_cleared_when_rule_still_fires():
+    # If the rule that would justify the cap still fires, the marker isn't
+    # stale -- it's re-earned, so the normal downgrade path re-caps the
+    # finding rather than leaving a mismatched marker in place.
+    f = _finding()
+    apply_scope_gate(f, LOCAL)
+    assert f["severity"] == "minor"
+    f["severity"] = "major"
+
+    assert apply_scope_gate(f, LOCAL) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "sourceless_path"
 
 
 # --- integration: wired into FindingEnricher.enrich ------------------------
