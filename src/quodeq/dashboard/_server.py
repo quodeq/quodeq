@@ -116,6 +116,16 @@ def _serve_and_wait(
     if hasattr(signal, "SIGTSTP"):
         signal.signal(signal.SIGTSTP, _handle_tstp)
 
+    def _handle_term(_signum, _frame) -> None:
+        # Without this the API child outlives a `kill`/logout of the dashboard
+        # and keeps holding its port, so the next launch scans past it and the
+        # orphan lingers until it's found by hand. Only KeyboardInterrupt and
+        # SIGTSTP used to reach _stop_children.
+        _stop_children()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _handle_term)
+
     if config.build.use_native and config.build.open_browser:
         _serve_native(action_api_url, action_api_process, _stop_children)
     elif config.build.open_browser:
@@ -161,16 +171,18 @@ def _serve_native(
 
     instance = InstanceController()
 
-    if not instance.try_acquire():
+    # Probe rather than acquire: the *window* process owns the reload socket,
+    # because it is the only one that can act on a reload. Binding it here
+    # would leave the child unable to bind, its listener dead, and every
+    # relaunch's reload dropped into a socket nobody reads.
+    if instance.probe_existing():
         try:
             instance.send_reload(action_api_url)
         except (ConnectionRefusedError, OSError):
+            # The instance answered the probe but died before the send. Fall
+            # through and open our own window; its try_acquire clears the
+            # now-stale socket.
             logging.getLogger(__name__).warning("Could not reach existing instance — opening new window")
-            instance.shutdown()
-            instance = InstanceController()
-            if not instance.try_acquire():
-                stop_children()
-                return
         else:
             stop_children()
             return

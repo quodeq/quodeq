@@ -1161,7 +1161,17 @@ def main() -> None:
     window.events.loaded += _on_loaded
     window.events.closing += _make_on_closing(api, window)
 
-    instance.start_listening(on_reload=_on_reload)
+    # Own the reload socket here, not in the parent: this process holds the
+    # window, so it is the only one that can bring it forward on a relaunch.
+    # try_acquire is what binds the socket — without it start_listening has
+    # nothing to accept on.
+    if not instance.try_acquire():
+        _logger.warning(
+            "Another instance owns %s — this window will not answer reloads",
+            instance.sock_path,
+        )
+    else:
+        instance.start_listening(on_reload=_on_reload)
 
     storage_dir = str(_quodeq_dir() / "webview")
 

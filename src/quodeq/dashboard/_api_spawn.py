@@ -1,6 +1,7 @@
 """Action API subprocess spawning helpers."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -59,8 +60,15 @@ def spawn_action_api(
         **_popen_platform_kwargs(),
     )
     try:
-        pid_file_path.write_text(str(proc.pid), encoding="utf-8")
-    except (OSError, AttributeError) as exc:
+        pid_file_path.write_text(
+            json.dumps({
+                "pid": proc.pid,
+                "host": env[_ENV_ACTION_API_HOST],
+                "port": port,
+            }),
+            encoding="utf-8",
+        )
+    except (OSError, AttributeError, TypeError) as exc:
         log_warning(f"Could not write PID file: {exc}")
     return proc
 
