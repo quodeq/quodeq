@@ -273,7 +273,11 @@ export function useEvaluation() {
       // racing the ~33s server-side kill path) must KEEP the job: clearing
       // it hid a still-running scan and let a second concurrent scan start
       // on the same project.
-      setJobError(t("evaluate.cancelFailed"));
+      // Keep the backend's sentence as a detail suffix: a 409 ("already
+      // finished") and a 500 are different situations for the user, and the
+      // translated summary alone flattened them into one. Same policy as
+      // apiErrorMessage, which preserves err.message for unmapped codes.
+      setJobError(err?.message ? `${t("evaluate.cancelFailed")} (${err.message})` : t("evaluate.cancelFailed"));
       if (err?.status !== 409 && err?.status !== 404) return;
       const id = jobId;
       if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
