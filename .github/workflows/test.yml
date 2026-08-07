@@ -5,6 +5,13 @@ on:
     branches: [develop, main]
   push:
     branches: [develop]
+  # Manual escape hatch. On 2026-08-06 a GitHub incident stopped delivering
+  # pull_request/push events to Actions: runs were never created, so a PR sat
+  # with zero checks and no way to produce them. Run creation and the runners
+  # themselves were fine, only event delivery was down. workflow_dispatch goes
+  # through the API instead of the event pipeline, and its check runs attach to
+  # the dispatched ref's head commit, which is where branch protection looks.
+  workflow_dispatch:
 
 jobs:
   test:
@@ -25,7 +32,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.3.2
+        uses: astral-sh/setup-uv@v9.0.0
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -68,9 +75,21 @@ jobs:
         # miss a 5s window purely by not being scheduled. Multiply every
         # budget() wait here rather than hand-tuning ~45 call sites for the
         # slowest runner and slowing local runs down with them.
+        #
+        # --timeout must move with that scale. pyproject.toml caps every test
+        # at 60s, which is generous on an idle box but not against 4x-scaled
+        # waits on a saturated one: a runner-wide stall inflates every worker
+        # at once (run 31077131601 pushed four workers 3-10x for ~100s), and
+        # whichever test is mid-flight when it crosses 60s is killed. On
+        # Windows pytest-timeout only has the thread method, which ends the
+        # test by calling os._exit, so the worker dies without reporting and
+        # xdist blames it on "worker crashed while running <test>" - a
+        # segfault-shaped message for what is really a timeout. 60 * 4 keeps
+        # the cap proportional to the waits it has to cover; a genuine
+        # deadlock still fails inside the job's 15-minute budget.
         env:
           QUODEQ_TEST_TIMEOUT_SCALE: "4"
-        run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto
+        run: uv run pytest tests/ -v -ra --tb=short -m "not integration" -n auto --timeout=240
 
   ui:
     # The web UI ships ~1600 tests (vitest .test.jsx + node:test .test.js) that
@@ -99,3 +118,10 @@ jobs:
         working-directory: src/quodeq/ui
         # test:all = node --test (.test.js) + vitest run (.test.jsx).
         run: npm run test:all
+
+      - name: Check hardcoded UI strings (i18n ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on user-visible string literals not in tools/strings_baseline.json.
+        # New strings go in src/strings/en.json via t(); shrunk counts are locked
+        # in with `npm run lint:strings:update`.
+        run: npm run lint:strings

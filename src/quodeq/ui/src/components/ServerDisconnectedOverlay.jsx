@@ -1,4 +1,11 @@
 import { useApi } from '../api/ApiContext.jsx';
+import { t } from '../strings/index.js';
+
+// The shell command to restart the server: identity, not translatable copy.
+// The literal command to type. Not copy: translating it would print a
+// command that does not exist.
+// eslint-disable-next-line i18n/no-prose-literals
+const RESTART_COMMAND = 'quodeq dashboard';
 
 export default function ServerDisconnectedOverlay({ onReconnect }) {
   const { getHealth } = useApi();
@@ -16,11 +23,11 @@ export default function ServerDisconnectedOverlay({ onReconnect }) {
             <line x1="12" y1="20" x2="12.01" y2="20" />
           </svg>
         </div>
-        <h2>Server disconnected</h2>
-        <p>The Quodeq server is not running. Start it from the menu bar icon or run:</p>
-        <code>quodeq dashboard</code>
+        <h2>{t('common.serverDisconnected')}</h2>
+        <p>{t('common.serverDisconnectedBody')}</p>
+        <code>{RESTART_COMMAND}</code>
         <button type="button" className="server-retry-btn" onClick={() => getHealth().then(() => onReconnect()).catch((err) => console.warn('Reconnect failed:', err))}>
-          Retry connection
+          {t('common.retryConnection')}
         </button>
       </div>
     </div>

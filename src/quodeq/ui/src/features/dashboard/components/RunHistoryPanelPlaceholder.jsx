@@ -1,4 +1,5 @@
 import { SectionLabel } from '../../../components/terminal/index.js';
+import { t } from '../../../strings/index.js';
 
 // Suspense fallback for the lazy-loaded RunHistoryPanel. Rides the same
 // `.run-history-panel` selectors the real panel does (dashboard.css /
@@ -17,7 +18,7 @@ export default function RunHistoryPanelPlaceholder() {
       <div className="run-history-panel__header">
         {/* Deliberately omits the real header's controls/stats — both are
             single-line flex rows, so leaving them out doesn't change height. */}
-        <SectionLabel>score_history</SectionLabel>
+        <SectionLabel>{t('overview.scoreHistoryLabel')}</SectionLabel>
       </div>
       <div className="run-history-panel__chart-slot" />
     </section>

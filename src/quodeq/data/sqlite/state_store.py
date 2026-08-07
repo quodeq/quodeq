@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
 
 from quodeq.core.events.models import Judgment
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite._row_mappers import judgment_to_row
 
@@ -18,16 +20,19 @@ _logger = logging.getLogger(__name__)
 _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
+_GRADES_ALGO_KEY = "grades_algo_version"
 
 _INSERT_FINDING = """
 INSERT OR IGNORE INTO findings (
     schema_version, practice_id, dimension, requirement, verdict, severity,
     file, line, end_line, title, reason, snippet, violation_type, context,
-    scope, req_refs_json, dedup_key, confidence, provenance_downgrade
+    scope, req_refs_json, dedup_key, confidence, provenance_downgrade,
+    scope_downgrade_json
 ) VALUES (
     :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
     :file, :line, :end_line, :title, :reason, :snippet, :violation_type, :context,
-    :scope, :req_refs_json, :dedup_key, :confidence, :provenance_downgrade
+    :scope, :req_refs_json, :dedup_key, :confidence, :provenance_downgrade,
+    :scope_downgrade_json
 )
 """
 
@@ -155,6 +160,31 @@ class SQLiteStateStore:
             )
             conn.commit()
 
+    def get_grades_algo_version(self) -> int | None:
+        """Version of the grade math the stored grade tables were computed with.
+
+        None means the tables predate the stamp (or were never computed);
+        callers treat that as stale so pre-stamp DBs heal on first contact.
+        """
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT value FROM run_meta WHERE key = ?", (_GRADES_ALGO_KEY,)
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return None
+
+    def save_grades_algo_version(self, version: int) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
+                (_GRADES_ALGO_KEY, str(version)),
+            )
+            conn.commit()
+
     # --- grade tables -----------------------------------------------------
 
     def record_dimension_score(
@@ -269,7 +299,5 @@ class SQLiteStateStore:
 
     def read_run_score_from_dim_scores(self, params: "ScoringParams | None" = None) -> dict:
         """Compute the run-level score from non-null dimension scores (weighted when params enable dimension weights)."""
-        from quodeq.services.scoring.projector_scoring import compute_run_score  # noqa: PLC0415
-        from quodeq.core.scoring.params import DEFAULT_PARAMS  # noqa: PLC0415
         rows = self.read_dimension_scores()
         return compute_run_score(rows, params=params if params is not None else DEFAULT_PARAMS)

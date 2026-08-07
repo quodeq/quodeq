@@ -28,7 +28,7 @@ from quodeq.services.mutation_rescore import (
 )
 from quodeq.services.verified import unverify_finding, verified_entries
 from quodeq.shared.utils import get_evaluations_dir
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _MAX_DISMISSED_LIMIT = 5000
@@ -59,12 +59,31 @@ def _invalid_body_fields(
     return None
 
 
-def _project_dir(evaluations_dir: str, project: str) -> Path:
+def _project_dir_or_none(evaluations_dir: str, project: str) -> Path | None:
+    """Resolve *project* to its directory by listing, or None if there is none.
+
+    *project* is matched against real entries under *evaluations_dir* and never
+    concatenated onto it, so a traversal or absolute-path value matches nothing
+    instead of having to be contained after the fact.
+
+    None means absent, not invalid: validate_path_segment has already rejected
+    syntactically bad names above.
+    """
     validate_path_segment(project)
-    base = Path(evaluations_dir).resolve()
-    resolved = (base / project).resolve()
-    if not resolved.is_relative_to(base):
-        abort(400, description="Invalid project path")
+    resolved = resolve_child_dir(evaluations_dir, project)
+    return Path(resolved) if resolved is not None else None
+
+
+def _project_dir(evaluations_dir: str, project: str) -> Path:
+    """As above, but 404 when the project has no directory.
+
+    For the mutating endpoints, which have nothing to act on without one.
+    Read endpoints that answer "nothing here" with an empty list call
+    _project_dir_or_none directly.
+    """
+    resolved = _project_dir_or_none(evaluations_dir, project)
+    if resolved is None:
+        abort(404, description="Project not found")
     return resolved
 
 
@@ -89,12 +108,10 @@ def register_findings_routes(app: Flask) -> None:
         raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
         limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
         offset = max(0, request.args.get("offset", 0, type=int))
-        items = load_dismissed(
-            _project_dir(_eval_dir(), project),
-            offset=offset,
-            limit=limit,
-        )
-        return jsonify(items)
+        project_dir = _project_dir_or_none(_eval_dir(), project)
+        if project_dir is None:
+            return jsonify([])
+        return jsonify(load_dismissed(project_dir, offset=offset, limit=limit))
 
     @app.post("/api/findings/dismiss")
     def dismiss() -> tuple[Response, int]:
@@ -186,7 +203,10 @@ def register_findings_routes(app: Flask) -> None:
         project = request.args.get("project", "")
         if not project:
             return jsonify([])
-        return jsonify(verified_entries(_project_dir(_eval_dir(), project)))
+        project_dir = _project_dir_or_none(_eval_dir(), project)
+        if project_dir is None:
+            return jsonify([])
+        return jsonify(verified_entries(project_dir))
 
     @app.post("/api/findings/unverify")
     def unverify() -> tuple[Response, int]:

@@ -26,8 +26,8 @@ from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.core.types import JobSnapshot
 from quodeq.services.evaluation_mixin import FsEvaluationMixin, _discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
-from quodeq.shared.dimensions_state import DimState, write_dim_state
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _seed_cache_entries(cache_root: Path, keys: list[str]) -> LocalFileBackend:
@@ -63,7 +63,7 @@ class TestDiscardSkipsScoring:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
             result = m.cancel_evaluation(
@@ -82,7 +82,7 @@ class TestDiscardSkipsScoring:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
@@ -265,7 +265,7 @@ class TestProviderDiscardPurgesRun:
         # the liveness check report the pid dead once "killed" — but leave
         # status.json untouched, exactly like a wedged process would.
         import quodeq.services._external_jobs as _ext_mod
-        import quodeq.services._index_sync as _sync_mod
+        import quodeq.data.sqlite._index_sync as _sync_mod
         original_kill_tree = _ext_mod._kill_tree
         original_alive = _sync_mod._is_pid_alive
         pid_killed = False
@@ -376,7 +376,7 @@ class TestRouteDiscardBlocksScoringResurrection:
         )
         scored = threading.Event()
         with patch(
-            "quodeq.api._evaluation_routes._score_completed_evidence",
+            "quodeq.api._evaluation_routes.score_completed_evidence",
             side_effect=lambda *a, **k: scored.set(),
         ):
             get_resp = client.get("/api/evaluations/j-disc")

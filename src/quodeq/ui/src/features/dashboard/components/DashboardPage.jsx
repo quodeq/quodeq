@@ -6,6 +6,7 @@ import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
+import { t } from '../../../strings/index.js';
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
@@ -15,9 +16,9 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
     // — they just haven't finished yet.
     return (
       <EmptyState
-        title="First evaluation in progress"
-        description="The overview will fill in once a run finishes. You can watch dimensions complete in History."
-        actionLabel="Open history"
+        title={t('overview.firstEvalTitle')}
+        description={t('overview.firstEvalDesc')}
+        actionLabel={t('overview.openHistory')}
         onAction={() => onNavigate?.('history')}
       />
     );
@@ -30,23 +31,23 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
   if (selectedSource === 'shared') {
     return (
       <EmptyState
-        title="No completed evaluation yet"
-        description="no completed evaluation in this remote project yet"
+        title={t('overview.noCompletedEvalTitle')}
+        description={t('overview.noCompletedEvalSharedDesc')}
       />
     );
   }
   return (
     <EmptyState
-      title="No completed evaluation yet"
-      description="Previous attempts didn't finish cleanly. Start a new evaluation to populate the overview."
-      actionLabel="Start evaluation"
+      title={t('overview.noCompletedEvalTitle')}
+      description={t('overview.noCompletedEvalDesc')}
+      actionLabel={t('overview.startEvaluation')}
       onAction={() => onNavigate?.('evaluate')}
     />
   );
 }
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
   // No readiness check here on purpose: the page only mounts this component
@@ -80,7 +81,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
         <div className="section-header">
           <h3 className="section-title">{focusedDimension}</h3>
           <button type="button" className="btn-secondary" onClick={() => setFocusedDimension(null)}>
-            Show all
+            {t('overview.showAll')}
           </button>
         </div>
         <DimensionCard title={focusedDimension} dimension={focusedDimensionData} isSingleFocus={true} />
@@ -93,7 +94,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
         trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity, selectedSource,
-        scoresPending,
+        scoresPending, customFormula,
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
@@ -136,7 +137,7 @@ export function selectDashboardProjectInfo({ selectedSource, projects, selectedP
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false } = data;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
@@ -308,9 +309,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
             <EmptyState
-              title="No local projects yet"
-              description="Your team’s online repository has published projects you can browse without scanning anything locally."
-              actionLabel="Browse remote repositories"
+              title={t('overview.noLocalProjectsTitle')}
+              description={t('overview.noLocalProjectsDesc')}
+              actionLabel={t('overview.browseRemote')}
               onAction={() => onNavigate?.('projects')}
             />
           </div>
@@ -322,9 +323,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
           <EmptyState
-            title="No projects yet"
-            description="Add a project to start analyzing code quality."
-            actionLabel="Add a project"
+            title={t('overview.noProjectsTitle')}
+            description={t('overview.noProjectsDesc')}
+            actionLabel={t('overview.addProject')}
             onAction={() => onNavigate?.('projects')}
           />
         </div>
@@ -337,9 +338,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
           <EmptyState
-            title="No project selected"
-            description="Pick a project to view its overview."
-            actionLabel="Choose project"
+            title={t('overview.noProjectSelectedTitle')}
+            description={t('overview.noProjectSelectedDesc')}
+            actionLabel={t('overview.chooseProject')}
             onAction={() => onNavigate?.('projects')}
           />
         </div>
@@ -358,7 +359,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         <>
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-            <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+            <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />
           </div>
         </>
       );
@@ -368,9 +369,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
           <EmptyState
-            title="Couldn't load this project"
+            title={t('overview.loadProjectFailedTitle')}
             description={error}
-            actionLabel="Retry"
+            actionLabel={t('overview.retry')}
             onAction={() => callbacks.onRetry?.()}
           />
         </div>
@@ -390,9 +391,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}${isFetching ? ' dashboard-refreshing' : ''}`}>
           <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
           <EmptyState
-            title="No evaluations yet"
-            description={`Run an evaluation for ${projectName} to populate this page.`}
-            actionLabel="Start evaluation"
+            title={t('overview.noEvalsTitle')}
+            description={t('overview.noEvalsDesc', { name: projectName })}
+            actionLabel={t('overview.startEvaluation')}
             onAction={() => onNavigate?.('evaluate')}
           />
         </div>
@@ -411,7 +412,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         <>
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-            <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />
+            <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />
           </div>
         </>
       );
@@ -421,9 +422,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
           <EmptyState
-            title="Couldn't load this run"
-            description="This run's data didn't come back. Try refreshing."
-            actionLabel="Retry"
+            title={t('overview.loadRunFailedTitle')}
+            description={t('overview.loadRunFailedDesc')}
+            actionLabel={t('overview.retry')}
             onAction={() => callbacks.onRetry?.()}
           />
         </div>
@@ -456,10 +457,10 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           the wait legible instead of looking like the page hung. runMode only
           -- the Overview shows the OverviewSkeleton (inside .dashboard-page,
           see showOverviewSkeleton) instead. */}
-      {isLoading && runMode && <LoadingScreen variant="inline" message={projectName ? `Loading ${projectName}…` : undefined} />}
+      {isLoading && runMode && <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />}
       <div className={`dashboard-page dashboard-fade ${isDimmed ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
-        {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
+        {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
         {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
         {/* No runMode equivalent of the Overview's grace-fallback loader: in
             runMode contentReady is `!!dashboard`, so the instant dashboard lands
@@ -469,7 +470,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         {dashboard && contentReady && (
           <DashboardContent
             runMode={runMode}
-            data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending }}
+            data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula }}
             focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
             callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onNavigate, onGranularityChange }}
           />

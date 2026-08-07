@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useLibrary } from '../hooks/useLibrary.js';
+import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 function LibraryCard({ standard, onImport, importing }) {
   const principleCount = standard.principles?.length ?? 0;
@@ -18,9 +20,9 @@ function LibraryCard({ standard, onImport, importing }) {
         <p className="library-card-description">{standard.description}</p>
       )}
       <div className="library-card-counts">
-        <span>{principleCount} {principleCount === 1 ? 'principle' : 'principles'}</span>
+        <span>{principleCount === 1 ? t('standards.principlesCountOne', { count: principleCount }) : t('standards.principlesCountMany', { count: principleCount })}</span>
         <span className="library-card-counts-sep">·</span>
-        <span>{requirementCount} {requirementCount === 1 ? 'requirement' : 'requirements'}</span>
+        <span>{requirementCount === 1 ? t('standards.requirementsCountOne', { count: requirementCount }) : t('standards.requirementsCountMany', { count: requirementCount })}</span>
       </div>
       <div className="library-card-footer">
         <button
@@ -29,7 +31,7 @@ function LibraryCard({ standard, onImport, importing }) {
           onClick={() => onImport(standard.file || standard.id)}
           disabled={importing}
         >
-          Import
+          {t('standards.importBtn')}
         </button>
       </div>
     </div>
@@ -48,7 +50,7 @@ export default function LibraryBrowser({ onClose, onImported }) {
       onClose();
     } catch (err) {
       console.error('Import failed:', err);
-      setImportError(err.message || 'Import failed. Check the standard file and try again.');
+      setImportError(apiErrorMessage(err, 'standards.importFailedRetry'));
     }
   };
 
@@ -56,8 +58,8 @@ export default function LibraryBrowser({ onClose, onImported }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-dialog modal-dialog--wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Standards Library</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
+          <h2 className="modal-title">{t('standards.libraryTitle')}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -65,14 +67,14 @@ export default function LibraryBrowser({ onClose, onImported }) {
         </div>
 
         <p className="library-browser-subtitle">
-          Import community and reference standards into your workspace.
+          {t('standards.librarySubtitle')}
         </p>
 
-        {loading && <div className="library-loading">Loading library...</div>}
+        {loading && <div className="library-loading">{t('standards.loadingLibrary')}</div>}
         {(error || importError) && <p className="inline-error">{importError || error}</p>}
 
         {!loading && !error && libraryStandards.length === 0 && (
-          <p className="library-empty">No community standards available.</p>
+          <p className="library-empty">{t('standards.noCommunityStandards')}</p>
         )}
 
         {!loading && libraryStandards.length > 0 && (
@@ -89,7 +91,7 @@ export default function LibraryBrowser({ onClose, onImported }) {
         )}
 
         <div className="modal-actions modal-actions--end">
-          <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
+          <button type="button" className="btn-secondary" onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>

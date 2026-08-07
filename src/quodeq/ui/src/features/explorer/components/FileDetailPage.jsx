@@ -1,5 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER, parseFileRef, complianceRatio } from '../../../utils/formatters.js';
@@ -12,6 +11,9 @@ import { TermHeader, StatStrip, Stat, SevBadge } from '../../../components/termi
 import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
+import { t } from '../../../strings/index.js';
+import { severityLabel, scopeGateRuleLabel } from '../../../strings/labels.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
@@ -29,13 +31,21 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`}>
       <div className="vdetail-row-main">
-        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>
         {v.provenanceDowngrade && (
           <span
             className="provenance-downgrade-tag"
-            title="Provenance gate: de-escalated from critical to major because the finding named no reachable external input source."
+            title={t('explorer.provenanceDowngradeTitle')}
           >
-            downgraded from critical
+            {t('explorer.downgradedFromCritical')}
+          </span>
+        )}
+        {v.scopeDowngrade && (
+          <span
+            className="scope-downgrade-tag"
+            title={t('explorer.scopeDowngradeTitle')}
+          >
+            {t('explorer.scopeDowngradeBadge', { rule: scopeGateRuleLabel(v.scopeDowngrade.rule) })}
           </span>
         )}
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
@@ -51,15 +61,15 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
             onClick={() => { const spec = violationFixPlanSpec(v); if (spec) addWindow(spec); }}
           >
             <SparkleIcon />
-            Fix plan
+            {t('explorer.fixPlan')}
           </button>
           {onDismiss && (
             <button
               type="button"
               className="dismiss-btn"
               onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
-              title="Dismiss this finding (exclude from scoring)"
-              aria-label="Dismiss this finding (exclude from scoring)"
+              title={t('explorer.dismissFinding')}
+              aria-label={t('explorer.dismissFinding')}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
@@ -70,7 +80,7 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
         {(v.title || v.reason) && (
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
-              <span className="vlive-detail-section-label">Reason</span>
+              <span className="vlive-detail-section-label">{t('violations.reasonLabel')}</span>
               {linkedRefs.length > 0 &&
                 <span className="cwe-link-group">{linkedRefs.map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
@@ -79,7 +89,7 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
             </div>
             {v.title && <p className="vlive-detail-title">{v.title}</p>}
             {v.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
+              <span className="vlive-detail-section-label">{t('violations.detailLabel')}</span>
               <p className="vlive-detail-reason">{v.reason}</p>
             </>}
           </div>
@@ -111,22 +121,22 @@ function FileHeader({ file, sevCounts, totalViolations, totalCompliance, dimensi
       </div>
       <StatStrip cards>
         <Stat
-          label="VIOLATIONS"
+          label={t('overview.statViolations')}
           value={totalViolations}
           hint={<FileSevBadgeRow sevCounts={sevCounts} />}
         />
         <Stat
-          label="COMPLIANCE"
+          label={t('overview.statCompliance')}
           value={totalCompliance}
-          hint={totalChecks > 0 ? `passing / ${totalChecks} checks` : null}
+          hint={totalChecks > 0 ? t('overview.passingChecks', { count: totalChecks }) : null}
         />
         <Stat
-          label="RATIO"
+          label={t('overview.statRatio')}
           value={ratio}
-          hint="compliance : violations"
+          hint={t('overview.ratioHint')}
         />
         <Stat
-          label="DIMENSIONS"
+          label={t('explorer.dimensionsStat')}
           value={dimensionsCount}
         />
       </StatStrip>
@@ -151,77 +161,43 @@ function LowConfidenceToggle({ count, expanded, onToggle }) {
       aria-expanded={expanded}
       onClick={onToggle}
     >
-      <span className="violation-group-title">Low confidence</span>
+      <span className="violation-group-title">{t('violations.lowConfidence')}</span>
       <span className="violation-group-count">{count}</span>
       <span className="low-confidence-group-hint">
-        {expanded ? 'Hide' : 'Show'} likely false positives
+        {expanded ? t('violations.hideLikelyFp') : t('violations.showLikelyFp')}
       </span>
     </button>
   );
 }
 
-// Virtualizer extracted into its own component so the parent can remount it
-// (via `key={activeFilter}`) when the filter changes. A fresh virtualizer
-// starts with empty measurement caches, sidestepping the class of bugs
-// where stale heights at recycled indices cause row overlap.
-function VirtualList({ items, scrollElement, renderItem }) {
-  const virtualizer = useVirtualizer({
-    count: items.length,
-    getScrollElement: () => scrollElement,
-    estimateSize: (i) => {
-      const item = items[i];
-      if (!item) return 140;
-      if (item.kind === 'sev-header' || item.kind === 'compliance-header') return 36;
-      if (item.kind === 'low-conf-toggle') return 36;
-      return 160;
-    },
-    overscan: 6,
-    getItemKey: (i) => {
-      const item = items[i];
-      if (!item) return i;
-      if (item.kind === 'sev-header') return `h-${item.sev}`;
-      if (item.kind === 'compliance-header') return 'h-compliance';
-      if (item.kind === 'low-conf-toggle') return 'h-lowconf';
-      if (item.kind === 'violation') {
-        return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
-      }
-      if (item.kind === 'low-conf-row') {
-        return `lc-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
-      }
-      if (item.kind === 'compliance') {
-        return `c-${item.c.dimension || ''}:${item.c.file || ''}:${item.c.line ?? ''}:${item.c.principle || ''}`;
-      }
-      return i;
-    },
-  });
+function estimateItemSize(items) {
+  return (i) => {
+    const item = items[i];
+    if (!item) return 140;
+    if (item.kind === 'sev-header' || item.kind === 'compliance-header') return 36;
+    if (item.kind === 'low-conf-toggle') return 36;
+    return 160;
+  };
+}
 
-  const totalSize = virtualizer.getTotalSize();
-  const virtualItems = virtualizer.getVirtualItems();
-
-  return (
-    <div className="vlive-violations-virtual" style={{ position: 'relative', width: '100%', height: totalSize }}>
-      {virtualItems.map((virtualRow) => {
-        const item = items[virtualRow.index];
-        if (!item) return null;
-        return (
-          <div
-            key={virtualRow.key}
-            data-index={virtualRow.index}
-            ref={virtualizer.measureElement}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${virtualRow.start}px)`,
-            }}
-          >
-            {renderItem(item)}
-          </div>
-        );
-      })}
-    </div>
-  );
+function itemKey(items) {
+  return (i) => {
+    const item = items[i];
+    if (!item) return i;
+    if (item.kind === 'sev-header') return `h-${item.sev}`;
+    if (item.kind === 'compliance-header') return 'h-compliance';
+    if (item.kind === 'low-conf-toggle') return 'h-lowconf';
+    if (item.kind === 'violation') {
+      return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
+    }
+    if (item.kind === 'low-conf-row') {
+      return `lc-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
+    }
+    if (item.kind === 'compliance') {
+      return `c-${item.c.dimension || ''}:${item.c.file || ''}:${item.c.line ?? ''}:${item.c.principle || ''}`;
+    }
+    return i;
+  };
 }
 
 const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss, severityFilter }) {
@@ -292,12 +268,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
     return arr;
   }, [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, file.compliance, totalCompliance]);
 
-  // The dashboard's main column owns vertical scroll; tanstack-virtual needs
-  // a ref to that ancestor to track scroll position.
-  const [scrollElement, setScrollElement] = useState(null);
-  useLayoutEffect(() => {
-    setScrollElement(document.querySelector('.app-shell__main-column > .dashboard'));
-  }, []);
+  const scrollElement = useDashboardScrollElement();
 
   // Snap to top whenever the filter changes so a giant list doesn't dump the
   // user mid-scroll into a freshly-mounted virtualizer.
@@ -339,10 +310,12 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
 
   const renderItem = (item) => {
     switch (item.kind) {
-      case 'sev-header':
-        return <GroupHeader title={item.sev.charAt(0).toUpperCase() + item.sev.slice(1)} count={item.count} />;
+      case 'sev-header': {
+        const label = severityLabel(item.sev);
+        return <GroupHeader title={label.charAt(0).toUpperCase() + label.slice(1)} count={item.count} />;
+      }
       case 'compliance-header':
-        return <GroupHeader title="Compliance" count={item.count} />;
+        return <GroupHeader title={t('explorer.complianceHeader')} count={item.count} />;
       case 'low-conf-toggle':
         return <LowConfidenceToggle count={item.count} expanded={item.expanded} onToggle={() => setLowConfExpanded((v) => !v)} />;
       case 'violation':
@@ -382,7 +355,14 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
         />
       )}
 
-      <VirtualList key={virtualKey} items={items} scrollElement={scrollElement} renderItem={renderItem} />
+      <VirtualList
+        key={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        estimateSize={estimateItemSize(items)}
+        getItemKey={itemKey(items)}
+        renderItem={renderItem}
+      />
     </>
   );
 });

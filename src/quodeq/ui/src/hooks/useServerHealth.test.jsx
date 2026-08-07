@@ -7,7 +7,7 @@ vi.mock('../api/index.js', () => ({
 }));
 
 import { getHealth } from '../api/index.js';
-import { useServerHealth } from './useServerHealth.js';
+import { useServerHealth, altPortCandidates } from './useServerHealth.js';
 
 describe('useServerHealth', () => {
   beforeEach(() => {
@@ -35,6 +35,18 @@ describe('useServerHealth', () => {
     await waitFor(() => {
       expect(result.current[0]).toBe(false);
     });
+  });
+
+  it('scans the ports the dashboard actually binds', () => {
+    // The dashboard walks upward from 7863 when the base port is taken
+    // (dashboard/_networking.py), so recovery must probe that range — the
+    // old 4180-4183 list pointed at ports quodeq never binds.
+    expect(altPortCandidates('')).toEqual([7863, 7864, 7865, 7866, 7867]);
+  });
+
+  it('also scans around the port this window is pointed at', () => {
+    const candidates = altPortCandidates('9100');
+    expect(candidates).toEqual(expect.arrayContaining([7863, 9100, 9101, 9104]));
   });
 
   it('exposes setServerConnected for optimistic reconnect', async () => {

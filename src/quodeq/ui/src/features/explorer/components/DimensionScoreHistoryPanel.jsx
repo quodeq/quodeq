@@ -15,6 +15,7 @@ import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.j
 import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
 import { extractDimensionPeriodSeries } from '../../../utils/dailyGrouping.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
+import { t } from '../../../strings/index.js';
 import {
   cssVar,
   scoreBarColor,
@@ -28,7 +29,11 @@ import {
 
 const MAX = 16;
 const CHART_HEIGHT = 160;
-const GRANULARITY_SUFFIX = { day: 'd', week: 'w', month: 'mo' };
+const GRANULARITY_SUFFIX = {
+  day: t('granularity.dayAbbrev'),
+  week: t('granularity.weekAbbrev'),
+  month: t('granularity.monthAbbrev'),
+};
 
 /**
  * Build chart points for a single dimension, collapsed to one point per
@@ -136,23 +141,23 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
     };
   }, [data]);
 
-  const suffix = GRANULARITY_SUFFIX[granularity] || 'd';
+  const suffix = GRANULARITY_SUFFIX[granularity] || GRANULARITY_SUFFIX.day;
 
   return (
-    <section className="run-history-panel run-history-panel--terminal panel" aria-label={`${dimension} score history`}>
+    <section className="run-history-panel run-history-panel--terminal panel" aria-label={t('explorer.dimScoreHistoryAria', { dimension })}>
       <div className="run-history-panel__header">
-        <SectionLabel>score_history · {data.length}{suffix}</SectionLabel>
+        <SectionLabel>{t('overview.scoreHistoryLabel')} · {data.length}{suffix}</SectionLabel>
         <span className="run-history-panel__controls">
           {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
           {stats && (
             <span className="run-history-panel__stats">
-              MIN {stats.min.toFixed(1)} / MAX {stats.max.toFixed(1)} / AVG {stats.avg.toFixed(1)}
+              {t('overview.minMaxAvg', { min: stats.min.toFixed(1), max: stats.max.toFixed(1), avg: stats.avg.toFixed(1) })}
             </span>
           )}
         </span>
       </div>
       {data.length === 0 ? (
-        <div className="qd-history-empty">no history yet for this dimension</div>
+        <div className="qd-history-empty">{t('explorer.noHistoryYet')}</div>
       ) : (
         <div className="chart-with-kbd">
           <DimensionHistoryChart
@@ -163,10 +168,10 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
             onBarClick={onBarClick}
           />
           <ChartKeyboardControls
-            label={`${dimension} score history. Tab to a run, Enter to open it`}
+            label={t('explorer.dimScoreHistoryKbd', { dimension })}
             items={onBarClick ? data.map((d, i) => ({
               key: d.runId ?? i,
-              text: `${d.dateLabel}: ${Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?'}, grade ${gradeLetter(d.overallGrade)}${d.runId === selectedRunId ? ' (selected)' : ''}`,
+              text: `${t('history.kbdRunItem', { date: d.dateLabel, score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
               onActivate: () => onBarClick(d),
             })) : []}
           />

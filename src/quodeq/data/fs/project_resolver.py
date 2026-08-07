@@ -14,7 +14,7 @@ from quodeq.data.fs._index_cache import clear_index_cache
 from quodeq.data.fs._index_io import _load_index, _save_index
 from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
 from quodeq.data.fs._resolution import _create_project, _find_existing_project
-from quodeq.services._fs_projects import find_children
+from quodeq.data.fs.children import find_children
 
 # Re-exports for backward compatibility
 __all__ = [

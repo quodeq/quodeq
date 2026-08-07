@@ -212,7 +212,7 @@ def test_project_card_summary_applies_deletions(tmp_path, monkeypatch):
 
     from quodeq.services._fs_metadata import _read_accumulated_summary
     from quodeq.services.deleted import delete_finding
-    from quodeq.services.ports import list_runs
+    from quodeq.data.fs.report_parser.runs import list_runs
 
     # Delete the critical finding project-wide — this raises the score.
     delete_finding(project_dir, {"dimension": _DIM, "principle": "p1", "file": "a.py"})
@@ -239,7 +239,7 @@ def test_deletion_actually_moves_the_card_score(tmp_path, monkeypatch):
 
     from quodeq.services._fs_metadata import _read_accumulated_summary
     from quodeq.services.deleted import delete_finding
-    from quodeq.services.ports import list_runs
+    from quodeq.data.fs.report_parser.runs import list_runs
 
     runs = list_runs(reports_root, project)
     _g, before, _f = _read_accumulated_summary(reports_root, project, runs)

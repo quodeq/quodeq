@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { effectiveParamValue } from '../resolveRequirementText.js';
+import { t } from '../../../strings/index.js';
 
 function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangeParam, inputId }) {
   const [draft, setDraft] = useState(String(effectiveValue));
@@ -55,7 +56,7 @@ function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangePar
         onBlur={handleBlur}
       />
       <span className="threshold-field-hint">
-        default {spec.default} · {spec.min} – {spec.max}
+        {t('standards.thresholdHint', { default: spec.default, min: spec.min, max: spec.max })}
       </span>
       {overridden && (
         <button
@@ -63,7 +64,7 @@ function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangePar
           className="threshold-reset-btn"
           onClick={() => onChangeParam(name, null)}
         >
-          Reset to default
+          {t('standards.resetToDefault')}
         </button>
       )}
     </div>
@@ -74,7 +75,7 @@ export default function ThresholdFields({ requirement, reqOverrides, onChangePar
   const params = requirement.params || {};
   return (
     <div className="threshold-fields">
-      <div className="threshold-fields-title">Thresholds</div>
+      <div className="threshold-fields-title">{t('standards.thresholdsTitle')}</div>
       {Object.entries(params).map(([name, spec]) => {
         const overridden = reqOverrides?.[name] != null;
         const effectiveValue = effectiveParamValue(spec, reqOverrides?.[name]);

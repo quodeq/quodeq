@@ -1,6 +1,7 @@
 """Scaling logic: respawn decisions, scale-up computation, future collection."""
 from __future__ import annotations
 
+import os
 import time
 from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -16,6 +17,7 @@ from quodeq.analysis.subagents._pool_models import (
     _DEFAULT_FILES_PER_AGENT,
 )
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
+from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
 
 
@@ -42,24 +44,35 @@ _QUEUE_CACHE_MAX_SIZE = 64
 _cached_file_queues: OrderedDict[Path, WorkQueue] = OrderedDict()
 
 
-def get_queue(queue: WorkQueue | None, queue_path: Path) -> WorkQueue:
+def clear_cached_queues() -> None:
+    """Empty the process-wide FileQueue cache (test isolation hook)."""
+    _cached_file_queues.clear()
+
+
+def get_queue(
+    queue: WorkQueue | None, queue_path: Path,
+    *, cache: OrderedDict[Path, WorkQueue] | None = None,
+) -> WorkQueue:
     """Return the injected queue or construct a FileQueue from the path.
 
     When *queue* is None a ``FileQueue`` is constructed from *queue_path*.
     The result is cached by path so repeated calls avoid rebuilding the queue.
     The cache is bounded (LRU): in long-running sessions that touch many
     distinct queue paths, the oldest entry is evicted once the cap is hit.
+    *cache* defaults to the process-wide cache; tests inject their own so
+    cached queues never leak between them.
     """
     if queue is not None:
         return queue
-    cached = _cached_file_queues.get(queue_path)
+    c = cache if cache is not None else _cached_file_queues
+    cached = c.get(queue_path)
     if cached is not None:
-        _cached_file_queues.move_to_end(queue_path)
+        c.move_to_end(queue_path)
         return cached
     fq: WorkQueue = FileQueue(queue_path)
-    _cached_file_queues[queue_path] = fq
-    if len(_cached_file_queues) > _QUEUE_CACHE_MAX_SIZE:
-        _cached_file_queues.popitem(last=False)
+    c[queue_path] = fq
+    if len(c) > _QUEUE_CACHE_MAX_SIZE:
+        c.popitem(last=False)
     return fq
 
 
@@ -80,6 +93,13 @@ def should_respawn(
     do useful work.
     """
     remaining = get_queue(queue, queue_path).remaining()
+    if cancellation.is_cancelled():
+        if remaining > 0:
+            log_warning(
+                f"  Run cancelled -- {remaining} files left, "
+                f"not spawning new agents"
+            )
+        return 0
     if deadline_at is not None and time.monotonic() >= deadline_at:
         if remaining > 0:
             log_warning(
@@ -98,6 +118,48 @@ def should_respawn(
             )
         return 0
     return remaining
+
+
+_DEFAULT_AGENT_FAILURE_STREAK = 5
+
+
+def _agent_failure_streak_limit(env: dict[str, str] | None = None) -> int:
+    """Consecutive whole-agent failures tolerated before the run is cancelled.
+
+    Env override QUODEQ_AGENT_FAILURE_STREAK; 0 disables the backstop.
+    """
+    raw = (env if env is not None else os.environ).get("QUODEQ_AGENT_FAILURE_STREAK", "").strip()
+    try:
+        return int(raw) if raw else _DEFAULT_AGENT_FAILURE_STREAK
+    except ValueError:
+        return _DEFAULT_AGENT_FAILURE_STREAK
+
+
+def check_agent_failure_streak(results: list[SubagentResult]) -> None:
+    """Cancel the run when every recent agent died without a single success.
+
+    Provider-agnostic backstop for failure modes the fatal-error
+    classification doesn't recognize: N consecutive dead agents means the
+    provider cannot serve this run, and respawning only burns wall-clock and
+    spams the console. Cancellation is enforced by the spawn gate
+    (``should_respawn``) and the dimension loops.
+    """
+    limit = _agent_failure_streak_limit()
+    if limit <= 0 or cancellation.is_cancelled():
+        return
+    streak = 0
+    for result in reversed(results):
+        if result.success:
+            break
+        streak += 1
+    if streak >= limit:
+        last_error = results[-1].error or "unknown error"
+        log_warning(
+            f"  {streak} consecutive subagent failures (last: {last_error}) "
+            f"-- cancelling run, provider appears unable to serve requests. "
+            f"Adjust with QUODEQ_AGENT_FAILURE_STREAK (0 disables)."
+        )
+        cancellation.request_cancel(reason="agent_failure_streak")
 
 
 def compute_scale_up(

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared.repo_handler import prepare_repository
+from quodeq.data.fs.repo_handler import prepare_repository
 from quodeq.shared.utils import is_repo_url
 
 
@@ -87,7 +87,7 @@ def test_prepare_repository_clone_failure_raises_when_cache_disabled(monkeypatch
 
 def test_cleanup_preserves_cached_clones(monkeypatch, tmp_path):
     """The persistent cache must survive eval-end cleanup."""
-    from quodeq.shared.repo_handler import cleanup_cloned_repo
+    from quodeq.data.fs.repo_handler import cleanup_cloned_repo
     from quodeq.context.online_cache import repo_path_for_url
 
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
@@ -100,7 +100,7 @@ def test_cleanup_preserves_cached_clones(monkeypatch, tmp_path):
 
 
 def test_cleanup_still_removes_legacy_tempdir(monkeypatch, tmp_path):
-    from quodeq.shared.repo_handler import cleanup_cloned_repo
+    from quodeq.data.fs.repo_handler import cleanup_cloned_repo
 
     legacy = tmp_path / "scratch" / "my-repo"
     legacy.mkdir(parents=True)

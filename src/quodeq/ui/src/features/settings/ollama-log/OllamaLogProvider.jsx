@@ -3,6 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
 import { OllamaLogContext } from './OllamaLogContext.js';
 import { useOllamaLogStream } from './useOllamaLogStream.js';
+import { t } from '../../../strings/index.js';
 
 const WINDOW_ID = 'ollama-log';
 
@@ -10,14 +11,14 @@ const STATUS_LABEL = {
   idle: '',
   streaming: ' · running',
   done: ' · stopped',
-  error: ' · unavailable',
+  error: t('settings.logUnavailable'),
 };
 
 function buildSpec(logs, status) {
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
-    title: `Ollama log${STATUS_LABEL[status] || ''}`,
+    title: `${t('settings.ollamaLogTitle')}${STATUS_LABEL[status] || ''}`,
     render: () => <ConsoleLogViewer logs={logs} />,
   };
 }

@@ -3,18 +3,12 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
 const CLOUD_MODEL_HINTS = {
-  openrouter: (
-    <>
-      Type the model id you want. From cheapest to most expensive, you might try <code>meta-llama/llama-3.1-8b-instruct:free</code>, <code>anthropic/claude-haiku-4-5</code>, <code>anthropic/claude-sonnet-4</code>, or <code>anthropic/claude-opus-4-7</code>. The full catalog is on OpenRouter.
-    </>
-  ),
-  custom: (
-    <>
-      Type the model id your API expects.
-    </>
-  ),
+  openrouter: tRich('settings.cloudModelHintOpenrouter'),
+  custom: tRich('settings.cloudModelHintCustom'),
 };
 
 export default function CloudProviderTab({ providerId, providerConfig, state, update }) {
@@ -41,7 +35,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
         apiKey: '',
       });
       setTestResult(result);
-    } catch { setTestResult({ success: false, error: 'Connection failed' }); }
+    } catch { setTestResult({ success: false, error: t('settings.connectionFailed') }); }
     setTesting(false);
   };
 
@@ -50,12 +44,12 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Model</span>
-            {hint && <HelpHint label="Model help">{hint}</HelpHint>}
+            <span className="settings-label">{t('settings.modelLabel')}</span>
+            {hint && <HelpHint label={t('settings.modelHelpAria')}>{hint}</HelpHint>}
           </span>
           <span className="settings-description">
-            Type the model id you want to use.
-            {browseUrl && <> <a href={browseUrl} target="_blank" rel="noopener noreferrer">Browse models</a></>}
+            {t('settings.typeModelIdDesc')}
+            {browseUrl && <> <a href={browseUrl} target="_blank" rel="noopener noreferrer">{t('settings.browseModels')}</a></>}
           </span>
         </div>
         <div className="settings-budget-control">
@@ -63,22 +57,22 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
             type="text"
             className={`settings-model-input${!state.model ? ' settings-model-input--required' : ''}`}
             value={state.model || ''}
-            placeholder="Type model id"
+            placeholder={t('settings.typeModelId')}
             onChange={(e) => update('model', e.target.value)}
-            aria-label="Model identifier"
+            aria-label={t('settings.modelIdentifierAria')}
             autoCapitalize="off"
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
           />
           <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !state.model}>
-            {testing ? 'Testing...' : 'Test'}
+            {testing ? t('settings.testing') : t('settings.test')}
           </button>
         </div>
-        {!state.model && <span className="settings-model-hint">You&apos;ll need a model before you can run an evaluation.</span>}
+        {!state.model && <span className="settings-model-hint">{t('settings.needModelBeforeEval')}</span>}
         {testResult && (
           <span className={`settings-description ${testResult.success ? '' : 'settings-error'}`}>
-            {testResult.success ? `Connected (${testResult.latency_ms}ms)` : testResult.error}
+            {testResult.success ? t('settings.connected', { latency: testResult.latency_ms }) : testResult.error}
           </span>
         )}
       </div>
@@ -86,10 +80,10 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Max parallel agents</span>
-            <HelpHint label="Max parallel agents help">{SUBAGENTS_HINT_REMOTE}</HelpHint>
+            <span className="settings-label">{t('settings.maxParallelAgents')}</span>
+            <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_REMOTE}</HelpHint>
           </span>
-          <span className="settings-description">How many subagents work side by side. Pick a number from 1 to 10.</span>
+          <span className="settings-description">{t('settings.subagentsDescRemote')}</span>
         </div>
         <input
           type="number"
@@ -99,11 +93,11 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
           value={state.subagents ?? ''}
           onChange={(e) => update('subagents', e.target.value)}
           onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
-          aria-label="Max parallel agents"
+          aria-label={t('settings.maxParallelAgents')}
         />
       </div>
       <details className="settings-advanced">
-        <summary className="settings-advanced-toggle">Advanced</summary>
+        <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
         <div className="settings-advanced-content">
           <AdvancedAnalysisSettings state={state} update={update} />
         </div>

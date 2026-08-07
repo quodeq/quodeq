@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { nodeColor, nodeBorderColor } from '../core/mapColors.js';
 import FileShape from './FileShape.jsx';
+import { t } from '../../../../strings/index.js';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
@@ -160,12 +161,12 @@ function MatrixTooltip({ tip }) {
       bottom: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? window.innerHeight - tip.y + 12 : undefined,
     }}>
       <div className="map-tooltip-title">{c.path || c.name}</div>
-      <div className="map-tooltip-row"><span>Violations</span><span>{c.violations}</span></div>
-      <div className="map-tooltip-row"><span>Compliance</span><span>{c.compliance}</span></div>
-      <div className="map-tooltip-row"><span>Health</span><span>{rate}%</span></div>
-      {c.severity?.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>Critical</span><span>{c.severity.critical}</span></div>}
-      {c.severity?.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>Major</span><span>{c.severity.major}</span></div>}
-      {c.severity?.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>Minor</span><span>{c.severity.minor}</span></div>}
+      <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{c.violations}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{c.compliance}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.health')}</span><span>{rate}%</span></div>
+      {c.severity?.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{c.severity.critical}</span></div>}
+      {c.severity?.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{c.severity.major}</span></div>}
+      {c.severity?.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{c.severity.minor}</span></div>}
     </div>
   );
 }
@@ -181,7 +182,7 @@ export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLab
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }} aria-label="Risk matrix showing file violations by severity and frequency">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }} aria-label={t('map.riskMatrixAria')}>
         <defs>
           <radialGradient id="riskDanger" cx="100%" cy="0%" r="100%">
             <stop offset="0%" stopColor="var(--color-sev-critical-text)" stopOpacity="0.12" />
@@ -204,12 +205,12 @@ export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLab
             <line x1={PAD.l + PW * f} y1={PAD.t} x2={PAD.l + PW * f} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={0.5} />
           </g>
         ))}
-        <text x={PAD.l + PW - 8} y={PAD.t + 18} textAnchor="end" fontSize={10} fill="var(--color-sev-critical-text)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">Fix first</text>
-        <text x={PAD.l + 8} y={PAD.t + PH - 8} textAnchor="start" fontSize={10} fill="var(--color-compliance)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">Low priority</text>
+        <text x={PAD.l + PW - 8} y={PAD.t + 18} textAnchor="end" fontSize={10} fill="var(--color-sev-critical-text)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">{t('map.fixFirst')}</text>
+        <text x={PAD.l + 8} y={PAD.t + PH - 8} textAnchor="start" fontSize={10} fill="var(--color-compliance)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">{t('map.lowPriority')}</text>
         <line x1={PAD.l} y1={PAD.t + PH} x2={PAD.l + PW} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={1} />
         <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={1} />
-        <text x={PAD.l + PW / 2} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)">Violations</text>
-        <text x={14} y={PAD.t + PH / 2} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)" transform={`rotate(-90, 14, ${PAD.t + PH / 2})`}>Severity</text>
+        <text x={PAD.l + PW / 2} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)">{t('map.violations')}</text>
+        <text x={14} y={PAD.t + PH / 2} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)" transform={`rotate(-90, 14, ${PAD.t + PH / 2})`}>{t('map.severity')}</text>
         <BubbleGroup points={points} px={px} py={py} br={br} entered={entered}
           showLabels={showLabels} tip={tip} setTip={setTip}
           onDrillDown={onDrillDown} onFileClick={onFileClick} />

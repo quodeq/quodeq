@@ -14,17 +14,23 @@ from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
 
-_PLUGIN_CACHE_TTL = int(os.environ.get("QUODEQ_PLUGIN_CACHE_TTL", "60"))  # seconds; allows runtime plugin changes to propagate
+_DEFAULT_PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
+
+
+def _plugin_cache_ttl(env: dict[str, str] | None = None) -> int:
+    """Cache TTL, resolved per construction so runtime changes are seen."""
+    raw = (env if env is not None else os.environ).get("QUODEQ_PLUGIN_CACHE_TTL", "")
+    return int(raw) if raw.isdigit() and int(raw) > 0 else _DEFAULT_PLUGIN_CACHE_TTL
 
 
 class _PluginCache:
     """Thread-safe TTL cache for plugin metadata."""
 
-    def __init__(self, ttl: float = _PLUGIN_CACHE_TTL) -> None:
+    def __init__(self, ttl: float | None = None) -> None:
         self._lock = threading.Lock()
         self._cache: list[PluginInfo] | None = None
         self._ts: float = 0.0
-        self._ttl = ttl
+        self._ttl = _plugin_cache_ttl() if ttl is None else ttl
 
     def get(self) -> list[PluginInfo] | None:
         with self._lock:
@@ -97,7 +103,7 @@ def _discover_from_detection(detection_file: Path, dimensions_file: Path) -> lis
 def discover_plugins(*, cache: _PluginCache | None = None, paths: object | None = None) -> list[PluginInfo]:
     """Return available plugin metadata from detection.json + dimensions.json.
 
-    Results are cached for _PLUGIN_CACHE_TTL seconds so that configuration
+    Results are cached for _plugin_cache_ttl() seconds so that configuration
     changes are picked up on the next request after the TTL expires.
 
     Pass *cache* to override the module-level cache (useful for testing).

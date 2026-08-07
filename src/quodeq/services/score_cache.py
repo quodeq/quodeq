@@ -20,6 +20,7 @@ from quodeq.core.types import DimensionResult
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.shared._env import get_score_cache_path, score_cache_disabled
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 _logger = logging.getLogger(__name__)
 _BUSY_TIMEOUT_MS = 5000
@@ -257,15 +258,20 @@ def _params_fingerprint(params: ScoringParams) -> str:
 
 
 def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
-    """Content-hash of the project's dismissals + deletions + grade params.
+    """Content-hash of the project's suppression state + grade params.
 
     Any change to any of these produces a new version, auto-invalidating cached
-    rows without a write-path hook.
+    rows without a write-path hook. Pattern rules are part of the state for the
+    same reason the exact keys are: adding one hides findings, so a cached row
+    computed before it must not survive.
     """
     payload = json.dumps({
         "epoch": _CACHE_WRITER_EPOCH,
         "dismissed": sorted(str(k) for k in dismissed_keys(project_dir)),
         "deleted": sorted(str(k) for k in deleted_keys(project_dir)),
+        "rules": [
+            [r.req, r.file, r.reason] for r in load_suppression_rules(project_dir)
+        ],
         "params": _params_fingerprint(params),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -364,8 +370,12 @@ def accumulated_cache_version(
         # only status-independent scoped versions and lost that guard). v5:
         # dimensions are no longer scoped to the last-5-runs configured
         # standard; payloads written with scoping omit dimensions whose last
-        # valid run is older and must rebuild.
-        "algo": 5,
+        # valid run is older and must rebuild. v6: heal rows poisoned before
+        # PR #924's partial-dim guards — a mid-run partial rescore persisted
+        # under algo 5 hashes identically to a correct recompute, so without
+        # this bump it is served forever (tests/services/
+        # test_accumulated_version_heals_poison.py pins the keyspace exit).
+        "algo": 6,
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",

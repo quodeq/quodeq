@@ -11,12 +11,13 @@
  */
 import { TermHeader, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { EvalViolationCard } from './EvalCards.jsx';
+import { t } from '../../../strings/index.js';
 
 export default function FindingDetailPage({ finding, principle, dimension, onDismiss }) {
   if (!finding) {
     return (
       <section className="empty-state">
-        <h2>No finding selected</h2>
+        <h2>{t('explorer.noFindingSelected')}</h2>
       </section>
     );
   }
@@ -27,17 +28,17 @@ export default function FindingDetailPage({ finding, principle, dimension, onDis
   return (
     <section className="finding-detail-page">
       <TermHeader
-        name={`${principle || dimension || 'finding'}.detail`}
+        name={`${principle || dimension || t('explorer.findingFallback')}.detail`}
         sub={
           <span className="finding-detail-breadcrumb">
-            <span>overview</span>
+            <span>{t('explorer.overviewCrumb')}</span>
             {dimension && <> <span className="finding-detail-sep">▸</span> <span>{String(dimension).toLowerCase()}</span></>}
             {principle && <> <span className="finding-detail-sep">▸</span> <span>{String(principle).toLowerCase()}</span></>}
           </span>
         }
       />
 
-      <SectionLabel>{`${shortSev} · 1`}</SectionLabel>
+      <SectionLabel>{t('explorer.sevCount', { severity: shortSev, count: 1 })}</SectionLabel>
 
       <div className="vlive-violations-group">
         <EvalViolationCard

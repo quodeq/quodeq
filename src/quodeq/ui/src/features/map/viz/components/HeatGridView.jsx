@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../../components/HeatGridCells.jsx';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
+import { t } from '../../../../strings/index.js';
 
 const COL_NAME = 'name';
 const COL_CRITICAL = 'critical';
@@ -10,7 +11,7 @@ const COL_VIOLATIONS = 'violations';
 const COL_HEALTH = 'health';
 
 const COLUMNS = [
-  { id: COL_NAME, label: 'File / Folder', align: 'left' },
+  { id: COL_NAME, label: t('map.colFileFolder'), align: 'left' },
   { id: COL_CRITICAL, label: 'Critical' },
   { id: COL_MAJOR, label: 'Major' },
   { id: COL_MINOR, label: 'Minor' },
@@ -55,7 +56,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
   };
 
   if (rows.length === 0) {
-    return <p className="empty-state">No data available for this view.</p>;
+    return <p className="empty-state">{t('map.noData')}</p>;
   }
 
   const flat = variant === 'flat';

@@ -5,11 +5,12 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
+from quodeq.data.fs.project_files import write_scan_json
+from quodeq.data.git_cli import list_branches
 
 _logger = logging.getLogger(__name__)
 
@@ -96,19 +97,7 @@ def _walk_files(root: Path):
 
 def _list_branches(project_dir: Path) -> list[str]:
     """List local git branches, returning empty list if not a git repo."""
-    if not (project_dir / ".git").exists():
-        return []
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(project_dir), "branch", "--format=%(refname:short)"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_GIT_TIMEOUT_S,
-        )
-        if result.returncode != 0:
-            return []
-        return [b.strip() for b in result.stdout.splitlines() if b.strip()]
-    except (subprocess.TimeoutExpired, OSError):
-        _logger.debug("Failed to list git branches for %s", project_dir)
-        return []
+    return list_branches(project_dir, timeout=_GIT_TIMEOUT_S)
 
 
 def _list_modules(project_dir: Path) -> list[str]:
@@ -120,7 +109,5 @@ def _list_modules(project_dir: Path) -> list[str]:
 
 
 def _write_scan_json(scan: ScanData, output_dir: Path) -> None:
-    """Persist scan data as JSON."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    payload = dataclasses.asdict(scan)
-    (output_dir / "scan.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    """Persist scan data as JSON (delegates to the data layer)."""
+    write_scan_json(scan, output_dir)

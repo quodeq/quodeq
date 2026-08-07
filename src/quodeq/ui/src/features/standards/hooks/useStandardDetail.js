@@ -3,6 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { generateRequirementId } from '../utils.js';
 import { deepClone } from '../../../utils/deepClone.js';
 import { STANDARD_TYPES } from './useStandards.js';
+import { t } from '../../../strings/index.js';
 
 function useTreeMutations(setStandard, setDirty, setSelectedNode) {
   const addPrinciple = useCallback(() => {
@@ -73,8 +74,8 @@ function useStandardMutations(standard, setStandard, setDirty, standardId, isNew
 
   const save = useCallback(async () => {
     if (!standard) return;
-    if (!standard.id) return { error: 'ID is required' };
-    if (!standard.name) return { error: 'Name is required' };
+    if (!standard.id) return { error: t('standards.idRequired') };
+    if (!standard.name) return { error: t('standards.nameRequired') };
     try {
       if (isNew) { await createStandard(standard); } else { await updateStandard(standard.id, standard); }
       setDirty(false);

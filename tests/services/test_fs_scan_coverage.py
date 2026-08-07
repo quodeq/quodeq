@@ -103,30 +103,30 @@ class TestListBranches:
 
     def test_git_failure(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        with patch("quodeq.services._fs_scan.subprocess.run") as mock_run:
+        with patch("quodeq.data.git_cli.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout="")
             assert _list_branches(tmp_path) == []
 
     def test_timeout(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        with patch("quodeq.services._fs_scan.subprocess.run", side_effect=subprocess.TimeoutExpired("git", 10)):
+        with patch("quodeq.data.git_cli.subprocess.run", side_effect=subprocess.TimeoutExpired("git", 10)):
             assert _list_branches(tmp_path) == []
 
     def test_os_error(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        with patch("quodeq.services._fs_scan.subprocess.run", side_effect=OSError("fail")):
+        with patch("quodeq.data.git_cli.subprocess.run", side_effect=OSError("fail")):
             assert _list_branches(tmp_path) == []
 
     def test_parses_branches(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        with patch("quodeq.services._fs_scan.subprocess.run") as mock_run:
+        with patch("quodeq.data.git_cli.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="main\nfeature/x\n  develop  \n")
             branches = _list_branches(tmp_path)
             assert branches == ["main", "feature/x", "develop"]
 
     def test_empty_lines_filtered(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        with patch("quodeq.services._fs_scan.subprocess.run") as mock_run:
+        with patch("quodeq.data.git_cli.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="\n\n  \n")
             assert _list_branches(tmp_path) == []
 

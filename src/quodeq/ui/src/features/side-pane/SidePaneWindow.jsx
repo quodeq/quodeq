@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../../strings/index.js';
 
 const COPY_FEEDBACK_MS = 1500;
 // Defer mounting the body until the slide-in animation finishes (~220ms).
@@ -41,7 +42,7 @@ class RenderBoundary extends React.Component {
   }
   render() {
     if (this.state.failed) {
-      return <p className="side-pane-window__error">Failed to render report.</p>;
+      return <p className="side-pane-window__error">{t('sidePane.renderFailed')}</p>;
     }
     return this.props.children;
   }
@@ -110,16 +111,16 @@ export function SidePaneWindow({ spec, onClose }) {
               type="button"
               className="side-pane-window__icon-btn"
               onClick={onDownload}
-              aria-label="Download"
-              title="Download"
+              aria-label={t('sidePane.download')}
+              title={t('sidePane.download')}
             >↓</button>
           )}
           <button
             type="button"
             className="side-pane-window__icon-btn"
             onClick={onClickClose}
-            aria-label="Close window"
-            title="Close window"
+            aria-label={t('common.closeWindow')}
+            title={t('common.closeWindow')}
           >✕</button>
         </div>
       </header>

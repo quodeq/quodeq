@@ -83,6 +83,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         scope=obj.get("scope"),
         confidence=_coerce_confidence(obj.get("confidence")),
         provenance_downgrade=bool(obj.get("provenance_downgrade")),
+        scope_downgrade=obj.get("scope_downgrade") if isinstance(obj.get("scope_downgrade"), dict) else None,
         carried_forward=bool(obj.get("carried_forward")),
     ))
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))

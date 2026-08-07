@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { t } from '../../../strings/index.js';
 
 const TYPE_CONFIG = {
-  quodeq:    { label: 'Quodeq',    className: 'dimension-chip-type--quodeq',    order: 1 },
-  custom:    { label: 'Custom',    className: 'dimension-chip-type--custom',    order: 3 },
-  community: { label: 'Community', className: 'dimension-chip-type--community', order: 2 },
+  quodeq:    { label: t('evaluate.stdQuodeq'),    className: 'dimension-chip-type--quodeq',    order: 1 },
+  custom:    { label: t('evaluate.stdCustom'),    className: 'dimension-chip-type--custom',    order: 3 },
+  community: { label: t('evaluate.stdCommunity'), className: 'dimension-chip-type--community', order: 2 },
 };
-const DEFAULT_TYPE_CONFIG = { label: 'ISO', className: 'dimension-chip-type--builtin', order: 0 };
+const DEFAULT_TYPE_CONFIG = { label: t('evaluate.stdIso'), className: 'dimension-chip-type--builtin', order: 0 };
 
 function typeInfo(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
 
@@ -15,7 +16,7 @@ function DimensionChip({ dim, isSelected, onToggle }) {
     <button
       type="button"
       className={`dimension-chip-btn${isSelected ? ' selected' : ''}`}
-      title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : dim.label || dim.id}
+      title={dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id}
       aria-pressed={isSelected}
       onClick={() => onToggle(dim.id)}
     >
@@ -31,7 +32,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
     <button
       type="button"
       className={`eval-dim-card${isSelected ? ' eval-dim-card--selected' : ''}`}
-      title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : dim.label || dim.id}
+      title={dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id}
       aria-pressed={isSelected}
       onClick={() => onToggle(dim.id)}
     >
@@ -53,7 +54,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
         ) : metaLoading ? (
           // Estimates take a few seconds; a quiet placeholder keeps the card
           // from growing when the real meta lands.
-          <span className="eval-dim-card__meta eval-dim-card__meta--skeleton" title="estimating…" aria-hidden="true" />
+          <span className="eval-dim-card__meta eval-dim-card__meta--skeleton" title={t('evaluate.estimating')} aria-hidden="true" />
         ) : null}
       </span>
     </button>
@@ -82,14 +83,14 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
       <div className="form-group eval-dims-section">
         <div className="dimension-label-row dimension-label-row--terminal">
           <span className="eval-dims-heading">
-            <label>dimensions</label>
+            <label>{t('evaluate.dimensionsLabel')}</label>
             <span className="eval-dims-counter">
-              {selectedDims.size} of {sorted.length} selected · run in order
+              {t('evaluate.dimsSelectedCounter', { selected: selectedDims.size, total: sorted.length })}
             </span>
           </span>
           <div className="dimension-chip-actions">
-            <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onSelectAll}>all</button>
-            <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onClearAll}>clear</button>
+            <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onSelectAll}>{t('evaluate.allBtn')}</button>
+            <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onClearAll}>{t('evaluate.clearBtn')}</button>
           </div>
         </div>
 
@@ -112,10 +113,10 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
   return (
     <div className="form-group">
       <div className="dimension-label-row">
-        <label>Dimensions</label>
+        <label>{t('evaluate.dimensionsLabelCap')}</label>
         <div className="dimension-chip-actions">
-          <button type="button" className="dim-action-btn" onClick={onSelectAll}>All</button>
-          <button type="button" className="dim-action-btn" onClick={onClearAll}>Clear</button>
+          <button type="button" className="dim-action-btn" onClick={onSelectAll}>{t('evaluate.allCap')}</button>
+          <button type="button" className="dim-action-btn" onClick={onClearAll}>{t('evaluate.clearCap')}</button>
         </div>
       </div>
 

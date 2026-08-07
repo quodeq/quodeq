@@ -1,4 +1,4 @@
-import { memo, useState, useMemo } from 'react';
+import { memo, useMemo, useEffect } from 'react';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
@@ -8,57 +8,53 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { usePrincipleData } from './explorerDataHooks.js';
+import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
+import { t } from '../../../strings/index.js';
 
 function filterTitleSuffix(filter) {
   if (!filter || filter === 'all') return '';
   return ` (${filter})`;
 }
 
-// Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
-// `.vdetail-row` (see styles/explorer.css), so no JS virtualizer or
-// "Show all" pagination is needed. Rows render naturally inside the app's
-// existing scroll container.
+// Rows are virtualized (same VirtualList as FileDetailPage): a principle can
+// carry hundreds of findings, and each card runs pretext measurement layout
+// effects on mount — rendering them all before first paint froze the page for
+// seconds with no spinner. React now holds ~30 row instances at once.
 
-export function ViolationListSection({ violationsBySeverity, principle, onDismiss }) {
-  return EVAL_SEVERITY_ORDER.map((sev) => {
-    const vs = violationsBySeverity[sev];
-    if (!vs || vs.length === 0) return null;
-    return (
-      <div key={sev}>
-        <SectionLabel>{sev.toUpperCase()} · {vs.length}</SectionLabel>
-        <div className="vlive-violations-group">
-          {vs.map((v, idx) => (
-            <EvalViolationCard
-              key={`${v.file || 'nofile'}:${v.line ?? 'noline'}:${idx}`}
-              v={v}
-              principle={principle}
-              index={idx}
-              onDismiss={onDismiss}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  });
+function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
+  const arr = [];
+  if (activeSevFilter !== 'compliance') {
+    for (const sev of EVAL_SEVERITY_ORDER) {
+      const vs = displayedBySeverity[sev];
+      if (!vs || vs.length === 0) continue;
+      arr.push({ kind: 'sev-header', sev, count: vs.length });
+      vs.forEach((v, idx) => arr.push({ kind: 'violation', v, idx }));
+    }
+  }
+  if ((!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && compliance.length > 0) {
+    arr.push({ kind: 'compliance-header', count: compliance.length });
+    compliance.forEach((c, idx) => arr.push({ kind: 'compliance', c, idx }));
+  }
+  return arr;
 }
 
-function ComplianceListSection({ compliance, principle }) {
-  if (compliance.length === 0) return null;
-  return (
-    <div>
-      <SectionLabel>COMPLIANCE · {compliance.length}</SectionLabel>
-      <div className="vlive-violations-group">
-        {compliance.map((c, idx) => (
-          <ComplianceCard
-            key={`${c.file || 'nofile'}:${c.line ?? 'noline'}:${idx}`}
-            c={c}
-            principle={principle}
-            index={idx}
-          />
-        ))}
-      </div>
-    </div>
-  );
+function estimateItemSize(items) {
+  return (i) => {
+    const item = items[i];
+    if (!item) return 160;
+    return item.kind === 'sev-header' || item.kind === 'compliance-header' ? 36 : 160;
+  };
+}
+
+function itemKey(items) {
+  return (i) => {
+    const item = items[i];
+    if (!item) return i;
+    if (item.kind === 'sev-header') return `h-${item.sev}`;
+    if (item.kind === 'compliance-header') return 'h-compliance';
+    if (item.kind === 'violation') return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
+    return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
+  };
 }
 
 function SevBadgeRow({ sevCounts }) {
@@ -80,8 +76,8 @@ function PrincipleHeader({ data }) {
     : '—';
 
   const scoreHint = grade === 'Insufficient'
-    ? 'not enough evidence'
-    : grade ? `grade ${gradeLetter(grade)}` : null;
+    ? t('explorer.notEnoughEvidence')
+    : grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null;
 
   return (
     <section className="principle-detail-header principle-detail-header--terminal">
@@ -93,10 +89,10 @@ function PrincipleHeader({ data }) {
         />
       </div>
       <StatStrip cards>
-        <Stat label="SCORE" value={scoreDisplay} hint={scoreHint} />
-        <Stat label="VIOLATIONS" value={violations.length} hint={<SevBadgeRow sevCounts={sevCounts} />} />
-        <Stat label="COMPLIANCE" value={compliance.length} />
-        <Stat label="RATIO" value={ratioDisplay} hint="compliance : violations" />
+        <Stat label={t('overview.statScore')} value={scoreDisplay} hint={scoreHint} />
+        <Stat label={t('overview.statViolations')} value={violations.length} hint={<SevBadgeRow sevCounts={sevCounts} />} />
+        <Stat label={t('overview.statCompliance')} value={compliance.length} />
+        <Stat label={t('overview.statRatio')} value={ratioDisplay} hint={t('overview.ratioHint')} />
       </StatStrip>
     </section>
   );
@@ -231,6 +227,48 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
   }, [principle, dimension, runId, filteredViolations, principleData, activeSevFilter]);
   useRegisterWindowSpec('fixplan', fixPlanSpec);
 
+  const items = useMemo(
+    () => buildListItems({ displayedBySeverity, compliance, activeSevFilter }),
+    [displayedBySeverity, compliance, activeSevFilter],
+  );
+
+  const scrollElement = useDashboardScrollElement();
+
+  // Snap to top whenever the filter changes so a giant list doesn't dump the
+  // user mid-scroll into a freshly-mounted virtualizer.
+  useEffect(() => {
+    if (scrollElement) scrollElement.scrollTop = 0;
+  }, [activeSevFilter, scrollElement]);
+
+  // Remount the virtualizer whenever the items collection changes shape so
+  // stale cached row heights can't misplace recycled rows.
+  const virtualKey = `${activeSevFilter ?? 'all'}-${filteredViolations.length}-${principle}`;
+
+  // handleDismiss (from usePrincipleData) is always a stable, callable
+  // no-op-safe function regardless of whether the caller passed a
+  // real onDismiss — that contract lets callers omit onDismiss without
+  // usePrincipleData throwing. But EvalViolationCard's dismiss button
+  // gates on *this* prop being truthy, so passing handleDismiss
+  // unconditionally would keep the button visible for shared projects
+  // (where App.jsx passes onDismiss={undefined}). Gate on the
+  // original onDismiss here so the button actually vanishes.
+  const cardDismiss = onDismiss ? handleDismiss : undefined;
+
+  const renderItem = (item) => {
+    switch (item.kind) {
+      case 'sev-header':
+        return <SectionLabel>{item.sev.toUpperCase()} · {item.count}</SectionLabel>;
+      case 'compliance-header':
+        return <SectionLabel>{t('overview.statCompliance')} · {item.count}</SectionLabel>;
+      case 'violation':
+        return <EvalViolationCard v={item.v} principle={principle} index={item.idx} onDismiss={cardDismiss} />;
+      case 'compliance':
+        return <ComplianceCard c={item.c} principle={principle} index={item.idx} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       <PrincipleHeader
@@ -245,24 +283,14 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
           onFilterChange={setActiveSevFilter}
         />
       )}
-      {activeSevFilter !== 'compliance' && (
-        <ViolationListSection
-          violationsBySeverity={displayedBySeverity}
-          principle={principle}
-          // handleDismiss (from usePrincipleData) is always a stable, callable
-          // no-op-safe function regardless of whether the caller passed a
-          // real onDismiss — that contract lets callers omit onDismiss without
-          // usePrincipleData throwing. But EvalViolationCard's dismiss button
-          // gates on *this* prop being truthy, so passing handleDismiss
-          // unconditionally would keep the button visible for shared projects
-          // (where App.jsx passes onDismiss={undefined}). Gate on the
-          // original onDismiss here so the button actually vanishes.
-          onDismiss={onDismiss ? handleDismiss : undefined}
-        />
-      )}
-      {(!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && (
-        <ComplianceListSection compliance={compliance} principle={principle} />
-      )}
+      <VirtualList
+        key={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        estimateSize={estimateItemSize(items)}
+        getItemKey={itemKey(items)}
+        renderItem={renderItem}
+      />
     </>
   );
 });

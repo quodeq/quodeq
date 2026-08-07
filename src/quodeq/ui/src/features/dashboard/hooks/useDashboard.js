@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
+import { isFrozenRun } from '../../../models/runRules.js';
+import { t } from '../../../strings/index.js';
 
 const EMPTY_TREND = [];
 
@@ -66,18 +68,16 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
   // run deletion), and every one of those invalidates the project query
   // subtree — which forces a refetch regardless of staleTime. Freezing the
   // query here removes the routine time-based background refetch (and the
-  // dashboard-refreshing dim flash) on re-entering a run view. Unknown
-  // status counts as frozen: by the time a run detail is opened the runs
-  // list is already cached, and treating the brief unknown window as frozen
-  // avoids a spurious mount refetch.
-  const runStatus = (availableRuns || []).find((r) => r.runId === selectedRun)?.status;
-  const isFrozenRun = !!selectedRun && selectedRun !== "latest" && runStatus !== "in_progress";
+  // dashboard-refreshing dim flash) on re-entering a run view. The rule
+  // itself (including why an unknown run counts as frozen) lives in
+  // models/runRules.js.
+  const frozenRun = isFrozenRun(selectedRun, availableRuns);
 
   const dashboardQuery = useQuery({
     queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
-    staleTime: isFrozenRun ? Infinity : 60_000,
+    staleTime: frozenRun ? Infinity : 60_000,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
@@ -193,6 +193,11 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
     latestAccumulated: latestScores?.accumulated || null,
+    // How the grade was produced, not what it is. A tuned formula moves every
+    // score at once with no other trace, so the Overview has to be able to say
+    // so next to the number. This return is an explicit whitelist -- dropping
+    // the key here silently removes the warning.
+    customFormula: Boolean(scores?.scoring?.customFormula),
     rescoreLookup: {},
     loading: dashboardQuery.isLoading || scoresLoading,
     // True during background refetch when we already have placeholder data
@@ -203,7 +208,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // showing the previous selection's numbers until they land.
     scoresPending,
     error: dashboardQuery.isError
-      ? "Failed to load dashboard data. Check your connection and try refreshing."
+      ? t('overview.dashboardLoadFailed')
       : (scoresError || null),
     availableRuns,
     refreshDashboard,

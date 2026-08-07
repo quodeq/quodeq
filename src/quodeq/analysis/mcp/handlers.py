@@ -33,9 +33,9 @@ _SERVER_VERSION = __version__ or "0.0.0"
 _DEFAULT_MAX_FILE_BATCH_SIZE = 1000
 
 
-def _max_file_batch_size() -> int:
+def _max_file_batch_size(env: dict[str, str] | None = None) -> int:
     """Return the per-call file-batch ceiling, honouring QUODEQ_MCP_MAX_BATCH."""
-    raw = os.environ.get("QUODEQ_MCP_MAX_BATCH")
+    raw = (env if env is not None else os.environ).get("QUODEQ_MCP_MAX_BATCH")
     if not raw:
         return _DEFAULT_MAX_FILE_BATCH_SIZE
     try:

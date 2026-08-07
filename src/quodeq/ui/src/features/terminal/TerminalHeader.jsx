@@ -4,6 +4,7 @@ import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
 import {
   COPY_FEEDBACK_MS, ChevronDownIcon, CopyIcon, MaximizeIcon, MinimizeIcon, PlusIcon,
 } from '../../components/CopyButton.jsx';
+import { t } from '../../strings/index.js';
 
 /**
  * The terminal panel's own header: panel switcher, identity, the sandbox
@@ -30,26 +31,26 @@ export default function TerminalHeader({ onCopy, onNewSession }) {
       {openPanels.length < 2 && (
         <span className="tty-icon-block" aria-hidden="true">&gt;_</span>
       )}
-      <div className="tty-panel-title">Terminal</div>
+      <div className="tty-panel-title">{t('terminal.terminalLabel')}</div>
       {/* With a single session the tab strip is hidden and the "+" lives up
           here; creating a second session reveals the strip, which carries its
           own "+" from then on. */}
       {onNewSession && (
         <button type="button" className="tty-tab-add tty-header-add"
           onClick={onNewSession}
-          aria-label="New session" title="New session">
+          aria-label={t('terminal.newSession')} title={t('terminal.newSession')}>
           <PlusIcon />
         </button>
       )}
       <div className="tty-panel-controls">
         <button type="button" className={`assistant-drawer-btn${copied ? ' tty-copy-btn--done' : ''}`}
           onClick={handleCopy}
-          aria-label="Copy terminal output"
-          title={copied ? 'Copied' : 'Copy selection (or visible output)'}>
+          aria-label={t('terminal.copyOutput')}
+          title={copied ? t('common.copiedShort') : t('terminal.copySelection')}>
           <CopyIcon />
         </button>
         <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-          aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
+          aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
           aria-pressed={maximized}
           title={maximized ? 'Restore' : 'Maximize'}>
           {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
@@ -57,7 +58,7 @@ export default function TerminalHeader({ onCopy, onNewSession }) {
         {/* Chevron-down, NOT an ×: the shell keeps running server-side;
             reopening the tab reattaches to it. */}
         <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-          aria-label="Hide tab" title="Hide (keeps running in the background)">
+          aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
           <ChevronDownIcon />
         </button>
       </div>

@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.checks.runner import apply_checks_for_run
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 
@@ -59,6 +60,14 @@ class DimensionRunner:
         if ev is None:
             log_warning(f"[{idx}/{ctx.total}] {dim_id} — no valid evidence, skipping")
             return None
+
+        # Requirements the standard marks as deterministically checkable are
+        # answered here, from the whole import graph. They cannot come out of
+        # the per-file cache the way an LLM finding does -- "does anything in
+        # this project reach Flask" is not a property of any one file.
+        checked = apply_checks_for_run(config, dim_id, ev)
+        if checked:
+            log_info(f"   {dim_id} — {checked} finding(s) from deterministic checks")
 
         if emit_log:
             # The dimension has analytically succeeded. Guard the success-log

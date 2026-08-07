@@ -5,6 +5,8 @@
 
 import { computeOverallProgress } from './scanProgressTotals.js';
 import { formatDuration } from '../../../utils/formatters.js';
+import { isTimeLimitExit } from '../../../models/exitReason.js';
+import { t } from '../../../strings/index.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -181,12 +183,15 @@ export function formatSevHint(counts) {
  * echo the cleanScan flag back, but coverage tells the same story: cached
  * results exist only on incremental runs. Null while coverage is unknown
  * (legacy dims, preparing) — callers show a placeholder.
+ *
+ * Returns an identity value ('incremental' | 'clean'), never display text:
+ * callers compare it, and the words a user sees come from the catalog.
  */
 export function deriveScanMode(progress) {
   if (!progress) return null;
   const { cachedFiles, projectTotal } = computeOverallProgress(progress);
   if (cachedFiles == null || !(projectTotal > 0)) return null;
-  return cachedFiles > 0 ? 'incremental' : 'clean scan';
+  return cachedFiles > 0 ? 'incremental' : 'clean';
 }
 
 const STATUS_TONE = {
@@ -238,10 +243,10 @@ export function suppressedSuffix(suppressedCount) {
  */
 export function carriedSuffix(carriedCount) {
   if (!(carriedCount > 0)) return '';
-  return ` · ${carriedCount} carried forward`;
+  return t('evaluate.carriedForward', { count: carriedCount });
 }
 
-function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppressedCount = 0, carriedCount = 0) {
+function foundCell(liveCount, label = 'FOUND', hint = t('evaluate.liveViolations'), suppressedCount = 0, carriedCount = 0) {
   return {
     label,
     value: liveCount,
@@ -260,14 +265,24 @@ function foundCell(liveCount, label = 'FOUND', hint = 'live violations', suppres
  * @param {number} inputs.liveCount
  * @param {number} [inputs.suppressedCount] — re-found findings already dismissed/deleted
  * @param {number} [inputs.carriedCount] — carried-forward findings the live-feed preference hid
+ * @param {string|null} [inputs.exitReason] — job.exitReason; time-limit reasons soften the status cell
  * @param {object|null} [inputs.dimCycle] — from buildDimensionCycle (running only)
  * @param {object} [inputs.sevCounts] — from sumSeverities (running only)
  * @param {string|null} [inputs.scanMode] — from deriveScanMode (running only)
  * @returns {Array<{label,value,hint,tone,trailing?}>} exactly 4 cells.
  */
 export function buildJobStatCells(status, inputs) {
-  const tone = statusTone(status);
-  const statusCell = { label: 'STATUS', value: status, tone, hint: statusHint(status) };
+  // A run that ended at its time budget is not user-cancelled and not an
+  // error: agree with the header pill ("time limit reached") instead of
+  // showing "user cancelled" / critical "see logs" under it.
+  const timeLimit = isTimeLimitExit(inputs.exitReason);
+  const tone = timeLimit ? 'default' : statusTone(status);
+  const statusCell = {
+    label: 'STATUS',
+    value: status,
+    tone,
+    hint: timeLimit ? t('evaluate.timeLimitReached') : statusHint(status),
+  };
 
   if (status === 'done' || status === 'completed') {
     return [
@@ -283,8 +298,8 @@ export function buildJobStatCells(status, inputs) {
     // progress data instead of repeating "running".
     const dc = inputs.dimCycle ?? null;
     const runKnown = inputs.totalFiles > 0;
-    const modeHint = inputs.scanMode === 'incremental' ? ' · changed since last scan'
-      : inputs.scanMode === 'clean scan' ? ' · full rescan' : '';
+    const modeHint = inputs.scanMode === 'incremental' ? t('evaluate.modeIncremental')
+      : inputs.scanMode === 'clean' ? t('evaluate.modeFullRescan') : '';
     return [
       {
         // The counter lives in the hint, not the label. Tile labels are a
@@ -299,7 +314,7 @@ export function buildJobStatCells(status, inputs) {
         tone: 'accent',
       },
       {
-        label: 'files this run',
+        label: t('evaluate.filesThisRun'),
         value: runKnown ? inputs.takenFiles : '—',
         trailing: runKnown ? `/ ${inputs.totalFiles}` : null,
         hint: runKnown ? `${inputs.overallPct}%${modeHint}` : 'preparing…',
@@ -314,17 +329,17 @@ export function buildJobStatCells(status, inputs) {
   return [
     statusCell,
     progressCell(inputs),
-    foundCell(inputs.liveCount, 'FOUND', 'live violations', inputs.suppressedCount, inputs.carriedCount),
+    foundCell(inputs.liveCount, 'FOUND', t('evaluate.liveViolations'), inputs.suppressedCount, inputs.carriedCount),
     elapsedCell(inputs.elapsedS, 'ELAPSED', inputs.etaHint ?? null),
   ];
 }
 
 function statusHint(s) {
-  if (s === 'running') return 'scan in progress';
+  if (s === 'running') return t('evaluate.scanInProgress');
   if (s === 'done' || s === 'completed') return null;
   if (s === 'failed') return 'see logs';
-  if (s === 'lost')   return 'tracking lost';
-  if (s === 'cancelled') return 'user cancelled';
+  if (s === 'lost')   return t('evaluate.trackingLost');
+  if (s === 'cancelled') return t('evaluate.userCancelled');
   return null;
 }
 

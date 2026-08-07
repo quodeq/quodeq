@@ -138,7 +138,7 @@ def test_start_evaluation_forwards_provider_and_model(tmp_path: Path) -> None:
     mixin._dispatcher = _SpyDispatcher()
 
     opts = EvaluationOptions(ai_cmd="ollama", ai_model="gemma4:26b-mlx")
-    with patch("quodeq.services.evaluation_mixin._register_project"):
+    with patch("quodeq.services.evaluation_mixin.register_project"):
         mixin.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
 
     assert captured["ai_provider"] == "ollama"

@@ -9,27 +9,40 @@ import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { deriveScanMode } from './buildJobStatCells.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
+import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js';
+import { t } from '../../../strings/index.js';
+import { jobStatusLabel } from '../../../strings/labels.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
 const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
 
-function termNameForStatus(status) {
-  if (status === STATUS.RUNNING) return 'evaluation_in_progress';
-  if (status === STATUS.DONE)    return 'evaluation_complete';
-  if (status === STATUS.FAILED)  return 'evaluation_failed';
-  if (status === STATUS.LOST)    return 'evaluation_lost';
-  return 'evaluation_cancelled';
+// A cancelled/failed job whose run hit its time budget is not an error:
+// the header must agree with the coverage banner below it, which already
+// says "time limit reached" from the run's status.json. Done runs keep
+// their "complete" header; the banner tells the truncation story there.
+function isTimeLimitEnd(status, exitReason) {
+  return (status === 'cancelled' || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
 }
 
-function RunPill({ status }) {
+function termNameForStatus(status, exitReason) {
+  if (status === STATUS.RUNNING) return t('evaluate.termInProgress');
+  if (isTimeLimitEnd(status, exitReason)) return t('evaluate.termTimeLimit');
+  if (status === STATUS.DONE)    return t('evaluate.termComplete');
+  if (status === STATUS.FAILED)  return t('evaluate.termFailed');
+  if (status === STATUS.LOST)    return t('evaluate.termLost');
+  return t('evaluate.termCancelled');
+}
+
+function RunPill({ status, exitReason }) {
+  const timeLimit = isTimeLimitEnd(status, exitReason);
   const mod = status === STATUS.RUNNING ? 'running'
     : status === STATUS.DONE ? 'done'
-    : (status === STATUS.FAILED || status === STATUS.LOST) ? 'failed'
+    : !timeLimit && (status === STATUS.FAILED || status === STATUS.LOST) ? 'failed'
     : 'neutral';
   return (
     <span className={`eval-run-pill eval-run-pill--${mod}`}>
       {status === STATUS.RUNNING && <span className="eval-run-pill__dot" aria-hidden="true" />}
-      {status}
+      {timeLimit ? exitReasonLabel(exitReason) : jobStatusLabel(status)}
     </span>
   );
 }
@@ -39,18 +52,21 @@ function JobHeader({ job, onDismiss, onCancel }) {
   const isDone = job.status === STATUS.DONE;
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
-      <TermHeader name={termNameForStatus(job.status)} badge={<RunPill status={job.status} />} />
+      <TermHeader
+        name={termNameForStatus(job.status, job.exitReason)}
+        badge={<RunPill status={job.status} exitReason={job.exitReason} />}
+      />
       <div className="evaluate-panel__top-actions">
         {isRunning && (
-          <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>cancel</button>
+          <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>{t('evaluate.cancelBtn')}</button>
         )}
         {!isRunning && isDone && (
           <button type="button" className="term-btn term-btn--primary term-btn--sm" onClick={() => onDismiss('view')}>
-            <span aria-hidden="true">▸</span> view results
+            <span aria-hidden="true">▸</span> {t('evaluate.viewResults')}
           </button>
         )}
         {!isRunning && (
-          <button type="button" className="term-btn term-btn--secondary term-btn--sm" onClick={() => onDismiss('close')}>close</button>
+          <button type="button" className="term-btn term-btn--secondary term-btn--sm" onClick={() => onDismiss('close')}>{t('evaluate.closeBtn')}</button>
         )}
       </div>
     </div>
@@ -65,13 +81,13 @@ function JobIdentityStrip({ job, projectLabel }) {
   return (
     <IdentityStrip>
       {/* "Unknown beats wrong": a dash, never the global selection. */}
-      <IdentityCell label="repository">{projectLabel ?? '—'}</IdentityCell>
-      <IdentityCell label="job id" grow title={job.jobId}>
+      <IdentityCell label={t('evaluate.idRepository')}>{projectLabel ?? '—'}</IdentityCell>
+      <IdentityCell label={t('evaluate.idJobId')} grow title={job.jobId}>
         <code className="eval-identity__code">{job.jobId}</code>
-        <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
+        <CopyButton aria-label={t('evaluate.copyJobIdAria')} onClick={() => copyToClipboard(job.jobId)} />
       </IdentityCell>
       {job.aiProvider && job.aiModel && (
-        <IdentityCell label="model">
+        <IdentityCell label={t('evaluate.idModel')}>
           <span data-testid="job-runtime-chip">
             {job.aiProvider}
             <span className="eval-provider-sep" aria-hidden="true"> · </span>
@@ -79,7 +95,7 @@ function JobIdentityStrip({ job, projectLabel }) {
           </span>
         </IdentityCell>
       )}
-      <IdentityCell label="mode">{mode ?? '—'}</IdentityCell>
+      <IdentityCell label={t('evaluate.idMode')}>{mode ?? '—'}</IdentityCell>
     </IdentityStrip>
   );
 }

@@ -857,16 +857,37 @@ def _make_on_reload(window: object) -> "Callable[[str], None]":
 
     Extracted from ``main()`` so the test suite can import and exercise the
     real implementation rather than a hand-rolled duplicate.
+
+    An empty URL is the "focus" case a plain relaunch sends (see
+    InstanceController.send_focus): stay on the page this window already has,
+    reloading it in place so a ``--dev`` relaunch picks up the rebuilt UI, and
+    raise the window either way.
     """
     def _on_reload(new_url: str) -> None:
-        if not _is_safe_reload_url(new_url):
+        if new_url and not _is_safe_reload_url(new_url):
             _logger.warning("Ignoring unsafe reload URL: %s", new_url)
             return
-        window.load_url(new_url)  # type: ignore[union-attr]
+        target = new_url or _current_url(window)
+        if target:
+            window.load_url(target)  # type: ignore[union-attr]
         window.on_top = True  # type: ignore[union-attr]
         window.on_top = False  # type: ignore[union-attr]
 
     return _on_reload
+
+
+def _current_url(window: object) -> str | None:
+    """The window's own URL, or None if the backend won't say.
+
+    Only used to reload in place, so an unavailable URL just means "raise the
+    window without refreshing" — never a reason to fail the focus request.
+    """
+    try:
+        url = window.get_current_url()  # type: ignore[union-attr]
+    except Exception:  # noqa: BLE001 — backend-specific; the window may be mid-teardown
+        _logger.debug("get_current_url failed; focusing without reload", exc_info=True)
+        return None
+    return url if isinstance(url, str) and _is_safe_reload_url(url) else None
 
 
 def _webview_user_agent() -> str:
@@ -1161,7 +1182,17 @@ def main() -> None:
     window.events.loaded += _on_loaded
     window.events.closing += _make_on_closing(api, window)
 
-    instance.start_listening(on_reload=_on_reload)
+    # Own the reload socket here, not in the parent: this process holds the
+    # window, so it is the only one that can bring it forward on a relaunch.
+    # try_acquire is what binds the socket — without it start_listening has
+    # nothing to accept on.
+    if not instance.try_acquire():
+        _logger.warning(
+            "Another instance owns %s — this window will not answer reloads",
+            instance.sock_path,
+        )
+    else:
+        instance.start_listening(on_reload=_on_reload)
 
     storage_dir = str(_quodeq_dir() / "webview")
 

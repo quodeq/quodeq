@@ -3,6 +3,7 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { checkForUpdates, setUpdateAutoCheck } from '../../../api/index.js';
 import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
 import { openExternal } from '../../updates/openExternal.js';
+import { t } from '../../../strings/index.js';
 
 export default function UpdatesSection() {
   const { status, setStatus } = useUpdateStatus();
@@ -26,29 +27,31 @@ export default function UpdatesSection() {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <SectionLabel marker="▶">Updates</SectionLabel>
+        <SectionLabel marker="▶">{t('settings.updatesLabel')}</SectionLabel>
       </div>
 
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Version</span>
+          <span className="settings-label">{t('settings.versionLabel')}</span>
           <span className="settings-description">
             {available
-              ? `Update available: ${current} → ${status.latest}${status.is_security ? ' (security)' : ''}`
-              : `You're on the latest version (${current})`}
+              ? (status.is_security
+                  ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
+                  : t('settings.updateAvailable', { current, latest: status.latest }))
+              : t('settings.upToDate', { version: current })}
           </span>
         </div>
         <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
-          {checking ? 'checking…' : 'check now'}
+          {checking ? t('settings.checking') : t('settings.checkNow')}
         </button>
       </div>
 
       {available && (
         <div className="settings-row">
           <div className="settings-row-label">
-            <span className="settings-label">Get the update</span>
+            <span className="settings-label">{t('settings.getTheUpdate')}</span>
             <span className="settings-description">
-              {status.action_command ? status.action_command : 'Download the new build'}
+              {status.action_command ? status.action_command : t('settings.downloadNewBuild')}
             </span>
           </div>
           <button
@@ -56,15 +59,15 @@ export default function UpdatesSection() {
             className="settings-pill"
             onClick={() => openExternal(status.latest_url || status.download_url)}
           >
-            {status.action_command ? "what's new" : 'download'}
+            {status.action_command ? t('settings.whatsNew') : t('settings.download')}
           </button>
         </div>
       )}
 
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Automatic checks</span>
-          <span className="settings-description">Check PyPI/GitHub for new versions once a day</span>
+          <span className="settings-label">{t('settings.automaticChecks')}</span>
+          <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
         </div>
         <div className="settings-pill-group">
           <button
@@ -73,7 +76,7 @@ export default function UpdatesSection() {
             onClick={() => onToggle(true)}
             aria-pressed={auto}
           >
-            On
+            {t('settings.on')}
           </button>
           <button
             type="button"
@@ -81,7 +84,7 @@ export default function UpdatesSection() {
             onClick={() => onToggle(false)}
             aria-pressed={!auto}
           >
-            Off
+            {t('settings.off')}
           </button>
         </div>
       </div>

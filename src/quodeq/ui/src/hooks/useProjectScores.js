@@ -11,6 +11,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiContext.jsx";
 import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
+import { t } from '../strings/index.js';
 
 /**
  * @param {{
@@ -113,7 +114,7 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     scoresPending: scoresQuery.isPlaceholderData,
     error:
       (scoresQuery.isError || latestQuery.isError)
-        ? "Failed to load score data. Check your connection and try refreshing."
+        ? t('overview.scoresLoadFailed')
         : null,
     availableRuns,
     refreshScores,

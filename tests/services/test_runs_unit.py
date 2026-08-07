@@ -1,6 +1,6 @@
 from __future__ import annotations
 from quodeq.services._runs_unit import _ui_status, _row_to_run_entry
-from quodeq.services.run_index import RunRow
+from quodeq.data.sqlite.run_index import RunRow
 
 def _row(run_id="r1", state="done", started_at="2026-01-02T03:04:05Z"):
     return RunRow(
@@ -69,7 +69,7 @@ def test_fill_scores_tolerates_read_error(monkeypatch, tmp_path):
     assert entry["overallScore"] is None
 
 
-from quodeq.services.run_index import open_index
+from quodeq.data.sqlite.run_index import open_index
 
 def test_build_runs_unit_end_to_end(monkeypatch, tmp_path):
     db_path = tmp_path / "index.db"

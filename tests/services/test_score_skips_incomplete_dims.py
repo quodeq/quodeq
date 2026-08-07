@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.shared.dimensions_state import DimState, write_dim_state
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
 
 def _seed_run(tmp_path: Path) -> tuple[Path, Path]:
@@ -39,7 +39,7 @@ def _write_scan_json(reports: Path, project: str) -> None:
 
 
 def test_done_dim_scored_incomplete_skipped(tmp_path: Path):
-    from quodeq.services.evaluation_mixin import _score_completed_evidence
+    from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
 
     reports, run = _seed_run(tmp_path)
     _write_scan_json(reports, "proj")
@@ -64,7 +64,7 @@ def test_done_dim_scored_incomplete_skipped(tmp_path: Path):
 
 
 def test_idempotent_does_not_rescore(tmp_path: Path):
-    from quodeq.services.evaluation_mixin import _score_completed_evidence
+    from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
 
     reports, run = _seed_run(tmp_path)
     _write_scan_json(reports, "proj")
@@ -91,8 +91,8 @@ def test_cancelled_run_scoring_quarantines_off_standard_findings(tmp_path: Path,
     completed run does, so off-standard findings stay quarantined instead of
     re-entering the grade as phantom principles.
     """
-    from quodeq.services.evaluation_mixin import _score_completed_evidence
-    from quodeq.shared.dimensions_state import DimState, write_dim_state
+    from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
+    from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
     monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
     reports, run = _seed_run(tmp_path)

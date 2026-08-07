@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { t } from '../../../strings/index.js';
 
 export default function PrincipleForm({ principle, principleIndex, onUpdateField, editable }) {
   const nameRef = useRef(null);
@@ -10,10 +11,10 @@ export default function PrincipleForm({ principle, principleIndex, onUpdateField
 
   return (
     <div className="principle-form">
-      <SectionLabel marker="▶">Principle</SectionLabel>
+      <SectionLabel marker="▶">{t('standards.principleLabel')}</SectionLabel>
 
       <div className="form-group">
-        <label htmlFor={`principle-name-${principleIndex}`}>Name</label>
+        <label htmlFor={`principle-name-${principleIndex}`}>{t('standards.colName')}</label>
         <input
           ref={nameRef}
           id={`principle-name-${principleIndex}`}
@@ -21,26 +22,28 @@ export default function PrincipleForm({ principle, principleIndex, onUpdateField
           value={principle.name || ''}
           onChange={(e) => onUpdateField(['principles', principleIndex, 'name'], e.target.value)}
           disabled={!editable}
-          placeholder="e.g. Dependency Rule"
+          placeholder={t('standards.principleNamePlaceholder')}
         />
       </div>
 
       <div className="form-group">
-        <label htmlFor={`principle-desc-${principleIndex}`}>Description</label>
+        <label htmlFor={`principle-desc-${principleIndex}`}>{t('standards.descriptionLabel')}</label>
         <textarea
           id={`principle-desc-${principleIndex}`}
           className="form-textarea"
           value={principle.description || ''}
           onChange={(e) => onUpdateField(['principles', principleIndex, 'description'], e.target.value)}
           disabled={!editable}
-          placeholder="Describe this principle..."
+          placeholder={t('standards.describePrinciplePlaceholder')}
           rows={4}
         />
       </div>
 
       <div className="principle-form-meta">
         <span className="principle-form-req-count">
-          {principle.requirements?.length ?? 0} requirement{(principle.requirements?.length ?? 0) === 1 ? '' : 's'}
+          {(principle.requirements?.length ?? 0) === 1
+            ? t('standards.requirementsCountOne', { count: principle.requirements?.length ?? 0 })
+            : t('standards.requirementsCountMany', { count: principle.requirements?.length ?? 0 })}
         </span>
       </div>
     </div>

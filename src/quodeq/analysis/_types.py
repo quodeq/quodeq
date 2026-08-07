@@ -7,10 +7,12 @@ mutual dependencies.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from quodeq.analysis import dispatch_policy
 from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subprocess import HeartbeatCallback
@@ -35,6 +37,10 @@ class AnalysisOptions:
     consolidated: bool = True
     time_limit: int | None = None
     deadline_at: float | None = None
+    # Invoked with the new ISO deadline whenever the pool auto-scale ratchets
+    # ``deadline_at`` forward — wired by the CLI layer to the lifecycle so
+    # status.json (dashboard countdown, exit-reason labeling) follows.
+    on_deadline_extended: Callable[[str], None] | None = None
     incremental: bool = True
     incremental_file_filter: set[str] | None = None
     dry_run: bool = False
@@ -98,8 +104,6 @@ class RunConfig:
             files, total = self.manifest.source_files, self.manifest.total_files
         else:
             return 0
-        # Late import: dispatch_policy reads provider config; keep _types a leaf.
-        from quodeq.analysis import dispatch_policy  # noqa: PLC0415
         if not files or not dispatch_policy.provider_is_api():
             return total
         dispatchable, _excluded = dispatch_policy.split_api_dispatchable(self.src, files)

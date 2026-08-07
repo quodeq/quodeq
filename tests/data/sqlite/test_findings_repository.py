@@ -6,7 +6,7 @@ from quodeq.core.events.models import (
     JudgmentCreatedEvent,
     JudgmentPayload,
 )
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.actions_log import ActionLogWriter
 from quodeq.data.projection.projector import ProjectionResult, Projector
 from quodeq.data.sqlite.connection import open_evaluation_db
@@ -57,6 +57,19 @@ def test_insert_finding_persists_provenance_downgrade(tmp_path: Path):
     by_id = {f.practice_id: f for f in repo.list_all()}
     assert by_id["R-FT-2"].provenance_downgrade is True
     assert by_id["P-normal"].provenance_downgrade is False
+
+
+def test_insert_finding_persists_scope_downgrade(tmp_path: Path):
+    # A finding the scope gate downgraded must round-trip its rule/from/to
+    # through the INSERT + SELECT column lists, not silently fall back to
+    # None. A missing column in either list would regress it here.
+    repo = SqliteFindingsRepository(tmp_path)
+    marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    repo.insert_finding(_finding(p="S-AUT-3", severity="minor", scope_downgrade=marker))
+    repo.insert_finding(_finding(p="P-normal", line=2, severity="major"))
+    by_id = {f.practice_id: f for f in repo.list_all()}
+    assert by_id["S-AUT-3"].scope_downgrade == marker
+    assert by_id["P-normal"].scope_downgrade is None
 
 
 def test_search_uses_fts5(tmp_path: Path):

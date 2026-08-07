@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types import ProjectEntry
+from quodeq.data.fs.children import find_children  # noqa: F401 — re-exported API
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_project_helpers import (
@@ -20,8 +21,8 @@ from quodeq.services._fs_project_helpers import (
     _build_project_entry,
     _max_projects_listed,
 )
-from quodeq.services.ports import list_runs, safe_read_dir
-from quodeq.shared.repo_handler import is_valid_repo_url
+from quodeq.data.fs.report_parser.runs import list_runs, safe_read_dir
+from quodeq.data.fs.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
@@ -51,24 +52,6 @@ def _is_evaluable(repo_path: str | None) -> bool:
     if not repo_path:
         return False
     return Path(repo_path).is_dir()
-
-
-def find_children(reports_root: Path, parent_id: str) -> list[str]:
-    """Return UUIDs of child projects whose parent matches *parent_id*."""
-    children: list[str] = []
-    for entry in reports_root.iterdir():
-        if not entry.is_dir() or entry.name == parent_id:
-            continue
-        info_path = entry / "repository_info.json"
-        if not info_path.exists():
-            continue
-        try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
-            if info.get("parent") == parent_id:
-                children.append(entry.name)
-        except (json.JSONDecodeError, OSError):
-            continue
-    return children
 
 
 def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str]]:

@@ -15,7 +15,7 @@ import shutil
 from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import run_index as _run_index
+from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import is_safe_run_segment
 from quodeq.services.jobs import JobManager
 
@@ -211,7 +211,7 @@ class EvaluationsIndex:
         if snapshot.status != "running":
             return False
 
-        from quodeq.services._index_sync import force_promote_to_cancelled_stale
+        from quodeq.data.sqlite._index_sync import force_promote_to_cancelled_stale
 
         run_dir: Path | None = None
         if snapshot.output_project and snapshot.output_run_id and reports_dir:
@@ -303,10 +303,9 @@ class EvaluationsIndex:
             pid_file = run_dir / ".pid"
             if not pid_file.exists():
                 return True  # no PID file -> stale/crashed -> complete
-            project_uuid = run_dir.parent.name
-            run_id = run_dir.name
-            reports_root = run_dir.parent.parent
-            return resolve_external_pid(project_uuid, run_id, reports_root) is None
+            # run_dir is already resolved; pass its parent straight through
+            # instead of splitting it into names and rejoining them.
+            return resolve_external_pid(run_dir.parent, run_dir.name) is None
         snapshot = self._jobs.get_job(job_id)
         if snapshot is not None and snapshot.status in {"done", "failed", "cancelled"}:
             return True
@@ -435,7 +434,7 @@ def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     if dims:
         return dims
     from quodeq.shared.dim_estimates_io import read_dim_estimates
-    from quodeq.shared.dimensions_state import read_dimensions
+    from quodeq.data.fs.dimensions_state_store import read_dimensions
     recovered: dict[str, None] = {}
     dim_records = read_dimensions(run_dir).get("dimensions")
     record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()

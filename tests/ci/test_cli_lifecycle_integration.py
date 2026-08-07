@@ -9,7 +9,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quodeq.shared.run_status import read_status
+from quodeq.core.run.dimensions import DimState
+from quodeq.data.fs.dimensions_state_store import write_dim_state
+from quodeq.core.run.dimensions import DimState
+from quodeq.data.fs.run_status_store import read_status
 
 
 def test_pipeline_writes_running_then_done(tmp_path: Path) -> None:
@@ -91,7 +94,7 @@ def test_pipeline_writes_failed_on_domain_error(tmp_path: Path) -> None:
         result = cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
         assert result == 1
 
-    from quodeq.shared.run_status import read_status
+    from quodeq.data.fs.run_status_store import read_status
     run_dir = evaluation_dir.parent
     status = read_status(run_dir)
     assert status["state"] == "failed"
@@ -106,7 +109,7 @@ def test_record_deadline_if_hit_tags_lifecycle_when_deadline_past(tmp_path: Path
     """_record_deadline_if_hit must call set_exit_reason('deadline') when
     config.options.deadline_at is in the past (i.e. loop broke on deadline)."""
     import quodeq._cli_evaluation as cli
-    from quodeq.shared.run_lifecycle import RunLifecycleContext
+    from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -127,13 +130,17 @@ def test_record_deadline_if_hit_noop_when_no_deadline(tmp_path: Path) -> None:
     """If config.options.deadline_at is None, the helper must NOT touch
     exit_reason — a clean run still finalizes with exit_reason=null."""
     import quodeq._cli_evaluation as cli
-    from quodeq.shared.run_lifecycle import RunLifecycleContext
+    from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as lifecycle:
         config = SimpleNamespace(options=SimpleNamespace(deadline_at=None))
         cli._record_deadline_if_hit(lifecycle, config)
+        # Finish the declared dimension: a run that ends without scoring one
+        # now reports incomplete_dimensions, which would mask what this asserts.
+        write_dim_state(run_dir, "flex", DimState.RUNNING)
+        write_dim_state(run_dir, "flex", DimState.DONE)
         lifecycle.transition_to_finalizing()
 
     status = read_status(run_dir)
@@ -146,7 +153,7 @@ def test_record_deadline_if_hit_noop_when_deadline_not_yet_reached(tmp_path: Pat
     """If the deadline is still in the future when the loops returned (clean
     completion before the budget), the helper must NOT tag exit_reason."""
     import quodeq._cli_evaluation as cli
-    from quodeq.shared.run_lifecycle import RunLifecycleContext
+    from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -155,6 +162,10 @@ def test_record_deadline_if_hit_noop_when_deadline_not_yet_reached(tmp_path: Pat
             options=SimpleNamespace(deadline_at=time.monotonic() + 3600.0),
         )
         cli._record_deadline_if_hit(lifecycle, config)
+        # Finish the declared dimension: a run that ends without scoring one
+        # now reports incomplete_dimensions, which would mask what this asserts.
+        write_dim_state(run_dir, "flex", DimState.RUNNING)
+        write_dim_state(run_dir, "flex", DimState.DONE)
         lifecycle.transition_to_finalizing()
 
     status = read_status(run_dir)
@@ -239,7 +250,7 @@ def test_c88be50e_partial_state_invariants_agree(tmp_path: Path) -> None:
     import quodeq._cli_evaluation as cli
     from quodeq.analysis.cache.dimension_helpers import ClassifyResult
     from quodeq.analysis.cache.dimension_runner import _compute_files_read
-    from quodeq.shared.run_lifecycle import RunLifecycleContext
+    from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     # --- Half (a): lifecycle records exit_reason="deadline" -----------------
     run_dir = tmp_path / "run"
@@ -367,3 +378,41 @@ def test_pipeline_records_ai_cmd_as_provider(tmp_path: Path, monkeypatch) -> Non
     assert status is not None, "status.json must be written"
     assert status["ai_provider"] == "llamacpp"
     assert status["ai_model"] == "qwen3.6-27b"
+
+
+def test_pool_deadline_extension_reaches_status_json(tmp_path: Path) -> None:
+    """The deadline-extension callback is wired to the lifecycle before the
+    pipeline runs: invoking it (as the pool auto-scale does) must land the
+    new deadline in status.json, where the dashboard countdown and the
+    post-#956 exit-reason labeling read it."""
+    import argparse
+
+    import quodeq._cli_evaluation as cli
+    from quodeq.analysis._types import RunConfig
+
+    evidence_dir = tmp_path / "proj" / "run" / "evidence"
+    evaluation_dir = tmp_path / "proj" / "run" / "evaluation"
+    evidence_dir.mkdir(parents=True)
+    evaluation_dir.mkdir(parents=True)
+
+    config = RunConfig(src=tmp_path, language="python")
+    extended_iso = "2026-08-01T12:00:00+00:00"
+
+    def _fake_pipeline(*_a, **_k):
+        cb = config.options.on_deadline_extended
+        assert cb is not None, "extension callback must be wired before the pipeline runs"
+        cb(extended_iso)
+        return 0
+
+    with patch.object(cli, "_execute_pipeline", side_effect=_fake_pipeline), \
+         patch.object(cli, "_save_manifest"), \
+         patch.object(cli, "_build_run_config", return_value=config), \
+         patch.object(cli, "is_repo_url", return_value=False), \
+         patch.object(cli, "emit_marker"):
+        args = argparse.Namespace(repo="local", pool_budget=60)
+        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+
+    status = read_status(evaluation_dir.parent)
+    assert status is not None
+    assert status["deadline_at"] == extended_iso

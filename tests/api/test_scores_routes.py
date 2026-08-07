@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services.scoring import get_scores_raw, get_scores_slim
@@ -105,6 +105,33 @@ def test_get_scores_raw_surfaces_provenance_downgrade(tmp_path: Path) -> None:
     # Parity: an un-downgraded finding stays False (no over-marking).
     other = next(v for v in security["violations"] if v["file"] != "downgraded.py")
     assert other["provenanceDowngrade"] is False
+
+
+def test_get_scores_raw_surfaces_scope_downgrade(tmp_path: Path) -> None:
+    """A finding the scope gate capped from major to minor must keep its
+    scope_downgrade marker -- including WHICH rule fired -- through the
+    SQL-backed scores read path (_build_response_from_grade_tables /
+    _SELECT_ACTIVE), so the dashboard can show what was waived and why.
+    A dropped column here silently makes a waived finding indistinguishable
+    from an ordinary minor."""
+    violations = _scorable_violations()  # 5 distinct Security violations
+    violations[0] = {
+        **violations[0], "file": "downgraded.py",
+        "severity": "minor",
+        "scope_downgrade": {"rule": "sourceless_path", "from": "major", "to": "minor"},
+    }
+    _seed_run(tmp_path, "myproject", "r1", violations=violations)
+
+    result = get_scores_raw(tmp_path, "myproject", "r1")
+
+    security = next(d for d in result["dimensions"] if d["dimension"] == "Security")
+    target = next(v for v in security["violations"] if v["file"] == "downgraded.py")
+    assert target["scopeDowngrade"] == {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    # Parity: an un-downgraded finding has no marker at all (omitted, since
+    # to_camel_dict drops None fields -- absence, not a bare False, is the
+    # honest "not gated" signal for a dict-shaped marker).
+    other = next(v for v in security["violations"] if v["file"] != "downgraded.py")
+    assert "scopeDowngrade" not in other
 
 
 def test_get_scores_raw_falls_back_when_db_schema_too_new(tmp_path: Path) -> None:

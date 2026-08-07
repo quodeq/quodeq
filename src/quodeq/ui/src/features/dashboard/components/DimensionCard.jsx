@@ -14,6 +14,8 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { t } from '../../../strings/index.js';
+import { severityLabel } from '../../../strings/labels.js';
 
 const SEVERITY_OPTIONS = ['critical', 'major', 'minor', 'unknown'];
 
@@ -28,7 +30,7 @@ function PrincipleFilter({ principles }) {
   if (principleOptions.length === 0) return null;
   return (
     <div className="dim-principles-filter">
-      <p className="filter-section-label">Principles</p>
+      <p className="filter-section-label">{t('dimension.principlesLabel')}</p>
       <div className="checkbox-pills">
         {principleOptions.map((name) => (
           <button
@@ -61,7 +63,7 @@ function DimFilterControls({ severity, file, principles, activeFilterCount, clea
               aria-pressed={selectedSeverities.includes(sev)}
               onClick={() => setSelectedSeverities((prev) => toggleInList(prev, sev))}
             >
-              {sev}
+              {severityLabel(sev)}
             </button>
           ))}
         </div>
@@ -70,21 +72,21 @@ function DimFilterControls({ severity, file, principles, activeFilterCount, clea
           <input
             className="file-filter-input"
             type="text"
-            placeholder="Filter by file..."
-            aria-label="Filter by file"
+            placeholder={t('dimension.filterByFilePlaceholder')}
+            aria-label={t('dimension.filterByFileAria')}
             value={fileFilter}
             onChange={(e) => setFileFilter(e.target.value)}
           />
         ) : (
           <span className="active-filter-tag">
-            File: {fileFilter}
-            <button type="button" onClick={() => setFileFilter('')} aria-label="Clear file filter">&times;</button>
+            {t('dimension.fileTag', { name: fileFilter })}
+            <button type="button" onClick={() => setFileFilter('')} aria-label={t('dimension.clearFileFilterAria')}>&times;</button>
           </span>
         )}
 
         {activeFilterCount > 0 && (
           <button type="button" className="clear-filters-btn" onClick={clearAllFilters}>
-            Clear filters ({activeFilterCount})
+            {t('dimension.clearFilters', { count: activeFilterCount })}
           </button>
         )}
       </div>
@@ -99,13 +101,12 @@ function DimViolationsList({ filteredViolations, activeFilterCount, totalCount, 
     <div className="dim-violations-section">
       <div className="section-title-row compact">
         <h4>
-          Violations
           {activeFilterCount > 0
-            ? ` (${filteredViolations.length} of ${totalCount})`
-            : ` (${filteredViolations.length})`}
+            ? t('dimension.violationsHeadingFiltered', { shown: filteredViolations.length, total: totalCount })
+            : t('dimension.violationsHeading', { count: filteredViolations.length })}
         </h4>
         <CopyButton
-          label="Full fix plan"
+          label={t('dimension.fullFixPlan')}
           className="fix-plan-btn-header"
           icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildFixPlan())}
@@ -116,7 +117,7 @@ function DimViolationsList({ filteredViolations, activeFilterCount, totalCount, 
         {filteredViolations.map((entry, index) => (
           <div key={index} className="violation-row">
             <span className={`severity-tag ${entry.severity || 'unknown'}`}>
-              {entry.severity || 'unknown'}
+              {severityLabel(entry.severity)}
             </span>
             <span className="violation-row-principle">{entry.principle || '-'}</span>
             <span className="violation-row-file">
@@ -177,10 +178,10 @@ function DimCardHeader({ title, dimension, delta }) {
 function DimKpiGrid({ dimension }) {
   return (
     <div className="mini-kpi-grid">
-      <div className="mini-kpi"><p>Total Violations</p><strong>{dimension.totals?.violationCount ?? 0}</strong></div>
-      <div className="mini-kpi"><p>Total Compliance</p><strong>{dimension.totals?.complianceCount ?? 0}</strong></div>
-      <div className="mini-kpi"><p>Critical</p><strong>{dimension.totals?.severity?.critical ?? 0}</strong></div>
-      <div className="mini-kpi"><p>Major</p><strong>{dimension.totals?.severity?.major ?? 0}</strong></div>
+      <div className="mini-kpi"><p>{t('dimension.kpiTotalViolations')}</p><strong>{dimension.totals?.violationCount ?? 0}</strong></div>
+      <div className="mini-kpi"><p>{t('dimension.kpiTotalCompliance')}</p><strong>{dimension.totals?.complianceCount ?? 0}</strong></div>
+      <div className="mini-kpi"><p>{t('dimension.kpiCritical')}</p><strong>{dimension.totals?.severity?.critical ?? 0}</strong></div>
+      <div className="mini-kpi"><p>{t('dimension.kpiMajor')}</p><strong>{dimension.totals?.severity?.major ?? 0}</strong></div>
     </div>
   );
 }
@@ -189,7 +190,7 @@ function DimPrinciplesList({ dimension }) {
   if (!dimension.principles?.length) return null;
   return (
     <div className="dim-principles-list">
-      <p className="filter-section-label">Principles ({dimension.principles.length})</p>
+      <p className="filter-section-label">{t('dimension.principlesCount', { count: dimension.principles.length })}</p>
       <div className="principle-accordion-list">
         {dimension.principles.map((principle) => (
           <PrincipleAccordion key={principle.name} principle={principle} />
@@ -213,7 +214,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
   const buildFixPlan = () => buildDimensionPlanFromViolations(dimension?.dimension || title || 'dimension', filteredViolations);
 
   if (!dimension) {
-    return <section className="panel dim-card"><h3>{title}</h3><p className="dimension-meta">Select a dimension.</p></section>;
+    return <section className="panel dim-card"><h3>{title}</h3><p className="dimension-meta">{t('dimension.selectDimension')}</p></section>;
   }
 
   const currScore = parseFloat(dimension.overallScore);
@@ -238,7 +239,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
         <DimViolationsList filteredViolations={filteredViolations} activeFilterCount={activeFilterCount} totalCount={dimension.violations?.length ?? 0} buildFixPlan={buildFixPlan} />
       )}
       {filteredViolations.length === 0 && activeFilterCount > 0 && (
-        <p className="no-data-cell">No violations match current filters.</p>
+        <p className="no-data-cell">{t('dimension.noViolationsMatch')}</p>
       )}
     </section>
   );

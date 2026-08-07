@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
+import { projectKeys, samePlaceholderScope } from '../../../api/queryKeys.js';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { countBySeverity } from '../../../utils/severity.js';
 
@@ -86,18 +88,6 @@ function mergeRescoreIntoEval(prev, dimData) {
   };
 }
 
-async function fetchAndRescore(project, runId, dimension, getDimensionEval, getRunScores) {
-  const [data, rescored] = await Promise.all([
-    getDimensionEval(project, runId, dimension),
-    getRunScores(project, runId).catch(() => null),
-  ]);
-  if (rescored) {
-    const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
-    return dimData ? mergeRescoreIntoEval(data, dimData) : data;
-  }
-  return data;
-}
-
 /**
  * @param {string} project
  * @param {string} dimension
@@ -106,64 +96,72 @@ async function fetchAndRescore(project, runId, dimension, getDimensionEval, getR
  * @param {'local'|'shared'} [selectedSource='local'] - picks the shared-repo
  *   mirror fetchers (sharedGetDimensionEval/sharedGetRunScores) instead of
  *   the local ones when the selected project is a shared-repo project.
+ *
+ * Both queries live in the react-query cache under the project subtree, so
+ * re-entering the page (Back from a principle/file detail) renders instantly
+ * from cache instead of refetching behind a full-screen LoadingScreen — the
+ * cost that used to make every Back out of a principle a multi-second hop.
+ * Every dismiss/delete/formula mutation already invalidates the
+ * projectKeys.project() prefix (see refreshDashboard/scheduleDashboardReconcile
+ * in useDashboard.js), which marks these stale too, so the cached page
+ * refetches after user actions exactly like the Overview does.
  */
 export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = 'local') {
   const { getDimensionEval, getRunScores, sharedGetDimensionEval, sharedGetRunScores } = useApi();
   const fetchDimensionEval = selectedSource === 'shared' ? sharedGetDimensionEval : getDimensionEval;
   const fetchRunScores = selectedSource === 'shared' ? sharedGetRunScores : getRunScores;
-  const [evalData, setEvalData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const projectKey = project || '_none_';
+  // Reuse the previous payload only within this project+source subtree —
+  // run-navigator swaps keep the page up with an isFetching dim, a project
+  // switch drops to the real LoadingScreen (see samePlaceholderScope).
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
 
-  useEffect(() => {
-    // First load shows the LoadingScreen; subsequent run-switches keep
-    // the previous run's data on screen and toggle isFetching so the
-    // caller can dim the page during the background refetch (matches
-    // the Overview placeholderData behaviour).
-    // The stale flag drops responses that resolve after a newer request
-    // (run-navigator clicks re-fire this effect); without it a slow earlier
-    // response could park another run's findings under the current header.
-    let stale = false;
-    setIsFetching(true);
-    fetchAndRescore(project, runId, dimension, fetchDimensionEval, fetchRunScores)
-      .then((data) => {
-        if (stale) return;
-        setEvalData(data); setLoading(false); setIsFetching(false);
-      })
-      .catch((err) => {
-        if (stale) return;
-        setError(err.message); setLoading(false); setIsFetching(false);
-      });
-    return () => { stale = true; };
-  }, [project, dimension, runId, fetchDimensionEval, fetchRunScores]);
+  const evalQuery = useQuery({
+    queryKey: projectKeys.dimensionEval(projectKey, runId, dimension, selectedSource),
+    queryFn: () => fetchDimensionEval(project, runId, dimension),
+    enabled: !!project && !!dimension,
+    staleTime: 60_000,
+    placeholderData: keepInScope,
+  });
 
+  // The rescore side. Non-fatal by design: if it errors, the page renders
+  // the unrescored eval (the old fetchAndRescore caught and dropped scores
+  // errors the same way).
+  const scoresQuery = useQuery({
+    queryKey: projectKeys.runScores(projectKey, runId, selectedSource),
+    queryFn: () => fetchRunScores(project, runId),
+    enabled: !!project,
+    staleTime: 60_000,
+    placeholderData: keepInScope,
+  });
+
+  const evalData = useMemo(() => {
+    const data = evalQuery.data ?? null;
+    if (!data) return null;
+    const dimData = (scoresQuery.data?.dimensions || []).find((d) => d.dimension === dimension);
+    return dimData ? mergeRescoreIntoEval(data, dimData) : data;
+  }, [evalQuery.data, scoresQuery.data, dimension]);
+
+  // refreshSignal (the dashboard payload identity) flips after external
+  // changes; re-pull the rescore data then, like the old effect did.
   const initialRef = useRef(refreshSignal);
   useEffect(() => {
     if (refreshSignal === initialRef.current) return;
-    if (!evalData || !project || !runId) return;
-    fetchRunScores(project, runId).then((rescored) => {
-      const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
-      if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
-    }).catch((err) => {
-      // Non-blocking: the explorer keeps the previous scores on screen, but
-      // log the failure so the silent-stale state is diagnosable.
-      console.warn('Rescore refresh failed:', err);
-    });
+    if (!project || !runId) return;
+    queryClient.invalidateQueries({ queryKey: projectKeys.runScores(projectKey, runId, selectedSource) });
   }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live updates after a dismiss arrive synchronously in the dismiss HTTP
-  // response. Callers fold the rescored payload back into this hook via
-  // ``applyRescoredPayload`` so the page re-renders with the new scores
-  // without a follow-up GET. (Previously this was an SSE subscription, which
-  // turned out to be broken for completed runs — see the long-form
-  // commit message for the architectural history.)
-  const applyRescoredPayload = useCallback((payload) => {
-    if (!payload) return;
-    const dimData = (payload.dimensions || []).find((d) => d.dimension === dimension);
-    if (!dimData) return;
-    setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
-  }, [dimension]);
+  // Loading gates on BOTH queries so the first paint never shows pre-rescore
+  // grades that visibly correct themselves a beat later (the old code
+  // Promise.all'd the two fetches for the same reason). isLoading is false
+  // once cached data exists, so Back-navigation skips the LoadingScreen.
+  const loading = evalQuery.isLoading || scoresQuery.isLoading;
+  const isFetching = evalQuery.isFetching || scoresQuery.isFetching;
+  const error = evalQuery.isError ? (evalQuery.error?.message || String(evalQuery.error)) : null;
 
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
@@ -176,7 +174,6 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
     // report.
     waiting: !!evalData?.waiting,
     overallGrade, principleGrades, allViolations,
-    applyRescoredPayload,
     ...stats,
   };
 }

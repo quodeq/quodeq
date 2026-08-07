@@ -1,6 +1,7 @@
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
 import useTerminalSettings from '../features/settings/hooks/useTerminalSettings.js';
 import { TerminalIcon } from './CopyButton.jsx';
+import { t } from '../strings/index.js';
 
 export function TerminalLauncherButton() {
   const { openPanels, toggleTopbar } = useAssistantDrawer();
@@ -11,10 +12,10 @@ export function TerminalLauncherButton() {
   return (
     <button type="button"
       className={`topbar-btn topbar-btn--icon topbar-btn--terminal${on ? ' topbar-btn--terminal--open' : ''}`}
-      aria-pressed={on} aria-label="Terminal (Ctrl+Shift+`)" title="Terminal (Ctrl+Shift+`)"
+      aria-pressed={on} aria-label={t('common.terminalShortcut')} title={t('common.terminalShortcut')}
       onClick={() => toggleTopbar('terminal')}>
       <TerminalIcon />
-      <span className="topbar-btn__label">terminal</span>
+      <span className="topbar-btn__label">{t('common.terminal')}</span>
     </button>
   );
 }

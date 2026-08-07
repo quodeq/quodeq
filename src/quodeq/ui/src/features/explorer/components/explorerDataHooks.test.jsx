@@ -2,7 +2,10 @@ import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
 import { usePrincipleData, useExplorerData } from './explorerDataHooks.js';
 
 // ---------------------------------------------------------------------------
@@ -136,7 +139,7 @@ describe('useExplorerData source-aware fetch selection', () => {
     const fakeApi = makeFakeExplorerApi();
     const { result } = renderHook(
       () => useExplorerData('proj', 'security', 'r1', null),
-      { wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider> },
+      { wrapper: withStableQueryApi(fakeApi) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(fakeApi.getDimensionEval).toHaveBeenCalledWith('proj', 'r1', 'security');
@@ -149,7 +152,7 @@ describe('useExplorerData source-aware fetch selection', () => {
     const fakeApi = makeFakeExplorerApi();
     const { result } = renderHook(
       () => useExplorerData('proj', 'security', 'r1', null, 'shared'),
-      { wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider> },
+      { wrapper: withStableQueryApi(fakeApi) },
     );
     await waitFor(() => expect(result.current.evalData?.marker).toBe('shared'));
     expect(fakeApi.sharedGetDimensionEval).toHaveBeenCalledWith('proj', 'r1', 'security');
@@ -161,9 +164,9 @@ describe('useExplorerData source-aware fetch selection', () => {
 
 describe('useExplorerData response handling', () => {
   it('ignores a stale response that resolves after a newer request', async () => {
-    // Run-navigator clicks re-fire the fetch with no cancellation; a slow
-    // earlier response resolving last used to park another run's findings
-    // under the current header.
+    // Run-navigator clicks re-key the query; a slow earlier response
+    // resolving last must land in ITS OWN cache entry, never under the
+    // current run's header.
     const resolvers = {};
     const fakeApi = {
       getDimensionEval: vi.fn((p, r) => new Promise((res) => { resolvers[r] = res; })),
@@ -173,13 +176,12 @@ describe('useExplorerData response handling', () => {
     };
     const { result, rerender } = renderHook(
       ({ runId }) => useExplorerData('proj', 'security', runId, null),
-      {
-        initialProps: { runId: 'r1' },
-        wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider>,
-      },
+      { initialProps: { runId: 'r1' }, wrapper: withStableQueryApi(fakeApi) },
     );
     rerender({ runId: 'r2' });
     await act(async () => { resolvers.r2({ dimension: 'security', marker: 'r2' }); });
+    await waitFor(() => expect(result.current.evalData?.marker).toBe('r2'));
+    // The stale r1 response must land in its own cache entry, not on screen.
     await act(async () => { resolvers.r1({ dimension: 'security', marker: 'r1' }); });
     expect(result.current.evalData?.marker).toBe('r2');
   });
@@ -196,9 +198,66 @@ describe('useExplorerData response handling', () => {
     };
     const { result } = renderHook(
       () => useExplorerData('proj', 'security', 'r1', null),
-      { wrapper: ({ children }) => <ApiProvider value={fakeApi}>{children}</ApiProvider> },
+      { wrapper: withStableQueryApi(fakeApi) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.waiting).toBe(true);
+  });
+
+  it('re-enters from cache without a loading pass (the Back-nav path)', async () => {
+    // Back from a principle detail remounts ExplorerPage. With the queries
+    // in the shared cache the remount renders data immediately — loading
+    // must stay false from the first render or the page flashes the
+    // full-screen LoadingScreen it used to show on every Back.
+    // withStableQueryApi's client uses gcTime: 0, which drops the cache the
+    // moment the first mount unmounts — exactly the continuity this test is
+    // about — so it needs a client with a real gcTime.
+    const fakeApi = makeFakeExplorerApi();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 300_000, staleTime: 60_000 } },
+    });
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={client}>
+        <ApiProvider value={fakeApi}>{children}</ApiProvider>
+      </QueryClientProvider>
+    );
+    const first = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper });
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+
+    const second = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper });
+    expect(second.result.current.loading).toBe(false);
+    expect(second.result.current.evalData).toBeTruthy();
+  });
+
+  it('merges the rescored per-dimension grades over the raw eval payload', async () => {
+    const fakeApi = {
+      getDimensionEval: vi.fn(async () => ({
+        dimension: 'security',
+        principleGrades: [
+          { principle: 'Input Validation', score: '8.0/10', grade: 'B' },
+          { principle: 'Overall', score: '8.0/10', grade: 'B', isOverall: true },
+        ],
+        violations: [],
+      })),
+      getRunScores: vi.fn(async () => ({
+        dimensions: [{
+          dimension: 'security',
+          overallScore: '6.0/10',
+          overallGrade: 'C',
+          principles: [{ principle: 'Input Validation', score: '6.5/10', grade: 'C+' }],
+        }],
+      })),
+      sharedGetDimensionEval: vi.fn(),
+      sharedGetRunScores: vi.fn(),
+    };
+    const { result } = renderHook(
+      () => useExplorerData('proj', 'security', 'r1', null),
+      { wrapper: withStableQueryApi(fakeApi) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const pg = result.current.principleGrades.find((p) => p.principle === 'Input Validation');
+    expect(pg.score).toBe('6.5/10');
+    expect(result.current.overallGrade.score).toBe('6.0/10');
   });
 });

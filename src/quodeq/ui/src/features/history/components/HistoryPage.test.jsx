@@ -90,7 +90,12 @@ describe('HistoryPage — delete-run source gating', () => {
     expect(screen.queryByRole('button', { name: 'Delete run', hidden: true })).toBeNull();
     // The row itself (and its chevron) must still render — only the delete
     // affordance is gone.
-    expect(screen.getByText('Jul 1, 2026')).toBeInTheDocument();
+    //
+    // Was 'Jul 1, 2026', which passed only because this machine's browser
+    // locale is en-US: the row formatted dates with `undefined` as the locale,
+    // so the assertion (and the product) followed the OS rather than the app.
+    // Dates now come from strings/index.js LOCALE, so this is deterministic.
+    expect(screen.getByText('1 Jul 2026')).toBeInTheDocument();
   });
 });
 

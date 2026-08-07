@@ -3,6 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
 import { ServerLogContext } from './ServerLogContext.js';
 import { useServerLogPoll } from './useServerLogPoll.js';
+import { t } from '../../../strings/index.js';
 
 const WINDOW_ID = 'server-log';
 
@@ -10,7 +11,7 @@ function buildSpec(logs) {
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
-    title: 'Server log',
+    title: t('settings.serverLogTitle'),
     render: () => <ConsoleLogViewer logs={logs} />,
   };
 }

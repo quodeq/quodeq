@@ -20,8 +20,8 @@ from quodeq.config.paths import default_paths
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
     dimension_params,
-    load_project_overrides,
 )
+from quodeq.data.fs.standards_prefs import load_project_overrides
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
 
@@ -103,7 +103,12 @@ def _dimension_params_by_stat(
     _ = (c_size, c_mtime_ns, o_size, o_mtime_ns)
     try:
         data = json.loads(compiled.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError):
+    except Exception:  # noqa: BLE001 - keying must never abort analysis
+        # Deliberately wider than OSError/ValueError/UnicodeDecodeError:
+        # deeply nested JSON overflows the C decoder's call stack and raises
+        # RecursionError, a RuntimeError subclass that would otherwise escape.
+        # This sits on the per-dimension cache-keying path, so any escape here
+        # fails the run rather than degrading to an unkeyed hash.
         return "", {}
     overrides = load_project_overrides(project_root) if project_root else {}
     try:

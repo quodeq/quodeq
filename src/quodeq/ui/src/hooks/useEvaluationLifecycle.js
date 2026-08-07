@@ -4,6 +4,7 @@ import { useEvaluation, LOCAL_API_PROVIDERS } from '../features/evaluation/hooks
 import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 import { projectKeys } from '../api/queryKeys.js';
+import { t } from '../strings/index.js';
 
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
 const DEFAULT_ANALYSIS_POWER = 2;
@@ -93,7 +94,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
     // "once" toggle) instead of consuming it for a start that never ran.
     if (job && job.status === 'running') {
       setBlockedStartError(
-        'An evaluation is already running. Cancel it or wait for it to finish.',
+        t('evaluate.alreadyRunning'),
       );
       return false;
     }

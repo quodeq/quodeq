@@ -1560,6 +1560,8 @@ button.term-sev-badge--clickable:focus-visible {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /* Anchors the absolutely-positioned .nav-pending-bar to this column. */
+  position: relative;
   /* Isolate the main column's layout + paint from the side-pane subtree
      and topbar so a pane-divider drag doesn't propagate reflow into the
      entire document. The column already clips its own overflow, so

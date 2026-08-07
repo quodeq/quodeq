@@ -1,4 +1,5 @@
 import HelpHint from '../HelpHint.jsx';
+import { t } from '../../strings/index.js';
 
 /**
  * TermHeader — page header with a `▶ name` prompt and optional sub line.
@@ -20,7 +21,7 @@ export default function TermHeader({ name, sub, description, badge }) {
       <div className="term-header__prompt">
         <span className="term-header__glyph" aria-hidden="true">▶</span>
         <span className="term-header__name">{name}</span>
-        {tip && <HelpHint label={`About ${name}`}>{tip}</HelpHint>}
+        {tip && <HelpHint label={t('evaluate.aboutTitle', { title: name })}>{tip}</HelpHint>}
         {badge}
       </div>
       {sub != null && <div className="term-header__sub">{sub}</div>}

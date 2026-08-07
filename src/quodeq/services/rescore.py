@@ -77,7 +77,9 @@ def _score_principle(
     floor = severity_grade_floor(vt_counts, params=params)
 
     raw = base + (10.0 - base) * lift
-    final = max(floor, min(ceil, raw))
+    # Floor first, ceiling last -- see the note in core/scoring/projector_scoring.py.
+    # Keep byte-identical with it.
+    final = min(ceil, max(floor, raw))
     final = round(final, 1)
     grade = score_to_grade_label(final, params=params)
     return final, grade
@@ -131,6 +133,7 @@ def _rescore_dimension(
     params: ScoringParams = DEFAULT_PARAMS,
     *,
     run_dir: Path | None = None,
+    rules: tuple = (),
 ) -> DimensionResult:
     """Rescore a single dimension after filtering dismissed and deleted findings.
 
@@ -143,7 +146,7 @@ def _rescore_dimension(
     dim_id = dim.dimension or ""
     filtered_violations = [
         v for v in dim.violations
-        if not is_dismissed(dismissed, req=v.req, principle=v.practice_id,
+        if not is_dismissed(dismissed, req=v.req, principle=v.practice_id, rules=rules,
                             file=v.file, line=v.line)
         and not is_deleted(deleted, dimension=dim_id, principle=v.practice_id,
                            file=v.file)
@@ -212,6 +215,7 @@ def rescore_dimensions(
     params: ScoringParams | None = None,
     *,
     run_dir: Path | None = None,
+    rules: tuple = (),
 ) -> dict[str, Any]:
     """Rescore all dimensions after filtering dismissed and deleted findings.
 
@@ -224,7 +228,8 @@ def rescore_dimensions(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
     rescored = [
-        _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params, run_dir=run_dir)
+        _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params,
+                           run_dir=run_dir, rules=rules)
         for dim in dimensions
     ]
     summary = summarize_dimensions(rescored, params=params)

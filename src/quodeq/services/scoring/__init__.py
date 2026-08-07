@@ -19,23 +19,18 @@ change.
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
 
 _logger = logging.getLogger(__name__)
 
-from quodeq.core.types import to_camel_dict
-from quodeq.core.types.finding import Finding, SeverityTally, Totals
-from quodeq.core.scoring.internals import score_to_grade_label
-from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
-from quodeq.core.types.report import PrincipleGrade
-from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.types.dimension import DimensionResult
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import _make_run_dimension_fetcher
-from quodeq.services.grade_formula import load_params
+from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -45,12 +40,33 @@ from quodeq.services.score_cache import (
     cached_accumulated,
     per_run_versions,
 )
-from quodeq.services.ports import RunInfo, list_runs, read_run_data, read_run_scalars
-from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
+from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data, read_run_scalars
+from quodeq.services.rescore import _rescore_dimension
 from quodeq.shared._env import env_int
 from quodeq.shared.validation import validate_path_segment
-from quodeq.services.scoring._summary import recompute_summary
+from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 — facade re-export
 
+# ---------------------------------------------------------------------------
+# Decomposed submodules. Every moved name is re-exported here so external
+# callers and test patch targets keep working against the package facade.
+# ---------------------------------------------------------------------------
+from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS  # noqa: F401
+from quodeq.services.scoring._response_builders import (  # noqa: F401
+    _build_dimension_dict,
+    _build_response_from_eval_files,
+    _build_response_from_grade_tables,
+    _build_summary_from_dim_dicts,
+    _build_totals_from_findings,
+    _severity_bucket,
+)
+from quodeq.data.fs.suppression_rules import load_suppression_rules
+from quodeq.services.scoring._rescoring import (  # noqa: F401
+    _dims_expecting_rescore,
+    _merge_rescored_dims,
+    _rescore_accumulated_response,
+    _rescore_accumulated_with_coverage,
+    _rescore_runs_by_dimension,
+)
 
 def _max_history_runs() -> int:
     """Read max history runs from env at call time for lazy configuration."""
@@ -61,223 +77,9 @@ def _max_history_runs() -> int:
 # SQL-backed response builder
 # ---------------------------------------------------------------------------
 
-def _severity_bucket(severity: str) -> str:
-    """Map DB severity strings to the legacy tally buckets.
-
-    The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
-    ``critical``, ``major``, and ``minor`` have dedicated buckets; everything
-    else (including ``high``, ``medium``, ``low``) falls into ``unknown``.
-    This mirrors the legacy ``recount_totals`` in ``services/dismissed.py`` —
-    a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
-    """
-    s = (severity or "").lower()
-    if s == "critical":
-        return "critical"
-    if s == "major":
-        return "major"
-    if s == "minor":
-        return "minor"
-    return "unknown"
-
-
-def _build_totals_from_findings(
-    violations: list[Finding], compliance_count: int,
-) -> Totals:
-    """Build a Totals dataclass from a list of active (non-dismissed) violations."""
-    critical = major = minor = unknown = 0
-    for v in violations:
-        bucket = _severity_bucket(v.severity or "")
-        if bucket == "critical":
-            critical += 1
-        elif bucket == "major":
-            major += 1
-        elif bucket == "minor":
-            minor += 1
-        else:
-            unknown += 1
-    return Totals(
-        violation_count=len(violations),
-        compliance_count=compliance_count,
-        severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
-    )
-
-
-def _build_dimension_dict(
-    dim_row: dict,
-    p_rows: list[dict],
-    violations: list[Finding],
-    compliance: list[Finding],
-) -> dict:
-    """Build a single camelCase dimension dict from SQL grade-table rows + findings.
-
-    Produces the same shape as ``to_camel_dict(DimensionResult(...))`` so the
-    frontend sees no schema change.
-    """
-    score_val: float | None = dim_row.get("score")
-    overall_score_str = f"{score_val}/10" if score_val is not None else None
-    overall_grade = dim_row.get("grade")
-
-    principles = [
-        PrincipleGrade(
-            principle=p["principle_id"],
-            score=f"{p['score']}/10" if p.get("score") is not None else None,
-            grade=p.get("grade"),
-        )
-        for p in p_rows
-    ]
-
-    totals = _build_totals_from_findings(violations, compliance_count=len(compliance))
-
-    dim = DimensionResult(
-        dimension=dim_row["dimension"],
-        overall_score=overall_score_str,
-        overall_grade=overall_grade,
-        principles=principles,
-        violations=violations,
-        compliance=compliance,
-        totals=totals,
-    )
-    return to_camel_dict(dim)
-
-
-def _build_summary_from_dim_dicts(
-    dim_dicts: list[dict], params: ScoringParams = DEFAULT_PARAMS,
-) -> dict:
-    """Build a camelCase summary dict from a list of dimension camelCase dicts.
-
-    Mirrors ``summarize_dimensions`` logic but works directly on the already-
-    serialised dicts produced by ``_build_dimension_dict``.
-    """
-    overall_grades = [d["overallGrade"] for d in dim_dicts if d.get("overallGrade")]
-    score_pairs: list[tuple[str | None, float]] = []
-    for d in dim_dicts:
-        s = d.get("overallScore")
-        if s and isinstance(s, str) and "/" in s:
-            try:
-                score_pairs.append((d.get("dimension"), float(s.split("/")[0])))
-            except ValueError:
-                pass
-
-    numeric_average = dimension_weighted_average(score_pairs, params)
-
-    if numeric_average is not None:
-        overall_grade = score_to_grade_label(numeric_average, params=params)
-    elif overall_grades:
-        from collections import Counter  # noqa: PLC0415
-        overall_grade = Counter(overall_grades).most_common(1)[0][0]
-    else:
-        overall_grade = None
-
-    grade_counts: dict[str, int] = {}
-    for g in overall_grades:
-        grade_counts[g] = grade_counts.get(g, 0) + 1
-
-    summary = DimensionSummary(
-        dimensions_count=len(dim_dicts),
-        overall_grade=overall_grade,
-        numeric_average=numeric_average,
-        grade_breakdown=[
-            GradeBreakdown(grade=grade, count=count)
-            for grade, count in sorted(grade_counts.items(), key=lambda item: (-item[1], item[0]))
-        ],
-    )
-    return to_camel_dict(summary)
-
-
-def _build_response_from_grade_tables(
-    run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
-) -> dict:
-    """Build the full scores response from SQL grade tables + findings.
-
-    Reads dimension_scores and principle_grades from the state store, reads
-    active (non-dismissed) findings from the findings table, and assembles
-    the same camelCase dict shape as the legacy rescore path.
-    """
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-    from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-    from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: PLC0415
-
-    store = SQLiteStateStore(run_dir)
-    dim_rows = store.read_dimension_scores()
-    p_rows = store.read_principle_grades()
-
-    # Group principle rows by dimension for fast lookup.
-    p_rows_by_dim: dict[str, list[dict]] = {}
-    for p in p_rows:
-        p_rows_by_dim.setdefault(p["dimension"], []).append(p)
-
-    # Read active findings grouped by dimension and verdict.
-    _SELECT_ACTIVE = (
-        "SELECT id, practice_id, dimension, requirement, verdict, severity, "
-        "file, line, end_line, title, reason, snippet, violation_type, context, "
-        "scope, req_refs_json, confidence, provenance_downgrade "
-        "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
-    )
-
-    def _dict_row(cursor, row):  # noqa: ANN001
-        return {col[0]: row[i] for i, col in enumerate(cursor.description)}
-
-    violations_by_dim: dict[str, list[Finding]] = {}
-    compliance_by_dim: dict[str, list[Finding]] = {}
-    with open_evaluation_db(run_dir) as conn:
-        conn.row_factory = _dict_row
-        rows = conn.execute(_SELECT_ACTIVE).fetchall()
-
-    for row in rows:
-        f = row_to_finding(row)
-        dim = f.dimension or ""
-        if f.verdict == "violation":
-            violations_by_dim.setdefault(dim, []).append(f)
-        else:
-            compliance_by_dim.setdefault(dim, []).append(f)
-
-    dim_dicts = []
-    for dim_row in dim_rows:
-        dim_name = dim_row["dimension"]
-        dim_dicts.append(_build_dimension_dict(
-            dim_row,
-            p_rows_by_dim.get(dim_name, []),
-            violations_by_dim.get(dim_name, []),
-            compliance_by_dim.get(dim_name, []),
-        ))
-
-    summary = _build_summary_from_dim_dicts(dim_dicts, params=params)
-    return {"dimensions": dim_dicts, "summary": summary}
-
-
-def _build_response_from_eval_files(
-    reports_root: Path, project: str, run_id: str,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict:
-    """Read eval JSON files for a run and apply rescore (legacy path).
-
-    Used for older runs that pre-date the event-log scoring engine. Those runs
-    never get an ``events.jsonl`` so SQL projection has nothing to chew on —
-    the dim_scores / principle_grades tables stay empty forever. But the JSON
-    files (``evaluation/<dim>.json``) hold the original scores, and dismisses
-    on actions.jsonl can be applied via the same ``rescore_dimensions`` helper
-    the dashboard already uses for accumulated data.
-
-    Returns the same camelCase ``{dimensions, summary}`` shape as the SQL
-    path, so callers (UI dismiss handlers) don't need to branch.
-    """
-    validate_path_segment(project, run_id)
-    base_fetcher = _make_run_dimension_fetcher(reports_root, project)
-    project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-
-    dims = base_fetcher(run_id)
-    rescored = rescore_dimensions(
-        dims, dismissed, deleted, params=params, run_dir=project_dir / run_id)
-    return {
-        "dimensions": rescored.get("dimensions", []),
-        "summary": rescored.get("summary", {}),
-    }
-
-
 def get_scores_raw(
     reports_root: Path, project: str, run_id: str,
+    deps: ScoringDeps | None = None,
 ) -> dict:
     """Return raw rescore dict for a single run (explorer detail compat).
 
@@ -290,6 +92,7 @@ def get_scores_raw(
     POST returned no scores, the UI had nothing to apply.
     """
     validate_path_segment(project, run_id)
+    d = deps or _NO_DEPS
     run_dir = reports_root / project / run_id
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")
@@ -310,7 +113,10 @@ def get_scores_raw(
     # rescored that way; they keep the SQL path, whose ``_ensure_fresh``
     # re-projection applies the dismissals directly to the findings table.
     project_dir = reports_root / project
-    has_project_wide_filters = bool(dismissed_keys(project_dir) or deleted_keys(project_dir))
+    has_project_wide_filters = bool(
+        (d.dismissed_keys or dismissed_keys)(project_dir)
+        or (d.deleted_keys or deleted_keys)(project_dir)
+    )
     eval_dir = run_dir / "evaluation"
     prefer_eval_rescore = (
         has_project_wide_filters
@@ -325,7 +131,7 @@ def get_scores_raw(
         import sqlite3  # noqa: PLC0415
         try:
             repo = SqliteFindingsRepository(run_dir)
-            repo._ensure_fresh()  # noqa: SLF001
+            repo.ensure_projected()
             store = SQLiteStateStore(run_dir)
             if store.read_dimension_scores():
                 return _build_response_from_grade_tables(run_dir, params=params)
@@ -341,11 +147,14 @@ def get_scores_raw(
                 project, run_id,
             )
 
-    return _build_response_from_eval_files(reports_root, project, run_id, params=params)
+    return _build_response_from_eval_files(
+        reports_root, project, run_id, params=params, deps=deps,
+    )
 
 
 def get_scores_slim(
     reports_root: Path, project: str, run_id: str,
+    deps: ScoringDeps | None = None,
 ) -> dict:
     """``get_scores_raw`` with finding bodies stripped for the run-scores route.
 
@@ -358,7 +167,7 @@ def get_scores_slim(
     the merge needs at a fraction of the size. Compliance bodies are never
     read from this payload, so the list is emptied (counts live in totals).
     """
-    raw = get_scores_raw(reports_root, project, run_id)
+    raw = get_scores_raw(reports_root, project, run_id, deps=deps)
     slim_dims = []
     for dim in raw.get("dimensions", []) or []:
         slim_violations = [
@@ -372,6 +181,7 @@ def get_scores_slim(
 def scored_run_dimensions(
     reports_root: Path, project: str, run_id: str,
     params: ScoringParams | None = None,
+    deps: ScoringDeps | None = None,
 ) -> list[DimensionResult]:
     """Return a run's dimensions with the project-wide dismiss/delete rescore applied.
 
@@ -389,35 +199,44 @@ def scored_run_dimensions(
     ``get_scores_raw`` / ``build_dashboard``.
     """
     validate_path_segment(project, run_id)
+    d = deps or _NO_DEPS
     if params is None:
         params = load_params()
     project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    dims = read_run_data(reports_root, project, run_id)
-    if not dismissed and not deleted:
+    dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
+    deleted = (d.deleted_keys or deleted_keys)(project_dir)
+    dims = (d.read_run_data or read_run_data)(reports_root, project, run_id)
+    rules = load_suppression_rules(project_dir)
+    # Rules are suppression state too: skipping the rescore when only rules
+    # exist would silently return raw scores for a project whose ADRs are
+    # expressed as patterns rather than per-line dismissals.
+    if not dismissed and not deleted and not rules:
         return dims
     run_dir = project_dir / run_id
+    rescore = d.rescore_dimension or _rescore_dimension
     return [
-        _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
-        for d in dims
+        rescore(dim, dismissed, deleted, params=params, run_dir=run_dir, rules=rules)
+        for dim in dims
     ]
 
 
 def _make_rescoring_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
+    deps: ScoringDeps | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a dimension fetcher that applies rescore (dismissals) to results.
 
-    Thin seam over the shared :func:`make_rescoring_fetcher` factory. Passes the
-    scoring module's own ``dismissed_keys`` / ``deleted_keys`` references so
-    monkeypatch-based tests keep working, and the full-data base fetcher.
+    Thin seam over the shared :func:`make_rescoring_fetcher` factory. The
+    suppression readers come from *deps* (production defaults when None),
+    plus the full-data base fetcher.
     """
+    d = deps or _NO_DEPS
     return make_rescoring_fetcher(
         reports_root, project, params=params,
         base_fetcher=_make_run_dimension_fetcher(reports_root, project),
-        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+        dismissed_keys=d.dismissed_keys or dismissed_keys,
+        deleted_keys=d.deleted_keys or deleted_keys,
     )
 
 
@@ -425,150 +244,31 @@ def _make_trend_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
     cacheable_run_ids: set[str] | None = None,
+    deps: ScoringDeps | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return the dimension fetcher for the trend chart.
 
-    Thin seam over the shared :func:`make_trend_fetcher` factory, passing the
-    scoring module's own ``read_run_scalars`` / ``dismissed_keys`` /
-    ``deleted_keys`` references (so this module's monkeypatch-based tests keep
-    working) and the shared full-data base-fetcher factory. See
+    Thin seam over the shared :func:`make_trend_fetcher` factory. The scalar
+    reader and suppression readers come from *deps* (production defaults
+    when None), plus the shared full-data base-fetcher factory. See
     :func:`make_trend_fetcher` for the fast/heavy path and caching semantics.
     """
+    d = deps or _NO_DEPS
     return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         max_history=_max_history_runs(),
         base_fetcher_factory=_make_run_dimension_fetcher,
-        read_run_scalars=read_run_scalars,
-        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+        read_run_scalars=d.read_run_scalars or read_run_scalars,
+        dismissed_keys=d.dismissed_keys or dismissed_keys,
+        deleted_keys=d.deleted_keys or deleted_keys,
     )
-
-
-def _rescore_runs_by_dimension(
-    dims: list[dict], reports_root: Path, project: str,
-    dismissed: set[tuple], deleted: set[tuple] | None = None,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, dict]:
-    """Rescore each unique run and return a map of dim_key -> rescored dict."""
-    validate_path_segment(project)
-    dim_to_run: dict[str, str] = {}
-    for d in dims:
-        key = (d.get("dimension") or "").lower()
-        rid = d.get("fromRunId") or d.get("runId")
-        if key and rid:
-            dim_to_run[key] = rid
-
-    fetcher = _make_run_dimension_fetcher(reports_root, project)
-    rescored_by_dim: dict[str, dict] = {}
-    seen_runs: dict[str, dict[str, dict]] = {}
-    for dim_key, run_id in dim_to_run.items():
-        if run_id not in seen_runs:
-            validate_path_segment(run_id)
-            run_dims = fetcher(run_id)
-            # Grouped per run, so this run's own directory is the evidence
-            # basis for every dimension sourced from it.
-            result = rescore_dimensions(
-                run_dims, dismissed, deleted, params=params,
-                run_dir=reports_root / project / run_id)
-            seen_runs[run_id] = {
-                (rd.get("dimension") or "").lower(): rd
-                for rd in result.get("dimensions", [])
-            }
-        rd = seen_runs[run_id].get(dim_key)
-        if rd:
-            rescored_by_dim[dim_key] = rd
-    return rescored_by_dim
-
-
-def _dims_expecting_rescore(dims: list[dict]) -> set[str]:
-    """Dimension keys that carry a source run and therefore expect a rescore."""
-    return {
-        (d.get("dimension") or "").lower()
-        for d in dims
-        if (d.get("dimension") or "") and (d.get("fromRunId") or d.get("runId"))
-    }
-
-
-def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
-    """Merge rescored data into accumulated dimensions."""
-    new_dims = []
-    for d in dims:
-        key = (d.get("dimension") or "").lower()
-        rd = rescored_by_dim.get(key)
-        if rd:
-            new_dims.append({
-                **d,
-                "overallScore": rd.get("overallScore"),
-                "overallGrade": rd.get("overallGrade"),
-                "violations": rd.get("violations", d.get("violations", [])),
-                "compliance": rd.get("compliance", d.get("compliance", [])),
-                "principles": rd.get("principles", d.get("principles", [])),
-                "totals": rd.get("totals", d.get("totals")),
-            })
-        else:
-            new_dims.append(d)
-    return new_dims
-
-
-def _rescore_accumulated_with_coverage(
-    accumulated: dict[str, Any],
-    reports_root: Path,
-    project: str,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> tuple[dict[str, Any], bool]:
-    """Apply rescore to an accumulated response dict (in-place compatible shape).
-
-    Filters dismissed violations from each dimension, recalculates scores,
-    and recomputes the summary.
-
-    Returns ``(payload, complete)``. ``complete`` is False when at least one
-    dimension that has a source run got no rescored entry back (e.g. the run
-    read returned a partial dim set), in which case the missing dimensions
-    keep their raw baked scores and the payload MUST NOT be persisted: its
-    version hash cannot tell it apart from a fully rescored one.
-    """
-    project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    if (not dismissed and not deleted) or not accumulated:
-        return accumulated, True
-
-    dims = accumulated.get("dimensions", [])
-    if not dims:
-        return accumulated, True
-
-    rescored_by_dim = _rescore_runs_by_dimension(
-        dims, reports_root, project, dismissed, deleted, params=params,
-    )
-    missing = _dims_expecting_rescore(dims) - set(rescored_by_dim)
-    if missing:
-        _logger.warning(
-            "accumulated rescore for %s covered %d of %d dimensions (missing: %s); "
-            "serving the partial result without caching it",
-            project, len(rescored_by_dim), len(dims), sorted(missing),
-        )
-    new_dims = _merge_rescored_dims(dims, rescored_by_dim)
-
-    new_summary = recompute_summary(new_dims, accumulated.get("summary", {}), params=params)
-    return {**accumulated, "dimensions": new_dims, "summary": new_summary}, not missing
-
-
-def _rescore_accumulated_response(
-    accumulated: dict[str, Any],
-    reports_root: Path,
-    project: str,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, Any]:
-    """`_rescore_accumulated_with_coverage` for callers that don't persist."""
-    payload, _complete = _rescore_accumulated_with_coverage(
-        accumulated, reports_root, project, params=params,
-    )
-    return payload
 
 
 def rescore_accumulated(
     accumulated: dict[str, Any] | None,
     reports_root: Path, project: str,
     params: ScoringParams | None = None,
+    deps: ScoringDeps | None = None,
 ) -> dict[str, Any] | None:
     """Public seam: project-wide dismiss/delete rescore for an accumulated payload.
 
@@ -586,11 +286,14 @@ def rescore_accumulated(
         return accumulated
     if params is None:
         params = load_params()
-    return _rescore_accumulated_response(accumulated, reports_root, project, params=params)
+    return _rescore_accumulated_response(
+        accumulated, reports_root, project, params=params, deps=deps,
+    )
 
 
 def get_project_scores(
     reports_root: Path, project: str, as_of: str | None = None,
+    deps: ScoringDeps | None = None,
 ) -> dict[str, Any] | None:
     """Return the full scores payload for the dashboard.
 
@@ -604,7 +307,15 @@ def get_project_scores(
     if not (reports_root / project).exists():
         return None
 
+    d = deps or _NO_DEPS
     params = load_params()
+
+    # How the numbers were produced, not what they are. A tuned formula moves
+    # every score at once and leaves no other trace -- findings and runs are
+    # unchanged -- so the Overview has to be able to say so next to the grade.
+    # Computed outside the accumulated cache: it is a file-existence check, and
+    # keeping it out of the cached payload avoids another version input.
+    scoring_meta = {"customFormula": is_custom()}
 
     all_runs = list_runs(reports_root, project)
     if not all_runs:
@@ -612,6 +323,7 @@ def get_project_scores(
             "accumulated": {"dimensions": [], "summary": {}},
             "trend": [],
             "availableRuns": [],
+            "scoring": scoring_meta,
         }
 
     # Build accumulated using the existing service (returns full data with
@@ -625,7 +337,7 @@ def get_project_scores(
         if acc is None:
             acc = {"dimensions": [], "summary": {}}
         payload, complete = _rescore_accumulated_with_coverage(
-            acc, reports_root, project, params=params,
+            acc, reports_root, project, params=params, deps=deps,
         )
         rescore_complete[0] = complete
         return payload
@@ -642,7 +354,7 @@ def get_project_scores(
                              [(r.run_id, r.status) for r in all_runs]),
             as_of,
         )
-        accumulated = cached_accumulated(
+        accumulated = (d.cached_accumulated or cached_accumulated)(
             project, acc_version, _compute_accumulated_payload,
             cacheable=lambda _payload: rescore_complete[0],
         )
@@ -662,6 +374,7 @@ def get_project_scores(
     cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
     trend_fetcher = _make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
+        deps=deps,
     )
     trend = build_accumulated_trend(history_runs, trend_fetcher, params=params)
 
@@ -675,6 +388,7 @@ def get_project_scores(
         "accumulated": accumulated,
         "trend": trend,
         "availableRuns": available_runs,
+        "scoring": scoring_meta,
     }
 
 

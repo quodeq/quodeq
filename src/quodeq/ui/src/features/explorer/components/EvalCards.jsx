@@ -7,6 +7,7 @@ import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
+import { t } from '../../../strings/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
@@ -49,7 +50,7 @@ function ViolationDetail({ item }) {
       {(item.title || item.reason || item.findings) && (
         <div className="vlive-detail-section">
           <div className="vlive-detail-section-header">
-            {item.title && <span className="vlive-detail-section-label">REASON</span>}
+            {item.title && <span className="vlive-detail-section-label">{t('explorer.reasonLabelCaps')}</span>}
             <RefsLinks reqRefs={item.reqRefs} />
           </div>
           {item.title && (
@@ -63,7 +64,7 @@ function ViolationDetail({ item }) {
             </p>
           )}
           {item.reason && <>
-            <span className="vlive-detail-section-label">DETAIL</span>
+            <span className="vlive-detail-section-label">{t('explorer.detailLabelCaps')}</span>
             <p
               ref={reasonRef}
               className="vlive-detail-reason"
@@ -100,15 +101,15 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
             onClick={() => { const spec = violationFixPlanSpec(v, v.principle || principle); if (spec) addWindow(spec); }}
           >
             <SparkleIcon />
-            Fix plan
+            {t('explorer.fixPlan')}
           </button>
           {onDismiss && (
             <button
               type="button"
               className="dismiss-btn"
               onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
-              title="Dismiss this finding (exclude from scoring)"
-              aria-label="Dismiss this finding (exclude from scoring)"
+              title={t('explorer.dismissFinding')}
+              aria-label={t('explorer.dismissFinding')}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
@@ -128,7 +129,7 @@ export function ComplianceCard({ c, principle, index }) {
       style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
     >
       <div className="vdetail-row-main">
-        <span className="term-sev-badge term-sev-badge--compliant">COMPLIANT</span>
+        <span className="term-sev-badge term-sev-badge--compliant">{t('explorer.compliantBadge')}</span>
         <span className="vrow-label">[{c.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
       </div>

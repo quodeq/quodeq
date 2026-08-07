@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.services.dismissed import dismiss_finding
 

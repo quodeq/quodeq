@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
+from quodeq.data.fs.project_files import read_repository_info, write_repository_info
 from quodeq.services._fs_metadata import (
     _check_path_exists,
     _extract_project_metadata,
@@ -15,7 +16,7 @@ from quodeq.services._fs_metadata import (
     _read_language_stats,
     _read_repo_info,
 )
-from quodeq.services.ports import RunInfo
+from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.shared.utils import _env_int
 
 
@@ -34,26 +35,16 @@ def _backfill_onboarding_field(
     evaluation runs — running an evaluation IS completing setup, so a null
     left behind by a pre-stamp wizard must not show 'Resume setup' forever.
     """
-    info_path = project_dir / "repository_info.json"
-    if not info_path.exists():
-        return None
-    try:
-        data = json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    data = read_repository_info(project_dir)
+    if data is None:
         return None
     if "onboardingCompletedAt" in data:
         if data["onboardingCompletedAt"] is None and heal_completed_at:
             data["onboardingCompletedAt"] = heal_completed_at
-            try:
-                info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            except OSError:
-                pass
+            write_repository_info(project_dir, data)
         return data
     data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
-    try:
-        info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except OSError:
-        pass
+    write_repository_info(project_dir, data)
     return data
 
 

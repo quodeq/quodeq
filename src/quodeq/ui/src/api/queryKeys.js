@@ -33,6 +33,13 @@ export const projectKeys = {
   dashboard: (projectId, run, source = "local") => ["project", projectId, source, "dashboard", run || "latest"],
   runs: (projectId, source = "local") => ["project", projectId, source, "runs"],
   info: (projectId, source = "local") => ["project", projectId, source, "info"],
+  // Explorer (dimension detail) queries. Distinct from `scores`: that one is
+  // GET /projects/<p>/scores?as_of= (full payload incl. trend/availableRuns),
+  // runScores is the slim GET /projects/<p>/scores/<run> used for the rescore
+  // merge. Both sit inside the project subtree on purpose, so every existing
+  // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
+  runScores: (projectId, run, source = "local") => ["project", projectId, source, "runScores", run || "latest"],
+  dimensionEval: (projectId, run, dimension, source = "local") => ["project", projectId, source, "dimensionEval", run || "latest", dimension],
 };
 
 /**

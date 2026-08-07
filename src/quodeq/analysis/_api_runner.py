@@ -29,14 +29,15 @@ import openai
 from pydantic import BaseModel, Field
 
 from quodeq.analysis._drop_stats import record as _record_drop_stats
+from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
-from quodeq.core.standards.refs import load_compiled_requirements
-from quodeq.core.standards.refs import load_compiled_refs
+from quodeq.context.trust_model import resolve_trust_model
+from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
@@ -139,6 +140,34 @@ class ApiRunnerConfig:
     temperature: float = 0.1
     max_tokens: int | None = None
     context_size: int = 0
+    n_subagents: int = 1
+    """Pool size this call competes with; scales the local read timeout."""
+
+
+def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeout:
+    """Read budget for one completion call.
+
+    Local servers serve one request per loaded model, so with N subagents a
+    queued request can wait up to (N-1) inferences before its own starts:
+    a fixed budget times out queued-but-healthy calls, and each timeout burns
+    the whole budget for zero findings. Scale the read budget linearly with N.
+    Cloud backends parallelize, so their budget stays fixed.
+    QUODEQ_API_READ_TIMEOUT (whole seconds) overrides the read budget outright.
+    """
+    base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
+    env_val = os.environ.get("QUODEQ_API_READ_TIMEOUT", "").strip()
+    if env_val.isdigit() and int(env_val) > 0:
+        return httpx.Timeout(
+            connect=base.connect, read=float(env_val),
+            write=base.write, pool=base.pool,
+        )
+    scale = max(1, config.n_subagents)
+    if is_openai or scale == 1:
+        return base
+    return httpx.Timeout(
+        connect=base.connect, read=base.read * scale,
+        write=base.write, pool=base.pool,
+    )
 
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific
@@ -236,6 +265,30 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
     return findings, len(dropped)
 
 
+def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
+    """Return ``(reason_code, detail)`` when no retry can fix *exc*, else None.
+
+    The OpenAI SDK normalizes every OpenAI-compatible provider's errors into
+    typed exceptions with a status code, so one classifier covers ollama,
+    llamacpp, openrouter, and custom endpoints alike. 429 is fatal only when
+    the body says quota/credits (OpenAI ``insufficient_quota``, OpenRouter
+    out-of-credits): a bare 429 is a transient rate limit and stays on the
+    lossy-retry path.
+    """
+    if isinstance(exc, openai.AuthenticationError):
+        return "auth", "authentication failed (401)"
+    if isinstance(exc, openai.PermissionDeniedError):
+        return "auth", "permission denied (403)"
+    if isinstance(exc, openai.APIStatusError):
+        if exc.status_code == 402:
+            return "payment", "out of credits (402 payment required)"
+        if exc.status_code == 429:
+            reason = classify_fatal_provider_message(str(exc))
+            if reason in ("quota", "payment"):
+                return reason, "quota/credits exhausted (429)"
+    return None
+
+
 def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
@@ -288,7 +341,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens
 
-    timeout = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
+    timeout = _resolve_timeout(config, is_openai=is_openai)
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
     start = time.monotonic()
     with openai.OpenAI(
@@ -303,6 +356,16 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
             response = client.chat.completions.create(**create_kwargs)
         except Exception as exc:
             elapsed = time.monotonic() - start
+            fatal = _classify_fatal_api_error(exc)
+            if fatal is not None:
+                reason_code, detail = fatal
+                _log.error(
+                    "Model %s: %s -- no retry can succeed, aborting: %s",
+                    config.model, detail, str(exc)[:300],
+                )
+                raise FatalProviderError(
+                    f"{detail}: {str(exc)[:300]}", reason=reason_code,
+                ) from exc
             if isinstance(exc, (httpx.TimeoutException, openai.APITimeoutError)):
                 _log.warning(
                     "Model %s call timed out after %.0fs. Likely causes: "
@@ -398,6 +461,7 @@ def _build_router_context(
         compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         project_shape = detect_shape(work_dir) if work_dir is not None else None
+        trust_model = resolve_trust_model(work_dir) if work_dir is not None else None
         precedents = load_precedent_fingerprints(project_dir) if project_dir else set()
         corpus = (
             load_precedent_corpus(project_dir, run_dir)
@@ -409,6 +473,7 @@ def _build_router_context(
             dimension=dimension,
             work_dir=work_dir,
             project_shape=project_shape,
+            trust_model=trust_model,
             precedent_fingerprints=precedents,
             precedent_corpus=corpus,
         )
@@ -481,7 +546,15 @@ def run_api_analysis(
     marker writes its per-file cache entry to disk before returning. Legacy
     callers that omit either remain unchanged -- no cache is written.
     """
-    findings, was_lossy = _call_api(prompt, config)
+    # A fatal provider error (quota/auth/billing) still writes 'error'
+    # markers first -- the breaker and reachability guard rely on them --
+    # then re-raises so the pool layer can cancel the run instead of
+    # respawning agents against a dead provider.
+    fatal_exc: FatalProviderError | None = None
+    try:
+        findings, was_lossy = _call_api(prompt, config)
+    except FatalProviderError as exc:
+        fatal_exc, findings, was_lossy = exc, [], True
 
     if source_file_paths:
         findings = _resolve_file_paths(findings, source_file_paths)
@@ -507,7 +580,7 @@ def run_api_analysis(
     events_log = jsonl_file.parent.parent / "events.jsonl"
 
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
-    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(events_log)
 
     cache_writer = None
@@ -541,6 +614,12 @@ def run_api_analysis(
             # but lets the failure-streak breaker and the post-run
             # reachability guard see the failure and fail the run loudly.
             status = "error" if was_lossy else "ok"
-            reason = "model call failed (unreachable or errored)" if was_lossy else None
+            reason = None
+            if fatal_exc is not None:
+                reason = f"fatal provider error ({fatal_exc.reason}): {fatal_exc}"
+            elif was_lossy:
+                reason = "model call failed (unreachable or errored)"
             for path in source_file_paths:
                 router.mark_file_done(file=path, status=status, reason=reason)
+    if fatal_exc is not None:
+        raise fatal_exc

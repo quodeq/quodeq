@@ -1,6 +1,7 @@
 import { getThemeColors, rgb } from '../core/galaxyCore.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { buildFolderScene, countDescendants } from './galaxyFolderScene.js';
+import { t } from '../../../../strings/index.js';
 
 /**
  * Create mouse/click event handlers for GalaxyFolderView.
@@ -21,24 +22,27 @@ export function createEventHandlers(refs, params) {
     const rows = [];
     const sev = d.severity || {};
     if (h.type === 'folder') {
-      rows.push(row('Compliance', (d.complianceRate * 100).toFixed(0) + '%'));
-      rows.push(row('Violations', d.violations));
-      rows.push(row('Contents', countDescendants(d._node)));
+      rows.push(row(t('map.compliance'), (d.complianceRate * 100).toFixed(0) + '%'));
+      rows.push(row(t('map.violations'), d.violations));
+      rows.push(row(t('map.contents'), countDescendants(d._node)));
     } else {
-      rows.push(row('Violations', d.violations));
-      rows.push(row('Compliance', d.compliance));
+      rows.push(row(t('map.violations'), d.violations));
+      rows.push(row(t('map.compliance'), d.compliance));
     }
     if (d.violations > 0) {
-      if (sev.critical) rows.push(row('Critical', sev.critical, 'var(--color-sev-critical-text)'));
-      if (sev.major) rows.push(row('Major', sev.major, 'var(--color-sev-major-text)'));
-      if (sev.minor) rows.push(row('Minor', sev.minor, 'var(--color-sev-minor-text)'));
+      if (sev.critical) rows.push(row(t('map.critical'), sev.critical, 'var(--color-sev-critical-text)'));
+      if (sev.major) rows.push(row(t('map.major'), sev.major, 'var(--color-sev-major-text)'));
+      if (sev.minor) rows.push(row(t('map.minor'), sev.minor, 'var(--color-sev-minor-text)'));
     }
     const nameCol = rgb(d.col);
     const name = d.name;
     const ff = refs.focusedFolderRef.current;
     const isFocused = h.type === 'folder' && ff && ff.starIdx === h.starIdx;
-    const action = h.type === 'file' ? 'zoom in' : isFocused ? 'enter folder' : 'focus';
-    el.innerHTML = `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${escapeHtml(name)}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">Click to ${action}</div>`;
+    // Whole-sentence keys, not "Click to " + a verb phrase: the fragment is
+    // unassemblable in languages that order the clause differently.
+    const hint = h.type === 'file' ? t('map.clickToZoomIn')
+      : isFocused ? t('map.clickToEnterFolder') : t('map.clickToFocus');
+    el.innerHTML = `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${escapeHtml(name)}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(hint)}</div>`;
     el.style.display = 'block';
     el.style.left = Math.min(cx + 16, window.innerWidth - 200) + 'px';
     el.style.top = Math.min(cy + 16, window.innerHeight - 160) + 'px';

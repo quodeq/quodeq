@@ -267,12 +267,47 @@ def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
         )
 
 
+def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
+    """Add the scope_downgrade_json column to findings (default NULL).
+
+    Marks findings the deterministic scope gate de-escalated from major to
+    minor per the declared trust model, as a JSON-encoded {"rule", "from",
+    "to"} dict (mirroring req_refs_json's shape) so the SQL projection and
+    dashboard can surface WHICH rule waived the finding, not just that one
+    did.
+
+    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
+    only ever created a subset of tables -- only the fresh-DB DDL guarantees
+    it. Skip the ALTER in that case (mirrors the provenance_downgrade guard
+    in _upgrade_v5_to_v6); a future caller needing the column gets the fresh
+    DDL.
+
+    Idempotency: the ALTER and the PRAGMA user_version bump in
+    apply_evaluation_schema commit separately (autocommit), so a crash in
+    between leaves the column added but the version still 6. Re-running the
+    bare ALTER would then raise "duplicate column name: scope_downgrade_json"
+    -- a plain OperationalError the scoring/dashboard read seams don't catch,
+    permanently bricking the run. Skip if the column already exists.
+    """
+    has_findings = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
+    ).fetchone() is not None
+    if not has_findings:
+        return
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if "scope_downgrade_json" not in columns:
+        conn.execute(
+            "ALTER TABLE findings ADD COLUMN scope_downgrade_json TEXT"
+        )
+
+
 _UPGRADES = {
     1: _upgrade_v1_to_v2,
     2: _upgrade_v2_to_v3,
     3: _upgrade_v3_to_v4,
     4: _upgrade_v4_to_v5,
     5: _upgrade_v5_to_v6,
+    6: _upgrade_v6_to_v7,
 }
 
 

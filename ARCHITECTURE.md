@@ -4,42 +4,44 @@
 
 | Layer | Purpose | Dependencies |
 |-------|---------|--------------|
-| `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions | None (stdlib only) |
-| `engine/` | Infrastructure and execution: pipeline orchestration, markers, runner utilities | core/, analysis/ |
+| `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions, stream-event parsing | None (stdlib only) |
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
-| `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ (via `services/ports.py`) |
+| `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ |
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
-| `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP | core/, engine/, data/, services/, context/ |
+| `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP, markers, scoring pipeline | core/, data/, services/, context/ |
 | `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/, update/ |
-| `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (not yet covered by import checker) |
+| `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (nothing — leaf; one grandfathered analysis import) |
 | `terminal/` | Embedded-terminal PTY backends (Unix pty / Windows ConPTY) + manager | core/ |
 | `update/` | Update-notification subsystem (notify-only; never self-replaces the binary) | None |
-| `ci/` | CI integration: report posting, evidence reading, SARIF export | (not yet covered by import checker) |
+| `ci/` | CI integration: report posting, evidence reading, SARIF export | core/, services/, analysis/, context/ |
 | `context/` | Context enrichment: path-role classification, project shape, precedent fingerprinting | core/, data/, llm_bridge/ |
 | `ui/` | React + Vite dashboard frontend (npm project, served by the Flask API) | n/a (JavaScript) |
-| `shared/` | Cross-cutting utilities: config, logging, env helpers | None (stdlib only) |
+| `shared/` | Cross-cutting utilities: config, logging, env helpers | core/ (pure helper re-exports) |
 | `config/` | Configuration: paths, discipline detection, standards fetching | shared/ |
 
 ## Import Rules
 
 ```
 core/          -> core/
-engine/        -> core/, analysis/
 data/          -> core/
-services/      -> core/, data/ (by convention via services/ports.py)
+services/      -> core/, data/
 assistant/     -> core/, data/, services/, llm_bridge/
 api/           -> core/, services/, update/, assistant/, terminal/
-analysis/      -> core/, engine/, data/, services/, context/
+analysis/      -> core/, data/, services/, context/
 dashboard/     -> services/, api/, update/
 terminal/      -> core/
 update/        -> (nothing)
 context/       -> core/, data/, llm_bridge/
+shared/        -> core/ (strict — no cross-cutting blanket)
+llm_bridge/    -> (nothing)
+ci/            -> core/, services/, analysis/, context/
 ```
 
 Every checked layer may additionally import stdlib plus the cross-cutting
-`shared/` and `config/` packages. Layers not listed (`llm_bridge/`, `ci/`,
-`ui/`) are not yet covered by the checker.
+`shared/` and `config/` packages. Only `ui/` (JavaScript) and package-root
+modules (`cli.py`, `_cli_*.py`) are outside the checker. `core/` and `shared/`
+are strict: the cross-cutting allowance does not apply to them.
 
 These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
 Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list: fix
@@ -133,6 +135,54 @@ Dashboard
   ├─► probes GET /api/jobs/<id>/logs?since=0  (404 → placeholder, skip SSE)
   └─► opens  GET /api/jobs/<id>/logs/stream   (SSE: replay + tail; `event: done` on terminal)
 ```
+
+## Deterministic Requirement Checkers
+
+Some requirements are properties of the whole codebase rather than of any one
+file — "no transitive framework dependencies in core layers" cannot be judged
+by reading a single file, which is why they never produced a judgment at all.
+A requirement opts into a deterministic checker by naming it in the compiled
+standard:
+
+```json
+{ "id": "CLEA-DEP-06", "text": "...", "check": "framework-imports" }
+```
+
+At run time `analysis/checks/runner.py` resolves the named checkers, runs each
+once, filters the judgments back to the requirements that declared it, and
+folds the results into the dimension's evidence — as ordinary violations and
+compliances, so scoring, dismissal, the dashboard and the SQL projection need
+no special case. A checker that runs clean emits **one** compliance, because
+"no violations" and "never checked" must not look the same.
+
+Three rules hold everywhere in this path:
+
+- **Fail-soft.** A checker that raises, a standard that will not parse, a JSONL
+  that will not open — each costs the deterministic findings and nothing else.
+- **Forward compatible.** A `check` name this build does not know is skipped,
+  not an error: standards ship as data and outlive binaries.
+- **Never cached.** These are graph properties, and the per-file content cache
+  has no key that could express "the graph changed". They recompute per run.
+
+| Piece | File |
+|---|---|
+| Pure judgment logic | `src/quodeq/core/checks/` |
+| Static facts off disk (the only I/O) | `src/quodeq/data/fs/import_graph.py`, `symbol_uses.py` |
+| Registry + fact memo + run wiring | `src/quodeq/analysis/checks/` |
+
+Shipped checkers, and the requirements they answer:
+
+| `check` | Requirements |
+|---|---|
+| `framework-imports` | CLEA-FRM-01, CLEA-DEP-06 |
+| `entity-imports` | CLEA-DEP-02 |
+| `config-reads` | CLEA-DEP-07 |
+
+Adding one is: a pure function in `core/checks/` returning `Judgment`s, an entry
+in `CHECKERS`, and a `"check"` key on the requirement. New facts (beyond the
+import graph and symbol uses) get their own collector in `data/fs/` and a lazy
+accessor on `CheckContext`, which memoises per context so several checkers
+share one walk of the tree.
 
 ## Key Design Rules
 

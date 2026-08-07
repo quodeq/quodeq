@@ -3,27 +3,17 @@ import { TermHeader, TermInput, StatStrip, Stat } from '../../../../components/t
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
+import { t } from '../../../../strings/index.js';
+import { apiErrorMessage } from '../../../../strings/apiErrors.js';
 
 const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
 const CLONE_DEST_STORAGE_KEY = 'quodeq.lastCloneRoot';
 
-// Map backend error codes (Task A8) to user-facing messages.
+// Map backend error codes (Task A8) to user-facing messages. The switch that
+// used to live here moved into strings/apiErrors.js so every screen resolves
+// codes the same way; the copy is unchanged, just translatable now.
 function friendlyCloneError(err) {
-  const code = err?.code;
-  switch (code) {
-    case 'AUTH_REQUIRED':
-      return "Couldn't clone. If this is a private repo, make sure `git clone <url>` works in your terminal first.";
-    case 'NETWORK_ERROR':
-      return "Couldn't reach the remote. Check your connection and try again.";
-    case 'REPO_NOT_FOUND':
-      return 'Repository not found. Check the URL and try again.';
-    case 'DEST_EXISTS':
-      return 'That folder already contains files. Pick a different location, or use the existing directory as a local-path project.';
-    case 'DISK_ERROR':
-      return err?.message || 'A disk error occurred. Check available space and permissions.';
-    default:
-      return err?.message || 'Clone failed.';
-  }
+  return apiErrorMessage(err, 'onboarding.cloneFailed');
 }
 
 export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
@@ -127,9 +117,9 @@ export default function RepoScanStep({ state, actions, createProject, getProject
 
   return (
     <div className="onboarding-step onboarding-step--repo-scan">
-      <TermHeader name="repo" sub={`step ${stepIndex} of ${stepTotal} · paste a url or local folder`} />
+      <TermHeader name={t('onboarding.termRepo')} sub={t('onboarding.subRepo', { step: stepIndex, total: stepTotal })} />
       <p className="onboarding-step__pitch">
-        Paste a Git URL or pick a local folder. quodeq will scan it locally. No AI tokens used yet.
+        {t('onboarding.repoScanDesc')}
       </p>
 
       <div className={sub === 'idle' ? 'onboarding-repo-row' : 'onboarding-repo-row onboarding-form-locked'}>
@@ -140,7 +130,7 @@ export default function RepoScanStep({ state, actions, createProject, getProject
           onChange={(value) => actions.setRepo({ value, source: 'url' })}
           onSubmit={handleSubmit}
           placeholder="git@github.com:org/repo.git"
-          ariaLabel="repository url or local path"
+          ariaLabel={t('onboarding.repoInputAria')}
         />
         <button
           type="button"
@@ -148,26 +138,26 @@ export default function RepoScanStep({ state, actions, createProject, getProject
           onClick={() => setFolderBrowserOpen(true)}
           disabled={sub !== 'idle'}
         >
-          local
+          {t('onboarding.local')}
         </button>
       </div>
       {sub === 'scanned' && (
-        <button type="button" className="onboarding-edit-link" onClick={actions.resetScan}>edit repository</button>
+        <button type="button" className="onboarding-edit-link" onClick={actions.resetScan}>{t('onboarding.editRepository')}</button>
       )}
 
       {sub === 'scanning' && (
         <div className="onboarding-scan-progress">
           <ScanProgress />
-          <p className="onboarding-scan-progress__hint">cloning · walking files · detecting languages…</p>
+          <p className="onboarding-scan-progress__hint">{t('onboarding.scanning')}</p>
         </div>
       )}
 
       {sub === 'error' && (
         <div className="onboarding-scan-error" role="alert">
-          <p>{state.scanError?.message || 'Scan failed.'}</p>
+          <p>{state.scanError?.message || t('onboarding.scanFailed')}</p>
           <div className="onboarding-step__actions">
-            <button type="button" className="term-btn--primary" onClick={handleSubmit}>try again</button>
-            <button type="button" className="term-btn--secondary" onClick={actions.resetScan}>edit repository</button>
+            <button type="button" className="term-btn--primary" onClick={handleSubmit}>{t('onboarding.tryAgain')}</button>
+            <button type="button" className="term-btn--secondary" onClick={actions.resetScan}>{t('onboarding.editRepository')}</button>
           </div>
         </div>
       )}
@@ -182,8 +172,8 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         return (
           <div className="onboarding-scan-summary">
             <StatStrip cards>
-              <Stat label="FILES" value={totalFiles} hint="all files in repo" />
-              <Stat label="CODE" value={codeFiles} hint="files the eval will analyse" />
+              <Stat label="FILES" value={totalFiles} hint={t('onboarding.allFilesHint')} />
+              <Stat label="CODE" value={codeFiles} hint={t('onboarding.codeFilesHint')} />
               <Stat label="LANGUAGES" value={langCount} />
               <Stat label="BRANCHES" value={branchCount} />
             </StatStrip>
@@ -203,10 +193,10 @@ export default function RepoScanStep({ state, actions, createProject, getProject
 
       <div className="onboarding-step__actions">
         {sub === 'idle' && (
-          <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={handleSubmit} disabled={!state.repo.value}>scan repository</button>
+          <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={handleSubmit} disabled={!state.repo.value}>{t('onboarding.scanRepository')}</button>
         )}
         {sub === 'scanned' && (
-          <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onContinue}>continue</button>
+          <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onContinue}>{t('common.continue')}</button>
         )}
       </div>
 
@@ -214,8 +204,8 @@ export default function RepoScanStep({ state, actions, createProject, getProject
         <FolderBrowser
           onSelect={handleFolderSelect}
           onClose={() => setFolderBrowserOpen(false)}
-          title="Select Folder or File"
-          confirmText="Use this path"
+          title={t('onboarding.selectFolderOrFile')}
+          confirmText={t('onboarding.useThisPath')}
           showFiles
         />
       )}

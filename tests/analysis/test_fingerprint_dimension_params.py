@@ -143,3 +143,19 @@ def test_shape_invalid_params_list_hashes_empty_without_raising(tmp_path, projec
     bad_dir = tmp_path / "standards-bad-list"
     _write_compiled_raw_params(bad_dir, DIM, "M-ANA-2", ["max_lines"])
     assert dimension_params_state(bad_dir, DIM, project_root) == ("", {})
+
+
+def test_deeply_nested_compiled_file_hashes_empty(standards_dir, project_root, deeply_nested_json):
+    """A compiled dimension file must degrade the same way a missing one does.
+
+    Deeply nested JSON overflows the C decoder's call stack and raises
+    RecursionError, a RuntimeError subclass the narrow
+    (OSError, ValueError, UnicodeDecodeError) catch did not cover. Cache keying
+    already treats an unparseable compiled file as ("", {}); this is the same
+    failure reached through a different exception type, and it sits on the
+    per-file hot path, so an escape here aborts the whole run.
+    """
+    (standards_dir / "compiled" / f"{DIM}.json").write_text(
+        deeply_nested_json, encoding="utf-8")
+
+    assert dimension_params_state(standards_dir, DIM, project_root) == ("", {})

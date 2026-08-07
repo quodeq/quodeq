@@ -3,6 +3,7 @@ import { hierarchy, pack } from 'd3-hierarchy';
 import { nodeSize } from '../core/mapColors.js';
 import PackInfoPanel from './PackInfoPanel.jsx';
 import PackCircles from './PackCircles.jsx';
+import { t } from '../../../../strings/index.js';
 
 const BASE_SIZE = 600;
 const PAD = 20;
@@ -159,12 +160,12 @@ function PackTooltip({ circles, hover, mousePos, containerRef }) {
   return (
     <div className="map-tooltip" style={{ position: 'absolute', left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (containerRef.current?.offsetWidth || 300) - TOOLTIP_MAX_MARGIN), top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (containerRef.current?.offsetHeight || 300) - TOOLTIP_MAX_MARGIN_Y), pointerEvents: 'none', zIndex: 10 }}>
       <div className="map-tooltip-title">{(hd.path || hd.name || '').replace(/\/$/, '')}</div>
-      <div className="map-tooltip-row"><span>Violations</span><span>{hd.violations}</span></div>
-      {hd.violations > 0 && sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>Critical</span><span>{sev.critical}</span></div>}
-      {hd.violations > 0 && sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>Major</span><span>{sev.major}</span></div>}
-      {hd.violations > 0 && sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>Minor</span><span>{sev.minor}</span></div>}
-      <div className="map-tooltip-row"><span>Compliance</span><span>{hd.compliance}</span></div>
-      <div className="map-tooltip-row"><span>Rate</span><span>{(hd.violations + hd.compliance) > 0 ? ((hd.compliance / (hd.violations + hd.compliance)) * 100).toFixed(0) + '%' : '—'}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{hd.violations}</span></div>
+      {hd.violations > 0 && sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}
+      {hd.violations > 0 && sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{sev.major}</span></div>}
+      {hd.violations > 0 && sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{sev.minor}</span></div>}
+      <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{hd.compliance}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{(hd.violations + hd.compliance) > 0 ? ((hd.compliance / (hd.violations + hd.compliance)) * 100).toFixed(0) + '%' : '—'}</span></div>
     </div>
   );
 }
@@ -200,7 +201,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
         tabIndex={0}
         onClick={handleBgClick}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); handleBgClick(); } }}
-        aria-label="Zoomable pack visualization of project compliance by folder and file"
+        aria-label={t('map.zoomablePackAria')}
       >
         <defs>
           <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">

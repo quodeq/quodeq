@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.api.app import create_app
-from quodeq.services.shared_repo import (
+from quodeq.data.fs.shared_repo import (
     FORMAT_NAME,
     MARKER_FILENAME,
     ensure_shared_clone,
@@ -275,7 +275,7 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
     there and per-project summaries would read/write the LOCAL score cache
     DB instead of this clone's own one. Both must hold: the per-clone cache
     gets written, and the local (sandboxed-default) cache never does."""
-    from quodeq.services.shared_repo import shared_score_cache_path
+    from quodeq.data.fs.shared_repo import shared_score_cache_path
     from quodeq.shared._env import get_score_cache_path
 
     clone_cache_path = shared_score_cache_path(shared_clone_fixture)
@@ -372,7 +372,7 @@ def test_shared_scores_not_found(client, shared_clone_fixture):
 def test_shared_scores_uses_isolated_score_cache(client, shared_clone_fixture):
     """Task 9 integration: the shared clone's own score_cache.db is touched,
     not the local (unconfigured, in this test) default score cache path."""
-    from quodeq.services.shared_repo import shared_score_cache_path
+    from quodeq.data.fs.shared_repo import shared_score_cache_path
 
     cache_path = shared_score_cache_path(shared_clone_fixture)
     assert not cache_path.exists()

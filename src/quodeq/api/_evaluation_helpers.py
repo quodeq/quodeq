@@ -10,7 +10,7 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
-from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
+from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.shared.validation import validate_relative_scope
 
 # Userinfo cannot contain an unencoded "/", so excluding it keeps matches
@@ -91,11 +91,11 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
-    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), _DEFAULT_MAX_SUBAGENTS)
+    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS)
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
     # Read new key first; fall back to legacy `poolBudget` for back-compat.
     time_limit_raw = _coerce_int(
-        payload.get("timeLimit", payload.get("poolBudget")), _DEFAULT_TIME_LIMIT,
+        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT,
     )
     time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None

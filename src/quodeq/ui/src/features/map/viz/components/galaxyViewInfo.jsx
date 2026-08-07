@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../../../../strings/index.js';
 
 /** Presentational component for the level info panel overlay */
 export function LevelInfoPanel({ levelInfo }) {
@@ -22,7 +23,7 @@ export function LevelInfoPanel({ levelInfo }) {
           style={{ marginTop: 10, width: '100%', padding: '6px 12px', background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', fontSize: 11, cursor: 'pointer', transition: 'all 0.2s' }}
           onMouseEnter={e => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 35%, transparent)'; }}
           onMouseLeave={e => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 20%, transparent)'; }}
-        >View Details</button>
+        >{t('map.viewDetails')}</button>
       )}
     </div>
   );
@@ -69,8 +70,8 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
     }
     lines.push({ label: 'Compliance', value: totalC });
     return {
-      title: clusterCon?.label || (projectName ? `${projectName} System` : 'Project System'),
-      lines, hint: 'Click a dimension to explore', detailAction: null,
+      title: clusterCon?.label || (projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.projectSystem')),
+      lines, hint: t('map.clickDimension'), detailAction: null,
     };
   }
 
@@ -95,7 +96,7 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
     }
     dimLines.push({ label: 'Compliance', value: dim.compliance });
     return {
-      title: dim.name, lines: dimLines, hint: 'Click a principle to explore',
+      title: dim.name, lines: dimLines, hint: t('map.clickPrinciple'),
       detailAction: () => {
         const d = scene.stars[navRef.current.dim]?._raw;
         if (!d) return;

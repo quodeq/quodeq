@@ -10,6 +10,7 @@ import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
+import { t } from '../../../strings/index.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
@@ -26,13 +27,13 @@ const VIEW_MODES = [
 ];
 
 const VIZ_STYLES = [
-  { id: 'zoompack', label: 'Circle Pack', enabled: true },
+  { id: 'zoompack', label: t('map.vizCirclePack'), enabled: true },
   { id: 'galaxy', label: 'Galaxy', enabled: true },
-  { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
+  { id: 'riskmatrix', label: t('map.vizRiskMatrix'), enabled: true },
 ];
 
 const GALAXY_MODES = [
-  { id: 'filesystem', label: 'File System' },
+  { id: 'filesystem', label: t('map.vizFileSystem') },
   { id: 'standards', label: 'Standards' },
 ];
 
@@ -57,13 +58,13 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
         type="button"
         className={`map-pill map-filter-btn${isFiltered ? ' is-filtered' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        title={isFiltered ? `${selectedDimensions.size} of ${allDimensions.length} dimensions` : 'All dimensions'}
-        aria-label={isFiltered ? `Dimensions (${selectedDimensions.size} of ${allDimensions.length} active)` : 'Dimensions'}
+        title={isFiltered ? t('map.dimensionsOf', { selected: selectedDimensions.size, total: allDimensions.length }) : t('map.allDimensions')}
+        aria-label={isFiltered ? t('map.dimensionsAria', { selected: selectedDimensions.size, total: allDimensions.length }) : t('map.dimensions')}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-        Dimensions
+        {t('map.dimensions')}
         {isFiltered && <span className="map-filter-btn__dot" aria-hidden="true" />}
       </button>
       {open && (
@@ -107,7 +108,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
       )}
       <div className="map-pill-group">
         {VIZ_STYLES.map((s) => (
-          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''} aria-pressed={vizStyle === s.id}>
+          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? t('map.comingSoon') : ''} aria-pressed={vizStyle === s.id}>
             {s.label}
           </button>
         ))}
@@ -137,12 +138,12 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
       <div className="map-viz-toggles">
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
-          Labels
+          {t('map.labels')}
         </label>
         {!appIsDark && (
           <label className="map-label-toggle">
             <input type="checkbox" checked={!darkMode} onChange={(e) => setDarkMode(!e.target.checked)} />
-            Light
+            {t('map.light')}
           </label>
         )}
       </div>
@@ -176,11 +177,11 @@ export default function MapPage(props) {
   if (!projectsLoaded) return <LoadingScreen />;
   if (projects.length === 0 && selectedSource !== 'shared') {
     return (
-      <MapEmpty sub="no projects yet">
+      <MapEmpty sub={t('map.subNoProjects')}>
         <EmptyState
-          title="No projects yet"
-          description="Add a project to start analyzing code quality."
-          actionLabel="Add a project"
+          title={t('map.noProjectsYet')}
+          description={t('map.addProjectDesc')}
+          actionLabel={t('map.addProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </MapEmpty>
@@ -188,11 +189,11 @@ export default function MapPage(props) {
   }
   if (!selectedProject) {
     return (
-      <MapEmpty sub="no project selected">
+      <MapEmpty sub={t('map.subNoProjectSelected')}>
         <EmptyState
-          title="No project selected"
-          description="Pick a project to view its map."
-          actionLabel="Choose project"
+          title={t('map.noProjectSelected')}
+          description={t('map.pickProjectDesc')}
+          actionLabel={t('map.chooseProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </MapEmpty>
@@ -223,7 +224,7 @@ export default function MapPage(props) {
       return (
         <MapEmpty sub="error">
           <EmptyState
-            title="Couldn't load this project"
+            title={t('map.projectLoadFailed')}
             description={error}
             actionLabel="Retry"
             onAction={() => onRetry?.()}
@@ -237,20 +238,20 @@ export default function MapPage(props) {
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
+        <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
           <EmptyState
-            title="No completed evaluation yet"
-            description="no completed evaluation in this remote project yet"
+            title={t('map.noCompletedEvaluation')}
+            description={t('map.noCompletedRemote')}
           />
         </MapEmpty>
       );
     }
     return (
-      <MapEmpty sub="no evaluations yet" refreshing={isRefreshing}>
+      <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
         <EmptyState
-          title="No evaluations yet"
-          description={`Run an evaluation for ${projectName || selectedProject} to populate this page.`}
-          actionLabel="Start evaluation"
+          title={t('map.noEvaluationsYet')}
+          description={t('map.runEvaluationDesc', { project: projectName || selectedProject })}
+          actionLabel={t('map.startEvaluation')}
           onAction={() => onNavigate?.('evaluate')}
         />
       </MapEmpty>

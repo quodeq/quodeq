@@ -9,6 +9,42 @@
   to { opacity: 1; }
 }
 
+/* ── Navigation pending bar ─────────────────────────────
+   Shown while a route transition's target page is still rendering
+   (useNavStack navPending). Sits at the top of the content column so a
+   heavy detail page (or a slow webview engine) never leaves a click
+   looking ignored. Fades in late: fast navigations never flash it. */
+.nav-pending-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  z-index: 30;
+  pointer-events: none;
+  animation: nav-pending-appear 80ms ease-out 120ms both;
+}
+
+.nav-pending-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--color-accent);
+  animation: nav-pending-slide 0.9s ease-in-out infinite;
+}
+
+@keyframes nav-pending-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes nav-pending-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(350%); }
+}
+
 /* ── Dashboard fade transitions ──────────────────────── */
 
 .dashboard-fade {
@@ -2271,6 +2307,9 @@
 
 .rht-date  { color: var(--color-text-muted); }
 .rht-score { font-weight: 600; color: var(--color-text); }
+/* Only rendered when the scan refreshed some of the dimensions, so it must
+   read as a qualifier on the score above it, not as a third headline. */
+.rht-coverage { color: var(--color-text-muted); font-size: 0.72rem; }
 
 /* ── History panels row (Score History + Dimension Scores side-by-side) ── */
 

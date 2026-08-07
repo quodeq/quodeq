@@ -29,10 +29,11 @@ from quodeq.core.types import DimensionResult
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
-from quodeq.services.ports import read_run_scalars as _default_read_run_scalars
+from quodeq.data.fs.report_parser.runs import read_run_scalars as _default_read_run_scalars
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.services.score_cache import make_cache_backed_fetcher
 from quodeq.shared.validation import validate_path_segment
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 _logger = logging.getLogger(__name__)
 
@@ -58,7 +59,9 @@ def make_rescoring_fetcher(
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
-    if not dismissed and not deleted:
+    rules = load_suppression_rules(project_dir)
+    # Rules count as suppression state; see scored_run_dimensions.
+    if not dismissed and not deleted and not rules:
         return base_fetcher
 
     def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
@@ -68,7 +71,8 @@ def make_rescoring_fetcher(
         validate_path_segment(run_id)
         run_dir = project_dir / run_id
         return [
-            _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir)
+            _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir,
+                               rules=rules)
             for d in dims
         ]
 

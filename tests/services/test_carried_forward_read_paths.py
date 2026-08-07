@@ -55,3 +55,60 @@ def test_report_write_whitelist_carries_the_flag_through_flatten():
     carried, not_carried = flattened
     assert carried["carried_forward"] is True
     assert "carried_forward" not in not_carried
+
+
+# ---------------------------------------------------------------------------
+# scope_downgrade must survive BOTH dimension-eval read paths too, the same
+# class of bug carried_forward guards above: a gap in either parser makes a
+# gated finding's rule name reappear/disappear as a dimension finishes.
+# ---------------------------------------------------------------------------
+
+def test_live_jsonl_path_carries_scope_downgrade():
+    marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    obj = {
+        "p": "P1", "t": "violation", "d": "security", "file": "a.py",
+        "line": 1, "severity": "minor", "w": "t", "reason": "r",
+        "scope_downgrade": marker,
+    }
+    assert _build_finding_entry(obj, "security").scope_downgrade == marker
+
+
+def test_live_jsonl_path_defaults_scope_downgrade_to_none():
+    obj = {
+        "p": "P1", "t": "violation", "d": "security", "file": "a.py",
+        "line": 1, "severity": "minor", "w": "t", "reason": "r",
+    }
+    assert _build_finding_entry(obj, "security").scope_downgrade is None
+
+
+def test_report_json_path_carries_scope_downgrade():
+    marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    item = {
+        "principle": "P1", "file": "a.py", "line": 1, "severity": "minor",
+        "title": "t", "reason": "r", "scope_downgrade": marker,
+    }
+    assert build_finding(item, include_severity=True).scope_downgrade == marker
+
+
+def test_report_write_whitelist_carries_scope_downgrade_through_flatten():
+    """Same whitelist gap class as carried_forward above: _flatten_findings
+    keeps ONLY the keys listed in _VIOLATION_FIELDS when writing
+    evaluation/<dim>.json. Omission here drops the rule name silently, and a
+    reader could no longer tell a waived finding from an ordinary minor."""
+    marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
+    items = [
+        {
+            "file": "a.py", "line": 1, "severity": "minor",
+            "title": "t", "reason": "r", "scope_downgrade": marker,
+        },
+        {
+            "file": "b.py", "line": 2, "severity": "minor",
+            "title": "t", "reason": "r",
+        },
+    ]
+
+    flattened = _flatten_findings(items, "P1", _VIOLATION_FIELDS)
+
+    downgraded, not_downgraded = flattened
+    assert downgraded["scope_downgrade"] == marker
+    assert "scope_downgrade" not in not_downgraded

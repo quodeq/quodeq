@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { BRAND_NAME } from '../strings/brand.js';
 
 const PHRASES = [
   'evaluate <b>local folders</b> or <b>remote git repositories</b>, no cloning needed',
@@ -198,7 +199,7 @@ export default function BrandCarousel() {
           needleWobble={c.needleWobble}
           handlers={{ left: c.handleLeft, right: c.handleRight }}
         />
-        <span className="sa-wordmark">quodeq</span>
+        <span className="sa-wordmark">{BRAND_NAME}</span>
         <p className="sa-phrase-wrap">
           <span className={c.changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}>
             <SafePhrase html={PHRASES[c.index]} />

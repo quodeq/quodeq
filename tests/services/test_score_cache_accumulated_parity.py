@@ -57,7 +57,7 @@ def test_parent_project_bypasses_cache(tmp_path, monkeypatch):
     import quodeq.services.scoring as scoring
     def boom(*a, **k):
         raise AssertionError("accumulated cache used for a parent project")
-    monkeypatch.setattr(scoring, "cached_accumulated", boom)
+    deps = scoring.ScoringDeps(cached_accumulated=boom)
 
-    result = get_project_scores(reports, "parent")   # must NOT raise (bypasses cache)
+    result = get_project_scores(reports, "parent", deps=deps)   # must NOT raise (bypasses cache)
     assert result is not None

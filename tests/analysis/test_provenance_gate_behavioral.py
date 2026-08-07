@@ -99,6 +99,10 @@ pytestmark = [
 _CASES = discover_cases()
 _INTERNAL = [c for c in _CASES if c.expected["provenance"] == "internal"]
 _EXTERNAL = [c for c in _CASES if c.expected["provenance"] == "external"]
+# Operator-controlled (argv/env) behaves like internal for the outcome pin --
+# never critical -- but keeps the loose req-only matching of the external
+# fixtures, since these are single-issue synthetic files.
+_OPERATOR = [c for c in _CASES if c.expected["provenance"] == "operator"]
 
 
 def _run(case):
@@ -119,9 +123,29 @@ def _run(case):
     findings, lossy = _call_api(prompt, ApiRunnerConfig(model=_GATE_MODEL, api_base=_API_BASE, temperature=0.1))
     # Loose req-only matching is for the single-issue external fixtures; internal
     # fixtures hold other same-req sites, so they match on construct/line only.
-    allow_req_only = case.expected["provenance"] == "external"
+    allow_req_only = case.expected["provenance"] in ("external", "operator")
     severity, _matches = target_severity(findings, case.expected, allow_req_only=allow_req_only)
     return severity, lossy
+
+
+@pytest.mark.parametrize("case", _OPERATOR, ids=[c.name for c in _OPERATOR])
+def test_operator_construct_not_critical(case):
+    """A path built from argv/env must not surface as critical.
+
+    Same outcome pin as the internal cases (absence is a pass, only a critical
+    fails), but for a different reason: the source is real and named, it just
+    is not a trust boundary. This is the control for the argv/env tier -- if it
+    regresses, every local-first CLI scores criticals on its own operator.
+    """
+    runs = [_run(case) for _ in range(_RUNS_INTERNAL)]
+    valid = [s for (s, lossy) in runs if not lossy]
+    if len(valid) < _MIN_VALID:
+        pytest.skip(f"{case.name}: too many lossy runs ({len(valid)} valid); model unstable")
+    crit = sum(1 for s in valid if s == "critical")
+    assert crit == 0, (
+        f"{case.name}: REGRESSION - an operator-controlled construct came back "
+        f"critical in {crit}/{len(valid)} runs; it must stay <= major.\n  severities: {valid}"
+    )
 
 
 @pytest.mark.parametrize("case", _INTERNAL, ids=[c.name for c in _INTERNAL])

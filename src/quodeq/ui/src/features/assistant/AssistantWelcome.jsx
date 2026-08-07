@@ -1,6 +1,7 @@
 import React from 'react';
 import { pillsForView } from './commands.js';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+import { t } from '../../strings/index.js';
 
 // Dot tints cycle so neighboring cards read as distinct entry points.
 const DOT_TONES = ['info', 'accent', 'warning', 'success'];
@@ -22,14 +23,14 @@ export function AssistantWelcome({ catalog, view, onPick, readOnly = false }) {
         </span>
         <p className="assistant-welcome-intro">
           {readOnly
-            ? 'I can explain scores and dig into findings for this remote project.'
-            : 'I can explain scores, dig into findings, and draft standards for this project.'}
-          {' '}Pick a starting point or ask me anything.
+            ? t('assistant.welcomeRemote')
+            : t('assistant.welcomeLocal')}
+          {' '}{t('assistant.welcomeHint')}
         </p>
       </div>
       {pills.length > 0 && (
         <div className="assistant-welcome-section">
-          <div className="assistant-welcome-label">Suggested</div>
+          <div className="assistant-welcome-label">{t('assistant.suggested')}</div>
           <div className="assistant-suggest-grid">
             {pills.map((p, i) => (
               <button

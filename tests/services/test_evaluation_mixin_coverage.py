@@ -10,17 +10,17 @@ import pytest
 
 class TestScoreCompletedEvidence:
     def test_no_project_or_run_id(self):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         _score_completed_evidence("/tmp/reports", {})  # should not raise
 
     def test_no_evidence_dir(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         _score_completed_evidence(str(tmp_path), {
             "outputProject": "proj", "outputRunId": "run1"
         })  # evidence dir doesn't exist, returns early
 
     def test_scores_completed_dimension(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
         evidence_dir.mkdir(parents=True)
@@ -44,7 +44,7 @@ class TestScoreCompletedEvidence:
             })
 
     def test_skips_already_scored(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
         evidence_dir.mkdir(parents=True)
@@ -65,7 +65,7 @@ class TestScoreCompletedEvidence:
             mock_parse.assert_not_called()
 
     def test_skips_empty_jsonl(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
         evidence_dir.mkdir(parents=True)
@@ -83,7 +83,7 @@ class TestScoreCompletedEvidence:
             mock_parse.assert_not_called()
 
     def test_skips_no_queue_file(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
         evidence_dir.mkdir(parents=True)
@@ -100,7 +100,7 @@ class TestScoreCompletedEvidence:
             mock_parse.assert_not_called()
 
     def test_handles_scoring_exception(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
         evidence_dir.mkdir(parents=True)
@@ -117,7 +117,7 @@ class TestScoreCompletedEvidence:
             })  # should not raise
 
     def test_handles_none_evidence(self, tmp_path):
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
         evidence_dir.mkdir(parents=True)
@@ -164,7 +164,7 @@ class TestFsEvaluationMixinMethods:
         mixin = self._make_mixin()
         mixin._jobs.cancel_job.return_value = True
         mixin._jobs.get_job.return_value = MagicMock(output_project="proj", output_run_id="run1")
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence"):
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence"):
             result = mixin.cancel_evaluation("job-1", "/tmp/reports")
             assert result is True
 
@@ -187,7 +187,7 @@ class TestFsEvaluationMixinMethods:
         job.get.return_value = "failed"
         job.__getitem__ = MagicMock()
         mixin._jobs.get_job.return_value = job
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence"):
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence"):
             result = mixin.score_failed_evaluation("job-1", "/tmp/reports")
             assert result is True
 

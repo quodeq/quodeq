@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../components/HeatGridCells.jsx';
+import { t } from '../../../strings/index.js';
 
 const DEFAULT_SEVERITY = 'minor';
 const PRINCIPLE_INDENT_PX = 24;
 
 const COLUMNS = [
-  { id: 'name', label: 'Dimension / Principle', align: 'left' },
-  { id: 'critical', label: 'Critical' },
-  { id: 'major', label: 'Major' },
-  { id: 'minor', label: 'Minor' },
-  { id: 'violations', label: 'Violations' },
-  { id: 'health', label: 'Health' },
+  { id: 'name', label: t('violations.colDimensionPrinciple'), align: 'left' },
+  { id: 'critical', label: t('violations.colCritical') },
+  { id: 'major', label: t('violations.colMajor') },
+  { id: 'minor', label: t('violations.colMinor') },
+  { id: 'violations', label: t('violations.colViolations') },
+  { id: 'health', label: t('violations.colHealth') },
 ];
 
 function getSortValue(row, col) {
@@ -132,7 +133,7 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
   };
 
   if (rows.length === 0) {
-    return <p className="empty-state">No violations found.</p>;
+    return <p className="empty-state">{t('violations.noViolationsFound')}</p>;
   }
 
   return (

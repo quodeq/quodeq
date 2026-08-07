@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
+import { t } from '../../../strings/index.js';
 
 /**
  * ConsoleLogViewer — renders streaming job logs as one-line-per-row, with
@@ -123,14 +124,14 @@ function FollowToggle({ active, onToggle }) {
     <button
       type="button"
       className={`console-follow-btn${active ? ' console-follow-btn--active' : ''}`}
-      title={active ? 'Following, click to stop' : 'Click to follow new output'}
+      title={active ? t('evaluate.followingTitle') : t('evaluate.followTitle')}
       aria-pressed={active}
       onClick={onToggle}
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <polyline points="6 9 12 15 18 9" />
       </svg>
-      <span>follow</span>
+      <span>{t('evaluate.follow')}</span>
     </button>
   );
 }
@@ -228,7 +229,7 @@ export default function ConsoleLogViewer({ logs }) {
       <div className="console-scroll" ref={scrollRef}>
         <div className="console-content" ref={contentRef}>
           {cleanedLogs.length === 0 ? (
-            <div className="console-log-empty">Waiting for output…</div>
+            <div className="console-log-empty">{t('evaluate.waitingForOutput')}</div>
           ) : (
             cleanedLogs.map((line, i) => <LogLine key={i} text={line} />)
           )}

@@ -1,5 +1,6 @@
 import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
 import { formatRunId, extDisplayName } from '../utils/formatters.js';
+import { t, LOCALE } from '../strings/index.js';
 
 const MAX_DISPLAYED_STATS = 5;
 
@@ -11,8 +12,8 @@ function LanguageStats({ stats, totalFiles }) {
     <div className="content-header-stats">
       {total && (
         <span className="content-stat">
-          <span className="content-stat-num">{total.toLocaleString()}</span>
-          <span className="content-stat-label">files</span>
+          <span className="content-stat-num">{total.toLocaleString(LOCALE)}</span>
+          <span className="content-stat-label">{t('evaluate.filesLabel')}</span>
         </span>
       )}
       {sorted.map(([lang, count]) => (
@@ -34,7 +35,7 @@ function CoverageStat({ totalFiles, analyzedFiles }) {
       <span className="content-header-sep" aria-hidden="true">·</span>
       <span className="content-stat">
         <span className="content-stat-num" style={{ color: 'var(--color-accent)' }}>{pct}%</span>
-        <span className="content-stat-label">analyzed</span>
+        <span className="content-stat-label">{t('common.analyzed')}</span>
       </span>
     </>
   );

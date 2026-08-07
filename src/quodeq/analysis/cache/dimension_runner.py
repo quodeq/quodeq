@@ -53,14 +53,15 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
+from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
     DimensionCallbacks,
     process_dimension_with_subagents,
 )
+from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.evidence.model import Evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 
 _logger = logging.getLogger(__name__)
 
@@ -197,7 +198,7 @@ def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
     if not findings:
         return
     from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
-    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
 
     writer = EventLogWriter(events_log)
@@ -217,6 +218,7 @@ def _write_findings(
     jsonl: Path, findings: list[dict], *, append: bool,
     emit_events: bool = True,
     unconsolidated: list[dict] | None = None,
+    trust_model: TrustModel | None = None,
 ) -> None:
     """Replay cached findings into this run's evidence JSONL.
 
@@ -241,10 +243,35 @@ def _write_findings(
     # inflate the grade. The gate only touches un-gated criticals, so
     # re-gating an already-gated (or non-critical) finding is a no-op --
     # safe to apply unconditionally to every cached finding.
+    #
+    # The scope gate is re-applied here for the identical reason: it too
+    # runs at the FindingEnricher sink (enrich(), after apply_provenance_gate),
+    # which cache replay bypasses just like the provenance gate. CacheKey
+    # deliberately does not fingerprint the declared trust model (that would
+    # defeat the point of gating at replay time instead of at the cache key),
+    # so a cached finding survives untouched across a
+    # ``.quodeq/project-profile.json`` edit unless something re-gates it on
+    # every replay -- this is that something. The practical effect: editing
+    # the profile to declare, say, ``networkExposure: loopback`` re-caps
+    # already-cached ``major`` findings on the very next run, without a cache
+    # miss or a CacheKey change.
+    #
+    # apply_scope_gate is symmetric (see its own module docstring): the same
+    # call also restores a finding this gate previously capped to ``minor``
+    # once the profile is TIGHTENED enough that the rule that capped it no
+    # longer fires. Without that other direction, a team that declares
+    # loopback, scans, then honestly ships hosted and widens the profile back
+    # to ``{"networkExposure": "public"}`` would see every already-cached
+    # finding stay stuck at ``minor`` forever -- the exact same staleness
+    # problem this whole re-gating pass exists to prevent, just in reverse.
+    #
+    # apply_severity_gates owns the sequence and the order it must run in
+    # (see severity_gates.py); this call site owns only the decision to
+    # re-gate on replay at all.
     for finding in findings:
-        apply_provenance_gate(finding)
+        apply_severity_gates(finding, trust_model)
     for finding in pending:
-        apply_provenance_gate(finding)
+        apply_severity_gates(finding, trust_model)
     # Every caller of this function is a cache replay -- the dispatcher
     # writes its own fresh findings and never comes through here. Stamp the
     # origin so the live evaluation feed can show only what this scan is
@@ -283,6 +310,14 @@ def process_dimension_with_cache(
         # skip this branch). Reclaim entries orphaned by the schema bump,
         # once per process. Best-effort: never blocks the run.
         maybe_collect_legacy_entries(cache.root)
+
+    # Resolved once per dimension and threaded through to every _write_findings
+    # call below, mirroring how the live path resolves it (_api_runner.py,
+    # findings_server.py): guard on ``config.src`` being set rather than
+    # assuming it, even though ``resolve_trust_model`` already degrades to
+    # CONSERVATIVE on ``None`` -- passing ``None`` through instead makes
+    # apply_scope_gate's no-op explicit rather than incidental.
+    trust_model = resolve_trust_model(config.src) if config.src is not None else None
 
     files, _ext, _excluded = _list_source_files(config, dim_id)
     if not files:
@@ -355,6 +390,7 @@ def process_dimension_with_cache(
         _write_findings(
             jsonl, classify.cached_findings, append=True,
             unconsolidated=classify.unconsolidated_findings,
+            trust_model=trust_model,
         )
         if jsonl.exists():
             deduplicate_jsonl(jsonl)
@@ -385,6 +421,7 @@ def process_dimension_with_cache(
         _write_findings(
             jsonl, classify.cached_findings, append=True,
             unconsolidated=classify.unconsolidated_findings,
+            trust_model=trust_model,
         )
 
     # Persist the per-file cache keys to a sidecar so the discard path can

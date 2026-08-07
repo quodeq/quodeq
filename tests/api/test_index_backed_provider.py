@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.shared.run_status import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, write_status
 
 
 def _seed_run(reports: Path, project: str, run_id: str, state: RunState) -> Path:
@@ -51,7 +51,7 @@ def test_get_evaluation_status_promotes_stale_ext_run(tmp_path, monkeypatch) -> 
     old filesystem heuristic)."""
     import os
     import time
-    from quodeq.shared.run_status import RunState, read_status, write_status
+    from quodeq.data.fs.run_status_store import RunState, read_status, write_status
 
     reports = tmp_path / "reports"
     run = reports / "p" / "stale-run"
@@ -102,7 +102,7 @@ def test_list_evaluations_internal_job_overrides_index_row(tmp_path, monkeypatch
     The authoritative live state must come from JobManager, not the index.
     """
     from unittest.mock import MagicMock
-    from quodeq.shared.run_status import RunState, write_status
+    from quodeq.data.fs.run_status_store import RunState, write_status
     from quodeq.services.filesystem import FilesystemActionProvider
     from quodeq.core.types.job import JobSnapshot
 

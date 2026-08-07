@@ -1,24 +1,18 @@
 import { useEffect } from 'react';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
+import { t } from '../../../strings/index.js';
+import { readString, removeKey, writeString } from '../../../adapters/storage.js';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
 function readPermanent() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return readString(STORAGE_KEY) === '1';
 }
 
 function writePermanent(on) {
-  try {
-    if (on) localStorage.setItem(STORAGE_KEY, '1');
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore quota / disabled storage */
-  }
+  if (on) writeString(STORAGE_KEY, '1');
+  else removeKey(STORAGE_KEY);
 }
 
 function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
@@ -42,7 +36,7 @@ function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
           <span className="eval-mode-card__title">{title}</span>
           <span className="eval-mode-card__tag">{tag}</span>
           <span className="eval-mode-card__hint">
-            <HelpHint label={`About ${title}`}>{children}</HelpHint>
+            <HelpHint label={t('evaluate.aboutTitle', { title })}>{children}</HelpHint>
           </span>
         </span>
       </span>
@@ -80,7 +74,7 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
     if (isClean) return;
     onChange('once');
     // Auto-dismissing heads-up: switching to clean is easy to underestimate.
-    showToast('Clean scan discards all previous findings and re-analyzes every file. Expect higher token usage.');
+    showToast(t('evaluate.cleanScanToast'));
   }
   function pickOnce() {
     writePermanent(false);
@@ -94,11 +88,11 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
   return (
     <div className="eval-scan-mode">
       <div className="eval-scan-mode__head">
-        <span className="eval-scan-mode__label">scan mode</span>
+        <span className="eval-scan-mode__label">{t('evaluate.scanModeLabel')}</span>
         {isClean && (
           <span className="eval-scan-mode__persist">
-            <span className="eval-scan-mode__persist-label">apply clean scan to</span>
-            <span className="eval-scan-mode__seg" role="group" aria-label="Clean scan persistence">
+            <span className="eval-scan-mode__persist-label">{t('evaluate.applyCleanTo')}</span>
+            <span className="eval-scan-mode__seg" role="group" aria-label={t('evaluate.cleanPersistAria')}>
               <button
                 type="button"
                 className={`eval-scan-mode__seg-btn${value === 'once' ? ' eval-scan-mode__seg-btn--on' : ''}`}
@@ -106,7 +100,7 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
                 disabled={disabled}
                 aria-pressed={value === 'once'}
               >
-                this scan only
+                {t('evaluate.thisScanOnly')}
               </button>
               <button
                 type="button"
@@ -114,27 +108,26 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
                 onClick={pickPermanent}
                 disabled={disabled}
                 aria-pressed={value === 'permanent'}
-                title="Clean scan for every run, all projects"
+                title={t('evaluate.alwaysTitle')}
               >
-                always
+                {t('evaluate.always')}
               </button>
             </span>
           </span>
         )}
       </div>
       <div className="eval-scan-mode__grid">
-        <ModeCard id="incremental" checked={!isClean} onPick={pickIncremental} disabled={disabled} title="incremental" tag="recommended">
-          re-analyzes only files changed since the last run and keeps earlier findings for everything else.
+        <ModeCard id="incremental" checked={!isClean} onPick={pickIncremental} disabled={disabled} title={t('evaluate.incremental')} tag={t('evaluate.recommended')}>
+          {t('evaluate.incrementalDesc')}
         </ModeCard>
-        <ModeCard id="clean" checked={isClean} onPick={pickClean} disabled={disabled} title="clean scan" tag="slow">
-          none of the previous findings are used. every file gets re-analyzed from scratch. use it after changing standards or a quodeq version.
+        <ModeCard id="clean" checked={isClean} onPick={pickClean} disabled={disabled} title={t('evaluate.cleanScanTitle')} tag={t('evaluate.slow')}>
+          {t('evaluate.cleanScanDesc')}
         </ModeCard>
       </div>
       {value === 'permanent' && (
         <div className="eval-scan-mode__note">
           <span className="eval-scan-mode__note-glyph" aria-hidden="true">▸</span>
-          every future scan of this repository will discard the cache and re-analyze every file.
-          slower, and it overrides incremental runs triggered from CI.
+          {t('evaluate.permanentNote')}
         </div>
       )}
     </div>

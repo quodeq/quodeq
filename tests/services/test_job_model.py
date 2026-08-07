@@ -207,7 +207,7 @@ class TestSerialization:
             "job_id", "status", "command", "started_at", "ended_at",
             "exit_code", "logs", "output_project", "output_run_id",
             "phase", "deadline_at", "current_dimension", "dimensions",
-            "ai_provider", "ai_model", "time_limit_s",
+            "ai_provider", "ai_model", "time_limit_s", "exit_reason",
         }
         assert set(data.keys()) == expected_keys
 

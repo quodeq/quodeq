@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { applyAssistantAction, rejectAssistantAction } from '../../api/assistant.js';
+import { t } from '../../strings/index.js';
 
 function CardSummary({ actionType, summary }) {
   if (actionType === 'dismiss_finding' || actionType === 'verify_finding') {
@@ -7,7 +8,7 @@ function CardSummary({ actionType, summary }) {
     return (
       <div className="assistant-card-summary">
         <div className="assistant-card-name">
-          {isDismiss ? 'Dismiss finding' : 'Mark finding as verified'}
+          {isDismiss ? t('assistant.dismissFinding') : t('assistant.verifyFinding')}
         </div>
         <div className="assistant-card-meta">
           {summary.req} &middot; {summary.file}:{summary.line}
@@ -20,7 +21,7 @@ function CardSummary({ actionType, summary }) {
     <div className="assistant-card-summary">
       <div className="assistant-card-name">{summary.name}</div>
       <div className="assistant-card-meta">
-        {summary.principleCount} principles &middot; {actionType}
+        {t('assistant.principlesMeta', { count: summary.principleCount, action: actionType })}
       </div>
     </div>
   );
@@ -72,7 +73,7 @@ export function ActionPreviewCard({ action }) {
           onClick={handleApply}
           disabled={disabled}
         >
-          Apply
+          {t('assistant.apply')}
         </button>
         <button
           type="button"
@@ -80,18 +81,18 @@ export function ActionPreviewCard({ action }) {
           onClick={handleReject}
           disabled={disabled}
         >
-          Reject
+          {t('assistant.reject')}
         </button>
       </div>
       {status === 'applied' && (
-        <div className="assistant-card-status assistant-card-status-applied">Applied ✓</div>
+        <div className="assistant-card-status assistant-card-status-applied">{t('assistant.applied')}</div>
       )}
       {status === 'rejected' && (
-        <div className="assistant-card-status assistant-card-status-rejected">Rejected</div>
+        <div className="assistant-card-status assistant-card-status-rejected">{t('assistant.rejected')}</div>
       )}
       {status === 'error' && (
         <div className="assistant-card-status assistant-card-status-error">
-          Something went wrong. Please try again.
+          {t('assistant.somethingWrong')}
         </div>
       )}
     </div>

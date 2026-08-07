@@ -14,7 +14,7 @@ from pathlib import Path
 
 from quodeq.api._run_event_stream import WatcherState, compute_tick
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys, load_dismissed
 

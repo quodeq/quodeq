@@ -19,6 +19,7 @@ import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
 import ServerStatusDot from './ServerStatusDot.jsx';
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 import { TerminalLauncherButton } from './TerminalLauncherButton.jsx';
+import { t } from '../strings/index.js';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
   const ctx = useSidePane();
@@ -128,7 +129,7 @@ export default function TopBar({
           type="button"
           className="topbar-back-btn"
           onClick={onBack}
-          aria-label="Go back"
+          aria-label={t('common.goBack')}
         >
           <BackIcon />
         </button>
@@ -145,7 +146,7 @@ export default function TopBar({
             type="button"
             className="topbar-mobile-project"
             onClick={onSelectProject}
-            title="Open projects"
+            title={t('common.openProjects')}
           >
             {projectName}
           </button>
@@ -171,8 +172,8 @@ export default function TopBar({
             type="button"
             className="topbar-btn topbar-btn--icon topbar-btn--theme"
             onClick={onToggleTheme}
-            aria-label={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={effectiveDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
+            title={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
           >
             {effectiveDark ? <SunIcon /> : <MoonIcon />}
             <span className="topbar-btn__label">{effectiveDark ? 'light' : 'dark'}</span>
@@ -189,7 +190,7 @@ export default function TopBar({
               type="button"
               className="topbar-pill topbar-pill--button"
               onClick={onProviderClick}
-              title="Open Settings to change provider or model"
+              title={t('common.openSettingsForModel')}
             >
               {provider && model
                 ? (
@@ -222,7 +223,7 @@ export default function TopBar({
             type="button"
             className="topbar-run-chip"
             onClick={onEvaluate}
-            title="View running evaluation"
+            title={t('common.viewRunningEvaluation')}
           >
             <span className="topbar-run-chip__dot" aria-hidden="true" />
             <span className="topbar-run-chip__dim">{runProgress?.dimension || 'evaluating…'}</span>
@@ -242,11 +243,11 @@ export default function TopBar({
             className={`topbar-btn topbar-btn--evaluate${evaluating ? ' topbar-btn--evaluate--running' : ''}`}
             onClick={evaluating ? undefined : onEvaluate}
             aria-disabled={evaluating || undefined}
-            title={evaluating ? 'An evaluation is already running' : undefined}
+            title={evaluating ? t('evaluate.alreadyRunningShort') : undefined}
             aria-live="polite"
           >
             <span className="topbar-btn__play" aria-hidden="true">▸</span>
-            <span>Evaluate</span>
+            <span>{t('common.evaluate')}</span>
           </button>
         )}
 
@@ -256,7 +257,7 @@ export default function TopBar({
             type="button"
             className="topbar-menu-btn"
             onClick={onMenuToggle}
-            aria-label="Open menu"
+            aria-label={t('common.openMenu')}
           >
             <BurgerIcon />
           </button>

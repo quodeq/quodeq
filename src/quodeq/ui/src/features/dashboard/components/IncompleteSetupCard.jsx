@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import CloneTargetStep from '../../onboarding/components/steps/CloneTargetStep.jsx';
 import { registerProject } from '../../../api/index.js';
+import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { writeString } from '../../../adapters/storage.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -23,13 +26,11 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
     try {
       const result = await registerProject({ repo: repoUrl, cloneDest, ephemeral });
       if (cloneDest) {
-        try { localStorage.setItem('quodeq.lastCloneRoot', cloneDest); } catch (_) {
-          // ignore (private mode, disabled storage, etc.)
-        }
+        writeString('quodeq.lastCloneRoot', cloneDest);
       }
       onComplete?.(result);
     } catch (err) {
-      setError(err?.message || 'Clone failed');
+      setError(apiErrorMessage(err, 'overview.cloneFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -38,9 +39,9 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
   if (!open) {
     return (
       <div className="incomplete-setup-card">
-        <p>This project was added by URL and has no local copy. Clone it now to enable evaluation.</p>
+        <p>{t('overview.incompleteSetupBody')}</p>
         <button type="button" className="term-btn term-btn--primary" onClick={() => setOpen(true)}>
-          Complete setup
+          {t('overview.completeSetup')}
         </button>
       </div>
     );

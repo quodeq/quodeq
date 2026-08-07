@@ -23,51 +23,19 @@ from pathlib import Path
 from typing import Mapping
 
 from quodeq.config.paths import default_paths
+from quodeq.services.deleted import deleted_keys
+from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
+    _coerce_line,
+    is_deleted,
+    is_dismissed,
+)
 from quodeq.shared.validation import validate_path_segment
+from quodeq.data.fs.suppression_rules import (  # noqa: F401 — re-exported API
+    load_suppression_rules,
+)
 
 _TYPE_VIOLATION = "violation"
-
-
-def _coerce_line(line: object) -> int:
-    try:
-        return int(line)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
-
-
-def is_dismissed(
-    dismissed: frozenset | set, *, req: str | None, principle: str | None = "",
-    file: str | None = "", line: object = 0,
-) -> bool:
-    """True when the dismiss store hides this finding.
-
-    A finding's dismiss identity is its ``req``, falling back to its principle
-    when it has none -- the same ``req || principle`` the UI stores
-    (buildDismissPayload). Every read side must apply the same fallback, or a
-    no-req finding disappears from the counters while its grade never moves.
-
-    For a no-req finding the assistant's draft/apply path records the key with
-    an empty req (``("", file, line)``, see tests/assistant/
-    test_dismiss_apply_e2e.py), and older stores may hold either form -- so
-    both are accepted.
-    """
-    if not dismissed:
-        return False
-    file_key = file or ""
-    line_key = _coerce_line(line)
-    if (req or principle or "", file_key, line_key) in dismissed:
-        return True
-    return not req and ("", file_key, line_key) in dismissed
-
-
-def is_deleted(
-    deleted: frozenset | set, *, dimension: str | None,
-    principle: str | None, file: str | None,
-) -> bool:
-    """True when the delete store hides this finding's whole principle+file."""
-    if not deleted:
-        return False
-    return (dimension or "", principle or "", file or "") in deleted
 
 
 @dataclass(frozen=True)
@@ -77,12 +45,13 @@ class SuppressionMatcher:
     dimension: str
     dismissed: frozenset = frozenset()
     deleted: frozenset = frozenset()
+    rules: tuple = ()
     req_to_principle: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def active(self) -> bool:
         """False when nothing is suppressed -- callers can skip the scan."""
-        return bool(self.dismissed or self.deleted)
+        return bool(self.dismissed or self.deleted or self.rules)
 
     def principle_for(self, raw: str) -> str:
         """Map an evidence ``p`` (req ID or principle name) to a principle name."""
@@ -102,7 +71,7 @@ class SuppressionMatcher:
             return False
         file = row.get("file") or ""
         if is_dismissed(self.dismissed, req=row.get("req"), principle=raw,
-                        file=file, line=row.get("line")):
+                        file=file, line=row.get("line"), rules=self.rules):
             return True
         return is_deleted(self.deleted, dimension=self.dimension,
                           principle=self.principle_for(raw), file=file)
@@ -148,9 +117,6 @@ def project_suppressions(project_dir: Path) -> tuple[frozenset, frozenset]:
     memo keyed on anything coarser than the file contents would freeze the
     counts for the rest of the run.
     """
-    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-
     return frozenset(dismissed_keys(project_dir)), frozenset(deleted_keys(project_dir))
 
 
@@ -160,6 +126,7 @@ def build_matcher(
     deleted: frozenset,
     *,
     evaluators_dir: Path | None = None,
+    rules: tuple = (),
 ) -> SuppressionMatcher:
     """Attach already-loaded key sets to one dimension.
 
@@ -167,13 +134,14 @@ def build_matcher(
     run (the progress reader) pays for the store reads once, not once per
     dimension.
     """
-    if not dismissed and not deleted:
+    if not dismissed and not deleted and not rules:
         # Nothing to map against, so skip the evaluator read entirely.
         return SuppressionMatcher(dimension=dimension)
     return SuppressionMatcher(
         dimension=dimension,
         dismissed=dismissed,
         deleted=deleted,
+        rules=rules,
         req_to_principle=load_req_to_principle(dimension, evaluators_dir),
     )
 
@@ -183,4 +151,5 @@ def matcher_for(
 ) -> SuppressionMatcher:
     """Build the matcher for *dimension* from *project_dir*'s suppression stores."""
     dismissed, deleted = project_suppressions(project_dir)
-    return build_matcher(dimension, dismissed, deleted, evaluators_dir=evaluators_dir)
+    return build_matcher(dimension, dismissed, deleted, evaluators_dir=evaluators_dir,
+                         rules=load_suppression_rules(project_dir))

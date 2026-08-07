@@ -7,6 +7,7 @@ import {
   ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon,
 } from '../../components/CopyButton.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+import { t } from '../../strings/index.js';
 
 // Providers where the web toggle does something: claude flips its native
 // WebSearch/WebFetch; local providers get in-process search_web/fetch_url.
@@ -45,14 +46,14 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
         </span>
       )}
       <div className="assistant-panel-identity">
-        <div className="assistant-panel-title">Assistant</div>
+        <div className="assistant-panel-title">{t('assistant.assistantLabel')}</div>
         <div className="assistant-panel-subtitle">
-          {selectedProject ? `project · ${selectedProject}` : 'no project selected'}
+          {selectedProject ? t('assistant.projectSub', { name: selectedProject }) : t('assistant.noProjectSelected')}
         </div>
       </div>
       {readOnly && (
-        <Badge variant="tag" tone="info" title="Remote project session: read tools only">
-          read-only
+        <Badge variant="tag" tone="info" title={t('assistant.readOnlyTitle')}>
+          {t('assistant.readOnly')}
         </Badge>
       )}
       {/* Repo attachment is the NORMAL case — only the exception is worth a
@@ -61,15 +62,17 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           reason; stay silent when everything is fine. */}
       {repoInfo && !repoInfo.attached && (
         <Badge variant="tag" tone="warning"
-          title={`Repository not attached: ${repoInfo.reason || 'unknown'}`}>
-          no repo access
+          title={t('assistant.repoNotAttached', { reason: repoInfo.reason || t('assistant.unknownReason') })}>
+          {t('assistant.noRepoAccess')}
         </Badge>
       )}
       {workspace?.filesChanged > 0 && (
         <button type="button" className="badge badge--tag badge--danger drawer-changes-chip"
           onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
-          title="Review pending changes">
-          {workspace.filesChanged} file{workspace.filesChanged === 1 ? '' : 's'} changed
+          title={t('assistant.reviewPendingChanges')}>
+          {workspace.filesChanged === 1
+            ? t('assistant.filesChangedOne', { count: workspace.filesChanged })
+            : t('assistant.filesChangedMany', { count: workspace.filesChanged })}
         </button>
       )}
       <div className="assistant-drawer-controls">
@@ -77,7 +80,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
             buttons; status badges stay on the left with the identity. */}
         {modelLabel && (
           <button type="button" className="assistant-model-chip"
-            title={`${modelLabel} — change in Settings`}
+            title={t('assistant.modelChangeHint', { model: modelLabel })}
             onClick={() => {
               // Jump to Settings AND tuck the panel away: the drawer would
               // otherwise cover the provider section the user is heading to.
@@ -90,8 +93,8 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
         )}
         <button type="button" className="assistant-drawer-btn"
           onClick={resetConversation}
-          aria-label="New conversation"
-          title="New conversation (clears the model context)"
+          aria-label={t('assistant.newConversation')}
+          title={t('assistant.newConversationHint')}
           disabled={streaming || !sessionReady}>
           <RotateCcwIcon />
         </button>
@@ -99,8 +102,8 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <button type="button" className="assistant-drawer-btn assistant-drawer-write"
             onClick={toggleWriteEnabled}
             aria-pressed={writeEnabled}
-            aria-label="Allow repository edits for this conversation"
-            title="Allow repository edits for this conversation (isolated worktree, you review before anything lands)"
+            aria-label={t('assistant.allowRepoEdits')}
+            title={t('assistant.allowRepoEditsHint')}
             disabled={streaming}>
             <PencilIcon />
           </button>
@@ -109,14 +112,14 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <button type="button" className="assistant-drawer-btn assistant-drawer-web"
             onClick={toggleWebEnabled}
             aria-pressed={webEnabled}
-            aria-label="Allow web access for this conversation"
-            title="Allow web access for this conversation"
+            aria-label={t('assistant.allowWebAccess')}
+            title={t('assistant.allowWebAccess')}
             disabled={streaming}>
             <GlobeIcon />
           </button>
         )}
         <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-          aria-label={maximized ? 'Restore drawer' : 'Maximize drawer'}
+          aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
           aria-pressed={maximized}
           title={maximized ? 'Restore' : 'Maximize'}>
           {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
@@ -125,7 +128,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
             in-flight assistant turn keeps running server-side; reopening the
             tab reattaches to it. */}
         <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-          aria-label="Hide tab" title="Hide (keeps running in the background)">
+          aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
           <ChevronDownIcon />
         </button>
       </div>

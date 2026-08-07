@@ -25,7 +25,7 @@ from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.services.suppression import build_matcher, project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
-from quodeq.shared.dimensions_state import read_dimensions
+from quodeq.data.fs.dimensions_state_store import read_dimensions
 
 _AGENT_ACTIVE_WINDOW_S = 30
 
@@ -60,6 +60,10 @@ class _ScanProgress:
     # The time limit is one deadline for the whole run, shared across all
     # selected dimensions — never a per-dimension allowance.
     budget_s: int | None = None
+    # Run-level exit_reason from status.json (e.g. "provider_fatal",
+    # "failure_streak"). Lets the UI say WHY a failed run stopped instead of
+    # only that it did.
+    exit_reason: str | None = None
     dimensions: list[_DimProgress] = field(default_factory=list)
 
 
@@ -352,6 +356,7 @@ def build_scan_progress(
             project_files=project_files,
             total_elapsed_s=total_elapsed_s,
             budget_s=run_budget_s,
+            exit_reason=status.get("exit_reason"),
             dimensions=[_consolidated_dim_progress(run_dir)],
         )
 
@@ -372,7 +377,12 @@ def build_scan_progress(
             has_evaluation=eval_path.is_file(),
         )
         record = dim_records.get(dim_id) if isinstance(dim_records, dict) else None
-        exit_reason = record.get("exit_reason") if isinstance(record, dict) else None
+        # DONE dims carry `exit_reason`; INCOMPLETE dims carry `reason`
+        # (e.g. "provider_fatal", "cancelled_signal"). Fall back so an
+        # interrupted dim still tells the UI why it stopped.
+        exit_reason = None
+        if isinstance(record, dict):
+            exit_reason = record.get("exit_reason") or record.get("reason")
 
         if queue is not None:
             # `taken` is a list of batch entries [{"files": [...], "agent": ..., "ts": ...}, ...].
@@ -438,20 +448,6 @@ def build_scan_progress(
         project_files=project_files,
         total_elapsed_s=total_elapsed_s,
         budget_s=run_budget_s,
+        exit_reason=status.get("exit_reason"),
         dimensions=dim_results,
     )
-
-
-def progress_to_dict(progress: _ScanProgress) -> dict:
-    """Serialize the dataclass tree to a camelCase dict for jsonify.
-
-    Uses to_camel_dict so dataclass field names like ``exit_reason`` and
-    ``estimate_reason`` become ``exitReason`` and ``estimateReason`` in the
-    JSON the client sees. The route still wraps the result in to_camel_dict;
-    that second pass is a no-op for already-camelCased dicts.
-    """
-    from quodeq.core.types import to_camel_dict
-    result = to_camel_dict(progress)
-    if not isinstance(result, dict):
-        return {}
-    return result

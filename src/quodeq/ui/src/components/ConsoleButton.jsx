@@ -1,3 +1,4 @@
+import { t } from '../strings/index.js';
 const CONSOLE_ICON = (
   <svg className="console-button__icon" viewBox="0 0 16 16" fill="none"
        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
@@ -19,7 +20,7 @@ const CONSOLE_ICON = (
  *   evaluation card to nudge first-time users.
  */
 export default function ConsoleButton({ open, onToggle, showDot = false }) {
-  const label = open ? 'Hide console' : 'Show console';
+  const label = open ? t('common.hideConsole') : t('common.showConsole');
   return (
     <button
       type="button"
@@ -30,7 +31,7 @@ export default function ConsoleButton({ open, onToggle, showDot = false }) {
       title={label}
     >
       {CONSOLE_ICON}
-      <span className="console-button__label">Console</span>
+      <span className="console-button__label">{t('common.console')}</span>
       {showDot && <span className="console-button__dot" aria-hidden="true" />}
     </button>
   );

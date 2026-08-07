@@ -19,9 +19,10 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import FittedText from '../../../components/FittedText.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
+import { t, LOCALE } from '../../../strings/index.js';
 
 const TOAST_DISMISS_MS = 2600;
-const NOT_READY_MESSAGE = 'No standards fully evaluated yet. Try again once the first one finishes.';
+const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
 // Only outright failures are hidden. Cancelled runs may still have written
 // per-dim evaluation files (the dashboard's overview reads them and shows
@@ -34,9 +35,13 @@ function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
   try {
     const d = new Date(dateISO);
-    // Short month (`Apr 14, 2026`) to match the reference mockup.
-    const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    // Short month, ordered by LOCALE. The mockup this was built from showed
+    // `Apr 14, 2026`, but the call passed `undefined` as the locale, so the
+    // order actually followed the viewer's OS -- US machines matched the
+    // mockup and nobody else did. It now agrees with formatPeriodLabel,
+    // which was already day-first and deterministic everywhere.
+    const date = d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     return { date, time };
   } catch {
     return { date: fallbackLabel || '', time: '' };
@@ -85,7 +90,7 @@ function formatDimSummary(entry) {
     if (Number.isNaN(score)) return label;
     return `${label} ${score.toFixed(1)}`;
   });
-  return `${dims.length} dims · ${parts.join(', ')}`;
+  return `${t('history.dimsCount', { count: dims.length })} · ${parts.join(', ')}`;
 }
 
 function DeltaText({ delta }) {
@@ -99,7 +104,7 @@ function DeltaText({ delta }) {
 function HistoryEmptyShell({ sub, children, refreshing }) {
   return (
     <div className={`history-page history-page--terminal${refreshing ? ' dashboard-refreshing' : ''}`}>
-      <TermHeader name="history" sub={sub} />
+      <TermHeader name={t('history.termName')} sub={sub} />
       {children}
     </div>
   );
@@ -198,8 +203,8 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
               <button
                 type="button"
                 className="history-row__delete"
-                aria-label="Delete run"
-                title="Delete run"
+                aria-label={t('history.deleteRunTitle')}
+                title={t('history.deleteRunTitle')}
                 onClick={handleDeleteClick}
               >
                 ×
@@ -227,7 +232,7 @@ function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
   const { date } = formatDateParts(new Date().toISOString());
   const liveText = liveCount === 0 ? '' : formatLiveDimSummary(liveDims, plannedDimensions);
   const dimsCell = liveCount === 0
-    ? <span className="history-row__muted">performing an evaluation...</span>
+    ? <span className="history-row__muted">{t('history.performingEvaluation')}</span>
     : (
       <span className="history-row__muted">
         <FittedText text={liveText} mode="end" />
@@ -243,7 +248,7 @@ function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
         time: (
           <span className="history-row__running">
             <span className="history-row__running-dot" aria-hidden="true" />
-            running
+            {t('status.running')}
           </span>
         ),
         grade: <span className="history-row__muted">—</span>,
@@ -259,7 +264,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
   return (
     <section className="history-evaluations panel">
       <div className="history-evaluations__header">
-        <span className="term-section-label__text">EVALUATIONS</span>
+        <span className="term-section-label__text">{t('history.evaluationsHeader')}</span>
       </div>
       {/* Row-to-row movement resets the dwell timer inside usePrefetchRun;
           leaving the table entirely must drop the pending prefetch too. */}
@@ -267,12 +272,12 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
         <HistoryRow
           className="history-row--header"
           cells={{
-            date: 'DATE',
-            time: 'TIME',
-            grade: 'GRADE',
-            score: 'SCORE',
-            delta: 'Δ',
-            dims: 'DIMENSIONS CHANGED',
+            date: t('history.colDate'),
+            time: t('history.colTime'),
+            grade: t('history.colGrade'),
+            score: t('history.colScore'),
+            delta: t('history.colDelta'),
+            dims: t('history.colDims'),
           }}
         />
         {visible.map((entry, i) => {
@@ -308,9 +313,9 @@ function EvaluationsTable({ visible, selectedRunId, deltas, statusByRunId, onRun
                     {isPartial && (
                       <span
                         className="chip small history-row__partial-chip"
-                        title="Run cancelled. Some dimensions completed; re-run to finish the rest."
+                        title={t('history.partialTitle')}
                       >
-                        partial
+                        {t('history.partialChip')}
                       </span>
                     )}
                   </>
@@ -362,8 +367,8 @@ function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, 
     <div className={`history-page history-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <div className="history-page__top">
         <TermHeader
-          name="history"
-          sub={`${trend.length} eval${trend.length !== 1 ? 's' : ''}${languageSub ? ` · ${languageSub}` : ''}`}
+          name={t('history.termName')}
+          sub={`${trend.length === 1 ? t('history.evalsCountOne', { count: trend.length }) : t('history.evalsCountMany', { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
           badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
         />
         {availableRuns && availableRuns.length > 0 && (
@@ -432,10 +437,10 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     if (selectedSource !== 'local') return;
     const label = dateLabel || runId;
     const ok = await confirmDialog({
-      title: 'Delete run?',
-      message: `Remove the run "${label}" from history. This cannot be undone.`,
-      confirmLabel: 'Delete',
-      cancelLabel: 'Keep',
+      title: t('history.deleteRunConfirmTitle'),
+      message: t('history.deleteRunConfirmMsg', { label }),
+      confirmLabel: t('violations.delete'),
+      cancelLabel: t('history.keep'),
       variant: 'danger',
     });
     if (!ok) return;
@@ -443,7 +448,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     try {
       await deleteEvaluation(jobId);
     } catch (err) {
-      alert(`Failed to delete run: ${err.message || 'unknown error'}`);
+      alert(t('history.deleteRunFailed', { message: err.message || t('history.unknownError') }));
       return;
     }
     onRunDeleted?.(runId);
@@ -461,7 +466,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     if (entry?.dateISO) {
       try {
         const d = new Date(entry.dateISO);
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
       } catch { return entry.dateISO || ''; }
     }
     return entry?.dateLabel || currentOverviewRun;
@@ -482,11 +487,11 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   // so a shared selection falls through to the normal shared data flow below.
   if (projects.length === 0 && selectedSource !== 'shared') {
     return (
-      <HistoryEmptyShell sub="no projects yet">
+      <HistoryEmptyShell sub={t('violations.subNoProjects')}>
         <EmptyState
-          title="No projects yet"
-          description="Add a project to start analyzing code quality."
-          actionLabel="Add a project"
+          title={t('overview.noProjectsTitle')}
+          description={t('overview.noProjectsDesc')}
+          actionLabel={t('overview.addProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </HistoryEmptyShell>
@@ -494,11 +499,11 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   }
   if (!selectedProject) {
     return (
-      <HistoryEmptyShell sub="no project selected">
+      <HistoryEmptyShell sub={t('violations.subNoProjectSelected')}>
         <EmptyState
-          title="No project selected"
-          description="Pick a project to view its history."
-          actionLabel="Choose project"
+          title={t('overview.noProjectSelectedTitle')}
+          description={t('history.noProjectSelectedDesc')}
+          actionLabel={t('overview.chooseProject')}
           onAction={() => onNavigate?.('projects')}
         />
       </HistoryEmptyShell>
@@ -512,7 +517,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   if (visibleHistoryRows(availableRuns, trend).length === 0) {
     if (loading) {
       return (
-        <HistoryEmptyShell sub="loading…">
+        <HistoryEmptyShell sub={t('overview.loading')}>
           <LoadingScreen variant="inline" />
         </HistoryEmptyShell>
       );
@@ -525,17 +530,17 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     if (error) {
       if (isFetching) {
         return (
-          <HistoryEmptyShell sub="loading…">
+          <HistoryEmptyShell sub={t('overview.loading')}>
             <LoadingScreen variant="inline" />
           </HistoryEmptyShell>
         );
       }
       return (
-        <HistoryEmptyShell sub="error">
+        <HistoryEmptyShell sub={t('violations.subError')}>
           <EmptyState
-            title="Couldn't load this project"
+            title={t('overview.loadProjectFailedTitle')}
             description={error}
-            actionLabel="Retry"
+            actionLabel={t('overview.retry')}
             onAction={() => onRetry?.()}
           />
         </HistoryEmptyShell>
@@ -547,21 +552,21 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     // precedent this mirrors).
     if (selectedSource === 'shared') {
       return (
-        <HistoryEmptyShell sub="no evaluations yet" refreshing={isRefreshing}>
+        <HistoryEmptyShell sub={t('violations.subNoEvals')} refreshing={isRefreshing}>
           <EmptyState
-            title="No completed evaluation yet"
-            description="no completed evaluation in this remote project yet"
+            title={t('overview.noCompletedEvalTitle')}
+            description={t('overview.noCompletedEvalSharedDesc')}
           />
         </HistoryEmptyShell>
       );
     }
     const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
     return (
-      <HistoryEmptyShell sub="no evaluations yet" refreshing={isRefreshing}>
+      <HistoryEmptyShell sub={t('violations.subNoEvals')} refreshing={isRefreshing}>
         <EmptyState
-          title="No evaluations yet"
-          description={`Run an evaluation for ${projectName} to populate this page.`}
-          actionLabel="Start evaluation"
+          title={t('overview.noEvalsTitle')}
+          description={t('overview.noEvalsDesc', { name: projectName })}
+          actionLabel={t('overview.startEvaluation')}
           onAction={() => onNavigate?.('evaluate')}
         />
       </HistoryEmptyShell>

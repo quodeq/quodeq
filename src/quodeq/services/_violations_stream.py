@@ -7,8 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from quodeq.core.types import Finding, ViolationResponse
-from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
-from quodeq.analysis.stream.counters import extract_files_from_event
+from quodeq.core.stream.events import TEXT_EXTRACTORS, extract_files_from_event
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.violations_parsing import (
     _build_finding_entry,

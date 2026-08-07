@@ -1,6 +1,7 @@
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
 import useAssistantProvider from '../features/settings/hooks/useAssistantProvider.js';
 import { QMarkIcon } from './QMarkIcon.jsx';
+import { t } from '../strings/index.js';
 
 export function AssistantLauncherButton() {
   const { openPanels, toggleTopbar } = useAssistantDrawer();
@@ -18,15 +19,15 @@ export function AssistantLauncherButton() {
       type="button"
       className={`topbar-btn topbar-btn--icon topbar-btn--assistant${on ? ' topbar-btn--assistant--open' : ''}`}
       aria-pressed={on}
-      aria-label="Assistant (Ctrl+`)"
-      title="Assistant (Ctrl+`)"
+      aria-label={t('common.assistantShortcut')}
+      title={t('common.assistantShortcut')}
       onClick={() => toggleTopbar('assistant')}
     >
       {/* 11px, not the 12px of the stroke icons: the Q fills its tight
           viewBox edge-to-edge while stroke icons carry built-in padding, so
           equal pixel sizes read visually larger. */}
       <QMarkIcon size={11} />
-      <span className="topbar-btn__label">assistant</span>
+      <span className="topbar-btn__label">{t('common.assistant')}</span>
     </button>
   );
 }

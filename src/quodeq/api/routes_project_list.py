@@ -11,13 +11,14 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
+from quodeq.core.types import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
 from quodeq.services._fs_clone import CloneError
 from quodeq.services._fs_scan import scan_project
 from quodeq.services.base import ActionProvider
-from quodeq.shared.validation import validate_path_segment, validate_relative_scope
+from quodeq.shared.validation import contained_path, validate_path_segment, validate_relative_scope
 
 _logger = logging.getLogger(__name__)
 
@@ -136,7 +137,10 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             projects = projects[offset:]
         if limit > 0:
             projects = projects[:limit]
-        return jsonify({**result, "projects": projects})
+        # Serialize at the boundary: providers hand back ProjectEntry
+        # entities (or already-serialized dicts from remote providers).
+        wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
+        return jsonify({**result, "projects": wire})
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
@@ -289,7 +293,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
         ``ephemeral`` are ignored.
         """
-        from quodeq.services.evaluation_mixin import _register_project
+        from quodeq.services.project_registration import register_project
         from quodeq.shared.utils import is_repo_url
 
         data = request.get_json(silent=True) or {}
@@ -325,10 +329,14 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                 )
                 return jsonify(body), status
             if not ephemeral and clone_dest:
-                dest_path = Path(clone_dest)
-                home = Path.home().resolve()
                 try:
-                    dest_resolved = dest_path.resolve()
+                    # Containment and the directory check both live in the try
+                    # so every rejection exits here. Falling through past a
+                    # failed containment check on a sentinel would leave the
+                    # unguarded value live on one path.
+                    dest = contained_path(clone_dest, Path.home())
+                    if not os.path.isdir(dest):
+                        raise ValueError("cloneDest is not an existing directory")
                 except OSError:
                     body, status = error_response(
                         "Invalid cloneDest path",
@@ -336,13 +344,17 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                         "INVALID_CLONE_DEST",
                     )
                     return jsonify(body), status
-                if not dest_resolved.is_dir() or not dest_resolved.is_relative_to(home):
+                except ValueError:
                     body, status = error_response(
                         "cloneDest must be an existing directory under your home folder",
                         HTTPStatus.BAD_REQUEST,
                         "INVALID_CLONE_DEST",
                     )
                     return jsonify(body), status
+                # Hand the *contained* path to the cloner. The previous code
+                # resolved into a local and then passed the raw request string
+                # on, so the check guarded a value nothing downstream used.
+                clone_dest = dest
         else:
             # For local repos, fail fast if the path doesn't exist — registering
             # a project for a missing directory would leave an orphan UUID dir
@@ -382,7 +394,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         )
 
         try:
-            project_uuid = _register_project(
+            project_uuid = register_project(
                 repo,
                 discipline,
                 reports_root,
@@ -427,7 +439,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         # list as soon as it closes).
         provider.invalidate_projects_cache()
 
-        # scan.json is now always present after _register_project succeeds.
+        # scan.json is now always present after register_project succeeds.
         scan_path = Path(reports_root) / project_uuid / "scan.json"
         try:
             scan_data = json.loads(scan_path.read_text(encoding="utf-8"))

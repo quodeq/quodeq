@@ -16,11 +16,12 @@ from pathlib import Path
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
-from quodeq.core.standards.refs import load_compiled_refs as _load_compiled_refs
+from quodeq.data.fs.standards_loader import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
-from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
-from quodeq.core.standards.overrides import load_project_overrides
+from quodeq.context.trust_model import resolve_trust_model
+from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
+from quodeq.data.fs.standards_prefs import load_project_overrides
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
@@ -43,6 +44,7 @@ def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
                 req_to_dim[req_id] = dim
 
     project_shape = detect_shape(work_dir) if work_dir is not None else None
+    trust_model = resolve_trust_model(work_dir) if work_dir is not None else None
 
     return CompiledContext(
         compiled_refs=compiled_refs or {},
@@ -51,6 +53,7 @@ def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
         dimension=sa.dimension,
         work_dir=work_dir,
         project_shape=project_shape,
+        trust_model=trust_model,
     )
 
 
@@ -113,7 +116,7 @@ def _build_router(
     project_dir = run_dir.parent
     ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
     ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
-    from quodeq.core.events.writer import EventLogWriter  # noqa: PLC0415
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 
     cache_writer = None

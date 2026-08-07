@@ -56,11 +56,13 @@ def test_list_projects_returns_latest_run(tmp_path: Path) -> None:
     result = provider.list_projects(str(reports))
 
     assert result["projects"], "expected projects to be listed"
+    # The provider hands back ProjectEntry entities; the route serializes
+    # them to the camelCase wire shape (WS6 boundary).
     project = result["projects"][0]
-    assert project["name"] == "proj"
-    assert project["runsCount"] == 2
-    assert project["latestRunId"] == "20260102"
-    assert project["latestDate"] == "2026-01-02"
+    assert project.name == "proj"
+    assert project.runs_count == 2
+    assert project.latest_run_id == "20260102"
+    assert project.latest_date == "2026-01-02"
 
 
 def test_get_dimension_eval_from_json(tmp_path: Path) -> None:

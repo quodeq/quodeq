@@ -1,3 +1,4 @@
+import { t } from '../../strings/index.js';
 const W = 220;
 const H = 130;
 const PAD_L = 26;
@@ -26,7 +27,7 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
   const ceilPath = pathFor(ceiling);
   const zone = `${ceilPath} L ${basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label="Score curves">
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label={t('gradeFormula.scoreCurves')}>
       {thresholds.map(([t]) => (
         <line
           key={t}
@@ -61,7 +62,7 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
         fill="var(--color-text-muted)"
         textAnchor="middle"
       >
-        violations
+        {t('gradeFormula.violationsAxis')}
       </text>
     </svg>
   );

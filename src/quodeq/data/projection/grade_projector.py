@@ -14,10 +14,12 @@ from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
+from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.sqlite._row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
-from quodeq.services.scoring.projector_scoring import (
+from quodeq.core.scoring.projector_scoring import (
+    GRADE_ALGO_VERSION,
     compute_dimension_score,
     compute_principle_grade,
 )
@@ -129,15 +131,14 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     When *params* is None, the saved grade-formula params are loaded.
     """
     if params is None:
-        from quodeq.services import grade_formula  # noqa: PLC0415
-        params = grade_formula.load_params()
+        params = load_params()
     principle_rows, dimension_rows = compute_run_grades(run_dir, params)
 
     # Carry the per-dim exit_reason (failure_streak, time_limit, ...) from the
     # authoritative dim-state file so the grade layer can flag/exclude
     # interrupted dimensions. Match case-insensitively: findings carry the
     # dimension label, dimensions.json carries the dimension id.
-    from quodeq.shared.dimensions_state import read_dimensions  # noqa: PLC0415
+    from quodeq.data.fs.dimensions_state_store import read_dimensions  # noqa: PLC0415
     dim_states = read_dimensions(run_dir).get("dimensions", {})
     if not isinstance(dim_states, dict):
         dim_states = {}
@@ -151,3 +152,6 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
 
     store = SQLiteStateStore(run_dir)
     store.batch_rewrite_grades(principle_rows, dimension_rows)
+    # Stamp the math these tables now embody, so ensure_projected can tell a
+    # run graded with older scoring apart from one that is merely unchanged.
+    store.save_grades_algo_version(GRADE_ALGO_VERSION)

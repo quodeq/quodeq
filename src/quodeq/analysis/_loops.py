@@ -13,13 +13,13 @@ from pathlib import Path
 from quodeq.analysis._drop_stats import report_run_drop_stats
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
-from quodeq.analysis.errors import EvaluationError
+from quodeq.analysis.errors import EvaluationError, FatalProviderError
 from quodeq.core.evidence.model import Evidence
-from quodeq.engine._runner_markers import emit_marker
+from quodeq.analysis._runner_markers import emit_marker
 # NOTE: logging in inner layer - tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared import cancellation
-from quodeq.shared.dimensions_state import DimState, write_dim_state, IllegalDimTransitionError
+from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
 
 
 def _safe_write_dim_state(
@@ -78,15 +78,82 @@ def _run_dir_for(config: RunConfig) -> Path | None:
 def _interruption_reason(exc: BaseException | None = None) -> str:
     """Map a process state and optional exception to a dim-state reason.
 
+    - Fatal provider error (quota/auth/billing): 'provider_fatal'.
     - Circuit-breaker trip: returns 'circuit_breaker' (recognised so the
       lifecycle exit handler can map to exit_reason=failure_streak).
-    - Cancellation flag set (signal or breaker-via-flag): 'cancelled_signal'.
+    - Cancellation flag set: the recorded cancel cause ('provider_fatal',
+      'agent_failure_streak') when there is one, else 'cancelled_signal'.
     - Otherwise: 'failed_exception'.
     """
     from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    if isinstance(exc, FatalProviderError):
+        return "provider_fatal"
     if isinstance(exc, CircuitBreakerError):
         return "circuit_breaker"
-    return "cancelled_signal" if cancellation.is_cancelled() else "failed_exception"
+    if cancellation.is_cancelled():
+        reason = cancellation.cancel_reason() or ""
+        if reason.startswith("provider_fatal"):
+            return "provider_fatal"
+        if reason == "agent_failure_streak":
+            return "agent_failure_streak"
+        return "cancelled_signal"
+    return "failed_exception"
+
+
+def _count_ok_files(run_dir: Path | None) -> int:
+    """Files successfully analysed by THIS run's workers, across all dims.
+
+    ``ok`` file_done markers are written only by dispatch workers; cache
+    replays write findings without markers. So this count measures fresh
+    progress this run made, never carried-forward data.
+    """
+    if run_dir is None:
+        return 0
+    evidence_dir = Path(run_dir) / "evidence"
+    if not evidence_dir.is_dir():
+        return 0
+    total = 0
+    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
+        ok, _err = _tally_markers(jsonl)
+        total += ok
+    return total
+
+
+def _raise_on_fatal_cancel(run_dir: Path | None) -> None:
+    """Fail the run loudly when a dead provider stopped it before ANY analysis.
+
+    Two outcomes, keyed on whether this run already analysed files
+    successfully (``ok`` markers, see ``_count_ok_files``):
+
+    - No successful analysis: the run is worthless. Raise so the lifecycle
+      maps it to a failed run with a distinct exit_reason, instead of DONE
+      with silently incomplete dimensions.
+    - Partial success (e.g. quota died halfway): the data is worth keeping.
+      Return without raising so the run finalizes as done; the CLI hook
+      (``_record_provider_fatal_if_cancelled``) stamps the exit_reason so
+      the UI says "stopped early, results are partial" rather than showing
+      a clean completion.
+    """
+    reason = cancellation.cancel_reason() or ""
+    is_provider_fatal = reason.startswith("provider_fatal")
+    is_streak = reason == "agent_failure_streak"
+    if not (is_provider_fatal or is_streak):
+        return
+    ok_files = _count_ok_files(run_dir)
+    if ok_files > 0:
+        log_warning(
+            f"[loop] provider failed mid-run after {ok_files} file(s) were "
+            f"analysed -- keeping partial results, run finalizes as done "
+            f"with a stopped-early warning"
+        )
+        return
+    if is_provider_fatal:
+        raise FatalProviderError(
+            f"evaluation aborted: {reason.partition(':')[2].strip() or 'fatal provider error'}",
+            reason="provider_fatal",
+        )
+    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    raise CircuitBreakerError("agent_failure_streak")
 
 
 def _silence_broken_stdout() -> None:
@@ -264,20 +331,30 @@ def run_incremental_loop(
             last_exc = exc
             ev = None
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}, falling back to full")
             last_exc = exc
-            fallback_options = copy(config.options)
-            fallback_options.incremental_file_filter = None
-            fallback_config = replace(config, options=fallback_options)
-            try:
-                ev = runner.run(fallback_config, dimension, idx, ctx, emit_log=True)
-            except BrokenPipeError as inner_exc:
-                _silence_broken_stdout()
-                last_exc = inner_exc
+            if cancellation.is_cancelled():
+                # The run is being torn down (signal, breaker, fatal provider
+                # error): a full-scan fallback would only spawn agents that
+                # die immediately against the same dead provider.
+                log_warning(
+                    f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}; "
+                    f"run cancelled, skipping full-scan fallback",
+                )
                 ev = None
-            except Exception as inner_exc:  # noqa: BLE001
-                last_exc = inner_exc
-                ev = None
+            else:
+                log_warning(f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}, falling back to full")
+                fallback_options = copy(config.options)
+                fallback_options.incremental_file_filter = None
+                fallback_config = replace(config, options=fallback_options)
+                try:
+                    ev = runner.run(fallback_config, dimension, idx, ctx, emit_log=True)
+                except BrokenPipeError as inner_exc:
+                    _silence_broken_stdout()
+                    last_exc = inner_exc
+                    ev = None
+                except Exception as inner_exc:  # noqa: BLE001
+                    last_exc = inner_exc
+                    ev = None
         except Exception as exc:  # noqa: BLE001
             # Loop-level diagnostic: an unanticipated exception class would
             # otherwise propagate up silently and the lifecycle would treat
@@ -342,6 +419,7 @@ def run_incremental_loop(
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
     report_run_drop_stats()
+    _raise_on_fatal_cancel(_run_dir_for(config))
     check_zero_findings(
         result, config.source_file_count,
         incremental_filter_active=config.options.incremental_file_filter is not None
@@ -455,6 +533,7 @@ def run_per_dimension_loop(
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
     report_run_drop_stats()
+    _raise_on_fatal_cancel(_run_dir_for(config))
     check_zero_findings(
         result, config.source_file_count, skipped_count,
         incremental_filter_active=config.options.incremental_file_filter is not None

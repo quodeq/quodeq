@@ -28,6 +28,8 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.context.trust_model import resolve_trust_model
+from quodeq.shared import cancellation
 from quodeq.shared.utils import get_ai_cmd
 
 
@@ -408,18 +410,29 @@ def _run_api_analysis_bridge(
     if source_files is None:
         return
 
-    from quodeq.core.standards.overrides import load_project_overrides  # noqa: PLC0415
+    from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
 
     overrides = load_project_overrides(work_dir)
     standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension, overrides=overrides)
+    # Resolved once per dimension, not per batch: same declared-then-detected
+    # trust model the finding sink applies (quodeq.context.trust_model),
+    # briefed here so the model generates fewer out-of-scope findings for the
+    # sink to have to claw back.
+    trust_model = resolve_trust_model(work_dir)
 
     for batch in _batch_files_by_size(source_files, _api_prompt_char_budget()):
+        # A cancelled run (signal, breaker, fatal provider error) must not
+        # keep burning model calls on the remaining batches.
+        if cancellation.is_cancelled():
+            _log.info("Cancellation requested -- stopping API batch dispatch")
+            break
         api_prompt = assemble_api_prompt(
             source_files=batch,
             standards_text=standards_text,
             dimension=cfg.dimension or "general",
             repo_name=str(work_dir.name),
             repo_root=work_dir,
+            trust_model=trust_model,
         )
 
         # POSIX-style separators: paths flow into findings (file fields,
@@ -435,6 +448,13 @@ def _run_api_analysis_bridge(
                 api_base=api_base,
                 api_key=api_key,
                 context_size=cfg.context_size,
+                n_subagents=max(
+                    1,
+                    getattr(
+                        getattr(cfg.run_config, "options", None),
+                        "max_subagents", 1,
+                    ),
+                ),
             ),
             compiled_dir=cfg.compiled_dir,
             dimension=cfg.dimension,

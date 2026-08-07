@@ -69,6 +69,12 @@ class Judgment(BaseModel):
     # finding from critical to major. UI/DB-visible audit marker (#656); the
     # severity flip already drives the grade, this just makes it auditable.
     provenance_downgrade: bool = False
+    # Set (dict: {"rule", "from", "to"}) when the deterministic scope gate
+    # capped this finding's severity from major to minor per the declared
+    # trust model. None when not gated. A dict, not a bool, because the
+    # marker's whole purpose is naming WHICH rule waived the finding so it
+    # can be recovered later, not just that something did.
+    scope_downgrade: Optional[Dict[str, str]] = None
     # True when this finding was replayed from the content-addressed cache
     # rather than produced by the running scan. Lets the live evaluation
     # feed show only what this scan is actually finding (the rest of the

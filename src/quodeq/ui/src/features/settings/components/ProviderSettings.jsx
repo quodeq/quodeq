@@ -1,51 +1,41 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
+import { t } from '../../../strings/index.js';
+import { tRich } from '../../../strings/rich.jsx';
 
 const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 60;
 const DEFAULT_TIME_LIMIT_MINUTES = Math.max(MIN_MINUTES, Math.round(DEFAULT_TIME_LIMIT_S / SECONDS_PER_MINUTE));
 
-const TIME_LIMIT_HINT_BASE = (
-  <>
-    Most of the token usage happens during the analysis phase, so this is your main way to keep a run short. Whatever finished in time still shows up in your results, and the next evaluation picks up from where this one stopped instead of starting over.
-  </>
-);
-
-const TIME_LIMIT_HINT_CLOUD = (
-  <>
-    Heads up: a cloud evaluation runs against your own provider plan. The longer it runs, the more tokens you&apos;ll use. On a long codebase that can add up fast, so keep an eye on your usage and start with a tighter limit if you&apos;re not sure.
-  </>
-);
-
 export const SUBAGENTS_HINT_REMOTE = (
   <>
-    <p>Quodeq splits an evaluation into separate checks (one for each quality dimension) and runs them at the same time. More subagents means a faster run, but it also means more requests in flight.</p>
-    <p>Your AI provider sets its own concurrency limits, so the number you pick here is the most Quodeq will try to run at once. The provider may queue or throttle some of them.</p>
+    <p>{t('settings.subagentsHintRemoteP1')}</p>
+    <p>{t('settings.subagentsHintRemoteP2')}</p>
   </>
 );
 
 export const SUBAGENTS_HINT_OLLAMA = (
   <>
-    <p>Quodeq splits an evaluation into separate checks (one for each quality dimension) and runs them at the same time. More subagents means a faster run, but it also uses more memory at once.</p>
-    <p>Your VRAM sets the real ceiling here. Use Auto-detect to let Quodeq pick a safe default, or run a quick test to see what your hardware can comfortably handle.</p>
+    <p>{t('settings.subagentsHintOllamaP1')}</p>
+    <p>{t('settings.subagentsHintOllamaP2')}</p>
   </>
 );
 
 const ANALYSIS_MODE_HINT = (
   <>
-    <p>Two ways to look at your code:</p>
-    <p><strong>Per-dimension</strong> runs a separate analysis for each quality area (security, maintainability, and so on). It uses more API calls and takes longer, but each dimension gets its own focused look.</p>
-    <p><strong>Grouped</strong> runs one consolidated pass that covers every dimension in a single AI call. It&apos;s faster and cheaper, but findings tend to be less detailed since the model is juggling every area at once.</p>
+    <p>{t('settings.analysisModeHintIntro')}</p>
+    <p><strong>{t('settings.analysisModeHintPerDimTerm')}</strong> {t('settings.analysisModeHintPerDimBody')}</p>
+    <p><strong>{t('settings.analysisModeHintGroupedTerm')}</strong> {t('settings.analysisModeHintGroupedBody')}</p>
   </>
 );
 
 const VERIFY_HINT = (
   <>
-    <p>When you re-run an evaluation, Quodeq can check whether findings from earlier runs still apply.</p>
-    <p><strong>On:</strong> findings in files you haven&apos;t touched are kept as is. Findings in files that changed are sent to a quick AI check against your current code, so confirmed ones carry forward and stale ones get dropped automatically.</p>
-    <p><strong>Off:</strong> every run starts fresh. Previous findings are ignored, so you&apos;ll only see what the current run discovers. Faster, but you lose the history between runs.</p>
+    <p>{t('settings.verifyHintIntro')}</p>
+    <p><strong>{t('settings.verifyHintOnTerm')}</strong> {t('settings.verifyHintOnBody')}</p>
+    <p><strong>{t('settings.verifyHintOffTerm')}</strong> {t('settings.verifyHintOffBody')}</p>
   </>
 );
 
@@ -71,18 +61,18 @@ export function TimeLimitSetting({ state, update, providerType }) {
     <div className="settings-row">
       <div className="settings-row-label">
         <span className="settings-label-row">
-          <span className="settings-label">Evaluation time limit</span>
-          <HelpHint label="Time limit help">
-            <p>{TIME_LIMIT_HINT_BASE}</p>
-            {providerType === 'cloud-api' && <p>{TIME_LIMIT_HINT_CLOUD}</p>}
+          <span className="settings-label">{t('settings.timeLimitLabel')}</span>
+          <HelpHint label={t('settings.timeLimitHelpAria')}>
+            <p>{t('settings.timeLimitHintBase')}</p>
+            {providerType === 'cloud-api' && <p>{t('settings.timeLimitHintCloud')}</p>}
           </HelpHint>
         </span>
-        <span className="settings-description">Stop the evaluation after this long. You&apos;ll still see whatever finished in time, and the next run continues from there.</span>
+        <span className="settings-description">{t('settings.timeLimitDesc')}</span>
       </div>
       <div className="settings-budget-control">
         <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', '0')} aria-pressed={unlimited}>Unlimited</button>
-          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', String(DEFAULT_TIME_LIMIT_S))} aria-pressed={!unlimited}>Limited</button>
+          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', '0')} aria-pressed={unlimited}>{t('settings.unlimited')}</button>
+          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', String(DEFAULT_TIME_LIMIT_S))} aria-pressed={!unlimited}>{t('settings.limited')}</button>
         </div>
         <input
           type="number"
@@ -90,7 +80,7 @@ export function TimeLimitSetting({ state, update, providerType }) {
           min={MIN_MINUTES}
           max={MAX_MINUTES}
           value={unlimited ? '' : draft}
-          placeholder={unlimited ? '\u221E' : 'min'}
+          placeholder={unlimited ? '\u221E' : t('settings.timeLimitMinPlaceholder')}
           disabled={unlimited}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={(e) => commit(e.target.value)}
@@ -109,28 +99,28 @@ export function AdvancedAnalysisSettings({ state, update }) {
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Analysis mode</span>
-            <HelpHint label="Analysis mode help">{ANALYSIS_MODE_HINT}</HelpHint>
+            <span className="settings-label">{t('settings.analysisMode')}</span>
+            <HelpHint label={t('settings.analysisModeHelpAria')}>{ANALYSIS_MODE_HINT}</HelpHint>
           </span>
-          <span className="settings-description">Per-dimension is deeper, Grouped is faster.</span>
+          <span className="settings-description">{t('settings.analysisModeDesc')}</span>
         </div>
         <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>Per-dimension</button>
-          <button type="button" className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>Grouped</button>
+          <button type="button" className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>{t('settings.perDimension')}</button>
+          <button type="button" className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>{t('settings.grouped')}</button>
         </div>
       </div>
 
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
-            <span className="settings-label">Verify findings</span>
-            <HelpHint label="Verify findings help">{VERIFY_HINT}</HelpHint>
+            <span className="settings-label">{t('settings.verifyFindings')}</span>
+            <HelpHint label={t('settings.verifyHelpAria')}>{VERIFY_HINT}</HelpHint>
           </span>
-          <span className="settings-description">Recheck findings from earlier runs against your current code.</span>
+          <span className="settings-description">{t('settings.verifyFindingsDesc')}</span>
         </div>
         <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>On</button>
-          <button type="button" className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>Off</button>
+          <button type="button" className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>{t('settings.on')}</button>
+          <button type="button" className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>{t('settings.off')}</button>
         </div>
       </div>
     </>

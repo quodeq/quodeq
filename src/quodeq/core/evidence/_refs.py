@@ -26,14 +26,6 @@ def _cwe_url_template(env: dict[str, str] | None = None) -> str:
     )
 
 
-def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
-    """Return {req_id: [{label, url}, ...]} for all refs of each requirement.
-
-    Delegates to _ref_utils.load_compiled_refs for the heavy lifting.
-    """
-    return load_compiled_refs(str(compiled_dir), dimension)
-
-
 def resolve_llm_refs(
     llm_refs: list[str] | None,
     all_req_refs: list[dict] | None,
@@ -88,7 +80,7 @@ def enrich_judgment(
     all_req_refs = None
     if compiled_dir and j.req and j.dimension:
         if j.dimension not in req_refs_cache:
-            req_refs_cache[j.dimension] = build_req_refs_lookup(compiled_dir, j.dimension)
+            req_refs_cache[j.dimension] = load_compiled_refs(str(compiled_dir), j.dimension)
         all_req_refs = req_refs_cache[j.dimension].get(j.req)
     resolved = resolve_llm_refs(llm_refs, all_req_refs)
     if not resolved:

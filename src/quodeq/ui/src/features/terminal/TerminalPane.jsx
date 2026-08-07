@@ -4,6 +4,7 @@ import { useTerminalSessions } from './useTerminalSessions.js';
 import TerminalSessionView from './TerminalSessionView.jsx';
 import TerminalHeader from './TerminalHeader.jsx';
 import { LockIcon, PlusIcon, XIcon } from '../../components/CopyButton.jsx';
+import { t } from '../../strings/index.js';
 
 /**
  * The terminal panel: header, session tab strip, one TerminalSessionView per
@@ -25,7 +26,7 @@ export default function TerminalPane({ active }) {
       setReason(s.enabled ? null : s.reason);
       setShell(s.shell || '');
       setChecked(true);
-    }).catch(() => { if (alive) { setReason('Terminal unavailable'); setChecked(true); } });
+    }).catch(() => { if (alive) { setReason(t('terminal.unavailable')); setChecked(true); } });
     return () => { alive = false; };
   }, []);
 
@@ -75,7 +76,7 @@ export default function TerminalPane({ active }) {
     <div className="tty-shell">
       <TerminalHeader onCopy={handleCopy} onNewSession={showTabs ? null : openSession} />
       {showTabs && (
-        <div className="tty-tabs" role="tablist" aria-label="Terminal sessions">
+        <div className="tty-tabs" role="tablist" aria-label={t('terminal.sessions')}>
           {sessions.map((s) => (
             <div key={s.id} role="tab" aria-selected={s.id === activeId} tabIndex={0}
               className={`tty-tab${s.id === activeId ? ' tty-tab--active' : ''}`}
@@ -84,7 +85,7 @@ export default function TerminalPane({ active }) {
               <span className="tty-tab-dot" aria-hidden="true" />
               <span className="tty-tab-name">{s.name}</span>
               <button type="button" className="tty-tab-close"
-                aria-label={`Close ${s.name}`} title="Close session"
+                aria-label={`Close ${s.name}`} title={t('terminal.closeSession')}
                 onClick={(e) => { e.stopPropagation(); closeSession(s.id); }}>
                 <XIcon />
               </button>
@@ -92,8 +93,8 @@ export default function TerminalPane({ active }) {
           ))}
           <button type="button" className="tty-tab-add" onClick={openSession}
             disabled={sessions.length >= max}
-            aria-label="New session"
-            title={sessions.length >= max ? `Limit of ${max} sessions reached` : 'New session'}>
+            aria-label={t('terminal.newSession')}
+            title={sessions.length >= max ? t('terminal.sessionLimit', { max }) : t('terminal.newSession')}>
             <PlusIcon />
           </button>
         </div>
@@ -108,14 +109,16 @@ export default function TerminalPane({ active }) {
       <div className="tty-statusbar">
         {shell && <span>{shell}</span>}
         {shell && <span className="tty-statusbar-sep" aria-hidden="true">·</span>}
-        <span>{sessions.length} session{sessions.length === 1 ? '' : 's'}</span>
+        <span>{sessions.length === 1
+          ? t('terminal.sessionsOne', { count: sessions.length })
+          : t('terminal.sessionsMany', { count: sessions.length })}</span>
         <span className="tty-statusbar-sep" aria-hidden="true">·</span>
         {/* The gate only ever admits loopback clients (terminal/gate.py); a
             shell in a browser deserves a visible, if quiet, answer to "who
             else can reach this?". */}
-        <span className="tty-statusbar-lock" title="The embedded terminal only works on localhost">
+        <span className="tty-statusbar-lock" title={t('terminal.localhostTitle')}>
           <LockIcon />
-          localhost only
+          {t('terminal.localhostOnly')}
         </span>
         <span className="tty-statusbar-spacer" />
         {activeSession?.cwd && <span className="tty-statusbar-cwd" title={activeSession.cwd}>{activeSession.cwd}</span>}

@@ -3,6 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../components/ConsoleLogViewer.jsx';
 import { EvalLogContext, EvalLogLogsContext, useEvalLogLogs } from './EvalLogContext.js';
 import { useJobLogStream } from './useJobLogStream.js';
+import { t } from '../../../strings/index.js';
 
 // Read logs from the dedicated logs context so the side-pane's spec stays
 // stable across log appends — only this leaf re-renders on each batch.
@@ -50,7 +51,7 @@ const WINDOW_ID = 'eval-log';
 function buildSpec({ jobId, jobStatus, status, terminalState }) {
   if (!jobId) return null;
   const word = statusWord(jobStatus, status, terminalState);
-  const parts = ['log evaluation'];
+  const parts = [t('evaluate.logTitle')];
   if (word) parts.push(word);
   parts.push(jobId);
   return {

@@ -1,0 +1,119 @@
+"""Use case: score completed evidence after cancellation.
+
+Extracted from ``evaluation_mixin`` so the API layer has a public entry
+point instead of importing a private helper.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+
+from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.scoring.engine import score_evidence
+from quodeq.analysis.report import write_dimension_report
+from quodeq.services.grade_formula import load_params
+
+_logger = logging.getLogger(__name__)
+
+def _read_queue_files_count(queue_path: Path) -> int:
+    """Sum of files dispatched across all batches in a dim's queue.json.
+
+    Used to populate ``files_read`` when scoring residual evidence —
+    without this, ``_score_completed_evidence`` writes eval stubs with
+    ``filesRead: 0``, which the ``scoring_view`` trust rule rejects as
+    untrustworthy. Returning the queue's taken count yields a faithful
+    coverage figure: every file that was actually dispatched to an agent.
+    """
+    try:
+        data = json.loads(queue_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    taken = data.get("taken") if isinstance(data, dict) else None
+    if not isinstance(taken, list):
+        return 0
+    total = 0
+    for entry in taken:
+        files = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(files, list):
+            total += len(files)
+    return total
+
+
+def _read_project_source_file_count(reports_dir: str, project: str) -> int:
+    """Read ``scan.json`` total_files for the project. Returns 0 on failure."""
+    scan_path = Path(reports_dir) / project / "scan.json"
+    try:
+        data = json.loads(scan_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    raw = data.get("total_files") if isinstance(data, dict) else None
+    return int(raw) if isinstance(raw, int) else 0
+
+
+def score_completed_evidence(reports_dir: str, job: dict) -> None:
+    """Score any dimensions that have evidence but no evaluation report.
+
+    Called after cancellation so completed dimensions are preserved in the
+    dashboard even when the overall run was cancelled.
+
+    Populates ``files_read`` from the dim's queue.json (count of dispatched
+    files) and ``source_file_count`` from the project's scan.json. Without
+    these, the scored eval has ``filesRead: 0``, which ``scoring_view``'s
+    trust rule rejects — the user sees the cancelled run's data fall
+    through to an older run's stale value despite real findings on disk.
+    """
+    project = job.get("outputProject")
+    run_id = job.get("outputRunId")
+    if not project or not run_id:
+        return
+
+    _log = _logger
+
+    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
+    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
+    if not evidence_dir.is_dir():
+        return
+
+    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    source_file_count = _read_project_source_file_count(reports_dir, project)
+    params = load_params()
+    # Same standard dirs as a completed run's scoring, so off-standard
+    # findings are quarantined here too instead of entering the grade.
+    from quodeq.services.evidence_rescore import standard_dirs  # noqa: PLC0415
+    compiled_dir, evaluators_dir = standard_dirs()
+
+    from quodeq.data.fs.dimensions_state_store import read_dimensions
+    dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
+
+    for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
+        dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
+        eval_file = evaluation_dir / f"{dim_id}.json"
+        if eval_file.exists():
+            continue  # already scored
+        if dim_states.get(dim_id, {}).get("state") == "incomplete":
+            _logger.info("Skipping scoring for incomplete dim %s", dim_id)
+            continue
+        if jsonl_path.stat().st_size == 0:
+            continue  # no findings
+        # Only score dimensions that passed verification (analysis queue exists)
+        queue_file = evidence_dir / f"{dim_id}_queue.json"
+        if not queue_file.exists():
+            continue  # verification not completed for this dimension
+
+        files_read = _read_queue_files_count(queue_file)
+        try:
+            evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
+                language="", repository="", date_str="",
+                source_file_count=source_file_count, files_read=files_read,
+            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+            if evidence is None:
+                continue
+            scores = score_evidence(evidence, mode="numerical", params=params)
+            write_dimension_report(evidence, scores, dim_id, evaluation_dir)
+            _log.info(
+                "Scored cancelled dimension '%s' for run %s (files_read=%d)",
+                dim_id, run_id[:8], files_read,
+            )
+        except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
+            _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)

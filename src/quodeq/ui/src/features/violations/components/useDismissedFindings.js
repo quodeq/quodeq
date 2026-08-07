@@ -10,6 +10,7 @@ import {
 } from '../../../api/index.js';
 import { applyMutationDelta } from '../../../api/applyMutationDelta.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { t } from '../../../strings/index.js';
 
 /**
  * @param {string} selectedProject
@@ -71,12 +72,23 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to restore finding:', err);
-      setRestoreError?.('Failed to restore finding. Please try again.');
+      setRestoreError?.(t('violations.restoreFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
+  // Restoring un-suppresses every finding the user ever triaged away, and the
+  // only undo is dismissing them again one by one. The button sits next to the
+  // per-item Restore, so a mis-click is cheap to make and expensive to reverse.
+  // Delete-all has always confirmed; this needs it at least as much.
   const handleRestoreAll = useCallback(async () => {
     if (isShared) return;
+    const count = dismissed.length;
+    const ok = await confirmDialog({
+      title: t('violations.restoreDismissedTitle'),
+      message: t('violations.restoreDismissedBody', { count }),
+      confirmLabel: t('violations.restoreAll'),
+    });
+    if (!ok) return;
     try {
       const result = await restoreAllFindings(selectedProject);
       applyDelta(result);
@@ -84,9 +96,9 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to restore all findings:', err);
-      setRestoreError?.('Failed to restore all findings. Please try again.');
+      setRestoreError?.(t('violations.restoreAllFailed'));
     }
-  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
+  }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
 
   const handleDelete = useCallback(async (d) => {
     if (isShared) return;
@@ -107,7 +119,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to delete finding:', err);
-      setRestoreError?.('Failed to delete finding. Please try again.');
+      setRestoreError?.(t('violations.deleteFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
 
@@ -115,8 +127,8 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     if (isShared) return;
     const count = dismissed.length;
     const ok = await confirmDialog({
-      title: 'Delete dismissed findings?',
-      message: `Are you sure you want to permanently delete those ${count} findings? This cannot be undone.`,
+      title: t('violations.deleteDismissedTitle'),
+      message: t('violations.deleteDismissedBody', { count }),
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       variant: 'danger',
@@ -129,7 +141,7 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
       onReconcile?.();
     } catch (err) {
       console.error('Failed to delete all findings:', err);
-      setRestoreError?.('Failed to delete all findings. Please try again.');
+      setRestoreError?.(t('violations.deleteAllFailed'));
     }
   }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
 

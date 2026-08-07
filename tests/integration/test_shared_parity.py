@@ -19,10 +19,10 @@ import pytest
 
 from quodeq.api.app import create_app
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
-from quodeq.core.events.writer import EventLogWriter
+from quodeq.data.events.writer import EventLogWriter
 from quodeq.services.dismissed import dismiss_finding
 from quodeq.services.shared_publish import publish_project
-from quodeq.services.shared_repo import sync_shared_index
+from quodeq.data.fs.shared_repo import sync_shared_index
 from quodeq.services.shared_settings import SharedSettings, write_settings
 
 _PROJECT = "proj-a"

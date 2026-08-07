@@ -1,5 +1,6 @@
 import React from 'react';
 import { WorkspaceDiffPanel } from '../assistant/WorkspaceDiffPanel.jsx';
+import { t } from '../../strings/index.js';
 
 /** Side-pane window spec for the assistant's pending worktree changes.
  *  `key` (the worktree's createdAt) folds into the window id so a NEW worktree
@@ -11,7 +12,7 @@ export function workspaceDiffSpec({ sessionId, key, onChanged }) {
   return {
     id,
     type: 'workspace-diff',
-    title: 'Assistant changes',
+    title: t('assistant.workspaceChanges'),
     render: () => <WorkspaceDiffPanel sessionId={sessionId} onChanged={onChanged} />,
   };
 }

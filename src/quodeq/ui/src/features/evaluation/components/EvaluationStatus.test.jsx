@@ -82,6 +82,56 @@ describe('JobIdentityStrip', () => {
   });
 });
 
+describe('JobHeader time-limit exit', () => {
+  it('renders a deadline-killed job as time limit reached, not failed', () => {
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, status: 'cancelled', exitReason: 'deadline' }} />
+    );
+    expect(screen.getByText('evaluation_time_limit')).toBeInTheDocument();
+    expect(screen.getByText('time limit reached')).toBeInTheDocument();
+    // Non-error styling, consistent with the coverage banner below.
+    expect(document.querySelector('.eval-run-pill--failed')).toBeNull();
+    expect(document.querySelector('.eval-run-pill--neutral')).not.toBeNull();
+  });
+
+  it('treats a failed status with a time_limit reason the same way', () => {
+    // Defensive: external index rows can end "failed" while status.json
+    // still records the time budget as the cause.
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, status: 'failed', exitReason: 'time_limit' }} />
+    );
+    expect(screen.getByText('evaluation_time_limit')).toBeInTheDocument();
+    expect(screen.getByText('time limit reached')).toBeInTheDocument();
+    expect(document.querySelector('.eval-run-pill--failed')).toBeNull();
+  });
+
+  it('still renders plain failures as failed', () => {
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, status: 'failed' }} />
+    );
+    expect(screen.getByText('evaluation_failed')).toBeInTheDocument();
+    expect(document.querySelector('.eval-run-pill--failed')).not.toBeNull();
+  });
+
+  it('keeps a truncated-but-done run rendered as complete', () => {
+    // rc=0 deadline truncation: results exist and were scored; the banner
+    // below tells the truncation story, the header stays "done".
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, status: 'done', exitReason: 'deadline' }} />
+    );
+    expect(screen.getByText('evaluation_complete')).toBeInTheDocument();
+    expect(screen.queryByText('time limit reached')).toBeNull();
+  });
+
+  it('keeps a user-cancelled job rendered as cancelled', () => {
+    renderWithClient(
+      <EvaluationStatus job={{ ...baseJob, status: 'cancelled' }} />
+    );
+    expect(screen.getByText('evaluation_cancelled')).toBeInTheDocument();
+    expect(screen.queryByText('time limit reached')).toBeNull();
+  });
+});
+
 describe('project label', () => {
   const startedInfo = { id: 'uuid-c', name: 'project-c', displayName: 'Project C' };
   const jobInfo = { id: 'uuid-a', name: 'project-a', displayName: 'Project A' };

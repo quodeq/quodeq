@@ -15,7 +15,10 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
-from quodeq.analysis.mcp.provenance_gate import EXTERNAL_SOURCE_TERMS
+from quodeq.analysis.mcp.provenance_gate import (
+    EXTERNAL_SOURCE_TERMS,
+    OPERATOR_CONTROLLED_TERMS,
+)
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.prompts._template import load_template
 from quodeq.context.path_role import Role, path_role
@@ -111,9 +114,13 @@ def test_fixture_matrix_is_well_formed():
     assert _CASES, "no provenance-gate fixtures discovered"
     internal = [c for c in _CASES if c.expected["provenance"] == "internal"]
     external = [c for c in _CASES if c.expected["provenance"] == "external"]
+    operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
     assert len(internal) >= 4, f"expected >=4 internal FP fixtures, got {len(internal)}"
     assert any(c.expected["dimension"] == "reliability" for c in external), "no reliability external control"
     assert any(c.expected["dimension"] == "security" for c in external), "no security external control"
+    assert operator, "no operator-controlled fixture: the argv/env tier is unguarded"
+    assert all(c.expected["expectation"] != "stays_critical" for c in operator), \
+        "an operator-controlled fixture expects critical; that is the bug this tier exists to prevent"
     for case in _CASES:
         for key in ("dimension", "req", "display_file", "target_line", "construct", "provenance", "expectation"):
             assert key in case.expected, f"{case.name}: expected.json missing {key!r}"
@@ -177,7 +184,14 @@ def test_vocabulary_concepts_present_in_rules():
     prompt gate's source taxonomy, so the two cannot silently diverge.
     """
     lower = RULES.lower()
-    # Representative concepts that the rules' source taxonomy lists.
-    for concept in ("request", "header", "cookie", "cli argument", "environment variable"):
+    # Remote ingress: named in the rules AND holding the critical bar.
+    for concept in ("request", "header", "cookie"):
         assert concept in lower, f"rules no longer mention source concept {concept!r}"
         assert concept in EXTERNAL_SOURCE_TERMS, f"vocabulary dropped {concept!r}"
+    # Operator-controlled: named in the rules, but explicitly NOT critical.
+    # If one of these ever drifts back into the external set, the gate and the
+    # prompt would again call a self-inflicted path a critical vulnerability.
+    for concept in ("cli argument", "environment variable"):
+        assert concept in lower, f"rules no longer mention source concept {concept!r}"
+        assert concept in OPERATOR_CONTROLLED_TERMS, f"vocabulary dropped {concept!r}"
+        assert concept not in EXTERNAL_SOURCE_TERMS, f"{concept!r} must not hold the critical bar"

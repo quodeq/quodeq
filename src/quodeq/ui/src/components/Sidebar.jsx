@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
 import { cloneElement } from 'react';
+import { BRAND_NAME } from '../strings/brand.js';
+import { t, LOCALE } from '../strings/index.js';
 
 // Folder glyph for the REPOSITORY row — same outline used in the file/folder
 // table on FileDetailPage, just sized up for the sidebar rail.
@@ -8,7 +10,7 @@ const ICON_FOLDER = cloneElement(BASE_ICON_FOLDER, { width: 18, height: 18 });
 
 function Logo() {
   return (
-    <svg viewBox="288 209 965 588" role="img" aria-label="Quodeq" width="32" height="32" style={{overflow:'visible'}}>
+    <svg viewBox="288 209 965 588" role="img" aria-label={BRAND_NAME} width="32" height="32" style={{overflow:'visible'}}>
       <defs>
         <filter id="chevron-glow" x="-25%" y="-25%" width="150%" height="150%">
           <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="var(--logo-chevron-hover)" floodOpacity="0.28" />
@@ -63,7 +65,7 @@ function formatLastEval(iso) {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleString(undefined, {
+    return d.toLocaleString(LOCALE, {
       day: '2-digit',
       month: 'short',
       hour: '2-digit',
@@ -127,7 +129,7 @@ export default function Sidebar({
       <button
         type="button"
         className={`sidebar-scrim${isPinned ? ' sidebar-scrim--visible' : ''}`}
-        aria-label="Close menu"
+        aria-label={t('common.closeMenu')}
         aria-hidden={!isPinned}
         tabIndex={isPinned ? 0 : -1}
         onClick={() => setPinned(false)}
@@ -138,13 +140,13 @@ export default function Sidebar({
             type="button"
             className="sidebar-brand-icon sidebar-brand-icon--toggle"
             onClick={handleTogglePin}
-            aria-label={isPinned ? 'Close menu' : 'Open menu'}
+            aria-label={isPinned ? t('common.closeMenu') : t('common.openMenu')}
             aria-expanded={isPinned}
           >
             <Logo />
           </button>
-          <span className="sidebar-brand-text">quodeq</span>
-          {version && <span className="sidebar-version">v{version}</span>}
+          <span className="sidebar-brand-text">{BRAND_NAME}</span>
+          {version && <span className="sidebar-version">{t('common.versionPrefix', { version })}</span>}
         </div>
 
         {showProjectTabs && (
@@ -178,7 +180,7 @@ export default function Sidebar({
           <div className="sidebar-status">
             {lastEvalStr && (
               <div className="sidebar-status-row">
-                <span className="sidebar-status-label">Last eval</span>
+                <span className="sidebar-status-label">{t('common.lastEval')}</span>
                 <span className="sidebar-status-value">{lastEvalStr}</span>
               </div>
             )}

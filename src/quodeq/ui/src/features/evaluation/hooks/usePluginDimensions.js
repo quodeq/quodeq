@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { STANDARD_TYPES } from '../../standards/hooks/useStandards.js';
+import { t } from '../../../strings/index.js';
 
 function mergeStandardsDimensions(standards, seen) {
   for (const s of standards) {
@@ -82,7 +83,7 @@ export function usePluginDimensions() {
       setAllDimensions(_filterVisible(dims));
       setDimLoadError(null);
     }).catch(() => {
-      setDimLoadError('Failed to load dimensions. Try refreshing the page or check that the server is running.');
+      setDimLoadError(t('evaluate.dimensionsLoadFailed'));
     });
   }, []);
 

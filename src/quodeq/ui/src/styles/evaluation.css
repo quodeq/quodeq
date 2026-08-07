@@ -2860,6 +2860,19 @@ button.eval-provider-badge--clickable:focus-visible {
   color: var(--color-sev-critical-text, #f85149);
   border-bottom: 1px solid var(--color-border-soft, var(--color-border));
 }
+/* Raw log line under the labelled reason: keep it readable but secondary. */
+.scan-progress__error-detail {
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+/* Done-with-errors: run kept partial results after a provider failure. */
+.scan-progress__warning {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--color-sev-major-text, #d29922);
+  border-bottom: 1px solid var(--color-border-soft, var(--color-border));
+}
 
 
 .scan-progress__bar {

@@ -55,15 +55,27 @@ _DEFAULT_LIST_LIMIT = 100
 # which only lands in job state after the analyzing_start marker — so a
 # blocking wait(timeout=full_budget) at spawn time can't see it.
 _WATCHDOG_POLL_INTERVAL_S = 1.0
-# Grace window past deadline_at before SIGKILL — gives the analysis side's
-# graceful-cancel path time to score completed dimensions.
-_WATCHDOG_DEADLINE_GRACE_S = 60
+# Grace window past deadline_at before the kill. The watchdog exists to
+# reap HUNG runs, never to cut loaded agents: past the deadline the pool
+# stops dispatching and in-flight model calls drain. The longest
+# legitimate in-flight call is one scaled local read timeout (500s per
+# subagent, realistically up to 3), so the grace must exceed that or a
+# healthy drain gets SIGTERMed and the batch's work is lost.
+_WATCHDOG_DEADLINE_GRACE_S = 1800
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"
 STATUS_CANCELLED = "cancelled"
 STATUS_DONE = "done"
 STATUS_FAILED = "failed"
+
+# status.json exit reasons that mean "the run hit its time budget" — the
+# user's own setting doing its job, not an error. Jobs ending this way are
+# marked cancelled (already in the salvage-scoring trigger list in
+# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
+# renders "time limit reached" instead of FAILED.
+_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
+_EXIT_REASON_DEADLINE = "deadline"
 
 
 class JobManager:
@@ -276,7 +288,10 @@ class JobManager:
         elif phase in ("analyzing", "scoring"):
             job.current_dimension = marker.get("dimension")
             job.phase = phase
-        elif phase == "analyzing_start":
+        elif phase in ("analyzing_start", "deadline_extended"):
+            # deadline_extended: the pool auto-scale ratcheted the run
+            # deadline forward; the watchdog must follow or it kills a
+            # healthy run at the original deadline.
             job.deadline_at = marker.get("deadline_at")
         elif phase == "report_path":
             project = marker.get("project")
@@ -434,9 +449,34 @@ class JobManager:
             return False
         return now > deadline + _WATCHDOG_DEADLINE_GRACE_S
 
+    def _run_status_exit_reason(self, job: Job | None) -> str | None:
+        """Best-effort read of the run's ``status.json`` ``exit_reason``.
+
+        The analysis loops break out at the deadline without raising, and the
+        lifecycle records ``exit_reason="deadline"`` (see
+        ``_cli_evaluation._record_deadline_if_hit``). When the process then
+        exits nonzero without the job watchdog ever firing, this is the only
+        signal that the exit was a time-limit truncation, not a failure.
+        """
+        if (
+            job is None
+            or not job.output_project
+            or not job.output_run_id
+            or self._reports_root is None
+        ):
+            return None
+        status_path = self._reports_root / job.output_project / job.output_run_id / "status.json"
+        try:
+            data = json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        reason = data.get("exit_reason")
+        return reason if isinstance(reason, str) else None
+
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         started_at = time.time()
         exit_code: int = 0
+        watchdog_killed = False
         while True:
             try:
                 exit_code = process.wait(timeout=_WATCHDOG_POLL_INTERVAL_S)
@@ -454,7 +494,17 @@ class JobManager:
                     # and waits internally.
                     _terminate_process(process)
                     exit_code = _EXIT_CODE_TIMEOUT
+                    watchdog_killed = True
                     break
+        # Resolve a time-limit exit before taking the lock — status.json I/O
+        # must not block API request paths contending on self._lock.
+        deadline_reason: str | None = None
+        if watchdog_killed:
+            deadline_reason = _EXIT_REASON_DEADLINE
+        elif exit_code != 0:
+            reason = self._run_status_exit_reason(self._store.get(job_id))
+            if reason in _DEADLINE_EXIT_REASONS:
+                deadline_reason = reason
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)
@@ -462,7 +512,13 @@ class JobManager:
                 return
             job.exit_code = exit_code
             job.ended_at = datetime.now(timezone.utc).isoformat()
-            job.status = STATUS_DONE if exit_code == 0 else STATUS_FAILED
+            if exit_code == 0:
+                job.status = STATUS_DONE
+            elif deadline_reason is not None:
+                job.status = STATUS_CANCELLED
+                job.exit_reason = deadline_reason
+            else:
+                job.status = STATUS_FAILED
             self._store.put(job)
             self._evict_completed_jobs()
         if self._on_job_complete is not None:

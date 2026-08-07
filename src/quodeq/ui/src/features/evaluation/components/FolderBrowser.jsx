@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
+import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 function FileIcon() {
   return (
@@ -16,13 +18,13 @@ function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigat
     <>
       {navError && <p className="inline-error" role="alert">{navError}</p>}
       {!navError && data?.directories?.length === 0 && files.length === 0 && (
-        <p className="empty-folder">No items in this directory</p>
+        <p className="empty-folder">{t('evaluate.noItemsInDir')}</p>
       )}
       {!navError && (data?.directories?.length > 0 || files.length > 0) && (
         <div className="folder-browser-hint">
-          {data?.directories?.length > 0 && 'Click to select · Double-click to open'}
+          {data?.directories?.length > 0 && t('evaluate.clickToSelectHint')}
           {data?.directories?.length > 0 && files.length > 0 && ' · '}
-          {files.length > 0 && 'Click file to select'}
+          {files.length > 0 && t('evaluate.clickFileHint')}
         </div>
       )}
       {(data?.directories || []).map((dir) => (
@@ -41,7 +43,7 @@ function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigat
         >
           <span className="folder-icon">{dir.isGitRepo ? '\uD83D\uDCE6' : '\uD83D\uDCC1'}</span>
           <span className="folder-name">{dir.name}</span>
-          {dir.isGitRepo && <span className="git-indicator">repo</span>}
+          {dir.isGitRepo && <span className="git-indicator">{t('evaluate.repoIndicator')}</span>}
         </div>
       ))}
       {files.map((file) => (
@@ -71,7 +73,7 @@ function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate, onN
         className="folder-nav-btn"
         disabled={!data?.parent || loading}
         onClick={() => data?.parent && onNavigate(data.parent)}
-        aria-label="Go to parent folder"
+        aria-label={t('evaluate.parentFolderAria')}
       >
         ↑
       </button>
@@ -80,8 +82,8 @@ function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate, onN
           className="folder-nav-btn folder-new-btn"
           disabled={loading}
           onClick={onNewFolder}
-          aria-label="Create new folder"
-          title="New folder"
+          aria-label={t('evaluate.newFolderAria')}
+          title={t('evaluate.newFolderTitle')}
         >
           +
         </button>
@@ -92,22 +94,22 @@ function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate, onN
         value={pathInput}
         onChange={(e) => setPathInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') onNavigate(pathInput); }}
-        placeholder="Enter path and press Enter"
-        aria-label="Enter folder path"
+        placeholder={t('evaluate.pathPlaceholder')}
+        aria-label={t('evaluate.pathAria')}
       />
     </div>
   );
 }
 
-function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = 'Use This Folder' }) {
+function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = t('evaluate.useThisFolder') }) {
   return (
     <div className="folder-browser-footer">
       <div className={`selected-path ${selectedFolder ? 'visible' : ''}`}>
-        <span className="selected-label">Path:</span>
+        <span className="selected-label">{t('evaluate.pathLabel')}</span>
         <code>{selectedFolder || ''}</code>
       </div>
       <div className="folder-browser-actions">
-        <button className="btn-cancel" onClick={onClose}>Cancel</button>
+        <button className="btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
         <button className="btn-confirm" onClick={onConfirm} disabled={!selectedFolder}>
           {confirmText}
         </button>
@@ -124,7 +126,7 @@ async function navigateFolder(path, navigation, showFiles, browseDirectory) {
     const result = await browseDirectory(path || '', { files: showFiles });
     updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
-    setNavError(err.message || 'Failed to load folder');
+    setNavError(apiErrorMessage(err, 'evaluate.folderLoadFailed'));
   } finally {
     setLoading(false);
   }
@@ -143,7 +145,7 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
       onClose();
       navigate(currentPath);
     } catch (err) {
-      setError(err.message || 'Failed to create folder');
+      setError(apiErrorMessage(err, 'evaluate.folderCreateFailed'));
     }
   }
 
@@ -153,10 +155,10 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
         type="text" className="new-folder-input" value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
-        placeholder="Folder name" autoFocus
+        placeholder={t('evaluate.folderNamePlaceholder')} autoFocus
       />
-      <button className="folder-nav-btn folder-nav-btn--text" onClick={handleCreate} disabled={!name.trim()}>Create</button>
-      <button className="folder-nav-btn" onClick={onClose} aria-label="Cancel new folder">✕</button>
+      <button className="folder-nav-btn folder-nav-btn--text" onClick={handleCreate} disabled={!name.trim()}>{t('evaluate.create')}</button>
+      <button className="folder-nav-btn" onClick={onClose} aria-label={t('evaluate.cancelNewFolderAria')}>✕</button>
       {error && <span className="inline-error" role="alert">{error}</span>}
     </div>
   );
@@ -173,13 +175,13 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
     <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
         <h2 id="folder-browser-title">{title}</h2>
-        <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
+        <button className="modal-close" onClick={onClose} aria-label={t('common.close')}>&times;</button>
       </div>
       <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} onNewFolder={() => setCreatingFolder(true)} />
       {creatingFolder && <NewFolderInput currentPath={data?.current} navigate={navigate} onClose={() => setCreatingFolder(false)} />}
       <div className="folder-browser-list">
         {loading ? (
-          <p className="loading" role="status" aria-live="polite">Loading...</p>
+          <p className="loading" role="status" aria-live="polite">{t('evaluate.loadingDots')}</p>
         ) : (
           <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} showFiles={showFiles} />
         )}
@@ -189,7 +191,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
   );
 }
 
-export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder', showFiles = false, rootPath = null }) {
+export default function FolderBrowser({ onSelect, onClose, title = t('evaluate.selectRepoFolderTitle'), confirmText = t('evaluate.useThisFolder'), showFiles = false, rootPath = null }) {
   const { browseDirectory } = useApi();
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');

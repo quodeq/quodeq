@@ -1,7 +1,42 @@
 """Shared test fixtures and helpers."""
 from __future__ import annotations
 
+import json
+
 import pytest
+
+# Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
+# main-thread stack. ~160KB of text -- trivially producible by hand or by a
+# buggy generator, which is what makes this a real degradation path and not a
+# curiosity.
+_STACK_OVERFLOW_NESTING = 80_000
+
+
+@pytest.fixture(scope="session")
+def deeply_nested_json() -> str:
+    """JSON text that makes ``json.loads`` raise ``RecursionError``.
+
+    ``RecursionError`` subclasses ``RuntimeError``, not ``ValueError``, so it
+    escapes the ``(OSError, ValueError, UnicodeDecodeError)`` tuple that the
+    degrade-to-default config readers catch. Every reader whose contract is
+    "a malformed file degrades, it never fails a scan" needs a regression test
+    against this payload.
+
+    The depth at which the decoder overflows depends on the interpreter's
+    stack size, so the fixture proves the payload really does overflow *this*
+    interpreter and skips otherwise. Without that check a build with a deeper
+    stack would parse the payload fine and every test using it would pass
+    while exercising nothing.
+    """
+    payload = "[" * _STACK_OVERFLOW_NESTING + "]" * _STACK_OVERFLOW_NESTING
+    try:
+        json.loads(payload)
+    except RecursionError:
+        return payload
+    pytest.skip(
+        f"this interpreter parses {_STACK_OVERFLOW_NESTING} levels of JSON "
+        "nesting without overflowing; the RecursionError regression cannot be "
+        "exercised here")
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +75,11 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     # touch the real ~/.quodeq/run/jobs again (it was wedged with fake jobs
     # named job-wire/sample-project that surfaced in the real dashboard).
     monkeypatch.setenv("QUODEQ_JOB_PERSIST_DIR", str(home / "run" / "jobs"))
+    # A developer's real custom grade formula (~/.quodeq/grade_formula.json)
+    # must never leak into score assertions — 2026-07-31: two rescore-path
+    # tests failed machine-locally the moment the Grade Formula Editor saved
+    # custom params.
+    monkeypatch.setenv("QUODEQ_GRADE_FORMULA_PATH", str(home / "grade_formula.json"))
 
 
 class DummyProcess:

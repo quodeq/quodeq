@@ -7,10 +7,10 @@ evaluation.db (aggregated across runs).
 from __future__ import annotations
 
 import json
-import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
+from quodeq.services.suppression_keys import is_dismissed
 from quodeq.core.events.models import (
     EventType,
     FindingDismissed,
@@ -21,7 +21,8 @@ from quodeq.core.events.models import (
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.data.actions_log import ActionLogWriter, read_action_events
 from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed
-from quodeq.data.sqlite.connection import open_evaluation_db
+from quodeq.data.sqlite.findings_queries import read_finding_details
+from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 
 def dismiss_finding(project_dir: Path, finding: dict) -> None:
@@ -91,40 +92,12 @@ def _enrich_from_sql(run_dir: Path, keys: set[tuple], out: dict[tuple, dict]) ->
     """Add finding detail from a run's SQL findings table for any dismissed key not yet enriched.
 
     Modern runs (those with an ``events.jsonl`` projected into ``findings``)
-    expose the full Judgment row here. We look up by the canonical (req,
-    file, line) tuple — the SQL ``verdict`` column is ignored because we
-    treat ``actions.jsonl`` as the source of truth for *which* findings
-    are dismissed, and the SQL row only for *what* the finding was.
+    expose the full Judgment row here. The lookup and its schema knowledge
+    live in the data layer (``findings_queries``); ``setdefault`` preserves
+    the first-run-wins merge across runs.
     """
-    db_path = run_dir / "evaluation.db"
-    if not db_path.is_file():
-        return
-    try:
-        with open_evaluation_db(run_dir) as conn:
-            cursor = conn.execute(
-                "SELECT requirement, file, line, dimension, practice_id, severity, "
-                "title, reason, snippet, context, scope, end_line, req_refs_json "
-                "FROM findings"
-            )
-            for row in cursor:
-                key = (str(row[0] or ""), str(row[1] or ""), int(row[2] or 0))
-                if key not in keys or key in out:
-                    continue
-                req_refs_raw = row[12]
-                try:
-                    req_refs = json.loads(req_refs_raw) if req_refs_raw else []
-                except (json.JSONDecodeError, TypeError):
-                    req_refs = []
-                out[key] = {
-                    "req": row[0] or "", "file": row[1] or "", "line": row[2] or 0,
-                    "dimension": row[3] or "", "principle": row[4] or "",
-                    "severity": row[5] or "", "title": row[6] or "", "reason": row[7] or "",
-                    "snippet": row[8] or "", "context": row[9] or "", "scope": row[10] or "",
-                    "endLine": row[11] or 0, "reqRefs": req_refs,
-                }
-    except sqlite3.DatabaseError:
-        # Corrupt evaluation.db — skip rather than fail the whole list.
-        return
+    for key, detail in read_finding_details(run_dir, keys).items():
+        out.setdefault(key, detail)
 
 
 def _enrich_from_json_eval(run_dir: Path, keys: set[tuple], out: dict[tuple, dict]) -> None:
@@ -274,17 +247,16 @@ def filter_dismissed_from_dimensions(
     Recalculates totals for any dimension whose violations were filtered.
     Leaves compliance, principles, overall_score, overall_grade unchanged.
     """
-    from quodeq.services.suppression import is_dismissed  # noqa: PLC0415
-
     keys = dismissed_keys(project_dir)
-    if not keys:
+    rules = load_suppression_rules(project_dir)
+    if not keys and not rules:
         return dimensions
     result = []
     for dim in dimensions:
         filtered = [
             v for v in dim.violations
             if not is_dismissed(keys, req=v.req, principle=v.practice_id,
-                                file=v.file, line=v.line)
+                                file=v.file, line=v.line, rules=rules)
         ]
         if len(filtered) == len(dim.violations):
             result.append(dim)

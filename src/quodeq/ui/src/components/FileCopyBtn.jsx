@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { CopyIcon, COPY_FEEDBACK_MS } from './CopyButton.jsx';
 import { copyToClipboard } from '../utils/clipboard.js';
+import { t } from '../strings/index.js';
 
 export default function FileCopyBtn({ display, copyText }) {
   const [status, setStatus] = useState('idle');
@@ -24,7 +25,7 @@ export default function FileCopyBtn({ display, copyText }) {
   }, [copyText]);
 
   const showStatusLabel = status === 'copied' || status === 'failed';
-  const statusText = status === 'copied' ? 'Copied!' : 'Copy failed';
+  const statusText = status === 'copied' ? t('common.copied') : t('common.copyFailed');
   const label = showStatusLabel ? statusText : display;
 
   return (

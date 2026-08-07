@@ -3,7 +3,10 @@ import ProviderTabs from '../../../settings/components/ProviderTabs.jsx';
 import { getProviderConfigs } from '../../../../api/index.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../../constants.js';
 import { TermHeader } from '../../../../components/terminal/index.js';
+import { t } from '../../../../strings/index.js';
 
+// Product names, not copy.
+/* eslint-disable i18n/no-prose-literals */
 const PROVIDER_LABELS = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
@@ -13,6 +16,7 @@ const PROVIDER_LABELS = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
 };
+/* eslint-enable i18n/no-prose-literals */
 
 function readActiveProviderState() {
   try {
@@ -85,21 +89,21 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
   const summary = activeProvider.id
     ? (
       <p className="onboarding-provider-active">
-        Selected: <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
+        {t('onboarding.selectedPrefix')} <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
         {activeProvider.model && <> · <code>{activeProvider.model}</code></>}
       </p>
     )
     : (
       <p className="onboarding-provider-active onboarding-provider-active--empty">
-        Pick a provider tab below and choose a model to continue.
+        {t('onboarding.pickProviderHint')}
       </p>
     );
 
   return (
     <div className="onboarding-step onboarding-step--provider">
-      <TermHeader name="provider" sub={`step ${stepIndex} of ${stepTotal} · pick an ai provider`} />
+      <TermHeader name={t('onboarding.termProvider')} sub={t('onboarding.subProvider', { step: stepIndex, total: stepTotal })} />
       <p className="onboarding-step__pitch">
-        quodeq sends source files to an AI model for review. Pick the provider you want to use. Uninstalled providers are shown disabled with install hints.
+        {t('onboarding.providerDesc')}
       </p>
 
       {summary}
@@ -109,8 +113,8 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
       </div>
 
       <div className="onboarding-step__actions">
-        <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={continueDisabled} onClick={handleContinue}>continue</button>
-        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>back</button>
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={continueDisabled} onClick={handleContinue}>{t('common.continue')}</button>
+        <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>
       </div>
     </div>
   );

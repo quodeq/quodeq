@@ -161,6 +161,7 @@ def _payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:
         "snippet": payload.snippet,
         "confidence": payload.confidence,
         "provenance_downgrade": getattr(payload, "provenance_downgrade", False),
+        "scope_downgrade": getattr(payload, "scope_downgrade", None),
         "carried_forward": getattr(payload, "carried_forward", False),
     }
 
@@ -180,7 +181,7 @@ def _read_new_findings_from_events(
     if not events_log.is_file():
         return []
     try:
-        from quodeq.core.events.reader import EventLogReader  # noqa: PLC0415
+        from quodeq.services.run_events import EventLogReader  # noqa: PLC0415
         from quodeq.core.events.models import EventType  # noqa: PLC0415
         results: list[tuple[datetime, int, dict[str, Any]]] = []
         counter = counter_start

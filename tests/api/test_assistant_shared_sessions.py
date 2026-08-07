@@ -16,7 +16,7 @@ from quodeq.api._assistant_helpers import build_tool_context, get_repository
 from quodeq.api.app import create_app
 from quodeq.assistant.tools import build_registry
 from quodeq.services.score_cache import get_score_cache_path, score_cache_path_override
-from quodeq.services.shared_repo import shared_evaluations_root, shared_score_cache_path
+from quodeq.data.fs.shared_repo import shared_evaluations_root, shared_score_cache_path
 
 
 @pytest.fixture()

@@ -6,8 +6,9 @@ import BranchScopeSelector from './BranchScopeSelector.jsx';
 import { useScanData } from '../hooks/useScanData.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import CleanScanToggle from './CleanScanToggle.jsx';
+import { t } from '../../../strings/index.js';
 
-const NO_STANDARDS_MESSAGE = 'Select at least one standard before evaluating.';
+const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
 
 const FOLDER_MARGIN_BOTTOM = 8;
@@ -15,7 +16,7 @@ const FOLDER_MARGIN_BOTTOM = 8;
 export function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   return (
     <div className="form-group">
-      <label htmlFor="eval-form-repo">Repository</label>
+      <label htmlFor="eval-form-repo">{t('evaluate.repositoryLabelCap')}</label>
       <div className="repo-input-wrapper">
         <input
           id="eval-form-repo"
@@ -29,7 +30,7 @@ export function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
             type="button"
             className="input-clear-btn"
             onClick={onClear}
-            aria-label="Clear repository input"
+            aria-label={t('evaluate.clearRepoAria')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -40,12 +41,12 @@ export function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
           type="button"
           className="browse-btn"
           onClick={onBrowse}
-          title="Browse local filesystem"
+          title={t('evaluate.browseLocalTitle')}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
-          Local
+          {t('evaluate.localBtn')}
         </button>
       </div>
     </div>
@@ -171,7 +172,7 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
         <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canSubmit} />
 
         <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
-          {disabled ? 'Running...' : 'Scan'}
+          {disabled ? t('evaluate.running') : t('evaluate.scanCap')}
         </button>
       </form>
 
@@ -179,8 +180,8 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
         <FolderBrowser
           onSelect={handleFolderSelect}
           onClose={() => setFolderBrowserOpen(false)}
-          title="Select Folder or File"
-          confirmText="Evaluate"
+          title={t('evaluate.selectFolderOrFile')}
+          confirmText={t('evaluate.evaluateBtn')}
           showFiles
         />
       )}

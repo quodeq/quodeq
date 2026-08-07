@@ -50,6 +50,7 @@ import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
+import { t } from './strings/index.js';
 
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
@@ -98,8 +99,7 @@ function useNativeTitlebarSync(effectiveDark) {
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
-function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
-  const { connected, setConnected } = serverHealth;
+function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
   const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
   // The in-progress card describes the running job's own project, which can
@@ -115,7 +115,6 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject, projects, onG
     : null;
   return (
     <>
-      {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
         context={{ selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims }}
@@ -312,28 +311,28 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     prefetchHandlers: state.prefetchHandlers,
     onAddProject: () => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before adding a project.');
+        showToast(t('evaluate.busyAddProject'));
         return;
       }
       setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
     },
     onImportProject: () => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before importing a project.');
+        showToast(t('evaluate.busyImportProject'));
         return;
       }
       state.handleImportProject();
     },
     onTakeTour: () => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before starting the tour.');
+        showToast(t('evaluate.busyStartTour'));
         return;
       }
       setWizardEntry({ startStep: 'welcome', isFirstProject: true });
     },
     onResumeSetup: (projectId) => {
       if (isEvaluating) {
-        showToast('An evaluation is in progress. Cancel it before resuming setup.');
+        showToast(t('evaluate.busyResumeSetup'));
         return;
       }
       setWizardEntry({
@@ -670,6 +669,7 @@ export const ROUTE_RENDERERS = {
       dimension={params.dimension}
       runId={params.runId}
       dateLabel={params.dateLabel}
+      sourceTab={params.sourceTab}
       selectedSource={props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
@@ -690,7 +690,7 @@ export const ROUTE_RENDERERS = {
     if (isSharedSource(props.navigation.selectedSource)) {
       return ROUTE_RENDERERS.overview(params, props);
     }
-    return <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
+    return <EvaluateCase evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} preselectDims={params.preselectDims} onGoToProjects={() => props.navigation.navTab('projects')} onGoToSettings={() => props.navigation.navTab('settings')} />;
   },
   file: (params, props) => (
     <FileDetailPage
@@ -1290,6 +1290,20 @@ export default function App() {
           }
           content={
             <Suspense fallback={<LoadingScreen />}>
+              {/* Every route, not just Evaluate. A dead backend is the one
+                  failure no page can render around: the Overview's own wall
+                  falls back to a bare loading spinner that never resolves, so
+                  a killed server read as "quodeq won't start" with nothing
+                  on screen to say why or to retry from. */}
+              {!state.serverConnected && (
+                <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
+              )}
+              {/* Route pushes render the target page in a transition
+                  (useNavStack); this bar is the feedback while that render
+                  runs. Without it a heavy detail page (or a slow webview
+                  engine) leaves the click looking ignored — there is no
+                  yield point where a spinner could otherwise paint. */}
+              {state.navPending && <div className="nav-pending-bar" aria-hidden="true" />}
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>

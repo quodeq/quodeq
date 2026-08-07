@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
+import { t } from '../../../strings/index.js';
 
 // Module-level CSS variable cache. Use clearCssVarCache() for test resets.
 const _cssVarCache = new Map();
@@ -105,7 +106,7 @@ function DimensionTooltip({ active, payload }) {
   return (
     <div className="run-history-tooltip">
       <span className="rht-date">{d.dimension}</span>
-      <span className="rht-score">{parseFloat(d.overallScore).toFixed(1)} / 10</span>
+      <span className="rht-score">{t('history.outOfTen', { score: parseFloat(d.overallScore).toFixed(1) })}</span>
       <span className="rht-grade">{gradeLetter(d.overallGrade)}</span>
     </div>
   );
@@ -199,9 +200,9 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
   const data = prepareDimensionData(dimensions);
 
   return (
-    <section className="run-history-panel panel" aria-label="Dimension scores bar chart">
+    <section className="run-history-panel panel" aria-label={t('history.dimensionScoresAria')}>
       <div className="run-history-header">
-        <span className="run-history-title">Dimension Scores</span>
+        <span className="run-history-title">{t('history.dimensionScoresTitle')}</span>
         {(runDate || runId) && (
           <span className="dim-panel-run-meta">
             {runDate && <span className="dim-panel-run-date">{formatShortDate(runDate)}</span>}
@@ -212,10 +213,10 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
       <div className="chart-with-kbd">
         <DimensionBarChart data={data} onBarClick={onBarClick} />
         <ChartKeyboardControls
-          label="Dimension scores. Tab to a dimension, Enter to open it"
+          label={t('history.kbdDimsLabel')}
           items={onBarClick ? data.map((d, i) => ({
             key: d.dimension ?? i,
-            text: `${d.dimension}: ${Number.isFinite(d.numericScore) ? d.numericScore.toFixed(1) : '?'} / 10, grade ${gradeLetter(d.overallGrade)}`,
+            text: t('history.kbdDimItem', { dimension: d.dimension, score: Number.isFinite(d.numericScore) ? d.numericScore.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) }),
             onActivate: () => onBarClick(d),
           })) : []}
         />

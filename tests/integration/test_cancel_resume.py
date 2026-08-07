@@ -25,7 +25,7 @@ from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared import cancellation
-from quodeq.shared.dimensions_state import DimState, read_dimensions, write_dim_state
+from quodeq.data.fs.dimensions_state_store import DimState, read_dimensions, write_dim_state
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ class TestScoringSkipsIncompleteDim:
         """A run with one done dim + one incomplete dim writes a summary
         that includes only the done dim's report. The incomplete dim is
         NOT scored as 0 / NA."""
-        from quodeq.services.evaluation_mixin import _score_completed_evidence
+        from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
 
         reports = tmp_path / "reports"
         run = reports / "proj" / "run-1"

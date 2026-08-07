@@ -22,21 +22,21 @@ from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, 
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.engine.scoring_pipeline import run_full
+from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
 from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.services.grade_formula import load_params
-from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
-from quodeq.shared.repo_handler import cleanup_cloned_repo
-from quodeq.engine._runner_markers import emit_marker
-from quodeq.shared.prereqs import check_evaluate_prereqs
+from quodeq.data.fs.repo_handler import cleanup_cloned_repo
+from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
-from quodeq.shared.run_lifecycle import RunLifecycleContext
+from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401
@@ -166,7 +166,7 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     # different local paths share a single project identity.
     remote_url = None
     if location == "local":
-        from quodeq.shared._repo import git_remote_url
+        from quodeq.data.git_cli import git_remote_url
         remote_url = git_remote_url(str(src))
 
     project_uuid = resolve_project_uuid(
@@ -434,6 +434,24 @@ def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig
         lifecycle.set_exit_reason("deadline")
 
 
+def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
+    """Tag a completed run that a dead provider cut short.
+
+    ``_raise_on_fatal_cancel`` lets the pipeline finish when files were
+    already analysed before the provider died (partial data is worth
+    keeping). Without this hook such a run finalizes with
+    ``exit_reason=null``, indistinguishable from a clean completion, and
+    the UI can't warn that the results are partial. Runs after the
+    deadline hook so the provider failure, being the actual cause, wins.
+    """
+    from quodeq.shared import cancellation
+    reason = cancellation.cancel_reason() or ""
+    if reason.startswith("provider_fatal"):
+        lifecycle.set_exit_reason("provider_fatal")
+    elif reason == "agent_failure_streak":
+        lifecycle.set_exit_reason("failure_streak")
+
+
 def _run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
 ) -> int:
@@ -502,12 +520,17 @@ def _run_pipeline_with_cleanup(
                             datetime.now(timezone.utc) + timedelta(seconds=budget_s)
                         ).isoformat()
                         lifecycle.set_deadline(deadline_iso)
+                        # Let the pool auto-scale push the deadline outward
+                        # in status.json too, so the dashboard countdown and
+                        # exit-reason labeling track the granted budget.
+                        config.options.on_deadline_extended = lifecycle.set_deadline
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
                     # If the loops broke out on --max-duration, the pipeline
                     # returns cleanly with no exception. Tag the lifecycle so
                     # the dashboard can distinguish a deadline-truncated run
                     # from a clean completion (exit_reason=null vs "deadline").
                     _record_deadline_if_hit(lifecycle, config)
+                    _record_provider_fatal_if_cancelled(lifecycle)
                     # run_full writes per-dimension reports as each dimension
                     # completes, so by the time it returns scoring is already
                     # done. Record the last pre-finalize phase as "scoring"

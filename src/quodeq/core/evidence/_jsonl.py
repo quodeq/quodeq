@@ -10,7 +10,7 @@ from pathlib import Path
 from quodeq.core.evidence._refs import enrich_judgment
 from quodeq.core.events.models import Judgment
 from quodeq.core.types.req_ref import ReqRef
-from quodeq.shared.utils import open_text
+from quodeq.core.utils.io import open_text
 
 _logger = logging.getLogger(__name__)
 
@@ -24,6 +24,17 @@ def _jsonl_confidence(value: object, default: int = 100) -> int:
     except (TypeError, ValueError):
         return default
     return max(0, min(100, coerced))
+
+
+def _coerce_scope_downgrade(raw: object) -> dict[str, str] | None:
+    """Coerce a JSONL value to the scope-gate marker shape ({"rule",
+    "from", "to"}, all strings), dropping anything else rather than raising.
+    """
+    if not isinstance(raw, dict):
+        return None
+    if not all(isinstance(v, str) for v in raw.values()):
+        return None
+    return raw
 
 
 def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
@@ -63,6 +74,7 @@ def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         confidence=_jsonl_confidence(obj.get("confidence")),
         req_refs=req_refs,
         provenance_downgrade=bool(obj.get("provenance_downgrade")),
+        scope_downgrade=_coerce_scope_downgrade(obj.get("scope_downgrade")),
         carried_forward=bool(obj.get("carried_forward")),
     )
     return j, obj.get("refs")
@@ -98,6 +110,11 @@ def judgment_to_dict(j: Judgment) -> dict:
     # confidence -- keeps the common (un-downgraded) finding dict compact.
     if j.provenance_downgrade:
         d["provenance_downgrade"] = True
+    # Carry the scope-gate marker forward only when set, same reasoning --
+    # and as the dict scope_gate.py stamps, not collapsed to a bool, so the
+    # rule name that moved the finding survives this seam too.
+    if j.scope_downgrade:
+        d["scope_downgrade"] = j.scope_downgrade
     # Emit only when set, mirroring confidence / provenance_downgrade, so
     # the common (freshly-scanned) finding dict stays compact.
     if j.carried_forward:

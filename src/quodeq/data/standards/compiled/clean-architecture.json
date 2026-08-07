@@ -21,7 +21,8 @@
           "id": "CLEA-DEP-02",
           "text": "Entities must not import from use case or adapter layers",
           "description": "Domain entities should have zero imports from application or infrastructure code. Check import statements in entity files — they should only reference other entities, value objects, or standard library types",
-          "refs": []
+          "refs": [],
+          "check": "entity-imports"
         },
         {
           "id": "CLEA-DEP-03",
@@ -45,13 +46,15 @@
           "id": "CLEA-DEP-06",
           "text": "No transitive framework dependencies in core layers",
           "description": "Even indirect imports of framework packages in entities or use cases violate the rule. If entity A imports utility B, and utility B imports Flask, then entity A has a transitive framework dependency",
-          "refs": []
+          "refs": [],
+          "check": "framework-imports"
         },
         {
           "id": "CLEA-DEP-07",
           "text": "Configuration and environment variables are not read in inner layers",
           "description": "Entities and use cases must not read from os.environ, config files, or settings modules directly. Configuration is injected from the outermost layer through constructor parameters or interfaces",
-          "refs": []
+          "refs": [],
+          "check": "config-reads"
         },
         {
           "id": "CLEA-DEP-08",
@@ -117,7 +120,8 @@
           "id": "CLEA-FRM-01",
           "text": "Core business logic must not import framework packages",
           "description": "Use case and entity files should have zero imports from web frameworks, ORMs, or DI containers. Check the import section of every file in domain/ and usecases/ — any framework import is a violation",
-          "refs": []
+          "refs": [],
+          "check": "framework-imports"
         },
         {
           "id": "CLEA-FRM-02",

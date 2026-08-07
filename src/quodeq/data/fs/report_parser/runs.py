@@ -2,7 +2,7 @@
 
 The module-level functions (``read_run_data``, ``list_runs``) provide the
 default filesystem implementation.  The ``RunStorage`` protocol is defined
-in ``quodeq.services.ports`` — alternative backends (S3, database) should
+in ``quodeq.data.fs.report_parser.runs`` — alternative backends should
 implement that protocol and be injected at the call site.
 """
 
@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
+from quodeq.data.fs.report_parser._external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
 from quodeq.data.fs.report_parser._repository import (
     build_repository_info as build_repository_info,
@@ -22,6 +24,7 @@ from quodeq.data.fs.report_parser._run_info import (
     parse_run_date,
     safe_read_dir as safe_read_dir,
 )
+from quodeq.data.fs.report_parser.run_dates import project_run_dates
 from quodeq.data.fs.report_parser._run_lookup import (
     RunLookupCache as RunLookupCache,
     _get_previous_run_for_dimension as _get_previous_run_for_dimension,
@@ -40,7 +43,14 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
         dims = read_run_data(Path("/reports"), "my-project", "20260301")
     """
     validate_path_segment(project, run_id)
-    run_dir = reports_root / project / run_id
+    # Resolve both segments by listing rather than joining, so neither name
+    # is ever concatenated onto a path. A miss raises the same
+    # FileNotFoundError callers already handle for an absent run.
+    project_dir = resolve_child_dir(reports_root, project)
+    resolved_run = resolve_child_dir(project_dir, run_id) if project_dir else None
+    if resolved_run is None:
+        raise FileNotFoundError(f"Run not found: {project}/{run_id}")
+    run_dir = Path(resolved_run)
     evaluations = load_evaluations(run_dir / "evaluation")
     evidence_map = load_evidence_map(run_dir / "evidence")
 
@@ -186,8 +196,13 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         runs = list_runs(Path("/reports"), "my-project", limit=5)
     """
     validate_path_segment(project)
-    project_dir = reports_root / project
-    from quodeq.services.run_dates import project_run_dates  # noqa: PLC0415
+    # Resolve by listing, not by joining: the returned path comes from the
+    # directory enumeration, so *project* is only ever compared. No project
+    # directory means no runs, which is what a bad name produces too.
+    resolved = resolve_child_dir(reports_root, project)
+    if resolved is None:
+        return []
+    project_dir = Path(resolved)
     index_dates = project_run_dates(reports_root, project)
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
@@ -213,8 +228,7 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         if terminal_status is not None:
             status = terminal_status
         else:
-            from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
-            pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
+            pid = resolve_external_pid(project_dir, entry.name)
             status = "in_progress" if pid is not None else "complete"
         cached = index_dates.get(entry.name)
         if cached is not None:

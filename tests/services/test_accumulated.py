@@ -75,7 +75,7 @@ class TestZeroCoverageStubExcluded:
     accumulated reader falls through to an older run with real coverage."""
 
     def _info(self, run_id):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         return RunInfo(run_id=run_id, date_iso="2024-01-01", date_label="Jan 01")
 
     def test_zero_files_read_dim_falls_through_to_real_run(self):

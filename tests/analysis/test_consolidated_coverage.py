@@ -84,7 +84,7 @@ class TestBuildConsolidatedConfig:
         config = _MockRunConfig(options=_MockOptions(time_limit=None))
         with patch("quodeq.analysis.subagents._consolidated._default_subagent_model", return_value=None):
             ac = _build_consolidated_config(config, ["security"], 5)
-        # Should use _DEFAULT_TIME_LIMIT
+        # Should use DEFAULT_TIME_LIMIT
         assert ac.time_limit > 0
 
     def test_time_limit_custom(self):

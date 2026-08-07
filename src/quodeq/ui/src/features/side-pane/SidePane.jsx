@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSidePane } from './SidePaneContext.jsx';
 import { SidePaneWindow } from './SidePaneWindow.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
+import { t } from '../../strings/index.js';
 import './SidePane.css';
 
 const MIN_WINDOW_RATIO = 0.1;
@@ -167,14 +168,14 @@ export function SidePane() {
     <aside
       className="side-pane"
       role="complementary"
-      aria-label="Side pane"
+      aria-label={t('sidePane.aria')}
       ref={containerRef}
     >
       <div
         className={`side-pane__divider${isDragging ? ' side-pane__divider--dragging' : ''}`}
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize side pane"
+        aria-label={t('sidePane.resize')}
         tabIndex={0}
         onPointerDown={onOuterDividerPointerDown}
         onKeyDown={(e) => {
@@ -198,7 +199,7 @@ export function SidePane() {
               className="side-pane__row-divider"
               role="separator"
               aria-orientation="horizontal"
-              aria-label={`Resize between window ${i + 1} and ${i + 2}`}
+              aria-label={t('sidePane.resizeBetween', { first: i + 1, second: i + 2 })}
               aria-valuenow={Math.round((ratios[i] ?? 0.5) * 100)}
               aria-valuemin={0}
               aria-valuemax={100}

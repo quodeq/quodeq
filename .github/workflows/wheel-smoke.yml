@@ -22,6 +22,10 @@ on:
       - '.github/workflows/wheel-smoke.yml'
   push:
     branches: [develop, main]
+  # Manual escape hatch when event delivery is down, see test.yml. Note
+  # workflow_dispatch ignores the paths filter above, so a manual run always
+  # builds the wheel rather than deciding it has nothing to do.
+  workflow_dispatch:
 
 jobs:
   smoke:
@@ -31,7 +35,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.3.2
+        uses: astral-sh/setup-uv@v9.0.0
 
       - name: Set up Python
         run: uv python install 3.12
@@ -39,7 +43,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Build UI
         working-directory: src/quodeq/ui

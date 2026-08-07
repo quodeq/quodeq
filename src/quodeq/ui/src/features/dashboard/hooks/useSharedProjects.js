@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 /**
  * useSharedProjects — shared-repo status + project list for the merged
@@ -172,7 +174,7 @@ export function useSharedProjects() {
       // toggles, since configured was already true before and after).
       await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     } catch (err) {
-      setConnectError(err?.message || 'failed to connect');
+      setConnectError(apiErrorMessage(err, 'projects.connectFailed'));
     } finally {
       connectingRef.current = false;
       setConnecting(false);
@@ -215,9 +217,9 @@ export function useSharedProjects() {
   const statusFailedInitial = statusQuery.isError && statusQuery.data === undefined;
   const listFailedInitial = configured && listQuery.isError && listQuery.data === undefined;
   const error = statusFailedInitial
-    ? (statusQuery.error?.message || 'failed to load shared repository status')
+    ? (statusQuery.error?.message || t('projects.sharedStatusFailed'))
     : listFailedInitial
-      ? (listQuery.error?.message || 'failed to load shared repository status')
+      ? (listQuery.error?.message || t('projects.sharedStatusFailed'))
       : null;
 
   return {

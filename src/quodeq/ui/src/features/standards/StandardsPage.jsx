@@ -7,6 +7,7 @@ import StandardEditor from './components/StandardEditor.jsx';
 import ImportModal from './components/ImportModal.jsx';
 import { TermHeader } from '../../components/terminal/index.js';
 import { useAppState } from '../../hooks/useAppState.js';
+import { t } from '../../strings/index.js';
 
 function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
   const [view, setView] = useState({ mode: 'list' });
@@ -31,7 +32,7 @@ function StandardsListView({ grouped, loading, error, actions, customizedCounts 
     <>
       {error && <p className="inline-error inline-error--spaced">{error}</p>}
       {loading ? (
-        <div className="standards-loading">Loading standards...</div>
+        <div className="standards-loading">{t('standards.loadingStandards')}</div>
       ) : (
         <StandardsTable grouped={grouped} actions={actions} customizedCounts={customizedCounts} />
       )}
@@ -67,12 +68,12 @@ export default function StandardsPage({ onRescan }) {
     <div className="standards-page standards-page--terminal">
       <div className="standards-page-header standards-page-header--terminal">
         <TermHeader
-          name="standards"
-          sub={`manage evaluation standards and quality criteria · ${activeCount} active`}
+          name={t('standards.termName')}
+          sub={t('standards.termSub', { count: activeCount })}
         />
         <div className="standards-page-header-actions">
-          <button type="button" className="btn-secondary" onClick={() => setShowImport(true)}>Import</button>
-          <button type="button" className="btn-primary" onClick={handleNewStandard}>+ New Standard</button>
+          <button type="button" className="btn-secondary" onClick={() => setShowImport(true)}>{t('standards.importBtn')}</button>
+          <button type="button" className="btn-primary" onClick={handleNewStandard}>{t('standards.newStandardBtn')}</button>
         </div>
       </div>
       <StandardsListView grouped={grouped} loading={loading} error={error} actions={{ onEdit: handleEdit, onDelete: handleDeleteWithCleanup, onDuplicate: handleDuplicate, isVisible, onToggleVisibility: toggle }} customizedCounts={customizedCounts} />

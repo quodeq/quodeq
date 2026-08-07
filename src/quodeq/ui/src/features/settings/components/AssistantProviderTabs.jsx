@@ -3,12 +3,13 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import useAssistantProvider from '../hooks/useAssistantProvider.js';
 import AssistantModelPicker from './AssistantModelPicker.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { t } from '../../../strings/index.js';
 
 const DEFAULT_PROVIDER_ORDER = 50;
 
 const MODE_OPTIONS = [
-  { value: 'default', label: 'Default' },
-  { value: 'custom', label: 'Custom' },
+  { value: 'default', label: t('settings.modeDefault') },
+  { value: 'custom', label: t('settings.modeCustom') },
 ];
 
 export default function AssistantProviderTabs({ providerConfigs }) {
@@ -27,7 +28,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
       });
       setClients(list);
       setClientsError(null);
-    }).catch(() => { setClients([]); setClientsError('We couldn’t load your AI providers. Make sure the server is running.'); });
+    }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });
   }, []);
 
   const active = clients.find((c) => c.id === activeProvider);
@@ -35,19 +36,19 @@ export default function AssistantProviderTabs({ providerConfigs }) {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <SectionLabel marker="▶">Assistant</SectionLabel>
+        <SectionLabel marker="▶">{t('settings.assistantLabel')}</SectionLabel>
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
 
       <div className={`settings-row${enabled ? '' : ' settings-row--last'}`}>
         <div className="settings-row-label">
-          <span className="settings-label">Enable assistant</span>
+          <span className="settings-label">{t('settings.assistantEnable')}</span>
           <span className="settings-description">
-            Shows the assistant button (✦) in the toolbar and enables the Ctrl+` panel. On by default.
+            {t('settings.assistantEnableDesc')}
           </span>
         </div>
         <div className="settings-pill-group" role="tablist">
-          {[{ value: true, label: 'On' }, { value: false, label: 'Off' }].map(({ value, label }) => (
+          {[{ value: true, label: t('settings.on') }, { value: false, label: t('settings.off') }].map(({ value, label }) => (
             <button
               key={label}
               type="button"
@@ -65,9 +66,9 @@ export default function AssistantProviderTabs({ providerConfigs }) {
       {enabled && (
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Model source</span>
+          <span className="settings-label">{t('settings.modelSource')}</span>
           <span className="settings-description">
-            Default follows your Analysis provider and model. Choose Custom to pick a different one for the assistant.
+            {t('settings.modelSourceDesc')}
           </span>
         </div>
         <div className="settings-pill-group" role="tablist">
@@ -90,7 +91,10 @@ export default function AssistantProviderTabs({ providerConfigs }) {
       {enabled && mode === 'default' && (
         <div className="settings-row settings-row--last">
           <span className="settings-description">
-            Follows Analysis · {active?.label || activeProvider || 'none selected'} · {model || 'default'}
+            {t('settings.followsAnalysis', {
+              provider: active?.label || activeProvider || t('settings.noneSelected'),
+              model: model || t('settings.modeDefault').toLowerCase(),
+            })}
           </span>
         </div>
       )}
@@ -99,8 +103,8 @@ export default function AssistantProviderTabs({ providerConfigs }) {
         <>
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-label">AI Provider</span>
-              <span className="settings-description">Choose which AI powers the in-app assistant.</span>
+              <span className="settings-label">{t('settings.aiProvider')}</span>
+              <span className="settings-description">{t('settings.assistantProviderDesc')}</span>
             </div>
             <div className="settings-pill-group" role="tablist">
               {clients.map((c) => {
@@ -112,7 +116,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
                     role="tab"
                     aria-selected={c.id === activeProvider}
                     aria-disabled={!installed}
-                    title={installed ? undefined : `${c.label} isn’t installed yet`}
+                    title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
                     className={`settings-pill${c.id === activeProvider ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
                     onClick={() => setActiveProvider(c.id)}
                   >
@@ -125,8 +129,8 @@ export default function AssistantProviderTabs({ providerConfigs }) {
           {active && (
             <div className="settings-row settings-row--last">
               <div className="settings-row-label">
-                <span className="settings-label">Model</span>
-                <span className="settings-description">Pick the model the assistant should use.</span>
+                <span className="settings-label">{t('settings.modelLabel')}</span>
+                <span className="settings-description">{t('settings.assistantModelDesc')}</span>
               </div>
               <AssistantModelPicker
                 provider={active}

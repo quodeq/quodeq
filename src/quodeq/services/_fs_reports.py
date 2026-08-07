@@ -55,15 +55,20 @@ def get_dimension_eval(
     dimension: str,
     *,
     compiled_dir: Path | None = None,
+    evaluators_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     """Return parsed evaluation data for a single dimension in a run."""
     base = (Path(reports_dir) / project / run_id).resolve()
     if not base.is_relative_to(Path(reports_dir).resolve()):
         return None
     effective_compiled = compiled_dir or default_paths().standards_dir / "compiled"
+    effective_evaluators = evaluators_dir or default_paths().evaluators_dir
     result = resolve_dimension_eval(
         base, project, run_id, dimension,
-        options=_ResolveOptions(compiled_dir=effective_compiled if effective_compiled.exists() else None),
+        options=_ResolveOptions(
+            compiled_dir=effective_compiled if effective_compiled.exists() else None,
+            evaluators_dir=effective_evaluators if effective_evaluators.exists() else None,
+        ),
     )
     if result is not None:
         return to_camel_dict(result) if isinstance(result, ViolationResponse) else result

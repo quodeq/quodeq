@@ -133,7 +133,7 @@ class TestReadAccumulatedSummary:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     def test_computes_summary(self, mock_summarize, mock_read):
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         dim = DimensionResult(dimension="security", overall_score="8.5/10",
                               overall_grade="A", files_read=10, source_file_count=10)
@@ -149,7 +149,7 @@ class TestReadAccumulatedSummary:
 
     @patch("quodeq.services._fs_metadata.read_run_data", return_value=[])
     def test_no_dimensions(self, mock_read):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
         grade, score, files = _read_accumulated_summary(Path("/r"), "proj", runs)
         assert grade is None
@@ -163,7 +163,7 @@ class TestReadAccumulatedSummary:
 
     @patch("quodeq.services._fs_metadata.read_run_data", side_effect=OSError("boom"))
     def test_error_returns_none_tuple(self, mock_read):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
         grade, score, files = _read_accumulated_summary(Path("/r"), "proj", runs)
         assert grade is None
@@ -178,7 +178,7 @@ class TestReadAccumulatedSummary:
         """Dims absent from the latest run's config are KEPT (show all,
         count all) so the card grade matches the accumulated overview."""
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         # Bypass the persisted project-summary cache so we observe the fresh
         # computation (the cache is keyed by project name, not reports_root).
@@ -221,9 +221,9 @@ class TestReadAccumulatedSummary:
         """Dims outside the visible-standards selection must not move the
         card grade: the Overview headline excludes them (the client filters
         the accumulated payload by the same selection)."""
-        from quodeq.core.standards.visibility import save_visible_standard_ids
+        from quodeq.data.fs.standards_prefs import save_visible_standard_ids
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
@@ -260,7 +260,7 @@ class TestReadAccumulatedSummary:
         non-default dim (clean-architecture) no longer drags the card grade
         while being invisible on the Overview."""
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
@@ -287,9 +287,9 @@ class TestReadAccumulatedSummary:
         """The selection is folded into the cache version: editing
         standards-visibility.json must invalidate the persisted card summary,
         not serve the grade computed under the previous selection."""
-        from quodeq.core.standards.visibility import save_visible_standard_ids
+        from quodeq.data.fs.standards_prefs import save_visible_standard_ids
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
         reports_root = tmp_path / "evaluations"
@@ -335,11 +335,9 @@ class TestReadAccumulatedSummary:
         from quodeq.data.sqlite.state_store import SQLiteStateStore
         from quodeq.services import grade_formula
         from quodeq.services.dashboard import clear_shared_dimension_cache
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
-        monkeypatch.setattr(
-            grade_formula, "grade_formula_path", lambda: tmp_path / "grade_formula.json",
-        )
+        monkeypatch.setenv("QUODEQ_GRADE_FORMULA_PATH", str(tmp_path / "grade_formula.json"))
         clear_shared_dimension_cache()
 
         reports_root = tmp_path / "reports"
@@ -400,7 +398,7 @@ class TestReadAccumulatedSummary:
 
 class TestReadLanguageStats:
     def test_reads_from_manifest(self, tmp_path: Path):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         proj = tmp_path / "proj" / "run1" / "evidence"
         proj.mkdir(parents=True)
         (proj / "manifest.json").write_text(json.dumps({
@@ -411,7 +409,7 @@ class TestReadLanguageStats:
         assert result == {"py": 100, "js": 50}
 
     def test_strips_leading_dots(self, tmp_path: Path):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         proj = tmp_path / "proj" / "run1" / "evidence"
         proj.mkdir(parents=True)
         (proj / "manifest.json").write_text(json.dumps({
@@ -422,12 +420,12 @@ class TestReadLanguageStats:
         assert "ts" in result
 
     def test_returns_empty_on_missing_manifest(self, tmp_path: Path):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
         assert _read_language_stats(tmp_path, "proj", runs) == {}
 
     def test_returns_empty_on_bad_json(self, tmp_path: Path):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         proj = tmp_path / "proj" / "run1" / "evidence"
         proj.mkdir(parents=True)
         (proj / "manifest.json").write_text("bad")
@@ -435,7 +433,7 @@ class TestReadLanguageStats:
         assert _read_language_stats(tmp_path, "proj", runs) == {}
 
     def test_skips_empty_stats(self, tmp_path: Path):
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
         proj = tmp_path / "proj" / "run1" / "evidence"
         proj.mkdir(parents=True)
         (proj / "manifest.json").write_text(json.dumps({"language_stats": {}}))
@@ -559,7 +557,7 @@ class TestCardUsesDefaultViewRuns:
         different grade than the Overview showed after clicking in.
         """
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         mock_read.return_value = [
@@ -590,7 +588,7 @@ class TestCardUsesDefaultViewRuns:
         self, mock_read, mock_summarize, monkeypatch,
     ):
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         mock_read.return_value = [
@@ -619,7 +617,7 @@ class TestCardUsesDefaultViewRuns:
         drive the project card, exactly like the accumulated Overview. The
         card fell through to the real older run's score."""
         from quodeq.core.types import DimensionResult
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         per_run = {
@@ -673,7 +671,7 @@ class TestPerDimensionRunDirRescore:
         from quodeq.core.types.finding import Finding
         from quodeq.services.dismissed import dismiss_finding, dismissed_keys
         from quodeq.services.evidence_rescore import score_dimension_from_evidence
-        from quodeq.services.ports import RunInfo
+        from quodeq.data.fs.report_parser.runs import RunInfo
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"

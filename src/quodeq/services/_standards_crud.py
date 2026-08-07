@@ -6,6 +6,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.data.fs.standards_store import (
+    compiled_exists, ensure_evaluators_dir, remove_standard,
+    standard_exists, standard_path,
+)
 from quodeq.core.types.standard import StandardDetail
 from quodeq.services._standards_io import (
     _TYPE_CUSTOM, build_custom_meta, build_detail, count_principles_and_requirements,
@@ -32,10 +36,10 @@ def create(data: dict, evaluators_dir: Path, io: JsonIO) -> StandardDetail:
     """Create a new custom standard and persist it to disk."""
     standard_id = data["id"]
     _validate_id(standard_id)
-    path = evaluators_dir / f"{standard_id}.json"
-    if path.exists():
+    path = standard_path(evaluators_dir, standard_id)
+    if standard_exists(evaluators_dir, standard_id):
         raise ValueError(f"Standard '{standard_id}' already exists")
-    evaluators_dir.mkdir(parents=True, exist_ok=True)
+    ensure_evaluators_dir(evaluators_dir)
     io.write(path, {**data, **_CUSTOM_DEFAULTS})
     return build_detail(io.read(path))
 
@@ -43,8 +47,8 @@ def create(data: dict, evaluators_dir: Path, io: JsonIO) -> StandardDetail:
 def update(standard_id: str, data: dict, evaluators_dir: Path, io: JsonIO) -> StandardDetail:
     """Update an existing custom standard with new *data*."""
     _validate_id(standard_id)
-    path = evaluators_dir / f"{standard_id}.json"
-    if not path.is_file():
+    path = standard_path(evaluators_dir, standard_id)
+    if not standard_exists(evaluators_dir, standard_id):
         raise FileNotFoundError(f"Standard not found: {standard_id}")
     if io.read(path).get("managed", False):
         raise PermissionError(f"Cannot edit managed standard '{standard_id}'")
@@ -57,24 +61,24 @@ def delete(standard_id: str, evaluators_dir: Path, compiled_dir: Path,
            io: JsonIO, is_builtin: Callable[[str], bool]) -> None:
     """Delete a custom standard. Raises for built-in or managed standards."""
     _validate_id(standard_id)
-    path = evaluators_dir / f"{standard_id}.json"
-    if not path.is_file():
-        if (compiled_dir / f"{standard_id}.json").is_file() or is_builtin(standard_id):
+    path = standard_path(evaluators_dir, standard_id)
+    if not standard_exists(evaluators_dir, standard_id):
+        if compiled_exists(compiled_dir, standard_id) or is_builtin(standard_id):
             raise PermissionError(f"Cannot delete built-in standard '{standard_id}'")
         raise FileNotFoundError(f"Standard not found: {standard_id}")
     if io.read(path).get("managed", False):
         raise PermissionError(f"Cannot delete managed standard '{standard_id}'")
-    path.unlink()
+    remove_standard(evaluators_dir, standard_id)
 
 
 def duplicate(standard_id: str, new_id: str, source_detail: StandardDetail,
               evaluators_dir: Path, io: JsonIO) -> StandardDetail:
     """Duplicate an existing standard under *new_id* as a custom copy."""
     _validate_id(new_id)
-    new_path = evaluators_dir / f"{new_id}.json"
-    if new_path.exists():
+    new_path = standard_path(evaluators_dir, new_id)
+    if standard_exists(evaluators_dir, new_id):
         raise ValueError(f"Standard '{new_id}' already exists")
-    evaluators_dir.mkdir(parents=True, exist_ok=True)
+    ensure_evaluators_dir(evaluators_dir)
     s = source_detail
     payload = {"id": new_id, "name": s.name, "description": s.description,
                "weight": s.weight, "source": s.source, "principles": s.principles,
@@ -91,15 +95,15 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, io: JsonIO) 
     cleaned = validation["data"]
     warnings = scan_injection(cleaned)
     standard_id = cleaned["id"]
-    path = evaluators_dir / f"{standard_id}.json"
-    if path.is_file() and not force:
+    path = standard_path(evaluators_dir, standard_id)
+    if standard_exists(evaluators_dir, standard_id) and not force:
         existing = io.read(path)
         p, r = count_principles_and_requirements(existing)
         return {"status": "conflict", "detail": None,
                 "existing": build_custom_meta(existing, p, r), "warnings": warnings}
-    if path.is_file() and force and io.read(path).get("managed", False):
+    if standard_exists(evaluators_dir, standard_id) and force and io.read(path).get("managed", False):
         raise PermissionError(f"Cannot overwrite managed standard '{standard_id}'")
-    evaluators_dir.mkdir(parents=True, exist_ok=True)
+    ensure_evaluators_dir(evaluators_dir)
     io.write(path, {**cleaned, **_CUSTOM_DEFAULTS})
     return {"status": "imported", "detail": build_detail(io.read(path)),
             "existing": None, "warnings": warnings}

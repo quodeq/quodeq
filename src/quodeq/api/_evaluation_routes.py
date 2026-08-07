@@ -21,9 +21,9 @@ from quodeq.core.types import to_camel_dict
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
-from quodeq.services.evaluation_mixin import _score_completed_evidence
-from quodeq.services.scan_progress import build_scan_progress, progress_to_dict
-from quodeq.shared.dimensions_state import read_dimensions
+from quodeq.services.score_run import score_completed_evidence
+from quodeq.services.scan_progress import build_scan_progress
+from quodeq.services.run_events import read_run_dim_states
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
@@ -81,8 +81,7 @@ def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     run_id = getattr(job, "output_run_id", None)
     if not project or not run_id:
         return {}
-    run_dir = Path(_reports_dir()) / project / run_id
-    return read_dimensions(run_dir).get("dimensions", {})
+    return read_run_dim_states(_reports_dir(), project, run_id)
 
 # Cap on /api/evaluations ?limit= so a client cannot ask the server to materialize
 # an unbounded list. limit=0 still means "no client cap" but we clamp the actual
@@ -190,7 +189,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
             def _score_in_bg(reports_dir: str, score_args: dict) -> None:
                 try:
-                    _score_completed_evidence(reports_dir, score_args)
+                    score_completed_evidence(reports_dir, score_args)
                 except Exception as exc:
                     _logger.debug(
                         "Could not score cancelled dimension for %s: %s",
@@ -229,7 +228,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if progress is None:
             body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        return jsonify(to_camel_dict(progress_to_dict(progress)))
+        return jsonify(to_camel_dict(progress))
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:

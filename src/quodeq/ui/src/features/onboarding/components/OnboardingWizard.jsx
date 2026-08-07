@@ -7,6 +7,7 @@ import WelcomeStep from './steps/WelcomeStep.jsx';
 import RepoScanStep from './steps/RepoScanStep.jsx';
 import ProviderStep from './steps/ProviderStep.jsx';
 import StandardLaunchStep from './steps/StandardLaunchStep.jsx';
+import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
 
 const STEP_ORDER = ['welcome', 'repo-scan', 'provider', 'standard-launch'];
@@ -115,9 +116,9 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   }
 
   return (
-    <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label="onboarding">
+    <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label={t('onboarding.dialogAria')}>
       <div className="onboarding-wizard__panel-frame">
-        <button type="button" className="onboarding-wizard__close" aria-label="Close onboarding" onClick={handleClose}>
+        <button type="button" className="onboarding-wizard__close" aria-label={t('onboarding.close')} onClick={handleClose}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />

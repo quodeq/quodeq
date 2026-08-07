@@ -9,7 +9,7 @@ import pytest
 import quodeq.services.shared_publish as shared_publish
 from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
 from quodeq.services.shared_publish import PublishError, publish_project
-from quodeq.services.shared_repo import ensure_shared_clone, shared_repo_path
+from quodeq.data.fs.shared_repo import ensure_shared_clone, shared_repo_path
 
 
 def _monotonic_clock(start: float = 1_000_000.0, step: float = 50.0):

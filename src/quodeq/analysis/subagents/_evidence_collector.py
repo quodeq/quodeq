@@ -15,7 +15,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.pool import SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
-from quodeq.engine._runner_markers import cleanup_stream
+from quodeq.analysis._runner_markers import cleanup_stream
 
 
 @dataclass

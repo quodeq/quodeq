@@ -29,6 +29,11 @@ def client(tmp_path, monkeypatch):
     """Full Flask app stack with a *tight* rate limit so the burst test is fast."""
     monkeypatch.setenv("QUODEQ_RATE_LIMIT_MAX", "5")
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path))
+    # The mutation endpoints resolve a project against the directory listing,
+    # so the project these requests name has to exist. It always does in real
+    # use; the fixture only got away without it while the old code silently
+    # created the tree on first write.
+    (tmp_path / "p").mkdir(exist_ok=True)
     # Use a fresh in-memory store with the same tight cap so the test
     # doesn't depend on environment-reading inside the factory.
     store = InMemoryRateLimitStore(window=60, max_requests=5)

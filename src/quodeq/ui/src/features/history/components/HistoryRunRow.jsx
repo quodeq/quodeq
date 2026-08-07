@@ -1,10 +1,11 @@
 import { scoreColorClass, gradeLabel } from '../../../utils/formatters.js';
+import { t, LOCALE } from '../../../strings/index.js';
 
 function formatDate(dateISO) {
   if (!dateISO) return '';
   try {
     const d = new Date(dateISO);
-    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+    return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
   } catch { return ''; }
 }
 
@@ -12,7 +13,7 @@ function formatTime(dateISO) {
   if (!dateISO) return '';
   try {
     const d = new Date(dateISO);
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
   } catch { return ''; }
 }
 
@@ -60,7 +61,7 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
         <span className="history-row-date-main">{formatDate(dateISO) || dateLabel}</span>
         <span className="history-row-date-time">
           {isInProgress
-            ? <span style={{ color: 'var(--color-text-subtle)', fontStyle: 'italic' }}>&#8635; Running&hellip;</span>
+            ? <span style={{ color: 'var(--color-text-subtle)', fontStyle: 'italic' }}>&#8635; {t('history.runningEllipsis')}</span>
             : formatTime(dateISO)
           }
         </span>
@@ -89,10 +90,10 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
         </div>
       </div>
       <div className="history-row-acc">
-        <span className="history-row-acc-label">Accumulated</span>
+        <span className="history-row-acc-label">{t('history.accumulatedLabel')}</span>
         <div className="history-row-acc-line">
           {isInProgress
-            ? <span style={{ color: 'var(--color-text-subtle)', fontSize: 'var(--text-sm)' }}>In progress</span>
+            ? <span style={{ color: 'var(--color-text-subtle)', fontSize: 'var(--text-sm)' }}>{t('history.inProgress')}</span>
             : <>
                 <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.85 }}>{accLetter}</span>
                 <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>

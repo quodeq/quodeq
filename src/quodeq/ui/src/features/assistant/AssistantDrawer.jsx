@@ -5,6 +5,7 @@ import { CommandMenu } from './CommandMenu.jsx';
 import { AssistantWelcome } from './AssistantWelcome.jsx';
 import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.js';
 import { StopIcon } from '../../components/CopyButton.jsx';
+import { t } from '../../strings/index.js';
 
 function SendIcon() {
   return (
@@ -113,7 +114,7 @@ export function AssistantPane({ uiState, active = true }) {
           <textarea
             ref={inputRef}
             className="assistant-drawer-input"
-            placeholder="Ask the assistant, or type / for commands…"
+            placeholder={t('assistant.inputPlaceholder')}
             value={draft}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -123,7 +124,7 @@ export function AssistantPane({ uiState, active = true }) {
           {streaming ? (
             <button type="button" className="assistant-send-btn assistant-stop-btn"
               onClick={stopTurn}
-              aria-label="Stop generating" title="Stop generating">
+              aria-label={t('assistant.stopGenerating')} title={t('assistant.stopGenerating')}>
               <StopIcon />
             </button>
           ) : (
@@ -131,13 +132,13 @@ export function AssistantPane({ uiState, active = true }) {
               className={`assistant-send-btn${draft.trim() ? ' assistant-send-btn--ready' : ''}`}
               onClick={handleSend}
               disabled={!draft.trim()}
-              aria-label="Send" title="Send (Enter)">
+              aria-label={t('assistant.send')} title={t('assistant.sendHint')}>
               <SendIcon />
             </button>
           )}
         </div>
         <div className="assistant-composer-hint">
-          Enter to send · Shift+Enter for newline · runs locally on your model
+          {t('assistant.inputHint')}
         </div>
       </div>
     </>

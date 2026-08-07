@@ -11,17 +11,19 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_TIME_LIMIT
+from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     SubprocessDispatcher,
     _build_evaluate_cmd,
     _discard_run_state,
+    _wait_for_terminal_status,
+)
+from quodeq.services.project_registration import register_project as _register_project
+from quodeq.services.score_run import (
     _read_project_source_file_count,
     _read_queue_files_count,
-    _register_project,
-    _score_completed_evidence,
-    _wait_for_terminal_status,
+    score_completed_evidence as _score_completed_evidence,
 )
 from tests._timeouts import budget
 
@@ -74,7 +76,7 @@ class TestBuildEvaluateCmd:
         assert "10" in cmd
 
     def test_default_subagents_not_added(self, tmp_path: Path):
-        opts = EvaluationOptions(max_subagents=_DEFAULT_MAX_SUBAGENTS)
+        opts = EvaluationOptions(max_subagents=DEFAULT_MAX_SUBAGENTS)
         cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "--n-subagents" not in cmd
 
@@ -150,9 +152,9 @@ class TestBuildEvalEnv:
         # couldn't resolve a time limit, the analyzing_start marker never
         # fired, and the UI countdown timer froze at the static budget.
         m = self._mixin()
-        opts = EvaluationOptions(time_limit=_DEFAULT_TIME_LIMIT)
+        opts = EvaluationOptions(time_limit=DEFAULT_TIME_LIMIT)
         env = m._build_eval_env("/repo", opts, env={})
-        assert env["QUODEQ_TIME_LIMIT"] == str(_DEFAULT_TIME_LIMIT)
+        assert env["QUODEQ_TIME_LIMIT"] == str(DEFAULT_TIME_LIMIT)
 
     def test_unlimited_time_limit_propagated_as_zero(self):
         # 0 means "unlimited". It must reach the subprocess explicitly:
@@ -269,14 +271,14 @@ class TestStartEvaluation:
             m.start_evaluation("https://github.com/org/repo.git", "/reports", opts)
         m._dispatcher.dispatch.assert_not_called()
 
-    @patch("quodeq.services.evaluation_mixin._register_project")
+    @patch("quodeq.services.evaluation_mixin.register_project")
     def test_start_with_local_dir(self, mock_reg, tmp_path: Path):
         m = self._setup_mixin()
         opts = EvaluationOptions()
         snap = m.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
         assert snap.job_id == "j1"
 
-    @patch("quodeq.services.evaluation_mixin._register_project")
+    @patch("quodeq.services.evaluation_mixin.register_project")
     def test_start_passes_time_limit_to_dispatcher(self, mock_reg, tmp_path: Path):
         # The job snapshot is the only channel through which the progress
         # route and the UI can learn the run's budget.
@@ -291,7 +293,7 @@ class TestStartEvaluation:
         with pytest.raises(FileNotFoundError, match="Repository not found"):
             m.start_evaluation("/nonexistent/path", "/reports", opts)
 
-    @patch("quodeq.services.evaluation_mixin._register_project")
+    @patch("quodeq.services.evaluation_mixin.register_project")
     def test_local_file_walks_up_to_git_root(self, mock_reg, tmp_path: Path):
         """When repo arg is a file, cwd should be the enclosing git root."""
         git_root = tmp_path / "repo"
@@ -323,7 +325,7 @@ class TestCancelEvaluation:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
@@ -347,7 +349,7 @@ class TestCancelEvaluation:
         m._jobs = MagicMock()
         m._jobs.cancel_job.return_value = True
         m._jobs.get_job.return_value = JobSnapshot(job_id="j1", status="running")
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status") as mock_wait:
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
@@ -376,7 +378,7 @@ class TestCancelEvaluation:
             output_project="proj-uuid", output_run_id="run-42",
         )
         with patch.object(FsEvaluationMixin, "get_evaluation_status", return_value=ext_snapshot), \
-             patch("quodeq.services.evaluation_mixin._score_completed_evidence") as mock_score, \
+             patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
             result = m.cancel_evaluation("ext-run-42", reports_dir="/reports")
         assert result is True
@@ -463,7 +465,7 @@ class TestCancelEvaluationWaitsForTerminal:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin._wait_for_terminal_status") as mock_wait, \
-             patch("quodeq.services.evaluation_mixin._score_completed_evidence"):
+             patch("quodeq.services.evaluation_mixin.score_completed_evidence"):
             m.cancel_evaluation("j1", reports_dir="/reports")
         mock_wait.assert_called_once()
         run_dir_arg = mock_wait.call_args.args[0]
@@ -492,7 +494,7 @@ class TestCancelDiscardPartial:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence"), \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence"), \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"), \
              patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard:
             m.cancel_evaluation("j1", reports_dir="/reports")
@@ -506,7 +508,7 @@ class TestCancelDiscardPartial:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._score_completed_evidence"), \
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence"), \
              patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"), \
              patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard:
             m.cancel_evaluation("j1", reports_dir="/reports", discard_partial=True)

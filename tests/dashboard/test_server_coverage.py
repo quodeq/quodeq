@@ -177,10 +177,10 @@ class TestServeNative:
     @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
     @patch("quodeq.dashboard._server.subprocess_cmd", return_value=["quodeq-webview"])
-    def test_acquires_and_launches(self, mock_cmd, mock_popen, mock_backend):
+    def test_cold_start_launches_window(self, mock_cmd, mock_popen, mock_backend):
         from quodeq.dashboard._server import _serve_native
         mock_instance = MagicMock()
-        mock_instance.try_acquire.return_value = True
+        mock_instance.probe_existing.return_value = False
         mock_instance._sock_path = Path("/tmp/test.sock")
 
         mock_proc = MagicMock()
@@ -195,18 +195,50 @@ class TestServeNative:
 
     @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
-    def test_send_reload_to_existing(self, mock_popen, mock_backend):
+    @patch("quodeq.dashboard._server.subprocess_cmd", return_value=["quodeq-webview"])
+    def test_parent_never_owns_the_reload_socket(self, mock_cmd, mock_popen, mock_backend):
+        """The window process owns the socket, so the parent must not bind it.
+
+        Binding here is what left the webview child unable to acquire: its
+        listener thread died on the unbound socket and every relaunch's reload
+        was dropped. Probing must also never unlink a live instance's socket.
+        """
         from quodeq.dashboard._server import _serve_native
         mock_instance = MagicMock()
-        mock_instance.try_acquire.return_value = False
-        mock_instance.send_reload.return_value = None
+        mock_instance.probe_existing.return_value = False
+        mock_instance._sock_path = Path("/tmp/test.sock")
+
+        mock_proc = MagicMock()
+        mock_proc.pid = 1234
+
+        with self._fake_webview_ctx(), \
+             patch("quodeq.dashboard._instance.InstanceController", return_value=mock_instance):
+            _serve_native("http://localhost:8000", mock_proc, MagicMock())
+
+        mock_instance.try_acquire.assert_not_called()
+        mock_instance.start_listening.assert_not_called()
+        mock_instance.shutdown.assert_not_called()
+
+    @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
+    @patch("quodeq.dashboard._server.subprocess.Popen")
+    def test_focuses_existing_instead_of_retargeting_it(self, mock_popen, mock_backend):
+        """The running window keeps its own backend.
+
+        stop_children kills the API this launch spawned, so sending that URL
+        would hand the window a server about to die.
+        """
+        from quodeq.dashboard._server import _serve_native
+        mock_instance = MagicMock()
+        mock_instance.probe_existing.return_value = True
+        mock_instance.send_focus.return_value = None
         mock_stop = MagicMock()
 
         with self._fake_webview_ctx(), \
              patch("quodeq.dashboard._instance.InstanceController", return_value=mock_instance):
             _serve_native("http://localhost:8000", MagicMock(), mock_stop)
 
-        mock_instance.send_reload.assert_called_once_with("http://localhost:8000")
+        mock_instance.send_focus.assert_called_once_with()
+        mock_instance.send_reload.assert_not_called()
         mock_stop.assert_called_once()
         mock_popen.assert_not_called()
 
@@ -221,48 +253,26 @@ class TestServeNative:
     @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
     @patch("quodeq.dashboard._server.subprocess.Popen")
     @patch("quodeq.dashboard._server.subprocess_cmd", return_value=["quodeq-webview"])
-    def test_reload_fails_opens_new(self, mock_cmd, mock_popen, mock_backend):
+    @pytest.mark.parametrize("failure", [ConnectionRefusedError(), OSError("refused")])
+    def test_focus_failure_opens_own_window(self, mock_cmd, mock_popen, mock_backend, failure):
+        """An instance that answers the probe but dies before the send.
+
+        The launch must still produce a window rather than exiting silently —
+        the child's own try_acquire clears the now-stale socket.
+        """
         from quodeq.dashboard._server import _serve_native
-        mock_instance1 = MagicMock()
-        mock_instance1.try_acquire.return_value = False
-        mock_instance1.send_reload.side_effect = ConnectionRefusedError()
-        mock_instance1._sock_path = Path("/tmp/test.sock")
-
-        mock_instance2 = MagicMock()
-        mock_instance2.try_acquire.return_value = True
-        mock_instance2._sock_path = Path("/tmp/test.sock")
-
-        instances = [mock_instance1, mock_instance2]
+        mock_instance = MagicMock()
+        mock_instance.probe_existing.return_value = True
+        mock_instance.send_focus.side_effect = failure
+        mock_instance._sock_path = Path("/tmp/test.sock")
 
         mock_proc = MagicMock()
         mock_proc.pid = 999
         mock_stop = MagicMock()
 
         with self._fake_webview_ctx(), \
-             patch("quodeq.dashboard._instance.InstanceController", side_effect=instances):
+             patch("quodeq.dashboard._instance.InstanceController", return_value=mock_instance):
             _serve_native("http://localhost:8000", mock_proc, mock_stop)
 
-        mock_instance1.shutdown.assert_called_once()
         mock_popen.assert_called_once()
-
-    @patch("quodeq.dashboard._server._linux_webview_backend_available", return_value=True)
-    @patch("quodeq.dashboard._server.subprocess.Popen")
-    def test_reload_fails_second_acquire_fails(self, mock_popen, mock_backend):
-        """When reload fails and second acquire also fails, stop_children is called."""
-        from quodeq.dashboard._server import _serve_native
-        mock_instance1 = MagicMock()
-        mock_instance1.try_acquire.return_value = False
-        mock_instance1.send_reload.side_effect = OSError("refused")
-
-        mock_instance2 = MagicMock()
-        mock_instance2.try_acquire.return_value = False
-
-        instances = [mock_instance1, mock_instance2]
-        mock_stop = MagicMock()
-
-        with self._fake_webview_ctx(), \
-             patch("quodeq.dashboard._instance.InstanceController", side_effect=instances):
-            _serve_native("http://localhost:8000", MagicMock(), mock_stop)
-
-        mock_stop.assert_called_once()
-        mock_popen.assert_not_called()
+        mock_instance.shutdown.assert_not_called()

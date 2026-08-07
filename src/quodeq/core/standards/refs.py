@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from quodeq.shared.utils import read_json
+from quodeq.core.utils.io import read_json
 from quodeq.core.standards.overrides import resolve_requirement_text
 
 _logger = logging.getLogger(__name__)
@@ -89,8 +89,82 @@ def extract_requirements(data: dict, overrides: dict[str, dict] | None = None) -
     return lookup
 
 
+def extract_requirement_checks(data: dict) -> dict[str, frozenset[str]]:
+    """Extract ``{check_name: {req_id, ...}}`` from a compiled-standards dict.
+
+    A requirement opts into a deterministic checker by naming it
+    (``"check": "framework-imports"``). Grouping by checker name lets the
+    caller run each one once no matter how many requirements it answers, then
+    filter the judgments back to the requirements that actually asked.
+
+    Requirements without a ``check`` are absent from the result, so a standard
+    that declares none costs nothing.
+    """
+    grouped: dict[str, set[str]] = {}
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            name = req.get("check")
+            req_id = req.get("id")
+            if isinstance(name, str) and name and req_id:
+                grouped.setdefault(name, set()).add(req_id)
+    return {name: frozenset(ids) for name, ids in grouped.items()}
+
+
+def known_dimension_ids(
+    compiled_dir: str | Path | None, evaluators_dir: str | Path | None = None,
+) -> frozenset[str]:
+    """Return the dimension ids actually installed on disk.
+
+    A dimension is "known" when a same-named ``<id>.json`` file sits
+    directly inside *compiled_dir* (built-in, compiled standards) or
+    *evaluators_dir* (custom, user-imported standards) -- the two places a
+    standard's definition can live. The set is rebuilt from a directory
+    listing every call rather than cached, so a newly imported custom
+    standard is recognised immediately.
+
+    Listing is the point, not joining: a traversal segment or absolute path
+    never matches a real directory entry, so there is nothing to sanitise --
+    the caller compares the candidate dimension against this set before
+    building any path from it.
+    """
+    ids: set[str] = set()
+    for directory in (compiled_dir, evaluators_dir):
+        if not directory:
+            continue
+        path = Path(directory)
+        if not path.is_dir():
+            continue
+        ids.update(p.stem for p in path.glob("*.json"))
+    return frozenset(ids)
+
+
+def is_known_dimension(
+    dimension: str | None,
+    compiled_dir: str | Path | None,
+    evaluators_dir: str | Path | None = None,
+) -> bool:
+    """True if *dimension* names a standard actually installed on disk.
+
+    Comparison is case-insensitive, matching every other place dimension ids
+    are compared in this codebase (see
+    ``core.standards.visibility.normalize_ids``): older eval payloads and
+    request values may carry ``"Security"`` where a fresh compile writes
+    ``security.json``, and both must be recognised as the same dimension.
+    """
+    if not dimension:
+        return False
+    known_lower = {d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)}
+    return dimension.lower() in known_lower
+
+
 # ---------------------------------------------------------------------------
-# I/O convenience wrappers (kept for backward-compatible call-sites)
+# The one I/O function core still owns.
+#
+# ``core/evidence/_refs.enrich_judgment`` resolves requirement refs while
+# parsing judgments, and ``compiled_dir`` is threaded to it from 15 call
+# sites. Until enrichment moves out of the parse path (its own workstream),
+# core needs this read. Every OTHER standards loader lives in
+# ``data/fs/standards_loader.py``.
 # ---------------------------------------------------------------------------
 
 def _load_compiled_data(
@@ -100,10 +174,20 @@ def _load_compiled_data(
     """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
 
     Falls back to *evaluators_dir* for custom evaluators when provided.
-    This is an I/O adapter — callers that already have the data should use
-    :func:`extract_refs` or :func:`extract_requirements` directly.
+
+    *dimension* is request-reachable (routed here from the action API's
+    per-dimension endpoints), so it is checked against
+    :func:`is_known_dimension` before it ever reaches a path join. A
+    dimension outside that installed set is treated the same as one with no
+    compiled data at all: this returns ``None`` rather than raising, matching
+    every other failure mode in this function.
     """
     if not dimension:
+        return None
+    if (compiled_dir or evaluators_dir) and not is_known_dimension(
+        dimension, compiled_dir, evaluators_dir,
+    ):
+        _logger.warning("Rejected unknown dimension for compiled standards lookup: %r", dimension)
         return None
     if compiled_dir:
         path = Path(compiled_dir) / f"{dimension}.json"
@@ -113,7 +197,6 @@ def _load_compiled_data(
             except (OSError, ValueError, UnicodeDecodeError) as exc:
                 _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
                 return None
-    # Fallback: custom evaluators directory (caller must supply it)
     if evaluators_dir:
         evaluators_path = evaluators_dir / f"{dimension}.json"
         if evaluators_path.is_file():
@@ -128,60 +211,8 @@ def load_compiled_refs(
     compiled_dir: str | Path | None, dimension: str | None,
     evaluators_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
-    """Load {req_id: [{label, url, ...}, ...]} from compiled standards on disk.
-
-    Backward-compat convenience wrapper that handles file I/O then delegates
-    to the pure :func:`extract_refs`.  Prefer ``extract_refs`` when data is
-    already loaded.
-    """
+    """Load ``{req_id: [{label, url, ...}, ...]}`` from compiled standards on disk."""
     data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if not data:
         return {}
     return extract_refs(data)
-
-
-def load_compiled_refs_multi(
-    compiled_dir: str | Path | None, dimensions: list[str],
-    evaluators_dir: Path | None = None,
-) -> dict[str, list[dict]]:
-    """Load refs for multiple dimensions, merging into a single lookup."""
-    merged: dict[str, list[dict]] = {}
-    for dim in dimensions:
-        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir))
-    return merged
-
-
-def load_compiled_requirements_multi(
-    compiled_dir: str | Path | None, dimensions: list[str],
-    evaluators_dir: Path | None = None,
-    overrides: dict[str, dict] | None = None,
-) -> dict[str, dict]:
-    """Load requirements for multiple dimensions, merging into a single lookup."""
-    merged: dict[str, dict] = {}
-    for dim in dimensions:
-        merged.update(load_compiled_requirements(
-            compiled_dir, dim,
-            evaluators_dir=evaluators_dir,
-            overrides=overrides,
-        ))
-    return merged
-
-
-def load_compiled_requirements(
-    compiled_dir: str | Path | None, dimension: str | None,
-    evaluators_dir: Path | None = None,
-    overrides: dict[str, dict] | None = None,
-) -> dict[str, dict]:
-    """Load {req_id: {principle, text}} from compiled standards on disk.
-
-    When *overrides* is supplied, requirement text placeholders are resolved
-    using the per-requirement override values.
-
-    Backward-compat convenience wrapper that handles file I/O then delegates
-    to the pure :func:`extract_requirements`.  Used by the MCP server to
-    auto-fill principle name and requirement text from the requirement ID.
-    """
-    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
-    if not data:
-        return {}
-    return extract_requirements(data, overrides=overrides)
