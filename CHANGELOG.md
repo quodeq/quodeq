@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.9.0] - 2026-08-06
+
+### Features
+- **Declared trust model**: a project can state its own threat model in `.quodeq/project-profile.json`, and findings that the model excludes are capped instead of counted against you. A single-user tool bound to loopback no longer collects majors for cross-tenant attacks it cannot suffer. Network exposure is only ever read from the file you write, never guessed from your manifests, so nothing is waived without you declaring it.
+- **Deterministic requirement checkers**: framework imports, entity imports and config reads are now checked by code instead of inferred by the model, so those requirements give the same answer on every run.
+- **Suppression pattern rules**: a suppression can match a pattern instead of a fixed file and line, so a decision you already accepted survives the code being moved or renamed. Pattern rules count in scoring, not only in the findings list.
+- **Partial results survive a dying provider**: when the provider fails mid-run the dimensions that already finished are kept instead of the run being discarded, and Quodeq stops respawning agents into a provider that is already gone.
+- **Exit reasons in plain words**: a run that stopped early says why on the evaluate screen, with a hint on what to do about it, instead of showing a bare status.
+- **Score provenance**: a history point says when it came from a partial scan, and an Overview grade says when it came from a tuned formula, so a number you did not expect is explainable from the screen.
+- **Near-miss requirement IDs**: a finding whose requirement ID is slightly off is folded onto the right requirement instead of being quarantined out of your score.
+- **Translation-ready interface**: every screen, the help pages and backend error messages now come from a string catalog instead of being hardcoded. English is still the only language shipped, but adding another no longer means touching the components.
+
+### Improvements
+- **Dates and numbers stop following the OS**: on a machine set to another language, dates and numbers inside the English interface were rendered in that language. They now follow a single locale, so one screen no longer mixes two.
+- **Faster drill-in**: the findings list on principle detail is virtualized, finding payloads no longer ride along in browser history, and the explorer's dimension data is cached, so coming back from a principle or a file renders from cache instead of refetching behind a full-screen loader.
+- **Feedback while a page renders**: a detail page that takes a moment to appear now leaves the current page up with a slim progress bar rather than painting nothing, so a click never looks ignored. Cards react to the press in the same frame.
+- **Local models**: the read timeout scales with the number of subagents, so a heavily parallel local run no longer times out waiting on its own queue.
+- **Architecture**: the internal layering was reworked so domain rules, storage and the API no longer reach into each other, with an import checker that keeps it that way. No behavior change on its own, but the class of bug listed below is much harder to reintroduce.
+- **Dependencies**: pydantic is declared explicitly and runtime dependency ranges are bounded, so an install cannot quietly pick up an incompatible version.
+
+### Fixes
+- **Time limits**: an explicit time limit is now a hard cap. It no longer resets each time a dimension launches, the watchdog no longer cuts short a run that is draining its final results, and a run stopped by the deadline reports that it hit the time limit rather than FAILED or a user cancel.
+- **Inflated grades on high-volume principles**: the severity floor no longer overrides the volume ceiling. A principle carrying hundreds of minor findings and no major ones was scored by the floor alone, which hid the volume entirely. Runs you already scanned re-derive their grades on first read, so a stored grade no longer disagrees with a fresh rescore or appears to change on its own after a dismissal.
+- **Restore all**: restoring every dismissal asks for confirmation first, so one click can no longer wipe a project's dismissal history.
+- **Skipped dimensions**: a run that skipped dimensions no longer reports a clean completion, and a dry run that finished normally is no longer reported as truncated.
+- **Stale Overview scores**: accumulated rows cached before the partial-dimension guards landed were served forever. They are now flushed on the next read, so an Overview stuck on old numbers recovers without a rescan.
+- **Relaunching the dashboard**: starting Quodeq while it is already running now brings the open window to the front instead of racing it, no longer kills the healthy instance, and a corrupt PID file no longer takes the launch down with it.
+- **Reconnecting**: the interface now looks for the backend on the ports Quodeq actually binds, so a window whose server moved can follow it, and the disconnected notice appears on every route instead of leaving a spinner that never resolves.
+- **Navigation**: drilling into a principle or a file keeps the source tab you were on.
+- **Symlinked project directories**: a project directory reached through a symlink is still skipped for safety, but Quodeq now says so and names the link, its real target and the fix, instead of silently rendering the project as empty.
+- **Security**: path containment on the API routes goes through one recognized barrier, the dimension name is validated against the installed set before it reaches a path, response bodies are bounded in bytes as well as in seconds, and operator-controlled inputs are no longer treated as external ingress.
+- **Malformed project files**: an unreadable or pathological manifest, profile or per-project config degrades to safe defaults instead of failing the scan. Deeply nested JSON and TOML were the case that got through.
+- **Waivers that came back**: a downgraded finding keeps its marker across cache replay and across the report's JSON round trip, so a finding capped once does not silently return as a major.
+
 ## [1.8.1] - 2026-07-29
 
 ### Features
