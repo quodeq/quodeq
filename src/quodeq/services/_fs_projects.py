@@ -73,7 +73,9 @@ def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[
     return parent_ids, subproject_ids
 
 
-def build_project_list(reports_root: Path, *, backfill: bool = True) -> list[ProjectEntry]:
+def build_project_list(
+    reports_root: Path, *, backfill: bool = True, inline_summaries: bool = False,
+) -> list[ProjectEntry]:
     """Collect eligible project dirs and build entries in parallel.
 
     *backfill* controls the lazy ``onboardingCompletedAt`` backfill below (and
@@ -81,6 +83,12 @@ def build_project_list(reports_root: Path, *, backfill: bool = True) -> list[Pro
     are read as-is and never rewritten. Local callers keep the default
     (True); the shared-repo route passes False so listing a clone's projects
     never dirties its git worktree (see routes_shared.py shared_projects).
+
+    *inline_summaries* is forwarded to ``_build_project_entry`` (as
+    ``compute_on_miss``): the shared-repo route has no warm-up engine to fill
+    a missing project-card summary, so it passes True to keep computing one
+    inline on a miss. Local callers keep the default (False) -- a miss is
+    reported pending and left for the warm-up engine.
     """
     max_listed = _max_projects_listed()
     dir_names: list[str] = []
@@ -113,7 +121,9 @@ def build_project_list(reports_root: Path, *, backfill: bool = True) -> list[Pro
         runs = list_runs(reports_root, name)
         if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
             return None
-        return _build_project_entry(reports_root, name, runs, backfill=backfill)
+        return _build_project_entry(
+            reports_root, name, runs, backfill=backfill, inline_summaries=inline_summaries,
+        )
 
     # contextvars do NOT propagate into ThreadPoolExecutor worker threads --
     # each worker runs with its own default Context, so a caller-side

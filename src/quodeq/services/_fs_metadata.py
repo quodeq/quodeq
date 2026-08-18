@@ -82,32 +82,81 @@ def _local_repo_root(reports_root: Path, entry_name: str) -> Path | None:
     return root if root.is_dir() else None
 
 
-def _read_accumulated_summary(
+def _compute_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
-    params: "ScoringParams | None" = None,
-) -> tuple[str | None, float | None, int | None]:
-    """Compute accumulated grade and score across all runs. Returns (grade, score, files).
+    params: "ScoringParams", visible_set: set[str],
+) -> dict:
+    project_dir = reports_root / entry_name
+    try:
+        # Same run-set selection as the accumulated Overview
+        # (complete-only, cancelled fallback, never failed or
+        # in_progress). Iterating ALL runs newest-first gave the card
+        # a different grade than the Overview whenever the newest run
+        # was cancelled/failed/in_progress.
+        from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
+        from quodeq.services._accumulated_data import _has_valid_score  # noqa: PLC0415
+        view_runs = select_default_view_runs(runs)
+        latest_by_dim: dict[str, object] = {}
+        # Each dimension may come from a DIFFERENT run (last valid run per
+        # dimension), so remember the source run's directory per dimension:
+        # the rescore below must use THAT run's evidence, not the newest
+        # run's.
+        run_dir_by_dim: dict[str, Path] = {}
+        files_count: int | None = None
+        for run in view_runs:
+            dims = read_run_data(reports_root, entry_name, run.run_id)
+            for d in dims:
+                # Same trust gate as the accumulated Overview
+                # (_has_valid_score): skip a coverage-0 stub so the card
+                # falls through to a real older run instead of showing
+                # the stub's inflated grade. Hidden standards are skipped
+                # entirely: the Overview headline excludes them, and a
+                # dimension the user cannot see must not move the grade.
+                if (d.dimension and d.dimension.lower() in visible_set
+                        and d.dimension not in latest_by_dim and _has_valid_score(d)):
+                    latest_by_dim[d.dimension] = d
+                    validate_path_segment(run.run_id)
+                    run_dir_by_dim[d.dimension] = project_dir / run.run_id
+                if files_count is None and d.source_file_count:
+                    files_count = d.source_file_count
+        acc_dims = list(latest_by_dim.values())
+        # Apply the project-wide dismiss/delete rescore so the card agrees
+        # with every other read path (detail/explorer/dashboard/trend all
+        # route through ``scored_run_dimensions``, i.e. read_run_data +
+        # ``_rescore_dimension``). ``read_run_data`` returns the raw scan;
+        # its SQL grade overlay reflects dismisses only when the run is
+        # freshly projected, and NEVER reflects deletions. Without this the
+        # project-card grade kept a stale, too-low value for any project
+        # with deletions (or dismissals on a not-yet-reprojected run) —
+        # diverging from the score shown everywhere else.
+        from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
+        from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
+        from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+        dismissed = dismissed_keys(project_dir)
+        deleted = deleted_keys(project_dir)
+        if dismissed or deleted:
+            # Per-dimension run_dir: each dimension is rescored from the
+            # evidence of the run it was actually sourced from.
+            acc_dims = [
+                _rescore_dimension(
+                    d, dismissed, deleted, params=params,
+                    run_dir=run_dir_by_dim.get(dim_name),
+                )
+                for dim_name, d in latest_by_dim.items()
+            ]
+        if not acc_dims:
+            return {"grade": None, "score": None, "files": files_count}
+        summary = summarize_dimensions(acc_dims, params)
+        return {"grade": summary.overall_grade, "score": summary.numeric_average, "files": files_count}
+    except (OSError, json.JSONDecodeError, KeyError):
+        return {"grade": None, "score": None, "files": None}
 
-    The card summary applies the same project-wide dismiss/delete rescore as
-    every other read path (see the ``_rescore_dimension`` step below), so the
-    repositories-screen grade agrees with the Overview / explorer / trend.
-    *params* (loaded from the saved formula when None) keeps the aggregate
-    threshold labels and dimension weights consistent with the dashboard.
 
-    The card also scopes to the project's visible-standards selection: the
-    Overview headline averages only visible dimensions (the client filters
-    the accumulated payload), so a card computed over ALL dimensions shows a
-    different grade whenever a hidden dimension's score diverges. The
-    selection is folded into the cache version so toggling a standard
-    invalidates the cached card.
-    """
-    if params is None:
-        from quodeq.services import grade_formula  # noqa: PLC0415
-        params = grade_formula.load_params()
+def _summary_version(
+    reports_root: Path, entry_name: str, runs: list[RunInfo], params: "ScoringParams",
+) -> tuple[str, set[str]]:
+    from quodeq.services.score_cache import accumulated_cache_version, per_run_versions  # noqa: PLC0415
 
-    from quodeq.services.score_cache import (  # noqa: PLC0415
-        accumulated_cache_version, cached_project_summary, per_run_versions,
-    )
     project_dir = reports_root / entry_name
     visible = load_visible_standard_ids(_local_repo_root(reports_root, entry_name))
     visible_set = set(visible)
@@ -115,74 +164,88 @@ def _read_accumulated_summary(
         project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
     version = accumulated_cache_version(
         project_dir, params, run_versions, as_of=None, visible_dims=visible)
+    return version, visible_set
 
-    def _compute() -> dict:
-        try:
-            # Same run-set selection as the accumulated Overview
-            # (complete-only, cancelled fallback, never failed or
-            # in_progress). Iterating ALL runs newest-first gave the card
-            # a different grade than the Overview whenever the newest run
-            # was cancelled/failed/in_progress.
-            from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
-            from quodeq.services._accumulated_data import _has_valid_score  # noqa: PLC0415
-            view_runs = select_default_view_runs(runs)
-            latest_by_dim: dict[str, object] = {}
-            # Each dimension may come from a DIFFERENT run (last valid run per
-            # dimension), so remember the source run's directory per dimension:
-            # the rescore below must use THAT run's evidence, not the newest
-            # run's.
-            run_dir_by_dim: dict[str, Path] = {}
-            files_count: int | None = None
-            for run in view_runs:
-                dims = read_run_data(reports_root, entry_name, run.run_id)
-                for d in dims:
-                    # Same trust gate as the accumulated Overview
-                    # (_has_valid_score): skip a coverage-0 stub so the card
-                    # falls through to a real older run instead of showing
-                    # the stub's inflated grade. Hidden standards are skipped
-                    # entirely: the Overview headline excludes them, and a
-                    # dimension the user cannot see must not move the grade.
-                    if (d.dimension and d.dimension.lower() in visible_set
-                            and d.dimension not in latest_by_dim and _has_valid_score(d)):
-                        latest_by_dim[d.dimension] = d
-                        validate_path_segment(run.run_id)
-                        run_dir_by_dim[d.dimension] = project_dir / run.run_id
-                    if files_count is None and d.source_file_count:
-                        files_count = d.source_file_count
-            acc_dims = list(latest_by_dim.values())
-            # Apply the project-wide dismiss/delete rescore so the card agrees
-            # with every other read path (detail/explorer/dashboard/trend all
-            # route through ``scored_run_dimensions``, i.e. read_run_data +
-            # ``_rescore_dimension``). ``read_run_data`` returns the raw scan;
-            # its SQL grade overlay reflects dismisses only when the run is
-            # freshly projected, and NEVER reflects deletions. Without this the
-            # project-card grade kept a stale, too-low value for any project
-            # with deletions (or dismissals on a not-yet-reprojected run) —
-            # diverging from the score shown everywhere else.
-            from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-            from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-            from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
-            dismissed = dismissed_keys(project_dir)
-            deleted = deleted_keys(project_dir)
-            if dismissed or deleted:
-                # Per-dimension run_dir: each dimension is rescored from the
-                # evidence of the run it was actually sourced from.
-                acc_dims = [
-                    _rescore_dimension(
-                        d, dismissed, deleted, params=params,
-                        run_dir=run_dir_by_dim.get(dim_name),
-                    )
-                    for dim_name, d in latest_by_dim.items()
-                ]
-            if not acc_dims:
-                return {"grade": None, "score": None, "files": files_count}
-            summary = summarize_dimensions(acc_dims, params)
-            return {"grade": summary.overall_grade, "score": summary.numeric_average, "files": files_count}
-        except (OSError, json.JSONDecodeError, KeyError):
-            return {"grade": None, "score": None, "files": None}
 
-    payload = cached_project_summary(entry_name, version, _compute)
-    return payload["grade"], payload["score"], payload["files"]
+def _read_accumulated_summary(
+    reports_root: Path, entry_name: str, runs: list[RunInfo],
+    params: "ScoringParams | None" = None, *, compute_on_miss: bool = False,
+) -> tuple[str | None, float | None, int | None, bool]:
+    """Compute accumulated grade and score across all runs. Returns (grade, score, files, pending).
+
+    The card summary applies the same project-wide dismiss/delete rescore as
+    every other read path (see the ``_rescore_dimension`` step in
+    ``_compute_summary``), so the repositories-screen grade agrees with the
+    Overview / explorer / trend. *params* (loaded from the saved formula when
+    None) keeps the aggregate threshold labels and dimension weights
+    consistent with the dashboard.
+
+    The card also scopes to the project's visible-standards selection: the
+    Overview headline averages only visible dimensions (the client filters
+    the accumulated payload), so a card computed over ALL dimensions shows a
+    different grade whenever a hidden dimension's score diverges. The
+    selection is folded into the cache version so toggling a standard
+    invalidates the cached card.
+
+    *compute_on_miss* controls what happens on a cache miss. False (the
+    default, used by the local projects-list path) never computes inline: a
+    miss reports ``pending=True`` and leaves the warm-up engine to fill the
+    cache, so first paint after an upgrade never blocks on a full recompute.
+    True (used by the shared-repo route, which has no warm-up engine) keeps
+    the pre-warm-up behavior of computing inline on a miss. The kill switch
+    (``QUODEQ_DISABLE_SCORE_CACHE``) always computes inline too, since a
+    disabled cache can never be filled by the warm-up engine.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
+
+    from quodeq.services.score_cache import (  # noqa: PLC0415
+        cached_project_summary, open_score_cache, read_cached_project_summary,
+    )
+    from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
+    version, visible_set = _summary_version(reports_root, entry_name, runs, params)
+    if compute_on_miss or score_cache_disabled():
+        payload = cached_project_summary(
+            entry_name, version,
+            lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+        )
+        return payload["grade"], payload["score"], payload["files"], False
+    # Read-only branch only: a project with no complete run will also never
+    # be picked up by the warm-up engine (warm_project_summary has the same
+    # gate below), so a cache miss here would report pending forever. Report
+    # it settled (not pending) instead. The compute_on_miss/kill-switch
+    # branch above is unaffected -- it still lets a project's cancelled-only
+    # runs fall back to a computed grade via select_default_view_runs,
+    # exactly as before this read-only path existed.
+    if not any(r.status == "complete" for r in runs):
+        return None, None, None, False
+    import sqlite3  # noqa: PLC0415
+    try:
+        with open_score_cache() as conn:
+            hit = read_cached_project_summary(conn, entry_name, version)
+    except sqlite3.Error:
+        hit = None
+    if hit is not None:
+        return hit["grade"], hit["score"], hit["files"], False
+    return None, None, None, True
+
+
+def warm_project_summary(reports_root: Path, entry_name: str) -> None:
+    """Compute-and-cache one project's card summary (warm-up engine entry)."""
+    from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
+    from quodeq.services import grade_formula  # noqa: PLC0415
+    from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
+
+    runs = list_runs(reports_root, entry_name)
+    if not any(r.status == "complete" for r in runs):
+        return
+    params = grade_formula.load_params()
+    version, visible_set = _summary_version(reports_root, entry_name, runs, params)
+    cached_project_summary(
+        entry_name, version,
+        lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+    )
 
 
 def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:

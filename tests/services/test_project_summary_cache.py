@@ -37,9 +37,12 @@ def test_read_accumulated_summary_is_cached(monkeypatch, tmp_path):
             self.status = "complete"
     runs = [_Run("a"), _Run("b")]
 
-    first = md._read_accumulated_summary(tmp_path, "proj", runs)
+    # compute_on_miss=True: this test exercises the compute-and-cache path
+    # itself (the shared-repo route's contract), not the local list path's
+    # pending-on-miss behavior covered by test_fs_metadata_readonly.py.
+    first = md._read_accumulated_summary(tmp_path, "proj", runs, compute_on_miss=True)
     n_after_first = calls["n"]
-    second = md._read_accumulated_summary(tmp_path, "proj", runs)
+    second = md._read_accumulated_summary(tmp_path, "proj", runs, compute_on_miss=True)
     assert first == second
-    assert first == ("Good", 7.0, 10)  # grade, numeric_average, files_count
+    assert first == ("Good", 7.0, 10, False)  # grade, numeric_average, files_count, pending
     assert calls["n"] == n_after_first  # second call served from cache, no re-read
