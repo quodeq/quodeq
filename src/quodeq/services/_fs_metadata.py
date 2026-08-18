@@ -195,6 +195,15 @@ def _read_accumulated_summary(
     the pre-warm-up behavior of computing inline on a miss. The kill switch
     (``QUODEQ_DISABLE_SCORE_CACHE``) always computes inline too, since a
     disabled cache can never be filled by the warm-up engine.
+
+    On the read-only path, only a project with NO runs at all is settled
+    (``pending=False`` without a cache lookup) -- ``warm_project_summary``
+    requires at least one run too, so such a project can never be warmed and
+    reporting it pending would be a lie. A project whose runs exist but
+    include no ``complete`` run (cancelled-only, in-progress-only) still gets
+    a cache lookup: ``warm_project_summary`` computes a fallback grade for it
+    via ``select_default_view_runs``' cancelled fallback, so a miss there is
+    genuinely pending, not settled.
     """
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
@@ -211,14 +220,15 @@ def _read_accumulated_summary(
             lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
         )
         return payload["grade"], payload["score"], payload["files"], False
-    # Read-only branch only: a project with no complete run will also never
-    # be picked up by the warm-up engine (warm_project_summary has the same
-    # gate below), so a cache miss here would report pending forever. Report
-    # it settled (not pending) instead. The compute_on_miss/kill-switch
-    # branch above is unaffected -- it still lets a project's cancelled-only
-    # runs fall back to a computed grade via select_default_view_runs,
-    # exactly as before this read-only path existed.
-    if not any(r.status == "complete" for r in runs):
+    # Read-only branch only: a project with NO runs at all will never be
+    # picked up by the warm-up engine (warm_project_summary has the same
+    # empty-runs gate below), so a cache miss here would report pending
+    # forever -- report it settled instead. A project whose runs are all
+    # cancelled/in-progress (no "complete" run) is NOT special-cased here:
+    # warm_project_summary computes a fallback grade for it too (cancelled
+    # fallback via select_default_view_runs), so its cache must still be
+    # consulted below rather than assumed empty forever.
+    if not runs:
         return None, None, None, False
     import sqlite3  # noqa: PLC0415
     try:
@@ -232,13 +242,21 @@ def _read_accumulated_summary(
 
 
 def warm_project_summary(reports_root: Path, entry_name: str) -> None:
-    """Compute-and-cache one project's card summary (warm-up engine entry)."""
+    """Compute-and-cache one project's card summary (warm-up engine entry).
+
+    Computes whenever the project has ANY run, not just a "complete" one --
+    a cancelled-only or in-progress-only project still gets a fallback grade
+    via ``_compute_summary``'s ``select_default_view_runs`` cancelled
+    fallback, so it must not be left permanently ungraded. Versions are
+    status-stamped (``_summary_version`` -> ``per_run_versions``), so an
+    in-progress run's cached row self-invalidates once it completes.
+    """
     from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
     from quodeq.services import grade_formula  # noqa: PLC0415
     from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
 
     runs = list_runs(reports_root, entry_name)
-    if not any(r.status == "complete" for r in runs):
+    if not runs:
         return
     params = grade_formula.load_params()
     version, visible_set = _summary_version(reports_root, entry_name, runs, params)

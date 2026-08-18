@@ -24,6 +24,10 @@ def _runs() -> list[RunInfo]:
     return [RunInfo(run_id="r1", date_iso="2026-08-01", date_label="1 Aug", status="complete")]
 
 
+def _cancelled_runs() -> list[RunInfo]:
+    return [RunInfo(run_id="r1", date_iso="2026-08-01", date_label="1 Aug", status="cancelled")]
+
+
 def test_miss_returns_pending_without_computing(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
@@ -35,11 +39,52 @@ def test_miss_returns_pending_without_computing(tmp_path, monkeypatch):
 
 
 def test_no_complete_runs_is_not_pending(tmp_path, monkeypatch):
+    """A project with NO runs at all can never be warmed (warm_project_summary
+    also requires at least one run), so it must never report pending -- there
+    is nothing the warm-up engine will ever fill in."""
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
-    runs = [RunInfo(run_id="r1", date_iso="2026-08-01", date_label="1 Aug", status="in_progress")]
-    grade, score, files, pending = _read_accumulated_summary(tmp_path, "proj", runs, DEFAULT_PARAMS)
+    with patch("quodeq.services._fs_metadata._compute_summary") as compute:
+        grade, score, files, pending = _read_accumulated_summary(
+            tmp_path, "proj", [], DEFAULT_PARAMS)
+    compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, False)
+
+
+def test_cancelled_only_miss_returns_pending_without_computing(tmp_path, monkeypatch):
+    """Runs exist (cancelled-only, no complete run) but nothing is cached
+    yet: the read-only path must report pending, not silently settle to
+    None -- warm_project_summary WILL compute a fallback grade for this
+    project (see test_warm_cancelled_only_then_read_hits_without_pending),
+    so reporting it settled here would make the grade disappear forever."""
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    _project(tmp_path)
+    with patch("quodeq.services._fs_metadata._compute_summary") as compute:
+        grade, score, files, pending = _read_accumulated_summary(
+            tmp_path, "proj", _cancelled_runs(), DEFAULT_PARAMS)
+    compute.assert_not_called()
+    assert (grade, score, files, pending) == (None, None, None, True)
+
+
+def test_warm_cancelled_only_then_read_hits_without_pending(tmp_path, monkeypatch):
+    """warm_project_summary must compute a fallback grade for a project whose
+    only runs are cancelled (select_default_view_runs' cancelled fallback) --
+    it must NOT gate on any run being "complete", or such a project could
+    never regain a grade on the repositories screen."""
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    _project(tmp_path)
+    with patch(
+        "quodeq.services._fs_metadata._compute_summary",
+        return_value={"grade": "D", "score": 4.0, "files": 2},
+    ) as compute, patch(
+        "quodeq.data.fs.report_parser.runs.list_runs", return_value=_cancelled_runs(),
+    ):
+        warm_project_summary(tmp_path, "proj")
+        assert compute.call_count == 1
+        grade, score, files, pending = _read_accumulated_summary(
+            tmp_path, "proj", _cancelled_runs(), DEFAULT_PARAMS)
+    assert (grade, score, files, pending) == ("D", 4.0, 2, False)
+    assert compute.call_count == 1  # the read did not recompute
 
 
 def test_warm_then_read_hits_without_pending(tmp_path, monkeypatch):
