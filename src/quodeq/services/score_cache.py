@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import sqlite3
+import threading
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -137,18 +138,27 @@ def _init(path: Path) -> sqlite3.Connection:
     return conn
 
 
+# Serializes _init (and the corrupt-db rebuild). Concurrent first-opens of a
+# fresh DB race the schema DDL; the loser's lock error is indistinguishable
+# from corruption here, so the rebuild path would unlink the file out from
+# under the winner's live WAL connection (observed as a SIGBUS on the mmap'd
+# -shm). Only open/rebuild is serialized — yielded connections stay concurrent.
+_OPEN_LOCK = threading.Lock()
+
+
 @contextmanager
 def open_score_cache() -> Iterator[sqlite3.Connection]:
     """Open the score cache DB (WAL). Rebuilds from scratch if corrupt/older-schema."""
     override = _CACHE_PATH_OVERRIDE.get()
     path = Path(override) if override else Path(get_score_cache_path())
     path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        conn = _init(path)
-    except sqlite3.DatabaseError:
-        _logger.warning("score cache at %s unreadable; rebuilding", path)
-        path.unlink(missing_ok=True)
-        conn = _init(path)
+    with _OPEN_LOCK:
+        try:
+            conn = _init(path)
+        except sqlite3.DatabaseError:
+            _logger.warning("score cache at %s unreadable; rebuilding", path)
+            path.unlink(missing_ok=True)
+            conn = _init(path)
     try:
         yield conn
     finally:
@@ -429,6 +439,31 @@ def per_run_versions(
     return out
 
 
+# In-flight computes by (kind, project, version). Concurrent misses on the
+# same key must share ONE compute: these computes walk a project's full run
+# history and can take minutes right after an upgrade invalidates every
+# cached row, and the client re-requests while the first compute is still
+# running. The registry entry is dropped once no thread holds the key's lock;
+# a waiter that raced the cleanup at worst recomputes (idempotent write).
+_INFLIGHT_GUARD = threading.Lock()
+_INFLIGHT: dict[tuple[str, str, str], threading.Lock] = {}
+
+
+@contextmanager
+def _single_flight(kind: str, project: str, version: str) -> Iterator[None]:
+    key = (kind, project, version)
+    with _INFLIGHT_GUARD:
+        lock = _INFLIGHT.setdefault(key, threading.Lock())
+    lock.acquire()
+    try:
+        yield
+    finally:
+        lock.release()
+        with _INFLIGHT_GUARD:
+            if not lock.locked() and _INFLIGHT.get(key) is lock:
+                del _INFLIGHT[key]
+
+
 def cached_accumulated(
     project: str, version: str, compute: Callable[[], dict],
     cacheable: Callable[[dict], bool] | None = None,
@@ -437,6 +472,7 @@ def cached_accumulated(
 
     Hit -> return the deserialized cached payload. Miss (or kill switch / cache
     error) -> call *compute*, cache the result best-effort, return it.
+    Concurrent misses on one (project, version) share a single compute.
 
     *cacheable*, when given, is called with the computed result before it is
     persisted; returning False serves the result without caching it. This lets
@@ -453,15 +489,24 @@ def cached_accumulated(
             return cached
     except sqlite3.Error:
         return compute()
-    result = compute()
-    if cacheable is not None and not cacheable(result):
+    with _single_flight("accumulated", project, version):
+        # Re-check: a caller we waited on may have computed and cached it.
+        try:
+            with open_score_cache() as conn:
+                cached = read_cached_accumulated(conn, project, version)
+            if cached is not None:
+                return cached
+        except sqlite3.Error:
+            pass
+        result = compute()
+        if cacheable is not None and not cacheable(result):
+            return result
+        try:
+            with open_score_cache() as conn:
+                write_cached_accumulated(conn, project, version, result)
+        except sqlite3.Error:
+            pass
         return result
-    try:
-        with open_score_cache() as conn:
-            write_cached_accumulated(conn, project, version, result)
-    except sqlite3.Error:
-        pass
-    return result
 
 
 def read_cached_project_summary(
@@ -515,13 +560,22 @@ def cached_project_summary(
             return hit
     except sqlite3.Error:
         return compute()
-    result = compute()
-    try:
-        with open_score_cache() as conn:
-            write_cached_project_summary(conn, project, version, result)
-    except sqlite3.Error:
-        pass
-    return result
+    with _single_flight("summary", project, version):
+        # Re-check: a caller we waited on may have computed and cached it.
+        try:
+            with open_score_cache() as conn:
+                hit = read_cached_project_summary(conn, project, version)
+            if hit is not None:
+                return hit
+        except sqlite3.Error:
+            pass
+        result = compute()
+        try:
+            with open_score_cache() as conn:
+                write_cached_project_summary(conn, project, version, result)
+        except sqlite3.Error:
+            pass
+        return result
 
 
 def make_cache_backed_fetcher(

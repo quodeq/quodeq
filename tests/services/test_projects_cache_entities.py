@@ -53,6 +53,46 @@ def test_invalidate_forces_a_reread(tmp_path):
     assert spy.call_count == 2
 
 
+def test_concurrent_cold_reads_share_one_build(tmp_path):
+    """Requests racing a cold cache must share ONE disk walk.
+
+    Regression (v1.9.0 startup storm): the client re-requests /api/projects
+    while the first build is still running; without an in-flight lock every
+    request started its own full build_project_list, multiplying minutes of
+    post-upgrade recompute by the number of piled-up requests.
+    """
+    import threading
+    import time as _time
+
+    calls = []
+
+    def slow_build(_root):
+        calls.append(1)
+        _time.sleep(0.05)
+        return [_entry()]
+
+    with patch(
+        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        side_effect=slow_build,
+    ):
+        cache = ProjectsCache()
+        barrier = threading.Barrier(4)
+        results = [None] * 4
+
+        def hit(i):
+            barrier.wait()
+            results[i] = cache.list(str(tmp_path))
+
+        threads = [threading.Thread(target=hit, args=(i,)) for i in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+    assert len(calls) == 1, "concurrent cold reads must collapse into one build"
+    assert all(r == results[0] for r in results)
+
+
 def test_service_module_does_no_serialization():
     """The declared WS6 wire-boundary entry is retired: no to_camel_dict here."""
     import quodeq.services._projects_cache as mod
