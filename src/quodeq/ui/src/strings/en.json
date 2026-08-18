@@ -668,6 +668,8 @@
   "overview.lastEvaluated": "last_evaluated · {date}",
   "overview.loadFailed": "Failed to load dashboard data. Please try again.",
   "overview.loadProjectFailedTitle": "Couldn't load this project",
+  "overview.projectsLoadFailedTitle": "Couldn't load your projects",
+  "overview.projectsLoadFailedDesc": "The server took too long to respond. It may still be preparing data after an update. Retrying is safe.",
   "overview.loadRunFailedDesc": "This run's data didn't come back. Try refreshing.",
   "overview.loadRunFailedTitle": "Couldn't load this run",
   "overview.loading": "loading…",

@@ -74,6 +74,7 @@ export function useProjectState({
   const { listProjects } = useApi();
   const [projects, setProjects] = useState([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const [projectsLoadFailed, setProjectsLoadFailed] = useState(false);
   const [selectedProject, setSelectedProject] = useState(() => readStoredProject(storage));
   const [selectedSource, setSelectedSource] = useState(() => readStoredSource(storage));
   const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
@@ -82,10 +83,13 @@ export function useProjectState({
   // during a startup/reload race) must NOT be mistaken for "no projects" —
   // that used to strand the user in the onboarding wizard even though their
   // projects were fine. Retry a few times; on genuine exhaustion return null
-  // so the caller skips onboarding and the app keeps its loading state (which
-  // recovers on the next successful load / reconnect). A successful fetch that
-  // returns an empty array is still a real "fresh user" -> onboarding.
+  // so the caller skips onboarding, and raise projectsLoadFailed so the UI
+  // can offer a retry instead of spinning forever (retries used to exhaust
+  // silently, leaving a permanent LoadingScreen even after the backend
+  // recovered). A successful fetch that returns an empty array is still a
+  // real "fresh user" -> onboarding.
   const loadProjects = useCallback(function load(attempt = 0) {
+    if (attempt === 0) setProjectsLoadFailed(false);
     return listProjects()
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.projects || []);
@@ -99,9 +103,20 @@ export function useProjectState({
             .then(() => load(attempt + 1));
         }
         console.warn('Failed to load projects after retries:', err);
+        setProjectsLoadFailed(true);
         return null;
       });
   }, [listProjects, maxRetries, retryDelayMs]);
+
+  // Same load + boot-time selection resolution as the mount effect, for the
+  // failure-state Retry action (and the reconnect re-arm): a retry that
+  // succeeds must also migrate a stale stored selection, exactly like boot.
+  function retryLoadProjects() {
+    return loadProjects().then((list) => {
+      if (list) resolveInitialProject(list, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage);
+      return list;
+    });
+  }
 
   useEffect(() => {
     loadProjects().then((list) => {
@@ -128,6 +143,8 @@ export function useProjectState({
   return {
     projects,
     projectsLoaded,
+    projectsLoadFailed,
+    retryLoadProjects,
     setProjects,
     selectedProject,
     selectedSource,

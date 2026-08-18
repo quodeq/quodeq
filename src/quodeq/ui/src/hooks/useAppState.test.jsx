@@ -22,8 +22,11 @@ vi.mock('../features/evaluation/hooks/useEvaluation.js', () => ({
   useEvaluation: () => evaluationState,
   LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
 }));
+// Mutable so the reconnect re-arm regression below can flip connectivity;
+// defaults to connected for every other test.
+const healthState = { connected: true };
 vi.mock('./useServerHealth.js', () => ({
-  useServerHealth: () => [true, vi.fn(), null],
+  useServerHealth: () => [healthState.connected, vi.fn(), null],
 }));
 
 // Task 2 (stacked on Task 1's scheduleDashboardReconcile): the Overview's
@@ -410,5 +413,50 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     await waitFor(() => expect(fakeApi.getProjectScores.mock.calls.length).toBeGreaterThan(scoresCallsBefore));
     await waitFor(() => expect(result.current.accumulated).toEqual({ score: 95 }));
     await waitFor(() => expect(result.current.availableRuns.some((r) => r.runId === 'run-2')).toBe(true));
+  });
+});
+
+// v1.9.0 startup-spinner regression, third recovery lane: if the projects load
+// exhausted its retries while the backend was unreachable, a later reconnect
+// (health poll coming back) must re-fire the load -- otherwise the only way
+// out is the manual Retry button.
+describe('useAppState projects-load re-arm on server reconnect', () => {
+  beforeEach(() => {
+    evaluationState.job = null;
+    healthState.connected = true;
+    localStorage.setItem('quodeq_selected_project', 'project-a');
+    localStorage.setItem('quodeq_selected_source', 'local');
+  });
+  afterEach(() => {
+    healthState.connected = true;
+    localStorage.removeItem('quodeq_selected_project');
+    localStorage.removeItem('quodeq_selected_source');
+  });
+
+  it('reloads the project list when connectivity returns after the load failed', async () => {
+    const fakeApi = makeAppStateFakeApi();
+    fakeApi.listProjects.mockRejectedValue(new Error('backend still starting'));
+    healthState.connected = false;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    });
+    const { result, rerender } = renderHook(() => useAppState(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>
+          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+        </QueryClientProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true), { timeout: 5000 });
+    const callsWhileDown = fakeApi.listProjects.mock.calls.length;
+
+    fakeApi.listProjects.mockResolvedValue([{ id: 'project-a', name: 'Project A' }]);
+    healthState.connected = true;
+    rerender();
+
+    await waitFor(() => expect(result.current.projectsLoaded).toBe(true), { timeout: 5000 });
+    expect(fakeApi.listProjects.mock.calls.length).toBeGreaterThan(callsWhileDown);
+    expect(result.current.projectsLoadFailed).toBe(false);
   });
 });

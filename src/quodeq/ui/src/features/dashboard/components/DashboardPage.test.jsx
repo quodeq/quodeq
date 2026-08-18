@@ -905,3 +905,42 @@ describe('selectDashboardProjectInfo', () => {
     expect(info).toBeNull();
   });
 });
+
+// v1.9.0 regression: when the startup projects fetch exhausted its retries the
+// page sat on the fullscreen LoadingScreen forever -- projectsLoaded stayed
+// false with no error branch above this gate and nothing left to re-fire the
+// load. The gate must surface a retry instead of an unrecoverable spinner.
+describe('projects-load failure gate (startup infinite spinner)', () => {
+  it('renders a retry action instead of a LoadingScreen when the projects load failed', () => {
+    const onProjectsRetry = vi.fn();
+    const { container } = render(
+      <DashboardPage
+        data={{ projectsLoaded: false, projectsLoadFailed: true }}
+        callbacks={{ onProjectsRetry }}
+        runMode={false}
+      />,
+    );
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    const btn = container.querySelector('.empty-state-btn');
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onProjectsRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the LoadingScreen while the load is still in flight (not failed)', () => {
+    const { container } = render(
+      <DashboardPage data={{ projectsLoaded: false, projectsLoadFailed: false }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+    expect(container.querySelector('.empty-state-btn')).toBeNull();
+  });
+
+  it('does not change hook count across the failed -> loaded transition', () => {
+    const { rerender } = render(
+      <DashboardPage data={{ projectsLoaded: false, projectsLoadFailed: true }} callbacks={{}} runMode={false} />,
+    );
+    expect(() => {
+      rerender(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
+    }).not.toThrow();
+  });
+});
