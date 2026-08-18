@@ -113,3 +113,59 @@ def test_progress_shows_current_project_while_working(tmp_path):
     assert snap["projectsTotal"] == 1
     assert snap["projectsDone"] == 0
     release.set()
+
+
+def test_reset_for_tests_stops_worker_and_allows_restart(tmp_path):
+    """Verify reset_for_tests() actually joins the worker thread and allows restart."""
+    calls = []
+    release1 = threading.Event()
+    release2 = threading.Event()
+
+    def warm(reports_dir, pid):
+        calls.append(pid)
+        if pid == "p1":
+            release1.wait(5)
+        else:
+            release2.wait(5)
+
+    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: [])
+    eng.start(str(tmp_path))
+    eng.enqueue("p1")
+    assert _wait_until(lambda: calls == ["p1"])
+
+    # Reset: stops the worker, clears state
+    release1.set()
+    eng.reset_for_tests()
+    assert _wait_until(lambda: eng.snapshot() is None)
+
+    # Restart: should spawn exactly one new worker
+    eng.start(str(tmp_path))
+    eng.enqueue("p2")
+    assert _wait_until(lambda: calls == ["p1", "p2"])
+    release2.set()
+    assert _wait_until(lambda: eng.snapshot()["projectsDone"] == 1)
+    assert calls == ["p1", "p2"]
+
+
+def test_bad_repository_info_json_does_not_kill_worker(tmp_path):
+    """Verify that invalid repository_info.json doesn't crash the worker."""
+    import json
+
+    # Create a project with invalid metadata (JSON list instead of dict)
+    bad_dir = tmp_path / "bad_project"
+    bad_dir.mkdir()
+    (bad_dir / "repository_info.json").write_text(json.dumps(["item1", "item2"]))
+
+    seen = []
+
+    def warm(reports_dir, pid):
+        seen.append(pid)
+
+    eng = WarmupEngine(
+        warm_fn=warm,
+        list_fn=lambda _rd: [("bad_project", "2026-08-01"), ("good_project", "2026-07-01")],
+    )
+    eng.start(str(tmp_path))
+    # Worker should process both, despite bad_project having invalid metadata
+    assert _wait_until(lambda: eng.snapshot() is not None and eng.snapshot()["projectsDone"] == 2)
+    assert seen == ["bad_project", "good_project"]

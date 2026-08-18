@@ -73,6 +73,7 @@ class WarmupEngine:
         self._warm_fn = warm_fn or _warm_project
         self._list_fn = list_fn or _enumerate_projects
         self._cond = threading.Condition()
+        self._shutdown = threading.Event()
         self._pending: deque[str] = deque()
         self._queued: set[str] = set()
         self._failed_at: dict[str, float] = {}
@@ -86,6 +87,7 @@ class WarmupEngine:
         with self._cond:
             if self._thread is not None:
                 return
+            self._shutdown.clear()
             self._reports_dir = reports_dir
             try:
                 listing = sorted(self._list_fn(reports_dir), key=lambda t: t[1], reverse=True)
@@ -123,6 +125,15 @@ class WarmupEngine:
             }
 
     def reset_for_tests(self) -> None:
+        # Signal worker to shut down and wait for it to exit
+        self._shutdown.set()
+        thread_to_join = None
+        with self._cond:
+            thread_to_join = self._thread
+            self._cond.notify()  # Wake up worker if it's waiting
+        if thread_to_join is not None:
+            thread_to_join.join(timeout=10)
+        # Clear all state after worker has stopped
         with self._cond:
             self._pending.clear()
             self._queued.clear()
@@ -136,12 +147,20 @@ class WarmupEngine:
     def _worker(self) -> None:
         while True:
             with self._cond:
-                while not self._pending:
-                    self._cond.wait()
+                while not self._pending and not self._shutdown.is_set():
+                    self._cond.wait(timeout=0.1)
+                if self._shutdown.is_set():
+                    break
                 project_id = self._pending.popleft()
                 self._current = project_id
-                self._current_name = _project_display_name(self._reports_dir or "", project_id)
                 reports_dir = self._reports_dir or ""
+            # Fetch display name outside the lock (file I/O shouldn't block others)
+            try:
+                current_name = _project_display_name(reports_dir, project_id)
+            except Exception:  # noqa: BLE001 - bad metadata shouldn't crash worker
+                current_name = project_id
+            with self._cond:
+                self._current_name = current_name
             try:
                 self._warm_fn(reports_dir, project_id)
             except Exception:  # noqa: BLE001 - log and continue with the queue
