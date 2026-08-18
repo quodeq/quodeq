@@ -75,7 +75,7 @@ def _build_project_entry(
     backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
     info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
-    latest_grade, latest_score, files_count, _pending = _read_accumulated_summary(
+    latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=inline_summaries,
     )
     # runs is sorted newest-first (list_runs); status is already read there
@@ -106,6 +106,7 @@ def _build_project_entry(
         language_stats=_read_language_stats(reports_root, entry_name, runs),
         onboarding_completed_at=info.get("onboardingCompletedAt"),
         origin_url=info.get("originUrl"),
+        summary_pending=summary_pending,
     )
 
 
