@@ -17,6 +17,7 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
 from quodeq.services._fs_clone import CloneError
 from quodeq.services._fs_scan import scan_project
+from quodeq.services._warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import contained_path, validate_path_segment, validate_relative_scope
 
@@ -131,6 +132,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         """Return all projects with optional ``?limit=N&offset=M`` pagination."""
         result = provider.list_projects(reports_dir())
         projects = result.get("projects", [])
+        # Self-healing warm-up: anything still pending goes (back) on the
+        # queue before pagination, so unpolled pages heal too.
+        for entry in projects:
+            if getattr(entry, "summary_pending", False):
+                warmup_engine.enqueue(entry.id)
         offset = request.args.get("offset", 0, type=int)
         limit = request.args.get("limit", 0, type=int)
         if offset > 0:
@@ -140,7 +146,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         # Serialize at the boundary: providers hand back ProjectEntry
         # entities (or already-serialized dicts from remote providers).
         wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
-        return jsonify({**result, "projects": wire})
+        payload = {**result, "projects": wire}
+        snapshot = warmup_engine.snapshot()
+        if snapshot is not None:
+            payload["warmup"] = snapshot
+        return jsonify(payload)
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
