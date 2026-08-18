@@ -291,8 +291,25 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     setNoRunsEmptySticky({ scopeKey: noRunsScopeKey, active: showNoRunsEmpty });
   }
 
-  const { projectsLoaded } = data;
-  if (!projectsLoaded) return <LoadingScreen />;
+  const { projectsLoaded, projectsLoadFailed } = data;
+  if (!projectsLoaded) {
+    // The startup projects load exhausted its retries: offer a retry instead
+    // of an unrecoverable spinner (this early return sits above every other
+    // error branch, so without this the page spins forever even after the
+    // backend recovered). No hooks in either branch — the hook count across
+    // the false -> true flip is pinned by tests.
+    if (projectsLoadFailed) {
+      return (
+        <EmptyState
+          title={t('overview.projectsLoadFailedTitle')}
+          description={t('overview.projectsLoadFailedDesc')}
+          actionLabel={t('overview.retry')}
+          onAction={() => callbacks.onProjectsRetry?.()}
+        />
+      );
+    }
+    return <LoadingScreen />;
+  }
   if (projects.length === 0 && selectedSource !== 'shared') {
     // Zero local projects. When the connected shared repo has published
     // content, the useful next step is browsing it (read-only until pulled)

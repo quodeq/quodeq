@@ -37,9 +37,16 @@ export function getHealth() {
 
 // ── Projects ────────────────────────────────────────────────────────────
 
+// First startup after an upgrade can invalidate the backend's score caches,
+// making the first /projects response take minutes, not seconds. The default
+// 30s abort turned that into an abandon-and-re-request loop that multiplied
+// the backend's recompute; the server single-flights the build now, and this
+// wider window lets one request wait it out instead of churning.
+const PROJECTS_LIST_TIMEOUT_MS = 120000;
+
 /** @returns {Promise<import('../models/project.js').Project[]>} */
 export async function listProjects() {
-  const data = await request('/projects');
+  const data = await request('/projects', { timeout: PROJECTS_LIST_TIMEOUT_MS });
   const list = data?.projects ?? data ?? [];
   return Array.isArray(list) ? list.map(createProject) : [];
 }

@@ -55,6 +55,45 @@ describe('useProjectState — resilience to a transient projects-fetch failure',
   });
 });
 
+describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner)', () => {
+  it('exposes projectsLoadFailed=true after retries exhaust', async () => {
+    listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 1 }));
+
+    await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true));
+    expect(result.current.projectsLoaded).toBe(false);
+  });
+
+  it('retryLoadProjects clears the failure, reloads, and resolves the initial selection', async () => {
+    listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0 }));
+
+    await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true));
+
+    listProjects.mockResolvedValue([{ id: 'p1', name: 'proj1' }]);
+    await act(async () => { await result.current.retryLoadProjects(); });
+
+    expect(result.current.projectsLoaded).toBe(true);
+    expect(result.current.projectsLoadFailed).toBe(false);
+    expect(result.current.selectedProject).toBe('p1');
+  });
+
+  it('a failed retry raises the failure flag again', async () => {
+    listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0 }));
+
+    await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true));
+
+    await act(async () => { await result.current.retryLoadProjects(); });
+
+    expect(result.current.projectsLoadFailed).toBe(true);
+    expect(result.current.projectsLoaded).toBe(false);
+  });
+});
+
 function makeMemoryStorage(initial = {}) {
   const store = { ...initial };
   return {
