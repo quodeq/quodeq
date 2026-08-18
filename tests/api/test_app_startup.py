@@ -19,3 +19,26 @@ def test_create_app_handles_missing_clones_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: fake_home)
     # No ~/.quodeq/clones dir at all - must not raise.
     create_app()
+
+
+def test_main_starts_warmup_before_serving(monkeypatch, tmp_path):
+    from quodeq.api import app as app_module
+
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "evaluations"))
+    started = []
+    monkeypatch.setattr("quodeq.services._warmup.engine.start", started.append)
+    monkeypatch.setattr("flask.Flask.run", lambda self, **kwargs: None)
+
+    app_module.main(env={})
+
+    assert len(started) == 1
+    assert started[0].endswith("evaluations")
+
+
+def test_create_app_does_not_start_warmup(monkeypatch):
+    from quodeq.api.app import create_app
+
+    started = []
+    monkeypatch.setattr("quodeq.services._warmup.engine.start", started.append)
+    create_app(test_config={"TESTING": True})
+    assert started == []
