@@ -1901,6 +1901,43 @@ textarea:focus {
   text-align: center;
 }
 
+.loading-tip {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  max-width: 420px;
+  animation: loading-fadein 500ms ease;
+}
+
+.warmup-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 420px;
+}
+
+.warmup-notice__bar {
+  width: 240px;
+  height: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  overflow: hidden;
+}
+
+.warmup-notice__fill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  transition: width 400ms ease;
+}
+
+.warmup-notice__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
 .loading-logo {
   width: 80px;
   height: auto;
