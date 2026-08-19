@@ -9,8 +9,9 @@ const TIP_KEYS = [
   'loading.tips.ignore', 'loading.tips.history', 'loading.tips.compliance',
   'loading.tips.shared',
 ];
-const TIPS_DELAY_MS = 5000;
+const TIPS_DELAY_MS = 3000;
 const TIPS_ROTATE_MS = 8000;
+const LEAVE_MS = 400;
 
 function useRotatingTip(enabled) {
   const [idx, setIdx] = useState(-1);
@@ -46,15 +47,37 @@ function useRotatingTip(enabled) {
  * seconds. `warmup` renders the determinate preparing-data strip when a
  * post-update warm-up is running.
  */
-export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, warmup = null }) {
+export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, warmup = null, leaving = false }) {
   const tipKey = useRotatingTip(tips);
-  const className = variant === 'inline' ? 'loading-screen loading-screen--inline' : 'loading-screen';
+  const classes = ['loading-screen'];
+  if (variant === 'inline') classes.push('loading-screen--inline');
+  if (leaving) classes.push('loading-screen--leaving');
   return (
-    <div className={className} role="status" aria-live="polite">
+    <div className={classes.join(' ')} role="status" aria-live="polite">
       <QMarkIcon className="loading-logo" />
       {message && <p className="loading-message">{message}</p>}
       {tipKey && <p className="loading-tip">{t(tipKey)}</p>}
       <WarmupNotice warmup={warmup} />
     </div>
   );
+}
+
+/**
+ * Fullscreen loader with a graceful exit. Stays mounted at a stable spot in
+ * the tree; when `show` flips false it plays the fade-out (the leaving class)
+ * and unmounts after it, instead of vanishing on the same frame the content
+ * appears. Flipping `show` back mid-fade cancels the exit.
+ */
+export function FadingLoadingScreen({ show, ...props }) {
+  const [mounted, setMounted] = useState(show);
+  useEffect(() => {
+    if (show) {
+      setMounted(true);
+      return undefined;
+    }
+    const id = setTimeout(() => setMounted(false), LEAVE_MS);
+    return () => clearTimeout(id);
+  }, [show]);
+  if (!show && !mounted) return null;
+  return <LoadingScreen {...props} leaving={!show} />;
 }

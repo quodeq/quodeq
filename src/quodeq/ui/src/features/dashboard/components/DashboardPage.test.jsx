@@ -927,12 +927,15 @@ describe('projects-load failure gate (startup infinite spinner)', () => {
     expect(onProjectsRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the LoadingScreen while the load is still in flight (not failed)', () => {
+  it('renders nothing at the gate while the load is in flight (the app-level overlay covers it)', () => {
     const { container } = render(
       <DashboardPage data={{ projectsLoaded: false, projectsLoadFailed: false }} callbacks={{}} runMode={false} />,
     );
-    expect(container.querySelector('.loading-screen')).toBeTruthy();
+    // The loader lives at one stable app-level mount (FadingLoadingScreen)
+    // so it can fade out; a second copy here would stack tips on tips.
+    expect(container.querySelector('.loading-screen')).toBeNull();
     expect(container.querySelector('.empty-state-btn')).toBeNull();
+    expect(container.firstChild).toBeNull();
   });
 
   it('does not change hook count across the failed -> loaded transition', () => {
@@ -946,13 +949,13 @@ describe('projects-load failure gate (startup infinite spinner)', () => {
 });
 
 describe('warm-up surfaces', () => {
-  it('passes tips and warmup to the startup LoadingScreen', () => {
+  it('renders no loader of its own before projects load (app-level overlay owns that state)', () => {
     const warmup = { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' };
     const { container } = render(
       <DashboardPage data={{ projectsLoaded: false, warmup }} callbacks={{}} runMode={false} />,
     );
-    expect(container.querySelector('.loading-screen')).toBeTruthy();
-    expect(container.querySelector('.warmup-notice')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.warmup-notice')).toBeNull();
   });
 
   it('shows the warm-up notice above the overview skeleton while scores compute', () => {

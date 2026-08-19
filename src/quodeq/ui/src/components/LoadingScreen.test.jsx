@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import LoadingScreen from './LoadingScreen.jsx';
+import LoadingScreen, { FadingLoadingScreen } from './LoadingScreen.jsx';
 
 describe('LoadingScreen tips', () => {
   it('shows no tip without the tips prop', () => {
@@ -10,12 +10,14 @@ describe('LoadingScreen tips', () => {
     expect(container.querySelector('.loading-tip')).toBeNull();
   });
 
-  it('shows a tip only after the delay, then rotates to a different one', async () => {
+  it('shows a tip only after the 3s delay, then rotates to a different one', async () => {
     vi.useFakeTimers();
     try {
       const { container } = render(<LoadingScreen tips />);
       expect(container.querySelector('.loading-tip')).toBeNull();
-      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(2900); });
+      expect(container.querySelector('.loading-tip')).toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
       const first = container.querySelector('.loading-tip');
       expect(first).toBeTruthy();
       const firstText = first.textContent;
@@ -39,12 +41,59 @@ describe('LoadingScreen tips', () => {
       const { container } = render(
         <LoadingScreen tips warmup={{ active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' }} />,
       );
-      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
       const children = Array.from(container.querySelector('.loading-screen').children);
       const tipIdx = children.findIndex((el) => el.classList.contains('loading-tip'));
       const noticeIdx = children.findIndex((el) => el.classList.contains('warmup-notice'));
       expect(tipIdx).toBeGreaterThan(-1);
       expect(noticeIdx).toBeGreaterThan(tipIdx);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// The loader must leave gracefully: when `show` flips false it stays mounted
+// with the leaving class while the fade-out plays, then unmounts. Ripping it
+// out of the DOM on the same frame the content appears reads as a "break".
+describe('FadingLoadingScreen', () => {
+  it('renders the loader while show is true, without the leaving class', () => {
+    const { container } = render(<FadingLoadingScreen show />);
+    const screen = container.querySelector('.loading-screen');
+    expect(screen).toBeTruthy();
+    expect(screen.classList.contains('loading-screen--leaving')).toBe(false);
+  });
+
+  it('renders nothing when mounted with show=false', () => {
+    const { container } = render(<FadingLoadingScreen show={false} />);
+    expect(container.querySelector('.loading-screen')).toBeNull();
+  });
+
+  it('fades out then unmounts when show flips false', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(<FadingLoadingScreen show />);
+      rerender(<FadingLoadingScreen show={false} />);
+      const leaving = container.querySelector('.loading-screen');
+      expect(leaving).toBeTruthy();
+      expect(leaving.classList.contains('loading-screen--leaving')).toBe(true);
+      await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+      expect(container.querySelector('.loading-screen')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels the pending unmount when show flips back true mid-fade', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(<FadingLoadingScreen show />);
+      rerender(<FadingLoadingScreen show={false} />);
+      rerender(<FadingLoadingScreen show />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      const screen = container.querySelector('.loading-screen');
+      expect(screen).toBeTruthy();
+      expect(screen.classList.contains('loading-screen--leaving')).toBe(false);
     } finally {
       vi.useRealTimers();
     }

@@ -1910,6 +1910,25 @@ textarea:focus {
   animation: loading-fadein 500ms ease;
 }
 
+/* The tip floats below the centered logo instead of joining the flex column,
+   so the logo never shifts when a tip appears or wraps to a second line. */
+.loading-screen:not(.loading-screen--inline) .loading-tip {
+  position: absolute;
+  top: calc(50% + 64px);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+}
+
+.loading-screen--leaving {
+  animation: loading-fadeout 400ms ease forwards;
+}
+
+@keyframes loading-fadeout {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
 .warmup-notice {
   display: flex;
   flex-direction: column;
