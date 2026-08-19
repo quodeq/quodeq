@@ -38,7 +38,9 @@ Quodeq checks PyPI and GitHub once a day for a newer version. When one exists, a
 
 ### After an update
 
-The first start after an update can invalidate Quodeq's score caches. The dashboard opens right away and rebuilds them in the background, newest projects first: project cards show a pulsing placeholder while their grade recomputes, and a progress bar on the loading and Overview screens counts through the projects being prepared. Anything you open jumps the queue. If the very first request still times out, the screen offers **Retry**; retrying is safe and never duplicates work.
+The first start after an update can invalidate Quodeq's score caches. The dashboard opens right away and rebuilds them in the background, newest projects first: project cards show a pulsing placeholder while their grade recomputes, and a *Refreshing scores* progress bar on the loading and Overview screens counts through the projects being prepared. Anything you open jumps the queue. If the very first request still times out, the screen offers **Retry**; retrying is safe and never duplicates work.
+
+The same background rebuild runs whenever score caches need re-deriving for other reasons, for example after relocating a repository or clearing `~/.quodeq`.
 
 ### Assistant and terminal
 

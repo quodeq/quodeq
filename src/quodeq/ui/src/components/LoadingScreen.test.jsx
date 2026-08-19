@@ -28,6 +28,40 @@ describe('LoadingScreen tips', () => {
     }
   });
 
+  it('shuffles the rotation per mount: fresh launches open with different tips', async () => {
+    vi.useFakeTimers();
+    try {
+      const firstTips = new Set();
+      for (let i = 0; i < 8; i++) {
+        const { container, unmount } = render(<LoadingScreen tips />);
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+        firstTips.add(container.querySelector('.loading-tip').textContent);
+        unmount();
+      }
+      // 8 independent shuffles of 10 tips all opening identically has odds
+      // of 1e-7; a sequential rotation always opens with the same tip.
+      expect(firstTips.size).toBeGreaterThan(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('walks every tip exactly once before repeating', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<LoadingScreen tips />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      const seen = [];
+      for (let i = 0; i < 10; i++) {
+        seen.push(container.querySelector('.loading-tip').textContent);
+        await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      }
+      expect(new Set(seen).size).toBe(10);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('renders the warm-up notice when a snapshot is active', () => {
     const { container } = render(
       <LoadingScreen warmup={{ active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' }} />,

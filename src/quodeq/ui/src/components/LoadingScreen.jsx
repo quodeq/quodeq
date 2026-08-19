@@ -13,7 +13,19 @@ const TIPS_DELAY_MS = 3000;
 const TIPS_ROTATE_MS = 8000;
 const LEAVE_MS = 400;
 
+// Fisher-Yates copy shuffle: each launch walks the tips in a fresh order,
+// still covering all of them before any repeat.
+function shuffled(keys) {
+  const out = [...keys];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 function useRotatingTip(enabled) {
+  const [order] = useState(() => shuffled(TIP_KEYS));
   const [idx, setIdx] = useState(-1);
   useEffect(() => {
     if (!enabled) return undefined;
@@ -23,10 +35,10 @@ function useRotatingTip(enabled) {
   const started = idx >= 0;
   useEffect(() => {
     if (!started) return undefined;
-    const id = setInterval(() => setIdx((i) => (i + 1) % TIP_KEYS.length), TIPS_ROTATE_MS);
+    const id = setInterval(() => setIdx((i) => (i + 1) % order.length), TIPS_ROTATE_MS);
     return () => clearInterval(id);
-  }, [started]);
-  return started ? TIP_KEYS[idx] : null;
+  }, [started, order.length]);
+  return started ? order[idx] : null;
 }
 
 /**
