@@ -759,6 +759,7 @@
   "projects.filterLocation": "location",
   "projects.filterMenuAria": "{label} filter",
   "projects.filterSort": "sort",
+  "projects.gradePending": "Computing grade",
   "projects.importAria": "Import project",
   "projects.importAsCopy": "Import as copy",
   "projects.importProject": "import project",
