@@ -51,8 +51,8 @@ export default function LoadingScreen({ message, variant = 'fullscreen', tips = 
     <div className={className} role="status" aria-live="polite">
       <QMarkIcon className="loading-logo" />
       {message && <p className="loading-message">{message}</p>}
-      <WarmupNotice warmup={warmup} />
       {tipKey && <p className="loading-tip">{t(tipKey)}</p>}
+      <WarmupNotice warmup={warmup} />
     </div>
   );
 }

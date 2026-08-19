@@ -32,4 +32,21 @@ describe('LoadingScreen tips', () => {
     );
     expect(container.querySelector('.warmup-notice')).toBeTruthy();
   });
+
+  it('keeps the tip right under the logo and the warm-up notice in the last (bottom) slot', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(
+        <LoadingScreen tips warmup={{ active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' }} />,
+      );
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      const children = Array.from(container.querySelector('.loading-screen').children);
+      const tipIdx = children.findIndex((el) => el.classList.contains('loading-tip'));
+      const noticeIdx = children.findIndex((el) => el.classList.contains('warmup-notice'));
+      expect(tipIdx).toBeGreaterThan(-1);
+      expect(noticeIdx).toBeGreaterThan(tipIdx);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
