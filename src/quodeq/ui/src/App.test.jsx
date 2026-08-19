@@ -927,4 +927,14 @@ describe('projects-load failure threading', () => {
     const el = ROUTE_RENDERERS.run({}, props);
     expect(el.props.callbacks.onProjectsRetry).toBe(props.dashboardData.onProjectsRetry);
   });
+
+  it('both bundles forward the warmup snapshot', () => {
+    const warmup = { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' };
+    const state = { warmup };
+    expect(buildDashboardDataBundle({ state }).warmup).toBe(warmup);
+    expect(buildNavigationBundle({
+      state, navTab: vi.fn(), navStackLength: 1, isEvaluating: false,
+      showToast: vi.fn(), setWizardEntry: vi.fn(),
+    }).warmup).toBe(warmup);
+  });
 });

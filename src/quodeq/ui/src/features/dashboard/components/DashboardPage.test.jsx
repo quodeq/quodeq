@@ -944,3 +944,30 @@ describe('projects-load failure gate (startup infinite spinner)', () => {
     }).not.toThrow();
   });
 });
+
+describe('warm-up surfaces', () => {
+  it('passes tips and warmup to the startup LoadingScreen', () => {
+    const warmup = { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' };
+    const { container } = render(
+      <DashboardPage data={{ projectsLoaded: false, warmup }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.loading-screen')).toBeTruthy();
+    expect(container.querySelector('.warmup-notice')).toBeTruthy();
+  });
+
+  it('shows the warm-up notice above the overview skeleton while scores compute', () => {
+    const warmup = { active: true, projectsDone: 1, projectsTotal: 6, currentProjectName: 'my-app' };
+    const { container } = render(
+      <DashboardPage data={{ ...overviewLoading, warmup }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.overview-skeleton')).toBeTruthy();
+    expect(container.querySelector('.warmup-notice')).toBeTruthy();
+  });
+
+  it('renders no warm-up notice when the snapshot is inactive', () => {
+    const { container } = render(
+      <DashboardPage data={{ ...overviewLoading, warmup: { active: false, projectsDone: 2, projectsTotal: 2 } }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.warmup-notice')).toBeNull();
+  });
+});

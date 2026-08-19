@@ -290,6 +290,7 @@ export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
     onProjectsRetry: state.retryLoadProjects,
+    warmup: state.warmup,
     dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
     onRetry: state.refreshDashboardActive,
     scoresPending: state.scoresPending,
@@ -307,6 +308,7 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
     retryLoadProjects: state.retryLoadProjects,
+    warmup: state.warmup,
     loadProjects: state.loadProjects,
     handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
     handleProjectChange: state.handleProjectChange, navTab, navStackLength,
@@ -862,7 +864,7 @@ function MainContent({ activePage, props }) {
           />
         );
       }
-      return <LoadingScreen />;
+      return <LoadingScreen tips warmup={props.navigation?.warmup} />;
     }
     return (
       <EmptyStateWithTour
