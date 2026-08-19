@@ -15,6 +15,7 @@
  * @property {string|null}  latestRunId
  * @property {string|null}  latestDoneRunId - id of the newest run that finished (not cancelled/failed/in-progress), or null
  * @property {string|null}  latestGrade
+ * @property {boolean}      summaryPending - true while the backend is still computing this project's warm-up summary
  * @property {number|null}  latestScore
  * @property {number}       runsCount
  * @property {number|null}  filesCount
@@ -46,6 +47,7 @@ export function createProject(raw) {
     latestRunId:  raw.latestRunId ?? null,
     latestDoneRunId: raw.latestDoneRunId ?? null,
     latestGrade:  raw.latestGrade ?? null,
+    summaryPending: raw.summaryPending ?? false,
     latestScore:  raw.latestScore ?? null,
     runsCount:    raw.runsCount ?? 0,
     filesCount:   raw.filesCount ?? null,

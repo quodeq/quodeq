@@ -44,11 +44,14 @@ export function getHealth() {
 // wider window lets one request wait it out instead of churning.
 const PROJECTS_LIST_TIMEOUT_MS = 120000;
 
-/** @returns {Promise<import('../models/project.js').Project[]>} */
+/** @returns {Promise<{ projects: import('../models/project.js').Project[], warmup: object | null }>} */
 export async function listProjects() {
   const data = await request('/projects', { timeout: PROJECTS_LIST_TIMEOUT_MS });
   const list = data?.projects ?? data ?? [];
-  return Array.isArray(list) ? list.map(createProject) : [];
+  return {
+    projects: Array.isArray(list) ? list.map(createProject) : [],
+    warmup: (data && !Array.isArray(data) && data.warmup) || null,
+  };
 }
 
 /** @returns {Promise<import('../models/project.js').Project>} */

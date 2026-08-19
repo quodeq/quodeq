@@ -8,6 +8,7 @@ const VALID_SOURCES = ['local', 'shared'];
 const DEFAULT_RUN = 'latest';
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_MS = 400;
+const DEFAULT_SUMMARY_POLL_MS = 3000;
 
 function persistProject(setter, name, storage = localStorage) {
   setter(name);
@@ -61,20 +62,23 @@ function resolveInitialProject(list, currentProject, currentSource, onChangeProj
  * @param {Object} params
  * @param {Function} [params.onNoProjects] - Callback invoked when the loaded project list is empty
  *   (e.g. to redirect to the evaluate tab).
- * @returns {{ projects: Array, setProjects: Function, selectedProject: string, selectedSource: string,
- *   selectedRun: string, setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
- *   handleRunChange: Function, selectProjectAndRun: Function }}
+ * @param {number} [params.summaryPollMs] - Poll interval while any project's summary is pending.
+ * @returns {{ projects: Array, warmup: Object|null, setProjects: Function, selectedProject: string,
+ *   selectedSource: string, selectedRun: string, setSelectedRun: Function, loadProjects: Function,
+ *   handleProjectChange: Function, handleRunChange: Function, selectProjectAndRun: Function }}
  */
 export function useProjectState({
   onNoProjects,
   storage = localStorage,
   maxRetries = DEFAULT_MAX_RETRIES,
   retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+  summaryPollMs = DEFAULT_SUMMARY_POLL_MS,
 }) {
   const { listProjects } = useApi();
   const [projects, setProjects] = useState([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [projectsLoadFailed, setProjectsLoadFailed] = useState(false);
+  const [warmup, setWarmup] = useState(null);
   const [selectedProject, setSelectedProject] = useState(() => readStoredProject(storage));
   const [selectedSource, setSelectedSource] = useState(() => readStoredSource(storage));
   const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
@@ -93,6 +97,7 @@ export function useProjectState({
     return listProjects()
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.projects || []);
+        if (data && !Array.isArray(data)) setWarmup(data.warmup ?? null);
         setProjects(list);
         setProjectsLoaded(true);
         return list;
@@ -118,6 +123,16 @@ export function useProjectState({
     });
   }
 
+  // Warm-up poll: while the backend is still computing summaries, refresh the
+  // list every few seconds so grades fill in as they land. Stops on settle
+  // and on failure (the failure state has its own retry/reconnect lanes).
+  const anySummaryPending = projects.some((p) => p.summaryPending);
+  useEffect(() => {
+    if (!anySummaryPending || !projectsLoaded || projectsLoadFailed) return undefined;
+    const id = setInterval(() => { loadProjects(); }, summaryPollMs);
+    return () => clearInterval(id);
+  }, [anySummaryPending, projectsLoaded, projectsLoadFailed, loadProjects, summaryPollMs]);
+
   useEffect(() => {
     loadProjects().then((list) => {
       // Array (possibly empty -> onboarding) on success; null when the load
@@ -142,6 +157,7 @@ export function useProjectState({
 
   return {
     projects,
+    warmup,
     projectsLoaded,
     projectsLoadFailed,
     retryLoadProjects,
