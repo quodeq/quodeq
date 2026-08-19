@@ -4,8 +4,10 @@ import WarmupNotice from './WarmupNotice.jsx';
 import { t } from '../strings/index.js';
 
 const TIP_KEYS = [
-  'loading.tips.dimensions', 'loading.tips.history', 'loading.tips.dismiss',
-  'loading.tips.standards', 'loading.tips.help', 'loading.tips.shared',
+  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.dimensions',
+  'loading.tips.dismiss', 'loading.tips.fixplans', 'loading.tips.standards',
+  'loading.tips.ignore', 'loading.tips.history', 'loading.tips.compliance',
+  'loading.tips.shared',
 ];
 const TIPS_DELAY_MS = 5000;
 const TIPS_ROTATE_MS = 8000;

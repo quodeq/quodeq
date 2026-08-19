@@ -36,6 +36,10 @@ Quodeq checks PyPI and GitHub once a day for a newer version. When one exists, a
 - **Automatic checks** turns the daily background check on or off.
 - Set `QUODEQ_NO_UPDATE_NOTIFIER=1` to disable automatic checks and CLI notices entirely.
 
+### After an update
+
+The first start after an update can invalidate Quodeq's score caches. The dashboard opens right away and rebuilds them in the background, newest projects first: project cards show a pulsing placeholder while their grade recomputes, and a progress bar on the loading and Overview screens counts through the projects being prepared. Anything you open jumps the queue. If the very first request still times out, the screen offers **Retry**; retrying is safe and never duplicates work.
+
 ### Assistant and terminal
 
 Both ship disabled. The *Assistant* section turns the chat drawer on and picks its provider and model; *Enable terminal* switches on the embedded shell. See the **Assistant** and **Terminal** help sections.

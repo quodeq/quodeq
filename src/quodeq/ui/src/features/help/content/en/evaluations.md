@@ -16,7 +16,7 @@ The **Evaluate** tab is where you start, watch, and finish a run. The same scree
 - **Branch** which git branch to analyze. Defaults to the repo default.
 - **Scope** a subdirectory to focus on, e.g. `packages/frontend`. Useful for monorepos.
 - **Sub-agents** how many parallel agents run. Higher is faster, costs more.
-- **Time budget** a soft cap on run length. Quodeq scores whatever has completed when the timer expires.
+- **Time budget** a hard cap on run length. When the timer expires the run stops, whatever completed is scored, and the remaining files carry over to the next run.
 
 ### Excluding paths
 
@@ -41,6 +41,15 @@ The Evaluate tab streams a live phase indicator (detect → analyze → collect 
 ### Cancelling a run
 
 Hit **Cancel evaluation** any time. You will be asked whether to **keep partial findings** (everything collected so far is scored as a partial run) or **discard** (the run is dropped). Completed dimensions are always scored on cancel; dimensions in flight stop where they are.
+
+### How runs end
+
+Not every run ends with a clean *done*, and the run names its exit reason:
+
+- **Done** every requested dimension completed. A run that skipped dimensions is not reported as done.
+- **Time limit reached** the budget expired. Completed work is scored and the remaining files carry over to the next run.
+- **Cancelled** you stopped it. Kept partials are scored; discarded ones are dropped.
+- **Failed** the provider died mid-run. Findings collected before the failure are kept, and Quodeq stops instead of retrying into the same error.
 
 ### When it finishes
 

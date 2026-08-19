@@ -4,7 +4,7 @@ The **Projects** tab is your home base. Every codebase you evaluate becomes a pr
 
 ### What each row tells you
 
-- **Grade and score** from the latest run, on a 0 to 10 scale.
+- **Grade and score** from the latest run, on a 0 to 10 scale. After an update the grade can show a pulsing placeholder for a while: the score is recomputing in the background and lands on its own.
 - **File and line counts** of the analyzed scope.
 - **Last run timestamp** and the model that produced it.
 - **Setup state**: projects with an interrupted onboarding show a *Resume setup* action.

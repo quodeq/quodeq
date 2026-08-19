@@ -13,6 +13,8 @@ Each finding includes a file and line, a short reason, the offending code, and a
 
 A *downgraded from critical* tag means the provenance gate stepped in: the finding named no reachable external input source, so it was de-escalated to major.
 
+A *capped from major* tag is the scope gate: your declared trust model puts the finding's premise out of scope, for example remote reachability on a loopback-only service, so the severity is capped. See *Trust model and suppression rules* below.
+
 ```text
 CRITICAL    src/db.py:15        SQL injection via string concatenation     CWE-89
             query = f"SELECT * FROM users WHERE id = {user_id}"
@@ -63,6 +65,15 @@ If a finding is a false positive or an accepted trade-off, dismiss it from the v
 - are **excluded from future evaluations** for the same principle and file,
 - can be **restored** individually or in bulk via *Restore all*, or removed for good with *Delete* and *Delete all*.
 
+### Trust model and suppression rules
+
+Two files refine how findings are judged, beyond one-off dismissals:
+
+- **Trust model** `.quodeq/project-profile.json` in the repo declares what the service is exposed to, e.g. `{"version": 1, "multiTenant": false, "networkExposure": "loopback"}`. Detection can fill in `multiTenant`, but network exposure is never guessed: only a human declaration can relax a remote-reachability finding. Commit it and the whole team scores against the same assumptions.
+- **Suppression rules** `suppression_rules.json` in the project's data directory (under `~/.quodeq/evaluations`, next to its runs) holds pattern rules: a requirement glob, a file glob, and a mandatory reason. A rule survives the code moving or being renamed, which a plain dismissal does not. There is no editor for it yet; it is a hand-written JSON file, and malformed entries are skipped rather than suppressing everything.
+
+The run stats show how many findings the rules removed as *suppressed*.
+
 > **Dismissals are durable**
 >
-> Dismissals persist across runs. They are tied to the finding's principle and file, so renaming or moving the file may bring the finding back. That is intentional.
+> Dismissals persist across runs. They are tied to the finding's principle and file, so renaming or moving the file may bring the finding back. That is intentional. When you want a decision that follows the code around, use a suppression rule instead.
