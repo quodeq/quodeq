@@ -147,6 +147,29 @@ def test_reset_for_tests_stops_worker_and_allows_restart(tmp_path):
     assert calls == ["p1", "p2"]
 
 
+def test_start_is_a_noop_when_score_cache_disabled(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+    eng = WarmupEngine(warm_fn=lambda *_: None, list_fn=lambda _rd: [("p1", "2026-08-01")])
+    eng.start(str(tmp_path))
+    assert eng.snapshot() is None
+
+
+def test_default_warm_project_runs_against_a_real_project_dir(tmp_path, monkeypatch):
+    """Smoke: the production warm_fn imports and executes end to end.
+
+    Every other engine test injects warm_fn; a typo inside _warm_project
+    would otherwise pass the suite and silently push every project into
+    failure backoff in production."""
+    from quodeq.services._warmup import _warm_project
+
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    project = tmp_path / "proj"
+    project.mkdir()
+    (project / "repository_info.json").write_text('{"name": "proj"}', encoding="utf-8")
+
+    _warm_project(str(tmp_path), "proj")  # must not raise
+
+
 def test_bad_repository_info_json_does_not_kill_worker(tmp_path):
     """Verify that invalid repository_info.json doesn't crash the worker."""
     import json

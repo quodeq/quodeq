@@ -84,6 +84,13 @@ class WarmupEngine:
         self._done = 0
 
     def start(self, reports_dir: str) -> None:
+        # Warming a disabled cache stores nothing, so it would be pure wasted
+        # compute every boot; the inline read-through paths already handle
+        # the kill switch themselves.
+        from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
+
+        if score_cache_disabled():
+            return
         with self._cond:
             if self._thread is not None:
                 return
