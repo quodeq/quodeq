@@ -1906,7 +1906,27 @@ textarea:focus {
   color: var(--color-text-muted);
   text-align: center;
   max-width: 420px;
+  margin-top: var(--space-5);
   animation: loading-fadein 500ms ease;
+}
+
+/* The tip floats below the centered logo instead of joining the flex column,
+   so the logo never shifts when a tip appears or wraps to a second line. */
+.loading-screen:not(.loading-screen--inline) .loading-tip {
+  position: absolute;
+  top: calc(50% + 64px);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+}
+
+.loading-screen--leaving {
+  animation: loading-fadeout 400ms ease forwards;
+}
+
+@keyframes loading-fadeout {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 .warmup-notice {
@@ -1915,6 +1935,17 @@ textarea:focus {
   align-items: center;
   gap: var(--space-2);
   max-width: 420px;
+}
+
+/* Inside the fullscreen loader the warm-up strip anchors to the bottom so the
+   logo + tip keep the center to themselves; the skeleton-page placement (the
+   notice rendered standalone) keeps normal flow. */
+.loading-screen:not(.loading-screen--inline) .warmup-notice {
+  position: absolute;
+  bottom: var(--space-10);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
 }
 
 .warmup-notice__bar {

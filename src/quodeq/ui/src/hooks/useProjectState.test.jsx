@@ -80,6 +80,48 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
     expect(result.current.selectedProject).toBe('p1');
   });
 
+  it('auto-retries in the background while failed, staying on the failed state', async () => {
+    vi.useFakeTimers();
+    try {
+      listProjects.mockRejectedValue(new Error('down'));
+      const { result } = renderHook(() =>
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, autoRetryMs: 1000 }));
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.projectsLoadFailed).toBe(true);
+      const calls = listProjects.mock.calls.length;
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(listProjects.mock.calls.length).toBe(calls + 1);
+      // The silent attempt failed again: no flicker back to the loading state.
+      expect(result.current.projectsLoadFailed).toBe(true);
+      expect(result.current.projectsLoaded).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('recovers on its own when a background retry succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      listProjects.mockRejectedValue(new Error('down'));
+      const { result } = renderHook(() =>
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, autoRetryMs: 1000 }));
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.projectsLoadFailed).toBe(true);
+
+      listProjects.mockResolvedValue({ projects: [{ id: 'p1', name: 'proj1' }], warmup: null });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+      expect(result.current.projectsLoaded).toBe(true);
+      expect(result.current.projectsLoadFailed).toBe(false);
+      expect(result.current.selectedProject).toBe('p1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a failed retry raises the failure flag again', async () => {
     listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
     const { result } = renderHook(() =>

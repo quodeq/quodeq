@@ -309,7 +309,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         />
       );
     }
-    return <LoadingScreen tips warmup={warmup} />;
+    // The app-level FadingLoadingScreen overlay covers this state; render
+    // nothing here so the loader lives at one stable spot and can fade out.
+    return null;
   }
   if (projects.length === 0 && selectedSource !== 'shared') {
     // Zero local projects. When the connected shared repo has published

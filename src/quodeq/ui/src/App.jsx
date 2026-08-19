@@ -29,7 +29,7 @@ import { setGradeThresholds } from './utils/gradeThresholds.js';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import { useEvaluationProgress } from './features/evaluation/hooks/useEvaluationProgress.js';
 import { computeOverallProgress } from './features/evaluation/components/scanProgressTotals.js';
-import LoadingScreen from './components/LoadingScreen.jsx';
+import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
@@ -864,7 +864,9 @@ function MainContent({ activePage, props }) {
           />
         );
       }
-      return <LoadingScreen tips warmup={props.navigation?.warmup} />;
+      // The app-level FadingLoadingScreen overlay covers this state; render
+      // nothing here so the loader lives at one stable spot and can fade out.
+      return null;
     }
     return (
       <EmptyStateWithTour
@@ -1325,6 +1327,16 @@ export default function App() {
                   engine) leaves the click looking ignored — there is no
                   yield point where a spinner could otherwise paint. */}
               {state.navPending && <div className="nav-pending-bar" aria-hidden="true" />}
+              {/* One stable mount for the startup loader: it covers every
+                  route's not-yet-loaded state and fades out when the projects
+                  land, instead of each gate ripping its own copy out of the
+                  DOM on the same frame the content appears. */}
+              <FadingLoadingScreen
+                show={!state.projectsLoaded && !state.projectsLoadFailed}
+                tips
+                warmup={state.warmup}
+              />
+
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
