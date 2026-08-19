@@ -5,6 +5,7 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import WarmupNotice from '../../../components/WarmupNotice.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
 
@@ -137,7 +138,7 @@ export function selectDashboardProjectInfo({ selectedSource, projects, selectedP
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false } = data;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false, warmup = null } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
@@ -308,7 +309,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         />
       );
     }
-    return <LoadingScreen />;
+    return <LoadingScreen tips warmup={warmup} />;
   }
   if (projects.length === 0 && selectedSource !== 'shared') {
     // Zero local projects. When the connected shared repo has published
@@ -478,6 +479,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <div className={`dashboard-page dashboard-fade ${isDimmed ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
+        {showOverviewSkeleton && <WarmupNotice warmup={warmup} />}
         {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
         {/* No runMode equivalent of the Overview's grace-fallback loader: in
             runMode contentReady is `!!dashboard`, so the instant dashboard lands

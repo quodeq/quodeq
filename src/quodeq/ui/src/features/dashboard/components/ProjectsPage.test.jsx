@@ -795,3 +795,25 @@ describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hi
     expect(screen.queryByText(/synced|not synced yet|syncing/)).not.toBeInTheDocument();
   });
 });
+
+// Task 7: pending grade chip while a project summary is computing.
+describe('ProjectsPage — pending grade chip', () => {
+  it('shows a pending placeholder chip while the summary is computing', async () => {
+    const projects = [{ id: 'a', name: 'proj-a', location: 'local', summaryPending: true }];
+    const fakeApi = makeFakeApi();
+    const { container } = renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    const chip = container.querySelector('.projects-grade--pending');
+    expect(chip).toBeTruthy();
+    expect(chip).toHaveAttribute('aria-label');
+  });
+
+  it('shows the real grade, not the placeholder, once the summary settles', async () => {
+    const projects = [{ id: 'a', name: 'proj-a', location: 'local', summaryPending: false, latestGrade: 'B', latestScore: 7.5 }];
+    const fakeApi = makeFakeApi();
+    const { container } = renderWithApi(<ProjectsPage projects={projects} actions={{}} />, fakeApi);
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(container.querySelector('.projects-grade--pending')).toBeNull();
+    expect(container.querySelector('.projects-grade')).toBeTruthy();
+  });
+});

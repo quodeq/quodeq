@@ -199,3 +199,61 @@ describe('useProjectState — source-aware project selection', () => {
     expect(storage.store['quodeq_selected_source']).toBe('local');
   });
 });
+
+describe('useProjectState — warm-up pending poll', () => {
+  it('exposes the warmup snapshot from the projects envelope', async () => {
+    listProjects.mockResolvedValue({
+      projects: [{ id: 'a', name: 'A', summaryPending: false }],
+      warmup: { active: true, projectsDone: 1, projectsTotal: 3, currentProjectName: 'A' },
+    });
+    const { result } = renderHook(() =>
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }));
+
+    await waitFor(() => expect(result.current.projectsLoaded).toBe(true));
+    expect(result.current.warmup).toEqual({ active: true, projectsDone: 1, projectsTotal: 3, currentProjectName: 'A' });
+  });
+
+  it('polls while any summary is pending and stops when all settle', async () => {
+    vi.useFakeTimers();
+    try {
+      listProjects
+        .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }], warmup: null })
+        .mockResolvedValue({ projects: [{ id: 'a', name: 'A', summaryPending: false }], warmup: null });
+      const { result } = renderHook(() =>
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, summaryPollMs: 1000 }));
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.projects[0].summaryPending).toBe(true);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(listProjects).toHaveBeenCalledTimes(2);
+      expect(result.current.projects[0].summaryPending).toBe(false);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(listProjects).toHaveBeenCalledTimes(2); // settled -> no more polls
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not poll after the load has failed', async () => {
+    vi.useFakeTimers();
+    try {
+      listProjects
+        .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }], warmup: null })
+        .mockRejectedValue(new Error('down'));
+      const { result } = renderHook(() =>
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, summaryPollMs: 1000 }));
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });   // poll fires, fails
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.projectsLoadFailed).toBe(true);
+      const calls = listProjects.mock.calls.length;
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(listProjects.mock.calls.length).toBe(calls);                    // failure stops the poll
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

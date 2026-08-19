@@ -224,8 +224,11 @@ def test_project_card_summary_applies_deletions(tmp_path, monkeypatch):
     assert accumulated is not None
 
     # The project-card summary must serve the SAME deletion-adjusted score.
+    # compute_on_miss=True: this test exercises the rescore-parity logic
+    # itself, not the local list path's cache-only/pending contract.
     runs = list_runs(reports_root, project)
-    _grade, card_score, _files = _read_accumulated_summary(reports_root, project, runs)
+    _grade, card_score, _files, _pending = _read_accumulated_summary(
+        reports_root, project, runs, compute_on_miss=True)
     assert card_score == accumulated, f"card {card_score} != accumulated {accumulated}"
 
 
@@ -241,11 +244,14 @@ def test_deletion_actually_moves_the_card_score(tmp_path, monkeypatch):
     from quodeq.services.deleted import delete_finding
     from quodeq.data.fs.report_parser.runs import list_runs
 
+    # compute_on_miss=True: see test_project_card_summary_applies_deletions.
     runs = list_runs(reports_root, project)
-    _g, before, _f = _read_accumulated_summary(reports_root, project, runs)
+    _g, before, _f, _p = _read_accumulated_summary(
+        reports_root, project, runs, compute_on_miss=True)
     delete_finding(project_dir, {"dimension": _DIM, "principle": "p1", "file": "a.py"})
     clear_shared_dimension_cache()
-    _g2, after, _f2 = _read_accumulated_summary(reports_root, project, runs)
+    _g2, after, _f2, _p2 = _read_accumulated_summary(
+        reports_root, project, runs, compute_on_miss=True)
     assert before is not None and after is not None
     assert after > before, f"deleting the critical should raise the card score; {before} -> {after}"
 

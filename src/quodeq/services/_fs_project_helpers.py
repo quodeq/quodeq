@@ -49,13 +49,19 @@ def _backfill_onboarding_field(
 
 
 def _build_project_entry(
-    reports_root: Path, entry_name: str, runs: list[RunInfo], *, backfill: bool = True,
+    reports_root: Path, entry_name: str, runs: list[RunInfo], *,
+    backfill: bool = True, inline_summaries: bool = False,
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
     *backfill* mirrors ``build_project_list``'s parameter of the same name:
     when False, the record is read read-only and never rewritten (used by
     the shared-repo route so listing a clone never dirties its worktree).
+
+    *inline_summaries* mirrors ``build_project_list``'s parameter of the same
+    name, forwarded to ``_read_accumulated_summary`` as ``compute_on_miss``:
+    the shared-repo route has no warm-up engine, so it keeps computing a
+    missing summary inline instead of reporting it pending.
     """
     # Lazy backfill: ensure legacy project records have an
     # ``onboardingCompletedAt`` field so the wizard never auto-opens for
@@ -69,8 +75,8 @@ def _build_project_entry(
     backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
     info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
-    latest_grade, latest_score, files_count = _read_accumulated_summary(
-        reports_root, entry_name, runs,
+    latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
+        reports_root, entry_name, runs, compute_on_miss=inline_summaries,
     )
     # runs is sorted newest-first (list_runs); status is already read there
     # (cancelled/failed/in_progress detection), so no extra per-run read is
@@ -100,6 +106,7 @@ def _build_project_entry(
         language_stats=_read_language_stats(reports_root, entry_name, runs),
         onboarding_completed_at=info.get("onboardingCompletedAt"),
         origin_url=info.get("originUrl"),
+        summary_pending=summary_pending,
     )
 
 

@@ -2740,6 +2740,22 @@
 .projects-grade--f { color: var(--color-grade-bottom-text); }
 .projects-grade--x { color: var(--color-text-muted); }
 
+.projects-grade--pending {
+  width: 34px;
+  min-height: 18px;
+  background: var(--color-surface-alt);
+  animation: grade-pending-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes grade-pending-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .projects-grade--pending { animation: none; opacity: 0.6; }
+}
+
 /* ── Children section ── */
 
 .project-card-group {

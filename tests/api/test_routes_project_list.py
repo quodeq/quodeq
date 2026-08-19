@@ -100,6 +100,33 @@ class TestListProjects:
         assert data[0]["name"] == "b"
 
 
+def test_projects_response_carries_warmup_snapshot(app, provider, monkeypatch):
+    from quodeq.core.types import ProjectEntry
+
+    provider.projects = [ProjectEntry(id="a", name="a", summary_pending=True)]
+    snap = {"active": True, "projectsDone": 1, "projectsTotal": 3, "currentProjectName": "a"}
+    monkeypatch.setattr("quodeq.api.routes_project_list.warmup_engine.snapshot", lambda: snap)
+    enqueued = []
+    monkeypatch.setattr("quodeq.api.routes_project_list.warmup_engine.enqueue", enqueued.append)
+
+    resp = app.test_client().get("/api/projects")
+
+    assert resp.get_json()["warmup"] == snap
+    assert resp.get_json()["projects"][0]["summaryPending"] is True
+    assert enqueued == ["a"]
+
+
+def test_projects_response_omits_warmup_when_engine_not_started(app, provider, monkeypatch):
+    from quodeq.core.types import ProjectEntry
+
+    provider.projects = [ProjectEntry(id="a", name="a")]
+    monkeypatch.setattr("quodeq.api.routes_project_list.warmup_engine.snapshot", lambda: None)
+
+    resp = app.test_client().get("/api/projects")
+
+    assert "warmup" not in resp.get_json()
+
+
 class TestDeleteProject:
     def test_delete_requires_confirm(self, client):
         resp = client.delete("/api/projects/my-proj")

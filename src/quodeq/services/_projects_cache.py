@@ -46,7 +46,13 @@ class ProjectsCache:
             # The cached part is the expensive disk walk; camelCase mapping is
             # cheap and belongs at the boundary.
             self._payload = {"projects": projects}
-            self._stamp = time.monotonic()
+            # While any summary is still pending (warm-up in flight), leave the
+            # cache cold so the UI's poll sees each newly filled grade. The
+            # build is a pure cache read now, so re-running it is cheap.
+            if any(getattr(p, "summary_pending", False) for p in projects):
+                self._stamp = 0.0
+            else:
+                self._stamp = time.monotonic()
             return self._payload
 
     def invalidate(self) -> None:
