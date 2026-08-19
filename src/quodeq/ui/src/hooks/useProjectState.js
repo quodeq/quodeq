@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApi } from '../api/ApiContext.jsx';
 
 const STORAGE_KEY = 'quodeq_selected_project';
@@ -9,6 +9,7 @@ const DEFAULT_RUN = 'latest';
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_MS = 400;
 const DEFAULT_SUMMARY_POLL_MS = 3000;
+const DEFAULT_AUTO_RETRY_MS = 30000;
 
 function persistProject(setter, name, storage = localStorage) {
   setter(name);
@@ -73,6 +74,7 @@ export function useProjectState({
   maxRetries = DEFAULT_MAX_RETRIES,
   retryDelayMs = DEFAULT_RETRY_DELAY_MS,
   summaryPollMs = DEFAULT_SUMMARY_POLL_MS,
+  autoRetryMs = DEFAULT_AUTO_RETRY_MS,
 }) {
   const { listProjects } = useApi();
   const [projects, setProjects] = useState([]);
@@ -92,14 +94,20 @@ export function useProjectState({
   // silently, leaving a permanent LoadingScreen even after the backend
   // recovered). A successful fetch that returns an empty array is still a
   // real "fresh user" -> onboarding.
+  const loadInFlightRef = useRef(false);
+
   const loadProjects = useCallback(function load(attempt = 0) {
-    if (attempt === 0) setProjectsLoadFailed(false);
+    if (attempt === 0) {
+      loadInFlightRef.current = true;
+      setProjectsLoadFailed(false);
+    }
     return listProjects()
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.projects || []);
         if (data && !Array.isArray(data)) setWarmup(data.warmup ?? null);
         setProjects(list);
         setProjectsLoaded(true);
+        loadInFlightRef.current = false;
         return list;
       })
       .catch((err) => {
@@ -109,6 +117,7 @@ export function useProjectState({
         }
         console.warn('Failed to load projects after retries:', err);
         setProjectsLoadFailed(true);
+        loadInFlightRef.current = false;
         return null;
       });
   }, [listProjects, maxRetries, retryDelayMs]);
@@ -122,6 +131,31 @@ export function useProjectState({
       return list;
     });
   }
+
+  // The failure screen owns its own recovery: while it shows, retry quietly
+  // in the background. A silent attempt never clears the failed flag upfront
+  // (no flicker back to the loading state on every tick); success applies the
+  // normal loaded path, including the boot-time selection resolution. The
+  // manual Retry button and the reconnect re-arm stay as faster lanes.
+  useEffect(() => {
+    if (!projectsLoadFailed || projectsLoaded) return undefined;
+    const id = setInterval(() => {
+      if (loadInFlightRef.current) return;
+      loadInFlightRef.current = true;
+      listProjects()
+        .then((data) => {
+          const list = Array.isArray(data) ? data : (data?.projects || []);
+          if (data && !Array.isArray(data)) setWarmup(data.warmup ?? null);
+          setProjects(list);
+          setProjectsLoaded(true);
+          setProjectsLoadFailed(false);
+          resolveInitialProject(list, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage);
+        })
+        .catch(() => { /* still down: stay on the failed state, try again next tick */ })
+        .finally(() => { loadInFlightRef.current = false; });
+    }, autoRetryMs);
+    return () => clearInterval(id);
+  }, [projectsLoadFailed, projectsLoaded, autoRetryMs, listProjects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Warm-up poll: while the backend is still computing summaries, refresh the
   // list every few seconds so grades fill in as they land. Stops on settle
