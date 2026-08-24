@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.9.1] - 2026-08-24
+
+### Features
+- **Startup no longer waits on the cache rebuild**: upgrading invalidates every project's cached scores, and that rebuild used to happen while you watched. It now runs in the background from the moment the server starts, so the projects list answers immediately. Projects still being computed show a pending grade placeholder and fill themselves in, and the project you open jumps the queue.
+- **Loading screens say what they are doing**: a wait longer than a few seconds now shows a rotating tip and a progress strip naming the project being prepared and how many are left, instead of a spinner with no end in sight.
+
+### Improvements
+- **Loading screen layout**: the tip sits under the logo with more room around it, the progress bar anchors to the bottom of the screen and finishes full before it disappears, and the logo holds steady instead of drifting. Tips are shuffled per launch, so a slow start does not replay the same order.
+- **Help content**: the help pages catch up with recent releases. What happens after an update, time budgets as a hard cap, the exit reasons a run can report, the scope gate badge, the declared trust model and pattern suppression rules are all documented now, and the tips rotation grew from six entries to ten, each backed by something the help actually says.
+- **Dependencies**: the OpenAI SDK moves to 3.0.0, verified against every provider call site Quodeq makes. nanoid is bumped to clear a build-time advisory, and packaging is kept current.
+
+### Fixes
+- **Startup hang after upgrading to 1.9.0**: the first launch after the upgrade could sit on the loading spinner forever while the backend burned CPU for minutes. Three things went wrong together. The post-upgrade rebuild ran once per piled-up request instead of once for all of them, the spinner had no way out once its retries were exhausted, and two concurrent first-opens of a fresh score cache could delete the database out from under a live connection. The rebuild is now shared by every request waiting on it, and a load that still fails offers a Retry button, keeps retrying quietly on its own, and recovers when the backend comes back.
+- **Projects with nothing finished**: a project whose runs were all cancelled or still running now gets its fallback grade prepared like any other, instead of waiting on a summary that was never going to arrive.
+
 ## [1.9.0] - 2026-08-06
 
 ### Features

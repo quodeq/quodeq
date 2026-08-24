@@ -5,6 +5,7 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import WarmupNotice from '../../../components/WarmupNotice.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
 
@@ -137,7 +138,7 @@ export function selectDashboardProjectInfo({ selectedSource, projects, selectedP
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false } = data;
+  const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false, warmup = null } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
   // After a successful clone-on-add migration the project's repository_info.json
@@ -291,8 +292,27 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     setNoRunsEmptySticky({ scopeKey: noRunsScopeKey, active: showNoRunsEmpty });
   }
 
-  const { projectsLoaded } = data;
-  if (!projectsLoaded) return <LoadingScreen />;
+  const { projectsLoaded, projectsLoadFailed } = data;
+  if (!projectsLoaded) {
+    // The startup projects load exhausted its retries: offer a retry instead
+    // of an unrecoverable spinner (this early return sits above every other
+    // error branch, so without this the page spins forever even after the
+    // backend recovered). No hooks in either branch — the hook count across
+    // the false -> true flip is pinned by tests.
+    if (projectsLoadFailed) {
+      return (
+        <EmptyState
+          title={t('overview.projectsLoadFailedTitle')}
+          description={t('overview.projectsLoadFailedDesc')}
+          actionLabel={t('overview.retry')}
+          onAction={() => callbacks.onProjectsRetry?.()}
+        />
+      );
+    }
+    // The app-level FadingLoadingScreen overlay covers this state; render
+    // nothing here so the loader lives at one stable spot and can fade out.
+    return null;
+  }
   if (projects.length === 0 && selectedSource !== 'shared') {
     // Zero local projects. When the connected shared repo has published
     // content, the useful next step is browsing it (read-only until pulled)
@@ -461,6 +481,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <div className={`dashboard-page dashboard-fade ${isDimmed ? 'dashboard-loading' : `dashboard-ready${dashboardAppearClass}`}${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
         {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
+        {showOverviewSkeleton && <WarmupNotice warmup={warmup} />}
         {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
         {/* No runMode equivalent of the Overview's grace-fallback loader: in
             runMode contentReady is `!!dashboard`, so the instant dashboard lands

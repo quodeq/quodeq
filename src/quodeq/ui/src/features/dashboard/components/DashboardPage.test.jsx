@@ -905,3 +905,72 @@ describe('selectDashboardProjectInfo', () => {
     expect(info).toBeNull();
   });
 });
+
+// v1.9.0 regression: when the startup projects fetch exhausted its retries the
+// page sat on the fullscreen LoadingScreen forever -- projectsLoaded stayed
+// false with no error branch above this gate and nothing left to re-fire the
+// load. The gate must surface a retry instead of an unrecoverable spinner.
+describe('projects-load failure gate (startup infinite spinner)', () => {
+  it('renders a retry action instead of a LoadingScreen when the projects load failed', () => {
+    const onProjectsRetry = vi.fn();
+    const { container } = render(
+      <DashboardPage
+        data={{ projectsLoaded: false, projectsLoadFailed: true }}
+        callbacks={{ onProjectsRetry }}
+        runMode={false}
+      />,
+    );
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    const btn = container.querySelector('.empty-state-btn');
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onProjectsRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders nothing at the gate while the load is in flight (the app-level overlay covers it)', () => {
+    const { container } = render(
+      <DashboardPage data={{ projectsLoaded: false, projectsLoadFailed: false }} callbacks={{}} runMode={false} />,
+    );
+    // The loader lives at one stable app-level mount (FadingLoadingScreen)
+    // so it can fade out; a second copy here would stack tips on tips.
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.empty-state-btn')).toBeNull();
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('does not change hook count across the failed -> loaded transition', () => {
+    const { rerender } = render(
+      <DashboardPage data={{ projectsLoaded: false, projectsLoadFailed: true }} callbacks={{}} runMode={false} />,
+    );
+    expect(() => {
+      rerender(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
+    }).not.toThrow();
+  });
+});
+
+describe('warm-up surfaces', () => {
+  it('renders no loader of its own before projects load (app-level overlay owns that state)', () => {
+    const warmup = { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' };
+    const { container } = render(
+      <DashboardPage data={{ projectsLoaded: false, warmup }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.warmup-notice')).toBeNull();
+  });
+
+  it('shows the warm-up notice above the overview skeleton while scores compute', () => {
+    const warmup = { active: true, projectsDone: 1, projectsTotal: 6, currentProjectName: 'my-app' };
+    const { container } = render(
+      <DashboardPage data={{ ...overviewLoading, warmup }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.overview-skeleton')).toBeTruthy();
+    expect(container.querySelector('.warmup-notice')).toBeTruthy();
+  });
+
+  it('renders no warm-up notice when the snapshot is inactive', () => {
+    const { container } = render(
+      <DashboardPage data={{ ...overviewLoading, warmup: { active: false, projectsDone: 2, projectsTotal: 2 } }} callbacks={{}} runMode={false} />,
+    );
+    expect(container.querySelector('.warmup-notice')).toBeNull();
+  });
+});

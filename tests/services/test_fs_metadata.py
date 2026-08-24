@@ -142,7 +142,8 @@ class TestReadAccumulatedSummary:
         mock_summarize.return_value = mock_summary
 
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files = _read_accumulated_summary(Path("/r"), "proj", runs)
+        grade, score, files, _pending = _read_accumulated_summary(
+            Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade == "A"
         assert score == 8.5
         assert files == 10
@@ -151,21 +152,24 @@ class TestReadAccumulatedSummary:
     def test_no_dimensions(self, mock_read):
         from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files = _read_accumulated_summary(Path("/r"), "proj", runs)
+        grade, score, files, _pending = _read_accumulated_summary(
+            Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade is None
         assert score is None
 
     def test_empty_runs(self):
-        grade, score, files = _read_accumulated_summary(Path("/r"), "proj", [])
+        grade, score, files, pending = _read_accumulated_summary(Path("/r"), "proj", [])
         assert grade is None
         assert score is None
         assert files is None
+        assert pending is False
 
     @patch("quodeq.services._fs_metadata.read_run_data", side_effect=OSError("boom"))
     def test_error_returns_none_tuple(self, mock_read):
         from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files = _read_accumulated_summary(Path("/r"), "proj", runs)
+        grade, score, files, _pending = _read_accumulated_summary(
+            Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade is None
         assert score is None
         assert files is None
@@ -310,9 +314,11 @@ class TestReadAccumulatedSummary:
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
 
         save_visible_standard_ids(repo, ["security", "reliability"])
-        _, score_both, _ = _read_accumulated_summary(reports_root, project, runs)
+        _, score_both, _, _ = _read_accumulated_summary(
+            reports_root, project, runs, compute_on_miss=True)
         save_visible_standard_ids(repo, ["security"])
-        _, score_one, _ = _read_accumulated_summary(reports_root, project, runs)
+        _, score_one, _, _ = _read_accumulated_summary(
+            reports_root, project, runs, compute_on_miss=True)
 
         assert score_both == 7.0
         assert score_one == 9.0
@@ -383,7 +389,8 @@ class TestReadAccumulatedSummary:
 
         clear_shared_dimension_cache()
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files = _read_accumulated_summary(reports_root, project, runs)
+        grade, score, files, _pending = _read_accumulated_summary(
+            reports_root, project, runs, compute_on_miss=True)
         clear_shared_dimension_cache()
 
         # Single dimension → the summary grade/score equals the overlaid custom value.
@@ -572,7 +579,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-failed", date_iso="2026-01-02", date_label="Jan 02", status="failed"),
             RunInfo(run_id="run-complete", date_iso="2026-01-01", date_label="Jan 01", status="complete"),
         ]
-        grade, score, files = _read_accumulated_summary(
+        grade, score, files, _pending = _read_accumulated_summary(
             Path("/r"), "proj-card-eligibility", runs,
         )
         read_run_ids = {call.args[2] for call in mock_read.call_args_list}
@@ -602,7 +609,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-cancelled", date_iso="2026-01-02", date_label="Jan 02", status="cancelled"),
             RunInfo(run_id="run-failed", date_iso="2026-01-01", date_label="Jan 01", status="failed"),
         ]
-        grade, score, files = _read_accumulated_summary(
+        grade, score, files, _pending = _read_accumulated_summary(
             Path("/r"), "proj-card-fallback", runs,
         )
         read_run_ids = {call.args[2] for call in mock_read.call_args_list}
@@ -635,7 +642,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-stub", date_iso="2026-01-02", date_label="Jan 02", status="cancelled"),
             RunInfo(run_id="run-real", date_iso="2026-01-01", date_label="Jan 01", status="cancelled"),
         ]
-        grade, score, files = _read_accumulated_summary(
+        grade, score, files, _pending = _read_accumulated_summary(
             Path("/r"), "proj-card-stub", runs,
         )
         # The card score must be the real run's 6.0, not the stub's 9.9.

@@ -7,6 +7,7 @@ to the camelCase wire shape happens at the route.
 """
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -27,17 +28,32 @@ class ProjectsCache:
         self._ttl_s = ttl_s
         self._payload: dict[str, Any] | None = None
         self._stamp: float = 0.0
+        self._lock = threading.Lock()
 
     def list(self, reports_dir: str) -> dict[str, Any]:
         if self._is_fresh():
             return self._payload  # type: ignore[return-value]
-        projects = _fs_projects.build_project_list(Path(reports_dir))
-        # Entities, not wire dicts: the route serializes per request (WS6).
-        # The cached part is the expensive disk walk; camelCase mapping is
-        # cheap and belongs at the boundary.
-        self._payload = {"projects": projects}
-        self._stamp = time.monotonic()
-        return self._payload
+        # Single-flight: requests racing a cold cache wait for the one build
+        # in progress instead of each starting their own. The client retries
+        # a slow startup request, and the build can take minutes right after
+        # an upgrade invalidates the score caches — without this lock those
+        # retries multiplied the whole recompute.
+        with self._lock:
+            if self._is_fresh():
+                return self._payload  # type: ignore[return-value]
+            projects = _fs_projects.build_project_list(Path(reports_dir))
+            # Entities, not wire dicts: the route serializes per request (WS6).
+            # The cached part is the expensive disk walk; camelCase mapping is
+            # cheap and belongs at the boundary.
+            self._payload = {"projects": projects}
+            # While any summary is still pending (warm-up in flight), leave the
+            # cache cold so the UI's poll sees each newly filled grade. The
+            # build is a pure cache read now, so re-running it is cheap.
+            if any(getattr(p, "summary_pending", False) for p in projects):
+                self._stamp = 0.0
+            else:
+                self._stamp = time.monotonic()
+            return self._payload
 
     def invalidate(self) -> None:
         """Drop the cached payload; next ``list`` call re-reads from disk."""

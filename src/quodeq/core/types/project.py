@@ -41,3 +41,4 @@ class ProjectEntry:
     analyzed_files: int | None = None
     onboarding_completed_at: str | None = None
     origin_url: str | None = None
+    summary_pending: bool = False

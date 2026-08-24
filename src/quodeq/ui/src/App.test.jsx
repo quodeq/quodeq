@@ -887,3 +887,54 @@ describe('history route onRunDeleted wiring', () => {
     expect(props.scheduleDashboardReconcile).toHaveBeenCalledTimes(1);
   });
 });
+
+// v1.9.0 startup-spinner regression: the failure state and its retry action
+// must survive both explicit bundle whitelists (see buildDashboardDataBundle's
+// docstring -- an unforwarded field silently arrives as undefined and the
+// feature never activates).
+describe('projects-load failure threading', () => {
+  it('buildDashboardDataBundle forwards projectsLoadFailed and the retry action', () => {
+    const state = { projectsLoadFailed: true, retryLoadProjects: vi.fn() };
+    const bundle = buildDashboardDataBundle({ state });
+    expect(bundle.projectsLoadFailed).toBe(true);
+    expect(bundle.onProjectsRetry).toBe(state.retryLoadProjects);
+  });
+
+  it('buildNavigationBundle forwards projectsLoadFailed and retryLoadProjects', () => {
+    const state = { projectsLoadFailed: true, retryLoadProjects: vi.fn() };
+    const bundle = buildNavigationBundle({
+      state, navTab: vi.fn(), navStackLength: 1, isEvaluating: false,
+      showToast: vi.fn(), setWizardEntry: vi.fn(),
+    });
+    expect(bundle.projectsLoadFailed).toBe(true);
+    expect(bundle.retryLoadProjects).toBe(state.retryLoadProjects);
+  });
+
+  it('the overview route threads onProjectsRetry into DashboardPage callbacks', () => {
+    const props = {
+      dashboardData: { projectsLoaded: false, projectsLoadFailed: true, onProjectsRetry: vi.fn() },
+      navigation: { handleNavigate: vi.fn(), handleRunSelect: vi.fn(), loadProjects: vi.fn() },
+    };
+    const el = ROUTE_RENDERERS.overview({}, props);
+    expect(el.props.callbacks.onProjectsRetry).toBe(props.dashboardData.onProjectsRetry);
+  });
+
+  it('the run route threads onProjectsRetry into DashboardPage callbacks', () => {
+    const props = {
+      dashboardData: { projectsLoaded: false, projectsLoadFailed: true, onProjectsRetry: vi.fn() },
+      navigation: { handleNavigate: vi.fn() },
+    };
+    const el = ROUTE_RENDERERS.run({}, props);
+    expect(el.props.callbacks.onProjectsRetry).toBe(props.dashboardData.onProjectsRetry);
+  });
+
+  it('both bundles forward the warmup snapshot', () => {
+    const warmup = { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' };
+    const state = { warmup };
+    expect(buildDashboardDataBundle({ state }).warmup).toBe(warmup);
+    expect(buildNavigationBundle({
+      state, navTab: vi.fn(), navStackLength: 1, isEvaluating: false,
+      showToast: vi.fn(), setWizardEntry: vi.fn(),
+    }).warmup).toBe(warmup);
+  });
+});

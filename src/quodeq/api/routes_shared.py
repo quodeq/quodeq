@@ -380,7 +380,12 @@ def register_shared_routes(app: Flask) -> None:
         # repository_info.json here would dirty it, and a dirty worktree can
         # make publish's `pull --rebase` refuse (confusing wedge) the next
         # time someone publishes into this clone.
-        projects = _fs_projects.build_project_list(eval_root, backfill=False)
+        # inline_summaries=True: this route has no warm-up engine to fill a
+        # missing project-card summary later, so a cache miss must compute
+        # it inline here instead of reporting it pending forever.
+        projects = _fs_projects.build_project_list(
+            eval_root, backfill=False, inline_summaries=True,
+        )
         listing = {"projects": [to_camel_dict(p) for p in projects]}
         meta = published_meta(url)
         for project in listing["projects"]:

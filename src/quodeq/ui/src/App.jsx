@@ -18,6 +18,7 @@ const ViolationsPage = lazy(() => import('./features/violations/components/Viola
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
+import EmptyState from './components/EmptyState.jsx';
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,7 +29,7 @@ import { setGradeThresholds } from './utils/gradeThresholds.js';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import { useEvaluationProgress } from './features/evaluation/hooks/useEvaluationProgress.js';
 import { computeOverallProgress } from './features/evaluation/components/scanProgressTotals.js';
-import LoadingScreen from './components/LoadingScreen.jsx';
+import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
@@ -287,6 +288,9 @@ export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
   return {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
+    projectsLoadFailed: state.projectsLoadFailed,
+    onProjectsRetry: state.retryLoadProjects,
+    warmup: state.warmup,
     dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
     onRetry: state.refreshDashboardActive,
     scoresPending: state.scoresPending,
@@ -302,6 +306,9 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
   return {
     selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
     projectsLoaded: state.projectsLoaded,
+    projectsLoadFailed: state.projectsLoadFailed,
+    retryLoadProjects: state.retryLoadProjects,
+    warmup: state.warmup,
     loadProjects: state.loadProjects,
     handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
     handleProjectChange: state.handleProjectChange, navTab, navStackLength,
@@ -599,7 +606,7 @@ function ViolationsRoute({ params, props }) {
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
 export const ROUTE_RENDERERS = {
-  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects, onRetry: props.dashboardData.onRetry }} runMode={false} />,
+  overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
@@ -622,7 +629,7 @@ export const ROUTE_RENDERERS = {
       tabKey={params._tabKey || 0}
     />;
   },
-  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
+  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={true} />,
   history: (params, props) => {
     const trend = props.dashboardData.dashboard?.trend || [];
     const runs = props.dashboardData.availableRuns || [];
@@ -844,7 +851,23 @@ export function buildAssistantActionAppliedHandler({
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
   if (shouldWallEmptyProjects({ page, projects: props.navigation?.projects, selectedSource: props.navigation?.selectedSource })) {
-    if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
+    if (!props.navigation?.projectsLoaded) {
+      // Mirror of DashboardPage's gate: a failed startup load must offer a
+      // retry instead of an unrecoverable fullscreen spinner.
+      if (props.navigation?.projectsLoadFailed) {
+        return (
+          <EmptyState
+            title={t('overview.projectsLoadFailedTitle')}
+            description={t('overview.projectsLoadFailedDesc')}
+            actionLabel={t('overview.retry')}
+            onAction={() => props.navigation.retryLoadProjects?.()}
+          />
+        );
+      }
+      // The app-level FadingLoadingScreen overlay covers this state; render
+      // nothing here so the loader lives at one stable spot and can fade out.
+      return null;
+    }
     return (
       <EmptyStateWithTour
         onAdd={() => props.navigation.onAddProject()}
@@ -1304,6 +1327,16 @@ export default function App() {
                   engine) leaves the click looking ignored — there is no
                   yield point where a spinner could otherwise paint. */}
               {state.navPending && <div className="nav-pending-bar" aria-hidden="true" />}
+              {/* One stable mount for the startup loader: it covers every
+                  route's not-yet-loaded state and fades out when the projects
+                  land, instead of each gate ripping its own copy out of the
+                  DOM on the same frame the content appears. */}
+              <FadingLoadingScreen
+                show={!state.projectsLoaded && !state.projectsLoadFailed}
+                tips
+                warmup={state.warmup}
+              />
+
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>

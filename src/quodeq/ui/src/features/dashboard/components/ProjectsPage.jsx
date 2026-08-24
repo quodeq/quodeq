@@ -55,7 +55,10 @@ function formatPath(path) {
   return path;
 }
 
-function GradeChip({ grade, score }) {
+function GradeChip({ grade, score, pending = false }) {
+  if (pending && !grade && score == null) {
+    return <span className="projects-grade projects-grade--pending" aria-label={t('projects.gradePending')} />;
+  }
   if (!grade && score == null) return null;
   const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
   return (
@@ -168,7 +171,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
               </button>
             )}
             {project.scopePath && <span className="scope-badge">{project.scopePath}</span>}
-            <GradeChip grade={grade} score={score} />
+            <GradeChip grade={grade} score={score} pending={project.summaryPending} />
           </div>
           <div className="project-card-top-right">
             <ProjectCardChips chips={chips} />
