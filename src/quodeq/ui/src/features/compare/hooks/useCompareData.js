@@ -47,6 +47,12 @@ export function useCompareData(projects) {
         ...QUERY_DEFAULTS,
         queryKey: projectKeys.standardsVisibility(id),
         queryFn: () => getStandardsVisibility(id),
+        // Visibility is a tiny payload the user can change from the
+        // Standards screen at any moment: always re-read on mount (the
+        // toggle also invalidates this key) so a disabled standard never
+        // lingers on Compare.
+        staleTime: 0,
+        refetchOnMount: 'always',
       };
     }),
   });
