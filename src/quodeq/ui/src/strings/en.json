@@ -172,7 +172,7 @@
   "compare.colViolations": "violations",
   "compare.computing": "computing scores…",
   "compare.crumbDuel": "duel",
-  "compare.detailTrendHint": "trend · one bar per run",
+  "compare.detailTrendHint": "score trend · oldest to newest",
   "compare.dimSubtitle": "{principles} principles · {violations} violations · {projects} projects in scope",
   "compare.dimTabsAria": "Switch dimension",
   "compare.dimensionsAria": "Dimensions across the scope",

@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
+import CompareTrendLine from './CompareTrendLine.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
@@ -97,18 +97,11 @@ function RowDetail({ row, openDimension, onOpenProject }) {
           <SevBadge level="major" format="count-abbr" count={row.severity.major} />
           <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
         </span>
-        {row.spark.length > 0 && (
-          /* Width scales with run count so a two-run project renders two
-             slim bars instead of stretching into giant blocks. */
-          <span
-            className="compare-row__sparkBox"
-            style={{ width: `${Math.min(90, row.spark.length * 7)}px` }}
-          >
-            <DimensionSparkline scores={row.spark} />
-          </span>
-        )}
-        {row.spark.length > 0 && (
-          <span className="compare-rowdetail__hint">{t('compare.detailTrendHint')}</span>
+        {row.spark.length > 1 && (
+          <>
+            <CompareTrendLine scores={row.spark} />
+            <span className="compare-rowdetail__hint">{t('compare.detailTrendHint')}</span>
+          </>
         )}
         {row.coveragePct != null && (
           <span className={row.coveragePct < 80 ? 'compare-row__cov--low' : undefined}>
@@ -213,9 +206,16 @@ export default function CompareFleetView({
   sortDir, toggleSortDir, pickerOpen, setPickerOpen, scopeIds, scopeCount,
   toggleProject, selectAll, selectFlagged, openDimension, openDuel, onOpenProject,
 }) {
-  const [expandedId, setExpandedId] = useState(null);
+  // Any number of rows can hold their detail open at once — comparing two
+  // projects' expansions side by side is the point of this screen.
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [showUnevaluated, setShowUnevaluated] = useState(false);
-  const toggleRow = (id) => setExpandedId((cur) => (cur === id ? null : id));
+  const toggleRow = (id) => setExpandedIds((cur) => {
+    const next = new Set(cur);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
 
   // Never-evaluated projects (settled, no data, no error) collapse into one
   // line; pending and errored rows stay visible individually.
@@ -374,7 +374,7 @@ export default function CompareFleetView({
               key={row.id}
               row={row}
               rank={i + 1}
-              expanded={expandedId === row.id}
+              expanded={expandedIds.has(row.id)}
               onToggle={toggleRow}
               onOpenProject={onOpenProject}
               openDimension={openDimension}

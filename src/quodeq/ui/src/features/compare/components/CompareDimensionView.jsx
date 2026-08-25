@@ -57,16 +57,23 @@ export default function CompareDimensionView({
     const found = source.principles.find((x) => x.key === p.key);
     return found ? found.score : null;
   });
-  const focused = focusId
-    ? view.standings.find((s) => s.row.id === focusId && s !== view.lead && s !== view.trail)
+  const focusStanding = focusId
+    ? view.standings.find((s) => s.row.id === focusId)
+    : null;
+  // When the hovered project is already plotted (leader/trailer), recolor
+  // that polygon to the focus style instead of drawing a duplicate — the
+  // hover must always visibly answer "which shape is this row".
+  const isFocused = (s) => Boolean(focusStanding && s === focusStanding);
+  const extraFocus = focusStanding && focusStanding !== view.lead && focusStanding !== view.trail
+    ? focusStanding
     : null;
   const series = [
     { values: view.principles.map((p) => p.avg), variant: 'average' },
     ...(view.trail && view.trail !== view.lead
-      ? [{ values: byKey(view.trail), variant: 'trail' }]
+      ? [{ values: byKey(view.trail), variant: 'trail', focused: isFocused(view.trail) }]
       : []),
-    ...(view.lead ? [{ values: byKey(view.lead), variant: 'lead' }] : []),
-    ...(focused ? [{ values: byKey(focused), variant: 'focus' }] : []),
+    ...(view.lead ? [{ values: byKey(view.lead), variant: 'lead', focused: isFocused(view.lead) }] : []),
+    ...(extraFocus ? [{ values: byKey(extraFocus), variant: 'focus' }] : []),
   ];
 
   return (

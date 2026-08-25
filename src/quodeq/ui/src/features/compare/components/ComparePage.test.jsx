@@ -113,6 +113,21 @@ describe('ComparePage', () => {
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha'));
   });
 
+  it('keeps multiple rows expanded independently', async () => {
+    renderPage();
+    // Scope to table rows: project names also appear in the attention strip.
+    const rowName = (name) => screen.getAllByText(name)
+      .find((el) => el.classList.contains('compare-row__name'));
+    await screen.findByText('alpha');
+    await userEvent.click(rowName('alpha'));
+    await userEvent.click(rowName('beta'));
+    // Both detail blocks stay open side by side.
+    expect(await screen.findAllByText(/open project/)).toHaveLength(2);
+    // Toggling one closed leaves the other open.
+    await userEvent.click(rowName('alpha'));
+    expect(await screen.findAllByText(/open project/)).toHaveLength(1);
+  });
+
   it('collapses never-evaluated projects into a single line', async () => {
     getCompareSummary.mockImplementation((id) => (id === 'alpha'
       ? Promise.resolve(summary(7.4, 7.0))
