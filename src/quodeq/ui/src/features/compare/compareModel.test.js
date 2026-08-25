@@ -67,7 +67,7 @@ test('nameKey normalizes case and whitespace', () => {
 test('trendDelta uses the newest run at or before the window start as baseline', () => {
   const trend = [
     { dateISO: iso(80), numericAverage: 6.0 },
-    { dateISO: iso(56), numericAverage: 6.4 }, // newest at/before 49d ago -> baseline
+    { dateISO: iso(56), numericAverage: 6.4 }, // newest at/before the 30d window start -> baseline
     { dateISO: iso(20), numericAverage: 6.9 },
     { dateISO: iso(1), numericAverage: 7.1 },
   ];

@@ -18,10 +18,10 @@ import {
 // real but the codebase has moved since.
 export const STALE_AFTER_DAYS = 7;
 
-// Delta window: the design's "7w" column. Baseline is the newest run at or
-// before the window start, so the delta reads "change over the last 7 weeks"
-// even when runs are unevenly spaced.
-export const DELTA_WINDOW_DAYS = 49;
+// Delta window: the "30d" column. Baseline is the newest run at or before
+// the window start, so the delta reads "change over the last month" even
+// when runs are unevenly spaced.
+export const DELTA_WINDOW_DAYS = 30;
 
 // Consequence thresholds. The score scales as
 // (10 - score) * log10(files + 10) * staleness, i.e. roughly 0..45 across
@@ -88,7 +88,7 @@ function sortedByDate(trend) {
  * accumulated average; the dimension view passes a per-dimension picker).
  *
  * `delta` is the change within the window (null when every run predates it —
- * nothing moved in the last 7 weeks). `lastDelta` is the change between the
+ * nothing moved in the last month). `lastDelta` is the change between the
  * two most recent runs regardless of age, for a muted fallback display.
  */
 export function trendDelta(trend, now, pick = (e) => e.numericAverage) {
