@@ -159,7 +159,15 @@ export default function CompareDimensionView({
                     <span className={scoreColorClass(s.score)}>{score1(s.score)}</span>
                     <span className="compare-standings__tier">{scoreToGradeLabel(s.score) || ''}</span>
                   </span>
-                  <span className="compare-standings__delta"><TrendBadge delta={s.delta} /></span>
+                  <span className="compare-standings__delta">
+                    {s.delta != null ? (
+                      <TrendBadge delta={s.delta} />
+                    ) : s.lastDelta != null ? (
+                      <span className="compare-delta--old" title={t('compare.oldDeltaTip')}>
+                        <TrendBadge delta={s.lastDelta} />
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="compare-standings__viol">
                     {t('compare.violCount', { count: nf(s.violations) })}
                   </span>

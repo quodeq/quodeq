@@ -69,9 +69,20 @@ test('trendDelta uses the newest run at or before the window start as baseline',
     { dateISO: iso(20), numericAverage: 6.9 },
     { dateISO: iso(1), numericAverage: 7.1 },
   ];
-  const { delta, spark } = trendDelta(trend, NOW);
+  const { delta, lastDelta, spark } = trendDelta(trend, NOW);
   assert.equal(delta, 0.7);
+  assert.equal(lastDelta, 0.2); // latest minus previous run
   assert.deepEqual(spark, [6.0, 6.4, 6.9, 7.1]);
+});
+
+test('trendDelta still reports lastDelta when every run predates the window', () => {
+  const trend = [
+    { dateISO: iso(120), numericAverage: 6.0 },
+    { dateISO: iso(90), numericAverage: 6.6 },
+  ];
+  const { delta, lastDelta } = trendDelta(trend, NOW);
+  assert.equal(delta, null); // nothing moved within the window
+  assert.equal(lastDelta, 0.6);
 });
 
 test('trendDelta falls back to the oldest entry when all runs are inside the window', () => {
@@ -139,11 +150,12 @@ test('consequenceLevel thresholds are ordered', () => {
   assert.equal(consequenceLevel(1), 'clear');
 });
 
-test('sortRows by score ranks unloaded projects last', () => {
+test('sortRows ranks by score both directions, unscored always last', () => {
   const a = buildRow(makeProject({ id: 'a' }), makeSummary({ score: 6 }), NOW);
   const b = buildRow(makeProject({ id: 'b' }), makeSummary({ score: 9 }), NOW);
   const c = buildRow(makeProject({ id: 'c' }), undefined, NOW);
-  assert.deepEqual(sortRows([a, c, b], 'score').map((r) => r.id), ['b', 'a', 'c']);
+  assert.deepEqual(sortRows([a, c, b]).map((r) => r.id), ['b', 'a', 'c']);
+  assert.deepEqual(sortRows([a, c, b], 'asc').map((r) => r.id), ['a', 'b', 'c']);
 });
 
 test('buildFleet aggregates severity, compliance and coverage', () => {

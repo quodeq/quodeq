@@ -104,7 +104,7 @@ function DimChip({ dim, onOpen }) {
   );
 }
 
-function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error }) {
+function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error, hasCoverage }) {
   const level = consequenceLevel(consequenceOf(row));
   const dimByKey = new Map(row.dims.map((d) => [d.key, d]));
   return (
@@ -130,7 +130,15 @@ function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error }
             <span className={scoreColorClass(row.score)}>{score1(row.score)}</span>
             <span className="compare-row__tier">{scoreToGradeLabel(row.score) || ''}</span>
           </span>
-          <span className="compare-row__delta"><TrendBadge delta={row.delta} /></span>
+          <span className="compare-row__delta">
+            {row.delta != null ? (
+              <TrendBadge delta={row.delta} />
+            ) : row.lastDelta != null ? (
+              <span className="compare-delta--old" title={t('compare.oldDeltaTip')}>
+                <TrendBadge delta={row.lastDelta} />
+              </span>
+            ) : null}
+          </span>
           <span className="compare-row__viol">
             <span className="compare-row__violTotal">{nf(row.totalViolations)}</span>
             <span className="compare-row__sev">
@@ -139,7 +147,18 @@ function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error }
               <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
             </span>
           </span>
-          <span className="compare-row__spark"><DimensionSparkline scores={row.spark} /></span>
+          <span className="compare-row__spark">
+            {row.spark.length > 0 && (
+              /* Width scales with run count so a two-run project renders two
+                 slim bars instead of stretching into giant blocks. */
+              <span
+                className="compare-row__sparkBox"
+                style={{ width: `${Math.min(90, row.spark.length * 7)}px` }}
+              >
+                <DimensionSparkline scores={row.spark} />
+              </span>
+            )}
+          </span>
           <span className="compare-row__dims">
             {dimOrder.map((key) => {
               const dim = dimByKey.get(key);
@@ -148,9 +167,11 @@ function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error }
                 : <span key={key} className="compare-dim-chip compare-dim-chip--empty" aria-hidden="true">·</span>;
             })}
           </span>
-          <span className={`compare-row__cov${row.coveragePct != null && row.coveragePct < 80 ? ' compare-row__cov--low' : ''}`}>
-            {row.coveragePct != null ? t('compare.analyzedPct', { pct: row.coveragePct }) : '—'}
-          </span>
+          {hasCoverage && (
+            <span className={`compare-row__cov${row.coveragePct != null && row.coveragePct < 80 ? ' compare-row__cov--low' : ''}`}>
+              {row.coveragePct != null ? t('compare.analyzedPct', { pct: row.coveragePct }) : '—'}
+            </span>
+          )}
           <span className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}>
             {relativeTime(row.lastISO) || '—'}
           </span>
@@ -170,7 +191,7 @@ function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error }
 
 export default function CompareFleetView({
   rows, orderedRows, fleet, board, attention, errorsById,
-  sortBy, setSortBy, pickerOpen, setPickerOpen, scopeIds, scopeCount,
+  sortDir, toggleSortDir, hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount,
   toggleProject, selectAll, selectFlagged, openDimension, onOpenProject,
 }) {
   const dimOrder = board.map((b) => b.key);
@@ -188,16 +209,14 @@ export default function CompareFleetView({
         </div>
         <div className="compare-header__controls">
           <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
-            {['consequence', 'score'].map((key) => (
-              <button
-                key={key}
-                type="button"
-                className={`compare-sort__btn${sortBy === key ? ' compare-sort__btn--on' : ''}`}
-                onClick={() => setSortBy(key)}
-              >
-                {key === 'consequence' ? t('compare.sortConsequence') : t('compare.sortScore')}
-              </button>
-            ))}
+            <button
+              type="button"
+              className="compare-sort__btn compare-sort__btn--on"
+              onClick={toggleSortDir}
+              aria-label={t('compare.sortToggleAria')}
+            >
+              {t('compare.sortScore')} {sortDir === 'desc' ? '↓' : '↑'}
+            </button>
           </span>
           <ScopePicker
             rows={rows}
@@ -242,10 +261,12 @@ export default function CompareFleetView({
         />
         <Stat
           label={t('compare.cardMeasurement')}
-          value={fleet.coveragePct != null ? `${fleet.coveragePct}%` : '—'}
-          hint={fleet.staleCount
-            ? t('compare.staleNote', { count: fleet.staleCount })
-            : t('compare.allCurrent')}
+          value={fleet.coveragePct != null ? `${fleet.coveragePct}%` : String(fleet.staleCount)}
+          hint={fleet.coveragePct == null
+            ? (fleet.staleCount ? t('compare.staleHint') : t('compare.allCurrent'))
+            : (fleet.staleCount
+              ? t('compare.staleNote', { count: fleet.staleCount })
+              : t('compare.allCurrent'))}
           tone={fleet.staleCount ? 'warning' : 'default'}
         />
       </StatStrip>
@@ -254,19 +275,19 @@ export default function CompareFleetView({
         <div className="compare-panel__head">
           <SectionLabel>{t('compare.projectsHeader', { count: scopeCount })}</SectionLabel>
           <span className="compare-panel__note">
-            {sortBy === 'consequence' ? t('compare.sortNoteConsequence') : t('compare.sortNoteScore')}
+            {sortDir === 'desc' ? t('compare.sortNoteScore') : t('compare.sortNoteScoreAsc')}
           </span>
         </div>
         <div className="compare-table" role="table">
           <div className="compare-row compare-row--head" role="row">
             <span className="compare-row__stripe" />
             <span className="compare-row__rank" />
-            <span>{t('compare.colProject')}</span>
-            <span>{t('compare.colScore')}</span>
-            <span>{t('compare.colDelta')}</span>
-            <span>{t('compare.colViolations')}</span>
-            <span>{t('compare.colTrend')}</span>
-            <span className="compare-row__dimsHead">
+            <span className="compare-row__project">{t('compare.colProject')}</span>
+            <span className="compare-row__score">{t('compare.colScore')}</span>
+            <span className="compare-row__delta">{t('compare.colDelta')}</span>
+            <span className="compare-row__viol">{t('compare.colViolations')}</span>
+            <span className="compare-row__spark">{t('compare.colTrend')}</span>
+            <span className="compare-row__dims compare-row__dimsHead">
               {board.map((b) => (
                 <button
                   key={b.key}
@@ -279,8 +300,8 @@ export default function CompareFleetView({
                 </button>
               ))}
             </span>
-            <span>{t('compare.colCoverage')}</span>
-            <span>{t('compare.colLast')}</span>
+            {hasCoverage && <span className="compare-row__cov">{t('compare.colCoverage')}</span>}
+            <span className="compare-row__last">{t('compare.colLast')}</span>
           </div>
           {orderedRows.map((row, i) => (
             <ProjectRow
@@ -291,17 +312,18 @@ export default function CompareFleetView({
               onOpenProject={onOpenProject}
               openDimension={openDimension}
               error={errorsById[row.id]}
+              hasCoverage={hasCoverage}
             />
           ))}
           {fleet.scoredCount > 1 && (
             <div className="compare-row compare-row--foot" role="row" aria-label={t('compare.scopeAverage')}>
               <span className="compare-row__stripe" />
               <span className="compare-row__rank" />
-              <span className="compare-row__footLabel">{t('compare.scopeAverage')}</span>
-              <span className={scoreColorClass(fleet.score)}>{score1(fleet.score)}</span>
-              <span><TrendBadge delta={fleet.delta} /></span>
-              <span>{nf(fleet.totalViolations)}</span>
-              <span />
+              <span className="compare-row__project compare-row__footLabel">{t('compare.scopeAverage')}</span>
+              <span className={`compare-row__score ${scoreColorClass(fleet.score)}`}>{score1(fleet.score)}</span>
+              <span className="compare-row__delta"><TrendBadge delta={fleet.delta} /></span>
+              <span className="compare-row__viol">{nf(fleet.totalViolations)}</span>
+              <span className="compare-row__spark" />
               <span className="compare-row__dims">
                 {board.map((b) => (
                   <span key={b.key} className={`compare-dim-avg ${scoreColorClass(b.avg)}`}>
@@ -309,8 +331,8 @@ export default function CompareFleetView({
                   </span>
                 ))}
               </span>
-              <span>{fleet.coveragePct != null ? `${fleet.coveragePct}%` : '—'}</span>
-              <span />
+              {hasCoverage && <span className="compare-row__cov">{fleet.coveragePct != null ? `${fleet.coveragePct}%` : '—'}</span>}
+              <span className="compare-row__last" />
             </div>
           )}
         </div>

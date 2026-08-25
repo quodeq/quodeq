@@ -58,22 +58,28 @@ function sortedByDate(trend) {
  * Score movement over the delta window plus the sparkline series.
  * `pick` extracts the numeric value from a trend entry (defaults to the
  * accumulated average; the dimension view passes a per-dimension picker).
+ *
+ * `delta` is the change within the window (null when every run predates it —
+ * nothing moved in the last 7 weeks). `lastDelta` is the change between the
+ * two most recent runs regardless of age, for a muted fallback display.
  */
 export function trendDelta(trend, now, pick = (e) => e.numericAverage) {
   const entries = sortedByDate(trend)
     .map((e) => ({ dateISO: e.dateISO, value: pick(e) }))
     .filter((e) => e.value != null);
   const spark = entries.map((e) => e.value);
-  if (entries.length < 2) return { delta: null, spark };
+  if (entries.length < 2) return { delta: null, lastDelta: null, spark };
+  const latest = entries[entries.length - 1];
+  const previous = entries[entries.length - 2];
+  const lastDelta = Math.round((latest.value - previous.value) * 10) / 10;
   const cutoff = new Date(now).getTime() - DELTA_WINDOW_DAYS * 86400000;
   let baseline = entries[0];
   for (const e of entries) {
     if (new Date(e.dateISO).getTime() <= cutoff) baseline = e;
     else break;
   }
-  const latest = entries[entries.length - 1];
-  if (baseline === latest) return { delta: null, spark };
-  return { delta: Math.round((latest.value - baseline.value) * 10) / 10, spark };
+  if (baseline === latest) return { delta: null, lastDelta, spark };
+  return { delta: Math.round((latest.value - baseline.value) * 10) / 10, lastDelta, spark };
 }
 
 function topLanguage(languageStats) {
@@ -98,7 +104,7 @@ export function buildRow(project, summary, now) {
   const stale = ageDays != null && ageDays > STALE_AFTER_DAYS;
   const totalFiles = project.totalFiles ?? project.filesCount ?? null;
   const analyzedFiles = project.analyzedFiles ?? null;
-  const { delta, spark } = trendDelta(summary?.trend, now);
+  const { delta, lastDelta, spark } = trendDelta(summary?.trend, now);
   const dims = (summary?.dimensions || [])
     .map((d) => ({
       key: nameKey(d.dimension),
@@ -126,6 +132,7 @@ export function buildRow(project, summary, now) {
     score,
     grade: s?.overallGrade ?? null,
     delta,
+    lastDelta,
     spark,
     severity: s?.severity || { critical: 0, major: 0, minor: 0 },
     totalViolations: s?.totalViolations ?? 0,
@@ -154,14 +161,16 @@ export function consequenceLevel(value) {
   return 'clear';
 }
 
-export function sortRows(rows, sortBy) {
-  const ranked = rows.slice();
-  if (sortBy === 'score') {
-    ranked.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-  } else {
-    ranked.sort((a, b) => consequenceOf(b) - consequenceOf(a));
-  }
-  return ranked;
+/**
+ * Score ordering with a direction toggle. Rows without a score always sink
+ * to the bottom, whichever direction is active — an unevaluated project is
+ * not "the worst project".
+ */
+export function sortRows(rows, direction = 'desc') {
+  const scored = rows.filter((r) => r.score != null)
+    .sort((a, b) => (direction === 'asc' ? a.score - b.score : b.score - a.score));
+  const unscored = rows.filter((r) => r.score == null);
+  return scored.concat(unscored);
 }
 
 function mean(values) {
@@ -282,11 +291,11 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   const standings = holders
     .map(({ row, dim }) => {
       const summary = summariesById?.[row.id];
-      const { delta } = trendDelta(summary?.trend, now, (e) => {
+      const { delta, lastDelta } = trendDelta(summary?.trend, now, (e) => {
         const detail = (e.dimensionDetails || []).find((d) => nameKey(d.dimension) === dimensionKey);
         return detail ? parseScore10(detail.score) : null;
       });
-      return { row, score: dim.score, delta, violations: dim.violations, severity: dim.severity, principles: dim.principles };
+      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, severity: dim.severity, principles: dim.principles };
     })
     .sort((a, b) => b.score - a.score);
   const lead = standings[0];

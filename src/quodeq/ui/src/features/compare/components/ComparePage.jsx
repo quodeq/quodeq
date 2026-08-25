@@ -50,7 +50,9 @@ export default function ComparePage({ projects, projectsLoaded, onOpenProject })
   const { summariesById, errorsById } = useCompareData(localProjects);
 
   const [view, setView] = useState('fleet');
-  const [sortBy, setSortBy] = useState('consequence');
+  // Score is the only table ordering (consequence ranked near-inverse of it
+  // on real fleets); the toggle flips best-first / worst-first.
+  const [sortDir, setSortDir] = useState('desc');
   const [pickerOpen, setPickerOpen] = useState(false);
   // null scope = everything (including projects added later); an array is an
   // explicit selection.
@@ -76,7 +78,7 @@ export default function ComparePage({ projects, projectsLoaded, onOpenProject })
     [scopeRows, now, summariesById],
   );
   const attention = useMemo(() => buildAttention(scopeRows), [scopeRows]);
-  const orderedRows = useMemo(() => sortRows(scopeRows, sortBy), [scopeRows, sortBy]);
+  const orderedRows = useMemo(() => sortRows(scopeRows, sortDir), [scopeRows, sortDir]);
   const dimensionView = useMemo(
     () => (view === 'fleet' ? null : buildDimensionView(view, scopeRows, now, summariesById)),
     [view, scopeRows, now, summariesById],
@@ -131,8 +133,9 @@ export default function ComparePage({ projects, projectsLoaded, onOpenProject })
     board,
     attention,
     errorsById,
-    sortBy,
-    setSortBy,
+    sortDir,
+    toggleSortDir: () => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc')),
+    hasCoverage: scopeRows.some((r) => r.coveragePct != null),
     pickerOpen,
     setPickerOpen,
     scopeIds,

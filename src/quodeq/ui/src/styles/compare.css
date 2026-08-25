@@ -101,7 +101,7 @@
   top: calc(100% + 7px);
   right: 0;
   z-index: 40;
-  width: 340px;
+  width: min(340px, 92vw);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -196,7 +196,7 @@
 .compare-panel__note {
   margin-left: auto;
   font-size: 10.5px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
 }
 
 .compare-panel__fallback {
@@ -217,23 +217,36 @@
   .compare-lower { grid-template-columns: 1fr; }
 }
 
-/* ── projects table ─────────────────────────────────────────────────── */
+/* ── grade text colours ─────────────────────────────────────────────────
+   scoreColorClass() emits bare `grade-*` classes; the app only styles them
+   inside specific scopes (.chip, .qd-card, …), so without this block every
+   compare score inherits the row colour and disappears in dark themes. */
+
+.compare-page .grade-top    { color: var(--color-grade-top-text); }
+.compare-page .grade-high   { color: var(--color-grade-high-text); }
+.compare-page .grade-mid    { color: var(--color-grade-mid-text); }
+.compare-page .grade-low    { color: var(--color-grade-low-text); }
+.compare-page .grade-bottom { color: var(--color-grade-bottom-text); }
+.compare-page .grade-none   { color: var(--color-text-muted); }
+
+/* ── projects table ─────────────────────────────────────────────────────
+   Flex cells with fixed widths instead of a shared grid template: columns
+   stay aligned across rows because widths are per-class, and a hidden or
+   conditionally absent cell (coverage, breakpoint tiers) needs no template
+   bookkeeping. */
 
 .compare-table {
   overflow-x: auto;
 }
 
 .compare-row {
-  display: grid;
-  grid-template-columns: 3px 28px minmax(150px, 1.3fr) 84px 70px 150px 90px minmax(180px, 1.8fr) 88px 76px;
+  display: flex;
   align-items: center;
   gap: 12px;
   padding-right: 16px;
   border-bottom: 1px solid var(--color-border);
-  min-width: 980px;
 }
 
-.compare-row--clickable,
 .compare-row[tabindex] { cursor: pointer; }
 
 .compare-row[tabindex]:hover { background: var(--color-surface-alt); }
@@ -241,8 +254,8 @@
 .compare-row--head,
 .compare-row--foot {
   background: var(--color-surface-alt);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
+  font-size: 10px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-muted);
   cursor: default;
@@ -250,12 +263,23 @@
   padding-bottom: 8px;
 }
 
-.compare-row--foot { text-transform: none; letter-spacing: normal; font-size: 12px; }
+.compare-row--head .compare-row__score,
+.compare-row--head .compare-row__viol { font-size: 10px; }
 
-.compare-row__stripe {
-  align-self: stretch;
-  background: transparent;
-}
+.compare-row--foot { text-transform: none; letter-spacing: normal; font-size: 12px; }
+.compare-row--foot .compare-row__score { font-size: 13px; }
+
+/* cell widths */
+.compare-row__stripe { width: 3px; align-self: stretch; flex-shrink: 0; background: transparent; }
+.compare-row__rank { width: 26px; flex-shrink: 0; }
+.compare-row__project { flex: 1 1 150px; min-width: 130px; }
+.compare-row__score { width: 88px; flex-shrink: 0; }
+.compare-row__delta { width: 68px; flex-shrink: 0; }
+.compare-row__viol { width: 168px; flex-shrink: 0; }
+.compare-row__spark { width: 90px; flex-shrink: 0; }
+.compare-row__dims { flex: 1.6 1 180px; min-width: 150px; }
+.compare-row__cov { width: 86px; flex-shrink: 0; }
+.compare-row__last { width: 78px; flex-shrink: 0; }
 
 .compare-row--severe .compare-row__stripe { background: var(--color-sev-critical-text); }
 .compare-row--elevated .compare-row__stripe { background: var(--color-sev-major-text); }
@@ -263,11 +287,11 @@
 
 .compare-row__rank {
   font-size: 11px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   text-align: center;
 }
 
-.compare-row__project { min-width: 0; padding: 10px 0; }
+.compare-row__project { padding: 10px 0; }
 
 .compare-row__name {
   display: block;
@@ -281,7 +305,7 @@
 .compare-row__meta {
   display: block;
   font-size: 10px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   margin-top: 3px;
 }
 
@@ -291,20 +315,22 @@
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
 }
 
 .compare-row__violTotal { font-size: 12.5px; color: var(--color-text); }
 
-.compare-row__sev { display: flex; gap: 5px; margin-top: 4px; flex-wrap: wrap; }
+/* Severity as plain coloured text (the design's "7c 275m 984n"): the boxed
+   SevBadge chrome wraps onto three lines inside a table cell. */
+.compare-row__sev { display: flex; gap: 8px; margin-top: 4px; flex-wrap: nowrap; white-space: nowrap; }
+.compare-row__sev .term-sev-badge { border: none; background: transparent; padding: 0; }
 
-.compare-row__spark { min-width: 0; }
+.compare-row__sparkBox { display: block; max-width: 100%; }
 
 .compare-row__dims,
 .compare-row__dimsHead {
   display: flex;
   gap: 6px;
-  min-width: 0;
 }
 
 .compare-row__dimHead {
@@ -381,11 +407,15 @@
 .compare-row__last--stale { color: var(--color-sev-major-text); }
 
 .compare-row__pending {
-  grid-column: 4 / -1;
+  flex: 1;
   padding: 14px 0;
   font-size: 11.5px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
 }
+
+/* Delta shown from outside the 7-week window (change at the last
+   evaluation, however old) — present but visibly secondary. */
+.compare-delta--old { display: inline-flex; opacity: 0.55; }
 
 .compare-row--nodata .compare-row__name { color: var(--color-text-muted); }
 
@@ -515,7 +545,7 @@
   margin-top: 9px;
   font: inherit;
   font-size: 11px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   background: transparent;
   border: none;
   padding: 0;
@@ -594,7 +624,7 @@
 .compare-standings__tag {
   display: block;
   font-size: 10px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   margin-top: 3px;
 }
 
@@ -765,5 +795,35 @@
 .compare-principle__caption {
   margin: 7px 0 0;
   font-size: 9.5px;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
+}
+
+/* ── small-view tiers ───────────────────────────────────────────────────
+   Shed secondary columns before anything important gets crushed: trend
+   sparkline first, then coverage + the per-dimension chips (both live in
+   the dimensions board / drill-down), then the last-evaluated column.
+   Name, score, delta and violations survive every tier. */
+
+@media (max-width: 1500px) {
+  .compare-row__spark { display: none; }
+}
+
+@media (max-width: 1280px) {
+  .compare-row__dims,
+  .compare-row__dimsHead,
+  .compare-row__cov { display: none; }
+  .compare-row__project { flex: 1 1 200px; }
+}
+
+@media (max-width: 860px) {
+  .compare-row__last { display: none; }
+  .compare-row__viol { width: 140px; }
+  .compare-board__row { grid-template-columns: minmax(0, 1fr) 56px 74px 64px 14px; }
+  .compare-board__bars { display: none; }
+}
+
+@media (max-width: 800px) {
+  .compare-standings__row { grid-template-columns: 26px minmax(0, 1fr) 92px 64px; }
+  .compare-standings__pbars,
+  .compare-standings__delta { display: none; }
 }
