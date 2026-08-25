@@ -5,7 +5,7 @@
  * that project too), and one card per principle.
  */
 import { useState } from 'react';
-import { StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
@@ -71,25 +71,27 @@ export default function CompareDimensionView({
 
   return (
     <>
-      <header className="compare-header compare-header--dim">
-        <div className="compare-header__titles">
+      <div className="compare-page__top">
+        <div className="compare-page__titles">
           <button type="button" className="compare-back" onClick={onBack}>
             ‹ {t('compare.backToFleet')}
           </button>
-          <div className="compare-dim-title">
-            <h1 className="compare-title">{view.label}</h1>
-            <span className={`compare-dim-tier ${scoreColorClass(view.avg)}`}>
-              {scoreToGradeLabel(view.avg) || ''}
-            </span>
-            <TrendBadge delta={view.delta} />
-          </div>
-          <p className="compare-subtitle">
-            {t('compare.dimSubtitle', {
+          <TermHeader
+            name={view.label}
+            sub={t('compare.dimSubtitle', {
               principles: view.principles.length,
               violations: nf(view.violations),
               projects: view.standings.length,
             })}
-          </p>
+            badge={(
+              <span className="compare-dim-badges">
+                <span className={`compare-dim-tier ${scoreColorClass(view.avg)}`}>
+                  {scoreToGradeLabel(view.avg) || ''}
+                </span>
+                <TrendBadge delta={view.delta} />
+              </span>
+            )}
+          />
         </div>
         <div className="compare-header__controls">
           <span className="compare-sort" role="group" aria-label={t('compare.dimTabsAria')}>
@@ -105,7 +107,7 @@ export default function CompareDimensionView({
             ))}
           </span>
         </div>
-      </header>
+      </div>
 
       <StatStrip cards>
         <Stat

@@ -3,7 +3,7 @@
  * the ranked projects table with per-dimension chips, the dimensions board
  * and the attention ("needs you") list.
  */
-import { StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
@@ -197,16 +197,14 @@ export default function CompareFleetView({
   const dimOrder = board.map((b) => b.key);
   return (
     <>
-      <header className="compare-header">
-        <div className="compare-header__titles">
-          <h1 className="compare-title">{t('compare.title')}</h1>
-          <p className="compare-subtitle">
-            {t('compare.subtitle', {
-              count: scopeCount,
-              files: nf(fleet.totalFiles),
-            })}
-          </p>
-        </div>
+      <div className="compare-page__top">
+        <TermHeader
+          name={t('compare.title')}
+          sub={t('compare.subtitle', {
+            count: scopeCount,
+            files: nf(fleet.totalFiles),
+          })}
+        />
         <div className="compare-header__controls">
           <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
             <button
@@ -229,7 +227,7 @@ export default function CompareFleetView({
             setPickerOpen={setPickerOpen}
           />
         </div>
-      </header>
+      </div>
 
       <StatStrip cards>
         <Stat
