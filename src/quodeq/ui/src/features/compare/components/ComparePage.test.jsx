@@ -101,12 +101,32 @@ describe('ComparePage', () => {
     expect(await screen.findByText('5.9')).toBeInTheDocument();
   });
 
-  it('opens a project overview on row click', async () => {
+  it('expands a row on click; the expansion opens the project overview', async () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProject });
     const name = await screen.findByText('alpha');
     await userEvent.click(name);
+    // Row click expands the detail (severity, dimensions, actions) instead
+    // of navigating away.
+    expect(onOpenProject).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByText(/open project/));
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha'));
+  });
+
+  it('collapses never-evaluated projects into a single line', async () => {
+    getCompareSummary.mockImplementation((id) => (id === 'alpha'
+      ? Promise.resolve(summary(7.4, 7.0))
+      : Promise.resolve({
+        summary: {}, dimensions: [], trend: [], runsCount: 0, lastRun: null,
+      })));
+    renderPage();
+    await screen.findByText('alpha');
+    // Once beta settles with no data it leaves the table for the collapsed
+    // line (it may briefly render as a pending row before that).
+    const toggle = await screen.findByText(/1 projects without evaluations/);
+    expect(screen.queryByText('beta')).toBeNull();
+    await userEvent.click(toggle);
+    expect(await screen.findByText('beta')).toBeInTheDocument();
   });
 
   it('drills into a dimension and back', async () => {

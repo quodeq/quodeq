@@ -219,17 +219,24 @@
   overflow-x: auto;
 }
 
+/* A row and its optional expansion share one bordered group so the detail
+   block reads as part of the row, not a new row. */
+.compare-rowgroup { border-bottom: 1px solid var(--color-border); }
+
 .compare-row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding-right: 16px;
-  border-bottom: 1px solid var(--color-border);
 }
+
+.compare-row--head,
+.compare-row--foot { border-bottom: 1px solid var(--color-border); }
 
 .compare-row[tabindex] { cursor: pointer; }
 
-.compare-row[tabindex]:hover { background: var(--color-surface-alt); }
+.compare-row[tabindex]:hover,
+.compare-rowgroup--open > .compare-row { background: var(--color-surface-alt); }
 
 .compare-row--head,
 .compare-row--foot {
@@ -249,22 +256,20 @@
 .compare-row--foot { text-transform: none; letter-spacing: normal; font-size: 12px; }
 .compare-row--foot .compare-row__score { font-size: 13px; }
 
-/* cell widths */
+/* cell widths — single-line rows: everything else lives in the expansion */
 .compare-row__stripe { width: 3px; align-self: stretch; flex-shrink: 0; background: transparent; }
 .compare-row__rank { width: 26px; flex-shrink: 0; }
-.compare-row__project { flex: 1 1 150px; min-width: 130px; }
-.compare-row__score { width: 88px; flex-shrink: 0; }
+.compare-row__project { flex: 1 1 200px; min-width: 150px; display: flex; align-items: baseline; gap: 8px; }
+.compare-row__score { width: 96px; flex-shrink: 0; }
 .compare-row__delta { width: 68px; flex-shrink: 0; }
-.compare-row__viol { width: 168px; flex-shrink: 0; }
-.compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
-.compare-row__spark { width: 90px; flex-shrink: 0; }
-.compare-row__dims { flex: 1.6 1 180px; min-width: 150px; }
-.compare-row__cov { width: 86px; flex-shrink: 0; }
-.compare-row__last { width: 78px; flex-shrink: 0; }
+.compare-row__viol { width: 84px; flex-shrink: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+.compare-row__last { width: 92px; flex-shrink: 0; }
+.compare-row__chev { width: 20px; flex-shrink: 0; font-size: 10px; color: var(--color-text-muted); text-align: center; }
 
-.compare-row--severe .compare-row__stripe { background: var(--color-sev-critical-text); }
-.compare-row--elevated .compare-row__stripe { background: var(--color-sev-major-text); }
-.compare-row--watch .compare-row__stripe { background: var(--color-warning); }
+.compare-rowgroup--severe .compare-row__stripe { background: var(--color-sev-critical-text); }
+.compare-rowgroup--elevated .compare-row__stripe { background: var(--color-sev-major-text); }
+.compare-rowgroup--watch .compare-row__stripe { background: var(--color-warning); }
 
 .compare-row__rank {
   font-size: 11px;
@@ -284,10 +289,9 @@
 }
 
 .compare-row__meta {
-  display: block;
   font-size: 10px;
   color: var(--color-text-muted);
-  margin-top: 3px;
+  flex-shrink: 0;
 }
 
 .compare-row__score { display: flex; align-items: baseline; gap: 7px; font-size: 15px; }
@@ -299,90 +303,98 @@
   color: var(--color-text-muted);
 }
 
-.compare-row__violTotal { font-size: 12.5px; color: var(--color-text); }
+/* ── row expansion (detail on demand) ─────────────────────────────────── */
 
-/* Severity as plain coloured text (the design's "7c 275m 984n"): the boxed
-   SevBadge chrome wraps onto three lines inside a table cell. */
-.compare-row__sev { display: flex; gap: 8px; margin-top: 4px; flex-wrap: nowrap; white-space: nowrap; }
+.compare-rowdetail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 16px 14px 41px; /* aligns under the project column */
+}
+
+.compare-rowdetail__facts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-rowdetail__hint { font-size: 10px; }
+
+/* Severity as plain coloured text (the design's "7c 275m 984n"). */
+.compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
 .compare-row__sev .term-sev-badge { border: none; background: transparent; padding: 0; }
 
 .compare-row__sparkBox { display: block; max-width: 100%; }
 
-.compare-row__dims,
-.compare-row__dimsHead {
-  display: flex;
-  gap: 6px;
-}
+.compare-rowdetail__dims { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.compare-row__dimHead {
-  flex: 1;
+.compare-dim-chip--inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
   font: inherit;
-  font-size: 8.5px;
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compare-row__dimHead:hover { color: var(--color-accent); }
-
-.compare-dim-chip {
-  flex: 1;
-  min-width: 0;
-  display: block;
-  font: inherit;
+  font-size: 11.5px;
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: 5px;
-  padding: 5px 4px 6px;
+  padding: 4px 10px;
   cursor: pointer;
 }
 
-.compare-dim-chip:hover { border-color: var(--color-accent); }
+.compare-dim-chip--inline:hover { border-color: var(--color-accent); }
 
-.compare-dim-chip--empty {
+.compare-dim-chip__label { font-size: 10.5px; color: var(--color-text-muted); }
+
+.compare-rowdetail__open {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
   background: transparent;
-  border-color: transparent;
-  color: var(--color-text-subtle);
-  text-align: center;
-  cursor: default;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
 }
 
-.compare-dim-chip__score {
-  display: block;
-  font-size: 11.5px;
-  text-align: center;
-}
+.compare-rowdetail__open:hover { color: var(--color-accent); border-color: var(--color-accent); }
 
-.compare-dim-chip__bar {
-  display: block;
-  height: 3px;
-  margin: 5px 4px 0;
-  border-radius: 2px;
-  background: var(--color-overlay-light);
-  overflow: hidden;
-}
-
-.compare-dim-chip__fill { display: block; height: 100%; border-radius: 2px; }
-
-.compare-dim-avg {
-  flex: 1;
-  text-align: center;
-  font-size: 11.5px;
-  border: 1px dashed var(--color-border);
-  border-radius: 5px;
-  padding: 4px 0;
-}
-
-.compare-row__cov { font-size: 10.5px; color: var(--color-text-muted); }
 .compare-row__cov--low { color: var(--color-warning-text); }
+
+/* ── collapsed never-evaluated projects ───────────────────────────────── */
+
+.compare-noevals { border-bottom: 1px solid var(--color-border); }
+
+.compare-noevals__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  padding: 9px 16px 9px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.compare-noevals__dot { width: 29px; text-align: center; }
+
+.compare-noevals__action { color: var(--color-accent); }
+
+.compare-noevals__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 16px 7px 3px;
+  font-size: 12px;
+}
+
+.compare-noevals__note { margin-left: auto; font-size: 10.5px; color: var(--color-text-muted); }
 
 .compare-row__last { font-size: 11px; color: var(--color-text-muted); }
 .compare-row__last--stale { color: var(--color-sev-major-text); }
@@ -415,9 +427,18 @@
 
 .compare-board { list-style: none; margin: 0; padding: 0; }
 
+/* Two-column board: compact rows, no per-project mini bars — the numbered
+   bars live in the drill-down where they are actually readable. */
+.compare-board--grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: 1px solid var(--color-border); }
+
 .compare-board__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 56px 74px 64px 14px;
+  grid-template-columns: minmax(0, 1fr) 56px 74px 64px 14px;
   align-items: center;
   gap: 14px;
   width: 100%;
@@ -426,7 +447,7 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--color-border);
-  padding: 11px 16px;
+  padding: 10px 16px;
   cursor: pointer;
 }
 
@@ -440,19 +461,6 @@
   white-space: nowrap;
 }
 
-.compare-board__bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 16px;
-}
-
-.compare-board__bar {
-  display: block;
-  width: 5px;
-  border-radius: 1px;
-}
-
 .compare-board__score { font-size: 13px; text-align: right; }
 .compare-board__delta { text-align: right; }
 .compare-board__viol { font-size: 11px; color: var(--color-text-muted); text-align: right; }
@@ -461,6 +469,25 @@
 /* ── attention list ─────────────────────────────────────────────────── */
 
 .compare-attention { list-style: none; margin: 0; padding: 0; }
+
+/* Promoted strip form: up to three compact cards side by side, first thing
+   after the stat cards. */
+.compare-attention--strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.compare-attention--strip .compare-attention__item {
+  border-bottom: none;
+  border-right: 1px solid var(--color-border);
+  padding: 11px 16px 12px 19px;
+}
+
+.compare-attention--strip .compare-attention__item:last-child { border-right: none; }
+
+.compare-attention--strip .compare-attention__why { margin-top: 7px; }
+
+.compare-attention--strip .compare-attention__link { margin: 0 0 0 6px; }
 
 .compare-attention__item {
   position: relative;
@@ -1022,28 +1049,24 @@
 }
 
 /* ── small-view tiers ───────────────────────────────────────────────────
-   Shed secondary columns before anything important gets crushed: trend
-   sparkline first, then coverage + the per-dimension chips (both live in
-   the dimensions board / drill-down), then the last-evaluated column.
-   Name, score, delta and violations survive every tier. */
+   The single-line table already fits most widths; below that, shed the
+   ratio and last-evaluated columns and stack the attention strip and the
+   dimensions board. Name, score, delta and violations survive every tier. */
 
-@media (max-width: 1500px) {
-  .compare-row__spark { display: none; }
-}
-
-@media (max-width: 1280px) {
-  .compare-row__dims,
-  .compare-row__dimsHead,
-  .compare-row__cov { display: none; }
-  .compare-row__project { flex: 1 1 200px; }
+@media (max-width: 1100px) {
+  .compare-attention--strip { grid-template-columns: 1fr; }
+  .compare-attention--strip .compare-attention__item {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .compare-attention--strip .compare-attention__item:last-child { border-bottom: none; }
 }
 
 @media (max-width: 860px) {
   .compare-row__last { display: none; }
   .compare-row__ratio { display: none; }
-  .compare-row__viol { width: 140px; }
-  .compare-board__row { grid-template-columns: minmax(0, 1fr) 56px 74px 64px 14px; }
-  .compare-board__bars { display: none; }
+  .compare-board--grid { grid-template-columns: 1fr; }
+  .compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: none; }
 }
 
 @media (max-width: 800px) {
