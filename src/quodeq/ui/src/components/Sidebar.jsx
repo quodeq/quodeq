@@ -101,6 +101,10 @@ export default function Sidebar({
      (which can collide with a local one by design) could start a real
      evaluation run whose output writes into the LOCAL project's store. */
   selectedSource = 'local',
+  /* Compare ranks projects against each other, so it needs at least two
+     analyzed projects to say anything — below that the tab is hidden as
+     redundant. The parent computes this from the projects list. */
+  showCompareTab = false,
 }) {
   const [internalPinned, setInternalPinned] = useState(false);
   const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
@@ -149,12 +153,21 @@ export default function Sidebar({
           {version && <span className="sidebar-version">{t('common.versionPrefix', { version })}</span>}
         </div>
 
-        {showProjectTabs && (
+        {(showProjectTabs || showCompareTab) && (
           <nav className="sidebar-nav sidebar-block">
-            <NavButton id="overview"   label="overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
-            <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
-            <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
-            <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+            {showProjectTabs && (
+              <NavButton id="overview" label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
+            )}
+            {showCompareTab && (
+              <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
+            )}
+            {showProjectTabs && (
+              <>
+                <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
+                <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+                <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+              </>
+            )}
           </nav>
         )}
 
@@ -172,9 +185,6 @@ export default function Sidebar({
             activeTab={activeTab}
             onNavTab={handleNav}
           />
-          {/* Compare is fleet-wide, so it sits with the cross-project block
-              rather than inside the run-gated project tabs above. */}
-          <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
         </nav>
 
         <div className="sidebar-spacer" />

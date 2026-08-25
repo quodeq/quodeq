@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import NavBreadcrumb from './NavBreadcrumb.jsx';
 
@@ -127,33 +127,82 @@ describe('NavBreadcrumb collapse and jump bar', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('navigates back to the level when the current sibling is picked from a deeper page', () => {
-    // Regression: from a detail page, the ancestor dimension crumb only opened
-    // the sibling menu and its current item was a no-op, so there was no way
-    // back up to that level.
-    const onGoTo = vi.fn();
-    const siblingsFor = (entry) => (entry.page === 'explorer'
+  const deeperPageProps = (overrides = {}) => ({
+    stack: [
+      { page: 'violations' },
+      { page: 'explorer', dimension: 'Security' },
+      { page: 'file', label: 'HomeVC.swift' },
+    ],
+    onGoTo: () => {},
+    projectName: 'repo',
+    onSelectProject: () => {},
+    siblingsFor: (entry) => (entry.page === 'explorer'
       ? [
           { key: 'Security', label: 'security', current: true, onSelect: () => {} },
           { key: 'Maintainability', label: 'maintainability', current: false, onSelect: () => {} },
         ]
-      : null);
-    render(
-      <NavBreadcrumb
-        stack={[
-          { page: 'violations' },
-          { page: 'explorer', dimension: 'Security' },
-          { page: 'file', label: 'HomeVC.swift' },
-        ]}
-        onGoTo={onGoTo}
-        projectName="repo"
-        onSelectProject={() => {}}
-        siblingsFor={siblingsFor}
-      />
-    );
+      : null),
+    ...overrides,
+  });
+
+  it('navigates straight back to the level when an earlier menu crumb is clicked', () => {
+    // Address-bar behaviour: a plain click on an ancestor walks back; the
+    // sibling menu is NOT what a left click opens.
+    const onGoTo = vi.fn();
+    render(<NavBreadcrumb {...deeperPageProps({ onGoTo })} />);
     fireEvent.click(screen.getByRole('button', { name: 'security' }));
+    expect(onGoTo).toHaveBeenCalledWith(1);
+    expect(screen.queryByRole('menuitemradio', { name: 'maintainability' })).toBeNull();
+  });
+
+  it('opens the sibling menu of an earlier crumb from its caret button', () => {
+    const onGoTo = vi.fn();
+    render(<NavBreadcrumb {...deeperPageProps({ onGoTo })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Switch security' }));
+    expect(onGoTo).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'security' }));
     expect(onGoTo).toHaveBeenCalledWith(1);
+  });
+
+  it('opens the sibling menu of an earlier crumb on right-click', () => {
+    const onGoTo = vi.fn();
+    render(<NavBreadcrumb {...deeperPageProps({ onGoTo })} />);
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'security' }));
+    expect(screen.getByRole('menuitemradio', { name: 'maintainability' })).toBeInTheDocument();
+    expect(onGoTo).not.toHaveBeenCalled();
+  });
+
+  it('opens the sibling menu on press-and-hold and swallows the release click', () => {
+    vi.useFakeTimers();
+    try {
+      const onGoTo = vi.fn();
+      render(<NavBreadcrumb {...deeperPageProps({ onGoTo })} />);
+      const label = screen.getByRole('button', { name: 'security' });
+      fireEvent.pointerDown(label);
+      act(() => { vi.advanceTimersByTime(500); });
+      fireEvent.pointerUp(label);
+      fireEvent.click(label);
+      expect(screen.getByRole('menuitemradio', { name: 'maintainability' })).toBeInTheDocument();
+      expect(onGoTo).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a released press shorter than the hold threshold still navigates', () => {
+    vi.useFakeTimers();
+    try {
+      const onGoTo = vi.fn();
+      render(<NavBreadcrumb {...deeperPageProps({ onGoTo })} />);
+      const label = screen.getByRole('button', { name: 'security' });
+      fireEvent.pointerDown(label);
+      act(() => { vi.advanceTimersByTime(200); });
+      fireEvent.pointerUp(label);
+      fireEvent.click(label);
+      expect(onGoTo).toHaveBeenCalledWith(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stays a plain link when siblingsFor returns null for the level', () => {

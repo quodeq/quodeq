@@ -271,7 +271,9 @@
 }
 
 /* ▾ affordance on jump-bar segments — invisible at rest (Xcode-style),
-   revealed by hover, keyboard focus, or an open menu. */
+   revealed by hover, keyboard focus, or an open menu. On earlier segments
+   the caret is its own button (the label button navigates back instead),
+   so the reveal also triggers from hovering anywhere on the crumb. */
 .nav-breadcrumb__caret {
   flex: 0 0 auto;
   margin-left: 5px;
@@ -279,6 +281,14 @@
   opacity: 0;
   transition: opacity 120ms ease;
 }
+.nav-breadcrumb__crumb > button.nav-breadcrumb__caret-btn {
+  padding: 3px 5px 3px 2px;
+  margin-left: -4px;
+}
+.nav-breadcrumb__caret-btn .nav-breadcrumb__caret {
+  margin-left: 0;
+}
+.nav-breadcrumb__crumb--menu:hover .nav-breadcrumb__caret,
 .nav-breadcrumb__crumb--menu > button:hover .nav-breadcrumb__caret,
 .nav-breadcrumb__crumb--menu > button:focus-visible .nav-breadcrumb__caret,
 .nav-breadcrumb__crumb--menu > button[aria-expanded='true'] .nav-breadcrumb__caret {

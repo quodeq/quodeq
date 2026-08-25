@@ -666,6 +666,13 @@
   fill: var(--color-sev-critical-bg);
   stroke: var(--color-sev-critical-text);
 }
+/* Standings-row hover overlay — neutral so it reads against both the lead
+   (accent) and trail (critical) polygons. */
+.compare-radar__poly--focus {
+  fill: transparent;
+  stroke: var(--color-text);
+  stroke-width: 1.6;
+}
 
 .compare-radar__labels { position: absolute; inset: 10px 12px 0; pointer-events: none; }
 

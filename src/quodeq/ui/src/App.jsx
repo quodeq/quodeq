@@ -1285,6 +1285,9 @@ export default function App() {
                 hasCurrentProjectRuns,
                 sharedProjectInfo: state.sharedProjectInfo,
               })}
+              // Compare needs two analyzed projects to rank anything; below
+              // that the tab is redundant and stays hidden.
+              showCompareTab={state.projects.filter((p) => (p.runsCount ?? 0) > 0).length >= 2}
               selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,

@@ -1,8 +1,10 @@
 /**
  * CompareDimensionView — one dimension across every project in scope:
  * stat cards, ranked standings with per-principle bars, a radar overlaying
- * the leader / trailer / scope average, and one card per principle.
+ * the leader / trailer / scope average (hovering a standings row overlays
+ * that project too), and one card per principle.
  */
+import { useState } from 'react';
 import { StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
@@ -46,17 +48,25 @@ function PrincipleDonut({ score }) {
 export default function CompareDimensionView({
   view, board, fleet, onBack, onOpenDimension, onOpenProject,
 }) {
+  // The radar plots leader/trailer/average by default (all N polygons would
+  // be unreadable); hovering a standings row overlays that project on top.
+  const [focusId, setFocusId] = useState(null);
+
   const axes = view.principles.map((p) => ({ label: p.label, value: p.avg }));
   const byKey = (source) => view.principles.map((p) => {
     const found = source.principles.find((x) => x.key === p.key);
     return found ? found.score : null;
   });
+  const focused = focusId
+    ? view.standings.find((s) => s.row.id === focusId && s !== view.lead && s !== view.trail)
+    : null;
   const series = [
     { values: view.principles.map((p) => p.avg), variant: 'average' },
     ...(view.trail && view.trail !== view.lead
       ? [{ values: byKey(view.trail), variant: 'trail' }]
       : []),
     ...(view.lead ? [{ values: byKey(view.lead), variant: 'lead' }] : []),
+    ...(focused ? [{ values: byKey(focused), variant: 'focus' }] : []),
   ];
 
   return (
@@ -147,6 +157,10 @@ export default function CompareDimensionView({
                   type="button"
                   className="compare-standings__row"
                   onClick={() => onOpenProject(s.row.id)}
+                  onMouseEnter={() => setFocusId(s.row.id)}
+                  onMouseLeave={() => setFocusId(null)}
+                  onFocus={() => setFocusId(s.row.id)}
+                  onBlur={() => setFocusId(null)}
                 >
                   <span className="compare-standings__rank">{i + 1}</span>
                   <span className="compare-standings__project">
