@@ -217,17 +217,7 @@
   .compare-lower { grid-template-columns: 1fr; }
 }
 
-/* ── grade text colours ─────────────────────────────────────────────────
-   scoreColorClass() emits bare `grade-*` classes; the app only styles them
-   inside specific scopes (.chip, .qd-card, …), so without this block every
-   compare score inherits the row colour and disappears in dark themes. */
-
-.compare-page .grade-top    { color: var(--color-grade-top-text); }
-.compare-page .grade-high   { color: var(--color-grade-high-text); }
-.compare-page .grade-mid    { color: var(--color-grade-mid-text); }
-.compare-page .grade-low    { color: var(--color-grade-low-text); }
-.compare-page .grade-bottom { color: var(--color-grade-bottom-text); }
-.compare-page .grade-none   { color: var(--color-text-muted); }
+/* Grade text colours come from the global .grade-* rules in base.css. */
 
 /* ── projects table ─────────────────────────────────────────────────────
    Flex cells with fixed widths instead of a shared grid template: columns

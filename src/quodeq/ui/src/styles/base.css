@@ -1044,6 +1044,19 @@ textarea:focus {
   white-space: nowrap;
 }
 
+/* ── Grade text colours ───────────────────────────────────
+   Global rules for the bare classes scoreColorClass()/gradeColorClass()
+   emit. Without these, a `grade-top` class outside a styled scope (.chip,
+   .qd-card, …) silently inherits the surrounding text colour — invisible
+   scores on dark themes. Scoped rules still win on specificity. */
+
+.grade-top    { color: var(--color-grade-top-text); }
+.grade-high   { color: var(--color-grade-high-text); }
+.grade-mid    { color: var(--color-grade-mid-text); }
+.grade-low    { color: var(--color-grade-low-text); }
+.grade-bottom { color: var(--color-grade-bottom-text); }
+.grade-none   { color: var(--color-text-muted); }
+
 /* ── Grade chips ──────────────────────────────────────── */
 
 .chip {
