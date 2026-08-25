@@ -38,8 +38,26 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
+export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
   const selectedProject = data?.projectName || data?.selectedProject || '__map__';
+
+  // Drill path and mode/style toggles live in the nav-stack entry (route
+  // params), not component state — drilling pushes a history entry, toggling
+  // replaces one (see App.jsx's map renderer), and browser back/forward and
+  // the breadcrumb restore them. Defaults apply when a fresh tab entry
+  // carries no params yet. Standalone renders (tests) may pass no nav
+  // bundle; the setters then no-op.
+  const {
+    path: currentPath = '',
+    vizStyle = 'zoompack',
+    viewMode = 'health',
+    galaxyMode = 'filesystem',
+    onPathChange, onVizStyleChange, onViewModeChange, onGalaxyModeChange,
+  } = nav || {};
+  const setCurrentPath = (p) => onPathChange?.(p);
+  const setVizStyle = (v) => onVizStyleChange?.(v);
+  const setViewMode = (v) => onViewModeChange?.(v);
+  const setGalaxyMode = (v) => onGalaxyModeChange?.(v);
 
   // Fresh tab click drops the cache; round-tripping through a detail view
   // does not change tabKey, so cached state survives unmount/remount.
@@ -50,10 +68,6 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   }
 
   const cached = readCachedState('map', selectedProject, {
-    currentPath: '',
-    vizStyle: 'zoompack',
-    viewMode: 'health',
-    galaxyMode: 'filesystem',
     selectedDimensionsArr: [],
   });
 
@@ -86,12 +100,6 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   }, []);
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
-  const [viewMode, _setViewMode] = useState(cached.viewMode);
-  const setViewMode = (v) => { writeCachedState('map', selectedProject, { viewMode: v }); _setViewMode(v); };
-  const [vizStyle, _setVizStyle] = useState(cached.vizStyle);
-  const setVizStyle = (v) => { writeCachedState('map', selectedProject, { vizStyle: v }); _setVizStyle(v); };
-  const [galaxyMode, _setGalaxyMode] = useState(cached.galaxyMode);
-  const setGalaxyMode = (v) => { writeCachedState('map', selectedProject, { galaxyMode: v }); _setGalaxyMode(v); };
   const [showLabels, _setShowLabels] = useState(() => { try { const v = localStorage.getItem(MAP_LABELS_KEY); return v === null ? true : v === '1'; } catch { return true; } });
   const setShowLabels = (v) => { _setShowLabels(v); try { localStorage.setItem(MAP_LABELS_KEY, v ? '1' : '0'); } catch {} };
   const appIsDark = useThemeIsDark();
@@ -106,18 +114,9 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
     if (appIsDark) { _setDarkMode(true); }
     else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? false : v === '1'); } catch { _setDarkMode(false); } }
   }, [appIsDark]);
-  const [currentPath, _setCurrentPath] = useState(cached.currentPath);
-  const setCurrentPath = (p) => { writeCachedState('map', selectedProject, { currentPath: p }); _setCurrentPath(p); };
-
-  // Animate back to root when tab is re-clicked while already on map
-  const prevTabKey = useRef(tabKey);
-  useEffect(() => {
-    if (tabKey !== prevTabKey.current) {
-      prevTabKey.current = tabKey;
-      setCurrentPath('');
-      callbacks?.onRefresh?.();
-    }
-  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tab re-click needs no path reset here anymore: navTab creates a fresh
+  // entry with no path param, so the controlled currentPath above is already
+  // '' (and the refresh-on-tabKey effect above covers the data refresh).
 
   // Get visible standards and available dimension names
   const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);

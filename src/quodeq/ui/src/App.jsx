@@ -312,6 +312,9 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     warmup: state.warmup,
     loadProjects: state.loadProjects,
     handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
+    // navStack + navGoTo let a route unwind history to an earlier entry of
+    // its own page (the map's drill-up) instead of pushing a duplicate.
+    navStack: state.navStack, navGoTo: state.navGoTo,
     handleProjectChange: state.handleProjectChange, navTab, navStackLength,
     handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
     historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
@@ -597,6 +600,12 @@ function ViolationsRoute({ params, props }) {
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
+      // The by-dimension / by-file / dismissed flip is view state on the SAME
+      // screen: it lives in the route entry so back/forward and the crumb see
+      // it, but flipping replaces (never pushes) so history doesn't grow.
+      // Params are spread forward so _tabKey survives the flip.
+      subTab={params.subTab || 'dimension'}
+      onSubTabChange={(v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v })}
     />
   );
 }
@@ -612,6 +621,25 @@ export const ROUTE_RENDERERS = {
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
+    // The viz drill-down is a real nav-stack entry: drilling into a folder
+    // pushes (browser back climbs back out), and navigating up to a path
+    // that already sits in the trailing run of map entries unwinds history
+    // to it instead of stacking a duplicate. Mode/style toggles replace in
+    // place so flipping them never grows history. Params are spread forward
+    // on every hop so _tabKey (the fresh-tab-click reset signal) survives.
+    const handlePathChange = (path) => {
+      const current = params.path || '';
+      if (path === current) return;
+      const stack = props.navigation.navStack || [];
+      for (let i = stack.length - 2; i >= 0 && stack[i].page === 'map'; i--) {
+        if ((stack[i].path || '') === path) {
+          props.navigation.navGoTo(i);
+          return;
+        }
+      }
+      props.navigation.handleNavigate('map', { ...params, path });
+    };
+    const replaceView = (patch) => props.navigation.handleNavigateReplace('map', { ...params, ...patch });
     return <MapPage
       data={{
         accumulated: acc,
@@ -626,6 +654,16 @@ export const ROUTE_RENDERERS = {
         error: props.dashboardData.error,
       }}
       callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard, onRetry: props.dashboardData.onRetry }}
+      nav={{
+        path: params.path || '',
+        vizStyle: params.vizStyle,
+        viewMode: params.viewMode,
+        galaxyMode: params.galaxyMode,
+        onPathChange: handlePathChange,
+        onVizStyleChange: (v) => replaceView({ vizStyle: v }),
+        onViewModeChange: (v) => replaceView({ viewMode: v }),
+        onGalaxyModeChange: (v) => replaceView({ galaxyMode: v }),
+      }}
       isDirectNav={isDirectNav}
       tabKey={params._tabKey || 0}
     />;

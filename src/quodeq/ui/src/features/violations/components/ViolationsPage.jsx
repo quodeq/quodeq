@@ -99,12 +99,7 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, onReconcile, initialSubTab, initialFilePath, dismissRefreshKey, selectedSource }) {
-  const [activeSubTab, _setActiveSubTab] = useState(initialSubTab);
-  const setActiveSubTab = (v) => {
-    writeCachedState('violations', selectedProject, { activeSubTab: v });
-    _setActiveSubTab(v);
-  };
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
   const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
   const setFileCurrentPath = (v) => {
     writeCachedState('violations', selectedProject, { fileCurrentPath: v });
@@ -137,7 +132,7 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   );
 
   return {
-    activeSubTab, setActiveSubTab, dismissed,
+    dismissed,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
@@ -192,15 +187,23 @@ export function ViolationsSubTabContent(props) {
   return null;
 }
 
-export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
+export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0, subTab = 'dimension', onSubTabChange }) {
   const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = 'local' } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
   const { onNavigate, onRefresh, onReconcile, onRetry } = callbacks;
 
-  // Fresh tab click (tabKey changed) drops the cached navigation state so
-  // the user lands at the default sub-tab / root path. Round-tripping
-  // through a file detail does NOT change tabKey, so the cache survives
-  // unmount and the page resumes where it was.
+  // The active sub-tab lives in the nav-stack entry, not component state:
+  // `subTab` arrives as a route param and flipping it replaces the entry in
+  // place (see App.jsx's ViolationsRoute), so back/forward restore it while
+  // history never grows per flip. A fresh tab click creates an entry with no
+  // subTab param, which lands on the default just like the old cache reset.
+  const activeSubTab = subTab;
+  const setActiveSubTab = (v) => onSubTabChange?.(v);
+
+  // Fresh tab click (tabKey changed) drops the cached file-tree path so the
+  // user lands at the root. Round-tripping through a file detail does NOT
+  // change tabKey, so the cache survives unmount and the tree resumes where
+  // it was.
   const lastTabKeyRef = useRef(tabKey);
   if (lastTabKeyRef.current !== tabKey) {
     resetCachedScope('violations', selectedProject);
@@ -208,7 +211,6 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   }
 
   const cached = readCachedState('violations', selectedProject, {
-    activeSubTab: 'dimension',
     fileCurrentPath: '',
   });
 
@@ -223,7 +225,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
-    activeSubTab, setActiveSubTab, dismissed,
+    dismissed,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
@@ -233,7 +235,6 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     selectedProject,
     onRefresh,
     onReconcile,
-    initialSubTab: cached.activeSubTab,
     initialFilePath: cached.fileCurrentPath,
     dismissRefreshKey,
     selectedSource,

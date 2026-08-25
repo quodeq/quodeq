@@ -16,6 +16,13 @@ const PAGE_LABELS = {
 };
 
 export function labelFor(entry) {
+  // A map drill-down entry carries its folder path (see App.jsx's map
+  // renderer): the crumb shows the folder name, so the trail reads
+  // map / src / components. The root map entry (no path) falls through to
+  // its tab label.
+  if (entry.page === 'map' && entry.path) {
+    return entry.path.split('/').filter(Boolean).pop() || 'map';
+  }
   if (PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
   switch (entry.page) {
     case 'run':           return entry.label || entry.runId || 'run';

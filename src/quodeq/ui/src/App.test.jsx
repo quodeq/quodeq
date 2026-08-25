@@ -700,6 +700,112 @@ describe('buildNavigationBundle', () => {
   });
 });
 
+// Same pattern as the compare tab's dimension drill-down (PR #1087): the
+// map's viz path and the violations sub-tab are route params, so the browser
+// back button and the breadcrumb see them. Drilling pushes, navigating up to
+// a path already in the trailing run of map entries unwinds history via
+// navGoTo, and view toggles replace in place so flipping never grows
+// history. Params must be spread forward on every hop or _tabKey (the
+// fresh-tab-click reset signal) silently drops and the page resets its
+// cached state mid-drill.
+describe('map/violations view state lives in the nav stack', () => {
+  function mapProps(navOverrides = {}) {
+    return {
+      dashboardData: {
+        latestAccumulated: null, accumulated: null, dashboard: null,
+        selectedDisplayName: 'p1', loading: false, isFetching: false,
+      },
+      navigation: {
+        selectedProject: 'p1', selectedSource: 'local', projects: [], projectsLoaded: true,
+        handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navGoTo: vi.fn(),
+        navStack: [{ page: 'map', _tabKey: 3 }], navStackLength: 1,
+        ...navOverrides,
+      },
+      refreshDashboard: vi.fn(),
+    };
+  }
+
+  it('map: drilling to a new path pushes, with existing params spread forward', () => {
+    const props = mapProps();
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, vizStyle: 'riskmatrix' }, props);
+    el.props.nav.onPathChange('src');
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('map', { _tabKey: 3, vizStyle: 'riskmatrix', path: 'src' });
+    expect(props.navigation.navGoTo).not.toHaveBeenCalled();
+    expect(props.navigation.handleNavigateReplace).not.toHaveBeenCalled();
+  });
+
+  it('map: navigating up to a path already in the trailing map trail unwinds via navGoTo, never pushes a duplicate', () => {
+    const props = mapProps({
+      navStack: [
+        { page: 'map', _tabKey: 3 },
+        { page: 'map', _tabKey: 3, path: 'src' },
+        { page: 'map', _tabKey: 3, path: 'src/app' },
+      ],
+      navStackLength: 3,
+    });
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app' }, props);
+    el.props.nav.onPathChange('');
+    expect(props.navigation.navGoTo).toHaveBeenCalledWith(0);
+    expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('map: the trail scan stops at the first non-map entry, so an older unrelated map entry is not a goTo target', () => {
+    const props = mapProps({
+      navStack: [
+        { page: 'map', _tabKey: 2, path: 'src' },
+        { page: 'overview' },
+        { page: 'map', _tabKey: 3, path: 'src/app' },
+      ],
+      navStackLength: 3,
+    });
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app' }, props);
+    el.props.nav.onPathChange('src');
+    expect(props.navigation.navGoTo).not.toHaveBeenCalled();
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src' });
+  });
+
+  it('map: mode/style toggles replace the entry in place, params preserved', () => {
+    const props = mapProps();
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src' }, props);
+    el.props.nav.onVizStyleChange('galaxy');
+    expect(props.navigation.handleNavigateReplace).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src', vizStyle: 'galaxy' });
+    el.props.nav.onGalaxyModeChange('standards');
+    expect(props.navigation.handleNavigateReplace).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src', galaxyMode: 'standards' });
+    expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('violations: the sub-tab flip replaces the entry (history must not grow), _tabKey preserved', () => {
+    const props = {
+      dashboardData: { latestAccumulated: null, accumulated: null, selectedDisplayName: 'p1', loading: false, isFetching: false },
+      navigation: {
+        selectedProject: 'p1', selectedSource: 'local', projects: [], projectsLoaded: true,
+        handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navStackLength: 1,
+      },
+      dismissRefreshKey: 0,
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+    const outer = ROUTE_RENDERERS.violations({ _tabKey: 2 }, props);
+    const inner = outer.type(outer.props);
+    expect(inner.props.subTab).toBe('dimension');
+    inner.props.onSubTabChange('file');
+    expect(props.navigation.handleNavigateReplace).toHaveBeenCalledWith('violations', { _tabKey: 2, subTab: 'file' });
+    expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('buildNavigationBundle forwards navStack and navGoTo (the map drill-up dies without them)', () => {
+    const navStack = [{ page: 'map' }];
+    const navGoTo = vi.fn();
+    const bundle = buildNavigationBundle({
+      state: { navStack, navGoTo },
+      navTab: vi.fn(), navStackLength: 1,
+      isEvaluating: false, showToast: vi.fn(), setWizardEntry: vi.fn(),
+    });
+    expect(bundle.navStack).toBe(navStack);
+    expect(bundle.navGoTo).toBe(navGoTo);
+  });
+});
+
 // Teammate persona, one click deeper than the data pages: with zero LOCAL
 // projects, drill-in pages (file/finding/dimension detail...) must not wall
 // a shared selection behind the add-a-project tour. Same gate class as the
