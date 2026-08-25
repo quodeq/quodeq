@@ -17,6 +17,7 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const ComparePage = lazy(() => import('./features/compare/components/ComparePage.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyState from './components/EmptyState.jsx';
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
@@ -56,7 +57,7 @@ import { t } from './strings/index.js';
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
-const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula'];
+const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
 const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
 /**
@@ -755,6 +756,16 @@ export const ROUTE_RENDERERS = {
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} projectsLoaded={props.navigation.projectsLoaded} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
+  compare: (params, props) => (
+    <ComparePage
+      projects={props.navigation.projects}
+      projectsLoaded={props.navigation.projectsLoaded}
+      onOpenProject={(id) => {
+        props.navigation.handleProjectChange(id, 'local');
+        props.navigation.navTab('overview');
+      }}
+    />
+  ),
 };
 
 // The app-level "no local projects" wall in MainContent. Route pages that

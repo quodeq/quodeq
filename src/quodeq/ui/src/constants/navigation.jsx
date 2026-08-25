@@ -68,6 +68,17 @@ export const ICON_HELP = (
   </svg>
 );
 
+// Balance scales — weighing projects against each other.
+export const ICON_COMPARE = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <line x1="12" y1="4" x2="12" y2="20" />
+    <line x1="5" y1="7" x2="19" y2="7" />
+    <path d="M5 7 2.5 13h5L5 7Z" />
+    <path d="M19 7l-2.5 6h5L19 7Z" />
+    <line x1="9" y1="20" x2="15" y2="20" />
+  </svg>
+);
+
 export const ICON_STANDARDS = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7l3-7z" />

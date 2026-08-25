@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
+import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_COMPARE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
 import { cloneElement } from 'react';
 import { BRAND_NAME } from '../strings/brand.js';
 import { t, LOCALE } from '../strings/index.js';
@@ -172,6 +172,9 @@ export default function Sidebar({
             activeTab={activeTab}
             onNavTab={handleNav}
           />
+          {/* Compare is fleet-wide, so it sits with the cross-project block
+              rather than inside the run-gated project tabs above. */}
+          <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
         </nav>
 
         <div className="sidebar-spacer" />

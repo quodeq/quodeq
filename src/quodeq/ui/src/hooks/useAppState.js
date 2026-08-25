@@ -17,7 +17,9 @@ import { useVisibleRuns } from './useVisibleRuns.js';
 
 export const TAB_OVERVIEW = 'overview';
 const TAB_HISTORY_RUN = 'history-run';
-export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings'];
+// 'compare' is appended AFTER the first four on purpose: PROJECT_TABS is a
+// positional slice of the head of this list.
+export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings', 'compare'];
 export const PROJECT_TABS = KNOWN_TABS.slice(0, 4);
 
 function computeDerivedState(accumulated, dashboard, selectedProject, projects) {

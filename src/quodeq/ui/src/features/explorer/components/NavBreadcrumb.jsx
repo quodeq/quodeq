@@ -13,6 +13,7 @@ const PAGE_LABELS = {
   'grade-formula': t('explorer.crumbGradeFormula'),
   projects: 'repositories',
   help: 'help',
+  compare: 'compare',
 };
 
 export function labelFor(entry) {
