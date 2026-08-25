@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import ComparePage from './ComparePage.jsx';
 
@@ -54,16 +55,28 @@ beforeEach(() => {
   ));
 });
 
-function renderPage(props = {}) {
-  return render(
+/* Mimics the App wiring: `dimension` is a route param — drilling in pushes,
+   switching replaces, back pops. The harness keeps a tiny stack so the
+   push/pop contract is exercised, not just a boolean. */
+function NavHarness(props) {
+  const [stack, setStack] = useState([null]);
+  const dimension = stack[stack.length - 1];
+  return (
     <ComparePage
       projects={PROJECTS}
       projectsLoaded
       onOpenProject={vi.fn()}
+      dimension={dimension}
+      onOpenDimension={(key) => setStack((s) => s.concat([key]))}
+      onSwitchDimension={(key) => setStack((s) => s.slice(0, -1).concat([key]))}
+      onBack={() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s))}
       {...props}
-    />,
-    { wrapper: withQueryClient() },
+    />
   );
+}
+
+function renderPage(props = {}) {
+  return render(<NavHarness {...props} />, { wrapper: withQueryClient() });
 }
 
 describe('ComparePage', () => {

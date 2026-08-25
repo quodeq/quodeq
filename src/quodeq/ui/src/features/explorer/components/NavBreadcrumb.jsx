@@ -13,7 +13,6 @@ const PAGE_LABELS = {
   'grade-formula': t('explorer.crumbGradeFormula'),
   projects: 'repositories',
   help: 'help',
-  compare: 'compare',
 };
 
 export function labelFor(entry) {
@@ -29,6 +28,9 @@ export function labelFor(entry) {
     case 'principle':     return entry.label || 'principle';
     case 'evalprinciple': return entry.label || entry.principleName || 'principle';
     case 'finding':       return entry.label || 'finding';
+    // Fleet entry reads "compare"; a drill-down entry carries its dimension
+    // so the crumb trail reads compare › security.
+    case 'compare':       return entry.dimension ? entry.dimension.toLowerCase() : 'compare';
     default:              return entry.label || entry.page;
   }
 }

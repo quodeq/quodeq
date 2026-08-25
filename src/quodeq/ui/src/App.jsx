@@ -311,7 +311,7 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     retryLoadProjects: state.retryLoadProjects,
     warmup: state.warmup,
     loadProjects: state.loadProjects,
-    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
+    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
     handleProjectChange: state.handleProjectChange, navTab, navStackLength,
     handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
     historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
@@ -760,10 +760,17 @@ export const ROUTE_RENDERERS = {
     <ComparePage
       projects={props.navigation.projects}
       projectsLoaded={props.navigation.projectsLoaded}
+      dimension={params.dimension || null}
       onOpenProject={(id) => {
         props.navigation.handleProjectChange(id, 'local');
         props.navigation.navTab('overview');
       }}
+      // Drill-down is a real nav-stack entry: push from the fleet so the
+      // browser back button returns there; replace when switching between
+      // dimensions so tab-hopping doesn't grow history.
+      onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
+      onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      onBack={props.navigation.navPop}
     />
   ),
 };

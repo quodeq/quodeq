@@ -10,7 +10,7 @@
  * rows for projects still computing render as pending instead of blocking
  * the whole screen.
  */
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
 import { useCompareData } from '../hooks/useCompareData.js';
@@ -42,14 +42,24 @@ function storeScope(ids) {
   }
 }
 
-export default function ComparePage({ projects, projectsLoaded, onOpenProject }) {
+export default function ComparePage({
+  projects, projectsLoaded, onOpenProject,
+  /* Navigation contract: the dimension drill-down is a nav-stack entry, not
+     component state — `dimension` arrives as a route param, drilling in
+     pushes (browser back returns to the fleet), switching dimensions
+     replaces, and the back control pops. */
+  dimension = null,
+  onOpenDimension,
+  onSwitchDimension,
+  onBack,
+}) {
   const localProjects = useMemo(
     () => (projects || []).filter((p) => p && (p.id || p.name)),
     [projects],
   );
   const { summariesById, errorsById } = useCompareData(localProjects);
 
-  const [view, setView] = useState('fleet');
+  const view = dimension || 'fleet';
   // Score is the only table ordering (consequence ranked near-inverse of it
   // on real fleets); the toggle flips best-first / worst-first.
   const [sortDir, setSortDir] = useState('desc');
@@ -105,17 +115,25 @@ export default function ComparePage({ projects, projectsLoaded, onOpenProject })
   }, [rows, updateScope]);
 
   const openDimension = useCallback((key) => {
-    setView(key);
     setPickerOpen(false);
-  }, []);
+    if (dimension) onSwitchDimension?.(key);
+    else onOpenDimension?.(key);
+  }, [dimension, onOpenDimension, onSwitchDimension]);
+
+  // The route component stays mounted across the fleet <-> dimension swap,
+  // so reset the scroll container ourselves on every view change.
+  const rootRef = useRef(null);
+  useEffect(() => {
+    rootRef.current?.closest('main')?.scrollTo?.(0, 0);
+  }, [view]);
 
   if (!projectsLoaded) {
-    return <div className="compare-page"><div className="compare-loading">{t('compare.loading')}</div></div>;
+    return <div className="compare-page" ref={rootRef}><div className="compare-loading">{t('compare.loading')}</div></div>;
   }
 
   if (!localProjects.length) {
     return (
-      <div className="compare-page">
+      <div className="compare-page" ref={rootRef}>
         <EmptyState
           title={t('compare.emptyTitle')}
           description={t('compare.emptyBody')}
@@ -149,13 +167,13 @@ export default function ComparePage({ projects, projectsLoaded, onOpenProject })
   };
 
   return (
-    <div className="compare-page dashboard-fade">
+    <div className="compare-page dashboard-fade" ref={rootRef}>
       {dimensionView ? (
         <CompareDimensionView
           view={dimensionView}
           board={board}
           fleet={fleet}
-          onBack={() => setView('fleet')}
+          onBack={onBack}
           onOpenDimension={openDimension}
           onOpenProject={onOpenProject}
         />
