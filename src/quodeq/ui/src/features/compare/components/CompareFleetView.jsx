@@ -192,7 +192,7 @@ function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error, 
 export default function CompareFleetView({
   rows, orderedRows, fleet, board, attention, errorsById,
   sortDir, toggleSortDir, hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount,
-  toggleProject, selectAll, selectFlagged, openDimension, onOpenProject,
+  toggleProject, selectAll, selectFlagged, openDimension, openDuel, onOpenProject,
 }) {
   const dimOrder = board.map((b) => b.key);
   return (
@@ -206,6 +206,11 @@ export default function CompareFleetView({
           })}
         />
         <div className="compare-header__controls">
+          {openDuel && (
+            <button type="button" className="compare-duel-cta" onClick={openDuel}>
+              {t('compare.duelAction')}
+            </button>
+          )}
           <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
             <button
               type="button"

@@ -281,6 +281,77 @@ export function buildAttention(rows, limit = 3) {
     .slice(0, limit);
 }
 
+const round1 = (x) => Math.round(x * 10) / 10;
+
+/**
+ * Head-to-head model for exactly two projects ("compare these two").
+ * Gap convention throughout: left minus right (a minus b), so a positive
+ * gap always means the left project leads.
+ *
+ * `dimensions` is the union (a dimension only one side has still renders,
+ * gapless); principle diffs exist only for shared dimensions — a diff needs
+ * both sides. `trend` carries each project's dated overall series for the
+ * overlay chart. Returns null when either id is not in `rows`.
+ */
+export function buildDuelView(idA, idB, rows, now, summariesById) {
+  const a = rows.find((r) => r.id === idA);
+  const b = rows.find((r) => r.id === idB);
+  if (!a || !b) return null;
+
+  const gapOf = (x, y) => (x != null && y != null ? round1(x - y) : null);
+
+  const keys = new Map();
+  for (const d of a.dims.concat(b.dims)) {
+    if (!keys.has(d.key)) keys.set(d.key, d.label);
+  }
+  const dimensions = Array.from(keys, ([key, label]) => {
+    const da = a.dims.find((d) => d.key === key);
+    const db = b.dims.find((d) => d.key === key);
+    const scoreA = da?.score ?? null;
+    const scoreB = db?.score ?? null;
+    return {
+      key,
+      label,
+      a: scoreA,
+      b: scoreB,
+      gap: gapOf(scoreA, scoreB),
+      shared: scoreA != null && scoreB != null,
+    };
+  }).sort((x, y) => x.label.localeCompare(y.label));
+
+  const principles = dimensions
+    .filter((d) => d.shared)
+    .map((dim) => {
+      const pa = a.dims.find((d) => d.key === dim.key)?.principles || [];
+      const pb = b.dims.find((d) => d.key === dim.key)?.principles || [];
+      const pKeys = new Map();
+      for (const p of pa.concat(pb)) {
+        if (p.score != null && !pKeys.has(p.key)) pKeys.set(p.key, p.label);
+      }
+      const items = Array.from(pKeys, ([key, label]) => {
+        const scoreA = pa.find((p) => p.key === key)?.score ?? null;
+        const scoreB = pb.find((p) => p.key === key)?.score ?? null;
+        return { key, label, a: scoreA, b: scoreB, gap: gapOf(scoreA, scoreB) };
+      }).sort((x, y) => x.label.localeCompare(y.label));
+      return { key: dim.key, label: dim.label, items };
+    })
+    .filter((g) => g.items.length);
+
+  const series = (id) => sortedByDate(summariesById?.[id]?.trend)
+    .map((e) => ({ dateISO: e.dateISO, value: e.numericAverage }));
+
+  return {
+    a,
+    b,
+    ready: a.hasData && b.hasData,
+    gap: gapOf(a.score, b.score),
+    dimensions,
+    sharedCount: dimensions.filter((d) => d.shared).length,
+    principles,
+    trend: { a: series(idA), b: series(idB) },
+  };
+}
+
 /** Drill-down model for one dimension across the scope. */
 export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   const holders = rows

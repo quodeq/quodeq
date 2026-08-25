@@ -799,6 +799,208 @@
   color: var(--color-text-muted);
 }
 
+/* ── duel (head to head) ──────────────────────────────────────────────
+   Side identity is fixed and colour-coded everywhere: project A (left)
+   speaks in --color-accent, project B (right) in --color-info. Gaps read
+   A minus B, tinted toward whichever side leads. */
+
+.compare-duel-cta {
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--color-accent);
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.compare-duel-cta:hover { background: var(--color-accent-soft); }
+
+.compare-duel__side--a { color: var(--color-accent); }
+.compare-duel__side--b { color: var(--color-text); }
+
+.compare-lower--duel {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+}
+
+@media (max-width: 1100px) {
+  .compare-lower--duel { grid-template-columns: 1fr; }
+}
+
+/* dimension rows + principle rows share one grid recipe */
+
+.compare-duel-dims { list-style: none; margin: 0; padding: 0; }
+
+.compare-duel-dims__row,
+.compare-duel-principles__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px minmax(90px, 180px) 40px 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.compare-duel-dims__label,
+.compare-duel-principles__label {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-duel-dims__score,
+.compare-duel-principles__score {
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.compare-duel__gap {
+  font-size: 11px;
+  text-align: right;
+  color: var(--color-text-muted);
+}
+
+.compare-duel__gap--a { color: var(--color-accent); }
+.compare-duel__gap--b { color: var(--color-text); }
+
+/* mirrored bars: A grows leftward from the centre seam, B rightward */
+
+.compare-duel__bars {
+  display: flex;
+  height: 10px;
+}
+
+.compare-duel__barLane {
+  flex: 1;
+  display: flex;
+  background: var(--color-overlay-light);
+}
+
+.compare-duel__barLane--a {
+  justify-content: flex-end;
+  border-right: 1px solid var(--color-border);
+}
+
+.compare-duel__bar { display: block; border-radius: 1px; }
+.compare-duel__bar--a { background: var(--color-accent); }
+.compare-duel__bar--b { background: var(--color-text); }
+
+/* trend overlay */
+
+.compare-duel-trend { padding: 12px 16px 2px; }
+
+.compare-duel-trend__plot { position: relative; margin-left: 26px; }
+
+.compare-duel-trend__svg { display: block; width: 100%; height: auto; }
+
+.compare-duel-trend__grid {
+  stroke: var(--color-chart-grid);
+  stroke-width: 1;
+}
+
+.compare-duel-trend__line {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.compare-duel-trend__line--a { stroke: var(--color-accent); }
+.compare-duel-trend__line--b { stroke: var(--color-text); }
+
+.compare-duel-trend__dot--a { fill: var(--color-accent); }
+.compare-duel-trend__dot--b { fill: var(--color-text); }
+
+.compare-duel-trend__ticks { position: absolute; inset: 0; pointer-events: none; }
+
+.compare-duel-trend__tick {
+  position: absolute;
+  left: -26px;
+  width: 20px;
+  transform: translateY(-50%);
+  text-align: right;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-duel-trend__dates {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0 0 26px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-duel__legendItem {
+  position: relative;
+  padding: 0 0 0 18px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.compare-duel__legendItem:hover { color: var(--color-text); }
+
+.compare-duel__legendItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.compare-duel__legendItem--a::before { background: var(--color-accent); }
+.compare-duel__legendItem--b::before { background: var(--color-text); }
+
+/* principle diffs, grouped per shared dimension */
+
+.compare-duel-principles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.compare-duel-principles__group {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+}
+
+.compare-duel-principles__dim {
+  margin: 0;
+  padding: 12px 16px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Principle rows live inside a ~320px group card, so the label must win
+   over the bars: fixed floor for the name, bars take what is left. */
+.compare-duel-principles__row {
+  grid-template-columns: minmax(90px, 1fr) 34px minmax(56px, 140px) 34px 40px;
+  gap: 8px;
+}
+
+.compare-duel-principles__row:last-child { border-bottom: none; }
+
+@media (max-width: 640px) {
+  .compare-duel-dims__row,
+  .compare-duel-principles__row {
+    grid-template-columns: minmax(0, 1fr) 40px 40px 44px;
+  }
+  .compare-duel__bars { display: none; }
+}
+
 /* ── small-view tiers ───────────────────────────────────────────────────
    Shed secondary columns before anything important gets crushed: trend
    sparkline first, then coverage + the per-dimension chips (both live in

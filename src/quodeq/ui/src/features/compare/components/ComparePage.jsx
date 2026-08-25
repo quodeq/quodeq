@@ -16,10 +16,11 @@ import { t } from '../../../strings/index.js';
 import { useCompareData } from '../hooks/useCompareData.js';
 import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
-  buildDimensionView, sortRows, consequenceOf, consequenceLevel,
+  buildDimensionView, buildDuelView, sortRows, consequenceOf, consequenceLevel,
 } from '../compareModel.js';
 import CompareFleetView from './CompareFleetView.jsx';
 import CompareDimensionView from './CompareDimensionView.jsx';
+import CompareDuelView from './CompareDuelView.jsx';
 
 const SCOPE_STORAGE_KEY = 'quodeq.compare.scope';
 
@@ -51,6 +52,11 @@ export default function ComparePage({
   dimension = null,
   onOpenDimension,
   onSwitchDimension,
+  /* The head-to-head view follows the same contract: `duel` is a route
+     param holding the two project ids, pushed from the fleet's "compare
+     these two" action; back pops to the fleet. */
+  duel = null,
+  onOpenDuel,
   onBack,
 }) {
   const localProjects = useMemo(
@@ -93,6 +99,14 @@ export default function ComparePage({
     () => (view === 'fleet' ? null : buildDimensionView(view, scopeRows, now, summariesById)),
     [view, scopeRows, now, summariesById],
   );
+  // Duel rows come from `rows`, not `scopeRows`: the entry pins two ids, and
+  // editing the scope afterwards must not blank an already-open duel.
+  const duelView = useMemo(
+    () => (Array.isArray(duel) && duel.length === 2
+      ? buildDuelView(duel[0], duel[1], rows, now, summariesById)
+      : null),
+    [duel, rows, now, summariesById],
+  );
 
   const updateScope = useCallback((ids) => {
     setScopeIds(ids);
@@ -125,7 +139,7 @@ export default function ComparePage({
   const rootRef = useRef(null);
   useEffect(() => {
     rootRef.current?.closest('main')?.scrollTo?.(0, 0);
-  }, [view]);
+  }, [view, duel]);
 
   if (!projectsLoaded) {
     return <div className="compare-page" ref={rootRef}><div className="compare-loading">{t('compare.loading')}</div></div>;
@@ -162,13 +176,25 @@ export default function ComparePage({
     selectAll: () => updateScope(null),
     selectFlagged,
     openDimension,
+    // "compare these two" only makes sense for a scope of exactly two; the
+    // fleet header shows the action whenever that holds (whether the pair
+    // was picked explicitly or the fleet just has two projects).
+    openDuel: scopeRows.length === 2 && onOpenDuel
+      ? () => { setPickerOpen(false); onOpenDuel([scopeRows[0].id, scopeRows[1].id]); }
+      : null,
     onOpenProject,
     now,
   };
 
   return (
     <div className="compare-page dashboard-fade" ref={rootRef}>
-      {dimensionView ? (
+      {duelView ? (
+        <CompareDuelView
+          duel={duelView}
+          onBack={onBack}
+          onOpenProject={onOpenProject}
+        />
+      ) : dimensionView ? (
         <CompareDimensionView
           view={dimensionView}
           board={board}
