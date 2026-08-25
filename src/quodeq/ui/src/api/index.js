@@ -105,6 +105,16 @@ export async function getRunScores(projectId, runId) {
   return request(`/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`);
 }
 
+/**
+ * Slim scores payload for the Compare tab: accumulated summary + dimensions
+ * (findings stripped server-side) + trend. One call per project.
+ *
+ * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
+ */
+export function getCompareSummary(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/compare-summary`);
+}
+
 // ── Grade formula ───────────────────────────────────────────────────────
 
 /** @returns {Promise<{current: Object, defaults: Object, isCustom: boolean}>} */

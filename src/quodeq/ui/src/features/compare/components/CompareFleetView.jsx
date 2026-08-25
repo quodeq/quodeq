@@ -1,0 +1,421 @@
+/**
+ * CompareFleetView — the Compare tab's landing view: scope-wide stat cards,
+ * the ranked projects table with per-dimension chips, the dimensions board
+ * and the attention ("needs you") list.
+ */
+import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
+import SevBadge from '../../../components/terminal/SevBadge.jsx';
+import TrendBadge from '../../../components/TrendBadge.jsx';
+import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
+import { relativeTime } from '../../../components/LastFetchedLine.jsx';
+import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
+import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
+import { t, LOCALE } from '../../../strings/index.js';
+import { consequenceOf, consequenceLevel } from '../compareModel.js';
+
+const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
+const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
+
+function levelLabel(level) {
+  return t(`compare.level${level.charAt(0).toUpperCase()}${level.slice(1)}`);
+}
+
+function ScopePicker({
+  rows, scopeIds, toggleProject, selectAll, selectFlagged, pickerOpen, setPickerOpen, scopeCount,
+}) {
+  const allSelected = scopeIds == null || scopeCount === rows.length;
+  const label = allSelected
+    ? t('compare.scopeAll', { count: rows.length })
+    : t('compare.scopeSome', { selected: scopeCount, count: rows.length });
+  return (
+    <span className="compare-picker">
+      <button
+        type="button"
+        className={`compare-picker__toggle${allSelected ? '' : ' compare-picker__toggle--filtered'}`}
+        onClick={() => setPickerOpen(!pickerOpen)}
+        aria-expanded={pickerOpen}
+      >
+        {label}
+        <span className="compare-picker__glyph" aria-hidden="true">{pickerOpen ? '▲' : '▼'}</span>
+      </button>
+      {pickerOpen && (
+        <div className="compare-picker__pop">
+          <div className="compare-picker__head">
+            <span className="compare-picker__title">{t('compare.pickerTitle')}</span>
+            <button type="button" className="compare-picker__quick" onClick={selectAll}>
+              {t('compare.pickerAll')}
+            </button>
+            <button type="button" className="compare-picker__quick" onClick={selectFlagged}>
+              {t('compare.pickerFlagged')}
+            </button>
+          </div>
+          <ul className="compare-picker__list">
+            {rows.map((row) => {
+              const on = scopeIds == null || scopeIds.includes(row.id);
+              return (
+                <li key={row.id}>
+                  <label className="compare-picker__row">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggleProject(row.id)}
+                    />
+                    <span className="compare-picker__name">{row.name}</span>
+                    <span
+                      className={`compare-picker__score ${scoreColorClass(row.score)}`}
+                    >
+                      {score1(row.score)}
+                    </span>
+                    <span className="compare-picker__viol">
+                      {row.hasData ? t('compare.violCount', { count: nf(row.totalViolations) }) : '—'}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </span>
+  );
+}
+
+function DimChip({ dim, onOpen }) {
+  return (
+    <button
+      type="button"
+      className="compare-dim-chip"
+      onClick={(e) => { e.stopPropagation(); onOpen(dim.key); }}
+      title={t('compare.openDimension', { dim: dim.label })}
+    >
+      <span className={`compare-dim-chip__score ${scoreColorClass(dim.score)}`}>
+        {score1(dim.score)}
+      </span>
+      <span className="compare-dim-chip__bar" aria-hidden="true">
+        <span
+          className="compare-dim-chip__fill"
+          style={{
+            width: `${Math.max(4, Math.round((dim.score ?? 0) * 10))}%`,
+            background: scoreGradeColorVar(dim.score ?? 0),
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
+function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error, hasCoverage }) {
+  const level = consequenceLevel(consequenceOf(row));
+  const dimByKey = new Map(row.dims.map((d) => [d.key, d]));
+  return (
+    <div
+      className={`compare-row compare-row--${level}${row.hasData ? '' : ' compare-row--nodata'}`}
+      role="row"
+      tabIndex={0}
+      onClick={() => onOpenProject(row.id)}
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpenProject(row.id); }}
+    >
+      <span className="compare-row__stripe" aria-hidden="true" />
+      <span className="compare-row__rank">{rank}</span>
+      <span className="compare-row__project">
+        <span className="compare-row__name">{row.name}</span>
+        <span className="compare-row__meta">
+          {[row.lang, row.totalFiles != null ? t('compare.filesSuffix', { count: nf(row.totalFiles) }) : null]
+            .filter(Boolean).join(' · ')}
+        </span>
+      </span>
+      {row.hasData ? (
+        <>
+          <span className="compare-row__score">
+            <span className={scoreColorClass(row.score)}>{score1(row.score)}</span>
+            <span className="compare-row__tier">{scoreToGradeLabel(row.score) || ''}</span>
+          </span>
+          <span className="compare-row__delta">
+            {row.delta != null ? (
+              <TrendBadge delta={row.delta} />
+            ) : row.lastDelta != null ? (
+              <span className="compare-delta--old" title={t('compare.oldDeltaTip')}>
+                <TrendBadge delta={row.lastDelta} />
+              </span>
+            ) : null}
+          </span>
+          <span className="compare-row__viol">
+            <span className="compare-row__violTotal">{nf(row.totalViolations)}</span>
+            <span className="compare-row__sev">
+              <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
+              <SevBadge level="major" format="count-abbr" count={row.severity.major} />
+              <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
+            </span>
+          </span>
+          <span className="compare-row__spark">
+            {row.spark.length > 0 && (
+              /* Width scales with run count so a two-run project renders two
+                 slim bars instead of stretching into giant blocks. */
+              <span
+                className="compare-row__sparkBox"
+                style={{ width: `${Math.min(90, row.spark.length * 7)}px` }}
+              >
+                <DimensionSparkline scores={row.spark} />
+              </span>
+            )}
+          </span>
+          <span className="compare-row__dims">
+            {dimOrder.map((key) => {
+              const dim = dimByKey.get(key);
+              return dim && dim.score != null
+                ? <DimChip key={key} dim={dim} onOpen={openDimension} />
+                : <span key={key} className="compare-dim-chip compare-dim-chip--empty" aria-hidden="true">·</span>;
+            })}
+          </span>
+          {hasCoverage && (
+            <span className={`compare-row__cov${row.coveragePct != null && row.coveragePct < 80 ? ' compare-row__cov--low' : ''}`}>
+              {row.coveragePct != null ? t('compare.analyzedPct', { pct: row.coveragePct }) : '—'}
+            </span>
+          )}
+          <span className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}>
+            {relativeTime(row.lastISO) || '—'}
+          </span>
+        </>
+      ) : (
+        <span className="compare-row__pending">
+          {error
+            ? t('compare.loadFailed')
+            : row.loaded
+              ? t('compare.noRuns')
+              : t('compare.computing')}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function CompareFleetView({
+  rows, orderedRows, fleet, board, attention, errorsById,
+  sortDir, toggleSortDir, hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount,
+  toggleProject, selectAll, selectFlagged, openDimension, onOpenProject,
+}) {
+  const dimOrder = board.map((b) => b.key);
+  return (
+    <>
+      <div className="compare-page__top">
+        <TermHeader
+          name={t('compare.title')}
+          sub={t('compare.subtitle', {
+            count: scopeCount,
+            files: nf(fleet.totalFiles),
+          })}
+        />
+        <div className="compare-header__controls">
+          <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
+            <button
+              type="button"
+              className="compare-sort__btn compare-sort__btn--on"
+              onClick={toggleSortDir}
+              aria-label={t('compare.sortToggleAria')}
+            >
+              {t('compare.sortScore')} {sortDir === 'desc' ? '↓' : '↑'}
+            </button>
+          </span>
+          <ScopePicker
+            rows={rows}
+            scopeIds={scopeIds}
+            scopeCount={scopeCount}
+            toggleProject={toggleProject}
+            selectAll={selectAll}
+            selectFlagged={selectFlagged}
+            pickerOpen={pickerOpen}
+            setPickerOpen={setPickerOpen}
+          />
+        </div>
+      </div>
+
+      <StatStrip cards>
+        <Stat
+          label={t('compare.cardScopeScore')}
+          value={score1(fleet.score)}
+          hint={fleet.score != null
+            ? `${scoreToGradeLabel(fleet.score) || ''} · ${t('compare.projectsInScope', { count: fleet.scoredCount })}`
+            : t('compare.noScores')}
+          trailing={<TrendBadge delta={fleet.delta} />}
+        />
+        <Stat
+          label={t('compare.cardViolations')}
+          value={nf(fleet.totalViolations)}
+          hint={(
+            <span className="compare-card__sev">
+              <SevBadge level="critical" count={fleet.severity.critical} />
+              <SevBadge level="major" count={fleet.severity.major} />
+              <SevBadge level="minor" count={fleet.severity.minor} />
+            </span>
+          )}
+        />
+        <Stat
+          label={t('compare.cardCompliance')}
+          value={fleet.passPct != null ? `${fleet.passPct}%` : '—'}
+          hint={t('compare.passingChecks', {
+            pass: nf(fleet.totalCompliance),
+            checks: nf(fleet.checks),
+          })}
+        />
+        <Stat
+          label={t('compare.cardMeasurement')}
+          value={fleet.coveragePct != null ? `${fleet.coveragePct}%` : String(fleet.staleCount)}
+          hint={fleet.coveragePct == null
+            ? (fleet.staleCount ? t('compare.staleHint') : t('compare.allCurrent'))
+            : (fleet.staleCount
+              ? t('compare.staleNote', { count: fleet.staleCount })
+              : t('compare.allCurrent'))}
+          tone={fleet.staleCount ? 'warning' : 'default'}
+        />
+      </StatStrip>
+
+      <section className="compare-panel" aria-label={t('compare.projectsAria')}>
+        <div className="compare-panel__head">
+          <SectionLabel>{t('compare.projectsHeader', { count: scopeCount })}</SectionLabel>
+          <span className="compare-panel__note">
+            {sortDir === 'desc' ? t('compare.sortNoteScore') : t('compare.sortNoteScoreAsc')}
+          </span>
+        </div>
+        <div className="compare-table" role="table">
+          <div className="compare-row compare-row--head" role="row">
+            <span className="compare-row__stripe" />
+            <span className="compare-row__rank" />
+            <span className="compare-row__project">{t('compare.colProject')}</span>
+            <span className="compare-row__score">{t('compare.colScore')}</span>
+            <span className="compare-row__delta">{t('compare.colDelta')}</span>
+            <span className="compare-row__viol">{t('compare.colViolations')}</span>
+            <span className="compare-row__spark">{t('compare.colTrend')}</span>
+            <span className="compare-row__dims compare-row__dimsHead">
+              {board.map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  className="compare-row__dimHead"
+                  title={t('compare.openDimension', { dim: b.label })}
+                  onClick={() => openDimension(b.key)}
+                >
+                  {b.label.slice(0, 5)}
+                </button>
+              ))}
+            </span>
+            {hasCoverage && <span className="compare-row__cov">{t('compare.colCoverage')}</span>}
+            <span className="compare-row__last">{t('compare.colLast')}</span>
+          </div>
+          {orderedRows.map((row, i) => (
+            <ProjectRow
+              key={row.id}
+              row={row}
+              rank={i + 1}
+              dimOrder={dimOrder}
+              onOpenProject={onOpenProject}
+              openDimension={openDimension}
+              error={errorsById[row.id]}
+              hasCoverage={hasCoverage}
+            />
+          ))}
+          {fleet.scoredCount > 1 && (
+            <div className="compare-row compare-row--foot" role="row" aria-label={t('compare.scopeAverage')}>
+              <span className="compare-row__stripe" />
+              <span className="compare-row__rank" />
+              <span className="compare-row__project compare-row__footLabel">{t('compare.scopeAverage')}</span>
+              <span className={`compare-row__score ${scoreColorClass(fleet.score)}`}>{score1(fleet.score)}</span>
+              <span className="compare-row__delta"><TrendBadge delta={fleet.delta} /></span>
+              <span className="compare-row__viol">{nf(fleet.totalViolations)}</span>
+              <span className="compare-row__spark" />
+              <span className="compare-row__dims">
+                {board.map((b) => (
+                  <span key={b.key} className={`compare-dim-avg ${scoreColorClass(b.avg)}`}>
+                    {score1(b.avg)}
+                  </span>
+                ))}
+              </span>
+              {hasCoverage && <span className="compare-row__cov">{fleet.coveragePct != null ? `${fleet.coveragePct}%` : '—'}</span>}
+              <span className="compare-row__last" />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="compare-lower">
+        <section className="compare-panel" aria-label={t('compare.dimensionsAria')}>
+          <div className="compare-panel__head">
+            <SectionLabel>{t('compare.dimensionsHeader', { count: board.length })}</SectionLabel>
+            <span className="compare-panel__note">{t('compare.dimensionsNote')}</span>
+          </div>
+          <ul className="compare-board">
+            {board.map((b) => (
+              <li key={b.key}>
+                <button type="button" className="compare-board__row" onClick={() => openDimension(b.key)}>
+                  <span className="compare-board__label">{b.label}</span>
+                  <span className="compare-board__bars" aria-hidden="true">
+                    {b.perProject.map((p) => (
+                      <span
+                        key={p.id}
+                        className="compare-board__bar"
+                        style={{
+                          height: `${Math.max(15, Math.round(p.score * 10))}%`,
+                          background: scoreGradeColorVar(p.score),
+                        }}
+                        title={`${p.name} · ${score1(p.score)}`}
+                      />
+                    ))}
+                  </span>
+                  <span className={`compare-board__score ${scoreColorClass(b.avg)}`}>{score1(b.avg)}</span>
+                  <span className="compare-board__delta"><TrendBadge delta={b.delta} /></span>
+                  <span className="compare-board__viol">{t('compare.violCount', { count: nf(b.violations) })}</span>
+                  <span className="compare-board__chevron" aria-hidden="true">›</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="compare-panel" aria-label={t('compare.attentionAria')}>
+          <div className="compare-panel__head">
+            <SectionLabel>{t('compare.attentionHeader', { count: attention.length })}</SectionLabel>
+            <span className="compare-panel__note">{t('compare.attentionNote')}</span>
+          </div>
+          <ul className="compare-attention">
+            {attention.map(({ row, level, reasons, worstDim }) => (
+              <li key={row.id} className={`compare-attention__item compare-attention__item--${level}`}>
+                <div className="compare-attention__top">
+                  <button
+                    type="button"
+                    className="compare-attention__name"
+                    onClick={() => onOpenProject(row.id)}
+                  >
+                    {row.name}
+                  </button>
+                  <span className={`compare-attention__level compare-attention__level--${level}`}>
+                    {levelLabel(level)}
+                  </span>
+                </div>
+                <p className="compare-attention__why">
+                  {reasons.map((r) => {
+                    if (r.type === 'worstDim') return t('compare.reasonWorstDim', { dim: r.dim, score: score1(r.score) });
+                    if (r.type === 'declining') return t('compare.reasonDeclining', { delta: r.delta });
+                    if (r.type === 'stale') return t('compare.reasonStale');
+                    if (r.type === 'coverage') return t('compare.reasonCoverage', { pct: r.pct });
+                    return null;
+                  }).filter(Boolean).join(' · ')}
+                </p>
+                {worstDim && (
+                  <button
+                    type="button"
+                    className="compare-attention__link"
+                    onClick={() => openDimension(worstDim)}
+                  >
+                    {t('compare.openDimension', { dim: worstDim })} ›
+                  </button>
+                )}
+              </li>
+            ))}
+            {!attention.length && (
+              <li className="compare-attention__empty">{t('compare.attentionEmpty')}</li>
+            )}
+          </ul>
+        </section>
+      </div>
+    </>
+  );
+}

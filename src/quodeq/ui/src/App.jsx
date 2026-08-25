@@ -17,6 +17,7 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const ComparePage = lazy(() => import('./features/compare/components/ComparePage.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyState from './components/EmptyState.jsx';
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
@@ -56,7 +57,7 @@ import { t } from './strings/index.js';
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
-const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula'];
+const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
 const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
 /**
@@ -310,7 +311,7 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     retryLoadProjects: state.retryLoadProjects,
     warmup: state.warmup,
     loadProjects: state.loadProjects,
-    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
+    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
     handleProjectChange: state.handleProjectChange, navTab, navStackLength,
     handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
     historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
@@ -755,6 +756,23 @@ export const ROUTE_RENDERERS = {
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} projectsLoaded={props.navigation.projectsLoaded} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
+  compare: (params, props) => (
+    <ComparePage
+      projects={props.navigation.projects}
+      projectsLoaded={props.navigation.projectsLoaded}
+      dimension={params.dimension || null}
+      onOpenProject={(id) => {
+        props.navigation.handleProjectChange(id, 'local');
+        props.navigation.navTab('overview');
+      }}
+      // Drill-down is a real nav-stack entry: push from the fleet so the
+      // browser back button returns there; replace when switching between
+      // dimensions so tab-hopping doesn't grow history.
+      onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
+      onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      onBack={props.navigation.navPop}
+    />
+  ),
 };
 
 // The app-level "no local projects" wall in MainContent. Route pages that
@@ -1267,6 +1285,9 @@ export default function App() {
                 hasCurrentProjectRuns,
                 sharedProjectInfo: state.sharedProjectInfo,
               })}
+              // Compare needs two analyzed projects to rank anything; below
+              // that the tab is redundant and stays hidden.
+              showCompareTab={state.projects.filter((p) => (p.runsCount ?? 0) > 0).length >= 2}
               selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,
