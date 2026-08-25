@@ -1,7 +1,30 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import NavBreadcrumb from './NavBreadcrumb.jsx';
+import NavBreadcrumb, { labelFor } from './NavBreadcrumb.jsx';
+
+// Map drill-down entries carry their folder path as a route param (see
+// App.jsx's map renderer); the crumb must read as the folder name so the
+// trail reads map / src / components instead of map / map / map.
+describe('labelFor — map drill-down entries', () => {
+  it('root map entry (no path) keeps the tab label', () => {
+    expect(labelFor({ page: 'map' })).toBe('map');
+    expect(labelFor({ page: 'map', path: '' })).toBe('map');
+  });
+
+  it('a drill-down entry shows the deepest folder name', () => {
+    expect(labelFor({ page: 'map', path: 'src' })).toBe('src');
+    expect(labelFor({ page: 'map', path: 'src/components' })).toBe('components');
+  });
+
+  it('tolerates trailing slashes in the path', () => {
+    expect(labelFor({ page: 'map', path: 'src/app/' })).toBe('app');
+  });
+
+  it('violations entries keep their tab label regardless of the sub-tab param', () => {
+    expect(labelFor({ page: 'violations', subTab: 'dismissed' })).toBe('violations');
+  });
+});
 
 describe('NavBreadcrumb project crumb', () => {
   const stack = [{ page: 'violations' }];
