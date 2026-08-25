@@ -59,16 +59,18 @@ beforeEach(() => {
    switching replaces, back pops. The harness keeps a tiny stack so the
    push/pop contract is exercised, not just a boolean. */
 function NavHarness(props) {
-  const [stack, setStack] = useState([null]);
-  const dimension = stack[stack.length - 1];
+  const [stack, setStack] = useState([{}]);
+  const params = stack[stack.length - 1];
   return (
     <ComparePage
       projects={PROJECTS}
       projectsLoaded
       onOpenProject={vi.fn()}
-      dimension={dimension}
-      onOpenDimension={(key) => setStack((s) => s.concat([key]))}
-      onSwitchDimension={(key) => setStack((s) => s.slice(0, -1).concat([key]))}
+      dimension={params.dimension || null}
+      duel={params.duel || null}
+      onOpenDimension={(key) => setStack((s) => s.concat([{ dimension: key }]))}
+      onSwitchDimension={(key) => setStack((s) => s.slice(0, -1).concat([{ dimension: key }]))}
+      onOpenDuel={(ids) => setStack((s) => s.concat([{ duel: ids }]))}
       onBack={() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s))}
       {...props}
     />
@@ -111,6 +113,31 @@ describe('ComparePage', () => {
     expect(screen.getByText('trails the scope')).toBeInTheDocument();
     await userEvent.click(screen.getByText(/ALL DIMENSIONS/));
     expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
+  });
+
+  it('opens the head-to-head duel when the scope is exactly two projects', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    // Two projects in the fleet = effective scope of two, so the action shows.
+    const cta = await screen.findByText('compare these two');
+    await userEvent.click(cta);
+    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+    // Left minus right: +1.5 shows as the overall gap card and again on the
+    // security dimension and principle rows (7.0 vs 5.5).
+    expect(screen.getAllByText('+1.5').length).toBeGreaterThan(1);
+    expect(screen.getByText('alpha leads by 1.5')).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/ALL PROJECTS/));
+    expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
+  });
+
+  it('hides the duel action when more than two projects are in scope', async () => {
+    renderPage({
+      projects: PROJECTS.concat([{
+        id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
+      }]),
+    });
+    await screen.findByText('gamma');
+    expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
   });
 
   it('marks projects whose summary failed', async () => {
