@@ -8,7 +8,7 @@ import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
-import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
+import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { consequenceOf, consequenceLevel } from '../compareModel.js';
@@ -146,6 +146,12 @@ function ProjectRow({ row, rank, dimOrder, onOpenProject, openDimension, error, 
               <SevBadge level="major" format="count-abbr" count={row.severity.major} />
               <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
             </span>
+          </span>
+          <span
+            className="compare-row__ratio"
+            title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
+          >
+            {complianceRatio(row.totalViolations, row.totalCompliance)}
           </span>
           <span className="compare-row__spark">
             {row.spark.length > 0 && (
@@ -289,6 +295,7 @@ export default function CompareFleetView({
             <span className="compare-row__score">{t('compare.colScore')}</span>
             <span className="compare-row__delta">{t('compare.colDelta')}</span>
             <span className="compare-row__viol">{t('compare.colViolations')}</span>
+            <span className="compare-row__ratio">{t('compare.colRatio')}</span>
             <span className="compare-row__spark">{t('compare.colTrend')}</span>
             <span className="compare-row__dims compare-row__dimsHead">
               {board.map((b) => (
@@ -326,6 +333,7 @@ export default function CompareFleetView({
               <span className={`compare-row__score ${scoreColorClass(fleet.score)}`}>{score1(fleet.score)}</span>
               <span className="compare-row__delta"><TrendBadge delta={fleet.delta} /></span>
               <span className="compare-row__viol">{nf(fleet.totalViolations)}</span>
+              <span className="compare-row__ratio">{complianceRatio(fleet.totalViolations, fleet.totalCompliance)}</span>
               <span className="compare-row__spark" />
               <span className="compare-row__dims">
                 {board.map((b) => (

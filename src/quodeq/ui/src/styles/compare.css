@@ -185,22 +185,9 @@
   overflow: hidden;
 }
 
-.compare-panel__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--color-surface-alt);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.compare-panel__head .term-section-label { margin: 0; }
-
-.compare-panel__note {
-  margin-left: auto;
-  font-size: 10.5px;
-  color: var(--color-text-muted);
-}
+/* .compare-panel__head shares the app's banner-header recipe — the same
+   selector group as the overview panels in terminal.css. Only additions
+   specific to compare belong here. */
 
 .compare-panel__fallback {
   margin: 0;
@@ -269,6 +256,7 @@
 .compare-row__score { width: 88px; flex-shrink: 0; }
 .compare-row__delta { width: 68px; flex-shrink: 0; }
 .compare-row__viol { width: 168px; flex-shrink: 0; }
+.compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
 .compare-row__spark { width: 90px; flex-shrink: 0; }
 .compare-row__dims { flex: 1.6 1 180px; min-width: 150px; }
 .compare-row__cov { width: 86px; flex-shrink: 0; }
@@ -584,7 +572,7 @@
 
 .compare-standings__row {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 92px 64px 64px 110px;
+  grid-template-columns: 26px minmax(0, 1fr) 92px 64px 64px 52px 110px;
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -629,6 +617,12 @@
 }
 
 .compare-standings__viol { font-size: 11px; color: var(--color-text-muted); }
+
+.compare-standings__ratio {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
 
 .compare-standings__pbars {
   display: flex;
@@ -783,15 +777,41 @@
 .compare-principle__lead { color: var(--color-accent); }
 .compare-principle__trail { color: var(--color-sev-critical-text); }
 
+/* Bars follow the STANDINGS order (same slot = same project in every card),
+   each numbered with its standings rank and separated by a faint hairline
+   so a bar can be traced back to the ranked list above. */
 .compare-principle__bars {
   display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 20px;
+  align-items: stretch;
   margin-top: 14px;
 }
 
-.compare-principle__bar { display: block; flex: 1; border-radius: 2px; }
+.compare-principle__slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 3px;
+  border-right: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.compare-principle__slot:last-child { border-right: none; }
+
+.compare-principle__barTrack {
+  display: flex;
+  align-items: flex-end;
+  height: 20px;
+}
+
+.compare-principle__bar { display: block; width: 100%; border-radius: 2px; }
+
+.compare-principle__rank {
+  font-size: 9px;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 
 .compare-principle__caption {
   margin: 7px 0 0;
@@ -1020,6 +1040,7 @@
 
 @media (max-width: 860px) {
   .compare-row__last { display: none; }
+  .compare-row__ratio { display: none; }
   .compare-row__viol { width: 140px; }
   .compare-board__row { grid-template-columns: minmax(0, 1fr) 56px 74px 64px 14px; }
   .compare-board__bars { display: none; }
@@ -1028,5 +1049,6 @@
 @media (max-width: 800px) {
   .compare-standings__row { grid-template-columns: 26px minmax(0, 1fr) 92px 64px; }
   .compare-standings__pbars,
+  .compare-standings__ratio,
   .compare-standings__delta { display: none; }
 }

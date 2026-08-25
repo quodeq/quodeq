@@ -8,8 +8,12 @@ import ComparePage from './ComparePage.jsx';
 vi.mock('../../../api/index.js', () => ({
   getCompareSummary: vi.fn(),
 }));
+vi.mock('../../../api/standards.js', () => ({
+  getStandardsVisibility: vi.fn(),
+}));
 
 import { getCompareSummary } from '../../../api/index.js';
+import { getStandardsVisibility } from '../../../api/standards.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
 
@@ -53,6 +57,8 @@ beforeEach(() => {
   getCompareSummary.mockImplementation((id) => Promise.resolve(
     id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5),
   ));
+  // Null ids = no filtering (fail-open), so most tests see the raw payload.
+  getStandardsVisibility.mockResolvedValue({ visibleStandardIds: null, isDefault: true });
 });
 
 /* Mimics the App wiring: `dimension` is a route param — drilling in pushes,
@@ -138,6 +144,26 @@ describe('ComparePage', () => {
     });
     await screen.findByText('gamma');
     expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
+  });
+
+  it('hides dimensions a project has disabled, like the Overview', async () => {
+    getCompareSummary.mockImplementation(() => Promise.resolve({
+      ...summary(7.0, 7.0),
+      dimensions: [
+        ...summary(7.0, 7.0).dimensions,
+        {
+          dimension: 'Usability',
+          overallScore: '8.0/10',
+          totals: { violationCount: 2, severity: { critical: 0, major: 1, minor: 1 } },
+          principles: [],
+        },
+      ],
+    }));
+    getStandardsVisibility.mockResolvedValue({ visibleStandardIds: ['security'], isDefault: false });
+    renderPage();
+    await screen.findByText('alpha');
+    expect(await screen.findAllByText('security')).not.toHaveLength(0);
+    expect(screen.queryByText('usability')).toBeNull();
   });
 
   it('marks projects whose summary failed', async () => {

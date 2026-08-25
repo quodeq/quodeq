@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
+import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import CompareRadar from './CompareRadar.jsx';
@@ -187,6 +187,12 @@ export default function CompareDimensionView({
                   <span className="compare-standings__viol">
                     {t('compare.violCount', { count: nf(s.violations) })}
                   </span>
+                  <span
+                    className="compare-standings__ratio"
+                    title={t('compare.ratioTip', { pass: nf(s.compliance), checks: nf(s.compliance + s.violations) })}
+                  >
+                    {complianceRatio(s.violations, s.compliance)}
+                  </span>
                   <span className="compare-standings__pbars" aria-hidden="true">
                     {s.principles.filter((p) => p.score != null).map((p) => (
                       <span
@@ -264,13 +270,20 @@ export default function CompareDimensionView({
                 {p.perProject.map((pp) => (
                   <span
                     key={pp.id}
-                    className="compare-principle__bar"
-                    style={{
-                      height: `${Math.max(15, Math.round(pp.score * 10))}%`,
-                      background: scoreGradeColorVar(pp.score),
-                    }}
-                    title={`${pp.name} · ${score1(pp.score)}`}
-                  />
+                    className="compare-principle__slot"
+                    title={`${pp.rank}. ${pp.name} · ${score1(pp.score)}`}
+                  >
+                    <span className="compare-principle__barTrack">
+                      <span
+                        className="compare-principle__bar"
+                        style={{
+                          height: `${Math.max(15, Math.round(pp.score * 10))}%`,
+                          background: scoreGradeColorVar(pp.score),
+                        }}
+                      />
+                    </span>
+                    <span className="compare-principle__rank">{pp.rank}</span>
+                  </span>
                 ))}
               </div>
               <p className="compare-principle__caption">{t('compare.barPerProject')}</p>

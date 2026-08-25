@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseScore10,
   nameKey,
+  applyVisibleStandards,
   trendDelta,
   buildRow,
   consequenceOf,
@@ -97,6 +98,44 @@ test('trendDelta falls back to the oldest entry when all runs are inside the win
 test('trendDelta needs two entries', () => {
   assert.equal(trendDelta([{ dateISO: iso(1), numericAverage: 7 }], NOW).delta, null);
   assert.equal(trendDelta([], NOW).delta, null);
+});
+
+test('applyVisibleStandards hides disabled dimensions and recomputes the summary', () => {
+  const summary = {
+    summary: {
+      numericAverage: 7,
+      totalViolations: 10,
+      totalCompliance: 90,
+      severity: { critical: 2, major: 3, minor: 5 },
+    },
+    dimensions: [
+      { dimension: 'Security', overallScore: '6.0/10', totals: { violationCount: 4, complianceCount: 40, severity: { critical: 2, major: 1, minor: 1 } } },
+      { dimension: 'Usability', overallScore: '8.0/10', totals: { violationCount: 6, complianceCount: 50, severity: { critical: 0, major: 2, minor: 4 } } },
+    ],
+    trend: [
+      { runId: 'r1', dateISO: iso(1), numericAverage: 7, dimensionDetails: [
+        { dimension: 'Security', score: 6 }, { dimension: 'Usability', score: 8 },
+      ] },
+    ],
+  };
+  const filtered = applyVisibleStandards(summary, ['security']);
+  assert.deepEqual(filtered.dimensions.map((d) => d.dimension), ['Security']);
+  assert.equal(filtered.summary.totalViolations, 4);
+  assert.equal(filtered.summary.totalCompliance, 40);
+  assert.equal(filtered.summary.severity.critical, 2);
+  // Trend average recomputed over the visible dimension only.
+  assert.equal(filtered.trend[0].numericAverage, 6);
+  assert.deepEqual(filtered.trend[0].dimensionDetails.map((d) => d.dimension), ['Security']);
+});
+
+test('applyVisibleStandards passes through when nothing is hidden or ids are absent', () => {
+  const summary = {
+    summary: { numericAverage: 7 },
+    dimensions: [{ dimension: 'Security', totals: { violationCount: 1, complianceCount: 1, severity: {} } }],
+    trend: [],
+  };
+  assert.equal(applyVisibleStandards(summary, ['security']), summary);
+  assert.equal(applyVisibleStandards(summary, null), summary);
 });
 
 test('buildRow joins project metadata with the summary payload', () => {
@@ -234,6 +273,9 @@ test('buildDimensionView ranks standings and aggregates principles', () => {
   assert.equal(integ.avg, 7);
   assert.equal(integ.lead.id, 'b');
   assert.equal(integ.trail.id, 'a');
+  // Bars follow the standings order and carry the standings rank, so the
+  // same slot is the same project in every principle card.
+  assert.deepEqual(integ.perProject.map((p) => [p.id, p.rank]), [['b', 1], ['a', 2]]);
   assert.equal(view.weakest.key, 'confidentiality');
 });
 

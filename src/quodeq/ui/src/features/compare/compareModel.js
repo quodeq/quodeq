@@ -8,6 +8,11 @@
  * this module fetches.
  */
 
+import {
+  filterTrendByVisibleStandards,
+  filterAccumulatedByVisibleStandards,
+} from '../../utils/scoreFiltering.js';
+
 // A project counts as stale when its newest run is older than this. Mirrors
 // the "grade measured on old data" idea from the design: the number shown is
 // real but the codebase has moved since.
@@ -38,6 +43,29 @@ export function parseScore10(value) {
 /** Case-insensitive identity for dimension/principle names across projects. */
 export function nameKey(name) {
   return String(name || '').trim().toLowerCase();
+}
+
+/**
+ * Restrict a compare-summary payload to the project's enabled standards,
+ * exactly the way the Overview does it: same filter utils, so the scores,
+ * severity totals and trend averages Compare shows for a project agree with
+ * that project's own Overview. Pass the ids from
+ * GET /projects/{id}/standards-visibility; a null/absent list means "no
+ * filtering" (fail open — data is better than a blank row).
+ */
+export function applyVisibleStandards(summary, visibleIds) {
+  if (!summary || !Array.isArray(visibleIds)) return summary;
+  const visibleSet = new Set(visibleIds.map((id) => nameKey(id)));
+  const dims = summary.dimensions || [];
+  if (dims.every((d) => visibleSet.has(nameKey(d.dimension)))) return summary;
+  const filteredTrend = filterTrendByVisibleStandards(summary.trend || [], visibleSet);
+  const acc = filterAccumulatedByVisibleStandards(
+    { dimensions: dims, summary: summary.summary || {} },
+    visibleSet,
+    filteredTrend,
+    null,
+  );
+  return { ...summary, dimensions: acc.dimensions, summary: acc.summary, trend: filteredTrend };
 }
 
 function daysBetween(isoA, isoB) {
@@ -112,6 +140,7 @@ export function buildRow(project, summary, now) {
       score: parseScore10(d.overallScore),
       grade: d.overallGrade ?? null,
       violations: d.totals?.violationCount ?? 0,
+      compliance: d.totals?.complianceCount ?? 0,
       severity: d.totals?.severity || { critical: 0, major: 0, minor: 0 },
       principles: (d.principles || []).map((p) => ({
         key: nameKey(p.principle || p.name),
@@ -366,7 +395,7 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
         const detail = (e.dimensionDetails || []).find((d) => nameKey(d.dimension) === dimensionKey);
         return detail ? parseScore10(detail.score) : null;
       });
-      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, severity: dim.severity, principles: dim.principles };
+      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, compliance: dim.compliance, severity: dim.severity, principles: dim.principles };
     })
     .sort((a, b) => b.score - a.score);
   const lead = standings[0];
@@ -394,14 +423,23 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   }
   const principles = Array.from(principleKeys.values())
     .map((entry) => {
-      const ranked = entry.perProject.slice().sort((a, b) => b.score - a.score);
+      const byScore = entry.perProject.slice().sort((a, b) => b.score - a.score);
+      // Bars render in the STANDINGS order, not per-principle rank: the same
+      // slot means the same project in every card, and each bar carries its
+      // standings rank so it ties back to the numbered list on screen.
+      const inStandingsOrder = standings
+        .map((s, idx) => {
+          const p = entry.perProject.find((x) => x.id === s.row.id);
+          return p ? { ...p, rank: idx + 1 } : null;
+        })
+        .filter(Boolean);
       return {
         key: entry.key,
         label: entry.label,
-        avg: mean(ranked.map((p) => p.score)),
-        lead: ranked[0] ?? null,
-        trail: ranked.length > 1 ? ranked[ranked.length - 1] : null,
-        perProject: ranked,
+        avg: mean(byScore.map((p) => p.score)),
+        lead: byScore[0] ?? null,
+        trail: byScore.length > 1 ? byScore[byScore.length - 1] : null,
+        perProject: inStandingsOrder,
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
