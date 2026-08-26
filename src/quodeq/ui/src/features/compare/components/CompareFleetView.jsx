@@ -81,7 +81,10 @@ function ScopePicker({
                       checked={on}
                       onChange={() => toggleProject(row.id)}
                     />
-                    <span className="compare-picker__name">{row.name}</span>
+                    <span className="compare-picker__name">
+                      {row.name}
+                      {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
+                    </span>
                     <span
                       className={`compare-picker__score ${scoreColorClass(row.score)}`}
                     >
@@ -140,7 +143,10 @@ function DuelTrigger({ row, targets, onPick }) {
               className="compare-dueltrigger__item"
               onClick={() => { setOpen(false); onPick(other.id); }}
             >
-              <span>{other.name}</span>
+              <span>
+                {other.name}
+                {other.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
+              </span>
               <span className={`compare-dueltrigger__itemScore ${scoreColorClass(other.score)}`}>
                 {score1(other.score)}
               </span>
@@ -236,6 +242,7 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
         <span className="compare-row__project">
           <span className="compare-row__name">{row.name}</span>
           {row.lang && <span className="compare-row__meta">{row.lang}</span>}
+          {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
         </span>
         {row.hasData ? (
           <>

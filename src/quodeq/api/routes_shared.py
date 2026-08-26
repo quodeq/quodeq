@@ -22,6 +22,7 @@ from quodeq.api.import_project import import_zip_stream
 from quodeq.api.zip import _build_project_zip
 from quodeq.core.types import to_camel_dict
 from quodeq.services import _fs_projects, _fs_reports
+from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit
 from quodeq.services.dismissed import load_dismissed
 from quodeq.services.score_cache import score_cache_path_override
@@ -470,6 +471,23 @@ def register_shared_routes(app: Flask) -> None:
         except Exception:
             _logger.exception("Unexpected error fetching shared scores for project %s", project)
             body, status = error_response("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+            return jsonify(body), status
+        if result is None:
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify(result)
+
+    @app.get("/api/shared/projects/<project>/compare-summary")
+    @_with_shared_root
+    def shared_compare_summary(project: str, eval_root: Path, url: str):
+        err = _validate_segment(project)
+        if err:
+            return err
+        try:
+            result = build_compare_summary(eval_root, project)
+        except Exception:
+            _logger.exception("Unexpected error building shared compare summary for project %s", project)
+            body, status = error_response("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
             return jsonify(body), status
         if result is None:
             body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")

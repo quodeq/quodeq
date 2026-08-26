@@ -812,8 +812,10 @@ export const ROUTE_RENDERERS = {
       projects={props.navigation.projects}
       projectsLoaded={props.navigation.projectsLoaded}
       dimension={params.dimension || null}
-      onOpenProject={(id) => {
-        props.navigation.handleProjectChange(id, 'local');
+      onOpenProject={(id, source = 'local') => {
+        // Remote fleet rows open through the shared source; the same
+        // machinery the projects drawer uses for shared selections.
+        props.navigation.handleProjectChange(id, source);
         props.navigation.navTab('overview');
       }}
       // Drill-down is a real nav-stack entry: push from the fleet so the
@@ -1362,8 +1364,13 @@ export default function App() {
                 sharedProjectInfo: state.sharedProjectInfo,
               })}
               // Compare needs two analyzed projects to rank anything; below
-              // that the tab is redundant and stays hidden.
-              showCompareTab={state.projects.filter((p) => (p.runsCount ?? 0) > 0).length >= 2}
+              // that the tab is redundant and stays hidden. Remote projects
+              // from the shared repository count toward the pair: one local
+              // project plus published teammates is a comparable fleet.
+              showCompareTab={(() => {
+                const localWithRuns = state.projects.filter((p) => (p.runsCount ?? 0) > 0).length;
+                return localWithRuns >= 2 || (localWithRuns >= 1 && sharedSignal.hasContent);
+              })()}
               selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,

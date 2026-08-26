@@ -164,6 +164,12 @@ export function buildRow(project, summary, now) {
     .filter((d) => d.key);
   return {
     id,
+    // Remote (shared-repo) rows: `id` is the prefixed fleet-unique key, and
+    // `sourceId` is the raw project id every API call and source-switching
+    // navigation needs. Local rows keep sourceId === id.
+    source: project.source === 'shared' ? 'shared' : 'local',
+    sourceId: project.sourceId || id,
+    remote: project.source === 'shared',
     name: project.displayName || project.name || id,
     lang: topLanguage(project.languageStats),
     totalFiles,
@@ -460,6 +466,9 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
         score: p.score,
         // Everything a click needs to open THIS project's view of THIS
         // principle: the run the number came from and the raw spellings.
+        // Remote rows can't deep-link into local project pages; the click
+        // handler falls back to opening the shared project instead.
+        remote: s.row.remote ?? false,
         principle: p.name,
         runId: s.runId,
         dimName: s.dimName,

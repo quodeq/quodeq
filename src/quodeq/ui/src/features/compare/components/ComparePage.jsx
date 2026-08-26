@@ -20,7 +20,7 @@ import {
   computeComplianceByPrinciple,
 } from '../../explorer/components/explorerDataHooks.js';
 import { t } from '../../../strings/index.js';
-import { useCompareData } from '../hooks/useCompareData.js';
+import { useCompareData, useSharedCompareProjects } from '../hooks/useCompareData.js';
 import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
   buildDimensionView, buildDuelView, sortRows, consequenceOf, consequenceLevel,
@@ -72,7 +72,15 @@ export default function ComparePage({
     () => (projects || []).filter((p) => p && (p.id || p.name)),
     [projects],
   );
-  const { summariesById, errorsById } = useCompareData(localProjects);
+  // Remote projects from the configured shared repository join the fleet as
+  // ordinary rows (empty list when nothing is configured). A project can
+  // exist both locally and remotely; both rows show, the remote one tagged.
+  const sharedProjects = useSharedCompareProjects();
+  const fleetProjects = useMemo(
+    () => localProjects.concat(sharedProjects),
+    [localProjects, sharedProjects],
+  );
+  const { summariesById, errorsById } = useCompareData(fleetProjects);
 
   const view = dimension || 'fleet';
   // Score is the only table ordering (consequence ranked near-inverse of it
@@ -87,9 +95,17 @@ export default function ComparePage({
   const now = useMemo(() => new Date().toISOString(), []);
 
   const rows = useMemo(
-    () => localProjects.map((p) => buildRow(p, summariesById[p.id || p.name], now)),
-    [localProjects, summariesById, now],
+    () => fleetProjects.map((p) => buildRow(p, summariesById[p.id || p.name], now)),
+    [fleetProjects, summariesById, now],
   );
+
+  // Every "open this project" affordance funnels through here: rows carry
+  // their own source, so a remote row switches the app to the shared
+  // source instead of asking the local registry for a project it lacks.
+  const openProject = useCallback((rowId) => {
+    const row = rows.find((r) => r.id === rowId);
+    onOpenProject?.(row?.sourceId ?? rowId, row?.source ?? 'local');
+  }, [rows, onOpenProject]);
 
   const scopeSet = scopeIds == null ? null : new Set(scopeIds);
   const scopeRows = useMemo(
@@ -143,6 +159,10 @@ export default function ComparePage({
   // not change, so browser back pops straight back to this drill-down.
   const queryClient = useQueryClient();
   const openPrinciple = useCallback(async (target) => {
+    // Remote rows can't deep-link into local project pages; opening the
+    // shared project itself is the honest fallback (same degradation the
+    // standings rows use).
+    if (target?.remote) { openProject(target.id); return; }
     if (!onOpenEvalPrincipal || !target?.runId || !target?.dimName) return;
     try {
       const evalData = await queryClient.fetchQuery({
@@ -162,7 +182,7 @@ export default function ComparePage({
       // Fetch failed (run pruned, server hiccup): stay on Compare rather
       // than landing on an empty principle page.
     }
-  }, [onOpenEvalPrincipal, queryClient]);
+  }, [onOpenEvalPrincipal, queryClient, openProject]);
 
   const openDimension = useCallback((key) => {
     setPickerOpen(false);
@@ -221,7 +241,7 @@ export default function ComparePage({
     // A duel can also start from any row's expansion ("compare with…") —
     // no need to narrow the scope to two first.
     openDuelPair: onOpenDuel ? (idA, idB) => onOpenDuel([idA, idB]) : null,
-    onOpenProject,
+    onOpenProject: openProject,
     now,
   };
 
@@ -231,7 +251,7 @@ export default function ComparePage({
         <CompareDuelView
           duel={duelView}
           onBack={onBack}
-          onOpenProject={onOpenProject}
+          onOpenProject={openProject}
         />
       ) : dimensionView ? (
         <CompareDimensionView
@@ -240,7 +260,7 @@ export default function ComparePage({
           fleet={fleet}
           onBack={onBack}
           onOpenDimension={openDimension}
-          onOpenProject={onOpenProject}
+          onOpenProject={openProject}
           onOpenPrinciple={openPrinciple}
           onOpenProjectDimension={onOpenProjectDimension}
         />

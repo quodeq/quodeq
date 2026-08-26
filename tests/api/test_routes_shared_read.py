@@ -381,6 +381,38 @@ def test_shared_scores_uses_isolated_score_cache(client, shared_clone_fixture):
     assert cache_path.exists()
 
 
+# --- GET /api/shared/projects/<project>/compare-summary -----------------------
+
+def test_shared_compare_summary(client, shared_clone_fixture):
+    """The Compare tab's slim payload served from the shared clone's own
+    evaluations root: same shape as the local endpoint, findings stripped."""
+    resp = client.get("/api/shared/projects/proj-a/compare-summary")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["project"] == "proj-a"
+    assert "summary" in body
+    assert "trend" in body
+    assert isinstance(body["dimensions"], list)
+    for dim in body["dimensions"]:
+        assert "violations" not in dim
+        assert "compliance" not in dim
+    # The clone records the publisher's repo path, which does not exist
+    # here — the staleness signal must fail open, not error.
+    assert body["commitsSinceLastRun"] is None or isinstance(body["commitsSinceLastRun"], int)
+
+
+def test_shared_compare_summary_not_found(client, shared_clone_fixture):
+    resp = client.get("/api/shared/projects/does-not-exist/compare-summary")
+    assert resp.status_code == 404
+
+
+def test_shared_compare_summary_unconfigured_409(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    resp = client.get("/api/shared/projects/proj-a/compare-summary")
+    assert resp.status_code == 409
+    assert resp.get_json()["error"] == "no shared repository configured"
+
+
 # --- GET /api/shared/projects/<project>/scores/<run_id> -----------------------
 
 def test_shared_run_scores(client, shared_clone_fixture):
