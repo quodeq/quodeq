@@ -512,6 +512,15 @@
 
 .compare-board__score { font-size: 13px; text-align: right; }
 .compare-board__delta { text-align: right; }
+
+/* The delta annotates the score and must not outshout it: caption-size
+   inside board cells, the same treatment the Overview's gauge cards give
+   their trend badge. */
+.compare-board__delta .trend-badge {
+  font-size: 10.5px;
+  padding: 0;
+  gap: 2px;
+}
 .compare-board__viol { font-size: 11px; color: var(--color-text-muted); text-align: right; }
 .compare-board__chevron { font-size: 12px; color: var(--color-text-subtle); text-align: right; }
 
