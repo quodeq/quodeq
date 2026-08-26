@@ -325,8 +325,6 @@
   color: var(--color-text-muted);
 }
 
-.compare-rowdetail__hint { font-size: 10px; }
-
 .compare-rowdetail__stale { color: var(--color-warning-text); }
 
 /* Severity as plain coloured text (the design's "7c 275m 984n"). */
@@ -878,11 +876,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.compare-principle__caption {
-  margin: 7px 0 0;
-  font-size: 9.5px;
-  color: var(--color-text-muted);
-}
 
 /* ── duel (head to head) ──────────────────────────────────────────────
    Side identity is fixed and colour-coded everywhere: project A (left)

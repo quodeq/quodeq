@@ -98,10 +98,7 @@ function RowDetail({ row, openDimension, onOpenProject }) {
           <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
         </span>
         {row.spark.length > 1 && (
-          <>
-            <CompareTrendLine scores={row.spark} />
-            <span className="compare-rowdetail__hint">{t('compare.detailTrendHint')}</span>
-          </>
+          <CompareTrendLine scores={row.spark} />
         )}
         {row.coveragePct != null && (
           <span className={row.coveragePct < 80 ? 'compare-row__cov--low' : undefined}>

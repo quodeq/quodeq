@@ -314,7 +314,6 @@ export default function CompareDimensionView({
                   </button>
                 ))}
               </div>
-              <p className="compare-principle__caption">{t('compare.barPerProject')}</p>
             </article>
           ))}
         </div>
