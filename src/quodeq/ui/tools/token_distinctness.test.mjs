@@ -6,9 +6,8 @@
  * and restored the original v1.9.1 grade palette, which shares the red
  * channel with severity and rides the accent at the top tier. What remains
  * guarded: grade steps stay mutually legible and grade text stays readable
- * at the restored palette's own baseline, compliance stays off the accent,
- * and the duel identity colors stay apart from each other and from every
- * grade tier.
+ * at the restored palette's own baseline, and the duel identity colors
+ * stay apart from each other and from every grade tier.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,12 +46,12 @@ test('deltaE matches known reference points', () => {
   assert.equal(deltaE(parseColor('#b00a14'), parseColor('#b00a14')), 0);
 });
 
-test('grade legibility, compliance, and duel identity hold in every theme', () => {
+test('grade legibility and duel identity hold in every theme', () => {
   const { results, failures } = auditDistinctness(css);
-  // 12 contexts x (15 contrast + 10 grade-step + 1 compliance + 1 duel
-  // sides + 3 duel-b contrast + 5 duel-b-vs-grade) = 420 — if this
-  // shrinks, the parser stopped seeing part of the matrix and the guard
-  // is weaker than it looks.
+  // 12 contexts x (15 contrast + 10 grade-step + 1 duel sides + 3 duel-b
+  // contrast + 5 duel-b-vs-grade) = 408 — if this shrinks, the parser
+  // stopped seeing part of the matrix and the guard is weaker than it
+  // looks.
   assert.ok(results.length >= 400, `matrix shrank: only ${results.length} checks ran`);
   const table = failures
     .map((f) => `  ${f.theme}: ${f.rule} ${f.a} vs ${f.b} = ${f.value} (min ${f.min} ${f.kind})`)

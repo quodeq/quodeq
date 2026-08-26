@@ -19,7 +19,6 @@ import { t } from '../../../strings/index.js';
 import {
   cssVar,
   scoreBarColor,
-  scoreDomain,
   refLineValues,
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
@@ -75,7 +74,6 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
     const point = data[idx];
     if (point?.runId) onBarClick?.(point);
   };
-  const domain = scoreDomain(data.map((d) => d.numericAverage));
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
       <ComposedChart
@@ -93,16 +91,13 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
           </linearGradient>
         </defs>
         <XAxis dataKey="dateLabel" hide />
-        {/* Bars stay absolute (0-10: a 7 fills 70%); only the line and its
-            grid ride the data-fitted domain so the shape stays visible. */}
-        <YAxis yAxisId="abs" domain={[0, 10]} hide />
-        <YAxis yAxisId="shape" domain={domain} hide />
+        <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<DimensionTooltip />} />
-        {refLineValues(domain).map((y, i) => (
-          <ReferenceLine key={y} yAxisId="shape" y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+        {refLineValues([0, 10]).map((y, i) => (
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
         ))}
-        <Area yAxisId="shape" dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
-        <Bar yAxisId="abs" dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>
+        <Area dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
+        <Bar dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>
           {data.map((entry, i) => (
             <Cell
               key={entry.runId ?? i}
@@ -114,7 +109,6 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
           ))}
         </Bar>
         <Line
-          yAxisId="shape"
           isAnimationActive={false}
           dataKey="numericAverage"
           type="monotone"
