@@ -315,22 +315,24 @@
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
 
-  /* Grade tier colors. Every theme follows the same rule: grades are a
-     metallic shine ramp (gold A, silver B, then duller metal down to lead F)
-     in a hue band that theme's severity ramp does not use, so a bad grade
-     and a severe finding never share a color. Severity keeps the vivid
-     warm/danger channel; grades own the metal channel. Enforced by
-     tools/token_distinctness.mjs. */
+  /* Grade tier colors. Every theme follows the same rule: grades live in
+     a hue band that theme's severity ramp does not use, so a bad grade and
+     a severe finding never share a color (enforced by
+     tools/token_distinctness.mjs). Daruma's ramp: gold A and silver B,
+     then a CAUTION descent (ochre -> deep orange -> brick) instead of dull
+     metal, because bronze reads as gold at gauge size and a bad grade must
+     not look decorated. The caution hexes are hue-shifted off the severity
+     pinks/reds to keep the channels apart. */
   --color-grade-top-text:    #a87e00;
   --color-grade-top-bg:      color-mix(in srgb, #a87e00 14%, transparent);
   --color-grade-high-text:   #566a82;
   --color-grade-high-bg:     color-mix(in srgb, #566a82 12%, transparent);
-  --color-grade-mid-text:    #8a621e;
-  --color-grade-mid-bg:      color-mix(in srgb, #8a621e 12%, transparent);
-  --color-grade-low-text:    #63491a;
-  --color-grade-low-bg:      color-mix(in srgb, #63491a 12%, transparent);
-  --color-grade-bottom-text: #3e332c;
-  --color-grade-bottom-bg:   color-mix(in srgb, #3e332c 12%, transparent);
+  --color-grade-mid-text:    #9a5a20;
+  --color-grade-mid-bg:      color-mix(in srgb, #9a5a20 12%, transparent);
+  --color-grade-low-text:    #84431c;
+  --color-grade-low-bg:      color-mix(in srgb, #84431c 12%, transparent);
+  --color-grade-bottom-text: #62342a;
+  --color-grade-bottom-bg:   color-mix(in srgb, #62342a 12%, transparent);
 
   /* Trend — default is light; dark themes override below */
   --color-trend-strong-up:   #e0a800;
@@ -445,12 +447,12 @@
     --color-grade-top-bg:      color-mix(in srgb, #f2c14e 12%, transparent);
     --color-grade-high-text:   var(--primitive-brand-300);
     --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 12%, transparent);
-    --color-grade-mid-text:    #c08c50;
-    --color-grade-mid-bg:      color-mix(in srgb, #c08c50 12%, transparent);
-    --color-grade-low-text:    #96805e;
-    --color-grade-low-bg:      color-mix(in srgb, #96805e 13%, transparent);
-    --color-grade-bottom-text: #76706a;
-    --color-grade-bottom-bg:   color-mix(in srgb, #76706a 12%, transparent);
+    --color-grade-mid-text:    #ce7e3c;
+    --color-grade-mid-bg:      color-mix(in srgb, #ce7e3c 12%, transparent);
+    --color-grade-low-text:    #c26648;
+    --color-grade-low-bg:      color-mix(in srgb, #c26648 13%, transparent);
+    --color-grade-bottom-text: #aa5858;
+    --color-grade-bottom-bg:   color-mix(in srgb, #aa5858 12%, transparent);
 
     --color-warning:      var(--primitive-amber-400);
     --color-info:         var(--primitive-cyan-400);
@@ -576,12 +578,12 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-grade-top-bg:      color-mix(in srgb, #f2c14e 12%, transparent);
   --color-grade-high-text:   var(--primitive-brand-300);
   --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 12%, transparent);
-  --color-grade-mid-text:    #c08c50;
-  --color-grade-mid-bg:      color-mix(in srgb, #c08c50 12%, transparent);
-  --color-grade-low-text:    #96805e;
-  --color-grade-low-bg:      color-mix(in srgb, #96805e 13%, transparent);
-  --color-grade-bottom-text: #76706a;
-  --color-grade-bottom-bg:   color-mix(in srgb, #76706a 12%, transparent);
+  --color-grade-mid-text:    #ce7e3c;
+  --color-grade-mid-bg:      color-mix(in srgb, #ce7e3c 12%, transparent);
+  --color-grade-low-text:    #c26648;
+  --color-grade-low-bg:      color-mix(in srgb, #c26648 13%, transparent);
+  --color-grade-bottom-text: #aa5858;
+  --color-grade-bottom-bg:   color-mix(in srgb, #aa5858 12%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
   --color-info:         var(--primitive-cyan-400);
@@ -663,12 +665,12 @@ html[data-theme="light"]:root, [data-theme="light"] {
   --color-grade-top-bg:      color-mix(in srgb, #a87e00 14%, transparent);
   --color-grade-high-text:   #566a82;
   --color-grade-high-bg:     color-mix(in srgb, #566a82 12%, transparent);
-  --color-grade-mid-text:    #8a621e;
-  --color-grade-mid-bg:      color-mix(in srgb, #8a621e 12%, transparent);
-  --color-grade-low-text:    #63491a;
-  --color-grade-low-bg:      color-mix(in srgb, #63491a 12%, transparent);
-  --color-grade-bottom-text: #3e332c;
-  --color-grade-bottom-bg:   color-mix(in srgb, #3e332c 12%, transparent);
+  --color-grade-mid-text:    #9a5a20;
+  --color-grade-mid-bg:      color-mix(in srgb, #9a5a20 12%, transparent);
+  --color-grade-low-text:    #84431c;
+  --color-grade-low-bg:      color-mix(in srgb, #84431c 12%, transparent);
+  --color-grade-bottom-text: #62342a;
+  --color-grade-bottom-bg:   color-mix(in srgb, #62342a 12%, transparent);
 
   /* Warning */
   --color-warning:      var(--primitive-amber-700);
