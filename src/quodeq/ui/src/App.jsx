@@ -714,8 +714,13 @@ export const ROUTE_RENDERERS = {
       severityFilter={params.severityFilter || params.severity || null}
       onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
-        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
-        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
+        // The entry's own project, not the global selection: a file opened
+        // from a cross-project explorer (fromProject) must dismiss into the
+        // project the finding belongs to. Same identity rule as the
+        // evalprinciple route.
+        const targetProject = params.fromProject || props.navigation.selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -735,8 +740,10 @@ export const ROUTE_RENDERERS = {
       dimension={params.dimension}
       onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
-        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
-        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
+        // Same identity rule as the file and evalprinciple routes.
+        const targetProject = params.fromProject || props.navigation.selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a

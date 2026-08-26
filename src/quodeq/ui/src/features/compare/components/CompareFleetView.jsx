@@ -303,14 +303,16 @@ export default function CompareFleetView({
           })}
         />
         <Stat
-          label={t('compare.cardMeasurement')}
-          value={fleet.coveragePct != null ? `${fleet.coveragePct}%` : String(fleet.staleCount)}
-          hint={fleet.coveragePct == null
-            ? (fleet.staleCount ? t('compare.staleHint') : t('compare.allCurrent'))
-            : (fleet.staleCount
-              ? t('compare.staleNote', { count: fleet.staleCount })
-              : t('compare.allCurrent'))}
-          tone={fleet.staleCount ? 'warning' : 'default'}
+          label={t('compare.cardSpread')}
+          value={fleet.spread != null ? score1(fleet.spread) : '—'}
+          hint={fleet.lead && fleet.trail
+            ? t('compare.spreadNote', {
+              lead: fleet.lead.name,
+              leadScore: score1(fleet.lead.score),
+              trail: fleet.trail.name,
+              trailScore: score1(fleet.trail.score),
+            })
+            : t('compare.needTwo')}
         />
       </StatStrip>
 

@@ -228,6 +228,10 @@ test('buildFleet aggregates severity, compliance and coverage', () => {
   assert.equal(fleet.passPct, 90);
   assert.equal(fleet.coveragePct, 90);
   assert.equal(fleet.staleCount, 0);
+  // Fleet spread: best minus worst scored project.
+  assert.equal(fleet.spread, 2);
+  assert.equal(fleet.lead.id, 'b');
+  assert.equal(fleet.trail.id, 'a');
 });
 
 const DIM_SEC = (score) => ({

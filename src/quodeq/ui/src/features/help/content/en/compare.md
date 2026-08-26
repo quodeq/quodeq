@@ -4,7 +4,7 @@ The **Compare** tab ranks every local project side by side. It appears in the si
 
 ### Reading the fleet
 
-- **Stat cards** the scope-wide picture: average score with its 30-day delta, violations by severity, compliance percentage, and how many grades were measured on stale data.
+- **Stat cards** the scope-wide picture: average score with its 30-day delta, violations by severity, compliance percentage, and the spread between the best and worst project.
 - **Needs attention** the actionable summary, ranked by *consequence*: how bad a score is, weighted by project size and staleness. Each card names the reason (weakest dimension, decline over 30 days, code moved since the scan, thin coverage) and links straight into the relevant dimension. The marker colour is the project's grade colour.
 - **Projects table** one line per project: rank, score with tier, the 30-day delta, violations, the compliance-to-violations ratio, and the last evaluation. A dimmed delta means every run predates the 30-day window; it then shows the change at the last evaluation instead. Sorting is by score, and the toggle flips best-first / worst-first.
 

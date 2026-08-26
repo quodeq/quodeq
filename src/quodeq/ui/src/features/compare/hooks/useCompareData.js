@@ -46,7 +46,13 @@ export function useCompareData(projects) {
       return {
         ...QUERY_DEFAULTS,
         queryKey: projectKeys.standardsVisibility(id),
-        queryFn: () => getStandardsVisibility(id),
+        // A 404 here means the project has no standards context at all
+        // (e.g. a mis-registered path with zero runs) — that is "use the
+        // defaults", not an error worth retrying.
+        queryFn: () => getStandardsVisibility(id).catch((e) => {
+          if (e?.status === 404) return { visibleStandardIds: null, isDefault: true };
+          throw e;
+        }),
         // Visibility is a tiny payload the user can change from the
         // Standards screen at any moment: always re-read on mount (the
         // toggle also invalidates this key) so a disabled standard never

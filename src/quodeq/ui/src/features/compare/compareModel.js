@@ -245,7 +245,16 @@ export function buildFleet(rows) {
   const covered = scored.filter((r) => r.coveragePct != null);
   const analyzed = covered.reduce((a, r) => a + (r.analyzedFiles || 0), 0);
   const coverageBase = covered.reduce((a, r) => a + (r.totalFiles || 0), 0);
+  // Fleet spread: how uneven the scope is, best project minus worst.
+  const byScore = scored.slice().sort((a, b) => b.score - a.score);
+  const lead = byScore[0] ?? null;
+  const trail = byScore.length > 1 ? byScore[byScore.length - 1] : null;
   return {
+    lead,
+    trail,
+    spread: lead && trail
+      ? Math.round((lead.score - trail.score) * 10) / 10
+      : null,
     count: rows.length,
     scoredCount: scored.length,
     totalFiles,

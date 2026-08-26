@@ -371,8 +371,16 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             # behind that the caller has no way to recover from.
             local_candidate = Path(repo)
             if not local_candidate.exists() or not local_candidate.is_dir():
+                # Say WHICH mistake it was: a path at a file is a different
+                # user error from a missing path (a real registration once
+                # slipped through as .../lib/player.js).
+                detail = (
+                    "points at a file, not a directory"
+                    if local_candidate.exists()
+                    else "does not exist"
+                )
                 body, status = error_response(
-                    "Local repo path does not exist or is not a directory",
+                    f"Local repo path {detail}",
                     HTTPStatus.BAD_REQUEST,
                     "INVALID_REPO",
                 )
