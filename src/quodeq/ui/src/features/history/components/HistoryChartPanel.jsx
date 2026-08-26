@@ -16,9 +16,8 @@ import {
 import {
   cssVar,
   scoreBarColor,
-  REF_LINE_LOW,
-  REF_LINE_MID,
-  REF_LINE_HIGH,
+  scoreDomain,
+  refLineValues,
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
@@ -27,8 +26,6 @@ import {
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = HISTORY_CHART_HEIGHT;
-const REF_LINE_FLOOR = 0;
-const REF_LINE_CEIL = 10;
 const HOVER_STROKE_WIDTH = 1.5;
 const TREND_LINE_STROKE_WIDTH = 2;
 const TREND_LINE_OPACITY = 0.9;
@@ -85,6 +82,7 @@ function ScoreHistoryChart({ data, interaction }) {
     const runId = data[idx]?.runId;
     if (runId) onBarClick?.(runId);
   };
+  const domain = scoreDomain(data.map((d) => d.numericAverage));
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
       <ComposedChart
@@ -96,13 +94,11 @@ function ScoreHistoryChart({ data, interaction }) {
         style={onBarClick ? { cursor: 'pointer' } : undefined}
       >
         <XAxis dataKey="dateLabel" hide />
-        <YAxis domain={[0, 10]} hide />
+        <YAxis domain={domain} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
-        <ReferenceLine y={REF_LINE_FLOOR} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-        <ReferenceLine y={REF_LINE_LOW}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.2} />
-        <ReferenceLine y={REF_LINE_MID}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-        <ReferenceLine y={REF_LINE_HIGH}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.2} />
-        <ReferenceLine y={REF_LINE_CEIL}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+        {refLineValues(domain).map((y, i) => (
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+        ))}
         <Bar
           dataKey="numericAverage"
           radius={[0, 0, 0, 0]}
