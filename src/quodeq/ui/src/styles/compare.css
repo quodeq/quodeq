@@ -339,7 +339,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 2px 16px 12px 41px; /* aligns under the project column */
+  /* Left edge aligns under the project column; 10px top so the facts line
+     breathes below the row instead of hugging it. */
+  padding: 10px 16px 12px 41px;
 }
 
 /* Header row of the expansion: facts left, actions right on one line so
