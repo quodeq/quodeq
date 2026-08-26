@@ -111,6 +111,11 @@ function RowDetail({ row, openDimension, onOpenProject }) {
         {row.totalFiles != null && (
           <span>{t('compare.filesSuffix', { count: nf(row.totalFiles) })}</span>
         )}
+        {row.commitsSince != null && row.commitsSince > 0 && (
+          <span className="compare-rowdetail__stale">
+            {t('compare.commitsSince', { count: nf(row.commitsSince) })}
+          </span>
+        )}
       </div>
       <div className="compare-rowdetail__dims">
         {row.dims.filter((d) => d.score != null).map((dim) => (
@@ -179,7 +184,12 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
             >
               {complianceRatio(row.totalViolations, row.totalCompliance)}
             </span>
-            <span className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}>
+            <span
+              className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}
+              title={row.commitsSince != null && row.commitsSince > 0
+                ? t('compare.commitsSince', { count: nf(row.commitsSince) })
+                : undefined}
+            >
               {relativeTime(row.lastISO) || '—'}
             </span>
             <span className="compare-row__chev" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
@@ -328,7 +338,11 @@ export default function CompareFleetView({
                   {reasons.map((r) => {
                     if (r.type === 'worstDim') return t('compare.reasonWorstDim', { dim: r.dim, score: score1(r.score) });
                     if (r.type === 'declining') return t('compare.reasonDeclining', { delta: r.delta });
-                    if (r.type === 'stale') return t('compare.reasonStale');
+                    if (r.type === 'stale') {
+                      return r.commits != null
+                        ? t('compare.reasonStaleCommits', { count: nf(r.commits) })
+                        : t('compare.reasonStale');
+                    }
                     if (r.type === 'coverage') return t('compare.reasonCoverage', { pct: r.pct });
                     return null;
                   }).filter(Boolean).join(' · ')}

@@ -323,6 +323,8 @@
 
 .compare-rowdetail__hint { font-size: 10px; }
 
+.compare-rowdetail__stale { color: var(--color-warning-text); }
+
 /* Severity as plain coloured text (the design's "7c 275m 984n"). */
 .compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
 .compare-row__sev .term-sev-badge { border: none; background: transparent; padding: 0; }

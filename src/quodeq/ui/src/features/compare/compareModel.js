@@ -13,9 +13,10 @@ import {
   filterAccumulatedByVisibleStandards,
 } from '../../utils/scoreFiltering.js';
 
-// A project counts as stale when its newest run is older than this. Mirrors
-// the "grade measured on old data" idea from the design: the number shown is
-// real but the codebase has moved since.
+// Staleness means "the code moved since the grade was measured". The real
+// signal is commitsSinceLastRun from the backend (git commits since the last
+// scored run); the age fallback below only applies when that signal is
+// unknowable (repo missing, no git, online project).
 export const STALE_AFTER_DAYS = 7;
 
 // Delta window: the "30d" column. Baseline is the newest run at or before
@@ -129,7 +130,12 @@ export function buildRow(project, summary, now) {
   const score = s?.numericAverage ?? null;
   const lastISO = summary?.lastRun?.dateISO || project.latestDate || null;
   const ageDays = lastISO ? daysBetween(lastISO, now) : null;
-  const stale = ageDays != null && ageDays > STALE_AFTER_DAYS;
+  const commitsSince = summary?.commitsSinceLastRun ?? null;
+  // Code moved since the last scored run -> the grade is provisional. Only
+  // when the commit count is unknowable does plain age stand in for it.
+  const stale = commitsSince != null
+    ? commitsSince > 0
+    : ageDays != null && ageDays > STALE_AFTER_DAYS;
   const totalFiles = project.totalFiles ?? project.filesCount ?? null;
   const analyzedFiles = project.analyzedFiles ?? null;
   const { delta, lastDelta, spark } = trendDelta(summary?.trend, now);
@@ -168,6 +174,7 @@ export function buildRow(project, summary, now) {
     totalCompliance: s?.totalCompliance ?? 0,
     lastISO,
     stale,
+    commitsSince,
     hasRuns: (project.runsCount ?? 0) > 0 || (summary?.runsCount ?? 0) > 0,
     loaded: summary !== undefined,
     hasData: score != null,
@@ -300,7 +307,7 @@ export function buildAttention(rows, limit = 3) {
       const reasons = [];
       if (worst) reasons.push({ type: 'worstDim', dim: worst.label, score: worst.score });
       if (row.delta != null && row.delta <= -0.3) reasons.push({ type: 'declining', delta: row.delta });
-      if (row.stale) reasons.push({ type: 'stale' });
+      if (row.stale) reasons.push({ type: 'stale', commits: row.commitsSince });
       if (row.coveragePct != null && row.coveragePct < 80) {
         reasons.push({ type: 'coverage', pct: row.coveragePct });
       }
