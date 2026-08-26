@@ -1898,6 +1898,15 @@ textarea:focus {
   animation: loading-fadein 500ms ease;
 }
 
+/* Opaque ground for the fullscreen loader: the startup hold (App.jsx
+   linger) keeps it up while real content commits BENEATH it, so without a
+   background the logo floats over the half-built page it exists to cover.
+   Fullscreen only -- the inline variant overlays already-rendered pages by
+   design and must stay transparent. */
+.loading-screen:not(.loading-screen--inline) {
+  background: var(--color-bg);
+}
+
 /* Contained variant for loaders mounted within an already-rendered page (see
    LoadingScreen.jsx's `variant` prop). Scoped to the nearest positioned
    ancestor -- `main.dashboard` -- instead of the viewport, so it never covers
