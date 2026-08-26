@@ -38,14 +38,21 @@ export const SEV_TOKENS = [
 // Minimum CIE76 delta-E between…
 export const MIN_DUEL_SIDES = 20;        // duel side A (accent) vs side B — identity must survive
 export const MIN_DUEL_VS_GRADE = 20;     // duel side B vs any grade tier — identity is not a judgement
-export const MIN_GRADE_VS_SEV = 20;      // any grade color and any severity color
-export const MIN_GRADE_VS_ACCENT = 20;   // any grade color and the accent
 export const MIN_COMPLIANCE_VS_ACCENT = 20; // compliance and the accent
-export const MIN_GRADE_STEP = 10;        // any two grade steps (mutual legibility)
 
-// Grade text sits in chips/gauges over every surface; hold it to the WCAG
-// UI-component floor so no theme ships an unreadable tier.
-export const MIN_GRADE_CONTRAST = 3.0;
+// There is deliberately NO grade-vs-severity or grade-vs-accent rule. The
+// 2026-08-25 recolor that introduced them (metallic ramp, then a caution
+// descent) was rejected by the user, who chose the original v1.9.1 grade
+// palette: it lives in the red channel severity also uses, and its top
+// tier rides the accent in dark themes. That sharing is the accepted
+// design; chip vs score context disambiguates.
+
+// The two floors below are grandfathered at the v1.9.1 palette's own
+// worst values (low-vs-bottom step 4.9, gold-on-light contrast 1.9).
+// They no longer assert WCAG; they exist so future edits cannot regress
+// BELOW the baseline the user chose.
+export const MIN_GRADE_STEP = 4.5;       // any two grade steps (mutual legibility)
+export const MIN_GRADE_CONTRAST = 1.8;
 export const SURFACE_TOKENS = ['--color-bg', '--color-surface', '--color-surface-alt'];
 
 const FAMILIES = ['neo', 'galadriel', 'ifrit', 'deckard'];
@@ -206,17 +213,10 @@ export function auditDistinctness(cssText) {
   for (const [theme, vars] of Object.entries(themes)) {
     const color = (token) => parseColor(resolveVar(vars, token));
     const grades = GRADE_TOKENS.map((t) => [t, color(t)]).filter(([, c]) => c);
-    const sevs = SEV_TOKENS.map((t) => [t, color(t)]).filter(([, c]) => c);
     const accent = color('--color-accent');
     const compliance = color('--color-compliance');
 
     for (const [g, gc] of grades) {
-      for (const [s, sc] of sevs) {
-        push(theme, 'grade-vs-severity', g, s, deltaE(gc, sc), MIN_GRADE_VS_SEV, 'deltaE');
-      }
-      if (accent) {
-        push(theme, 'grade-vs-accent', g, '--color-accent', deltaE(gc, accent), MIN_GRADE_VS_ACCENT, 'deltaE');
-      }
       for (const surface of SURFACE_TOKENS) {
         const bg = color(surface);
         if (bg) push(theme, 'grade-contrast', g, surface, contrastRatio(gc, bg), MIN_GRADE_CONTRAST, 'contrast');
