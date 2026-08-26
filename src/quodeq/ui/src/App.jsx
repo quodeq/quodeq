@@ -34,9 +34,15 @@ import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.j
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
-import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
+import { useOneShotGate } from './hooks/useOneShotGate.js';
+import { useLinger } from './hooks/useLinger.js';
+import { warmOverviewChunks } from './bootChunks.js';
+
+// How long the startup loader stays opaque after its data-hold releases,
+// covering the overview's final commit (lazy chart first render).
+const STARTUP_LOADER_LINGER_MS = 250;
 import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
@@ -456,6 +462,33 @@ export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCou
   if (selectedSource === 'shared') return false;
   if (!sharedHasContent) return false;
   return activeTab === 'overview';
+}
+
+/**
+ * Startup-loader hold. Dropping the loader at projectsLoaded hands the user
+ * a skeleton flash (loader > skeleton > data) on every boot, so on the
+ * default Overview landing it holds until the Overview's data is actually
+ * in. It must drop the moment we know no data is coming: load failure,
+ * zero local projects, nothing selected, a query error, a restored
+ * non-overview tab, or the queries settling empty (`loading` false covers
+ * a project with no completed evaluations, whose `accumulated` stays null
+ * forever) — every one of those renders its own state and an overlay
+ * would wall it off forever. This describes a STATE, not "booting": the
+ * caller must scope it with useOneShotGate or a mid-session project
+ * switch re-triggers it. Exported for unit tests.
+ */
+export function shouldShowStartupLoader({
+  projectsLoaded, projectsLoadFailed, projectsCount, selectedProject,
+  selectedSource, activeTab, dashboard, accumulated, error, loading,
+}) {
+  if (projectsLoadFailed) return false;
+  if (!projectsLoaded) return true;
+  if (activeTab !== 'overview') return false;
+  if ((projectsCount ?? 0) === 0 && selectedSource !== 'shared') return false;
+  if (!selectedProject) return false;
+  if (error) return false;
+  if (dashboard && accumulated) return false;
+  return !!loading;
 }
 
 function renderEvalPrincipleDetail(params, props) {
@@ -1004,6 +1037,10 @@ export default function App() {
   const { dismissFinding } = useApi();
   const queryClient = useQueryClient();
   const state = useAppState();
+  // Warm the Overview's lazy chunks (DashboardPage + the recharts chart)
+  // while the startup loader is up — see bootChunks.js for why page-mount
+  // time measured too late.
+  useEffect(() => { warmOverviewChunks(); }, []);
   // Passive shared-repo content signal driving the zero-local-projects flow:
   // wizard auto-open (below), the one-shot landing redirect, and the
   // "browse remote repositories" empty-state actions. Same react-query cache
@@ -1163,6 +1200,26 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
+  // One-shot: the hold predicate describes a state a mid-session project
+  // switch re-enters (Compare's open-project lands on a not-yet-loaded
+  // overview); the gate makes sure the fullscreen loader is boot-only —
+  // after it drops once, switches get the overview skeleton instead.
+  const startupHoldActive = useOneShotGate(shouldShowStartupLoader({
+    projectsLoaded: state.projectsLoaded,
+    projectsLoadFailed: state.projectsLoadFailed,
+    projectsCount: state.projects.length,
+    selectedProject: state.selectedProject,
+    selectedSource: state.selectedSource,
+    activeTab,
+    dashboard: state.dashboard,
+    accumulated: state.accumulated,
+    error: state.error,
+    loading: state.loading,
+  }));
+  // Linger a beat after the hold drops so the overview's final commit (the
+  // lazy chart's first render, ~200ms) happens under a still-opaque loader;
+  // the fade then reveals a finished page instead of a chart placeholder.
+  const showStartupLoader = useLinger(startupHoldActive, STARTUP_LOADER_LINGER_MS);
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
@@ -1416,6 +1473,19 @@ export default function App() {
             />
           }
           content={
+            <>
+              {/* One stable mount for the startup loader, OUTSIDE the
+                  Suspense: inside it, a lazy chunk's suspension unmounts the
+                  loader itself and the plain fallback restarts the fade and
+                  tips from zero (a loader-to-loader flash). Out here it
+                  covers chunk loads AND holds through the Overview's first
+                  data (shouldShowStartupLoader), so boot goes loader ->
+                  content with no skeleton in between. */}
+              <FadingLoadingScreen
+                show={showStartupLoader}
+                tips
+                warmup={state.warmup}
+              />
             <Suspense fallback={<LoadingScreen />}>
               {/* Every route, not just Evaluate. A dead backend is the one
                   failure no page can render around: the Overview's own wall
@@ -1425,16 +1495,6 @@ export default function App() {
               {!state.serverConnected && (
                 <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
               )}
-              {/* One stable mount for the startup loader: it covers every
-                  route's not-yet-loaded state and fades out when the projects
-                  land, instead of each gate ripping its own copy out of the
-                  DOM on the same frame the content appears. */}
-              <FadingLoadingScreen
-                show={!state.projectsLoaded && !state.projectsLoadFailed}
-                tips
-                warmup={state.warmup}
-              />
-
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
@@ -1445,6 +1505,7 @@ export default function App() {
                 />
               )}
             </Suspense>
+            </>
           }
             />
               </VerifiedFindingsProvider>

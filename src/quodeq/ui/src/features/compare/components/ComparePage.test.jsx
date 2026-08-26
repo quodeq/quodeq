@@ -104,6 +104,12 @@ describe('ComparePage', () => {
     expect(screen.getByText('Nothing to compare yet')).toBeInTheDocument();
   });
 
+  it('renders a table skeleton (not a bare text line) before projects load', () => {
+    const { container } = renderPage({ projectsLoaded: false });
+    expect(container.querySelector('.compare-skeleton')).toBeTruthy();
+    expect(container.querySelector('.compare-loading')).toBeNull();
+  });
+
   it('renders a row per project once summaries arrive', async () => {
     renderPage();
     expect(await screen.findByText('alpha')).toBeInTheDocument();

@@ -1962,11 +1962,28 @@
 .overview-skeleton__bar--gauge { width: 100px; height: 100px; border-radius: 50%; }
 .overview-skeleton__bar--meta { width: 50%; height: 8px; }
 .overview-skeleton__bar--sev { width: 40%; height: 12px; }
+/* Dimension-score table row slots. The spans they sit in carry the real
+   flex sizing (dashboard.css .dim-score-*), so the bars only need to fill
+   the text's height: rows stay the real ~28px (6px padding + content). */
+.overview-skeleton__bar--dim-label { width: 70%; height: 10px; }
+.overview-skeleton__bar--spark { width: 100%; height: 14px; }
+.overview-skeleton__bar--dim-value { width: 100%; height: 12px; }
+.overview-skeleton__bar--dim-trend { width: 100%; height: 10px; }
+.overview-skeleton__bar--dim-viol { width: 60%; height: 10px; }
+/* Offending-files placeholder rows: full-width dense-table rows. 25px
+   matches the real GridTable dense row (content + padding + row border). */
+.overview-skeleton__file-row {
+  display: block;
+  width: 100%;
+  height: 25px;
+  margin-top: 4px;
+}
 
-/* The real .dim-gauge-card is cursor:pointer + hover/focus affordances
-   (dim-gauge-card.css) -- this card isn't clickable, so neutralize both
-   rather than let a placeholder look interactive. */
-.overview-skeleton .dim-gauge-card {
+/* The real .dim-gauge-card and .dim-score-row are cursor:pointer + hover
+   affordances (dim-gauge-card.css, dashboard.css) -- the placeholders are
+   not clickable, so neutralize both rather than let them look interactive. */
+.overview-skeleton .dim-gauge-card,
+.overview-skeleton .dim-score-row {
   cursor: default;
   pointer-events: none;
 }
@@ -3200,4 +3217,44 @@
 }
 .incomplete-setup-card p {
   margin: 0 0 8px 0;
+}
+
+/* ── Violations loading skeleton ────────────────────────
+   Stand-in for the loaded violations page (flag pills + by-dimension
+   groups) while dimension data loads. Same idiom as .overview-skeleton:
+   static dimmed blocks, no shimmer. */
+.violations-skeleton__bar {
+  display: inline-block;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+/* Pill row rides the real .violations-flag-row spacing; pills approximate
+   the FlagPill footprint. */
+.violations-skeleton__pill { width: 110px; height: 24px; border-radius: 12px; }
+.violations-skeleton__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.violations-skeleton__bar--group-header { width: 30%; height: 20px; }
+.violations-skeleton__bar--card { width: 100%; height: 72px; }
+
+/* ── History loading skeleton ───────────────────────────
+   Chart shell (HistoryChartPanelPlaceholder) + dense evaluations-table
+   rows while the trend data loads. Same idiom as .overview-skeleton. */
+.history-skeleton__table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--space-6);
+}
+.history-skeleton__row {
+  display: block;
+  width: 100%;
+  height: 25px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
 }

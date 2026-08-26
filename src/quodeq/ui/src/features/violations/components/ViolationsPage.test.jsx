@@ -164,14 +164,14 @@ describe('ViolationsPage — scenario 9: loader gate, containment, refresh dim',
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
   });
 
-  it('initial load renders exactly one inline loader inside the page frame', () => {
+  it('initial load renders the violations skeleton inside the page frame, no spinner', () => {
     const { container } = renderPage(baseData({ loading: true, isFetching: true }));
-    expect(container.querySelectorAll('.loading-screen').length).toBe(1);
-    const loader = container.querySelector('.loading-screen--inline');
-    expect(loader).not.toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    const skeleton = container.querySelector('.violations-skeleton');
+    expect(skeleton).not.toBeNull();
     const frame = container.querySelector('.violations-page--terminal');
     expect(frame).not.toBeNull();
-    expect(frame.contains(loader)).toBe(true);
+    expect(frame.contains(skeleton)).toBe(true);
   });
 
   it('applies the refresh dim class to the empty state during a background refetch', () => {
@@ -200,12 +200,13 @@ describe('ViolationsPage — error state + retry feedback (P4-T2)', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it('error + isFetching renders the inline loader instead of the error state', () => {
+  it('error + isFetching renders the skeleton instead of the error state', () => {
     const { container } = renderPage(
       baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }], error: 'Failed to load', isFetching: true }),
     );
     expect(screen.queryByText("Couldn't load this project")).toBeNull();
-    expect(container.querySelector('.loading-screen')).toBeTruthy();
+    expect(container.querySelector('.violations-skeleton')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
   });
 
   it('data present with a stale error still renders the data, not the error screen', () => {

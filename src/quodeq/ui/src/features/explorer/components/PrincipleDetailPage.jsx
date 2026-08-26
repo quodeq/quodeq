@@ -10,7 +10,7 @@ import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { usePrincipleData } from './explorerDataHooks.js';
 import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
 import DeferredMount from './DeferredMount.jsx';
-import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
 
 function filterTitleSuffix(filter) {
@@ -289,7 +289,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
           without this split the first paint waits for every visible card's
           pretext layout effect and the click that navigated here looks
           ignored. Header first, cards one commit later. */}
-      <DeferredMount fallback={<LoadingScreen variant="inline" />}>
+      <DeferredMount fallback={<CardListSkeleton />}>
         <VirtualList
           key={virtualKey}
           items={items}

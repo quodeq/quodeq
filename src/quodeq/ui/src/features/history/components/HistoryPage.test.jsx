@@ -171,14 +171,14 @@ describe('HistoryPage — scenario 9: loader gate, containment, refresh dim', ()
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
   });
 
-  it('initial load renders exactly one inline loader inside the page frame', () => {
+  it('initial load renders the history skeleton inside the page frame, no spinner', () => {
     renderHistoryPageWithData({ loading: true, isFetching: true });
-    expect(document.querySelectorAll('.loading-screen').length).toBe(1);
-    const loader = document.querySelector('.loading-screen--inline');
-    expect(loader).not.toBeNull();
+    expect(document.querySelector('.loading-screen')).toBeNull();
+    const skeleton = document.querySelector('.history-skeleton');
+    expect(skeleton).not.toBeNull();
     const frame = document.querySelector('.history-page--terminal');
     expect(frame).not.toBeNull();
-    expect(frame.contains(loader)).toBe(true);
+    expect(frame.contains(skeleton)).toBe(true);
   });
 
   it('applies the refresh dim class to the empty state during a background refetch', () => {
@@ -207,13 +207,14 @@ describe('HistoryPage — error state + retry feedback (P4-T2)', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it('error + isFetching renders the inline loader instead of the error state', () => {
+  it('error + isFetching renders the skeleton instead of the error state', () => {
     renderHistoryPageWithData({
       selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }],
       error: 'Failed to load', isFetching: true,
     });
     expect(screen.queryByText("Couldn't load this project")).toBeNull();
-    expect(document.querySelector('.loading-screen')).toBeTruthy();
+    expect(document.querySelector('.history-skeleton')).toBeTruthy();
+    expect(document.querySelector('.loading-screen')).toBeNull();
   });
 
   it('data present with a stale error still renders the data, not the error screen', () => {

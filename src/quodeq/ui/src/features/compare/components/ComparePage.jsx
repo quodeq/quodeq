@@ -13,6 +13,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../../components/EmptyState.jsx';
+import CompareSkeleton from './CompareSkeleton.jsx';
 import { getDimensionEval } from '../../../api/index.js';
 import { projectKeys } from '../../../api/queryKeys.js';
 import {
@@ -198,7 +199,7 @@ export default function ComparePage({
   }, [view, duel]);
 
   if (!projectsLoaded) {
-    return <div className="compare-page" ref={rootRef}><div className="compare-loading">{t('compare.loading')}</div></div>;
+    return <div className="compare-page" ref={rootRef}><CompareSkeleton /></div>;
   }
 
   if (!localProjects.length) {

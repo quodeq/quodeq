@@ -210,7 +210,6 @@
   "compare.levelSevere": "severe",
   "compare.levelWatch": "watch",
   "compare.loadFailed": "failed to load scores",
-  "compare.loading": "Loading projects…",
   "compare.needTwo": "needs two scored projects",
   "compare.noEvalsCollapsed": "{count} projects without evaluations",
   "compare.noRuns": "no evaluations yet",

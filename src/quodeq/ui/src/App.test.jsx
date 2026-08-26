@@ -6,6 +6,7 @@ import {
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
   buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
   buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
+  shouldShowStartupLoader,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -1071,5 +1072,73 @@ describe('projects-load failure threading', () => {
       state, navTab: vi.fn(), navStackLength: 1, isEvaluating: false,
       showToast: vi.fn(), setWizardEntry: vi.fn(),
     }).warmup).toBe(warmup);
+  });
+});
+
+// The startup loader must outlive projectsLoaded: dropping it there hands the
+// user a skeleton flash (loader > skeleton > data) on every boot. It holds
+// until the Overview's data is in, and drops immediately on any dead end
+// where no data will ever arrive (failure, zero projects, nothing selected,
+// query error, or the user restored into a different tab).
+describe('shouldShowStartupLoader', () => {
+  const base = {
+    projectsLoaded: true, projectsLoadFailed: false, projectsCount: 2,
+    selectedProject: 'proj-1', selectedSource: 'local', activeTab: 'overview',
+    dashboard: null, accumulated: null, error: null, loading: true,
+  };
+
+  it('shows before projects load', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsLoaded: false })).toBe(true);
+  });
+
+  it('shows before projects load regardless of the restored tab', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsLoaded: false, activeTab: 'settings' })).toBe(true);
+  });
+
+  it('drops on projects load failure (retry state must be reachable)', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsLoaded: false, projectsLoadFailed: true })).toBe(false);
+  });
+
+  it('holds after projects load while overview data is still loading', () => {
+    expect(shouldShowStartupLoader(base)).toBe(true);
+  });
+
+  it('keeps holding when only the dashboard payload has arrived', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] } })).toBe(true);
+  });
+
+  it('drops once dashboard and accumulated are both in', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] }, accumulated: { dims: [] } })).toBe(false);
+  });
+
+  it('drops on a dashboard query error (error state must be reachable)', () => {
+    expect(shouldShowStartupLoader({ ...base, error: new Error('boom') })).toBe(false);
+  });
+
+  it('drops with zero local projects (onboarding/empty states take over)', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsCount: 0, selectedProject: null })).toBe(false);
+  });
+
+  it('holds for a shared selection even with zero local projects', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsCount: 0, selectedSource: 'shared' })).toBe(true);
+  });
+
+  it('drops when nothing is selected', () => {
+    expect(shouldShowStartupLoader({ ...base, selectedProject: null })).toBe(false);
+  });
+
+  it('drops when the user restored into a non-overview tab', () => {
+    expect(shouldShowStartupLoader({ ...base, activeTab: 'violations' })).toBe(false);
+  });
+
+  it('drops when the queries settle with no data coming (project with no completed evaluations)', () => {
+    // accumulated stays null forever for a run-less project; only `loading`
+    // (dashboard + scores queries combined) says nothing more is in flight.
+    // Without this escape the loader would wall off the empty state forever.
+    expect(shouldShowStartupLoader({ ...base, loading: false })).toBe(false);
+  });
+
+  it('keeps holding while either query is still in flight even with partial data', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] }, loading: true })).toBe(true);
   });
 });

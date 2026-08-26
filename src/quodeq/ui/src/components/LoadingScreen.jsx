@@ -9,7 +9,7 @@ const TIP_KEYS = [
   'loading.tips.ignore', 'loading.tips.history', 'loading.tips.compliance',
   'loading.tips.shared',
 ];
-const TIPS_DELAY_MS = 3000;
+const TIPS_DELAY_MS = 300;
 const TIPS_ROTATE_MS = 8000;
 const LEAVE_MS = 400;
 
