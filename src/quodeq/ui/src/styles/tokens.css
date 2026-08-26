@@ -287,6 +287,19 @@
   --color-accent-hover: var(--primitive-crimson-600);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-crimson-500) 6%, transparent);
 
+  /* Duel sides — stable IDENTITY hues for head-to-head views. Grade colors
+     cannot tell two projects apart (both sides are often the same tier), so
+     side A rides the theme accent and side B is a per-family counter-hue.
+     B must stay deltaE >= 20 from the accent AND from every grade-tier
+     color (a B line that matches a tier reads as a judgement), guarded in
+     tools/token_distinctness.mjs. Each family block picks its own B in the
+     hue territory its accent and grade ramp leave free: daruma (crimson +
+     gold/slate grades) -> purple, neo (all green) -> sand, galadriel
+     (green + gold) -> steel, ifrit (orange + gold/slate) -> purple,
+     deckard (magenta + purple grades) -> steel. */
+  --color-duel-a: var(--color-accent);
+  --color-duel-b: #8a5fb0;
+
   /* Status */
   --color-danger:  var(--primitive-red-600);
   --color-success: var(--primitive-green-700);
@@ -413,6 +426,7 @@
     --color-accent-hover: var(--primitive-flynn-accent-hover);
     --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
     --color-on-accent:    var(--primitive-flynn-950);
+    --color-duel-b:       #b08ad8;
 
     --color-danger:  #e05c4b;
     --color-success: #4caf7d;
@@ -543,6 +557,7 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-accent-hover: var(--primitive-flynn-accent-hover);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
   --color-on-accent:    var(--primitive-flynn-950);
+  --color-duel-b:       #b08ad8;
 
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
@@ -718,6 +733,8 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-accent:       var(--primitive-ifrit-accent-dark);
   --color-accent-hover: #f09040;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-dark) 14%, transparent);
+  /* Purple: ifrit's accent is warm and its grade ramp holds the slates. */
+  --color-duel-b:       #b08ad8;
   --color-on-accent:    var(--primitive-ifrit-950);
 
   --color-danger:  #ff5030;
@@ -805,6 +822,7 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-text-subtle:  #688968;
 
   --color-accent:       #1b6b3a;
+  --color-duel-b:       #3a6a8a; /* steel: sand collides with the gold top tier */
   --color-accent-hover: #145228;
   --color-accent-soft:  color-mix(in srgb, #1b6b3a 8%, transparent);
   /* Light mode on dark-green accent — explicit white for AA contrast
@@ -892,6 +910,7 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-text-muted:   var(--primitive-neo-500);
   --color-text-subtle:  #596f59;
   --color-accent:       var(--primitive-neo-accent);
+  --color-duel-b:       #d8b36a; /* sand vs neo green */
   --color-accent-hover: #33ff66;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent) 14%, transparent);
   --color-on-accent:    var(--primitive-neo-950);
@@ -969,6 +988,7 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-text-muted:   #516e51;
   --color-text-subtle:  #6a8b6a;
   --color-accent:       var(--primitive-neo-accent-dark);
+  --color-duel-b:       #a1782f; /* sand vs neo green */
   --color-accent-hover: #006622;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent-dark) 8%, transparent);
   --color-on-accent:    #ffffff;
@@ -1044,6 +1064,7 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-text-muted:   #7a9d7a;
   --color-text-subtle:  #548254;
   --color-accent:       var(--primitive-green-400);
+  --color-duel-b:       #7fa8c9; /* steel: sand collides with the gold top tier */
   --color-accent-hover: #6ee7a0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-green-400) 14%, transparent);
   --color-on-accent:    var(--primitive-galadriel-950);
@@ -1125,6 +1146,8 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-accent:       var(--primitive-ifrit-accent-light);
   --color-accent-hover: #a84a08;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-light) 8%, transparent);
+  /* Purple: ifrit's accent is warm and its grade ramp holds the slates. */
+  --color-duel-b:       #7a4fa0;
   --color-on-accent:    #ffffff;
 
   --color-danger:  #b82010;
@@ -1209,6 +1232,7 @@ html[data-theme="deckard-dark"]:root, [data-theme="deckard-dark"] {
   --color-text-subtle:  #706687;
 
   --color-accent:       var(--primitive-deckard-accent-dark);
+  --color-duel-b:       #7fa8c9; /* steel: deckard's grade ramp owns the purples */
   --color-accent-hover: #ff60d0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-dark) 14%, transparent);
   --color-on-accent:    var(--primitive-deckard-950);
@@ -1299,6 +1323,7 @@ html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
   --color-text-subtle:  #857996;
 
   --color-accent:       var(--primitive-deckard-accent-light);
+  --color-duel-b:       #3a6a8a; /* steel: deckard's grade ramp owns the purples */
   --color-accent-hover: #b01888;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-light) 8%, transparent);
   --color-on-accent:    #ffffff;

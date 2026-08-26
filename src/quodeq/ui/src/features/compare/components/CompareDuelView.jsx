@@ -8,15 +8,52 @@
  * Sides are fixed for the whole screen: A is always the left/first project
  * (accent), B the right/second (info), and every gap reads A minus B.
  */
-import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import { scoreColorClass } from '../../../utils/formatters.js';
+import { relativeTime } from '../../../components/LastFetchedLine.jsx';
+import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
-import { t } from '../../../strings/index.js';
+import { t, LOCALE } from '../../../strings/index.js';
 import CompareDuelTrend from './CompareDuelTrend.jsx';
+import CompareRadar from './CompareRadar.jsx';
 
+const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 const signed1 = (g) => (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1));
+
+/* One half of the versus header: identity-coloured name, grade-coloured
+   score, and the side's vitals. */
+function VersusSide({ side, row, onOpenProject }) {
+  return (
+    <div className={`compare-versus__side compare-versus__side--${side}`}>
+      <button
+        type="button"
+        className="compare-versus__name"
+        onClick={() => onOpenProject(row.id)}
+        title={t('compare.openProject')}
+      >
+        {row.name}
+      </button>
+      <div className="compare-versus__scoreRow">
+        <span className={`compare-versus__score ${scoreColorClass(row.score)}`}>{score1(row.score)}</span>
+        <span className="compare-versus__tier">{scoreToGradeLabel(row.score) || t('compare.noRuns')}</span>
+        <TrendBadge delta={row.delta ?? row.lastDelta} />
+      </div>
+      <div className="compare-versus__meta">
+        <span>{t('compare.violCount', { count: nf(row.totalViolations) })}</span>
+        <span>{complianceRatio(row.totalViolations, row.totalCompliance)}</span>
+        <span className={row.stale ? 'compare-row__last--stale' : undefined}>
+          {relativeTime(row.lastISO) || '—'}
+        </span>
+        {row.commitsSince != null && row.commitsSince > 0 && (
+          <span className="compare-rowdetail__stale">
+            {t('compare.commitsSince', { count: nf(row.commitsSince) })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function gapClass(gap) {
   if (gap == null || gap === 0) return 'compare-duel__gap--even';
@@ -52,6 +89,7 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
         gap: Math.abs(duel.gap).toFixed(1),
       });
   const trendPoints = duel.trend.a.length + duel.trend.b.length;
+  const sharedDims = duel.dimensions.filter((d) => d.shared);
 
   return (
     <>
@@ -67,30 +105,17 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
         </div>
       </div>
 
-      <StatStrip cards>
-        <Stat
-          label={<span className="compare-duel__side compare-duel__side--a">{a.name}</span>}
-          value={score1(a.score)}
-          hint={scoreToGradeLabel(a.score) || t('compare.noRuns')}
-          trailing={<TrendBadge delta={a.delta} />}
-        />
-        <Stat
-          label={<span className="compare-duel__side compare-duel__side--b">{b.name}</span>}
-          value={score1(b.score)}
-          hint={scoreToGradeLabel(b.score) || t('compare.noRuns')}
-          trailing={<TrendBadge delta={b.delta} />}
-        />
-        <Stat
-          label={t('compare.duelCardGap')}
-          value={duel.gap != null ? signed1(duel.gap) : '—'}
-          hint={gapHint}
-        />
-        <Stat
-          label={t('compare.duelCardShared')}
-          value={String(duel.sharedCount)}
-          hint={t('compare.duelSharedHint', { count: duel.dimensions.length })}
-        />
-      </StatStrip>
+      <div className="compare-versus" role="group" aria-label={t('compare.duelAria')}>
+        <VersusSide side="a" row={a} onOpenProject={onOpenProject} />
+        <div className="compare-versus__gap">
+          <span className="compare-versus__gapLabel">{t('compare.duelCardGap')}</span>
+          <span className={`compare-versus__gapValue ${gapClass(duel.gap)}`}>
+            {duel.gap != null ? signed1(duel.gap) : '—'}
+          </span>
+          <span className="compare-versus__gapHint">{gapHint}</span>
+        </div>
+        <VersusSide side="b" row={b} onOpenProject={onOpenProject} />
+      </div>
 
       {!duel.ready ? (
         <section className="compare-panel" aria-label={t('compare.duelAria')}>
@@ -98,25 +123,49 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
         </section>
       ) : (
         <>
+          <section className="compare-panel" aria-label={t('compare.duelDimsAria')}>
+            <div className="compare-panel__head">
+              <SectionLabel>{t('compare.dimensionsHeader', { count: duel.dimensions.length })}</SectionLabel>
+              <span className="compare-panel__note">{t('compare.duelDimsNote')}</span>
+            </div>
+            <ul className="compare-duel-dims">
+              {duel.dimensions.map((d) => (
+                <li key={d.key} className="compare-duel-dims__row">
+                  <span className="compare-duel-dims__label">{d.label}</span>
+                  <span className={`compare-duel-dims__score ${scoreColorClass(d.a)}`}>{score1(d.a)}</span>
+                  <DuelBars a={d.a} b={d.b} />
+                  <span className={`compare-duel-dims__score ${scoreColorClass(d.b)}`}>{score1(d.b)}</span>
+                  <span className={`compare-duel__gap ${gapClass(d.gap)}`}>
+                    {d.gap != null ? signed1(d.gap) : '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
           <div className="compare-lower compare-lower--duel">
-            <section className="compare-panel" aria-label={t('compare.duelDimsAria')}>
+            <section className="compare-panel" aria-label={t('compare.duelShapeAria')}>
               <div className="compare-panel__head">
-                <SectionLabel>{t('compare.dimensionsHeader', { count: duel.dimensions.length })}</SectionLabel>
-                <span className="compare-panel__note">{t('compare.duelDimsNote')}</span>
+                <SectionLabel>{t('compare.duelShapeHeader')}</SectionLabel>
+                <span className="compare-panel__note">{t('compare.duelShapeNote')}</span>
               </div>
-              <ul className="compare-duel-dims">
-                {duel.dimensions.map((d) => (
-                  <li key={d.key} className="compare-duel-dims__row">
-                    <span className="compare-duel-dims__label">{d.label}</span>
-                    <span className={`compare-duel-dims__score ${scoreColorClass(d.a)}`}>{score1(d.a)}</span>
-                    <DuelBars a={d.a} b={d.b} />
-                    <span className={`compare-duel-dims__score ${scoreColorClass(d.b)}`}>{score1(d.b)}</span>
-                    <span className={`compare-duel__gap ${gapClass(d.gap)}`}>
-                      {d.gap != null ? signed1(d.gap) : '—'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {sharedDims.length >= 3 ? (
+                <>
+                  <CompareRadar
+                    axes={sharedDims.map((d) => ({ label: d.label, value: null }))}
+                    series={[
+                      { values: sharedDims.map((d) => d.a), variant: 'duelA' },
+                      { values: sharedDims.map((d) => d.b), variant: 'duelB' },
+                    ]}
+                  />
+                  <div className="compare-radar__legend">
+                    <span className="compare-duel__legendItem compare-duel__legendItem--a">{a.name}</span>
+                    <span className="compare-duel__legendItem compare-duel__legendItem--b">{b.name}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="compare-panel__fallback">{t('compare.radialTooFew')}</p>
+              )}
             </section>
 
             <section className="compare-panel" aria-label={t('compare.duelTrendAria')}>

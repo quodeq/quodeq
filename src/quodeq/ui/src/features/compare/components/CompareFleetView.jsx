@@ -101,6 +101,57 @@ function ScopePicker({
   );
 }
 
+/* Duel trigger: a button opening a small opponent menu. Choosing navigates
+   to the head-to-head, so this is an action menu, not a value-holding
+   select. Same dismiss contract as the scope picker. */
+function DuelTrigger({ row, targets, onPick }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    const onEsc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+  return (
+    <span className="compare-dueltrigger" ref={rootRef} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="compare-dueltrigger__btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t('compare.duelWithAria', { project: row.name })}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {t('compare.duelOpen')} {open ? '▾' : '▸'}
+      </button>
+      {open && (
+        <span className="compare-dueltrigger__menu" role="menu">
+          {targets.map((other) => (
+            <button
+              key={other.id}
+              type="button"
+              role="menuitem"
+              className="compare-dueltrigger__item"
+              onClick={() => { setOpen(false); onPick(other.id); }}
+            >
+              <span>{other.name}</span>
+              <span className={`compare-dueltrigger__itemScore ${scoreColorClass(other.score)}`}>
+                {score1(other.score)}
+              </span>
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /* Detail-on-demand block under an expanded row: everything the single-line
    row no longer carries. */
 function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPair }) {
@@ -152,23 +203,11 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPai
           {t('compare.openProject')} ›
         </button>
         {openDuelPair && duelTargets.length > 0 && (
-          /* Native select in the terminal idiom (PeriodSelect's classes):
-             pick any other project to open a head-to-head, no scope
-             narrowing required. */
-          <span className="term-period-select-wrap" onClick={(e) => e.stopPropagation()}>
-            <select
-              className="term-period-select"
-              value=""
-              aria-label={t('compare.duelWithAria', { project: row.name })}
-              onChange={(e) => { if (e.target.value) openDuelPair(row.id, e.target.value); }}
-            >
-              <option value="" disabled>{t('compare.duelWith')}</option>
-              {duelTargets.map((other) => (
-                <option key={other.id} value={other.id}>{other.name}</option>
-              ))}
-            </select>
-            <span className="term-period-select__caret" aria-hidden="true">▾</span>
-          </span>
+          <DuelTrigger
+            row={row}
+            targets={duelTargets}
+            onPick={(otherId) => openDuelPair(row.id, otherId)}
+          />
         )}
       </div>
     </div>

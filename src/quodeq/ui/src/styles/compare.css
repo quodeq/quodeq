@@ -901,11 +901,12 @@
 
 .compare-duel-cta:hover { background: var(--color-accent-soft); }
 
-.compare-duel__side--a { color: var(--color-accent); }
-.compare-duel__side--b { color: var(--color-text); }
+.compare-duel__side--a { color: var(--color-duel-a); }
+.compare-duel__side--b { color: var(--color-duel-b); }
 
+/* Radar (fixed) beside the trend (flexible). */
 .compare-lower--duel {
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+  grid-template-columns: minmax(300px, 440px) minmax(0, 1fr);
 }
 
 @media (max-width: 1100px) {
@@ -948,8 +949,16 @@
   color: var(--color-text-muted);
 }
 
-.compare-duel__gap--a { color: var(--color-accent); }
-.compare-duel__gap--b { color: var(--color-text); }
+.compare-duel__gap--a {
+  color: var(--color-duel-a);
+  background: color-mix(in srgb, var(--color-duel-a) 9%, transparent);
+  border-color: color-mix(in srgb, var(--color-duel-a) 32%, transparent);
+}
+.compare-duel__gap--b {
+  color: var(--color-duel-b);
+  background: color-mix(in srgb, var(--color-duel-b) 9%, transparent);
+  border-color: color-mix(in srgb, var(--color-duel-b) 32%, transparent);
+}
 
 /* mirrored bars: A grows leftward from the centre seam, B rightward */
 
@@ -970,8 +979,8 @@
 }
 
 .compare-duel__bar { display: block; border-radius: 1px; }
-.compare-duel__bar--a { background: var(--color-accent); }
-.compare-duel__bar--b { background: var(--color-text); }
+.compare-duel__bar--a { background: var(--color-duel-a); }
+.compare-duel__bar--b { background: var(--color-duel-b); }
 
 /* trend overlay */
 
@@ -993,11 +1002,11 @@
   stroke-linecap: round;
 }
 
-.compare-duel-trend__line--a { stroke: var(--color-accent); }
-.compare-duel-trend__line--b { stroke: var(--color-text); }
+.compare-duel-trend__line--a { stroke: var(--color-duel-a); }
+.compare-duel-trend__line--b { stroke: var(--color-duel-b); }
 
-.compare-duel-trend__dot--a { fill: var(--color-accent); }
-.compare-duel-trend__dot--b { fill: var(--color-text); }
+.compare-duel-trend__dot--a { fill: var(--color-duel-a); }
+.compare-duel-trend__dot--b { fill: var(--color-duel-b); }
 
 .compare-duel-trend__ticks { position: absolute; inset: 0; pointer-events: none; }
 
@@ -1042,8 +1051,8 @@
   transform: translateY(-50%);
 }
 
-.compare-duel__legendItem--a::before { background: var(--color-accent); }
-.compare-duel__legendItem--b::before { background: var(--color-text); }
+.compare-duel__legendItem--a::before { background: var(--color-duel-a); }
+.compare-duel__legendItem--b::before { background: var(--color-duel-b); }
 
 /* principle diffs, grouped per shared dimension */
 
@@ -1085,6 +1094,167 @@
   .compare-duel__bars { display: none; }
 }
 
+/* ── duel versus header ──────────────────────────────────────────────────
+   The confrontation reads from the header: side A left, the gap in the
+   middle, side B right — each side under its identity colour's top rule. */
+
+.compare-versus {
+  display: grid;
+  grid-template-columns: 1fr 150px 1fr;
+  align-items: stretch;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.compare-versus__side { padding: 16px 20px; min-width: 0; }
+.compare-versus__side--a { border-top: 3px solid var(--color-duel-a); }
+.compare-versus__side--b { border-top: 3px solid var(--color-duel-b); text-align: right; }
+
+.compare-versus__name {
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.compare-versus__name:hover { text-decoration: underline; }
+.compare-versus__side--a .compare-versus__name { color: var(--color-duel-a); }
+.compare-versus__side--b .compare-versus__name { color: var(--color-duel-b); }
+
+.compare-versus__scoreRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.compare-versus__side--b .compare-versus__scoreRow { justify-content: flex-end; }
+
+.compare-versus__score { font-size: 32px; font-weight: 500; line-height: 1; }
+
+.compare-versus__tier {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.compare-versus__meta {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
+}
+
+.compare-versus__side--b .compare-versus__meta { justify-content: flex-end; }
+
+.compare-versus__gap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  background: var(--color-surface-alt);
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.compare-versus__gapLabel { font-size: 9.5px; letter-spacing: 0.14em; color: var(--color-text-muted); }
+.compare-versus__gapValue { font-size: 22px; font-weight: 500; }
+.compare-versus__gapValue.compare-duel__gap--a { color: var(--color-duel-a); background: transparent; border: none; }
+.compare-versus__gapValue.compare-duel__gap--b { color: var(--color-duel-b); background: transparent; border: none; }
+.compare-versus__gapHint { font-size: 9.5px; color: var(--color-text-muted); line-height: 1.4; }
+
+/* radar overlay of both projects' shapes */
+.compare-radar__poly--duelA {
+  fill: color-mix(in srgb, var(--color-duel-a) 12%, transparent);
+  stroke: var(--color-duel-a);
+  stroke-width: 1.6;
+}
+.compare-radar__poly--duelB {
+  fill: color-mix(in srgb, var(--color-duel-b) 10%, transparent);
+  stroke: var(--color-duel-b);
+  stroke-width: 1.6;
+}
+
+/* shaded 30-day window on the duel trend */
+.compare-duel-trend__window { fill: color-mix(in srgb, var(--color-text) 4%, transparent); }
+
+/* ── duel trigger in a row expansion ────────────────────────────────────
+   A button that opens a small opponent menu — choosing navigates, so a
+   value-holding select was the wrong control. */
+
+.compare-dueltrigger { position: relative; display: inline-flex; }
+
+.compare-dueltrigger__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.compare-dueltrigger__btn:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
+/* Opens DOWNWARD: .compare-table is an overflow container, and content
+   escaping its top edge is unreachable, while content past its bottom
+   edge just extends the scroll area. */
+.compare-dueltrigger__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px var(--color-overlay-heavy);
+}
+
+.compare-dueltrigger__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.compare-dueltrigger__item:hover { background: var(--color-surface-alt); }
+
+.compare-dueltrigger__itemScore { font-size: 11.5px; }
+
 /* ── small-view tiers ───────────────────────────────────────────────────
    The single-line table already fits most widths; below that, shed the
    ratio and last-evaluated columns and stack the attention strip and the
@@ -1104,6 +1274,16 @@
   .compare-row__ratio { display: none; }
   .compare-board--grid { grid-template-columns: 1fr; }
   .compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: none; }
+  .compare-versus { grid-template-columns: 1fr; }
+  .compare-versus__gap {
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .compare-versus__side--b { text-align: left; }
+  .compare-versus__side--b .compare-versus__scoreRow,
+  .compare-versus__side--b .compare-versus__meta { justify-content: flex-start; }
 }
 
 @media (max-width: 800px) {
