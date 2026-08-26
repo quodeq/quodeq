@@ -1098,6 +1098,10 @@
 }
 
 .compare-duel-principles__dim {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   margin: 0;
   padding: 12px 16px 8px;
   font-size: 11px;
@@ -1106,6 +1110,28 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
+
+/* The heading repeats the dimension's two scores and gap so a diff group
+   reads without scrolling back. Legend-style dashes in the side identity
+   colors say which number belongs to which project. */
+.compare-duel-principles__dimScores {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-duel-principles__side {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.compare-duel-principles__side--a { background: var(--color-duel-a); }
+.compare-duel-principles__side--b { background: var(--color-duel-b); margin-left: 5px; }
 
 /* Principle rows live inside a ~320px group card, so the label must win
    over the bars: fixed floor for the name, bars take what is left. */
@@ -1209,16 +1235,19 @@
 .compare-versus__gapValue.compare-duel__gap--b { color: var(--color-duel-b); background: transparent; border: none; }
 .compare-versus__gapHint { font-size: 9.5px; color: var(--color-text-muted); line-height: 1.4; }
 
-/* radar overlay of both projects' shapes */
+/* Radar overlay of both projects' shapes. STROKE ONLY, deliberately: two
+   translucent fills mix where the polygons overlap, and cyan over sand
+   lands on a muddy violet no palette intends. Two clean outlines carry
+   the comparison without inventing a third color. */
 .compare-radar__poly--duelA {
-  fill: color-mix(in srgb, var(--color-duel-a) 12%, transparent);
+  fill: none;
   stroke: var(--color-duel-a);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
 }
 .compare-radar__poly--duelB {
-  fill: color-mix(in srgb, var(--color-duel-b) 10%, transparent);
+  fill: none;
   stroke: var(--color-duel-b);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
 }
 
 /* shaded 30-day window on the duel trend */
@@ -1249,11 +1278,14 @@
 /* Opens DOWNWARD: .compare-table is an overflow container, and content
    escaping its top edge is unreachable, while content past its bottom
    edge just extends the scroll area. */
+/* Rendered through a portal at a FIXED position (the component computes
+   top/bottom/left inline from the button's rect): the projects table is an
+   overflow container that would clip an in-flow popover for rows near its
+   bottom edge. max-height must stay in sync with DUEL_MENU_MAX_H. */
 .compare-dueltrigger__menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 40;
+  position: fixed;
+  z-index: 80;
+  display: block;
   min-width: 200px;
   max-height: 260px;
   overflow-y: auto;

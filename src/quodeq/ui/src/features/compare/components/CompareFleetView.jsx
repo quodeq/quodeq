@@ -9,6 +9,7 @@
  * that were never evaluated collapse into a single line.
  */
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
@@ -106,35 +107,73 @@ function ScopePicker({
 
 /* Duel trigger: a button opening a small opponent menu. Choosing navigates
    to the head-to-head, so this is an action menu, not a value-holding
-   select. Same dismiss contract as the scope picker. */
+   select. The menu renders through a PORTAL at a fixed position: the
+   projects table is an overflow container, and an in-flow popover gets
+   clipped at its edge for rows near the bottom. It flips upward when the
+   space below the button cannot fit it, and any scroll or resize
+   dismisses it (the anchor moved). */
+const DUEL_MENU_MAX_H = 260; // keep in sync with the CSS max-height
+
 function DuelTrigger({ row, targets, onPick }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const openUp = spaceBelow < DUEL_MENU_MAX_H + 12 && r.top > spaceBelow;
+    setPos({
+      left: Math.max(8, Math.min(r.left, window.innerWidth - 228)),
+      ...(openUp
+        ? { bottom: window.innerHeight - r.top + 6 }
+        : { top: r.bottom + 6 }),
+    });
+    setOpen(true);
+  };
+
   useEffect(() => {
     if (!open) return undefined;
-    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    const onDown = (e) => {
+      if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false);
+    };
     const onEsc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    // Any OUTSIDE scroll moved the anchor, so the menu must go — but the
+    // menu's own list scrolls too (capture sees those events as well), and
+    // scrolling the options must not dismiss them.
+    const onAnchorMoved = (e) => {
+      if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onEsc);
+    window.addEventListener('scroll', onAnchorMoved, true);
+    window.addEventListener('resize', onAnchorMoved);
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onEsc);
+      window.removeEventListener('scroll', onAnchorMoved, true);
+      window.removeEventListener('resize', onAnchorMoved);
     };
   }, [open]);
   return (
-    <span className="compare-dueltrigger" ref={rootRef} onClick={(e) => e.stopPropagation()}>
+    <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={btnRef}
         type="button"
         className="compare-dueltrigger__btn"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t('compare.duelWithAria', { project: row.name })}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
       >
         {t('compare.duelOpen')} {open ? '▾' : '▸'}
       </button>
-      {open && (
-        <span className="compare-dueltrigger__menu" role="menu">
+      {open && pos && createPortal(
+        <span className="compare-dueltrigger__menu" role="menu" ref={menuRef} style={pos}>
           {targets.map((other) => (
             <button
               key={other.id}
@@ -152,7 +191,8 @@ function DuelTrigger({ row, targets, onPick }) {
               </span>
             </button>
           ))}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   );

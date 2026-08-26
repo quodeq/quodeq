@@ -211,9 +211,30 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
             </div>
             {duel.principles.length ? (
               <div className="compare-duel-principles">
-                {duel.principles.map((group) => (
+                {duel.principles.map((group) => {
+                  // The group IS a dimension: repeat its two scores and gap
+                  // in the heading so the diff reads without scrolling back
+                  // up to the dimensions table.
+                  const dim = duel.dimensions.find((d) => d.key === group.key);
+                  return (
                   <article key={group.key} className="compare-duel-principles__group">
-                    <h3 className="compare-duel-principles__dim">{group.label}</h3>
+                    <h3 className="compare-duel-principles__dim">
+                      <span className="compare-duel-principles__dimLabel">{group.label}</span>
+                      {dim && (
+                        /* Legend-style side swatches (the same dash language
+                           the charts' legends use) tie each number to its
+                           side without repeating the row bars up here. */
+                        <span className="compare-duel-principles__dimScores">
+                          <span className="compare-duel-principles__side compare-duel-principles__side--a" aria-hidden="true" />
+                          <span className={scoreColorClass(dim.a)}>{score1(dim.a)}</span>
+                          <span className="compare-duel-principles__side compare-duel-principles__side--b" aria-hidden="true" />
+                          <span className={scoreColorClass(dim.b)}>{score1(dim.b)}</span>
+                          <span className={`compare-duel__gap ${gapClass(dim.gap)}`}>
+                            {dim.gap != null ? signed1(dim.gap) : '—'}
+                          </span>
+                        </span>
+                      )}
+                    </h3>
                     <ul className="compare-duel-principles__list">
                       {group.items.map((p) => (
                         <li key={p.key} className="compare-duel-principles__row">
@@ -228,7 +249,8 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
                       ))}
                     </ul>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="compare-panel__fallback">{t('compare.duelNoShared')}</p>

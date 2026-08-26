@@ -118,10 +118,9 @@ export function useCompareData(projects) {
 }
 
 /**
- * Projects published to the configured shared repository, shaped for the
- * Compare fleet: each entry keeps its raw id in `sourceId`, takes a
- * fleet-unique `shared:`-prefixed `id` (a project can exist both locally
- * and remotely under the same name), and is tagged `source: 'shared'`.
+ * Projects published to the configured shared repository, RAW: the caller
+ * merges them against the local list with the Projects page's own
+ * precedence rule (projectsMerge.js) before any Compare-specific shaping.
  *
  * No shared repository configured (409), not fetched yet (503), or any
  * other failure all resolve to an empty list: Compare simply shows the
@@ -136,12 +135,7 @@ export function useSharedCompareProjects() {
     refetchOnWindowFocus: false,
   });
   return useMemo(
-    () => (data || [])
-      .filter((p) => p && (p.id || p.name))
-      .map((p) => {
-        const raw = p.id || p.name;
-        return { ...p, id: `shared:${raw}`, sourceId: raw, source: 'shared' };
-      }),
+    () => (data || []).filter((p) => p && (p.id || p.name)),
     [data],
   );
 }

@@ -34,4 +34,4 @@ The project picker narrows every number on the screen to a chosen subset; **flag
 
 ### Remote projects
 
-When a shared repository is connected, its published projects join the fleet as ordinary rows tagged **remote**. They rank, count toward the scope score, appear in the attention strip, and can duel local projects. A project you both work on locally and publish shows twice, one row per side, so you can compare your working copy against the published state. Opening a remote row switches to its shared, read-only view; deep links into principle pages stay local-only.
+When a shared repository is connected, its published projects join the fleet as ordinary rows tagged **remote**. They rank, count toward the scope score, appear in the attention strip, and can duel local projects. A published project you also have locally is the *same* project, matched exactly as the Projects screen matches it, and your local copy prevails: one row, no remote duplicate. Only projects that exist solely in the shared repository appear as remote rows. Opening a remote row switches to its shared, read-only view; deep links into principle pages stay local-only.
