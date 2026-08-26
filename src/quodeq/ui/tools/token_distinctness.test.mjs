@@ -1,13 +1,14 @@
 /**
  * Theme-matrix distinctness guard.
  *
- * The design-system UX audit found the grade ramp and the severity ramp
- * colliding (an F-grade file and a critical finding shared the same red),
- * and several dark themes resolving accent, compliance, and grade-top to
- * one identical color. This suite keeps every shipped theme combination
- * honest: grade colors must stay perceptually apart from severity colors
- * and the accent, grade steps must stay mutually legible, and grade text
- * must clear the WCAG UI-component contrast floor on every surface.
+ * Scope note (2026-08-26): the grade-vs-severity and grade-vs-accent rules
+ * are gone on purpose. The user rejected both recolors that enforced them
+ * and restored the original v1.9.1 grade palette, which shares the red
+ * channel with severity and rides the accent at the top tier. What remains
+ * guarded: grade steps stay mutually legible and grade text stays readable
+ * at the restored palette's own baseline, compliance stays off the accent,
+ * and the duel identity colors stay apart from each other and from every
+ * grade tier.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,12 +47,13 @@ test('deltaE matches known reference points', () => {
   assert.equal(deltaE(parseColor('#b00a14'), parseColor('#b00a14')), 0);
 });
 
-test('grades, severity, accent, and compliance stay apart in every theme', () => {
+test('grade legibility, compliance, and duel identity hold in every theme', () => {
   const { results, failures } = auditDistinctness(css);
-  // 12 contexts x (15 grade-vs-sev + 5 grade-vs-accent + 15 contrast +
-  // 10 grade-step + 1 compliance) — if this shrinks, the parser stopped
-  // seeing part of the matrix and the guard is weaker than it looks.
-  assert.ok(results.length >= 500, `matrix shrank: only ${results.length} checks ran`);
+  // 12 contexts x (15 contrast + 10 grade-step + 1 compliance + 1 duel
+  // sides + 3 duel-b contrast + 5 duel-b-vs-grade) = 420 — if this
+  // shrinks, the parser stopped seeing part of the matrix and the guard
+  // is weaker than it looks.
+  assert.ok(results.length >= 400, `matrix shrank: only ${results.length} checks ran`);
   const table = failures
     .map((f) => `  ${f.theme}: ${f.rule} ${f.a} vs ${f.b} = ${f.value} (min ${f.min} ${f.kind})`)
     .join('\n');
