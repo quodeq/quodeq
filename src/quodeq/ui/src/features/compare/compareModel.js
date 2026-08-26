@@ -418,6 +418,50 @@ export function buildDuelView(idA, idB, rows, now, summariesById) {
   };
 }
 
+/**
+ * Outliers inside ONE dimension, for its scoped needs-attention strip.
+ * Two signals: a principle where one project sits far under the rest
+ * (1.5+ under the next score, or below 4.5 outright), and a standing
+ * that dropped hard inside the 30-day window. An empty result means the
+ * strip does not render at all.
+ */
+export function buildDimensionAttention(view, limit = 4) {
+  if (!view) return [];
+  const items = [];
+  for (const p of view.principles) {
+    const by = p.perProject
+      .filter((x) => x.score != null)
+      .slice()
+      .sort((a, b) => a.score - b.score);
+    if (by.length < 2) continue;
+    const worst = by[0];
+    const gap = Math.round((by[1].score - worst.score) * 10) / 10;
+    if (gap < 1.5 && worst.score >= 4.5) continue;
+    items.push({
+      kind: 'outlier',
+      name: worst.name,
+      level: worst.score < 4.5 || gap >= 2.5 ? 'elevated' : 'watch',
+      principleLabel: p.label,
+      score: worst.score,
+      gap: gap >= 1.5 ? gap : null,
+      cell: worst,
+      weight: (10 - worst.score) + gap,
+    });
+  }
+  for (const s of view.standings) {
+    if (s.delta == null || s.delta > -0.5) continue;
+    items.push({
+      kind: 'drop',
+      name: s.row.name,
+      level: s.delta <= -1 ? 'elevated' : 'watch',
+      delta: s.delta,
+      row: s.row,
+      weight: Math.abs(s.delta) * 2 + (10 - (s.score ?? 10)),
+    });
+  }
+  return items.sort((a, b) => b.weight - a.weight).slice(0, limit);
+}
+
 /** Drill-down model for one dimension across the scope. */
 export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   const holders = rows

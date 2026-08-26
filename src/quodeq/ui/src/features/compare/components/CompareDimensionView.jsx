@@ -11,6 +11,7 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
+import { buildDimensionAttention } from '../compareModel.js';
 import CompareRadar from './CompareRadar.jsx';
 import CompareMatrix from './CompareMatrix.jsx';
 
@@ -53,6 +54,7 @@ export default function CompareDimensionView({
   // The radar plots leader/trailer/average by default (all N polygons would
   // be unreadable); hovering a standings row overlays that project on top.
   const [focusId, setFocusId] = useState(null);
+  const dimAttention = buildDimensionAttention(view);
 
   const axes = view.principles.map((p) => ({ label: p.label, value: p.avg }));
   const byKey = (source) => view.principles.map((p) => {
@@ -154,6 +156,50 @@ export default function CompareDimensionView({
           tone={view.weakest && view.weakest.avg != null && view.weakest.avg < 5 ? 'critical' : 'default'}
         />
       </StatStrip>
+
+      {/* Dimension-scoped triage: principles where one project sits far
+          under the rest, and hard 30-day drops. Renders only when it has
+          something to say. */}
+      {dimAttention.length > 0 && (
+        <section className="compare-panel" aria-label={t('compare.dimAttentionAria', { dim: view.label })}>
+          <div className="compare-panel__head">
+            <SectionLabel>{t('compare.attentionHeader', { count: dimAttention.length })}</SectionLabel>
+            <span className="compare-panel__note">{t('compare.dimAttentionNote')}</span>
+          </div>
+          <div className="compare-attention compare-attention--strip">
+            {dimAttention.map((item) => (
+              <div
+                key={`${item.kind}-${item.name}-${item.principleLabel || ''}`}
+                className={`compare-attention__item compare-attention__item--${item.level}`}
+                style={{ '--attention-accent': scoreGradeColorVar(item.kind === 'outlier' ? item.score : item.row.score) }}
+              >
+                <div className="compare-attention__top">
+                  <button
+                    type="button"
+                    className="compare-attention__name"
+                    onClick={() => (item.kind === 'outlier'
+                      ? onOpenPrinciple?.(item.cell)
+                      : onOpenProject(item.row.id))}
+                  >
+                    {item.name}
+                  </button>
+                  <span className={`compare-attention__level compare-attention__level--${item.level}`}>
+                    {t(`compare.level${item.level.charAt(0).toUpperCase()}${item.level.slice(1)}`)}
+                  </span>
+                </div>
+                <p className="compare-attention__why">
+                  {item.kind === 'outlier'
+                    ? [
+                      t('compare.dimReasonOutlier', { principle: item.principleLabel, score: score1(item.score) }),
+                      item.gap != null ? t('compare.dimReasonGap', { gap: score1(item.gap) }) : null,
+                    ].filter(Boolean).join(' · ')
+                    : t('compare.dimReasonDrop', { delta: score1(item.delta) })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="compare-lower compare-lower--dim">
         <section className="compare-panel" aria-label={t('compare.standingsAria')}>
@@ -259,6 +305,33 @@ export default function CompareDimensionView({
         </section>
       </div>
 
+      {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
+          one level deeper — projects x principles, cells opening that
+          project's own principle page. */}
+      <CompareMatrix
+        ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
+        header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
+        note={t('compare.matrixNote')}
+        footOverall={view.avg}
+        columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
+        matrixRows={view.standings.map((s) => ({
+          id: s.row.id,
+          name: s.row.name,
+          remote: s.row.remote,
+          overall: s.score,
+          onOpenRow: () => onOpenProject(s.row.id),
+          cells: Object.fromEntries(view.principles.map((p) => {
+            const cell = p.perProject.find((x) => x.id === s.row.id);
+            if (!cell) return [p.key, { score: null }];
+            return [p.key, {
+              score: cell.score,
+              title: t('compare.openDimensionIn', { dim: p.label, project: s.row.name }),
+              onClick: onOpenPrinciple ? () => onOpenPrinciple(cell) : undefined,
+            }];
+          })),
+        }))}
+      />
+
       <section className="compare-panel" aria-label={t('compare.principlesAria')}>
         <div className="compare-panel__head">
           <SectionLabel>{t('compare.principlesHeader', { count: view.principles.length })}</SectionLabel>
@@ -321,32 +394,6 @@ export default function CompareDimensionView({
         </div>
       </section>
 
-      {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
-          one level deeper — projects x principles, cells opening that
-          project's own principle page. */}
-      <CompareMatrix
-        ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
-        header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
-        note={t('compare.matrixNote')}
-        footOverall={view.avg}
-        columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
-        matrixRows={view.standings.map((s) => ({
-          id: s.row.id,
-          name: s.row.name,
-          remote: s.row.remote,
-          overall: s.score,
-          onOpenRow: () => onOpenProject(s.row.id),
-          cells: Object.fromEntries(view.principles.map((p) => {
-            const cell = p.perProject.find((x) => x.id === s.row.id);
-            if (!cell) return [p.key, { score: null }];
-            return [p.key, {
-              score: cell.score,
-              title: t('compare.openDimensionIn', { dim: p.label, project: s.row.name }),
-              onClick: onOpenPrinciple ? () => onOpenPrinciple(cell) : undefined,
-            }];
-          })),
-        }))}
-      />
     </>
   );
 }
