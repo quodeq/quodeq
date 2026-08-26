@@ -167,7 +167,7 @@
   "compare.colRatio": "ratio",
   "compare.colScore": "score",
   "compare.colViolations": "violations",
-  "compare.commitsSince": "{count} commits since last scan",
+  "compare.commitsSince": "{count} commits behind",
   "compare.computing": "computing scores…",
   "compare.crumbDuel": "duel",
   "compare.dimSubtitle": "{principles} principles · {violations} violations · {projects} projects in scope",

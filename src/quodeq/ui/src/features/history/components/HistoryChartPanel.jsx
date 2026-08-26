@@ -16,7 +16,6 @@ import {
 import {
   cssVar,
   scoreBarColor,
-  scoreDomain,
   refLineValues,
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
@@ -82,7 +81,6 @@ function ScoreHistoryChart({ data, interaction }) {
     const runId = data[idx]?.runId;
     if (runId) onBarClick?.(runId);
   };
-  const domain = scoreDomain(data.map((d) => d.numericAverage));
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
       <ComposedChart
@@ -94,17 +92,13 @@ function ScoreHistoryChart({ data, interaction }) {
         style={onBarClick ? { cursor: 'pointer' } : undefined}
       >
         <XAxis dataKey="dateLabel" hide />
-        {/* Bars stay absolute (0-10: a 7 fills 70%); only the line and its
-            grid ride the data-fitted domain so the shape stays visible. */}
-        <YAxis yAxisId="abs" domain={[0, 10]} hide />
-        <YAxis yAxisId="shape" domain={domain} hide />
+        <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
-        {refLineValues(domain).map((y, i) => (
-          <ReferenceLine key={y} yAxisId="shape" y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+        {refLineValues([0, 10]).map((y, i) => (
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
         ))}
         <Bar
-          yAxisId="abs"
-          dataKey="numericAverage"
+              dataKey="numericAverage"
           radius={[0, 0, 0, 0]}
           maxBarSize={32}
           isAnimationActive={false}
@@ -120,7 +114,6 @@ function ScoreHistoryChart({ data, interaction }) {
           ))}
         </Bar>
         <Line
-          yAxisId="shape"
           isAnimationActive={false}
           dataKey="numericAverage"
           type="monotone"

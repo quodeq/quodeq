@@ -11,13 +11,12 @@ const PAD = 2;
 
 export default function CompareTrendLine({ scores, width = 90 }) {
   if (!scores || scores.length < 2) return null;
-  const min = Math.min(...scores);
-  const max = Math.max(...scores);
-  // A flat series still draws mid-height instead of collapsing onto an edge.
-  const span = Math.max(0.5, max - min);
+  // Absolute 0-10 scale, matching the score-history charts: the spark's
+  // height position means score, not a magnified window. The duel trend
+  // is the one deliberately zoomed view.
   const point = (s, i) => {
     const x = PAD + (i / (scores.length - 1)) * (width - PAD * 2);
-    const y = HEIGHT - PAD - ((s - min) / span) * (HEIGHT - PAD * 2);
+    const y = HEIGHT - PAD - (s / 10) * (HEIGHT - PAD * 2);
     return [x, y];
   };
   const pts = scores.map((s, i) => point(s, i).map((v) => v.toFixed(1)).join(',')).join(' ');

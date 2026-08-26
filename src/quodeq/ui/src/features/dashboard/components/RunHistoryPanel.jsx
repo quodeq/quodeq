@@ -18,7 +18,6 @@ import {
 import {
   cssVar,
   scoreBarColor,
-  scoreDomain,
   refLineValues,
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
@@ -87,7 +86,6 @@ function ScoreBars({ data, hoveredIndex, selectedRunId }) {
   // they reach the chart-level onClick handler.
   return (
     <Bar
-      yAxisId="abs"
       dataKey="numericAverage"
       radius={[0, 0, 0, 0]}
       maxBarSize={28}
@@ -123,7 +121,6 @@ function ScoreHistoryChart({ data, interaction }) {
     const runId = data[idx]?.runId;
     if (runId) onBarClick?.(runId);
   };
-  const domain = scoreDomain(data.map((d) => d.numericAverage));
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
       <ComposedChart
@@ -144,21 +141,20 @@ function ScoreHistoryChart({ data, interaction }) {
             clean edge-to-edge bars with just the accent-coloured trend line
             on top. Labels live in the banner (MIN / MAX / AVG). */}
         <XAxis dataKey="dateLabel" hide />
-        {/* Two hidden Y axes on purpose. Bars keep the absolute 0-10 scale
-            so a 7 always fills 70% of the chart (a zoomed bar reads as a
-            smaller score). The line rides the data-fitted domain so the
-            trend's shape stays visible instead of flattening at the top. */}
-        <YAxis yAxisId="abs" domain={[0, 10]} hide />
-        <YAxis yAxisId="shape" domain={domain} hide />
+        {/* One absolute 0-10 axis for everything: bar height means score
+            (a 7 always fills 70%) and the line sits exactly on the bar
+            tops. A zoomed line was tried twice and rejected both ways: a
+            zoomed BAR reads as a smaller score, and a zoomed LINE visibly
+            detaches from the bars. The shape stays subtle by design; the
+            MIN/MAX/AVG banner carries the numbers. */}
+        <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
-        {/* Soft horizontal reference lines framing the line's domain —
-            subtle grid anchors even though numeric ticks are hidden. */}
-        {refLineValues(domain).map((y, i) => (
-          <ReferenceLine key={y} yAxisId="shape" y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+        {refLineValues([0, 10]).map((y, i) => (
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
         ))}
-        <Area yAxisId="shape" dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
+        <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />
-        <Line yAxisId="shape" isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
+        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
