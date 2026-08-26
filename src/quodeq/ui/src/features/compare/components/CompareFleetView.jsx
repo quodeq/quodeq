@@ -203,6 +203,10 @@ function DuelTrigger({ row, targets, onPick }) {
 function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProjectDimension, openDuelPair }) {
   return (
     <div className="compare-rowdetail">
+      {/* One justified header row — facts left, actions right — then the
+          chips as their own wrap line. Three stacked sparse rows left the
+          right half of the expansion dead. */}
+      <div className="compare-rowdetail__head">
       <div className="compare-rowdetail__facts">
         <span className="compare-row__sev">
           <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
@@ -225,6 +229,23 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProje
             {t('compare.commitsSince', { count: nf(row.commitsSince) })}
           </span>
         )}
+      </div>
+      <div className="compare-rowdetail__actions">
+        <button
+          type="button"
+          className="compare-rowdetail__open"
+          onClick={(e) => { e.stopPropagation(); onOpenProject(row.id); }}
+        >
+          {t('compare.openProject')} ›
+        </button>
+        {openDuelPair && duelTargets.length > 0 && (
+          <DuelTrigger
+            row={row}
+            targets={duelTargets}
+            onPick={(otherId) => openDuelPair(row.id, otherId)}
+          />
+        )}
+      </div>
       </div>
       <div className="compare-rowdetail__dims">
         {row.dims.filter((d) => d.score != null).map((dim) => {
@@ -258,22 +279,6 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProje
             </button>
           );
         })}
-      </div>
-      <div className="compare-rowdetail__actions">
-        <button
-          type="button"
-          className="compare-rowdetail__open"
-          onClick={(e) => { e.stopPropagation(); onOpenProject(row.id); }}
-        >
-          {t('compare.openProject')} ›
-        </button>
-        {openDuelPair && duelTargets.length > 0 && (
-          <DuelTrigger
-            row={row}
-            targets={duelTargets}
-            onPick={(otherId) => openDuelPair(row.id, otherId)}
-          />
-        )}
       </div>
     </div>
   );

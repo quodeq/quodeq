@@ -161,6 +161,24 @@ describe('ComparePage', () => {
     expect(await screen.findByText('beta')).toBeInTheDocument();
   });
 
+  it('expansion lays out facts and actions on one header row, chips below', async () => {
+    const { container } = renderPage();
+    await screen.findByText('alpha');
+    await userEvent.click(screen.getByText('alpha'));
+    const detail = container.querySelector('.compare-rowdetail');
+    const head = detail.querySelector('.compare-rowdetail__head');
+    expect(head).toBeTruthy();
+    // Facts (left) and actions (right) share the header row: no third
+    // sparse row, no dead space to the right of the facts.
+    expect(head.querySelector('.compare-rowdetail__facts')).toBeTruthy();
+    expect(head.querySelector('.compare-rowdetail__actions')).toBeTruthy();
+    // Chips follow as their own wrap line.
+    const children = Array.from(detail.children);
+    expect(children.indexOf(head)).toBeLessThan(
+      children.indexOf(detail.querySelector('.compare-rowdetail__dims')),
+    );
+  });
+
   it('an expanded row dimension chip opens that project’s own dimension page, not the compare drill-down', async () => {
     const onOpenProjectDimension = vi.fn();
     renderPage({ onOpenProjectDimension });
