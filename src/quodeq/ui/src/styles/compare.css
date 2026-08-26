@@ -353,6 +353,12 @@
 
 .compare-dim-chip__label { font-size: 10.5px; color: var(--color-text-muted); }
 
+.compare-rowdetail__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .compare-rowdetail__open {
   font: inherit;
   font-size: 11px;

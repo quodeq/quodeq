@@ -197,6 +197,8 @@
   "compare.duelTrendHeader": "SCORE_TREND",
   "compare.duelTrendNote": "overall score over time",
   "compare.duelTrendTooFew": "Not enough evaluations to draw a trend.",
+  "compare.duelWith": "compare with…",
+  "compare.duelWithAria": "Compare {project} with another project",
   "compare.emptyBody": "Add at least one project and run an evaluation, then this screen ranks every project side by side.",
   "compare.emptyTitle": "Nothing to compare yet",
   "compare.filesSuffix": "{count} files",

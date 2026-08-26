@@ -218,6 +218,9 @@ export default function ComparePage({
     openDuel: scopeRows.length === 2 && onOpenDuel
       ? () => { setPickerOpen(false); onOpenDuel([scopeRows[0].id, scopeRows[1].id]); }
       : null,
+    // A duel can also start from any row's expansion ("compare with…") —
+    // no need to narrow the scope to two first.
+    openDuelPair: onOpenDuel ? (idA, idB) => onOpenDuel([idA, idB]) : null,
     onOpenProject,
     now,
   };

@@ -26,7 +26,7 @@ Click any dimension chip or board row to see that dimension across the scope:
 
 ### Head-to-head
 
-When the scope holds exactly two projects, a **compare these two** action opens a duel view: per-dimension gaps, principle differences for shared dimensions, and both trends on one chart. Gaps always read left minus right.
+Any two projects can go head to head: expand a row and pick an opponent under **compare with…**. The duel view shows per-dimension gaps, principle differences for shared dimensions, and both trends on one chart; gaps always read left minus right. When the scope holds exactly two projects, a **compare these two** shortcut also appears in the header.
 
 ### Scope
 

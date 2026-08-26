@@ -103,7 +103,7 @@ function ScopePicker({
 
 /* Detail-on-demand block under an expanded row: everything the single-line
    row no longer carries. */
-function RowDetail({ row, openDimension, onOpenProject }) {
+function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPair }) {
   return (
     <div className="compare-rowdetail">
       <div className="compare-rowdetail__facts">
@@ -143,7 +143,7 @@ function RowDetail({ row, openDimension, onOpenProject }) {
           </button>
         ))}
       </div>
-      <div>
+      <div className="compare-rowdetail__actions">
         <button
           type="button"
           className="compare-rowdetail__open"
@@ -151,12 +151,31 @@ function RowDetail({ row, openDimension, onOpenProject }) {
         >
           {t('compare.openProject')} ›
         </button>
+        {openDuelPair && duelTargets.length > 0 && (
+          /* Native select in the terminal idiom (PeriodSelect's classes):
+             pick any other project to open a head-to-head, no scope
+             narrowing required. */
+          <span className="term-period-select-wrap" onClick={(e) => e.stopPropagation()}>
+            <select
+              className="term-period-select"
+              value=""
+              aria-label={t('compare.duelWithAria', { project: row.name })}
+              onChange={(e) => { if (e.target.value) openDuelPair(row.id, e.target.value); }}
+            >
+              <option value="" disabled>{t('compare.duelWith')}</option>
+              {duelTargets.map((other) => (
+                <option key={other.id} value={other.id}>{other.name}</option>
+              ))}
+            </select>
+            <span className="term-period-select__caret" aria-hidden="true">▾</span>
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimension, error }) {
+function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimension, error, duelTargets, openDuelPair }) {
   const level = consequenceLevel(consequenceOf(row));
   return (
     <div
@@ -222,7 +241,13 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
         )}
       </div>
       {expanded && row.hasData && (
-        <RowDetail row={row} openDimension={openDimension} onOpenProject={onOpenProject} />
+        <RowDetail
+          row={row}
+          duelTargets={duelTargets}
+          openDimension={openDimension}
+          onOpenProject={onOpenProject}
+          openDuelPair={openDuelPair}
+        />
       )}
     </div>
   );
@@ -231,7 +256,7 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
 export default function CompareFleetView({
   rows, orderedRows, fleet, board, attention, errorsById,
   sortDir, toggleSortDir, pickerOpen, setPickerOpen, scopeIds, scopeCount,
-  toggleProject, selectAll, selectFlagged, openDimension, openDuel, onOpenProject,
+  toggleProject, selectAll, selectFlagged, openDimension, openDuel, openDuelPair, onOpenProject,
 }) {
   // Any number of rows can hold their detail open at once — comparing two
   // projects' expansions side by side is the point of this screen.
@@ -416,6 +441,8 @@ export default function CompareFleetView({
               onOpenProject={onOpenProject}
               openDimension={openDimension}
               error={errorsById[row.id]}
+              duelTargets={rows.filter((r) => r.hasData && r.id !== row.id)}
+              openDuelPair={openDuelPair}
             />
           ))}
           {unevaluated.length > 0 && (

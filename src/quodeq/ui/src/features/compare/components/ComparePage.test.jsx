@@ -184,6 +184,23 @@ describe('ComparePage', () => {
     expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
   });
 
+  it('starts a duel from a row expansion regardless of scope size', async () => {
+    renderPage({
+      projects: PROJECTS.concat([{
+        id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
+      }]),
+    });
+    await screen.findByText('gamma');
+    // Three projects in scope: the header CTA is gone, but any expanded row
+    // can pick an opponent.
+    const rowName = screen.getAllByText('alpha')
+      .find((el) => el.classList.contains('compare-row__name'));
+    await userEvent.click(rowName);
+    const chooser = await screen.findByLabelText(/Compare alpha with/);
+    await userEvent.selectOptions(chooser, 'beta');
+    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+  });
+
   it('hides dimensions a project has disabled, like the Overview', async () => {
     getCompareSummary.mockImplementation(() => Promise.resolve({
       ...summary(7.0, 7.0),
