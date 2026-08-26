@@ -92,21 +92,21 @@ jobs:
       # before it writes SARIF.
       - name: Upload Snyk Python (deps) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-python.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.37.7
+        uses: github/codeql-action/upload-sarif@v4.37.8
         with:
           sarif_file: snyk-python.sarif
           category: snyk-python-deps
 
       - name: Upload Snyk UI (deps) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-ui.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.37.7
+        uses: github/codeql-action/upload-sarif@v4.37.8
         with:
           sarif_file: snyk-ui.sarif
           category: snyk-ui-deps
 
       - name: Upload Snyk Code (SAST) SARIF
         if: always() && env.SNYK_TOKEN != '' && hashFiles('snyk-code.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4.37.7
+        uses: github/codeql-action/upload-sarif@v4.37.8
         with:
           sarif_file: snyk-code.sarif
           category: snyk-code
