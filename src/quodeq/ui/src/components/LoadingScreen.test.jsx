@@ -10,14 +10,14 @@ describe('LoadingScreen tips', () => {
     expect(container.querySelector('.loading-tip')).toBeNull();
   });
 
-  it('shows a tip only after the 1s delay, then rotates to a different one', async () => {
+  it('shows a tip only after the 300ms delay, then rotates to a different one', async () => {
     vi.useFakeTimers();
     try {
       const { container } = render(<LoadingScreen tips />);
       expect(container.querySelector('.loading-tip')).toBeNull();
-      await act(async () => { await vi.advanceTimersByTimeAsync(900); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(250); });
       expect(container.querySelector('.loading-tip')).toBeNull();
-      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(50); });
       const first = container.querySelector('.loading-tip');
       expect(first).toBeTruthy();
       const firstText = first.textContent;
