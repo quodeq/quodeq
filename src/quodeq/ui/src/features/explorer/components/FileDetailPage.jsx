@@ -13,7 +13,7 @@ import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
 import DeferredMount from './DeferredMount.jsx';
-import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel, scopeGateRuleLabel } from '../../../strings/labels.js';
 
@@ -360,7 +360,7 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
       {/* Same two-commit split as PrincipleDetailPage: this page is param-fed
           (no fetch), so the first paint would otherwise wait for the visible
           cards' pretext layout effects. */}
-      <DeferredMount fallback={<LoadingScreen variant="inline" />}>
+      <DeferredMount fallback={<CardListSkeleton />}>
         <VirtualList
           key={virtualKey}
           items={items}
