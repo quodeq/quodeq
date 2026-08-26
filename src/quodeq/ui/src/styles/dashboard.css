@@ -3240,3 +3240,21 @@
 }
 .violations-skeleton__bar--group-header { width: 30%; height: 20px; }
 .violations-skeleton__bar--card { width: 100%; height: 72px; }
+
+/* ── History loading skeleton ───────────────────────────
+   Chart shell (HistoryChartPanelPlaceholder) + dense evaluations-table
+   rows while the trend data loads. Same idiom as .overview-skeleton. */
+.history-skeleton__table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--space-6);
+}
+.history-skeleton__row {
+  display: block;
+  width: 100%;
+  height: 25px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
