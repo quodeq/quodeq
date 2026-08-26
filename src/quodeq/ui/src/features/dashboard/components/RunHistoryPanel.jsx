@@ -87,6 +87,7 @@ function ScoreBars({ data, hoveredIndex, selectedRunId }) {
   // they reach the chart-level onClick handler.
   return (
     <Bar
+      yAxisId="abs"
       dataKey="numericAverage"
       radius={[0, 0, 0, 0]}
       maxBarSize={28}
@@ -143,17 +144,21 @@ function ScoreHistoryChart({ data, interaction }) {
             clean edge-to-edge bars with just the accent-coloured trend line
             on top. Labels live in the banner (MIN / MAX / AVG). */}
         <XAxis dataKey="dateLabel" hide />
-        <YAxis domain={domain} hide />
+        {/* Two hidden Y axes on purpose. Bars keep the absolute 0-10 scale
+            so a 7 always fills 70% of the chart (a zoomed bar reads as a
+            smaller score). The line rides the data-fitted domain so the
+            trend's shape stays visible instead of flattening at the top. */}
+        <YAxis yAxisId="abs" domain={[0, 10]} hide />
+        <YAxis yAxisId="shape" domain={domain} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
-        {/* Soft horizontal reference lines at the domain bounds and quarter
-            divisions — subtle grid anchors even though numeric ticks are
-            hidden. Bounds are drawn a touch stronger. */}
+        {/* Soft horizontal reference lines framing the line's domain —
+            subtle grid anchors even though numeric ticks are hidden. */}
         {refLineValues(domain).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+          <ReferenceLine key={y} yAxisId="shape" y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
         ))}
-        <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
+        <Area yAxisId="shape" dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />
-        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
+        <Line yAxisId="shape" isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-accent')} strokeOpacity={0.9} strokeWidth={2} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
