@@ -1100,11 +1100,12 @@
   color: var(--color-text-muted);
 }
 
-/* The heading repeats the dimension's two scores and gap so a diff group
-   reads without scrolling back to the dimensions table. */
+/* The heading repeats the dimension's two scores around the same mirrored
+   bars its table row uses, so a diff group reads without scrolling back
+   and the bar colors say which number belongs to which side. */
 .compare-duel-principles__dimScores {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 7px;
   font-size: 12px;
   letter-spacing: normal;
@@ -1112,7 +1113,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.compare-duel-principles__dimSep { color: var(--color-text-subtle); }
+.compare-duel-principles__dimScores .compare-duel__bars { width: 84px; }
 
 /* Principle rows live inside a ~320px group card, so the label must win
    over the bars: fixed floor for the name, bars take what is left. */

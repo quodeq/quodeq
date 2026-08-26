@@ -32,6 +32,43 @@ function domain(series) {
 const shortDate = (ms) => new Date(ms).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
 
 /**
+ * Monotone cubic (Fritsch-Carlson) path through the points: soft curves
+ * that still pass through every value and never overshoot a peak or put a
+ * wobble on a plateau — the same interpolation the Overview's line uses.
+ */
+function monotonePath(pts) {
+  const n = pts.length;
+  if (n < 2) return '';
+  const seg = (p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+  if (n === 2) return `M${seg(pts[0])} L${seg(pts[1])}`;
+  const dx = [];
+  const slope = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    dx.push(pts[i + 1][0] - pts[i][0]);
+    slope.push((pts[i + 1][1] - pts[i][1]) / (dx[i] || 1));
+  }
+  const tangent = [slope[0]];
+  for (let i = 1; i < n - 1; i += 1) {
+    if (slope[i - 1] * slope[i] <= 0) {
+      tangent.push(0);
+    } else {
+      const w1 = 2 * dx[i] + dx[i - 1];
+      const w2 = dx[i] + 2 * dx[i - 1];
+      tangent.push((w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]));
+    }
+  }
+  tangent.push(slope[n - 2]);
+  let d = `M${seg(pts[0])}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const h = dx[i] / 3;
+    d += ` C${(pts[i][0] + h).toFixed(1)},${(pts[i][1] + h * tangent[i]).toFixed(1)}`
+      + ` ${(pts[i + 1][0] - h).toFixed(1)},${(pts[i + 1][1] - h * tangent[i + 1]).toFixed(1)}`
+      + ` ${seg(pts[i + 1])}`;
+  }
+  return d;
+}
+
+/**
  * @param {object} props
  * @param {{dateISO: string, value: number}[]} props.a - Oldest-first series.
  * @param {{dateISO: string, value: number}[]} props.b - Oldest-first series.
@@ -54,9 +91,9 @@ export default function CompareDuelTrend({ a, b }) {
   const line = (series, variant) => series.length > 0 && (
     <g key={variant}>
       {series.length > 1 ? (
-        <polyline
+        <path
           className={`compare-duel-trend__line compare-duel-trend__line--${variant}`}
-          points={series.map((e) => `${x(e.dateISO).toFixed(1)},${y(e.value).toFixed(1)}`).join(' ')}
+          d={monotonePath(series.map((e) => [x(e.dateISO), y(e.value)]))}
         />
       ) : (
         <circle

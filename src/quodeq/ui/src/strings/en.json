@@ -238,7 +238,7 @@
   "compare.reasonCoverage": "only {pct}% of files analyzed",
   "compare.reasonDeclining": "{delta} over 30 days",
   "compare.reasonStale": "graded on stale data",
-  "compare.reasonStaleCommits": "{count} commits since last scan",
+  "compare.reasonStaleCommits": "{count} commits behind",
   "compare.reasonWorstDim": "{dim} at {score}",
   "compare.remoteTag": "remote",
   "compare.rowExpandHint": "click a row for detail",

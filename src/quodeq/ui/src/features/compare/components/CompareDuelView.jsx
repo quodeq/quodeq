@@ -221,9 +221,12 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
                     <h3 className="compare-duel-principles__dim">
                       <span className="compare-duel-principles__dimLabel">{group.label}</span>
                       {dim && (
+                        /* A compact replica of this dimension's table row:
+                           the mirrored bars carry side identity, so the two
+                           numbers need no left/right legend. */
                         <span className="compare-duel-principles__dimScores">
                           <span className={scoreColorClass(dim.a)}>{score1(dim.a)}</span>
-                          <span className="compare-duel-principles__dimSep">·</span>
+                          <DuelBars a={dim.a} b={dim.b} />
                           <span className={scoreColorClass(dim.b)}>{score1(dim.b)}</span>
                           <span className={`compare-duel__gap ${gapClass(dim.gap)}`}>
                             {dim.gap != null ? signed1(dim.gap) : '—'}
