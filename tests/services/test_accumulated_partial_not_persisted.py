@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from quodeq.services import score_cache, scoring
+from quodeq.services import _score_cache_fetch, scoring
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from quodeq.services.dismissed import dismiss_finding
 from quodeq.services.scoring import get_project_scores
@@ -45,13 +45,15 @@ def project(tmp_path):
 @pytest.fixture()
 def persist_spy(monkeypatch):
     calls: list = []
-    real_write = score_cache.write_cached_accumulated
+    real_write = _score_cache_fetch.write_cached_accumulated
 
     def spying_write(conn, project_name, version, payload):
         calls.append(version)
         return real_write(conn, project_name, version, payload)
 
-    monkeypatch.setattr(score_cache, "write_cached_accumulated", spying_write)
+    # Patch where cached_accumulated resolves the write, not the facade:
+    # score_cache only re-exports the name.
+    monkeypatch.setattr(_score_cache_fetch, "write_cached_accumulated", spying_write)
     return calls
 
 
