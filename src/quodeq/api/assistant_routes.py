@@ -56,8 +56,13 @@ def _try_claim_turn(sid: str) -> bool:
 
 
 def _release_turn(sid: str) -> None:
+    """Free the per-session turn slot and drop the turn's cancel token.
+
+    Workspace actions never register a token, so the pop is a no-op for them;
+    the slot is exclusive, so it can only ever drop this turn's own token."""
     with _running_lock:
         _running_turns.discard(sid)
+        _cancel_tokens.pop(sid, None)
 
 
 def _api_provider(provider_id: str) -> dict | None:
@@ -76,6 +81,94 @@ def _known_provider(provider_id: str) -> dict | None:
     return get_provider_configs().get(provider_id)
 
 
+def _shared_source_error() -> tuple[Response, int] | None:
+    """The shared-clone gate for a new session: the 409 body when no shared
+    repository is configured or its local clone state is unusable, else None."""
+    settings = read_settings()
+    if not settings.url:
+        return jsonify({"error": "no shared repository configured"}), 409
+    state = read_state(settings.url)
+    if state not in ("ok", "empty"):
+        return jsonify({"error": f"shared repository unavailable: {state}"}), 409
+    return None
+
+
+def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | None, str]:
+    """``(run_dir, repo_root, repo_reason)`` for a new session.
+
+    Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
+    Client-supplied runDir/repoRoot are NOT honored: they'd flow to the MCP
+    subprocess's --run-dir/--repo-root with no path jail, giving a remote
+    API-key caller arbitrary server-side file access. The real UI never sends
+    these — it sends {projectId, runId} and the server resolves
+    run_dir/repo_root itself via the jailed resolver.
+
+    Three shapes:
+    - shared: never attaches a repo (the clone has no working copy); data reads
+      resolve against the clone's evaluations root in build_tool_context.
+    - local + specific runId: binds that one run.
+    - local overview (projectId, no runId): stays run-unscoped, so the detail
+      tools read the accumulated (per-dimension-latest) composition from
+      project_id + reports_dir.
+    """
+    project_id = body.get("projectId")
+    if source == "shared":
+        run_dir = None
+        if project_id and body.get("runId"):
+            run_dir = _assistant_helpers.resolve_shared_run_location(
+                str(project_id), str(body["runId"]))
+        return run_dir, None, "online_project"
+    if not project_id:
+        return None, None, "no_project"
+    repo_root, repo_reason = _assistant_helpers.repo_attach_info(str(project_id))
+    run_dir = None
+    if body.get("runId"):
+        run_dir, _ = _assistant_helpers.resolve_run_location(
+            str(project_id), str(body["runId"]),
+        )
+    return run_dir, repo_root, repo_reason
+
+
+def _turn_endpoint(provider: str, body: dict, provider_cfg: dict) -> tuple[str, str | None]:
+    """``(api_base, api_key)`` for a turn — the trust boundary for both.
+
+    api_base is ALWAYS the server's catalog value, never the request body: a
+    caller-supplied apiBase would redirect the turn (and its tool calls) at an
+    arbitrary host (SSRF into internal services / cloud metadata). The UI never
+    sends one — provider endpoints live in ai_providers.json. api_key may still
+    come from the request for genuinely caller-defined providers
+    (custom/openrouter) — it's a credential the caller supplies, not a fetch
+    target — falling back to server config; fixed-endpoint local providers need
+    none.
+    """
+    catalog_cfg = _known_provider(provider)
+    # CLI providers (claude/codex/gemini) have no HTTP endpoint to pin or
+    # override — the orchestrator's run_turn dispatches them internally
+    # (spawning the CLI subprocess), so apiBase/apiKey are meaningless here and
+    # left unset.
+    if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
+        return "", None
+    if provider in _FIXED_ENDPOINT_PROVIDERS:
+        return provider_cfg.get("api_base", ""), None
+    return provider_cfg.get("api_base", ""), body.get("apiKey") or provider_cfg.get("api_key")
+
+
+def _start_turn_worker(sid: str, turn: TurnRequest, repo, tool_ctx, cancel: CancelToken) -> None:
+    """Run the turn on a daemon thread, freeing the session's turn slot when it
+    ends however it ends."""
+    def _worker():
+        try:
+            if tool_ctx.score_cache_path is not None:
+                with score_cache_path_override(tool_ctx.score_cache_path):
+                    run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+            else:
+                run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+        finally:
+            _release_turn(sid)
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 def register_assistant_routes(app: Flask) -> None:
     register_assistant_workspace_routes(app)
 
@@ -92,40 +185,11 @@ def register_assistant_routes(app: Flask) -> None:
         if source not in ("local", "shared"):
             return jsonify({"error": "invalid source"}), 400
         if source == "shared":
-            settings = read_settings()
-            if not settings.url:
-                return jsonify({"error": "no shared repository configured"}), 409
-            state = read_state(settings.url)
-            if state not in ("ok", "empty"):
-                return jsonify(
-                    {"error": f"shared repository unavailable: {state}"}), 409
+            shared_error = _shared_source_error()
+            if shared_error is not None:
+                return shared_error
         session_id = uuid.uuid4().hex
-        # Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
-        # Client-supplied runDir/repoRoot are NOT honored: they'd flow to the
-        # MCP subprocess's --run-dir/--repo-root with no path jail, giving a
-        # remote API-key caller arbitrary server-side file access. The real UI
-        # never sends these — it sends {projectId, runId} and the server
-        # resolves run_dir/repo_root itself via the jailed resolver.
-        run_dir, repo_root, repo_reason = None, None, "no_project"
-        if source == "shared":
-            # Shared sessions never attach a repo (the clone has no working
-            # copy); data reads resolve against the clone's evaluations root
-            # in build_tool_context.
-            repo_reason = "online_project"
-            if body.get("projectId") and body.get("runId"):
-                run_dir = _assistant_helpers.resolve_shared_run_location(
-                    str(body["projectId"]), str(body["runId"]))
-        elif body.get("projectId"):
-            repo_root, repo_reason = _assistant_helpers.repo_attach_info(
-                str(body["projectId"]))
-            # Only bind a single run when the UI selected a SPECIFIC run. On
-            # the overview it sends projectId with no runId → the session
-            # stays run-unscoped and the detail tools read the accumulated
-            # (per-dimension-latest) composition from project_id + reports_dir.
-            if body.get("runId"):
-                run_dir, _ = _assistant_helpers.resolve_run_location(
-                    str(body["projectId"]), str(body["runId"]),
-                )
+        run_dir, repo_root, repo_reason = _resolve_session_scope(source, body)
         project_id = body.get("projectId")
         get_repository(app).create_session(
             session_id=session_id, provider=body["provider"],
@@ -185,28 +249,7 @@ def register_assistant_routes(app: Flask) -> None:
         # to this session 409s permanently.
         try:
             provider_cfg = _api_provider(session["provider"]) or {}
-            catalog_cfg = _known_provider(session["provider"])
-            # CLI providers (claude/codex/gemini) have no HTTP endpoint to pin or
-            # override — the orchestrator's run_turn dispatches them internally
-            # (spawning the CLI subprocess), so apiBase/apiKey are meaningless
-            # here and left unset.
-            if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
-                api_base = ""
-                api_key = None
-            # api_base is ALWAYS the server's catalog value, never the request
-            # body: a caller-supplied apiBase would redirect the turn (and its
-            # tool calls) at an arbitrary host (SSRF into internal services /
-            # cloud metadata). The UI never sends one — provider endpoints live
-            # in ai_providers.json. api_key may still come from the request for
-            # genuinely caller-defined providers (custom/openrouter) — it's a
-            # credential the caller supplies, not a fetch target — falling back
-            # to server config; fixed-endpoint local providers need none.
-            elif session["provider"] in _FIXED_ENDPOINT_PROVIDERS:
-                api_base = provider_cfg.get("api_base", "")
-                api_key = None
-            else:
-                api_base = provider_cfg.get("api_base", "")
-                api_key = body.get("apiKey") or provider_cfg.get("api_key")
+            api_base, api_key = _turn_endpoint(session["provider"], body, provider_cfg)
             turn = TurnRequest(
                 session_id=sid, text=text, ui_state=body.get("uiState"),
                 api_base=api_base,
@@ -217,29 +260,12 @@ def register_assistant_routes(app: Flask) -> None:
                                and (session.get("source") or "local") == "local"),
             )
             tool_ctx = build_tool_context(app, session)
-
-            def _worker():
-                try:
-                    if tool_ctx.score_cache_path is not None:
-                        with score_cache_path_override(tool_ctx.score_cache_path):
-                            run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
-                    else:
-                        run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
-                finally:
-                    with _running_lock:
-                        _running_turns.discard(sid)
-                        _cancel_tokens.pop(sid, None)
-
-            threading.Thread(target=_worker, daemon=True).start()
+            _start_turn_worker(sid, turn, repo, tool_ctx, cancel)
         except SharedSourceUnavailable as exc:
-            with _running_lock:
-                _running_turns.discard(sid)
-                _cancel_tokens.pop(sid, None)
+            _release_turn(sid)
             return jsonify({"error": str(exc)}), 409
         except Exception:
-            with _running_lock:
-                _running_turns.discard(sid)
-                _cancel_tokens.pop(sid, None)
+            _release_turn(sid)
             raise
         return jsonify({"accepted": True}), 202
 

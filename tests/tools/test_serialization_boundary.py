@@ -22,7 +22,7 @@ DECLARED_WIRE_BOUNDARIES: dict[str, str] = {
     "data/fs/report_parser/_eval_parsing.py": "parses stored camelCase findings back out (stored contract)",
     "services/accumulated.py": "payload feeds both routes and the persisted score cache — burn-down: WS5/scoring reader",
     "services/rescore.py": "envelope consumed by routes AND services/scoring — burn-down: WS5/scoring reader",
-    "services/dashboard.py": "run-dim LRU stores wire payloads — burn-down: WS5/scoring reader",
+    "services/_dashboard_response.py": "run-dim LRU stores wire payloads — burn-down: WS5/scoring reader",
     "services/_fs_reports.py": "violation responses cached in wire shape — burn-down: WS5",
     "services/scoring/_response_builders.py": "scoring payloads flow into SSE + caches in wire shape — burn-down: WS5/scoring reader",
 }

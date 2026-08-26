@@ -1,0 +1,103 @@
+"""Run-dimension cache configuration and fetcher factory for the dashboard.
+
+Split out of ``dashboard``: the caching concern (env-tuned sizes, the
+process-wide LRU, its invalidation hook) is independent of run resolution and
+payload assembly, and ``services.scoring`` reaches into the fetcher factory
+directly. ``dashboard`` re-exports everything here, so the historical import
+path still resolves.
+"""
+from __future__ import annotations
+
+import os
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+from quodeq.core.types import DimensionResult
+from quodeq.services._cache import make_lru_dimension_fetcher
+
+
+@dataclass
+class DashboardCacheConfig:
+    """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
+    cache: OrderedDict[tuple, list[DimensionResult]] | None = None
+    lock: threading.Lock | None = None
+    max_size: int | None = None
+
+
+_DEFAULT_RUN_DIM_CACHE_MAX = 256
+
+
+def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
+    """Return the run-dimension cache size limit. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    try:
+        return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+    except (ValueError, TypeError):
+        return _DEFAULT_RUN_DIM_CACHE_MAX
+
+
+# Module-level shared cache for run-dimension data. Without this, every
+# dashboard request used a fresh cache (created in _make_run_dimension_fetcher
+# below), so re-fetching the same project's history (which collect_stale_dimensions
+# / _collect_previous_scores / build_accumulated_trend all walk) cost ~750ms
+# per request even on warm calls. The shared cache eliminates the cross-request
+# I/O without compromising the per-request consistency guarantees (the cache
+# is keyed by (reports_root, project, run_id, suppression_version) so a
+# dismiss/delete produces a new key and never serves a pre-suppression score,
+# and runs are immutable once finalized).
+#
+# Tests that need isolation can pass an explicit DashboardCacheConfig.
+_SHARED_RUN_DIM_CACHE, _SHARED_RUN_DIM_LOCK = OrderedDict(), threading.Lock()
+
+
+def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
+    """Create the default run-dimension LRU cache and its lock.
+
+    Override this factory to plug in a shared backend (e.g. a Redis-backed
+    OrderedDict wrapper) for multi-worker deployments.  The returned
+    ordered-dict must support ``move_to_end``, ``popitem(last=False)``,
+    and standard ``__getitem__``/``__setitem__``/``__contains__``.
+    """
+    return OrderedDict(), threading.Lock()
+
+
+def clear_shared_dimension_cache() -> None:
+    """Drop all cached run-dimension data (e.g. after a formula change)."""
+    with _SHARED_RUN_DIM_LOCK:
+        _SHARED_RUN_DIM_CACHE.clear()
+
+
+def _make_run_dimension_fetcher(
+    reports_root: Path,
+    project: str,
+    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
+    lock: threading.Lock | None = None,
+    max_size: int | None = None,
+    version: str = "",
+) -> Callable[[str], list[DimensionResult]]:
+    """Return a cached fetcher for run dimension data (LRU, bounded).
+
+    Defaults to the module-level shared cache so reads of the same run's
+    dimensions across requests reuse work. *version* scopes the cache key to the
+    project's suppression state so a dismiss/delete invalidates it. Tests pass
+    explicit cache/lock to isolate state.
+    """
+    return make_lru_dimension_fetcher(
+        reports_root,
+        project,
+        cache if cache is not None else _SHARED_RUN_DIM_CACHE,
+        lock if lock is not None else _SHARED_RUN_DIM_LOCK,
+        max_size if max_size is not None else _run_dim_cache_max(),
+        version=version,
+    )
+
+
+__all__ = [
+    "DashboardCacheConfig",
+    "clear_shared_dimension_cache",
+    "create_dimension_cache",
+]
