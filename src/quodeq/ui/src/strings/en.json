@@ -212,7 +212,7 @@
   "compare.loadFailed": "failed to load scores",
   "compare.matrixAria": "Score matrix",
   "compare.matrixHeader": "SCORE_MATRIX · {rows} × {cols}",
-  "compare.matrixNote": "every score at a glance · best and worst per column ringed",
+  "compare.matrixNote": "every score at a glance · per column: best ringed solid, worst dashed",
   "compare.matrixOverall": "overall",
   "compare.needTwo": "needs two scored projects",
   "compare.noEvalsCollapsed": "{count} projects without evaluations",

@@ -234,13 +234,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Header band matches the projects table's head row exactly (same
+   background, size, tracking), so the two tables read as one family. */
 .compare-matrix th {
-  font-size: 9.5px;
+  background: var(--color-surface-alt);
+  font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-muted);
   padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
   text-align: right;
   max-width: 110px;
   overflow: hidden;
@@ -250,7 +254,15 @@
 
 .compare-matrix td { padding: 7px 10px; border-top: 1px solid var(--color-border); }
 .compare-matrix__num { text-align: right; }
-.compare-matrix__project { text-align: left; padding-left: 16px !important; white-space: nowrap; }
+
+/* The "project" title sits flush-left over the project names, like the
+   ranked table above it. */
+.compare-matrix th.compare-matrix__project,
+.compare-matrix td.compare-matrix__project {
+  text-align: left;
+  padding-left: 16px;
+  white-space: nowrap;
+}
 .compare-matrix th.compare-matrix__project { max-width: none; }
 .compare-matrix__overall { font-weight: 600; }
 .compare-matrix__none { color: var(--color-text-subtle); }
@@ -265,7 +277,6 @@
 .compare-matrix__rowbtn,
 .compare-matrix__cell {
   font: inherit;
-  color: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
   background: transparent;
@@ -274,16 +285,34 @@
   cursor: pointer;
 }
 
+/* color: inherit stays OFF the score cells — their grade-* class is the
+   color source, and an equal-specificity inherit later in the cascade
+   would flatten every number to plain text. */
+.compare-matrix__colbtn,
+.compare-matrix__rowbtn { color: inherit; }
+
 .compare-matrix__colbtn:hover,
 .compare-matrix__rowbtn:hover { color: var(--color-accent); }
 
-button.compare-matrix__cell { border-radius: 5px; padding: 2px 6px; }
-button.compare-matrix__cell:hover { background: var(--color-surface-alt); }
-span.compare-matrix__cell { padding: 2px 6px; }
+/* Every cell is a chip in the SCORE'S OWN grade color (currentColor:
+   the text is already grade-colored): tinted background, matching
+   border — the expansion-chip look, without the little bar. Never a
+   fixed accent or danger: a column's lowest score can still be a good
+   one, and the styling must mark position, not pass judgement. The
+   extremes live in the border alone — the column's best turns its
+   border solid-strong, the worst dashed. */
+button.compare-matrix__cell,
+span.compare-matrix__cell {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
 
-/* The rings: outline, never fill — the number keeps its grade color. */
-.compare-matrix__cell--max { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent); border-radius: 5px; }
-.compare-matrix__cell--min { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 50%, transparent); border-radius: 5px; }
+button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
+
+.compare-matrix .compare-matrix__cell--max { border-color: color-mix(in srgb, currentColor 72%, transparent); }
+.compare-matrix .compare-matrix__cell--min { border-style: dashed; border-color: color-mix(in srgb, currentColor 62%, transparent); }
 
 /* ── projects table ─────────────────────────────────────────────────────
    Flex cells with fixed widths instead of a shared grid template: columns
