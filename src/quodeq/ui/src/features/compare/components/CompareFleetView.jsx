@@ -14,6 +14,7 @@ import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/t
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CompareTrendLine from './CompareTrendLine.jsx';
+import CompareMatrix from './CompareMatrix.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
@@ -373,6 +374,9 @@ export default function CompareFleetView({
   // Any number of rows can hold their detail open at once — comparing two
   // projects' expansions side by side is the point of this screen.
   const [expandedIds, setExpandedIds] = useState(() => new Set());
+  // The score matrix shows the same projects as the ranked table, in the
+  // same order — never-evaluated rows have no numbers to grid.
+  const scoredRows = orderedRows.filter((r) => r.hasData);
   const [showUnevaluated, setShowUnevaluated] = useState(false);
   const toggleRow = (id) => setExpandedIds((cur) => {
     const next = new Set(cur);
@@ -597,6 +601,33 @@ export default function CompareFleetView({
           )}
         </div>
       </section>
+
+      {/* v4a: every score at a glance, right after the ranked table. A
+          column header opens the dimension drill-down; a cell opens that
+          project's own dimension (remote rows open the shared project). */}
+      <CompareMatrix
+        ariaLabel={t('compare.matrixAria')}
+        header={t('compare.matrixHeader', { rows: scoredRows.length, cols: board.length })}
+        note={t('compare.matrixNote')}
+        footOverall={fleet.score}
+        columns={board.map((b) => ({
+          key: b.key, label: b.label, avg: b.avg, onOpen: () => openDimension(b.key),
+        }))}
+        matrixRows={scoredRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          remote: row.remote,
+          overall: row.score,
+          onOpenRow: () => onOpenProject(row.id),
+          cells: Object.fromEntries(row.dims.map((dim) => [dim.key, {
+            score: dim.score,
+            title: t('compare.openDimensionIn', { dim: dim.label, project: row.name }),
+            onClick: () => (row.remote || !dim.fromRunId || !onOpenProjectDimension
+              ? onOpenProject(row.id)
+              : onOpenProjectDimension({ id: row.id, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel })),
+          }])),
+        }))}
+      />
 
       <section className="compare-panel" aria-label={t('compare.dimensionsAria')}>
         <div className="compare-panel__head">

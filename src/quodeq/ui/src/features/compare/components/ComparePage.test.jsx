@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -114,8 +114,8 @@ describe('ComparePage', () => {
     renderPage();
     expect(await screen.findByText('alpha')).toBeInTheDocument();
     expect(await screen.findByText('beta')).toBeInTheDocument();
-    expect(await screen.findByText('7.4')).toBeInTheDocument();
-    expect(await screen.findByText('5.9')).toBeInTheDocument();
+    expect((await screen.findAllByText('7.4')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('5.9')).length).toBeGreaterThan(0);
   });
 
   it('expands a row on click; the expansion opens the project overview', async () => {
@@ -190,6 +190,20 @@ describe('ComparePage', () => {
       id: 'alpha', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
     });
     expect(screen.queryByText(/PROJECT_STANDINGS/)).toBeNull();
+  });
+
+  it('score matrix grids every project and drills through its columns and cells', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    const matrix = await screen.findByLabelText('Score matrix');
+    // Both projects' Security scores appear as cells (7.0 and 5.5).
+    expect(within(matrix).getByText('7.0')).toBeInTheDocument();
+    expect(within(matrix).getByText('5.5')).toBeInTheDocument();
+    // A column header opens the dimension drill-down, which carries the
+    // principle matrix appendix.
+    await userEvent.click(within(matrix).getByRole('button', { name: 'security' }));
+    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
+    expect(screen.getByText(/PRINCIPLE_MATRIX/)).toBeInTheDocument();
   });
 
   it('drills into a dimension and back', async () => {

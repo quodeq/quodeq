@@ -12,6 +12,7 @@ import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../u
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import CompareRadar from './CompareRadar.jsx';
+import CompareMatrix from './CompareMatrix.jsx';
 
 const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
@@ -319,6 +320,33 @@ export default function CompareDimensionView({
           ))}
         </div>
       </section>
+
+      {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
+          one level deeper — projects x principles, cells opening that
+          project's own principle page. */}
+      <CompareMatrix
+        ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
+        header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
+        note={t('compare.matrixNote')}
+        footOverall={view.avg}
+        columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
+        matrixRows={view.standings.map((s) => ({
+          id: s.row.id,
+          name: s.row.name,
+          remote: s.row.remote,
+          overall: s.score,
+          onOpenRow: () => onOpenProject(s.row.id),
+          cells: Object.fromEntries(view.principles.map((p) => {
+            const cell = p.perProject.find((x) => x.id === s.row.id);
+            if (!cell) return [p.key, { score: null }];
+            return [p.key, {
+              score: cell.score,
+              title: t('compare.openDimensionIn', { dim: p.label, project: s.row.name }),
+              onClick: onOpenPrinciple ? () => onOpenPrinciple(cell) : undefined,
+            }];
+          })),
+        }))}
+      />
     </>
   );
 }
