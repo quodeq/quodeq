@@ -143,6 +143,12 @@ export function buildRow(project, summary, now) {
     .map((d) => ({
       key: nameKey(d.dimension),
       label: String(d.dimension || '').toLowerCase(),
+      // Raw identifiers for cross-project navigation: the dimension-eval
+      // endpoint and the principle page need the payload's own spellings
+      // and the run the numbers came from.
+      name: d.dimension,
+      fromRunId: d.fromRunId ?? null,
+      fromDateLabel: d.fromDateLabel ?? null,
       score: parseScore10(d.overallScore),
       grade: d.overallGrade ?? null,
       violations: d.totals?.violationCount ?? 0,
@@ -151,6 +157,7 @@ export function buildRow(project, summary, now) {
       principles: (d.principles || []).map((p) => ({
         key: nameKey(p.principle || p.name),
         label: String(p.principle || p.name || '').toLowerCase(),
+        name: p.principle || p.name || '',
         score: parseScore10(p.score),
       })),
     }))
@@ -402,7 +409,20 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
         const detail = (e.dimensionDetails || []).find((d) => nameKey(d.dimension) === dimensionKey);
         return detail ? parseScore10(detail.score) : null;
       });
-      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, compliance: dim.compliance, severity: dim.severity, principles: dim.principles };
+      return {
+        row,
+        score: dim.score,
+        delta,
+        lastDelta,
+        violations: dim.violations,
+        compliance: dim.compliance,
+        severity: dim.severity,
+        principles: dim.principles,
+        // Cross-project navigation targets for this project's dimension.
+        runId: dim.fromRunId,
+        dimName: dim.name,
+        dateLabel: dim.fromDateLabel,
+      };
     })
     .sort((a, b) => b.score - a.score);
   const lead = standings[0];
@@ -417,15 +437,25 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   );
 
   const principleKeys = new Map();
-  for (const { row, principles } of standings.map((s) => ({ row: s.row, principles: s.principles }))) {
-    for (const p of principles) {
+  for (const s of standings) {
+    for (const p of s.principles) {
       if (p.score == null) continue;
       let entry = principleKeys.get(p.key);
       if (!entry) {
         entry = { key: p.key, label: p.label, perProject: [] };
         principleKeys.set(p.key, entry);
       }
-      entry.perProject.push({ id: row.id, name: row.name, score: p.score });
+      entry.perProject.push({
+        id: s.row.id,
+        name: s.row.name,
+        score: p.score,
+        // Everything a click needs to open THIS project's view of THIS
+        // principle: the run the number came from and the raw spellings.
+        principle: p.name,
+        runId: s.runId,
+        dimName: s.dimName,
+        dateLabel: s.dateLabel,
+      });
     }
   }
   const principles = Array.from(principleKeys.values())

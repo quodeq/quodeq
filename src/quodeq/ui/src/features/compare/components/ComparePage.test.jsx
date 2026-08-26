@@ -7,12 +7,13 @@ import ComparePage from './ComparePage.jsx';
 
 vi.mock('../../../api/index.js', () => ({
   getCompareSummary: vi.fn(),
+  getDimensionEval: vi.fn(),
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
 }));
 
-import { getCompareSummary } from '../../../api/index.js';
+import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
 import { getStandardsVisibility } from '../../../api/standards.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
@@ -35,6 +36,8 @@ function summary(score, dimScore) {
       dimension: 'Security',
       overallScore: `${dimScore}/10`,
       overallGrade: 'Good',
+      fromRunId: 'r2',
+      fromDateLabel: '25 Aug',
       totals: { violationCount: 6, severity: { critical: 1, major: 2, minor: 3 } },
       principles: [
         { principle: 'Integrity', score: `${dimScore}` },
@@ -199,6 +202,30 @@ describe('ComparePage', () => {
     await screen.findByText('alpha');
     expect(await screen.findAllByText('security')).not.toHaveLength(0);
     expect(screen.queryByText('usability')).toBeNull();
+  });
+
+  it('opens a project-specific principle from a principle card', async () => {
+    getDimensionEval.mockResolvedValue({
+      dimension: 'Security',
+      principles: [{ name: 'Integrity', violations: [], compliance: [] }],
+      principleGrades: [{ principle: 'Integrity', score: '7.0', grade: 'Good' }],
+      violations: [],
+      compliance: [],
+    });
+    const onOpenEvalPrincipal = vi.fn();
+    renderPage({ onOpenEvalPrincipal });
+    await screen.findByText('alpha');
+    await userEvent.click((await screen.findAllByText('security'))[0]);
+    // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
+    // integrity lead entry, whoever it is, via its accessible title.
+    const leads = await screen.findAllByTitle(/open integrity in/);
+    await userEvent.click(leads[0]);
+    await waitFor(() => expect(onOpenEvalPrincipal).toHaveBeenCalled());
+    const evalPrincipal = onOpenEvalPrincipal.mock.calls[0][0];
+    expect(evalPrincipal.principle).toBe('Integrity');
+    expect(evalPrincipal.runId).toBe('r2');
+    expect(['alpha', 'beta']).toContain(evalPrincipal.project);
+    expect(getDimensionEval).toHaveBeenCalledWith(evalPrincipal.project, 'r2', 'Security');
   });
 
   it('marks projects whose summary failed', async () => {

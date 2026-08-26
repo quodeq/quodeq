@@ -472,8 +472,14 @@ function renderEvalPrincipleDetail(params, props) {
         // local liveScore/liveGrade. The dashboard refetch covers the
         // accumulated (cross-run) rollup separately.
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
-        const result = await props.dismissFinding(selectedProject, payload);
-        props.applyDelta?.(selectedProject, result?.scores, result?.delta);
+        // The evalPrincipal's own project, NOT the global selection: a
+        // cross-project entry (Compare's principle jump, a parent
+        // dimension's fromProject) must dismiss into the project the
+        // finding belongs to — this is the recurring identity-divergence
+        // class from the assistant dismiss bug.
+        const targetProject = evalPrincipal.project || selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -770,6 +776,9 @@ export const ROUTE_RENDERERS = {
       // dimensions so tab-hopping doesn't grow history.
       onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
       onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      // Cross-project principle jump: the evalPrincipal carries its own
+      // project, so the selection doesn't change and back pops to Compare.
+      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
       // Head-to-head is a push like the dimension drill-down: back returns
       // to the fleet with the two-project scope still selected.
       duel={params.duel || null}

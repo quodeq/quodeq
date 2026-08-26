@@ -800,13 +800,24 @@
 
 .compare-principle__facts { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
+/* Lead/trail and the ranked bars are navigation: they open that project's
+   own view of this principle. */
 .compare-principle__lead,
 .compare-principle__trail {
+  font: inherit;
   font-size: 11px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.compare-principle__lead:hover,
+.compare-principle__trail:hover { text-decoration: underline; }
 
 .compare-principle__lead { color: var(--color-accent); }
 .compare-principle__trail { color: var(--color-sev-critical-text); }
@@ -826,9 +837,15 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  font: inherit;
+  background: transparent;
+  border: none;
   padding: 0 3px;
+  cursor: pointer;
   border-right: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
 }
+
+.compare-principle__slot:hover { background: var(--color-surface-alt); }
 
 .compare-principle__slot:last-child { border-right: none; }
 
