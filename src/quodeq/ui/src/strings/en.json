@@ -216,6 +216,7 @@
   "compare.noScores": "no scored projects in scope yet",
   "compare.oldDeltaTip": "change at the last evaluation, before the 30-day window",
   "compare.openDimension": "open {dim}",
+  "compare.openProjectDimension": "open {name}’s {dim}",
   "compare.openDimensionIn": "open {dim} in {project}",
   "compare.openPrincipleIn": "open {principle} in {project}",
   "compare.openProject": "open project",

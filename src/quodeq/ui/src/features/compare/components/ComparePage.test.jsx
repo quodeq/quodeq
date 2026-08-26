@@ -161,6 +161,19 @@ describe('ComparePage', () => {
     expect(await screen.findByText('beta')).toBeInTheDocument();
   });
 
+  it('an expanded row dimension chip opens that project’s own dimension page, not the compare drill-down', async () => {
+    const onOpenProjectDimension = vi.fn();
+    renderPage({ onOpenProjectDimension });
+    await screen.findByText('alpha');
+    await userEvent.click(screen.getByText('alpha'));
+    const chip = await screen.findByTitle('open alpha’s security');
+    await userEvent.click(chip);
+    expect(onOpenProjectDimension).toHaveBeenCalledWith({
+      id: 'alpha', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
+    });
+    expect(screen.queryByText(/PROJECT_STANDINGS/)).toBeNull();
+  });
+
   it('drills into a dimension and back', async () => {
     renderPage();
     await screen.findByText('alpha');
