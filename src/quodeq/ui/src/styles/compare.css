@@ -1087,6 +1087,10 @@
 }
 
 .compare-duel-principles__dim {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   margin: 0;
   padding: 12px 16px 8px;
   font-size: 11px;
@@ -1095,6 +1099,20 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
+
+/* The heading repeats the dimension's two scores and gap so a diff group
+   reads without scrolling back to the dimensions table. */
+.compare-duel-principles__dimScores {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-duel-principles__dimSep { color: var(--color-text-subtle); }
 
 /* Principle rows live inside a ~320px group card, so the label must win
    over the bars: fixed floor for the name, bars take what is left. */
@@ -1238,11 +1256,14 @@
 /* Opens DOWNWARD: .compare-table is an overflow container, and content
    escaping its top edge is unreachable, while content past its bottom
    edge just extends the scroll area. */
+/* Rendered through a portal at a FIXED position (the component computes
+   top/bottom/left inline from the button's rect): the projects table is an
+   overflow container that would clip an in-flow popover for rows near its
+   bottom edge. max-height must stay in sync with DUEL_MENU_MAX_H. */
 .compare-dueltrigger__menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 40;
+  position: fixed;
+  z-index: 80;
+  display: block;
   min-width: 200px;
   max-height: 260px;
   overflow-y: auto;

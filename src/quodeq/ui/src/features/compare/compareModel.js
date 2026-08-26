@@ -395,8 +395,16 @@ export function buildDuelView(idA, idB, rows, now, summariesById) {
     })
     .filter((g) => g.items.length);
 
-  const series = (id) => sortedByDate(summariesById?.[id]?.trend)
-    .map((e) => ({ dateISO: e.dateISO, value: e.numericAverage }));
+  // One point per DAY, keeping the day's newest run: several runs in one
+  // afternoon otherwise draw vertical zigzags that read as noise, not
+  // trend. Same collapse the Overview's day view applies.
+  const series = (id) => {
+    const daily = new Map();
+    for (const e of sortedByDate(summariesById?.[id]?.trend)) {
+      daily.set(String(e.dateISO).slice(0, 10), e);
+    }
+    return Array.from(daily.values()).map((e) => ({ dateISO: e.dateISO, value: e.numericAverage }));
+  };
 
   return {
     a,
