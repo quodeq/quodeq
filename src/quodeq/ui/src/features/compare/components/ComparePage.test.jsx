@@ -204,6 +204,22 @@ describe('ComparePage', () => {
     expect(screen.queryByText('usability')).toBeNull();
   });
 
+  it('closes the scope picker on outside click and on Escape', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    const toggle = screen.getByText(/all 2 projects/);
+    await userEvent.click(toggle);
+    expect(screen.getByText('Projects in scope')).toBeInTheDocument();
+    // Click anywhere outside the picker.
+    await userEvent.click(screen.getByText(/PROJECTS ·/));
+    expect(screen.queryByText('Projects in scope')).toBeNull();
+    // Escape closes it too.
+    await userEvent.click(toggle);
+    expect(screen.getByText('Projects in scope')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByText('Projects in scope')).toBeNull();
+  });
+
   it('standings rows open that project view of the same dimension', async () => {
     const onOpenProjectDimension = vi.fn();
     const onOpenProject = vi.fn();

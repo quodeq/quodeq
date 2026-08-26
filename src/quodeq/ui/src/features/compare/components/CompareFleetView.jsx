@@ -8,7 +8,7 @@
  * coverage, per-dimension chips) lives inside a row's expansion; projects
  * that were never evaluated collapse into a single line.
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
@@ -29,12 +29,27 @@ function levelLabel(level) {
 function ScopePicker({
   rows, scopeIds, toggleProject, selectAll, selectFlagged, pickerOpen, setPickerOpen, scopeCount,
 }) {
+  // Dismiss like every other popover in the app (NavBreadcrumb's pattern):
+  // a press anywhere outside, or Escape, closes it.
+  const rootRef = useRef(null);
+  useEffect(() => {
+    if (!pickerOpen) return undefined;
+    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setPickerOpen(false); };
+    const onEsc = (e) => { if (e.key === 'Escape') setPickerOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [pickerOpen, setPickerOpen]);
+
   const allSelected = scopeIds == null || scopeCount === rows.length;
   const label = allSelected
     ? t('compare.scopeAll', { count: rows.length })
     : t('compare.scopeSome', { selected: scopeCount, count: rows.length });
   return (
-    <span className="compare-picker">
+    <span className="compare-picker" ref={rootRef}>
       <button
         type="button"
         className={`compare-picker__toggle${allSelected ? '' : ' compare-picker__toggle--filtered'}`}
