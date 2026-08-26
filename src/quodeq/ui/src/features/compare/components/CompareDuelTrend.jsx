@@ -47,21 +47,32 @@ export default function CompareDuelTrend({ a, b }) {
   const ticks = [];
   for (let v = v0; v <= v1; v += 1) ticks.push(v);
 
+  /* Lines stay clean: no per-point dots. A lone-point series still gets a
+     visible dot (a dotless single point would vanish), and every point
+     keeps an invisible, slightly larger circle as the tooltip hit
+     target. */
   const line = (series, variant) => series.length > 0 && (
     <g key={variant}>
-      {series.length > 1 && (
+      {series.length > 1 ? (
         <polyline
           className={`compare-duel-trend__line compare-duel-trend__line--${variant}`}
           points={series.map((e) => `${x(e.dateISO).toFixed(1)},${y(e.value).toFixed(1)}`).join(' ')}
+        />
+      ) : (
+        <circle
+          className={`compare-duel-trend__dot compare-duel-trend__dot--${variant}`}
+          cx={x(series[0].dateISO).toFixed(1)}
+          cy={y(series[0].value).toFixed(1)}
+          r="4"
         />
       )}
       {series.map((e) => (
         <circle
           key={e.dateISO}
-          className={`compare-duel-trend__dot compare-duel-trend__dot--${variant}`}
+          className="compare-duel-trend__hit"
           cx={x(e.dateISO).toFixed(1)}
           cy={y(e.value).toFixed(1)}
-          r="4"
+          r="7"
         >
           <title>
             {t('compare.duelPointTip', { date: shortDate(Date.parse(e.dateISO)), score: e.value.toFixed(1) })}

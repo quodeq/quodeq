@@ -1008,6 +1008,10 @@
 .compare-duel-trend__dot--a { fill: var(--color-duel-a); }
 .compare-duel-trend__dot--b { fill: var(--color-duel-b); }
 
+/* Invisible per-point tooltip hit targets: the lines carry no visible
+   dots, but hovering a point still names its date and score. */
+.compare-duel-trend__hit { fill: transparent; }
+
 .compare-duel-trend__ticks { position: absolute; inset: 0; pointer-events: none; }
 
 .compare-duel-trend__tick {
