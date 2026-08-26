@@ -8,13 +8,13 @@
  * coverage, per-dimension chips) lives inside a row's expansion; projects
  * that were never evaluated collapse into a single line.
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CompareTrendLine from './CompareTrendLine.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
-import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
+import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { consequenceOf, consequenceLevel } from '../compareModel.js';
@@ -29,12 +29,27 @@ function levelLabel(level) {
 function ScopePicker({
   rows, scopeIds, toggleProject, selectAll, selectFlagged, pickerOpen, setPickerOpen, scopeCount,
 }) {
+  // Dismiss like every other popover in the app (NavBreadcrumb's pattern):
+  // a press anywhere outside, or Escape, closes it.
+  const rootRef = useRef(null);
+  useEffect(() => {
+    if (!pickerOpen) return undefined;
+    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setPickerOpen(false); };
+    const onEsc = (e) => { if (e.key === 'Escape') setPickerOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [pickerOpen, setPickerOpen]);
+
   const allSelected = scopeIds == null || scopeCount === rows.length;
   const label = allSelected
     ? t('compare.scopeAll', { count: rows.length })
     : t('compare.scopeSome', { selected: scopeCount, count: rows.length });
   return (
-    <span className="compare-picker">
+    <span className="compare-picker" ref={rootRef}>
       <button
         type="button"
         className={`compare-picker__toggle${allSelected ? '' : ' compare-picker__toggle--filtered'}`}
@@ -88,7 +103,7 @@ function ScopePicker({
 
 /* Detail-on-demand block under an expanded row: everything the single-line
    row no longer carries. */
-function RowDetail({ row, openDimension, onOpenProject }) {
+function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPair }) {
   return (
     <div className="compare-rowdetail">
       <div className="compare-rowdetail__facts">
@@ -98,10 +113,7 @@ function RowDetail({ row, openDimension, onOpenProject }) {
           <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
         </span>
         {row.spark.length > 1 && (
-          <>
-            <CompareTrendLine scores={row.spark} />
-            <span className="compare-rowdetail__hint">{t('compare.detailTrendHint')}</span>
-          </>
+          <CompareTrendLine scores={row.spark} />
         )}
         {row.coveragePct != null && (
           <span className={row.coveragePct < 80 ? 'compare-row__cov--low' : undefined}>
@@ -110,6 +122,11 @@ function RowDetail({ row, openDimension, onOpenProject }) {
         )}
         {row.totalFiles != null && (
           <span>{t('compare.filesSuffix', { count: nf(row.totalFiles) })}</span>
+        )}
+        {row.commitsSince != null && row.commitsSince > 0 && (
+          <span className="compare-rowdetail__stale">
+            {t('compare.commitsSince', { count: nf(row.commitsSince) })}
+          </span>
         )}
       </div>
       <div className="compare-rowdetail__dims">
@@ -126,7 +143,7 @@ function RowDetail({ row, openDimension, onOpenProject }) {
           </button>
         ))}
       </div>
-      <div>
+      <div className="compare-rowdetail__actions">
         <button
           type="button"
           className="compare-rowdetail__open"
@@ -134,15 +151,39 @@ function RowDetail({ row, openDimension, onOpenProject }) {
         >
           {t('compare.openProject')} ›
         </button>
+        {openDuelPair && duelTargets.length > 0 && (
+          /* Native select in the terminal idiom (PeriodSelect's classes):
+             pick any other project to open a head-to-head, no scope
+             narrowing required. */
+          <span className="term-period-select-wrap" onClick={(e) => e.stopPropagation()}>
+            <select
+              className="term-period-select"
+              value=""
+              aria-label={t('compare.duelWithAria', { project: row.name })}
+              onChange={(e) => { if (e.target.value) openDuelPair(row.id, e.target.value); }}
+            >
+              <option value="" disabled>{t('compare.duelWith')}</option>
+              {duelTargets.map((other) => (
+                <option key={other.id} value={other.id}>{other.name}</option>
+              ))}
+            </select>
+            <span className="term-period-select__caret" aria-hidden="true">▾</span>
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimension, error }) {
+function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimension, error, duelTargets, openDuelPair }) {
   const level = consequenceLevel(consequenceOf(row));
   return (
-    <div className={`compare-rowgroup compare-rowgroup--${level}${expanded ? ' compare-rowgroup--open' : ''}`}>
+    <div
+      className={`compare-rowgroup compare-rowgroup--${level}${expanded ? ' compare-rowgroup--open' : ''}`}
+      // The stripe's colour is the project's GRADE; the consequence level
+      // only decides whether a stripe shows.
+      style={row.hasData ? { '--row-accent': scoreGradeColorVar(row.score) } : undefined}
+    >
       <div
         className={`compare-row${row.hasData ? '' : ' compare-row--nodata'}`}
         role="row"
@@ -179,7 +220,12 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
             >
               {complianceRatio(row.totalViolations, row.totalCompliance)}
             </span>
-            <span className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}>
+            <span
+              className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}
+              title={row.commitsSince != null && row.commitsSince > 0
+                ? t('compare.commitsSince', { count: nf(row.commitsSince) })
+                : undefined}
+            >
               {relativeTime(row.lastISO) || '—'}
             </span>
             <span className="compare-row__chev" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
@@ -195,7 +241,13 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
         )}
       </div>
       {expanded && row.hasData && (
-        <RowDetail row={row} openDimension={openDimension} onOpenProject={onOpenProject} />
+        <RowDetail
+          row={row}
+          duelTargets={duelTargets}
+          openDimension={openDimension}
+          onOpenProject={onOpenProject}
+          openDuelPair={openDuelPair}
+        />
       )}
     </div>
   );
@@ -204,7 +256,7 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
 export default function CompareFleetView({
   rows, orderedRows, fleet, board, attention, errorsById,
   sortDir, toggleSortDir, pickerOpen, setPickerOpen, scopeIds, scopeCount,
-  toggleProject, selectAll, selectFlagged, openDimension, openDuel, onOpenProject,
+  toggleProject, selectAll, selectFlagged, openDimension, openDuel, openDuelPair, onOpenProject,
 }) {
   // Any number of rows can hold their detail open at once — comparing two
   // projects' expansions side by side is the point of this screen.
@@ -291,14 +343,16 @@ export default function CompareFleetView({
           })}
         />
         <Stat
-          label={t('compare.cardMeasurement')}
-          value={fleet.coveragePct != null ? `${fleet.coveragePct}%` : String(fleet.staleCount)}
-          hint={fleet.coveragePct == null
-            ? (fleet.staleCount ? t('compare.staleHint') : t('compare.allCurrent'))
-            : (fleet.staleCount
-              ? t('compare.staleNote', { count: fleet.staleCount })
-              : t('compare.allCurrent'))}
-          tone={fleet.staleCount ? 'warning' : 'default'}
+          label={t('compare.cardSpread')}
+          value={fleet.spread != null ? score1(fleet.spread) : '—'}
+          hint={fleet.lead && fleet.trail
+            ? t('compare.spreadNote', {
+              lead: fleet.lead.name,
+              leadScore: score1(fleet.lead.score),
+              trail: fleet.trail.name,
+              trailScore: score1(fleet.trail.score),
+            })
+            : t('compare.needTwo')}
         />
       </StatStrip>
 
@@ -311,7 +365,11 @@ export default function CompareFleetView({
           </div>
           <div className="compare-attention compare-attention--strip">
             {attention.map(({ row, level, reasons, worstDim }) => (
-              <div key={row.id} className={`compare-attention__item compare-attention__item--${level}`}>
+              <div
+                key={row.id}
+                className={`compare-attention__item compare-attention__item--${level}`}
+                style={{ '--attention-accent': scoreGradeColorVar(row.score) }}
+              >
                 <div className="compare-attention__top">
                   <button
                     type="button"
@@ -328,7 +386,11 @@ export default function CompareFleetView({
                   {reasons.map((r) => {
                     if (r.type === 'worstDim') return t('compare.reasonWorstDim', { dim: r.dim, score: score1(r.score) });
                     if (r.type === 'declining') return t('compare.reasonDeclining', { delta: r.delta });
-                    if (r.type === 'stale') return t('compare.reasonStale');
+                    if (r.type === 'stale') {
+                      return r.commits != null
+                        ? t('compare.reasonStaleCommits', { count: nf(r.commits) })
+                        : t('compare.reasonStale');
+                    }
                     if (r.type === 'coverage') return t('compare.reasonCoverage', { pct: r.pct });
                     return null;
                   }).filter(Boolean).join(' · ')}
@@ -379,6 +441,8 @@ export default function CompareFleetView({
               onOpenProject={onOpenProject}
               openDimension={openDimension}
               error={errorsById[row.id]}
+              duelTargets={rows.filter((r) => r.hasData && r.id !== row.id)}
+              openDuelPair={openDuelPair}
             />
           ))}
           {unevaluated.length > 0 && (

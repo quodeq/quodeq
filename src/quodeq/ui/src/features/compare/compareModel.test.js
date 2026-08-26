@@ -167,6 +167,24 @@ test('buildRow marks stale when the last run is older than a week', () => {
   assert.equal(row.stale, true);
 });
 
+test('staleness follows commits-since-scan when the backend knows it', () => {
+  // Old run but the code never moved -> the grade is still current.
+  const untouched = buildRow(
+    makeProject(),
+    { ...makeSummary({ lastRunDaysAgo: 30 }), commitsSinceLastRun: 0 },
+    NOW,
+  );
+  assert.equal(untouched.stale, false);
+  // Fresh run but the code moved since -> provisional.
+  const moved = buildRow(
+    makeProject(),
+    { ...makeSummary({ lastRunDaysAgo: 1 }), commitsSinceLastRun: 12 },
+    NOW,
+  );
+  assert.equal(moved.stale, true);
+  assert.equal(moved.commitsSince, 12);
+});
+
 test('buildRow with no summary yet is unloaded but keeps identity', () => {
   const row = buildRow(makeProject(), undefined, NOW);
   assert.equal(row.loaded, false);
@@ -210,6 +228,10 @@ test('buildFleet aggregates severity, compliance and coverage', () => {
   assert.equal(fleet.passPct, 90);
   assert.equal(fleet.coveragePct, 90);
   assert.equal(fleet.staleCount, 0);
+  // Fleet spread: best minus worst scored project.
+  assert.equal(fleet.spread, 2);
+  assert.equal(fleet.lead.id, 'b');
+  assert.equal(fleet.trail.id, 'a');
 });
 
 const DIM_SEC = (score) => ({

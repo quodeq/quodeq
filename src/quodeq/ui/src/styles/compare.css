@@ -267,9 +267,13 @@
 .compare-row__last { width: 92px; flex-shrink: 0; }
 .compare-row__chev { width: 20px; flex-shrink: 0; font-size: 10px; color: var(--color-text-muted); text-align: center; }
 
-.compare-rowgroup--severe .compare-row__stripe { background: var(--color-sev-critical-text); }
-.compare-rowgroup--elevated .compare-row__stripe { background: var(--color-sev-major-text); }
-.compare-rowgroup--watch .compare-row__stripe { background: var(--color-warning); }
+/* The stripe speaks the GRADE language (--row-accent, set inline from the
+   project's grade colour): the consequence level only decides whether a
+   stripe shows at all. A third colour scale (the old warning-yellow) on
+   top of grades and severities read as noise. */
+.compare-rowgroup--severe .compare-row__stripe,
+.compare-rowgroup--elevated .compare-row__stripe,
+.compare-rowgroup--watch .compare-row__stripe { background: var(--row-accent, var(--color-text-muted)); }
 
 .compare-row__rank {
   font-size: 11px;
@@ -321,7 +325,7 @@
   color: var(--color-text-muted);
 }
 
-.compare-rowdetail__hint { font-size: 10px; }
+.compare-rowdetail__stale { color: var(--color-warning-text); }
 
 /* Severity as plain coloured text (the design's "7c 275m 984n"). */
 .compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
@@ -348,6 +352,12 @@
 .compare-dim-chip--inline:hover { border-color: var(--color-accent); }
 
 .compare-dim-chip__label { font-size: 10.5px; color: var(--color-text-muted); }
+
+.compare-rowdetail__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
 .compare-rowdetail__open {
   font: inherit;
@@ -486,7 +496,11 @@
 
 .compare-attention--strip .compare-attention__item:last-child { border-right: none; }
 
-.compare-attention--strip .compare-attention__why { margin-top: 7px; }
+.compare-attention--strip .compare-attention__why {
+  margin-top: 7px;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
 
 .compare-attention--strip .compare-attention__link { margin: 0 0 0 6px; }
 
@@ -506,9 +520,10 @@
   background: var(--color-border);
 }
 
-.compare-attention__item--severe::before { background: var(--color-sev-critical-text); }
-.compare-attention__item--elevated::before { background: var(--color-sev-major-text); }
-.compare-attention__item--watch::before { background: var(--color-warning); }
+/* Same grade-language rule as the table stripes. */
+.compare-attention__item--severe::before,
+.compare-attention__item--elevated::before,
+.compare-attention__item--watch::before { background: var(--attention-accent, var(--color-text-muted)); }
 
 .compare-attention__top { display: flex; align-items: center; gap: 10px; }
 
@@ -539,9 +554,12 @@
   color: var(--color-text-muted);
 }
 
-.compare-attention__level--severe { color: var(--color-sev-critical-text); border-color: var(--color-sev-critical-border); }
-.compare-attention__level--elevated { color: var(--color-sev-major-text); border-color: var(--color-sev-major-border); }
-.compare-attention__level--watch { color: var(--color-warning-text); border-color: var(--color-warning); }
+.compare-attention__level--severe,
+.compare-attention__level--elevated,
+.compare-attention__level--watch {
+  color: var(--attention-accent, var(--color-text-muted));
+  border-color: color-mix(in srgb, var(--attention-accent, var(--color-text-muted)) 50%, transparent);
+}
 
 .compare-attention__why {
   margin: 9px 0 0;
@@ -550,18 +568,20 @@
   color: var(--color-text-muted);
 }
 
+/* Inline action, accent at rest (the 3a mock's "open security ›") — not a
+   hover-reveal: it is the card's one call to action. */
 .compare-attention__link {
   margin-top: 9px;
   font: inherit;
-  font-size: 11px;
-  color: var(--color-text-muted);
+  font-size: 10.5px;
+  color: var(--color-accent);
   background: transparent;
   border: none;
   padding: 0;
   cursor: pointer;
 }
 
-.compare-attention__link:hover { color: var(--color-accent); }
+.compare-attention__link:hover { color: var(--color-accent-hover); text-decoration: underline; }
 
 .compare-attention__empty {
   padding: 16px;
@@ -798,13 +818,24 @@
 
 .compare-principle__facts { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
+/* Lead/trail and the ranked bars are navigation: they open that project's
+   own view of this principle. */
 .compare-principle__lead,
 .compare-principle__trail {
+  font: inherit;
   font-size: 11px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.compare-principle__lead:hover,
+.compare-principle__trail:hover { text-decoration: underline; }
 
 .compare-principle__lead { color: var(--color-accent); }
 .compare-principle__trail { color: var(--color-sev-critical-text); }
@@ -824,9 +855,15 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  font: inherit;
+  background: transparent;
+  border: none;
   padding: 0 3px;
+  cursor: pointer;
   border-right: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
 }
+
+.compare-principle__slot:hover { background: var(--color-surface-alt); }
 
 .compare-principle__slot:last-child { border-right: none; }
 
@@ -845,11 +882,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.compare-principle__caption {
-  margin: 7px 0 0;
-  font-size: 9.5px;
-  color: var(--color-text-muted);
-}
 
 /* ── duel (head to head) ──────────────────────────────────────────────
    Side identity is fixed and colour-coded everywhere: project A (left)

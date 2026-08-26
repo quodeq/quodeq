@@ -475,8 +475,14 @@ function renderEvalPrincipleDetail(params, props) {
         // local liveScore/liveGrade. The dashboard refetch covers the
         // accumulated (cross-run) rollup separately.
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
-        const result = await props.dismissFinding(selectedProject, payload);
-        props.applyDelta?.(selectedProject, result?.scores, result?.delta);
+        // The evalPrincipal's own project, NOT the global selection: a
+        // cross-project entry (Compare's principle jump, a parent
+        // dimension's fromProject) must dismiss into the project the
+        // finding belongs to — this is the recurring identity-divergence
+        // class from the assistant dismiss bug.
+        const targetProject = evalPrincipal.project || selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -746,8 +752,13 @@ export const ROUTE_RENDERERS = {
       severityFilter={params.severityFilter || params.severity || null}
       onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
-        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
-        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
+        // The entry's own project, not the global selection: a file opened
+        // from a cross-project explorer (fromProject) must dismiss into the
+        // project the finding belongs to. Same identity rule as the
+        // evalprinciple route.
+        const targetProject = params.fromProject || props.navigation.selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -767,8 +778,10 @@ export const ROUTE_RENDERERS = {
       dimension={params.dimension}
       onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
-        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
-        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
+        // Same identity rule as the file and evalprinciple routes.
+        const targetProject = params.fromProject || props.navigation.selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -808,6 +821,19 @@ export const ROUTE_RENDERERS = {
       // dimensions so tab-hopping doesn't grow history.
       onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
       onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      // Cross-project principle jump: the evalPrincipal carries its own
+      // project, so the selection doesn't change and back pops to Compare.
+      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
+      // Standings row -> that project's own screen of the SAME dimension
+      // (the explorer's cross-project fromProject entry), pushed for the
+      // same back-pops-to-Compare contract.
+      onOpenProjectDimension={(target) => props.navigation.handleNavigate('explorer', {
+        dimension: target.dimName,
+        runId: target.runId,
+        dateLabel: target.dateLabel,
+        fromProject: target.id,
+        sourceTab: 'compare',
+      })}
       // Head-to-head is a push like the dimension drill-down: back returns
       // to the fleet with the two-project scope still selected.
       duel={params.duel || null}

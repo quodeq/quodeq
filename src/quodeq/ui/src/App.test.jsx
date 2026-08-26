@@ -158,6 +158,35 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
     expect(el.props.onDismiss).toBeUndefined();
   });
 
+  // The dismiss-identity contract, parametrized over EVERY dismissing route:
+  // a cross-project entry (Compare's jumps, a parent dimension's fromProject)
+  // must dismiss into the project the finding belongs to, never the global
+  // selection. Third instance of this divergence class (assistant dismiss,
+  // evalprinciple, file) — this test closes it: a new dismissing route with
+  // a cross-project param belongs in this table.
+  describe.each([
+    ['file', { file: { path: 'a.py' }, runId: 'r1', fromProject: 'other-proj' }, { file: { path: 'a.py' }, runId: 'r1' }],
+    ['finding', { finding: {}, principle: 'P', dimension: 'Security', runId: 'r1', fromProject: 'other-proj' }, { finding: {}, principle: 'P', dimension: 'Security', runId: 'r1' }],
+    ['evalprinciple', { evalPrincipal: { principle: 'P', dimension: 'Security', project: 'other-proj', runId: 'r1' } }, { evalPrincipal: { principle: 'P', dimension: 'Security' } }],
+  ])('%s route dismiss identity', (route, foreignParams, localParams) => {
+    const violation = { file: 'a.py', line: 1, principle: 'P', severity: 'major', reason: 'r' };
+
+    it('dismisses into the entry own project when it differs from the selection', async () => {
+      const props = baseProps('local');
+      const el = ROUTE_RENDERERS[route](foreignParams, props);
+      await el.props.onDismiss(violation);
+      expect(props.dismissFinding).toHaveBeenCalledWith('other-proj', expect.any(Object));
+      expect(props.applyDelta).toHaveBeenCalledWith('other-proj', expect.anything(), expect.anything());
+    });
+
+    it('falls back to the selected project when the entry carries none', async () => {
+      const props = baseProps('local');
+      const el = ROUTE_RENDERERS[route](localParams, props);
+      await el.props.onDismiss(violation);
+      expect(props.dismissFinding).toHaveBeenCalledWith('proj1', expect.any(Object));
+    });
+  });
+
   // The dashboard must eventually reflect a dismiss even though the delta
   // patch is only best-effort (e.g. it doesn't cover every view). Each
   // onDismiss success path makes ONE reconcile call: scheduleDashboardReconcile

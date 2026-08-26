@@ -13,9 +13,10 @@ import {
   filterAccumulatedByVisibleStandards,
 } from '../../utils/scoreFiltering.js';
 
-// A project counts as stale when its newest run is older than this. Mirrors
-// the "grade measured on old data" idea from the design: the number shown is
-// real but the codebase has moved since.
+// Staleness means "the code moved since the grade was measured". The real
+// signal is commitsSinceLastRun from the backend (git commits since the last
+// scored run); the age fallback below only applies when that signal is
+// unknowable (repo missing, no git, online project).
 export const STALE_AFTER_DAYS = 7;
 
 // Delta window: the "30d" column. Baseline is the newest run at or before
@@ -129,7 +130,12 @@ export function buildRow(project, summary, now) {
   const score = s?.numericAverage ?? null;
   const lastISO = summary?.lastRun?.dateISO || project.latestDate || null;
   const ageDays = lastISO ? daysBetween(lastISO, now) : null;
-  const stale = ageDays != null && ageDays > STALE_AFTER_DAYS;
+  const commitsSince = summary?.commitsSinceLastRun ?? null;
+  // Code moved since the last scored run -> the grade is provisional. Only
+  // when the commit count is unknowable does plain age stand in for it.
+  const stale = commitsSince != null
+    ? commitsSince > 0
+    : ageDays != null && ageDays > STALE_AFTER_DAYS;
   const totalFiles = project.totalFiles ?? project.filesCount ?? null;
   const analyzedFiles = project.analyzedFiles ?? null;
   const { delta, lastDelta, spark } = trendDelta(summary?.trend, now);
@@ -137,6 +143,12 @@ export function buildRow(project, summary, now) {
     .map((d) => ({
       key: nameKey(d.dimension),
       label: String(d.dimension || '').toLowerCase(),
+      // Raw identifiers for cross-project navigation: the dimension-eval
+      // endpoint and the principle page need the payload's own spellings
+      // and the run the numbers came from.
+      name: d.dimension,
+      fromRunId: d.fromRunId ?? null,
+      fromDateLabel: d.fromDateLabel ?? null,
       score: parseScore10(d.overallScore),
       grade: d.overallGrade ?? null,
       violations: d.totals?.violationCount ?? 0,
@@ -145,6 +157,7 @@ export function buildRow(project, summary, now) {
       principles: (d.principles || []).map((p) => ({
         key: nameKey(p.principle || p.name),
         label: String(p.principle || p.name || '').toLowerCase(),
+        name: p.principle || p.name || '',
         score: parseScore10(p.score),
       })),
     }))
@@ -168,6 +181,7 @@ export function buildRow(project, summary, now) {
     totalCompliance: s?.totalCompliance ?? 0,
     lastISO,
     stale,
+    commitsSince,
     hasRuns: (project.runsCount ?? 0) > 0 || (summary?.runsCount ?? 0) > 0,
     loaded: summary !== undefined,
     hasData: score != null,
@@ -231,7 +245,16 @@ export function buildFleet(rows) {
   const covered = scored.filter((r) => r.coveragePct != null);
   const analyzed = covered.reduce((a, r) => a + (r.analyzedFiles || 0), 0);
   const coverageBase = covered.reduce((a, r) => a + (r.totalFiles || 0), 0);
+  // Fleet spread: how uneven the scope is, best project minus worst.
+  const byScore = scored.slice().sort((a, b) => b.score - a.score);
+  const lead = byScore[0] ?? null;
+  const trail = byScore.length > 1 ? byScore[byScore.length - 1] : null;
   return {
+    lead,
+    trail,
+    spread: lead && trail
+      ? Math.round((lead.score - trail.score) * 10) / 10
+      : null,
     count: rows.length,
     scoredCount: scored.length,
     totalFiles,
@@ -300,7 +323,7 @@ export function buildAttention(rows, limit = 3) {
       const reasons = [];
       if (worst) reasons.push({ type: 'worstDim', dim: worst.label, score: worst.score });
       if (row.delta != null && row.delta <= -0.3) reasons.push({ type: 'declining', delta: row.delta });
-      if (row.stale) reasons.push({ type: 'stale' });
+      if (row.stale) reasons.push({ type: 'stale', commits: row.commitsSince });
       if (row.coveragePct != null && row.coveragePct < 80) {
         reasons.push({ type: 'coverage', pct: row.coveragePct });
       }
@@ -395,7 +418,20 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
         const detail = (e.dimensionDetails || []).find((d) => nameKey(d.dimension) === dimensionKey);
         return detail ? parseScore10(detail.score) : null;
       });
-      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, compliance: dim.compliance, severity: dim.severity, principles: dim.principles };
+      return {
+        row,
+        score: dim.score,
+        delta,
+        lastDelta,
+        violations: dim.violations,
+        compliance: dim.compliance,
+        severity: dim.severity,
+        principles: dim.principles,
+        // Cross-project navigation targets for this project's dimension.
+        runId: dim.fromRunId,
+        dimName: dim.name,
+        dateLabel: dim.fromDateLabel,
+      };
     })
     .sort((a, b) => b.score - a.score);
   const lead = standings[0];
@@ -410,15 +446,25 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   );
 
   const principleKeys = new Map();
-  for (const { row, principles } of standings.map((s) => ({ row: s.row, principles: s.principles }))) {
-    for (const p of principles) {
+  for (const s of standings) {
+    for (const p of s.principles) {
       if (p.score == null) continue;
       let entry = principleKeys.get(p.key);
       if (!entry) {
         entry = { key: p.key, label: p.label, perProject: [] };
         principleKeys.set(p.key, entry);
       }
-      entry.perProject.push({ id: row.id, name: row.name, score: p.score });
+      entry.perProject.push({
+        id: s.row.id,
+        name: s.row.name,
+        score: p.score,
+        // Everything a click needs to open THIS project's view of THIS
+        // principle: the run the number came from and the raw spellings.
+        principle: p.name,
+        runId: s.runId,
+        dimName: s.dimName,
+        dateLabel: s.dateLabel,
+      });
     }
   }
   const principles = Array.from(principleKeys.values())

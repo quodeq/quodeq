@@ -11,7 +11,14 @@
  * the whole screen.
  */
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../../components/EmptyState.jsx';
+import { getDimensionEval } from '../../../api/index.js';
+import { projectKeys } from '../../../api/queryKeys.js';
+import {
+  buildEvalPrincipalFn,
+  computeComplianceByPrinciple,
+} from '../../explorer/components/explorerDataHooks.js';
 import { t } from '../../../strings/index.js';
 import { useCompareData } from '../hooks/useCompareData.js';
 import {
@@ -52,6 +59,8 @@ export default function ComparePage({
   dimension = null,
   onOpenDimension,
   onSwitchDimension,
+  onOpenEvalPrincipal,
+  onOpenProjectDimension,
   /* The head-to-head view follows the same contract: `duel` is a route
      param holding the two project ids, pushed from the fleet's "compare
      these two" action; back pops to the fleet. */
@@ -128,6 +137,33 @@ export default function ComparePage({
     updateScope(flagged.length ? flagged : null);
   }, [rows, updateScope]);
 
+  // Open one project's own view of one principle: fetch that project's
+  // dimension eval (cached in its query subtree), build the evalPrincipal
+  // with the explorer's own builders, and PUSH — the selected project does
+  // not change, so browser back pops straight back to this drill-down.
+  const queryClient = useQueryClient();
+  const openPrinciple = useCallback(async (target) => {
+    if (!onOpenEvalPrincipal || !target?.runId || !target?.dimName) return;
+    try {
+      const evalData = await queryClient.fetchQuery({
+        queryKey: projectKeys.dimensionEval(target.id, target.runId, target.dimName),
+        queryFn: () => getDimensionEval(target.id, target.runId, target.dimName),
+        staleTime: 60_000,
+      });
+      const evalPrincipal = buildEvalPrincipalFn(
+        evalData,
+        computeComplianceByPrinciple(evalData),
+        target.id,
+        target.runId,
+        target.dateLabel || '',
+      )(target.principle);
+      onOpenEvalPrincipal(evalPrincipal);
+    } catch {
+      // Fetch failed (run pruned, server hiccup): stay on Compare rather
+      // than landing on an empty principle page.
+    }
+  }, [onOpenEvalPrincipal, queryClient]);
+
   const openDimension = useCallback((key) => {
     setPickerOpen(false);
     if (dimension) onSwitchDimension?.(key);
@@ -182,6 +218,9 @@ export default function ComparePage({
     openDuel: scopeRows.length === 2 && onOpenDuel
       ? () => { setPickerOpen(false); onOpenDuel([scopeRows[0].id, scopeRows[1].id]); }
       : null,
+    // A duel can also start from any row's expansion ("compare with…") —
+    // no need to narrow the scope to two first.
+    openDuelPair: onOpenDuel ? (idA, idB) => onOpenDuel([idA, idB]) : null,
     onOpenProject,
     now,
   };
@@ -202,6 +241,8 @@ export default function ComparePage({
           onBack={onBack}
           onOpenDimension={openDimension}
           onOpenProject={onOpenProject}
+          onOpenPrinciple={openPrinciple}
+          onOpenProjectDimension={onOpenProjectDimension}
         />
       ) : (
         <CompareFleetView {...shared} />

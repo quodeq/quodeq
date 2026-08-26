@@ -46,7 +46,8 @@ function PrincipleDonut({ score }) {
 }
 
 export default function CompareDimensionView({
-  view, board, fleet, onBack, onOpenDimension, onOpenProject,
+  view, board, fleet, onBack, onOpenDimension, onOpenProject, onOpenPrinciple,
+  onOpenProjectDimension,
 }) {
   // The radar plots leader/trailer/average by default (all N polygons would
   // be unreadable); hovering a standings row overlays that project on top.
@@ -165,7 +166,14 @@ export default function CompareDimensionView({
                 <button
                   type="button"
                   className="compare-standings__row"
-                  onClick={() => onOpenProject(s.row.id)}
+                  title={t('compare.openDimensionIn', { dim: view.label, project: s.row.name })}
+                  // In a dimension context, a project opens ITS view of the
+                  // same dimension (cross-project explorer entry), not its
+                  // overview. Falls back to the overview if the run target
+                  // is unknowable.
+                  onClick={() => (s.runId && onOpenProjectDimension
+                    ? onOpenProjectDimension({ id: s.row.id, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
+                    : onOpenProject(s.row.id))}
                   onMouseEnter={() => setFocusId(s.row.id)}
                   onMouseLeave={() => setFocusId(null)}
                   onFocus={() => setFocusId(s.row.id)}
@@ -262,25 +270,38 @@ export default function CompareDimensionView({
                 <PrincipleDonut score={p.avg} />
                 <div className="compare-principle__facts">
                   {p.lead && (
-                    <span className="compare-principle__lead">
+                    <button
+                      type="button"
+                      className="compare-principle__lead"
+                      title={t('compare.openPrincipleIn', { principle: p.label, project: p.lead.name })}
+                      onClick={() => onOpenPrinciple?.(p.lead)}
+                    >
                       ↑ {p.lead.name} {score1(p.lead.score)}
-                    </span>
+                    </button>
                   )}
                   {p.trail && (
-                    <span className="compare-principle__trail">
+                    <button
+                      type="button"
+                      className="compare-principle__trail"
+                      title={t('compare.openPrincipleIn', { principle: p.label, project: p.trail.name })}
+                      onClick={() => onOpenPrinciple?.(p.trail)}
+                    >
                       ↓ {p.trail.name} {score1(p.trail.score)}
-                    </span>
+                    </button>
                   )}
                 </div>
               </div>
-              <div className="compare-principle__bars" aria-hidden="true">
+              <div className="compare-principle__bars">
                 {p.perProject.map((pp) => (
-                  <span
+                  <button
                     key={pp.id}
+                    type="button"
                     className="compare-principle__slot"
-                    title={`${pp.rank}. ${pp.name} · ${score1(pp.score)}`}
+                    title={t('compare.openPrincipleIn', { principle: p.label, project: pp.name })}
+                    aria-label={t('compare.openPrincipleIn', { principle: p.label, project: pp.name })}
+                    onClick={() => onOpenPrinciple?.(pp)}
                   >
-                    <span className="compare-principle__barTrack">
+                    <span className="compare-principle__barTrack" aria-hidden="true">
                       <span
                         className="compare-principle__bar"
                         style={{
@@ -289,11 +310,10 @@ export default function CompareDimensionView({
                         }}
                       />
                     </span>
-                    <span className="compare-principle__rank">{pp.rank}</span>
-                  </span>
+                    <span className="compare-principle__rank" aria-hidden="true">{pp.rank}</span>
+                  </button>
                 ))}
               </div>
-              <p className="compare-principle__caption">{t('compare.barPerProject')}</p>
             </article>
           ))}
         </div>

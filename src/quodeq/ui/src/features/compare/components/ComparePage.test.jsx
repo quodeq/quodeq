@@ -7,12 +7,13 @@ import ComparePage from './ComparePage.jsx';
 
 vi.mock('../../../api/index.js', () => ({
   getCompareSummary: vi.fn(),
+  getDimensionEval: vi.fn(),
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
 }));
 
-import { getCompareSummary } from '../../../api/index.js';
+import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
 import { getStandardsVisibility } from '../../../api/standards.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
@@ -35,6 +36,8 @@ function summary(score, dimScore) {
       dimension: 'Security',
       overallScore: `${dimScore}/10`,
       overallGrade: 'Good',
+      fromRunId: 'r2',
+      fromDateLabel: '25 Aug',
       totals: { violationCount: 6, severity: { critical: 1, major: 2, minor: 3 } },
       principles: [
         { principle: 'Integrity', score: `${dimScore}` },
@@ -181,6 +184,23 @@ describe('ComparePage', () => {
     expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
   });
 
+  it('starts a duel from a row expansion regardless of scope size', async () => {
+    renderPage({
+      projects: PROJECTS.concat([{
+        id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
+      }]),
+    });
+    await screen.findByText('gamma');
+    // Three projects in scope: the header CTA is gone, but any expanded row
+    // can pick an opponent.
+    const rowName = screen.getAllByText('alpha')
+      .find((el) => el.classList.contains('compare-row__name'));
+    await userEvent.click(rowName);
+    const chooser = await screen.findByLabelText(/Compare alpha with/);
+    await userEvent.selectOptions(chooser, 'beta');
+    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+  });
+
   it('hides dimensions a project has disabled, like the Overview', async () => {
     getCompareSummary.mockImplementation(() => Promise.resolve({
       ...summary(7.0, 7.0),
@@ -199,6 +219,59 @@ describe('ComparePage', () => {
     await screen.findByText('alpha');
     expect(await screen.findAllByText('security')).not.toHaveLength(0);
     expect(screen.queryByText('usability')).toBeNull();
+  });
+
+  it('closes the scope picker on outside click and on Escape', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    const toggle = screen.getByText(/all 2 projects/);
+    await userEvent.click(toggle);
+    expect(screen.getByText('Projects in scope')).toBeInTheDocument();
+    // Click anywhere outside the picker.
+    await userEvent.click(screen.getByText(/PROJECTS ·/));
+    expect(screen.queryByText('Projects in scope')).toBeNull();
+    // Escape closes it too.
+    await userEvent.click(toggle);
+    expect(screen.getByText('Projects in scope')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByText('Projects in scope')).toBeNull();
+  });
+
+  it('standings rows open that project view of the same dimension', async () => {
+    const onOpenProjectDimension = vi.fn();
+    const onOpenProject = vi.fn();
+    renderPage({ onOpenProjectDimension, onOpenProject });
+    await screen.findByText('alpha');
+    await userEvent.click((await screen.findAllByText('security'))[0]);
+    await userEvent.click(await screen.findByText('leads the scope'));
+    expect(onOpenProjectDimension).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 'r2', dimName: 'Security' }),
+    );
+    expect(onOpenProject).not.toHaveBeenCalled();
+  });
+
+  it('opens a project-specific principle from a principle card', async () => {
+    getDimensionEval.mockResolvedValue({
+      dimension: 'Security',
+      principles: [{ name: 'Integrity', violations: [], compliance: [] }],
+      principleGrades: [{ principle: 'Integrity', score: '7.0', grade: 'Good' }],
+      violations: [],
+      compliance: [],
+    });
+    const onOpenEvalPrincipal = vi.fn();
+    renderPage({ onOpenEvalPrincipal });
+    await screen.findByText('alpha');
+    await userEvent.click((await screen.findAllByText('security'))[0]);
+    // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
+    // integrity lead entry, whoever it is, via its accessible title.
+    const leads = await screen.findAllByTitle(/open integrity in/);
+    await userEvent.click(leads[0]);
+    await waitFor(() => expect(onOpenEvalPrincipal).toHaveBeenCalled());
+    const evalPrincipal = onOpenEvalPrincipal.mock.calls[0][0];
+    expect(evalPrincipal.principle).toBe('Integrity');
+    expect(evalPrincipal.runId).toBe('r2');
+    expect(['alpha', 'beta']).toContain(evalPrincipal.project);
+    expect(getDimensionEval).toHaveBeenCalledWith(evalPrincipal.project, 'r2', 'Security');
   });
 
   it('marks projects whose summary failed', async () => {
