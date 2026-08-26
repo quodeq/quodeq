@@ -338,8 +338,18 @@
 .compare-rowdetail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 2px 16px 14px 41px; /* aligns under the project column */
+  gap: 8px;
+  padding: 2px 16px 12px 41px; /* aligns under the project column */
+}
+
+/* Header row of the expansion: facts left, actions right on one line so
+   the detail is two rows, not three, and the right half isn't dead space. */
+.compare-rowdetail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .compare-rowdetail__facts {

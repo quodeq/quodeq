@@ -200,9 +200,13 @@ function DuelTrigger({ row, targets, onPick }) {
 
 /* Detail-on-demand block under an expanded row: everything the single-line
    row no longer carries. */
-function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPair }) {
+function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProjectDimension, openDuelPair }) {
   return (
     <div className="compare-rowdetail">
+      {/* One justified header row — facts left, actions right — then the
+          chips as their own wrap line. Three stacked sparse rows left the
+          right half of the expansion dead. */}
+      <div className="compare-rowdetail__head">
       <div className="compare-rowdetail__facts">
         <span className="compare-row__sev">
           <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
@@ -226,20 +230,6 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPai
           </span>
         )}
       </div>
-      <div className="compare-rowdetail__dims">
-        {row.dims.filter((d) => d.score != null).map((dim) => (
-          <button
-            key={dim.key}
-            type="button"
-            className="compare-dim-chip compare-dim-chip--inline"
-            title={t('compare.openDimension', { dim: dim.label })}
-            onClick={(e) => { e.stopPropagation(); openDimension(dim.key); }}
-          >
-            <span className={scoreColorClass(dim.score)}>{score1(dim.score)}</span>
-            <span className="compare-dim-chip__label">{dim.label}</span>
-          </button>
-        ))}
-      </div>
       <div className="compare-rowdetail__actions">
         <button
           type="button"
@@ -256,11 +246,45 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, openDuelPai
           />
         )}
       </div>
+      </div>
+      <div className="compare-rowdetail__dims">
+        {row.dims.filter((d) => d.score != null).map((dim) => {
+          // A chip inside a project's expansion is project-scoped: it jumps
+          // to THAT project's dimension screen (same cross-project entry as
+          // the standings rows, back pops to Compare). The scope-wide
+          // drill-down belongs to the DIMENSIONS panel below the fleet.
+          // Falls back to the drill-down when the run target is unknowable
+          // — and for remote rows, whose detail pages live behind the
+          // shared source, not local routes.
+          const toProject = !!(dim.fromRunId && onOpenProjectDimension && !row.remote);
+          return (
+            <button
+              key={dim.key}
+              type="button"
+              className="compare-dim-chip compare-dim-chip--inline"
+              title={toProject
+                ? t('compare.openProjectDimension', { name: row.name, dim: dim.label })
+                : t('compare.openDimension', { dim: dim.label })}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (toProject) {
+                  onOpenProjectDimension({ id: row.id, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
+                } else {
+                  openDimension(dim.key);
+                }
+              }}
+            >
+              <span className={scoreColorClass(dim.score)}>{score1(dim.score)}</span>
+              <span className="compare-dim-chip__label">{dim.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimension, error, duelTargets, openDuelPair }) {
+function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, onOpenProjectDimension, openDimension, error, duelTargets, openDuelPair }) {
   const level = consequenceLevel(consequenceOf(row));
   return (
     <div
@@ -332,6 +356,7 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimensio
           duelTargets={duelTargets}
           openDimension={openDimension}
           onOpenProject={onOpenProject}
+          onOpenProjectDimension={onOpenProjectDimension}
           openDuelPair={openDuelPair}
         />
       )}
@@ -343,6 +368,7 @@ export default function CompareFleetView({
   rows, orderedRows, fleet, board, attention, errorsById,
   sortDir, toggleSortDir, pickerOpen, setPickerOpen, scopeIds, scopeCount,
   toggleProject, selectAll, selectFlagged, openDimension, openDuel, openDuelPair, onOpenProject,
+  onOpenProjectDimension,
 }) {
   // Any number of rows can hold their detail open at once — comparing two
   // projects' expansions side by side is the point of this screen.
@@ -525,6 +551,7 @@ export default function CompareFleetView({
               expanded={expandedIds.has(row.id)}
               onToggle={toggleRow}
               onOpenProject={onOpenProject}
+              onOpenProjectDimension={onOpenProjectDimension}
               openDimension={openDimension}
               error={errorsById[row.id]}
               duelTargets={rows.filter((r) => r.hasData && r.id !== row.id)}

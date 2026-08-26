@@ -241,6 +241,9 @@ export default function ComparePage({
     selectAll: () => updateScope(null),
     selectFlagged,
     openDimension,
+    // Expanded-row dimension chips jump to that project's own dimension
+    // screen; the compare drill-down stays on the DIMENSIONS panel.
+    onOpenProjectDimension,
     // "compare these two" only makes sense for a scope of exactly two; the
     // fleet header shows the action whenever that holds (whether the pair
     // was picked explicitly or the fleet just has two projects).
