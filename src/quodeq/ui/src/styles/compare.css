@@ -273,7 +273,7 @@
   background: var(--color-surface);
 }
 .compare-matrix th.compare-matrix__project { padding-left: 53px; }
-.compare-matrix td.compare-matrix__project { position: sticky; padding-left: 15px; }
+.compare-matrix td.compare-matrix__project { position: sticky; padding-left: 16px; }
 .compare-matrix tbody td.compare-matrix__project { position: relative; position: sticky; }
 
 .compare-matrix__stripe {
@@ -1500,6 +1500,9 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 @media (max-width: 860px) {
   .compare-row__last { display: none; }
   .compare-row__ratio { display: none; }
+  /* Origin chips are secondary metadata; on small screens the name needs
+     the room more. */
+  .compare-row__remote { display: none; }
   /* Flexible chrome for small views: gaps, cell widths and paddings all
      shrink a step so the row's information survives before anything has
      to scroll. */
@@ -1518,7 +1521,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   span.compare-matrix__cell { padding: 1px 4px; }
   .compare-matrix th.compare-matrix__project,
   .compare-matrix tfoot td.compare-matrix__project { padding-left: 38px; }
-  .compare-matrix tbody td.compare-matrix__project { padding-left: 10px; }
+  .compare-matrix tbody td.compare-matrix__project { padding-left: 11px; }
   .compare-matrix__rank { width: 20px; margin-right: 8px; font-size: 10px; }
   .compare-board--grid { grid-template-columns: 1fr; }
   .compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: none; }

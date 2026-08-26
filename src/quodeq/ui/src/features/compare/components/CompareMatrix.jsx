@@ -21,13 +21,14 @@ const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1))
 
 const OVERALL = '__overall';
 
-// Column headers hold 3-character numbers; full dimension or principle
-// names would set the column width instead. Multi-word names compress to
-// initials ("clean-architecture" -> "c-a", "independence from
-// frameworks" -> "i-f"), single words to a 5-char stem ("maintainability"
-// -> "maint"). When two columns' initials would collide, those fall back
-// to readable stems ("inde fra") so every header stays unique. The full
-// name lives in the tooltip and the sort button's aria-label.
+// Column headers hold 3-character numbers; full names would set the
+// column width instead. The primary code is the same one the dimension
+// tab bar already uses - the label's first 5 characters ("clean",
+// "flexi", "maint") - so the matrix speaks the app's established
+// vocabulary. When two columns share a prefix (the "independence from
+// ..." principles), those fall back to a readable stem ("inde fra",
+// "inde ui") so every header stays unique. Full names live in the
+// tooltip and the sort button's aria-label.
 const STOPWORDS = new Set(['from', 'of', 'the', 'and', 'for']);
 
 const significantWords = (label) => String(label || '')
@@ -35,11 +36,7 @@ const significantWords = (label) => String(label || '')
   .split(/[\s-]+/)
   .filter((w) => w && !STOPWORDS.has(w));
 
-function initialsOf(label) {
-  const words = significantWords(label);
-  if (words.length <= 1) return (words[0] || '').slice(0, 5);
-  return words.map((w) => w[0]).join('-');
-}
+const prefixOf = (label) => String(label || '').trim().slice(0, 5);
 
 function stemOf(label) {
   const words = significantWords(label);
@@ -50,12 +47,12 @@ function stemOf(label) {
 function makeShortLabels(columns) {
   const counts = new Map();
   for (const col of columns) {
-    const code = initialsOf(col.label);
+    const code = prefixOf(col.label);
     counts.set(code, (counts.get(code) || 0) + 1);
   }
   const out = new Map();
   for (const col of columns) {
-    const code = initialsOf(col.label);
+    const code = prefixOf(col.label);
     out.set(col.key, counts.get(code) > 1 ? stemOf(col.label) : code);
   }
   return out;
