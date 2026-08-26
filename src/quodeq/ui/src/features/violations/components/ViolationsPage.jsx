@@ -8,6 +8,7 @@ import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/ind
 import { useDismissedFindings } from './useDismissedFindings.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import ViolationsSkeleton from './ViolationsSkeleton.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 
@@ -278,7 +279,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
       return (
         <div className="violations-page violations-page--terminal">
           <TermHeader name={t('violations.termName')} sub={t('overview.loading')} />
-          <LoadingScreen variant="inline" />
+          <ViolationsSkeleton />
         </div>
       );
     }
@@ -292,7 +293,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
         return (
           <div className="violations-page violations-page--terminal">
             <TermHeader name={t('violations.termName')} sub={t('overview.loading')} />
-            <LoadingScreen variant="inline" />
+            <ViolationsSkeleton />
           </div>
         );
       }

@@ -3218,3 +3218,25 @@
 .incomplete-setup-card p {
   margin: 0 0 8px 0;
 }
+
+/* ── Violations loading skeleton ────────────────────────
+   Stand-in for the loaded violations page (flag pills + by-dimension
+   groups) while dimension data loads. Same idiom as .overview-skeleton:
+   static dimmed blocks, no shimmer. */
+.violations-skeleton__bar {
+  display: inline-block;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  opacity: 0.6;
+}
+/* Pill row rides the real .violations-flag-row spacing; pills approximate
+   the FlagPill footprint. */
+.violations-skeleton__pill { width: 110px; height: 24px; border-radius: 12px; }
+.violations-skeleton__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.violations-skeleton__bar--group-header { width: 30%; height: 20px; }
+.violations-skeleton__bar--card { width: 100%; height: 72px; }
