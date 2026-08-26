@@ -56,7 +56,7 @@ def _commits_since(repo_root: Path | None, since_iso: str | None) -> int | None:
     try:
         proc = subprocess.run(
             ["git", "-C", str(repo_root), "rev-list", "--count", f"--since={since_iso}", "HEAD"],
-            capture_output=True, text=True, timeout=_GIT_TIMEOUT_S, check=False,
+            capture_output=True, encoding="utf-8", timeout=_GIT_TIMEOUT_S, check=False,
         )
         if proc.returncode != 0:
             return None
