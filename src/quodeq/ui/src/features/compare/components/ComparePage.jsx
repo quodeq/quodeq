@@ -21,6 +21,7 @@ import {
 } from '../../explorer/components/explorerDataHooks.js';
 import { t } from '../../../strings/index.js';
 import { useCompareData, useSharedCompareProjects } from '../hooks/useCompareData.js';
+import { mergeProjects } from '../../dashboard/projectsMerge.js';
 import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
   buildDimensionView, buildDuelView, sortRows, consequenceOf, consequenceLevel,
@@ -73,13 +74,20 @@ export default function ComparePage({
     [projects],
   );
   // Remote projects from the configured shared repository join the fleet as
-  // ordinary rows (empty list when nothing is configured). A project can
-  // exist both locally and remotely; both rows show, the remote one tagged.
+  // ordinary rows (empty list when nothing is configured). Duplicates
+  // resolve with the Projects page's own precedence rule (projectsMerge.js):
+  // a shared entry claimed by a local project — same id, else same
+  // normalized git origin URL, never name alone — IS that project, and the
+  // local row prevails. Only unclaimed shared entries enter as remote rows.
   const sharedProjects = useSharedCompareProjects();
-  const fleetProjects = useMemo(
-    () => localProjects.concat(sharedProjects),
-    [localProjects, sharedProjects],
-  );
+  const fleetProjects = useMemo(() => {
+    const entries = mergeProjects(localProjects, sharedProjects);
+    return entries.map((e) => {
+      if (e.local) return e.local;
+      const raw = e.shared.id || e.shared.name;
+      return { ...e.shared, id: `shared:${raw}`, sourceId: raw, source: 'shared' };
+    });
+  }, [localProjects, sharedProjects]);
   const { summariesById, errorsById } = useCompareData(fleetProjects);
 
   const view = dimension || 'fleet';

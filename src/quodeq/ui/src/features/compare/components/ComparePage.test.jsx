@@ -336,6 +336,28 @@ describe('ComparePage remote projects', () => {
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });
 
+  it('a published copy of a local project is deduplicated, local prevailing', async () => {
+    // Same id as the local 'alpha' — the Projects page's merge rule says
+    // this is the SAME project, so no remote row appears for it.
+    sharedListProjects.mockResolvedValue({
+      projects: [
+        { id: 'alpha', name: 'alpha', displayName: 'alpha', languageStats: { py: 100 }, runsCount: 2, latestDate: iso(5) },
+        REMOTE,
+      ],
+      lastSynced: null,
+      stale: false,
+    });
+    renderPage();
+    await screen.findByText('gamma');
+    const alphaRows = screen.getAllByText('alpha')
+      .filter((el) => el.classList.contains('compare-row__name'));
+    expect(alphaRows).toHaveLength(1);
+    // The local endpoint serves alpha; the shared route is only asked for
+    // the genuinely remote project.
+    await waitFor(() => expect(getCompareSummary).toHaveBeenCalledWith('alpha'));
+    expect(sharedGetCompareSummary).not.toHaveBeenCalledWith('alpha');
+  });
+
   it('leaves the fleet local-only when no shared repository is configured', async () => {
     sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
     renderPage();
