@@ -34,7 +34,6 @@ import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.j
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
-import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
 import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
@@ -456,6 +455,28 @@ export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCou
   if (selectedSource === 'shared') return false;
   if (!sharedHasContent) return false;
   return activeTab === 'overview';
+}
+
+/**
+ * Startup-loader gate. Dropping the loader at projectsLoaded hands the user
+ * a skeleton flash (loader > skeleton > data) on every boot, so on the
+ * default Overview landing it holds until the Overview's data is actually
+ * in. It must drop the moment we know no data is coming: load failure,
+ * zero local projects, nothing selected, a query error, or a restored
+ * non-overview tab — every one of those renders its own state and an
+ * overlay would wall it off forever. Exported for unit tests.
+ */
+export function shouldShowStartupLoader({
+  projectsLoaded, projectsLoadFailed, projectsCount, selectedProject,
+  selectedSource, activeTab, dashboard, accumulated, error,
+}) {
+  if (projectsLoadFailed) return false;
+  if (!projectsLoaded) return true;
+  if (activeTab !== 'overview') return false;
+  if ((projectsCount ?? 0) === 0 && selectedSource !== 'shared') return false;
+  if (!selectedProject) return false;
+  if (error) return false;
+  return !(dashboard && accumulated);
 }
 
 function renderEvalPrincipleDetail(params, props) {
@@ -1161,6 +1182,17 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
+  const showStartupLoader = shouldShowStartupLoader({
+    projectsLoaded: state.projectsLoaded,
+    projectsLoadFailed: state.projectsLoadFailed,
+    projectsCount: state.projects.length,
+    selectedProject: state.selectedProject,
+    selectedSource: state.selectedSource,
+    activeTab,
+    dashboard: state.dashboard,
+    accumulated: state.accumulated,
+    error: state.error,
+  });
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
@@ -1409,6 +1441,19 @@ export default function App() {
             />
           }
           content={
+            <>
+              {/* One stable mount for the startup loader, OUTSIDE the
+                  Suspense: inside it, a lazy chunk's suspension unmounts the
+                  loader itself and the plain fallback restarts the fade and
+                  tips from zero (a loader-to-loader flash). Out here it
+                  covers chunk loads AND holds through the Overview's first
+                  data (shouldShowStartupLoader), so boot goes loader ->
+                  content with no skeleton in between. */}
+              <FadingLoadingScreen
+                show={showStartupLoader}
+                tips
+                warmup={state.warmup}
+              />
             <Suspense fallback={<LoadingScreen />}>
               {/* Every route, not just Evaluate. A dead backend is the one
                   failure no page can render around: the Overview's own wall
@@ -1418,16 +1463,6 @@ export default function App() {
               {!state.serverConnected && (
                 <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
               )}
-              {/* One stable mount for the startup loader: it covers every
-                  route's not-yet-loaded state and fades out when the projects
-                  land, instead of each gate ripping its own copy out of the
-                  DOM on the same frame the content appears. */}
-              <FadingLoadingScreen
-                show={!state.projectsLoaded && !state.projectsLoadFailed}
-                tips
-                warmup={state.warmup}
-              />
-
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
@@ -1438,6 +1473,7 @@ export default function App() {
                 />
               )}
             </Suspense>
+            </>
           }
             />
               </VerifiedFindingsProvider>
