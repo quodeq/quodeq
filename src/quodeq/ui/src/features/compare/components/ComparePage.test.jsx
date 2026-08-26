@@ -204,6 +204,19 @@ describe('ComparePage', () => {
     expect(screen.queryByText('usability')).toBeNull();
   });
 
+  it('standings rows open that project view of the same dimension', async () => {
+    const onOpenProjectDimension = vi.fn();
+    const onOpenProject = vi.fn();
+    renderPage({ onOpenProjectDimension, onOpenProject });
+    await screen.findByText('alpha');
+    await userEvent.click((await screen.findAllByText('security'))[0]);
+    await userEvent.click(await screen.findByText('leads the scope'));
+    expect(onOpenProjectDimension).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 'r2', dimName: 'Security' }),
+    );
+    expect(onOpenProject).not.toHaveBeenCalled();
+  });
+
   it('opens a project-specific principle from a principle card', async () => {
     getDimensionEval.mockResolvedValue({
       dimension: 'Security',

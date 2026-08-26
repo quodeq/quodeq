@@ -14,7 +14,7 @@ import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CompareTrendLine from './CompareTrendLine.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
-import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
+import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { consequenceOf, consequenceLevel } from '../compareModel.js';
@@ -147,7 +147,12 @@ function RowDetail({ row, openDimension, onOpenProject }) {
 function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, openDimension, error }) {
   const level = consequenceLevel(consequenceOf(row));
   return (
-    <div className={`compare-rowgroup compare-rowgroup--${level}${expanded ? ' compare-rowgroup--open' : ''}`}>
+    <div
+      className={`compare-rowgroup compare-rowgroup--${level}${expanded ? ' compare-rowgroup--open' : ''}`}
+      // The stripe's colour is the project's GRADE; the consequence level
+      // only decides whether a stripe shows.
+      style={row.hasData ? { '--row-accent': scoreGradeColorVar(row.score) } : undefined}
+    >
       <div
         className={`compare-row${row.hasData ? '' : ' compare-row--nodata'}`}
         role="row"
@@ -321,7 +326,11 @@ export default function CompareFleetView({
           </div>
           <div className="compare-attention compare-attention--strip">
             {attention.map(({ row, level, reasons, worstDim }) => (
-              <div key={row.id} className={`compare-attention__item compare-attention__item--${level}`}>
+              <div
+                key={row.id}
+                className={`compare-attention__item compare-attention__item--${level}`}
+                style={{ '--attention-accent': scoreGradeColorVar(row.score) }}
+              >
                 <div className="compare-attention__top">
                   <button
                     type="button"

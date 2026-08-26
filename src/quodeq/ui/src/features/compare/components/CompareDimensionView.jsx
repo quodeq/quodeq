@@ -47,6 +47,7 @@ function PrincipleDonut({ score }) {
 
 export default function CompareDimensionView({
   view, board, fleet, onBack, onOpenDimension, onOpenProject, onOpenPrinciple,
+  onOpenProjectDimension,
 }) {
   // The radar plots leader/trailer/average by default (all N polygons would
   // be unreadable); hovering a standings row overlays that project on top.
@@ -165,7 +166,14 @@ export default function CompareDimensionView({
                 <button
                   type="button"
                   className="compare-standings__row"
-                  onClick={() => onOpenProject(s.row.id)}
+                  title={t('compare.openDimensionIn', { dim: view.label, project: s.row.name })}
+                  // In a dimension context, a project opens ITS view of the
+                  // same dimension (cross-project explorer entry), not its
+                  // overview. Falls back to the overview if the run target
+                  // is unknowable.
+                  onClick={() => (s.runId && onOpenProjectDimension
+                    ? onOpenProjectDimension({ id: s.row.id, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
+                    : onOpenProject(s.row.id))}
                   onMouseEnter={() => setFocusId(s.row.id)}
                   onMouseLeave={() => setFocusId(null)}
                   onFocus={() => setFocusId(s.row.id)}

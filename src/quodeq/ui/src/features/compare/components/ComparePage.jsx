@@ -60,6 +60,7 @@ export default function ComparePage({
   onOpenDimension,
   onSwitchDimension,
   onOpenEvalPrincipal,
+  onOpenProjectDimension,
   /* The head-to-head view follows the same contract: `duel` is a route
      param holding the two project ids, pushed from the fleet's "compare
      these two" action; back pops to the fleet. */
@@ -238,6 +239,7 @@ export default function ComparePage({
           onOpenDimension={openDimension}
           onOpenProject={onOpenProject}
           onOpenPrinciple={openPrinciple}
+          onOpenProjectDimension={onOpenProjectDimension}
         />
       ) : (
         <CompareFleetView {...shared} />

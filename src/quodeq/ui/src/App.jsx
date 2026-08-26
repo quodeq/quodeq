@@ -779,6 +779,16 @@ export const ROUTE_RENDERERS = {
       // Cross-project principle jump: the evalPrincipal carries its own
       // project, so the selection doesn't change and back pops to Compare.
       onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
+      // Standings row -> that project's own screen of the SAME dimension
+      // (the explorer's cross-project fromProject entry), pushed for the
+      // same back-pops-to-Compare contract.
+      onOpenProjectDimension={(target) => props.navigation.handleNavigate('explorer', {
+        dimension: target.dimName,
+        runId: target.runId,
+        dateLabel: target.dateLabel,
+        fromProject: target.id,
+        sourceTab: 'compare',
+      })}
       // Head-to-head is a push like the dimension drill-down: back returns
       // to the fleet with the two-project scope still selected.
       duel={params.duel || null}
