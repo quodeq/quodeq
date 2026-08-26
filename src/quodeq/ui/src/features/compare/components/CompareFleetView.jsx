@@ -141,7 +141,13 @@ function DuelTrigger({ row, targets, onPick }) {
       if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false);
     };
     const onEsc = (e) => { if (e.key === 'Escape') setOpen(false); };
-    const onAnchorMoved = () => setOpen(false);
+    // Any OUTSIDE scroll moved the anchor, so the menu must go — but the
+    // menu's own list scrolls too (capture sees those events as well), and
+    // scrolling the options must not dismiss them.
+    const onAnchorMoved = (e) => {
+      if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onEsc);
     window.addEventListener('scroll', onAnchorMoved, true);

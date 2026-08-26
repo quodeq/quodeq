@@ -1216,16 +1216,19 @@
 .compare-versus__gapValue.compare-duel__gap--b { color: var(--color-duel-b); background: transparent; border: none; }
 .compare-versus__gapHint { font-size: 9.5px; color: var(--color-text-muted); line-height: 1.4; }
 
-/* radar overlay of both projects' shapes */
+/* Radar overlay of both projects' shapes. STROKE ONLY, deliberately: two
+   translucent fills mix where the polygons overlap, and cyan over sand
+   lands on a muddy violet no palette intends. Two clean outlines carry
+   the comparison without inventing a third color. */
 .compare-radar__poly--duelA {
-  fill: color-mix(in srgb, var(--color-duel-a) 12%, transparent);
+  fill: none;
   stroke: var(--color-duel-a);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
 }
 .compare-radar__poly--duelB {
-  fill: color-mix(in srgb, var(--color-duel-b) 10%, transparent);
+  fill: none;
   stroke: var(--color-duel-b);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
 }
 
 /* shaded 30-day window on the duel trend */
