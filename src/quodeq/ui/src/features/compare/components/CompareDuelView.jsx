@@ -33,6 +33,7 @@ function VersusSide({ side, row, onOpenProject }) {
         title={t('compare.openProject')}
       >
         {row.name}
+        {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
       </button>
       <div className="compare-versus__scoreRow">
         <span className={`compare-versus__score ${scoreColorClass(row.score)}`}>{score1(row.score)}</span>

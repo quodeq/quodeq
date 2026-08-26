@@ -31,3 +31,7 @@ Any two projects can go head to head: expand a row and pick an opponent under **
 ### Scope
 
 The project picker narrows every number on the screen to a chosen subset; **flagged** selects only the projects currently needing attention. Each project's numbers respect its own enabled standards, exactly as its Overview does, so a dimension nobody enables never appears here.
+
+### Remote projects
+
+When a shared repository is connected, its published projects join the fleet as ordinary rows tagged **remote**. They rank, count toward the scope score, appear in the attention strip, and can duel local projects. A project you both work on locally and publish shows twice, one row per side, so you can compare your working copy against the published state. Opening a remote row switches to its shared, read-only view; deep links into principle pages stay local-only.

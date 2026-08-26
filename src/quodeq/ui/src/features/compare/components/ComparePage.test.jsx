@@ -12,9 +12,14 @@ vi.mock('../../../api/index.js', () => ({
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
 }));
+vi.mock('../../../api/shared.js', () => ({
+  sharedListProjects: vi.fn(),
+  sharedGetCompareSummary: vi.fn(),
+}));
 
 import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
 import { getStandardsVisibility } from '../../../api/standards.js';
+import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
 
@@ -62,6 +67,9 @@ beforeEach(() => {
   ));
   // Null ids = no filtering (fail-open), so most tests see the raw payload.
   getStandardsVisibility.mockResolvedValue({ visibleStandardIds: null, isDefault: true });
+  // Default: no shared repository configured — the local-only flow.
+  sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
+  sharedGetCompareSummary.mockRejectedValue(new Error('unexpected shared fetch'));
 });
 
 /* Mimics the App wiring: `dimension` is a route param — drilling in pushes,
@@ -113,7 +121,7 @@ describe('ComparePage', () => {
     // of navigating away.
     expect(onOpenProject).not.toHaveBeenCalled();
     await userEvent.click(await screen.findByText(/open project/));
-    await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha'));
+    await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha', 'local'));
   });
 
   it('keeps multiple rows expanded independently', async () => {
@@ -285,5 +293,54 @@ describe('ComparePage', () => {
     expect(await screen.findByText('failed to load scores', undefined, { timeout: 4000 })).toBeInTheDocument();
     // The healthy project still renders its data (row + scope card).
     expect((await screen.findAllByText('7.4')).length).toBeGreaterThan(0);
+  });
+});
+
+describe('ComparePage remote projects', () => {
+  const REMOTE = {
+    id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { rb: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(3),
+  };
+
+  beforeEach(() => {
+    sharedListProjects.mockResolvedValue({ projects: [REMOTE], lastSynced: null, stale: false });
+    sharedGetCompareSummary.mockResolvedValue(summary(6.5, 6.2));
+  });
+
+  it('remote rows join the fleet through the shared route, tagged', async () => {
+    renderPage();
+    expect(await screen.findByText('gamma')).toBeInTheDocument();
+    expect((await screen.findAllByText('remote')).length).toBeGreaterThan(0);
+    await waitFor(() => expect(sharedGetCompareSummary).toHaveBeenCalledWith('gamma'));
+    // The local endpoint is never asked for the remote project.
+    expect(getCompareSummary).not.toHaveBeenCalledWith('gamma');
+  });
+
+  it('opening a remote row switches to the shared source', async () => {
+    const onOpenProject = vi.fn();
+    renderPage({ onOpenProject });
+    const rowName = (await screen.findAllByText('gamma'))
+      .find((el) => el.classList.contains('compare-row__name'));
+    await userEvent.click(rowName);
+    await userEvent.click(await screen.findByText(/open project/));
+    await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('gamma', 'shared'));
+  });
+
+  it('duels a local project against a remote one', async () => {
+    renderPage();
+    const rowName = (await screen.findAllByText('alpha'))
+      .find((el) => el.classList.contains('compare-row__name'));
+    await userEvent.click(rowName);
+    const trigger = await screen.findByLabelText(/Compare alpha with/);
+    await userEvent.click(trigger);
+    await userEvent.click(await screen.findByRole('menuitem', { name: /gamma/ }));
+    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+  });
+
+  it('leaves the fleet local-only when no shared repository is configured', async () => {
+    sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
+    renderPage();
+    expect(await screen.findByText('alpha')).toBeInTheDocument();
+    expect(screen.queryByText('gamma')).toBeNull();
+    expect(screen.queryByText('remote')).toBeNull();
   });
 });

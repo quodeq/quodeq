@@ -298,6 +298,21 @@
   flex-shrink: 0;
 }
 
+/* Remote (shared-repo) rows carry a small origin chip wherever the project
+   name appears: fleet rows, the scope picker, and the versus header. */
+.compare-row__remote {
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
 .compare-row__score { display: flex; align-items: baseline; gap: 7px; font-size: 15px; }
 
 .compare-row__tier {

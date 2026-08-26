@@ -11,10 +11,11 @@
  * dimension the project has disabled.
  */
 import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { getCompareSummary } from '../../../api/index.js';
+import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
 import { getStandardsVisibility } from '../../../api/standards.js';
-import { projectKeys } from '../../../api/queryKeys.js';
+import { projectKeys, sharedKeys } from '../../../api/queryKeys.js';
 import { applyVisibleStandards } from '../compareModel.js';
 
 // A cold project's first summary can take as long as its Overview takes to
@@ -33,16 +34,33 @@ export function useCompareData(projects) {
   const summaryResults = useQueries({
     queries: list.map((p) => {
       const id = p.id || p.name;
+      // Remote (shared-repo) rows fetch from the shared mirror route with
+      // the RAW project id; `id` stays the fleet-unique row key. The key's
+      // source segment keeps a same-named local project's cache separate.
+      const raw = p.sourceId || id;
+      const remote = p.source === 'shared';
       return {
         ...QUERY_DEFAULTS,
-        queryKey: projectKeys.compareSummary(id),
-        queryFn: () => getCompareSummary(id),
+        queryKey: projectKeys.compareSummary(raw, remote ? 'shared' : 'local'),
+        queryFn: () => (remote ? sharedGetCompareSummary(raw) : getCompareSummary(raw)),
       };
     }),
   });
   const visibilityResults = useQueries({
     queries: list.map((p) => {
       const id = p.id || p.name;
+      const raw = p.sourceId || id;
+      if (p.source === 'shared') {
+        // Standards visibility is local per-project configuration; a
+        // remote project has none here, so its summary passes unfiltered
+        // (exactly the 404 fail-open below, without the request).
+        return {
+          ...QUERY_DEFAULTS,
+          queryKey: projectKeys.standardsVisibility(raw, 'shared'),
+          queryFn: async () => ({ visibleStandardIds: null, isDefault: true }),
+          staleTime: Infinity,
+        };
+      }
       return {
         ...QUERY_DEFAULTS,
         queryKey: projectKeys.standardsVisibility(id),
@@ -97,4 +115,33 @@ export function useCompareData(projects) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summaryResults, visibilityResults]);
+}
+
+/**
+ * Projects published to the configured shared repository, shaped for the
+ * Compare fleet: each entry keeps its raw id in `sourceId`, takes a
+ * fleet-unique `shared:`-prefixed `id` (a project can exist both locally
+ * and remotely under the same name), and is tagged `source: 'shared'`.
+ *
+ * No shared repository configured (409), not fetched yet (503), or any
+ * other failure all resolve to an empty list: Compare simply shows the
+ * local fleet, exactly as before the feature existed.
+ */
+export function useSharedCompareProjects() {
+  const { data } = useQuery({
+    queryKey: [...sharedKeys.all(), 'compareProjects'],
+    queryFn: () => sharedListProjects().then((r) => r.projects || []).catch(() => []),
+    staleTime: COMPARE_SUMMARY_STALE_MS,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  return useMemo(
+    () => (data || [])
+      .filter((p) => p && (p.id || p.name))
+      .map((p) => {
+        const raw = p.id || p.name;
+        return { ...p, id: `shared:${raw}`, sourceId: raw, source: 'shared' };
+      }),
+    [data],
+  );
 }

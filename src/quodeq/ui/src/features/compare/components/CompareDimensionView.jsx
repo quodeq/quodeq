@@ -170,8 +170,9 @@ export default function CompareDimensionView({
                   // In a dimension context, a project opens ITS view of the
                   // same dimension (cross-project explorer entry), not its
                   // overview. Falls back to the overview if the run target
-                  // is unknowable.
-                  onClick={() => (s.runId && onOpenProjectDimension
+                  // is unknowable — and for remote rows, whose detail pages
+                  // live behind the shared source, not local routes.
+                  onClick={() => (s.runId && onOpenProjectDimension && !s.row.remote
                     ? onOpenProjectDimension({ id: s.row.id, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
                     : onOpenProject(s.row.id))}
                   onMouseEnter={() => setFocusId(s.row.id)}
