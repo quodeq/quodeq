@@ -808,6 +808,10 @@ export const ROUTE_RENDERERS = {
       // dimensions so tab-hopping doesn't grow history.
       onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
       onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      // Head-to-head is a push like the dimension drill-down: back returns
+      // to the fleet with the two-project scope still selected.
+      duel={params.duel || null}
+      onOpenDuel={(ids) => props.navigation.handleNavigate('compare', { duel: ids })}
       onBack={props.navigation.navPop}
     />
   ),

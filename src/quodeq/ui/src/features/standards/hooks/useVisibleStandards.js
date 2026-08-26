@@ -1,16 +1,26 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { readVisibleStandardIds, writeVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { putStandardsVisibility } from '../../../api/standards.js';
+import { projectKeys } from '../../../api/queryKeys.js';
 
 export function useVisibleStandards({ storage = localStorage, projectId = null } = {}) {
   const [visibleIds, setVisibleIds] = useState(() => readVisibleStandardIds(storage));
+  const queryClient = useQueryClient();
 
   const persist = useCallback((next) => {
     writeVisibleStandardIds(next, storage);
     // Fire-and-forget: the cache is already updated, so a failed write leaves
     // the UI correct for this session and re-syncs on the next hydrate.
-    if (projectId) putStandardsVisibility(projectId, next).catch(() => {});
-  }, [storage, projectId]);
+    if (projectId) {
+      putStandardsVisibility(projectId, next)
+        // Compare caches this project's visibility set per query key —
+        // invalidate AFTER the PUT lands so its refetch reads the new
+        // server state instead of racing the write.
+        .then(() => queryClient.invalidateQueries({ queryKey: projectKeys.standardsVisibility(projectId) }))
+        .catch(() => {});
+    }
+  }, [storage, projectId, queryClient]);
 
   const toggle = useCallback((id) => {
     setVisibleIds((prev) => {

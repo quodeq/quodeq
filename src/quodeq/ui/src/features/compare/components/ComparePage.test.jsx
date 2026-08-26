@@ -8,8 +8,12 @@ import ComparePage from './ComparePage.jsx';
 vi.mock('../../../api/index.js', () => ({
   getCompareSummary: vi.fn(),
 }));
+vi.mock('../../../api/standards.js', () => ({
+  getStandardsVisibility: vi.fn(),
+}));
 
 import { getCompareSummary } from '../../../api/index.js';
+import { getStandardsVisibility } from '../../../api/standards.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
 
@@ -53,22 +57,26 @@ beforeEach(() => {
   getCompareSummary.mockImplementation((id) => Promise.resolve(
     id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5),
   ));
+  // Null ids = no filtering (fail-open), so most tests see the raw payload.
+  getStandardsVisibility.mockResolvedValue({ visibleStandardIds: null, isDefault: true });
 });
 
 /* Mimics the App wiring: `dimension` is a route param — drilling in pushes,
    switching replaces, back pops. The harness keeps a tiny stack so the
    push/pop contract is exercised, not just a boolean. */
 function NavHarness(props) {
-  const [stack, setStack] = useState([null]);
-  const dimension = stack[stack.length - 1];
+  const [stack, setStack] = useState([{}]);
+  const params = stack[stack.length - 1];
   return (
     <ComparePage
       projects={PROJECTS}
       projectsLoaded
       onOpenProject={vi.fn()}
-      dimension={dimension}
-      onOpenDimension={(key) => setStack((s) => s.concat([key]))}
-      onSwitchDimension={(key) => setStack((s) => s.slice(0, -1).concat([key]))}
+      dimension={params.dimension || null}
+      duel={params.duel || null}
+      onOpenDimension={(key) => setStack((s) => s.concat([{ dimension: key }]))}
+      onSwitchDimension={(key) => setStack((s) => s.slice(0, -1).concat([{ dimension: key }]))}
+      onOpenDuel={(ids) => setStack((s) => s.concat([{ duel: ids }]))}
       onBack={() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s))}
       {...props}
     />
@@ -93,12 +101,47 @@ describe('ComparePage', () => {
     expect(await screen.findByText('5.9')).toBeInTheDocument();
   });
 
-  it('opens a project overview on row click', async () => {
+  it('expands a row on click; the expansion opens the project overview', async () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProject });
     const name = await screen.findByText('alpha');
     await userEvent.click(name);
+    // Row click expands the detail (severity, dimensions, actions) instead
+    // of navigating away.
+    expect(onOpenProject).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByText(/open project/));
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha'));
+  });
+
+  it('keeps multiple rows expanded independently', async () => {
+    renderPage();
+    // Scope to table rows: project names also appear in the attention strip.
+    const rowName = (name) => screen.getAllByText(name)
+      .find((el) => el.classList.contains('compare-row__name'));
+    await screen.findByText('alpha');
+    await userEvent.click(rowName('alpha'));
+    await userEvent.click(rowName('beta'));
+    // Both detail blocks stay open side by side.
+    expect(await screen.findAllByText(/open project/)).toHaveLength(2);
+    // Toggling one closed leaves the other open.
+    await userEvent.click(rowName('alpha'));
+    expect(await screen.findAllByText(/open project/)).toHaveLength(1);
+  });
+
+  it('collapses never-evaluated projects into a single line', async () => {
+    getCompareSummary.mockImplementation((id) => (id === 'alpha'
+      ? Promise.resolve(summary(7.4, 7.0))
+      : Promise.resolve({
+        summary: {}, dimensions: [], trend: [], runsCount: 0, lastRun: null,
+      })));
+    renderPage();
+    await screen.findByText('alpha');
+    // Once beta settles with no data it leaves the table for the collapsed
+    // line (it may briefly render as a pending row before that).
+    const toggle = await screen.findByText(/1 projects without evaluations/);
+    expect(screen.queryByText('beta')).toBeNull();
+    await userEvent.click(toggle);
+    expect(await screen.findByText('beta')).toBeInTheDocument();
   });
 
   it('drills into a dimension and back', async () => {
@@ -111,6 +154,51 @@ describe('ComparePage', () => {
     expect(screen.getByText('trails the scope')).toBeInTheDocument();
     await userEvent.click(screen.getByText(/ALL DIMENSIONS/));
     expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
+  });
+
+  it('opens the head-to-head duel when the scope is exactly two projects', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    // Two projects in the fleet = effective scope of two, so the action shows.
+    const cta = await screen.findByText('compare these two');
+    await userEvent.click(cta);
+    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
+    // Left minus right: +1.5 shows as the overall gap card and again on the
+    // security dimension and principle rows (7.0 vs 5.5).
+    expect(screen.getAllByText('+1.5').length).toBeGreaterThan(1);
+    expect(screen.getByText('alpha leads by 1.5')).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/ALL PROJECTS/));
+    expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
+  });
+
+  it('hides the duel action when more than two projects are in scope', async () => {
+    renderPage({
+      projects: PROJECTS.concat([{
+        id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
+      }]),
+    });
+    await screen.findByText('gamma');
+    expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
+  });
+
+  it('hides dimensions a project has disabled, like the Overview', async () => {
+    getCompareSummary.mockImplementation(() => Promise.resolve({
+      ...summary(7.0, 7.0),
+      dimensions: [
+        ...summary(7.0, 7.0).dimensions,
+        {
+          dimension: 'Usability',
+          overallScore: '8.0/10',
+          totals: { violationCount: 2, severity: { critical: 0, major: 1, minor: 1 } },
+          principles: [],
+        },
+      ],
+    }));
+    getStandardsVisibility.mockResolvedValue({ visibleStandardIds: ['security'], isDefault: false });
+    renderPage();
+    await screen.findByText('alpha');
+    expect(await screen.findAllByText('security')).not.toHaveLength(0);
+    expect(screen.queryByText('usability')).toBeNull();
   });
 
   it('marks projects whose summary failed', async () => {

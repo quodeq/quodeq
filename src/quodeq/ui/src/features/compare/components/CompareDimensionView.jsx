@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
+import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import CompareRadar from './CompareRadar.jsx';
@@ -57,16 +57,23 @@ export default function CompareDimensionView({
     const found = source.principles.find((x) => x.key === p.key);
     return found ? found.score : null;
   });
-  const focused = focusId
-    ? view.standings.find((s) => s.row.id === focusId && s !== view.lead && s !== view.trail)
+  const focusStanding = focusId
+    ? view.standings.find((s) => s.row.id === focusId)
+    : null;
+  // When the hovered project is already plotted (leader/trailer), recolor
+  // that polygon to the focus style instead of drawing a duplicate — the
+  // hover must always visibly answer "which shape is this row".
+  const isFocused = (s) => Boolean(focusStanding && s === focusStanding);
+  const extraFocus = focusStanding && focusStanding !== view.lead && focusStanding !== view.trail
+    ? focusStanding
     : null;
   const series = [
     { values: view.principles.map((p) => p.avg), variant: 'average' },
     ...(view.trail && view.trail !== view.lead
-      ? [{ values: byKey(view.trail), variant: 'trail' }]
+      ? [{ values: byKey(view.trail), variant: 'trail', focused: isFocused(view.trail) }]
       : []),
-    ...(view.lead ? [{ values: byKey(view.lead), variant: 'lead' }] : []),
-    ...(focused ? [{ values: byKey(focused), variant: 'focus' }] : []),
+    ...(view.lead ? [{ values: byKey(view.lead), variant: 'lead', focused: isFocused(view.lead) }] : []),
+    ...(extraFocus ? [{ values: byKey(extraFocus), variant: 'focus' }] : []),
   ];
 
   return (
@@ -187,6 +194,12 @@ export default function CompareDimensionView({
                   <span className="compare-standings__viol">
                     {t('compare.violCount', { count: nf(s.violations) })}
                   </span>
+                  <span
+                    className="compare-standings__ratio"
+                    title={t('compare.ratioTip', { pass: nf(s.compliance), checks: nf(s.compliance + s.violations) })}
+                  >
+                    {complianceRatio(s.violations, s.compliance)}
+                  </span>
                   <span className="compare-standings__pbars" aria-hidden="true">
                     {s.principles.filter((p) => p.score != null).map((p) => (
                       <span
@@ -264,13 +277,20 @@ export default function CompareDimensionView({
                 {p.perProject.map((pp) => (
                   <span
                     key={pp.id}
-                    className="compare-principle__bar"
-                    style={{
-                      height: `${Math.max(15, Math.round(pp.score * 10))}%`,
-                      background: scoreGradeColorVar(pp.score),
-                    }}
-                    title={`${pp.name} · ${score1(pp.score)}`}
-                  />
+                    className="compare-principle__slot"
+                    title={`${pp.rank}. ${pp.name} · ${score1(pp.score)}`}
+                  >
+                    <span className="compare-principle__barTrack">
+                      <span
+                        className="compare-principle__bar"
+                        style={{
+                          height: `${Math.max(15, Math.round(pp.score * 10))}%`,
+                          background: scoreGradeColorVar(pp.score),
+                        }}
+                      />
+                    </span>
+                    <span className="compare-principle__rank">{pp.rank}</span>
+                  </span>
                 ))}
               </div>
               <p className="compare-principle__caption">{t('compare.barPerProject')}</p>

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseScore10,
   nameKey,
+  applyVisibleStandards,
   trendDelta,
   buildRow,
   consequenceOf,
@@ -12,6 +13,7 @@ import {
   buildDimensionsBoard,
   buildAttention,
   buildDimensionView,
+  buildDuelView,
 } from './compareModel.js';
 
 const NOW = '2026-08-25T12:00:00Z';
@@ -65,7 +67,7 @@ test('nameKey normalizes case and whitespace', () => {
 test('trendDelta uses the newest run at or before the window start as baseline', () => {
   const trend = [
     { dateISO: iso(80), numericAverage: 6.0 },
-    { dateISO: iso(56), numericAverage: 6.4 }, // newest at/before 49d ago -> baseline
+    { dateISO: iso(56), numericAverage: 6.4 }, // newest at/before the 30d window start -> baseline
     { dateISO: iso(20), numericAverage: 6.9 },
     { dateISO: iso(1), numericAverage: 7.1 },
   ];
@@ -96,6 +98,44 @@ test('trendDelta falls back to the oldest entry when all runs are inside the win
 test('trendDelta needs two entries', () => {
   assert.equal(trendDelta([{ dateISO: iso(1), numericAverage: 7 }], NOW).delta, null);
   assert.equal(trendDelta([], NOW).delta, null);
+});
+
+test('applyVisibleStandards hides disabled dimensions and recomputes the summary', () => {
+  const summary = {
+    summary: {
+      numericAverage: 7,
+      totalViolations: 10,
+      totalCompliance: 90,
+      severity: { critical: 2, major: 3, minor: 5 },
+    },
+    dimensions: [
+      { dimension: 'Security', overallScore: '6.0/10', totals: { violationCount: 4, complianceCount: 40, severity: { critical: 2, major: 1, minor: 1 } } },
+      { dimension: 'Usability', overallScore: '8.0/10', totals: { violationCount: 6, complianceCount: 50, severity: { critical: 0, major: 2, minor: 4 } } },
+    ],
+    trend: [
+      { runId: 'r1', dateISO: iso(1), numericAverage: 7, dimensionDetails: [
+        { dimension: 'Security', score: 6 }, { dimension: 'Usability', score: 8 },
+      ] },
+    ],
+  };
+  const filtered = applyVisibleStandards(summary, ['security']);
+  assert.deepEqual(filtered.dimensions.map((d) => d.dimension), ['Security']);
+  assert.equal(filtered.summary.totalViolations, 4);
+  assert.equal(filtered.summary.totalCompliance, 40);
+  assert.equal(filtered.summary.severity.critical, 2);
+  // Trend average recomputed over the visible dimension only.
+  assert.equal(filtered.trend[0].numericAverage, 6);
+  assert.deepEqual(filtered.trend[0].dimensionDetails.map((d) => d.dimension), ['Security']);
+});
+
+test('applyVisibleStandards passes through when nothing is hidden or ids are absent', () => {
+  const summary = {
+    summary: { numericAverage: 7 },
+    dimensions: [{ dimension: 'Security', totals: { violationCount: 1, complianceCount: 1, severity: {} } }],
+    trend: [],
+  };
+  assert.equal(applyVisibleStandards(summary, ['security']), summary);
+  assert.equal(applyVisibleStandards(summary, null), summary);
 });
 
 test('buildRow joins project metadata with the summary payload', () => {
@@ -233,10 +273,118 @@ test('buildDimensionView ranks standings and aggregates principles', () => {
   assert.equal(integ.avg, 7);
   assert.equal(integ.lead.id, 'b');
   assert.equal(integ.trail.id, 'a');
+  // Bars follow the standings order and carry the standings rank, so the
+  // same slot is the same project in every principle card.
+  assert.deepEqual(integ.perProject.map((p) => [p.id, p.rank]), [['b', 1], ['a', 2]]);
   assert.equal(view.weakest.key, 'confidentiality');
 });
 
 test('buildDimensionView returns null for a dimension nobody has', () => {
   const rows = [buildRow(makeProject(), makeSummary({ dims: [DIM_SEC(6)] }), NOW)];
   assert.equal(buildDimensionView('reliability', rows, NOW, {}), null);
+});
+
+const DIM_USE = (score) => ({
+  dimension: 'Usability',
+  overallScore: `${score}/10`,
+  totals: { violationCount: 1, severity: { critical: 0, major: 0, minor: 1 } },
+  principles: [{ principle: 'Clarity', score: `${score}` }],
+});
+
+function makeDuel({ dimsA = [DIM_SEC(6)], dimsB = [DIM_SEC(8)], trendA = [], trendB = [] } = {}) {
+  const summaries = {
+    a: makeSummary({ score: 6, dims: dimsA, trend: trendA }),
+    b: makeSummary({ score: 8, dims: dimsB, trend: trendB }),
+  };
+  const rows = [
+    buildRow(makeProject({ id: 'a', displayName: 'proj-a' }), summaries.a, NOW),
+    buildRow(makeProject({ id: 'b', displayName: 'proj-b' }), summaries.b, NOW),
+  ];
+  return { rows, summaries };
+}
+
+test('buildDuelView returns null unless both projects are in the rows', () => {
+  const { rows, summaries } = makeDuel();
+  assert.equal(buildDuelView('a', 'missing', rows, NOW, summaries), null);
+  assert.equal(buildDuelView('missing', 'b', rows, NOW, summaries), null);
+});
+
+test('buildDuelView reports the overall gap as left minus right', () => {
+  const { rows, summaries } = makeDuel();
+  const duel = buildDuelView('a', 'b', rows, NOW, summaries);
+  assert.equal(duel.a.id, 'a');
+  assert.equal(duel.b.id, 'b');
+  assert.equal(duel.gap, -2);
+  assert.equal(duel.ready, true);
+});
+
+test('buildDuelView is not ready while either side lacks a score', () => {
+  const { summaries } = makeDuel();
+  const rows = [
+    buildRow(makeProject({ id: 'a' }), summaries.a, NOW),
+    buildRow(makeProject({ id: 'b' }), undefined, NOW),
+  ];
+  const duel = buildDuelView('a', 'b', rows, NOW, { a: summaries.a });
+  assert.equal(duel.ready, false);
+  assert.equal(duel.gap, null);
+});
+
+test('buildDuelView unions dimensions alphabetically and gaps only shared ones', () => {
+  const { rows, summaries } = makeDuel({
+    dimsA: [DIM_SEC(6)],
+    dimsB: [DIM_SEC(8), DIM_USE(7)],
+  });
+  const duel = buildDuelView('a', 'b', rows, NOW, summaries);
+  assert.deepEqual(duel.dimensions.map((d) => d.key), ['security', 'usability']);
+  const [sec, use] = duel.dimensions;
+  assert.equal(sec.a, 6);
+  assert.equal(sec.b, 8);
+  assert.equal(sec.gap, -2);
+  assert.equal(sec.shared, true);
+  assert.equal(use.a, null);
+  assert.equal(use.b, 7);
+  assert.equal(use.gap, null);
+  assert.equal(use.shared, false);
+  assert.equal(duel.sharedCount, 1);
+});
+
+test('buildDuelView diffs principles only for shared dimensions', () => {
+  const { rows, summaries } = makeDuel({
+    dimsA: [DIM_SEC(6)],
+    dimsB: [DIM_SEC(8), DIM_USE(7)],
+  });
+  const duel = buildDuelView('a', 'b', rows, NOW, summaries);
+  // Usability is one-sided, so no principle group for it.
+  assert.deepEqual(duel.principles.map((g) => g.key), ['security']);
+  const items = duel.principles[0].items;
+  assert.deepEqual(items.map((i) => i.key), ['confidentiality', 'integrity']);
+  const integ = items.find((i) => i.key === 'integrity');
+  assert.equal(integ.a, 6);
+  assert.equal(integ.b, 8);
+  assert.equal(integ.gap, -2);
+});
+
+test('buildDuelView keeps a one-sided principle inside a shared dimension, gapless', () => {
+  const withExtra = DIM_SEC(8);
+  withExtra.principles = withExtra.principles.concat([{ principle: 'Traceability', score: '7' }]);
+  const { rows, summaries } = makeDuel({ dimsA: [DIM_SEC(6)], dimsB: [withExtra] });
+  const duel = buildDuelView('a', 'b', rows, NOW, summaries);
+  const trace = duel.principles[0].items.find((i) => i.key === 'traceability');
+  assert.equal(trace.a, null);
+  assert.equal(trace.b, 7);
+  assert.equal(trace.gap, null);
+});
+
+test('buildDuelView extracts both trend series sorted by date', () => {
+  const { rows, summaries } = makeDuel({
+    trendA: [
+      { dateISO: iso(1), numericAverage: 6.0 },
+      { dateISO: iso(30), numericAverage: 5.5 },
+    ],
+    trendB: [{ dateISO: iso(10), numericAverage: 7.9 }],
+  });
+  const duel = buildDuelView('a', 'b', rows, NOW, summaries);
+  assert.deepEqual(duel.trend.a.map((e) => e.value), [5.5, 6.0]);
+  assert.deepEqual(duel.trend.b.map((e) => e.value), [7.9]);
+  assert.equal(duel.trend.a[0].dateISO, iso(30));
 });

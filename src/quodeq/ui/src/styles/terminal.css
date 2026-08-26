@@ -1103,6 +1103,7 @@ button.term-sev-badge--clickable:focus-visible {
 .run-history-panel--terminal .run-history-panel__header,
 .quality-dimensions__head,
 .qd-cards-panel__head,
+.compare-panel__head,
 .dim-score-panel--terminal .dim-score-panel__header {
   display: flex;
   align-items: baseline;
@@ -1120,7 +1121,8 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .run-history-panel--terminal .run-history-panel__header .term-section-label,
 .quality-dimensions__head .term-section-label,
-.qd-cards-panel__head .term-section-label {
+.qd-cards-panel__head .term-section-label,
+.compare-panel__head .term-section-label {
   padding: 0;
 }
 
@@ -1140,7 +1142,8 @@ button.term-sev-badge--clickable:focus-visible {
 /* Horizontal padding for dim rows is consolidated into the main rule below
    so a shorthand `padding` doesn't reset left/right. */
 
-.run-history-panel--terminal .run-history-panel__stats {
+.run-history-panel--terminal .run-history-panel__stats,
+.compare-panel__head .compare-panel__note {
   font-family: var(--term-font-mono);
   font-size: 11px;
   color: var(--color-text-muted);

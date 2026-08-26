@@ -8,15 +8,20 @@
  * this module fetches.
  */
 
+import {
+  filterTrendByVisibleStandards,
+  filterAccumulatedByVisibleStandards,
+} from '../../utils/scoreFiltering.js';
+
 // A project counts as stale when its newest run is older than this. Mirrors
 // the "grade measured on old data" idea from the design: the number shown is
 // real but the codebase has moved since.
 export const STALE_AFTER_DAYS = 7;
 
-// Delta window: the design's "7w" column. Baseline is the newest run at or
-// before the window start, so the delta reads "change over the last 7 weeks"
-// even when runs are unevenly spaced.
-export const DELTA_WINDOW_DAYS = 49;
+// Delta window: the "30d" column. Baseline is the newest run at or before
+// the window start, so the delta reads "change over the last month" even
+// when runs are unevenly spaced.
+export const DELTA_WINDOW_DAYS = 30;
 
 // Consequence thresholds. The score scales as
 // (10 - score) * log10(files + 10) * staleness, i.e. roughly 0..45 across
@@ -40,6 +45,29 @@ export function nameKey(name) {
   return String(name || '').trim().toLowerCase();
 }
 
+/**
+ * Restrict a compare-summary payload to the project's enabled standards,
+ * exactly the way the Overview does it: same filter utils, so the scores,
+ * severity totals and trend averages Compare shows for a project agree with
+ * that project's own Overview. Pass the ids from
+ * GET /projects/{id}/standards-visibility; a null/absent list means "no
+ * filtering" (fail open — data is better than a blank row).
+ */
+export function applyVisibleStandards(summary, visibleIds) {
+  if (!summary || !Array.isArray(visibleIds)) return summary;
+  const visibleSet = new Set(visibleIds.map((id) => nameKey(id)));
+  const dims = summary.dimensions || [];
+  if (dims.every((d) => visibleSet.has(nameKey(d.dimension)))) return summary;
+  const filteredTrend = filterTrendByVisibleStandards(summary.trend || [], visibleSet);
+  const acc = filterAccumulatedByVisibleStandards(
+    { dimensions: dims, summary: summary.summary || {} },
+    visibleSet,
+    filteredTrend,
+    null,
+  );
+  return { ...summary, dimensions: acc.dimensions, summary: acc.summary, trend: filteredTrend };
+}
+
 function daysBetween(isoA, isoB) {
   const a = new Date(isoA).getTime();
   const b = new Date(isoB).getTime();
@@ -60,7 +88,7 @@ function sortedByDate(trend) {
  * accumulated average; the dimension view passes a per-dimension picker).
  *
  * `delta` is the change within the window (null when every run predates it —
- * nothing moved in the last 7 weeks). `lastDelta` is the change between the
+ * nothing moved in the last month). `lastDelta` is the change between the
  * two most recent runs regardless of age, for a muted fallback display.
  */
 export function trendDelta(trend, now, pick = (e) => e.numericAverage) {
@@ -112,6 +140,7 @@ export function buildRow(project, summary, now) {
       score: parseScore10(d.overallScore),
       grade: d.overallGrade ?? null,
       violations: d.totals?.violationCount ?? 0,
+      compliance: d.totals?.complianceCount ?? 0,
       severity: d.totals?.severity || { critical: 0, major: 0, minor: 0 },
       principles: (d.principles || []).map((p) => ({
         key: nameKey(p.principle || p.name),
@@ -281,6 +310,77 @@ export function buildAttention(rows, limit = 3) {
     .slice(0, limit);
 }
 
+const round1 = (x) => Math.round(x * 10) / 10;
+
+/**
+ * Head-to-head model for exactly two projects ("compare these two").
+ * Gap convention throughout: left minus right (a minus b), so a positive
+ * gap always means the left project leads.
+ *
+ * `dimensions` is the union (a dimension only one side has still renders,
+ * gapless); principle diffs exist only for shared dimensions — a diff needs
+ * both sides. `trend` carries each project's dated overall series for the
+ * overlay chart. Returns null when either id is not in `rows`.
+ */
+export function buildDuelView(idA, idB, rows, now, summariesById) {
+  const a = rows.find((r) => r.id === idA);
+  const b = rows.find((r) => r.id === idB);
+  if (!a || !b) return null;
+
+  const gapOf = (x, y) => (x != null && y != null ? round1(x - y) : null);
+
+  const keys = new Map();
+  for (const d of a.dims.concat(b.dims)) {
+    if (!keys.has(d.key)) keys.set(d.key, d.label);
+  }
+  const dimensions = Array.from(keys, ([key, label]) => {
+    const da = a.dims.find((d) => d.key === key);
+    const db = b.dims.find((d) => d.key === key);
+    const scoreA = da?.score ?? null;
+    const scoreB = db?.score ?? null;
+    return {
+      key,
+      label,
+      a: scoreA,
+      b: scoreB,
+      gap: gapOf(scoreA, scoreB),
+      shared: scoreA != null && scoreB != null,
+    };
+  }).sort((x, y) => x.label.localeCompare(y.label));
+
+  const principles = dimensions
+    .filter((d) => d.shared)
+    .map((dim) => {
+      const pa = a.dims.find((d) => d.key === dim.key)?.principles || [];
+      const pb = b.dims.find((d) => d.key === dim.key)?.principles || [];
+      const pKeys = new Map();
+      for (const p of pa.concat(pb)) {
+        if (p.score != null && !pKeys.has(p.key)) pKeys.set(p.key, p.label);
+      }
+      const items = Array.from(pKeys, ([key, label]) => {
+        const scoreA = pa.find((p) => p.key === key)?.score ?? null;
+        const scoreB = pb.find((p) => p.key === key)?.score ?? null;
+        return { key, label, a: scoreA, b: scoreB, gap: gapOf(scoreA, scoreB) };
+      }).sort((x, y) => x.label.localeCompare(y.label));
+      return { key: dim.key, label: dim.label, items };
+    })
+    .filter((g) => g.items.length);
+
+  const series = (id) => sortedByDate(summariesById?.[id]?.trend)
+    .map((e) => ({ dateISO: e.dateISO, value: e.numericAverage }));
+
+  return {
+    a,
+    b,
+    ready: a.hasData && b.hasData,
+    gap: gapOf(a.score, b.score),
+    dimensions,
+    sharedCount: dimensions.filter((d) => d.shared).length,
+    principles,
+    trend: { a: series(idA), b: series(idB) },
+  };
+}
+
 /** Drill-down model for one dimension across the scope. */
 export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   const holders = rows
@@ -295,7 +395,7 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
         const detail = (e.dimensionDetails || []).find((d) => nameKey(d.dimension) === dimensionKey);
         return detail ? parseScore10(detail.score) : null;
       });
-      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, severity: dim.severity, principles: dim.principles };
+      return { row, score: dim.score, delta, lastDelta, violations: dim.violations, compliance: dim.compliance, severity: dim.severity, principles: dim.principles };
     })
     .sort((a, b) => b.score - a.score);
   const lead = standings[0];
@@ -323,14 +423,23 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   }
   const principles = Array.from(principleKeys.values())
     .map((entry) => {
-      const ranked = entry.perProject.slice().sort((a, b) => b.score - a.score);
+      const byScore = entry.perProject.slice().sort((a, b) => b.score - a.score);
+      // Bars render in the STANDINGS order, not per-principle rank: the same
+      // slot means the same project in every card, and each bar carries its
+      // standings rank so it ties back to the numbered list on screen.
+      const inStandingsOrder = standings
+        .map((s, idx) => {
+          const p = entry.perProject.find((x) => x.id === s.row.id);
+          return p ? { ...p, rank: idx + 1 } : null;
+        })
+        .filter(Boolean);
       return {
         key: entry.key,
         label: entry.label,
-        avg: mean(ranked.map((p) => p.score)),
-        lead: ranked[0] ?? null,
-        trail: ranked.length > 1 ? ranked[ranked.length - 1] : null,
-        perProject: ranked,
+        avg: mean(byScore.map((p) => p.score)),
+        lead: byScore[0] ?? null,
+        trail: byScore.length > 1 ? byScore[byScore.length - 1] : null,
+        perProject: inStandingsOrder,
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));

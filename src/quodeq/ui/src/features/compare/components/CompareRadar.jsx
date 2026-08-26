@@ -25,8 +25,9 @@ function polygonPoints(values, count) {
 /**
  * @param {object} props
  * @param {{label: string, value: number|null}[]} props.axes
- * @param {{values: (number|null)[], variant: string}[]} props.series
- *   variant becomes the class suffix: compare-radar__poly--<variant>.
+ * @param {{values: (number|null)[], variant: string, focused?: boolean}[]} props.series
+ *   variant becomes the class suffix: compare-radar__poly--<variant>;
+ *   focused adds is-focused, recoloring the polygon to the focus style.
  */
 export default function CompareRadar({ axes, series }) {
   const n = axes.length;
@@ -48,7 +49,7 @@ export default function CompareRadar({ axes, series }) {
         {series.map((s) => (
           <polygon
             key={s.variant}
-            className={`compare-radar__poly compare-radar__poly--${s.variant}`}
+            className={`compare-radar__poly compare-radar__poly--${s.variant}${s.focused ? ' is-focused' : ''}`}
             points={polygonPoints(s.values, n)}
           />
         ))}

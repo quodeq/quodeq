@@ -185,22 +185,9 @@
   overflow: hidden;
 }
 
-.compare-panel__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--color-surface-alt);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.compare-panel__head .term-section-label { margin: 0; }
-
-.compare-panel__note {
-  margin-left: auto;
-  font-size: 10.5px;
-  color: var(--color-text-muted);
-}
+/* .compare-panel__head shares the app's banner-header recipe — the same
+   selector group as the overview panels in terminal.css. Only additions
+   specific to compare belong here. */
 
 .compare-panel__fallback {
   margin: 0;
@@ -232,17 +219,24 @@
   overflow-x: auto;
 }
 
+/* A row and its optional expansion share one bordered group so the detail
+   block reads as part of the row, not a new row. */
+.compare-rowgroup { border-bottom: 1px solid var(--color-border); }
+
 .compare-row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding-right: 16px;
-  border-bottom: 1px solid var(--color-border);
 }
+
+.compare-row--head,
+.compare-row--foot { border-bottom: 1px solid var(--color-border); }
 
 .compare-row[tabindex] { cursor: pointer; }
 
-.compare-row[tabindex]:hover { background: var(--color-surface-alt); }
+.compare-row[tabindex]:hover,
+.compare-rowgroup--open > .compare-row { background: var(--color-surface-alt); }
 
 .compare-row--head,
 .compare-row--foot {
@@ -262,21 +256,20 @@
 .compare-row--foot { text-transform: none; letter-spacing: normal; font-size: 12px; }
 .compare-row--foot .compare-row__score { font-size: 13px; }
 
-/* cell widths */
+/* cell widths — single-line rows: everything else lives in the expansion */
 .compare-row__stripe { width: 3px; align-self: stretch; flex-shrink: 0; background: transparent; }
 .compare-row__rank { width: 26px; flex-shrink: 0; }
-.compare-row__project { flex: 1 1 150px; min-width: 130px; }
-.compare-row__score { width: 88px; flex-shrink: 0; }
+.compare-row__project { flex: 1 1 200px; min-width: 150px; display: flex; align-items: baseline; gap: 8px; }
+.compare-row__score { width: 96px; flex-shrink: 0; }
 .compare-row__delta { width: 68px; flex-shrink: 0; }
-.compare-row__viol { width: 168px; flex-shrink: 0; }
-.compare-row__spark { width: 90px; flex-shrink: 0; }
-.compare-row__dims { flex: 1.6 1 180px; min-width: 150px; }
-.compare-row__cov { width: 86px; flex-shrink: 0; }
-.compare-row__last { width: 78px; flex-shrink: 0; }
+.compare-row__viol { width: 84px; flex-shrink: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+.compare-row__last { width: 92px; flex-shrink: 0; }
+.compare-row__chev { width: 20px; flex-shrink: 0; font-size: 10px; color: var(--color-text-muted); text-align: center; }
 
-.compare-row--severe .compare-row__stripe { background: var(--color-sev-critical-text); }
-.compare-row--elevated .compare-row__stripe { background: var(--color-sev-major-text); }
-.compare-row--watch .compare-row__stripe { background: var(--color-warning); }
+.compare-rowgroup--severe .compare-row__stripe { background: var(--color-sev-critical-text); }
+.compare-rowgroup--elevated .compare-row__stripe { background: var(--color-sev-major-text); }
+.compare-rowgroup--watch .compare-row__stripe { background: var(--color-warning); }
 
 .compare-row__rank {
   font-size: 11px;
@@ -296,10 +289,9 @@
 }
 
 .compare-row__meta {
-  display: block;
   font-size: 10px;
   color: var(--color-text-muted);
-  margin-top: 3px;
+  flex-shrink: 0;
 }
 
 .compare-row__score { display: flex; align-items: baseline; gap: 7px; font-size: 15px; }
@@ -311,90 +303,99 @@
   color: var(--color-text-muted);
 }
 
-.compare-row__violTotal { font-size: 12.5px; color: var(--color-text); }
+/* ── row expansion (detail on demand) ─────────────────────────────────── */
 
-/* Severity as plain coloured text (the design's "7c 275m 984n"): the boxed
-   SevBadge chrome wraps onto three lines inside a table cell. */
-.compare-row__sev { display: flex; gap: 8px; margin-top: 4px; flex-wrap: nowrap; white-space: nowrap; }
+.compare-rowdetail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 16px 14px 41px; /* aligns under the project column */
+}
+
+.compare-rowdetail__facts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-rowdetail__hint { font-size: 10px; }
+
+/* Severity as plain coloured text (the design's "7c 275m 984n"). */
+.compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
 .compare-row__sev .term-sev-badge { border: none; background: transparent; padding: 0; }
 
-.compare-row__sparkBox { display: block; max-width: 100%; }
+.compare-trendline { display: block; flex-shrink: 0; }
+.compare-trendline polyline { fill: none; stroke-width: 1.5; }
 
-.compare-row__dims,
-.compare-row__dimsHead {
-  display: flex;
-  gap: 6px;
-}
+.compare-rowdetail__dims { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.compare-row__dimHead {
-  flex: 1;
+.compare-dim-chip--inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
   font: inherit;
-  font-size: 8.5px;
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compare-row__dimHead:hover { color: var(--color-accent); }
-
-.compare-dim-chip {
-  flex: 1;
-  min-width: 0;
-  display: block;
-  font: inherit;
+  font-size: 11.5px;
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: 5px;
-  padding: 5px 4px 6px;
+  padding: 4px 10px;
   cursor: pointer;
 }
 
-.compare-dim-chip:hover { border-color: var(--color-accent); }
+.compare-dim-chip--inline:hover { border-color: var(--color-accent); }
 
-.compare-dim-chip--empty {
+.compare-dim-chip__label { font-size: 10.5px; color: var(--color-text-muted); }
+
+.compare-rowdetail__open {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
   background: transparent;
-  border-color: transparent;
-  color: var(--color-text-subtle);
-  text-align: center;
-  cursor: default;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
 }
 
-.compare-dim-chip__score {
-  display: block;
-  font-size: 11.5px;
-  text-align: center;
-}
+.compare-rowdetail__open:hover { color: var(--color-accent); border-color: var(--color-accent); }
 
-.compare-dim-chip__bar {
-  display: block;
-  height: 3px;
-  margin: 5px 4px 0;
-  border-radius: 2px;
-  background: var(--color-overlay-light);
-  overflow: hidden;
-}
-
-.compare-dim-chip__fill { display: block; height: 100%; border-radius: 2px; }
-
-.compare-dim-avg {
-  flex: 1;
-  text-align: center;
-  font-size: 11.5px;
-  border: 1px dashed var(--color-border);
-  border-radius: 5px;
-  padding: 4px 0;
-}
-
-.compare-row__cov { font-size: 10.5px; color: var(--color-text-muted); }
 .compare-row__cov--low { color: var(--color-warning-text); }
+
+/* ── collapsed never-evaluated projects ───────────────────────────────── */
+
+.compare-noevals { border-bottom: 1px solid var(--color-border); }
+
+.compare-noevals__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  padding: 9px 16px 9px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.compare-noevals__dot { width: 29px; text-align: center; }
+
+.compare-noevals__action { color: var(--color-accent); }
+
+.compare-noevals__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 16px 7px 3px;
+  font-size: 12px;
+}
+
+.compare-noevals__note { margin-left: auto; font-size: 10.5px; color: var(--color-text-muted); }
 
 .compare-row__last { font-size: 11px; color: var(--color-text-muted); }
 .compare-row__last--stale { color: var(--color-sev-major-text); }
@@ -427,9 +428,18 @@
 
 .compare-board { list-style: none; margin: 0; padding: 0; }
 
+/* Two-column board: compact rows, no per-project mini bars — the numbered
+   bars live in the drill-down where they are actually readable. */
+.compare-board--grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: 1px solid var(--color-border); }
+
 .compare-board__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 56px 74px 64px 14px;
+  grid-template-columns: minmax(0, 1fr) 56px 74px 64px 14px;
   align-items: center;
   gap: 14px;
   width: 100%;
@@ -438,7 +448,7 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--color-border);
-  padding: 11px 16px;
+  padding: 10px 16px;
   cursor: pointer;
 }
 
@@ -452,19 +462,6 @@
   white-space: nowrap;
 }
 
-.compare-board__bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 16px;
-}
-
-.compare-board__bar {
-  display: block;
-  width: 5px;
-  border-radius: 1px;
-}
-
 .compare-board__score { font-size: 13px; text-align: right; }
 .compare-board__delta { text-align: right; }
 .compare-board__viol { font-size: 11px; color: var(--color-text-muted); text-align: right; }
@@ -473,6 +470,25 @@
 /* ── attention list ─────────────────────────────────────────────────── */
 
 .compare-attention { list-style: none; margin: 0; padding: 0; }
+
+/* Promoted strip form: up to three compact cards side by side, first thing
+   after the stat cards. */
+.compare-attention--strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.compare-attention--strip .compare-attention__item {
+  border-bottom: none;
+  border-right: 1px solid var(--color-border);
+  padding: 11px 16px 12px 19px;
+}
+
+.compare-attention--strip .compare-attention__item:last-child { border-right: none; }
+
+.compare-attention--strip .compare-attention__why { margin-top: 7px; }
+
+.compare-attention--strip .compare-attention__link { margin: 0 0 0 6px; }
 
 .compare-attention__item {
   position: relative;
@@ -584,7 +600,7 @@
 
 .compare-standings__row {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 92px 64px 64px 110px;
+  grid-template-columns: 26px minmax(0, 1fr) 92px 64px 64px 52px 110px;
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -630,6 +646,12 @@
 
 .compare-standings__viol { font-size: 11px; color: var(--color-text-muted); }
 
+.compare-standings__ratio {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .compare-standings__pbars {
   display: flex;
   align-items: flex-end;
@@ -668,11 +690,15 @@
   stroke: var(--color-sev-critical-text);
 }
 /* Standings-row hover overlay — neutral so it reads against both the lead
-   (accent) and trail (critical) polygons. */
-.compare-radar__poly--focus {
+   (accent) and trail (critical) polygons. `.is-focused` applies the same
+   look to an already-plotted leader/trailer polygon when its row is
+   hovered, so the hover always answers "which shape is this row". */
+.compare-radar__poly--focus,
+.compare-radar__poly.is-focused {
   fill: transparent;
   stroke: var(--color-text);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
+  stroke-dasharray: none;
 }
 
 .compare-radar__labels { position: absolute; inset: 10px 12px 0; pointer-events: none; }
@@ -783,15 +809,41 @@
 .compare-principle__lead { color: var(--color-accent); }
 .compare-principle__trail { color: var(--color-sev-critical-text); }
 
+/* Bars follow the STANDINGS order (same slot = same project in every card),
+   each numbered with its standings rank and separated by a faint hairline
+   so a bar can be traced back to the ranked list above. */
 .compare-principle__bars {
   display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 20px;
+  align-items: stretch;
   margin-top: 14px;
 }
 
-.compare-principle__bar { display: block; flex: 1; border-radius: 2px; }
+.compare-principle__slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 3px;
+  border-right: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.compare-principle__slot:last-child { border-right: none; }
+
+.compare-principle__barTrack {
+  display: flex;
+  align-items: flex-end;
+  height: 20px;
+}
+
+.compare-principle__bar { display: block; width: 100%; border-radius: 2px; }
+
+.compare-principle__rank {
+  font-size: 9px;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 
 .compare-principle__caption {
   margin: 7px 0 0;
@@ -799,32 +851,232 @@
   color: var(--color-text-muted);
 }
 
-/* ── small-view tiers ───────────────────────────────────────────────────
-   Shed secondary columns before anything important gets crushed: trend
-   sparkline first, then coverage + the per-dimension chips (both live in
-   the dimensions board / drill-down), then the last-evaluated column.
-   Name, score, delta and violations survive every tier. */
+/* ── duel (head to head) ──────────────────────────────────────────────
+   Side identity is fixed and colour-coded everywhere: project A (left)
+   speaks in --color-accent, project B (right) in --color-info. Gaps read
+   A minus B, tinted toward whichever side leads. */
 
-@media (max-width: 1500px) {
-  .compare-row__spark { display: none; }
+.compare-duel-cta {
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--color-accent);
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-@media (max-width: 1280px) {
-  .compare-row__dims,
-  .compare-row__dimsHead,
-  .compare-row__cov { display: none; }
-  .compare-row__project { flex: 1 1 200px; }
+.compare-duel-cta:hover { background: var(--color-accent-soft); }
+
+.compare-duel__side--a { color: var(--color-accent); }
+.compare-duel__side--b { color: var(--color-text); }
+
+.compare-lower--duel {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+}
+
+@media (max-width: 1100px) {
+  .compare-lower--duel { grid-template-columns: 1fr; }
+}
+
+/* dimension rows + principle rows share one grid recipe */
+
+.compare-duel-dims { list-style: none; margin: 0; padding: 0; }
+
+.compare-duel-dims__row,
+.compare-duel-principles__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px minmax(90px, 180px) 40px 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.compare-duel-dims__label,
+.compare-duel-principles__label {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-duel-dims__score,
+.compare-duel-principles__score {
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.compare-duel__gap {
+  font-size: 11px;
+  text-align: right;
+  color: var(--color-text-muted);
+}
+
+.compare-duel__gap--a { color: var(--color-accent); }
+.compare-duel__gap--b { color: var(--color-text); }
+
+/* mirrored bars: A grows leftward from the centre seam, B rightward */
+
+.compare-duel__bars {
+  display: flex;
+  height: 10px;
+}
+
+.compare-duel__barLane {
+  flex: 1;
+  display: flex;
+  background: var(--color-overlay-light);
+}
+
+.compare-duel__barLane--a {
+  justify-content: flex-end;
+  border-right: 1px solid var(--color-border);
+}
+
+.compare-duel__bar { display: block; border-radius: 1px; }
+.compare-duel__bar--a { background: var(--color-accent); }
+.compare-duel__bar--b { background: var(--color-text); }
+
+/* trend overlay */
+
+.compare-duel-trend { padding: 12px 16px 2px; }
+
+.compare-duel-trend__plot { position: relative; margin-left: 26px; }
+
+.compare-duel-trend__svg { display: block; width: 100%; height: auto; }
+
+.compare-duel-trend__grid {
+  stroke: var(--color-chart-grid);
+  stroke-width: 1;
+}
+
+.compare-duel-trend__line {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.compare-duel-trend__line--a { stroke: var(--color-accent); }
+.compare-duel-trend__line--b { stroke: var(--color-text); }
+
+.compare-duel-trend__dot--a { fill: var(--color-accent); }
+.compare-duel-trend__dot--b { fill: var(--color-text); }
+
+.compare-duel-trend__ticks { position: absolute; inset: 0; pointer-events: none; }
+
+.compare-duel-trend__tick {
+  position: absolute;
+  left: -26px;
+  width: 20px;
+  transform: translateY(-50%);
+  text-align: right;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-duel-trend__dates {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0 0 26px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compare-duel__legendItem {
+  position: relative;
+  padding: 0 0 0 18px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.compare-duel__legendItem:hover { color: var(--color-text); }
+
+.compare-duel__legendItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.compare-duel__legendItem--a::before { background: var(--color-accent); }
+.compare-duel__legendItem--b::before { background: var(--color-text); }
+
+/* principle diffs, grouped per shared dimension */
+
+.compare-duel-principles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.compare-duel-principles__group {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+}
+
+.compare-duel-principles__dim {
+  margin: 0;
+  padding: 12px 16px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Principle rows live inside a ~320px group card, so the label must win
+   over the bars: fixed floor for the name, bars take what is left. */
+.compare-duel-principles__row {
+  grid-template-columns: minmax(90px, 1fr) 34px minmax(56px, 140px) 34px 40px;
+  gap: 8px;
+}
+
+.compare-duel-principles__row:last-child { border-bottom: none; }
+
+@media (max-width: 640px) {
+  .compare-duel-dims__row,
+  .compare-duel-principles__row {
+    grid-template-columns: minmax(0, 1fr) 40px 40px 44px;
+  }
+  .compare-duel__bars { display: none; }
+}
+
+/* ── small-view tiers ───────────────────────────────────────────────────
+   The single-line table already fits most widths; below that, shed the
+   ratio and last-evaluated columns and stack the attention strip and the
+   dimensions board. Name, score, delta and violations survive every tier. */
+
+@media (max-width: 1100px) {
+  .compare-attention--strip { grid-template-columns: 1fr; }
+  .compare-attention--strip .compare-attention__item {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .compare-attention--strip .compare-attention__item:last-child { border-bottom: none; }
 }
 
 @media (max-width: 860px) {
   .compare-row__last { display: none; }
-  .compare-row__viol { width: 140px; }
-  .compare-board__row { grid-template-columns: minmax(0, 1fr) 56px 74px 64px 14px; }
-  .compare-board__bars { display: none; }
+  .compare-row__ratio { display: none; }
+  .compare-board--grid { grid-template-columns: 1fr; }
+  .compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: none; }
 }
 
 @media (max-width: 800px) {
   .compare-standings__row { grid-template-columns: 26px minmax(0, 1fr) 92px 64px; }
   .compare-standings__pbars,
+  .compare-standings__ratio,
   .compare-standings__delta { display: none; }
 }

@@ -36,8 +36,11 @@ export function labelFor(entry) {
     case 'evalprinciple': return entry.label || entry.principleName || 'principle';
     case 'finding':       return entry.label || 'finding';
     // Fleet entry reads "compare"; a drill-down entry carries its dimension
-    // so the crumb trail reads compare › security.
-    case 'compare':       return entry.dimension ? entry.dimension.toLowerCase() : 'compare';
+    // so the crumb trail reads compare › security, and a head-to-head entry
+    // reads compare › duel.
+    case 'compare':       return entry.duel
+      ? t('compare.crumbDuel')
+      : entry.dimension ? entry.dimension.toLowerCase() : 'compare';
     default:              return entry.label || entry.page;
   }
 }
