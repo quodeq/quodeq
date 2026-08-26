@@ -1100,20 +1100,27 @@
   color: var(--color-text-muted);
 }
 
-/* The heading repeats the dimension's two scores around the same mirrored
-   bars its table row uses, so a diff group reads without scrolling back
-   and the bar colors say which number belongs to which side. */
+/* The heading repeats the dimension's two scores and gap so a diff group
+   reads without scrolling back. Legend-style dashes in the side identity
+   colors say which number belongs to which project. */
 .compare-duel-principles__dimScores {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-size: 12px;
   letter-spacing: normal;
   text-transform: none;
   font-variant-numeric: tabular-nums;
 }
 
-.compare-duel-principles__dimScores .compare-duel__bars { width: 84px; }
+.compare-duel-principles__side {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.compare-duel-principles__side--a { background: var(--color-duel-a); }
+.compare-duel-principles__side--b { background: var(--color-duel-b); margin-left: 5px; }
 
 /* Principle rows live inside a ~320px group card, so the label must win
    over the bars: fixed floor for the name, bars take what is left. */
