@@ -94,12 +94,16 @@ function ScoreHistoryChart({ data, interaction }) {
         style={onBarClick ? { cursor: 'pointer' } : undefined}
       >
         <XAxis dataKey="dateLabel" hide />
-        <YAxis domain={domain} hide />
+        {/* Bars stay absolute (0-10: a 7 fills 70%); only the line and its
+            grid ride the data-fitted domain so the shape stays visible. */}
+        <YAxis yAxisId="abs" domain={[0, 10]} hide />
+        <YAxis yAxisId="shape" domain={domain} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
         {refLineValues(domain).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+          <ReferenceLine key={y} yAxisId="shape" y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
         ))}
         <Bar
+          yAxisId="abs"
           dataKey="numericAverage"
           radius={[0, 0, 0, 0]}
           maxBarSize={32}
@@ -116,6 +120,7 @@ function ScoreHistoryChart({ data, interaction }) {
           ))}
         </Bar>
         <Line
+          yAxisId="shape"
           isAnimationActive={false}
           dataKey="numericAverage"
           type="monotone"
