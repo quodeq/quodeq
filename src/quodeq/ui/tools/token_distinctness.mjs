@@ -38,13 +38,12 @@ export const SEV_TOKENS = [
 // Minimum CIE76 delta-E between…
 export const MIN_DUEL_SIDES = 20;        // duel side A (accent) vs side B — identity must survive
 export const MIN_DUEL_VS_GRADE = 20;     // duel side B vs any grade tier — identity is not a judgement
-export const MIN_COMPLIANCE_VS_ACCENT = 20; // compliance and the accent
-
-// There is deliberately NO grade-vs-severity or grade-vs-accent rule. The
-// 2026-08-25 recolor that introduced them (metallic ramp, then a caution
-// descent) was rejected by the user, who chose the original v1.9.1 grade
-// palette: it lives in the red channel severity also uses, and its top
-// tier rides the accent in dark themes. That sharing is the accepted
+// There is deliberately NO grade-vs-severity, grade-vs-accent, or
+// compliance-vs-accent rule. The 2026-08-25 recolor that introduced them
+// (metallic ramp, then a caution descent, plus compliance moved to green)
+// was rejected by the user, who chose the original v1.9.1 palette: grades
+// live in the red channel severity also uses, and grade-top AND
+// compliance ride the accent in dark themes. That sharing is the accepted
 // design; chip vs score context disambiguates.
 
 // The two floors below are grandfathered at the v1.9.1 palette's own
@@ -213,9 +212,6 @@ export function auditDistinctness(cssText) {
   for (const [theme, vars] of Object.entries(themes)) {
     const color = (token) => parseColor(resolveVar(vars, token));
     const grades = GRADE_TOKENS.map((t) => [t, color(t)]).filter(([, c]) => c);
-    const accent = color('--color-accent');
-    const compliance = color('--color-compliance');
-
     for (const [g, gc] of grades) {
       for (const surface of SURFACE_TOKENS) {
         const bg = color(surface);
@@ -226,9 +222,6 @@ export function auditDistinctness(cssText) {
       for (let j = i + 1; j < grades.length; j += 1) {
         push(theme, 'grade-step', grades[i][0], grades[j][0], deltaE(grades[i][1], grades[j][1]), MIN_GRADE_STEP, 'deltaE');
       }
-    }
-    if (accent && compliance) {
-      push(theme, 'compliance-vs-accent', '--color-compliance', '--color-accent', deltaE(compliance, accent), MIN_COMPLIANCE_VS_ACCENT, 'deltaE');
     }
     // Duel identity: the two sides must stay tellable apart, and side B must
     // stay readable on every surface (A rides the accent, already covered).

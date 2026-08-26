@@ -288,17 +288,14 @@
   --color-accent-soft:  color-mix(in srgb, var(--primitive-crimson-500) 6%, transparent);
 
   /* Duel sides — stable IDENTITY hues for head-to-head views. Grade colors
-     cannot tell two projects apart (both sides are often the same tier), so
-     side A rides the theme accent and side B is a per-family counter-hue.
-     B must stay deltaE >= 20 from the accent AND from every grade-tier
-     color (a B line that matches a tier reads as a judgement), guarded in
-     tools/token_distinctness.mjs. Each family block picks its own B in the
-     hue territory its accent and grade ramp leave free: daruma (crimson +
-     gold/slate grades) -> purple, neo (all green) -> sand, galadriel
-     (green + gold) -> steel, ifrit (orange + gold/slate) -> purple,
-     deckard (magenta + purple grades) -> steel. */
+     cannot tell two projects apart (both sides are often the same tier),
+     so side A rides the theme accent and side B is warm sand, the same in
+     every family: #a1782f in light modes, #d8b36a in dark. Against the
+     original v1.9.1 grade palette sand clears the accent and every grade
+     tier in all 10 contexts (guarded in tools/token_distinctness.mjs), so
+     no per-family counter-hues are needed. */
   --color-duel-a: var(--color-accent);
-  --color-duel-b: #8a5fb0;
+  --color-duel-b: #a1782f;
 
   /* Status */
   --color-danger:  var(--primitive-red-600);
@@ -380,9 +377,9 @@
   --logo-needle-dark:    var(--primitive-crimson-700);
 
   /* Compliance — deep emerald; gold now belongs to the grade ramp */
-  --color-compliance:        #157347;
-  --color-compliance-bg:     color-mix(in srgb, #157347 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #157347 38%, transparent);
+  --color-compliance:        #b08000;
+  --color-compliance-bg:     color-mix(in srgb, #b08000 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #b08000 38%, transparent);
 
   /* Warning */
   --color-warning:      var(--primitive-amber-700);
@@ -428,7 +425,7 @@
     --color-accent-hover: var(--primitive-flynn-accent-hover);
     --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
     --color-on-accent:    var(--primitive-flynn-950);
-    --color-duel-b:       #b08ad8;
+    --color-duel-b:       #d8b36a;
 
     --color-danger:  #e05c4b;
     --color-success: #4caf7d;
@@ -463,9 +460,9 @@
     --color-danger-bg:     color-mix(in srgb, var(--primitive-red-300) 15%, transparent);
     --color-danger-border: color-mix(in srgb, var(--primitive-red-300) 30%, transparent);
 
-    --color-compliance:        var(--primitive-compliance);
-    --color-compliance-bg:     color-mix(in srgb, var(--primitive-compliance) 4%, transparent);
-    --color-compliance-border: color-mix(in srgb, var(--primitive-compliance) 38%, transparent);
+    --color-compliance:        var(--primitive-flynn-accent);
+    --color-compliance-bg:     color-mix(in srgb, var(--primitive-flynn-accent) 4%, transparent);
+    --color-compliance-border: color-mix(in srgb, var(--primitive-flynn-accent) 38%, transparent);
 
     --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
     --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -559,7 +556,7 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-accent-hover: var(--primitive-flynn-accent-hover);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
   --color-on-accent:    var(--primitive-flynn-950);
-  --color-duel-b:       #b08ad8;
+  --color-duel-b:       #d8b36a;
 
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
@@ -595,9 +592,9 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-danger-border: color-mix(in srgb, var(--primitive-red-300) 30%, transparent);
 
   /* Compliance — spring green, off the cyan accent */
-  --color-compliance:        var(--primitive-compliance);
-  --color-compliance-bg:     color-mix(in srgb, var(--primitive-compliance) 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, var(--primitive-compliance) 38%, transparent);
+  --color-compliance:        var(--primitive-flynn-accent);
+  --color-compliance-bg:     color-mix(in srgb, var(--primitive-flynn-accent) 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, var(--primitive-flynn-accent) 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -684,9 +681,9 @@ html[data-theme="light"]:root, [data-theme="light"] {
   --color-danger-border: var(--color-sev-critical-border);
 
   /* Compliance — deep emerald; gold now belongs to the grade ramp */
-  --color-compliance:        #157347;
-  --color-compliance-bg:     color-mix(in srgb, #157347 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #157347 38%, transparent);
+  --color-compliance:        #b08000;
+  --color-compliance-bg:     color-mix(in srgb, #b08000 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #b08000 38%, transparent);
 
   /* Overlays */
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
@@ -735,8 +732,7 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-accent:       var(--primitive-ifrit-accent-dark);
   --color-accent-hover: #f09040;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-dark) 14%, transparent);
-  /* Purple: ifrit's accent is warm and its grade ramp holds the slates. */
-  --color-duel-b:       #b08ad8;
+  --color-duel-b:       #d8b36a;
   --color-on-accent:    var(--primitive-ifrit-950);
 
   --color-danger:  #ff5030;
@@ -774,9 +770,9 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-danger-border: color-mix(in srgb, #ff5030 30%, transparent);
 
   /* Compliance — spring green, clear of the orange accent and gold grades */
-  --color-compliance:        var(--primitive-compliance);
-  --color-compliance-bg:     color-mix(in srgb, var(--primitive-compliance) 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, var(--primitive-compliance) 38%, transparent);
+  --color-compliance:        #f0b830;
+  --color-compliance-bg:     color-mix(in srgb, #f0b830 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #f0b830 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -824,7 +820,7 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-text-subtle:  #688968;
 
   --color-accent:       #1b6b3a;
-  --color-duel-b:       #3a6a8a; /* steel: sand collides with the gold top tier */
+  --color-duel-b:       #a1782f;
   --color-accent-hover: #145228;
   --color-accent-soft:  color-mix(in srgb, #1b6b3a 8%, transparent);
   /* Light mode on dark-green accent — explicit white for AA contrast
@@ -867,9 +863,9 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-danger-border: var(--color-sev-critical-border);
 
   /* Compliance — blue-teal, off the forest-green accent */
-  --color-compliance:        #0c7a86;
-  --color-compliance-bg:     color-mix(in srgb, #0c7a86 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #0c7a86 38%, transparent);
+  --color-compliance:        #1b6b3a;
+  --color-compliance-bg:     color-mix(in srgb, #1b6b3a 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #1b6b3a 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
@@ -912,7 +908,7 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-text-muted:   var(--primitive-neo-500);
   --color-text-subtle:  #596f59;
   --color-accent:       var(--primitive-neo-accent);
-  --color-duel-b:       #d8b36a; /* sand vs neo green */
+  --color-duel-b:       #d8b36a;
   --color-accent-hover: #33ff66;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent) 14%, transparent);
   --color-on-accent:    var(--primitive-neo-950);
@@ -947,9 +943,9 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-danger-border: color-mix(in srgb, #ff4040 30%, transparent);
 
   /* Compliance — teal, off the matrix-green accent */
-  --color-compliance:        var(--primitive-teal-400);
-  --color-compliance-bg:     color-mix(in srgb, var(--primitive-teal-400) 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, var(--primitive-teal-400) 38%, transparent);
+  --color-compliance:        #00ff41;
+  --color-compliance-bg:     color-mix(in srgb, #00ff41 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #00ff41 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.92);
   --color-overlay-medium: rgba(0, 0, 0, 0.85);
@@ -990,7 +986,7 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-text-muted:   #516e51;
   --color-text-subtle:  #6a8b6a;
   --color-accent:       var(--primitive-neo-accent-dark);
-  --color-duel-b:       #a1782f; /* sand vs neo green */
+  --color-duel-b:       #a1782f;
   --color-accent-hover: #006622;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent-dark) 8%, transparent);
   --color-on-accent:    #ffffff;
@@ -1025,9 +1021,9 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-danger-border: var(--color-sev-critical-border);
 
   /* Compliance — deep teal, off the green accent */
-  --color-compliance:        #0c7a70;
-  --color-compliance-bg:     color-mix(in srgb, #0c7a70 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #0c7a70 38%, transparent);
+  --color-compliance:        #008833;
+  --color-compliance-bg:     color-mix(in srgb, #008833 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #008833 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
@@ -1066,7 +1062,7 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-text-muted:   #7a9d7a;
   --color-text-subtle:  #548254;
   --color-accent:       var(--primitive-green-400);
-  --color-duel-b:       #7fa8c9; /* steel: sand collides with the gold top tier */
+  --color-duel-b:       #d8b36a;
   --color-accent-hover: #6ee7a0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-green-400) 14%, transparent);
   --color-on-accent:    var(--primitive-galadriel-950);
@@ -1101,9 +1097,9 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 30%, transparent);
 
   /* Compliance — bright teal, off the sage-green accent */
-  --color-compliance:        var(--primitive-teal-400);
-  --color-compliance-bg:     color-mix(in srgb, var(--primitive-teal-400) 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, var(--primitive-teal-400) 38%, transparent);
+  --color-compliance:        #4caf7d;
+  --color-compliance-bg:     color-mix(in srgb, #4caf7d 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #4caf7d 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -1148,8 +1144,7 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-accent:       var(--primitive-ifrit-accent-light);
   --color-accent-hover: #a84a08;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-light) 8%, transparent);
-  /* Purple: ifrit's accent is warm and its grade ramp holds the slates. */
-  --color-duel-b:       #7a4fa0;
+  --color-duel-b:       #a1782f;
   --color-on-accent:    #ffffff;
 
   --color-danger:  #b82010;
@@ -1187,9 +1182,9 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-danger-border: var(--color-sev-critical-border);
 
   /* Compliance — deep green, clear of the orange accent and gold grades */
-  --color-compliance:        #1a7a42;
-  --color-compliance-bg:     color-mix(in srgb, #1a7a42 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #1a7a42 38%, transparent);
+  --color-compliance:        #c08000;
+  --color-compliance-bg:     color-mix(in srgb, #c08000 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #c08000 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
@@ -1234,7 +1229,7 @@ html[data-theme="deckard-dark"]:root, [data-theme="deckard-dark"] {
   --color-text-subtle:  #706687;
 
   --color-accent:       var(--primitive-deckard-accent-dark);
-  --color-duel-b:       #d8b36a; /* sand: deckard's grade ramp owns the blues and purples */
+  --color-duel-b:       #d8b36a;
   --color-accent-hover: #ff60d0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-dark) 14%, transparent);
   --color-on-accent:    var(--primitive-deckard-950);
@@ -1325,7 +1320,7 @@ html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
   --color-text-subtle:  #857996;
 
   --color-accent:       var(--primitive-deckard-accent-light);
-  --color-duel-b:       #a1782f; /* sand: deckard's grade ramp owns the blues and purples */
+  --color-duel-b:       #a1782f;
   --color-accent-hover: #b01888;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-light) 8%, transparent);
   --color-on-accent:    #ffffff;
