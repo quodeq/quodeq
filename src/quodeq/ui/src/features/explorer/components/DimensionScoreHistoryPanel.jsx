@@ -19,9 +19,8 @@ import { t } from '../../../strings/index.js';
 import {
   cssVar,
   scoreBarColor,
-  REF_LINE_LOW,
-  REF_LINE_MID,
-  REF_LINE_HIGH,
+  scoreDomain,
+  refLineValues,
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
@@ -76,6 +75,7 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
     const point = data[idx];
     if (point?.runId) onBarClick?.(point);
   };
+  const domain = scoreDomain(data.map((d) => d.numericAverage));
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
       <ComposedChart
@@ -93,13 +93,11 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
           </linearGradient>
         </defs>
         <XAxis dataKey="dateLabel" hide />
-        <YAxis domain={[0, 10]} hide />
+        <YAxis domain={domain} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<DimensionTooltip />} />
-        <ReferenceLine y={0}             stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-        <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.2} />
-        <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-        <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.2} />
-        <ReferenceLine y={10}            stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+        {refLineValues(domain).map((y, i) => (
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+        ))}
         <Area dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <Bar dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>
           {data.map((entry, i) => (

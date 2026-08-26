@@ -44,10 +44,27 @@ export function scoreBarColor(score) {
   return cssVar(varName);
 }
 
-/** Reference-line ticks at 25% / 50% / 75% of the 0-10 score range. */
-export const REF_LINE_LOW = 2.5;
-export const REF_LINE_MID = 5;
-export const REF_LINE_HIGH = 7.5;
+/**
+ * Adaptive Y domain for the score charts. Real projects live in a narrow
+ * band (say 6.9-8.2), and a fixed 0-10 axis flattens the trend into a
+ * near-straight line riding on top of near-full, near-equal bars. Padding
+ * the data range by half a point keeps the shape visible while no bar ever
+ * renders empty (the floor sits below the lowest score) or full (the
+ * ceiling sits above the highest).
+ */
+export function scoreDomain(values) {
+  const valid = (values || []).filter((n) => Number.isFinite(n));
+  if (!valid.length) return [0, 10];
+  const lo = Math.max(0, Math.floor(Math.min(...valid) - 0.5));
+  const hi = Math.min(10, Math.ceil(Math.max(...valid) + 0.5));
+  return [lo, hi > lo ? hi : lo + 1];
+}
+
+/** Reference-line ticks: domain bounds plus quarter divisions of the range. */
+export function refLineValues([lo, hi]) {
+  const step = (hi - lo) / 4;
+  return [lo, lo + step, lo + 2 * step, lo + 3 * step, hi];
+}
 
 /** Margin zeroed so bars span edge-to-edge inside the panel body. */
 export const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
