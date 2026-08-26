@@ -230,7 +230,7 @@
 .compare-matrix table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -241,7 +241,9 @@
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  /* lowercase, per review: the caps band doubled the shouting the panel
+     banner already does; column names read calmer in the terminal voice. */
+  text-transform: lowercase;
   color: var(--color-text-muted);
   padding: 6px 10px;
   border-bottom: 1px solid var(--color-border);
@@ -258,14 +260,46 @@
 /* The "project" title sits flush-left over the project names, and the
    whole lead column takes the SAME inset as the ranked table's name
    position (stripe 3 + gap 12 + rank 26 + gap 12), so the two stacked
-   tables' project names align down the page. */
+   tables' project names align down the page. The column is STICKY: under
+   horizontal scroll the names stay put, so no number goes anonymous —
+   which is also why every lead cell needs an opaque background. */
 .compare-matrix th.compare-matrix__project,
 .compare-matrix td.compare-matrix__project {
+  position: sticky;
+  left: 0;
+  z-index: 1;
   text-align: left;
-  padding-left: 53px;
   white-space: nowrap;
+  background: var(--color-surface);
 }
-.compare-matrix th.compare-matrix__project { max-width: none; }
+.compare-matrix th.compare-matrix__project { padding-left: 53px; }
+.compare-matrix td.compare-matrix__project { position: sticky; padding-left: 15px; }
+.compare-matrix tbody td.compare-matrix__project { position: relative; position: sticky; }
+
+.compare-matrix__stripe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.compare-matrix__rank {
+  display: inline-block;
+  width: 26px;
+  margin-right: 12px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.compare-matrix th.compare-matrix__project { max-width: none; background: var(--color-surface-alt); }
+.compare-matrix tfoot td.compare-matrix__project { background: var(--color-surface-alt); padding-left: 53px; }
+.compare-matrix tbody tr:hover td.compare-matrix__project { background: var(--color-surface-alt); }
+
+/* Crosshair: the hovered cell's whole column tints (the component sets
+   the class), and the row tint below intersects it. */
+.compare-matrix__hovercol { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+.compare-matrix th.compare-matrix__sorted { color: var(--color-accent); }
 .compare-matrix__overall { font-weight: 600; }
 .compare-matrix__none { color: var(--color-text-subtle); }
 .compare-matrix tbody tr:hover { background: var(--color-surface-alt); }
@@ -352,18 +386,22 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   background: var(--color-surface-alt);
   font-size: 10px;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  /* lowercase across all compare tables — the panel banner above already
+     carries the uppercase voice; column bands read calmer without it. */
+  text-transform: lowercase;
   color: var(--color-text-muted);
   cursor: default;
   padding-top: 6px;
   padding-bottom: 6px;
 }
 
-/* EVERY head cell at the banner size — pinning only score/viol left
-   RATIO and LAST at their content sizes, so the header read uneven. */
-.compare-row--head > * { font-size: 10px; }
+/* EVERY head cell at the banner size, with enough specificity to beat
+   the content cells' own sizes declared later in the file (pinning only
+   score/viol once left RATIO and LAST uneven; the child selector alone
+   then lost to .compare-row__score). */
+.compare-row.compare-row--head > * { font-size: 10px; }
 
-.compare-row--foot { text-transform: none; letter-spacing: normal; font-size: 12px; }
+.compare-row--foot { text-transform: lowercase; letter-spacing: normal; font-size: 12px; }
 .compare-row--foot .compare-row__score { font-size: 13px; }
 
 /* cell widths — single-line rows: everything else lives in the expansion */
@@ -380,7 +418,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   padding: 0;
   gap: 3px;
 }
-.compare-row__viol { width: 84px; flex-shrink: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.compare-row__viol { width: 84px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
 .compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
 .compare-row__last { width: 92px; flex-shrink: 0; }
 .compare-row__chev { width: 20px; flex-shrink: 0; font-size: 10px; color: var(--color-text-muted); text-align: center; }
@@ -403,7 +441,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 
 .compare-row__name {
   display: block;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -431,7 +469,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   vertical-align: middle;
 }
 
-.compare-row__score { display: flex; align-items: baseline; gap: 7px; font-size: 15px; }
+.compare-row__score { display: flex; align-items: baseline; gap: 7px; font-size: 14px; }
 
 .compare-row__tier {
   font-size: 9px;
@@ -571,7 +609,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 .compare-row__footLabel {
   font-size: 10px;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: var(--color-text-muted);
 }
 
@@ -1462,6 +1500,14 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 @media (max-width: 860px) {
   .compare-row__last { display: none; }
   .compare-row__ratio { display: none; }
+  /* Flexible chrome for small views: gaps, cell widths and paddings all
+     shrink a step so the row's information survives before anything has
+     to scroll. */
+  .compare-row { gap: 8px; padding-right: 10px; }
+  .compare-row__rank { width: 20px; }
+  .compare-row__score { width: 78px; }
+  .compare-row__delta { width: 52px; }
+  .compare-row__viol { width: 64px; }
   /* The matrix shrinks a step instead of shedding columns: every number
      still fits more often, and past that the panel scrolls sideways. The
      lead inset drops with the rank-less small layout. */
@@ -1471,7 +1517,9 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   button.compare-matrix__cell,
   span.compare-matrix__cell { padding: 1px 4px; }
   .compare-matrix th.compare-matrix__project,
-  .compare-matrix td.compare-matrix__project { padding-left: 12px; }
+  .compare-matrix tfoot td.compare-matrix__project { padding-left: 38px; }
+  .compare-matrix tbody td.compare-matrix__project { padding-left: 10px; }
+  .compare-matrix__rank { width: 20px; margin-right: 8px; font-size: 10px; }
   .compare-board--grid { grid-template-columns: 1fr; }
   .compare-board--grid > li:nth-child(odd) .compare-board__row { border-right: none; }
   .compare-versus { grid-template-columns: 1fr; }

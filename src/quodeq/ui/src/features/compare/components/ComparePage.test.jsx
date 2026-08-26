@@ -192,16 +192,31 @@ describe('ComparePage', () => {
     expect(screen.queryByText(/PROJECT_STANDINGS/)).toBeNull();
   });
 
-  it('score matrix grids every project and drills through its columns and cells', async () => {
+  it('score matrix grids every project; column headers rank by that column', async () => {
     renderPage();
     await screen.findByText('alpha');
     const matrix = await screen.findByLabelText('Score matrix');
     // Both projects' Security scores appear as cells (7.0 and 5.5).
     expect(within(matrix).getByText('7.0')).toBeInTheDocument();
     expect(within(matrix).getByText('5.5')).toBeInTheDocument();
-    // A column header opens the dimension drill-down, which carries the
-    // principle matrix appendix.
-    await userEvent.click(within(matrix).getByRole('button', { name: 'security' }));
+    const rowOrder = () => within(matrix).getAllByRole('row')
+      .map((r) => r.textContent)
+      .filter((tx) => /alpha|beta/.test(tx));
+    // Default order is the table's (score desc): alpha first.
+    expect(rowOrder()[0]).toMatch(/alpha/);
+    // First click ranks best-first (alpha still first), second flips it.
+    const colBtn = within(matrix).getByRole('button', { name: /Rank by security/ });
+    await userEvent.click(colBtn);
+    expect(rowOrder()[0]).toMatch(/alpha/);
+    await userEvent.click(within(matrix).getByRole('button', { name: /Rank by security/ }));
+    expect(rowOrder()[0]).toMatch(/beta/);
+  });
+
+  it('the dimension drill-down carries the principle matrix', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    const dimButtons = await screen.findAllByText('security');
+    await userEvent.click(dimButtons[dimButtons.length - 1]);
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
     expect(screen.getByText(/PRINCIPLE_MATRIX/)).toBeInTheDocument();
   });
@@ -210,7 +225,7 @@ describe('ComparePage', () => {
     renderPage();
     await screen.findByText('alpha');
     const dimButtons = await screen.findAllByText('security');
-    await userEvent.click(dimButtons[0]);
+    await userEvent.click(dimButtons[dimButtons.length - 1]);
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
     expect(screen.getByText('leads the scope')).toBeInTheDocument();
     expect(screen.getByText('trails the scope')).toBeInTheDocument();
@@ -302,7 +317,7 @@ describe('ComparePage', () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProjectDimension, onOpenProject });
     await screen.findByText('alpha');
-    await userEvent.click((await screen.findAllByText('security'))[0]);
+    await userEvent.click((await (async () => { const b = await screen.findAllByText('security'); return b[b.length - 1]; })()));
     await userEvent.click(await screen.findByText('leads the scope'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'r2', dimName: 'Security' }),
@@ -321,7 +336,7 @@ describe('ComparePage', () => {
     const onOpenEvalPrincipal = vi.fn();
     renderPage({ onOpenEvalPrincipal });
     await screen.findByText('alpha');
-    await userEvent.click((await screen.findAllByText('security'))[0]);
+    await userEvent.click((await (async () => { const b = await screen.findAllByText('security'); return b[b.length - 1]; })()));
     // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
     // integrity lead entry, whoever it is, via its accessible title.
     const leads = await screen.findAllByTitle(/open integrity in/);

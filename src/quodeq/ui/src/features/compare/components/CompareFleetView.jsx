@@ -602,17 +602,16 @@ export default function CompareFleetView({
         </div>
       </section>
 
-      {/* v4a: every score at a glance, right after the ranked table. A
-          column header opens the dimension drill-down; a cell opens that
-          project's own dimension (remote rows open the shared project). */}
+      {/* v4a: every score at a glance, right after the ranked table.
+          Column headers SORT (the dimensions board below still drills); a
+          cell opens that project's own dimension (remote rows open the
+          shared project). */}
       <CompareMatrix
         ariaLabel={t('compare.matrixAria')}
         header={t('compare.matrixHeader', { rows: scoredRows.length, cols: board.length })}
         note={t('compare.matrixNote')}
         footOverall={fleet.score}
-        columns={board.map((b) => ({
-          key: b.key, label: b.label, avg: b.avg, onOpen: () => openDimension(b.key),
-        }))}
+        columns={board.map((b) => ({ key: b.key, label: b.label, avg: b.avg }))}
         matrixRows={scoredRows.map((row) => ({
           id: row.id,
           name: row.name,
