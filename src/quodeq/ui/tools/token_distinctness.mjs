@@ -36,6 +36,8 @@ export const SEV_TOKENS = [
 ];
 
 // Minimum CIE76 delta-E between…
+export const MIN_DUEL_SIDES = 20;        // duel side A (accent) vs side B — identity must survive
+export const MIN_DUEL_VS_GRADE = 20;     // duel side B vs any grade tier — identity is not a judgement
 export const MIN_GRADE_VS_SEV = 20;      // any grade color and any severity color
 export const MIN_GRADE_VS_ACCENT = 20;   // any grade color and the accent
 export const MIN_COMPLIANCE_VS_ACCENT = 20; // compliance and the accent
@@ -227,6 +229,22 @@ export function auditDistinctness(cssText) {
     }
     if (accent && compliance) {
       push(theme, 'compliance-vs-accent', '--color-compliance', '--color-accent', deltaE(compliance, accent), MIN_COMPLIANCE_VS_ACCENT, 'deltaE');
+    }
+    // Duel identity: the two sides must stay tellable apart, and side B must
+    // stay readable on every surface (A rides the accent, already covered).
+    // B must also keep clear of the whole grade ramp: an identity line that
+    // matches a tier color reads as a judgement, not a name.
+    const duelA = color('--color-duel-a');
+    const duelB = color('--color-duel-b');
+    if (duelA && duelB) {
+      push(theme, 'duel-sides', '--color-duel-a', '--color-duel-b', deltaE(duelA, duelB), MIN_DUEL_SIDES, 'deltaE');
+      for (const surface of SURFACE_TOKENS) {
+        const bg = color(surface);
+        if (bg) push(theme, 'duel-b-contrast', '--color-duel-b', surface, contrastRatio(duelB, bg), MIN_GRADE_CONTRAST, 'contrast');
+      }
+      for (const [g, gc] of grades) {
+        push(theme, 'duel-b-vs-grade', '--color-duel-b', g, deltaE(duelB, gc), MIN_DUEL_VS_GRADE, 'deltaE');
+      }
     }
   }
   return { results, failures: results.filter((r) => !r.ok) };

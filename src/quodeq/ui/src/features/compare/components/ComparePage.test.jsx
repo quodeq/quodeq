@@ -196,8 +196,9 @@ describe('ComparePage', () => {
     const rowName = screen.getAllByText('alpha')
       .find((el) => el.classList.contains('compare-row__name'));
     await userEvent.click(rowName);
-    const chooser = await screen.findByLabelText(/Compare alpha with/);
-    await userEvent.selectOptions(chooser, 'beta');
+    const trigger = await screen.findByLabelText(/Compare alpha with/);
+    await userEvent.click(trigger);
+    await userEvent.click(await screen.findByRole('menuitem', { name: /beta/ }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });
 

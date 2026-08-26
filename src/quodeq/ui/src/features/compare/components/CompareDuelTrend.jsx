@@ -75,6 +75,21 @@ export default function CompareDuelTrend({ a, b }) {
     <div className="compare-duel-trend">
       <div className="compare-duel-trend__plot">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" className="compare-duel-trend__svg">
+          {/* The 30-day delta window, shaded so the numbers in the versus
+              header visibly correspond to this slice of the chart. */}
+          {span > 0 && (() => {
+            const windowStart = Math.max(t0, t1 - 30 * 86400000);
+            const xw = PAD.left + ((windowStart - t0) / span) * (W - PAD.left - PAD.right);
+            return (
+              <rect
+                className="compare-duel-trend__window"
+                x={xw.toFixed(1)}
+                y={PAD.top}
+                width={(W - PAD.right - xw).toFixed(1)}
+                height={H - PAD.top - PAD.bottom}
+              />
+            );
+          })()}
           {ticks.map((v) => (
             <line
               key={v}
