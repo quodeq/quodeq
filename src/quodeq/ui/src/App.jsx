@@ -37,6 +37,12 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
 import { useOneShotGate } from './hooks/useOneShotGate.js';
+import { useLinger } from './hooks/useLinger.js';
+import { warmOverviewChunks } from './bootChunks.js';
+
+// How long the startup loader stays opaque after its data-hold releases,
+// covering the overview's final commit (lazy chart first render).
+const STARTUP_LOADER_LINGER_MS = 250;
 import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
@@ -1029,6 +1035,10 @@ export default function App() {
   const { dismissFinding } = useApi();
   const queryClient = useQueryClient();
   const state = useAppState();
+  // Warm the Overview's lazy chunks (DashboardPage + the recharts chart)
+  // while the startup loader is up — see bootChunks.js for why page-mount
+  // time measured too late.
+  useEffect(() => { warmOverviewChunks(); }, []);
   // Passive shared-repo content signal driving the zero-local-projects flow:
   // wizard auto-open (below), the one-shot landing redirect, and the
   // "browse remote repositories" empty-state actions. Same react-query cache
@@ -1192,7 +1202,7 @@ export default function App() {
   // switch re-enters (Compare's open-project lands on a not-yet-loaded
   // overview); the gate makes sure the fullscreen loader is boot-only —
   // after it drops once, switches get the overview skeleton instead.
-  const showStartupLoader = useOneShotGate(shouldShowStartupLoader({
+  const startupHoldActive = useOneShotGate(shouldShowStartupLoader({
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
     projectsCount: state.projects.length,
@@ -1204,6 +1214,10 @@ export default function App() {
     error: state.error,
     loading: state.loading,
   }));
+  // Linger a beat after the hold drops so the overview's final commit (the
+  // lazy chart's first render, ~200ms) happens under a still-opaque loader;
+  // the fade then reveals a finished page instead of a chart placeholder.
+  const showStartupLoader = useLinger(startupHoldActive, STARTUP_LOADER_LINGER_MS);
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
