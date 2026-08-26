@@ -325,6 +325,63 @@ describe('useNavStack navReplace (repositories tab flips must not grow history)'
   });
 });
 
+describe('useNavStack navSwapAt (breadcrumb sibling swaps)', () => {
+  let historyAdapter;
+
+  beforeEach(() => {
+    historyAdapter = {
+      pushState: vi.fn(),
+      replaceState: vi.fn(),
+      back: vi.fn(),
+      go: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // The top-entry swap (switching dimension while ON the dimension page) runs
+  // in a transition since the nav-pending-feedback work — these pin that the
+  // swap still lands, replaces instead of pushing, and stays StrictMode-pure.
+  it('swaps the top entry in place via replaceState, exactly once in StrictMode', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navPush({ page: 'explorer', dimension: 'security' }); });
+    historyAdapter.pushState.mockClear();
+    historyAdapter.replaceState.mockClear();
+
+    act(() => { result.current.navSwapAt(1, { page: 'explorer', dimension: 'maintainability' }); });
+
+    expect(result.current.navStack).toHaveLength(2);
+    expect(result.current.navStack.at(-1).dimension).toBe('maintainability');
+    expect(historyAdapter.pushState).not.toHaveBeenCalled();
+    expect(historyAdapter.replaceState).toHaveBeenCalledTimes(1);
+    expect(result.current.navPending).toBe(false);
+  });
+
+  it('swaps an ancestor entry, truncates deeper entries, and walks history back', () => {
+    const { result } = renderHook(
+      () => useNavStack({ historyAdapter }),
+      { wrapper: strictWrapper },
+    );
+
+    act(() => { result.current.navPush({ page: 'explorer', dimension: 'security' }); });
+    act(() => { result.current.navPush({ page: 'evalprinciple' }); });
+    historyAdapter.go.mockClear();
+
+    act(() => { result.current.navSwapAt(1, { page: 'explorer', dimension: 'maintainability' }); });
+
+    expect(result.current.navStack).toHaveLength(2);
+    expect(result.current.navStack.at(-1).dimension).toBe('maintainability');
+    expect(historyAdapter.go).toHaveBeenCalledTimes(1);
+    expect(historyAdapter.go).toHaveBeenCalledWith(-1);
+  });
+});
+
 describe('useNavStack navPending', () => {
   let historyAdapter;
 

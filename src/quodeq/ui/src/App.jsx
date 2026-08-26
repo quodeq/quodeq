@@ -972,13 +972,20 @@ function MainContent({ activePage, props }) {
  * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, content, drawer }) {
+function AppShell({ sidebar, header, content, drawer, navPending }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
       <div className="app-shell__body">
         {sidebar}
         <div className="app-shell__main-column">
+          {/* Feedback while a navigation's target page renders (useNavStack
+              transition). Must live HERE, outside the scrolling <main>: the
+              .dashboard is position:relative, so an absolutely-positioned bar
+              inside it anchors to the top of the scrollable CONTENT and
+              scrolls out of view — exactly where every detail-page card
+              lives, so the one navigation that needed feedback never got it. */}
+          {navPending && <div className="nav-pending-bar" aria-hidden="true" />}
           <UpdateBanner />
           <main className="dashboard">
             {content}
@@ -1341,6 +1348,7 @@ export default function App() {
             <LlamaCppLogProvider>
               <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
               <AppShell
+          navPending={state.navPending}
           drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
             onOpenSettings={() => navTab('settings')} />}
           sidebar={
@@ -1410,12 +1418,6 @@ export default function App() {
               {!state.serverConnected && (
                 <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
               )}
-              {/* Route pushes render the target page in a transition
-                  (useNavStack); this bar is the feedback while that render
-                  runs. Without it a heavy detail page (or a slow webview
-                  engine) leaves the click looking ignored — there is no
-                  yield point where a spinner could otherwise paint. */}
-              {state.navPending && <div className="nav-pending-bar" aria-hidden="true" />}
               {/* One stable mount for the startup loader: it covers every
                   route's not-yet-loaded state and fades out when the projects
                   land, instead of each gate ripping its own copy out of the
