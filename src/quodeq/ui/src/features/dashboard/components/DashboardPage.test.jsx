@@ -640,38 +640,59 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     expect(nodeAfter).toBe(nodeBefore);
   });
 
-  it('carries dashboard-appear on first content appearance, not while still loading, and not on a second ready render over the same context', () => {
-    const { container, rerender } = render(
-      <SidePaneProvider>
-        <DashboardPage data={{ ...readyOverview, accumulated: null, loading: true }} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    let page = container.querySelector('.dashboard-page');
-    // P6: the Overview never dims -- the skeleton is showing here, undimmed --
-    // but it's still "still loading" for the appear latch's purposes.
-    expect(page.className).not.toContain('dashboard-loading');
-    expect(page.className).toContain('dashboard-ready');
-    expect(page.className).not.toContain('dashboard-appear');
-    expect(page.querySelector('.overview-skeleton')).toBeTruthy();
+  it('carries dashboard-appear on first content appearance, holds it through unrelated re-renders for the animation window, then releases', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, accumulated: null, loading: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      let page = container.querySelector('.dashboard-page');
+      // P6: the Overview never dims -- the skeleton is showing here, undimmed --
+      // but it's still "still loading" for the appear latch's purposes.
+      expect(page.className).not.toContain('dashboard-loading');
+      expect(page.className).toContain('dashboard-ready');
+      expect(page.className).not.toContain('dashboard-appear');
+      expect(page.querySelector('.overview-skeleton')).toBeTruthy();
 
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-ready');
-    expect(page.className).toContain('dashboard-appear');
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
+      expect(page.className).toContain('dashboard-appear');
 
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-ready');
-    expect(page.className).toContain('dashboard-refreshing');
-    expect(page.className).not.toContain('dashboard-appear');
+      // An unrelated re-render inside the animation window (isFetching
+      // flipping a moment after content appeared) must NOT drop the class:
+      // that snapped opacity to 1 and cut the fade short.
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
+      expect(page.className).toContain('dashboard-refreshing');
+      expect(page.className).toContain('dashboard-appear');
+
+      // Once the animation window has passed, the class releases -- and a
+      // further render over the same context must not re-add it.
+      act(() => { vi.advanceTimersByTime(450); });
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // P6 fix: the appear latch's read AND write are gated on `!showOverviewSkeleton`
@@ -713,7 +734,11 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
           <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
         </SidePaneProvider>,
       );
-      // Repeat render over the same context: no replay.
+      // Still inside the animation window: the hold keeps the fade running.
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-appear');
+      // After the window: released, and no replay over the same context.
+      act(() => { vi.advanceTimersByTime(450); });
       page = container.querySelector('.dashboard-page');
       expect(page.className).not.toContain('dashboard-appear');
     } finally {
@@ -764,56 +789,68 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
       error: null,
       availableRuns: [],
     };
-    const { container, rerender, getByText, queryByText } = render(
-      <SidePaneProvider>
-        <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    expect(getByText('No evaluations yet')).toBeTruthy();
-    let page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-appear');
+    vi.useFakeTimers();
+    try {
+      const { container, rerender, getByText, queryByText } = render(
+        <SidePaneProvider>
+          <DashboardPage data={baseNoRuns} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      expect(getByText('No evaluations yet')).toBeTruthy();
+      let page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-appear');
+      act(() => { vi.advanceTimersByTime(450); });
 
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={{ ...readyOverview, selectedProject: 'p1', selectedSource: 'local' }} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    expect(queryByText('No evaluations yet')).toBeNull();
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-ready');
-    expect(page.className).not.toContain('dashboard-appear');
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, selectedProject: 'p1', selectedSource: 'local' }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      expect(queryByText('No evaluations yet')).toBeNull();
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-ready');
+      expect(page.className).not.toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('re-arms dashboard-appear on a project switch (a new context gets its own fade)', () => {
-    const { container, rerender } = render(
-      <SidePaneProvider>
-        <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    let page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-appear');
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <SidePaneProvider>
+          <DashboardPage data={readyOverview} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      let page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-appear');
+      act(() => { vi.advanceTimersByTime(450); });
 
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).not.toContain('dashboard-appear');
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyOverview, isFetching: true }} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
 
-    const project2 = {
-      ...readyOverview,
-      selectedProject: 'p2',
-      projects: [{ id: 'p2', name: 'p2' }],
-      dashboard: { ...readyOverview.dashboard, selectedRun: { runId: 'r2', dateLabel: '2026-06-01' } },
-    };
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={project2} callbacks={{}} runMode={false} />
-      </SidePaneProvider>,
-    );
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-appear');
+      const project2 = {
+        ...readyOverview,
+        selectedProject: 'p2',
+        projects: [{ id: 'p2', name: 'p2' }],
+        dashboard: { ...readyOverview.dashboard, selectedRun: { runId: 'r2', dateLabel: '2026-06-01' } },
+      };
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={project2} callbacks={{}} runMode={false} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('re-arms dashboard-appear on a run switch in run-detail, but not on a repeat render of the same run', () => {
@@ -835,31 +872,37 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
       availableRuns: [{ runId, status: 'complete' }],
     });
 
-    const { container, rerender } = render(
-      <SidePaneProvider>
-        <DashboardPage data={readyRun('r1')} callbacks={{}} runMode={true} />
-      </SidePaneProvider>,
-    );
-    let page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-appear');
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <SidePaneProvider>
+          <DashboardPage data={readyRun('r1')} callbacks={{}} runMode={true} />
+        </SidePaneProvider>,
+      );
+      let page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-appear');
+      act(() => { vi.advanceTimersByTime(450); });
 
-    // Same run re-rendered (e.g. an unrelated prop changing): must not replay.
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={{ ...readyRun('r1'), isFetching: true }} callbacks={{}} runMode={true} />
-      </SidePaneProvider>,
-    );
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).not.toContain('dashboard-appear');
+      // Same run re-rendered (e.g. an unrelated prop changing): must not replay.
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={{ ...readyRun('r1'), isFetching: true }} callbacks={{}} runMode={true} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).not.toContain('dashboard-appear');
 
-    // Switching to a different run in run-detail is a legitimate new context.
-    rerender(
-      <SidePaneProvider>
-        <DashboardPage data={readyRun('r2')} callbacks={{}} runMode={true} />
-      </SidePaneProvider>,
-    );
-    page = container.querySelector('.dashboard-page');
-    expect(page.className).toContain('dashboard-appear');
+      // Switching to a different run in run-detail is a legitimate new context.
+      rerender(
+        <SidePaneProvider>
+          <DashboardPage data={readyRun('r2')} callbacks={{}} runMode={true} />
+        </SidePaneProvider>,
+      );
+      page = container.querySelector('.dashboard-page');
+      expect(page.className).toContain('dashboard-appear');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
