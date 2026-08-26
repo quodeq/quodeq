@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
-import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
+import AccumulatedOverviewPanel, { preloadRunHistoryPanel } from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
@@ -145,6 +145,11 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false, warmup = null } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
+  // Warm the score-history chunk while the boot loader / skeleton is still
+  // up: the chart is a separate lazy chunk, and without this the first
+  // data-bearing mount commits its placeholder for a beat inside otherwise
+  // real content — the exact flash the startup hold exists to remove.
+  useEffect(() => { preloadRunHistoryPanel(); }, []);
   // After a successful clone-on-add migration the project's repository_info.json
   // has been rewritten with location: "local". Refetch the projects list so the
   // sidebar/header reflect the new state. Fall back to a full reload if no

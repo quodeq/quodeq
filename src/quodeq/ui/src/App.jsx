@@ -36,6 +36,7 @@ import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
+import { useOneShotGate } from './hooks/useOneShotGate.js';
 import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
@@ -458,17 +459,21 @@ export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCou
 }
 
 /**
- * Startup-loader gate. Dropping the loader at projectsLoaded hands the user
+ * Startup-loader hold. Dropping the loader at projectsLoaded hands the user
  * a skeleton flash (loader > skeleton > data) on every boot, so on the
  * default Overview landing it holds until the Overview's data is actually
  * in. It must drop the moment we know no data is coming: load failure,
- * zero local projects, nothing selected, a query error, or a restored
- * non-overview tab — every one of those renders its own state and an
- * overlay would wall it off forever. Exported for unit tests.
+ * zero local projects, nothing selected, a query error, a restored
+ * non-overview tab, or the queries settling empty (`loading` false covers
+ * a project with no completed evaluations, whose `accumulated` stays null
+ * forever) — every one of those renders its own state and an overlay
+ * would wall it off forever. This describes a STATE, not "booting": the
+ * caller must scope it with useOneShotGate or a mid-session project
+ * switch re-triggers it. Exported for unit tests.
  */
 export function shouldShowStartupLoader({
   projectsLoaded, projectsLoadFailed, projectsCount, selectedProject,
-  selectedSource, activeTab, dashboard, accumulated, error,
+  selectedSource, activeTab, dashboard, accumulated, error, loading,
 }) {
   if (projectsLoadFailed) return false;
   if (!projectsLoaded) return true;
@@ -476,7 +481,8 @@ export function shouldShowStartupLoader({
   if ((projectsCount ?? 0) === 0 && selectedSource !== 'shared') return false;
   if (!selectedProject) return false;
   if (error) return false;
-  return !(dashboard && accumulated);
+  if (dashboard && accumulated) return false;
+  return !!loading;
 }
 
 function renderEvalPrincipleDetail(params, props) {
@@ -1182,7 +1188,11 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
-  const showStartupLoader = shouldShowStartupLoader({
+  // One-shot: the hold predicate describes a state a mid-session project
+  // switch re-enters (Compare's open-project lands on a not-yet-loaded
+  // overview); the gate makes sure the fullscreen loader is boot-only —
+  // after it drops once, switches get the overview skeleton instead.
+  const showStartupLoader = useOneShotGate(shouldShowStartupLoader({
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
     projectsCount: state.projects.length,
@@ -1192,7 +1202,8 @@ export default function App() {
     dashboard: state.dashboard,
     accumulated: state.accumulated,
     error: state.error,
-  });
+    loading: state.loading,
+  }));
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.

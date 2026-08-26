@@ -3,7 +3,17 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
 import { collapseByPeriod, collectPeriodDimensions, bucketKey, extractDimensionPeriodSeries, sliceTrendAtRun } from '../../../utils/dailyGrouping.js';
-const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
+const runHistoryPanelImport = () => import('./RunHistoryPanel.jsx');
+const RunHistoryPanel = lazy(runHistoryPanelImport);
+
+// Warm the chart chunk before the overview first mounts with data (called
+// from DashboardPage while the boot loader / skeleton is still up). The
+// dynamic import caches, so the lazy() above resolves without ever
+// committing its RunHistoryPanelPlaceholder fallback — otherwise a cold
+// boot pays a placeholder beat inside otherwise-real content.
+export function preloadRunHistoryPanel() {
+  runHistoryPanelImport();
+}
 import RunHistoryPanelPlaceholder from './RunHistoryPanelPlaceholder.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';

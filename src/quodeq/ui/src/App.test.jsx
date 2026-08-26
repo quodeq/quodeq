@@ -1084,7 +1084,7 @@ describe('shouldShowStartupLoader', () => {
   const base = {
     projectsLoaded: true, projectsLoadFailed: false, projectsCount: 2,
     selectedProject: 'proj-1', selectedSource: 'local', activeTab: 'overview',
-    dashboard: null, accumulated: null, error: null,
+    dashboard: null, accumulated: null, error: null, loading: true,
   };
 
   it('shows before projects load', () => {
@@ -1129,5 +1129,16 @@ describe('shouldShowStartupLoader', () => {
 
   it('drops when the user restored into a non-overview tab', () => {
     expect(shouldShowStartupLoader({ ...base, activeTab: 'violations' })).toBe(false);
+  });
+
+  it('drops when the queries settle with no data coming (project with no completed evaluations)', () => {
+    // accumulated stays null forever for a run-less project; only `loading`
+    // (dashboard + scores queries combined) says nothing more is in flight.
+    // Without this escape the loader would wall off the empty state forever.
+    expect(shouldShowStartupLoader({ ...base, loading: false })).toBe(false);
+  });
+
+  it('keeps holding while either query is still in flight even with partial data', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] }, loading: true })).toBe(true);
   });
 });
