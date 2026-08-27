@@ -526,6 +526,52 @@ export default function CompareFleetView({
         </section>
       )}
 
+      {/* v4a: every score at a glance, right after the ranked table.
+          Column headers SORT (the dimensions board below still drills); a
+          cell opens that project's own dimension (remote rows open the
+          shared project). */}
+      <CompareMatrix
+        ariaLabel={t('compare.matrixAria')}
+        header={t('compare.matrixHeader', { rows: scoredRows.length, cols: board.length })}
+        note={t('compare.matrixNote')}
+        footOverall={fleet.score}
+        columns={board.map((b) => ({ key: b.key, label: b.label, avg: b.avg }))}
+        matrixRows={scoredRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          remote: row.remote,
+          overall: row.score,
+          onOpenRow: () => onOpenProject(row.id),
+          cells: Object.fromEntries(row.dims.map((dim) => [dim.key, {
+            score: dim.score,
+            title: t('compare.openDimensionIn', { dim: dim.label, project: row.name }),
+            onClick: () => (row.remote || !dim.fromRunId || !onOpenProjectDimension
+              ? onOpenProject(row.id)
+              : onOpenProjectDimension({ id: row.id, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel })),
+          }])),
+        }))}
+      />
+
+      <section className="compare-panel" aria-label={t('compare.dimensionsAria')}>
+        <div className="compare-panel__head">
+          <SectionLabel>{t('compare.dimensionsHeader', { count: board.length })}</SectionLabel>
+          <span className="compare-panel__note">{t('compare.dimensionsNote')}</span>
+        </div>
+        <ul className="compare-board compare-board--grid">
+          {board.map((b) => (
+            <li key={b.key}>
+              <button type="button" className="compare-board__row" onClick={() => openDimension(b.key)}>
+                <span className="compare-board__label">{b.label}</span>
+                <span className={`compare-board__score ${scoreColorClass(b.avg)}`}>{score1(b.avg)}</span>
+                <span className="compare-board__delta"><TrendBadge delta={b.delta} /></span>
+                <span className="compare-board__viol">{t('compare.violCount', { count: nf(b.violations) })}</span>
+                <span className="compare-board__chevron" aria-hidden="true">›</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className="compare-panel" aria-label={t('compare.projectsAria')}>
         <div className="compare-panel__head">
           <SectionLabel>{t('compare.projectsHeader', { count: scopeCount })}</SectionLabel>
@@ -600,52 +646,6 @@ export default function CompareFleetView({
             </div>
           )}
         </div>
-      </section>
-
-      {/* v4a: every score at a glance, right after the ranked table.
-          Column headers SORT (the dimensions board below still drills); a
-          cell opens that project's own dimension (remote rows open the
-          shared project). */}
-      <CompareMatrix
-        ariaLabel={t('compare.matrixAria')}
-        header={t('compare.matrixHeader', { rows: scoredRows.length, cols: board.length })}
-        note={t('compare.matrixNote')}
-        footOverall={fleet.score}
-        columns={board.map((b) => ({ key: b.key, label: b.label, avg: b.avg }))}
-        matrixRows={scoredRows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          remote: row.remote,
-          overall: row.score,
-          onOpenRow: () => onOpenProject(row.id),
-          cells: Object.fromEntries(row.dims.map((dim) => [dim.key, {
-            score: dim.score,
-            title: t('compare.openDimensionIn', { dim: dim.label, project: row.name }),
-            onClick: () => (row.remote || !dim.fromRunId || !onOpenProjectDimension
-              ? onOpenProject(row.id)
-              : onOpenProjectDimension({ id: row.id, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel })),
-          }])),
-        }))}
-      />
-
-      <section className="compare-panel" aria-label={t('compare.dimensionsAria')}>
-        <div className="compare-panel__head">
-          <SectionLabel>{t('compare.dimensionsHeader', { count: board.length })}</SectionLabel>
-          <span className="compare-panel__note">{t('compare.dimensionsNote')}</span>
-        </div>
-        <ul className="compare-board compare-board--grid">
-          {board.map((b) => (
-            <li key={b.key}>
-              <button type="button" className="compare-board__row" onClick={() => openDimension(b.key)}>
-                <span className="compare-board__label">{b.label}</span>
-                <span className={`compare-board__score ${scoreColorClass(b.avg)}`}>{score1(b.avg)}</span>
-                <span className="compare-board__delta"><TrendBadge delta={b.delta} /></span>
-                <span className="compare-board__viol">{t('compare.violCount', { count: nf(b.violations) })}</span>
-                <span className="compare-board__chevron" aria-hidden="true">›</span>
-              </button>
-            </li>
-          ))}
-        </ul>
       </section>
     </>
   );
