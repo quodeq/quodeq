@@ -234,6 +234,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Wrapped column groups stack; each after the first opens with its own
+   header band, so the seam reads as a continuation, not a new panel. */
+.compare-matrix table + table { margin-top: 0; }
+.compare-matrix table + table thead th { border-top: 1px solid var(--color-border); }
+
 /* Header band matches the projects table's head row exactly (same
    background, size, tracking), so the two tables read as one family. */
 .compare-matrix th {
@@ -1080,18 +1085,47 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
    speaks in --color-accent, project B (right) in --color-info. Gaps read
    A minus B, tinted toward whichever side leads. */
 
-.compare-duel-cta {
-  font: inherit;
+/* Header duel launcher: sits with the sort/scope controls; the menu is
+   the shared dueltrigger popover with the two-pick chrome on top. */
+.compare-dueltrigger__btn--launcher {
   font-size: 11.5px;
-  color: var(--color-accent);
-  background: transparent;
-  border: 1px solid var(--color-accent);
-  border-radius: 6px;
   padding: 6px 12px;
-  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-muted);
+}
+.compare-dueltrigger__btn--launcher:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
+.compare-dueltrigger__hint {
+  display: block;
+  padding: 8px 10px 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.compare-duel-cta:hover { background: var(--color-accent-soft); }
+/* The pinned side A wears the side-A identity color: this chip IS the
+   left half of the coming versus header. */
+.compare-dueltrigger__pin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-duel-a);
+}
+.compare-dueltrigger__pinName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-dueltrigger__unpin {
+  font: inherit;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.compare-dueltrigger__unpin:hover { color: var(--color-danger); }
 
 .compare-duel__side--a { color: var(--color-duel-a); }
 .compare-duel__side--b { color: var(--color-duel-b); }

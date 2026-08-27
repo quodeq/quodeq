@@ -106,23 +106,34 @@ function ScopePicker({
   );
 }
 
-/* Duel trigger: a button opening a small opponent menu. Choosing navigates
-   to the head-to-head, so this is an action menu, not a value-holding
-   select. The menu renders through a PORTAL at a fixed position: the
-   projects table is an overflow container, and an in-flow popover gets
-   clipped at its edge for rows near the bottom. It flips upward when the
-   space below the button cannot fit it, and any scroll or resize
-   dismisses it (the anchor moved). */
+/* Duel trigger — one component, two homes. In a row expansion it pins
+   that row as side A and lists opponents. As the HEADER LAUNCHER (no row)
+   it runs the two-pick flow: the first pick pins side A (shown as a
+   removable chip in the side-A identity color), the second navigates to
+   the duel — choosing is the action, no confirm step. With the scope at
+   exactly two projects the launcher skips the popover entirely and duels
+   them directly (absorbing the old sometimes-visible "compare these two"
+   shortcut). The menu renders through a PORTAL at a fixed position: the
+   projects table is an overflow container that would clip an in-flow
+   popover, and it flips upward when the space below cannot fit it. */
 const DUEL_MENU_MAX_H = 260; // keep in sync with the CSS max-height
 
-function DuelTrigger({ row, targets, onPick }) {
+function DuelTrigger({ row = null, targets, onStart, openDirect = null, launcher = false }) {
   const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(null);
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
+  const sideA = row || pinned;
+  const list = targets.filter((other) => other.id !== sideA?.id);
+
+  const close = () => { setOpen(false); setPinned(null); };
+
   const toggle = () => {
-    if (open) { setOpen(false); return; }
+    if (open) { close(); return; }
+    // Exactly-two scope: nothing to pick, duel them directly.
+    if (!row && openDirect) { openDirect(); return; }
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
     const spaceBelow = window.innerHeight - r.bottom;
@@ -136,18 +147,25 @@ function DuelTrigger({ row, targets, onPick }) {
     setOpen(true);
   };
 
+  const pick = (other) => {
+    if (!sideA) { setPinned(other); return; }
+    const a = sideA.id;
+    close();
+    onStart(a, other.id);
+  };
+
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => {
-      if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false);
+      if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) close();
     };
-    const onEsc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onEsc = (e) => { if (e.key === 'Escape') close(); };
     // Any OUTSIDE scroll moved the anchor, so the menu must go — but the
     // menu's own list scrolls too (capture sees those events as well), and
     // scrolling the options must not dismiss them.
     const onAnchorMoved = (e) => {
       if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
-      setOpen(false);
+      close();
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onEsc);
@@ -159,29 +177,50 @@ function DuelTrigger({ row, targets, onPick }) {
       window.removeEventListener('scroll', onAnchorMoved, true);
       window.removeEventListener('resize', onAnchorMoved);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
   return (
     <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
       <button
         ref={btnRef}
         type="button"
-        className="compare-dueltrigger__btn"
+        className={`compare-dueltrigger__btn${launcher ? ' compare-dueltrigger__btn--launcher' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={t('compare.duelWithAria', { project: row.name })}
+        aria-label={row ? t('compare.duelWithAria', { project: row.name }) : t('compare.duelLaunchAria')}
         onClick={toggle}
       >
         {t('compare.duelOpen')} {open ? '▾' : '▸'}
       </button>
       {open && pos && createPortal(
         <span className="compare-dueltrigger__menu" role="menu" ref={menuRef} style={pos}>
-          {targets.map((other) => (
+          {!row && !pinned && (
+            <span className="compare-dueltrigger__hint">{t('compare.duelPickA')}</span>
+          )}
+          {!row && pinned && (
+            <span className="compare-dueltrigger__pin">
+              <span className="compare-dueltrigger__pinName">{pinned.name}</span>
+              <span className={`compare-dueltrigger__itemScore ${scoreColorClass(pinned.score)}`}>
+                {score1(pinned.score)}
+              </span>
+              <button
+                type="button"
+                className="compare-dueltrigger__unpin"
+                aria-label={t('compare.duelUnpin')}
+                onClick={() => setPinned(null)}
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {list.map((other) => (
             <button
               key={other.id}
               type="button"
               role="menuitem"
               className="compare-dueltrigger__item"
-              onClick={() => { setOpen(false); onPick(other.id); }}
+              onClick={() => pick(other)}
             >
               <span>
                 {other.name}
@@ -199,8 +238,6 @@ function DuelTrigger({ row, targets, onPick }) {
   );
 }
 
-/* Detail-on-demand block under an expanded row: everything the single-line
-   row no longer carries. */
 function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProjectDimension, openDuelPair }) {
   return (
     <div className="compare-rowdetail">
@@ -243,7 +280,7 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProje
           <DuelTrigger
             row={row}
             targets={duelTargets}
-            onPick={(otherId) => openDuelPair(row.id, otherId)}
+            onStart={openDuelPair}
           />
         )}
       </div>
@@ -402,10 +439,13 @@ export default function CompareFleetView({
           })}
         />
         <div className="compare-header__controls">
-          {openDuel && (
-            <button type="button" className="compare-duel-cta" onClick={openDuel}>
-              {t('compare.duelAction')}
-            </button>
+          {openDuelPair && scoredRows.length >= 2 && (
+            <DuelTrigger
+              targets={scoredRows}
+              onStart={openDuelPair}
+              openDirect={openDuel}
+              launcher
+            />
           )}
           <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
             <button

@@ -233,12 +233,10 @@ describe('ComparePage', () => {
     expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
   });
 
-  it('opens the head-to-head duel when the scope is exactly two projects', async () => {
+  it('the header launcher duels an exactly-two scope directly, no popover', async () => {
     renderPage();
     await screen.findByText('alpha');
-    // Two projects in the fleet = effective scope of two, so the action shows.
-    const cta = await screen.findByText('compare these two');
-    await userEvent.click(cta);
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
     // Left minus right: +1.5 shows as the overall gap card and again on the
     // security dimension and principle rows (7.0 vs 5.5).
@@ -248,14 +246,19 @@ describe('ComparePage', () => {
     expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
   });
 
-  it('hides the duel action when more than two projects are in scope', async () => {
+  it('the header launcher runs the two-pick flow on larger scopes', async () => {
     renderPage({
       projects: PROJECTS.concat([{
         id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
       }]),
     });
     await screen.findByText('gamma');
-    expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
+    // First pick pins side A and stays open; second pick navigates.
+    await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
+    expect(screen.getByLabelText('Clear the first pick')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('menuitem', { name: /beta/ }));
+    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });
 
   it('starts a duel from a row expansion regardless of scope size', async () => {
