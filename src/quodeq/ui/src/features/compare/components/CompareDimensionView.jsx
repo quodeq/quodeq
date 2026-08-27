@@ -48,7 +48,7 @@ function PrincipleDonut({ score }) {
 }
 
 export default function CompareDimensionView({
-  view, board, fleet, onBack, onOpenDimension, onOpenProject, onOpenPrinciple,
+  view, board, fleet, onOpenDimension, onOpenProject, onOpenPrinciple,
   onOpenProjectDimension,
 }) {
   // The radar plots leader/trailer/average by default (all N polygons would
@@ -87,10 +87,10 @@ export default function CompareDimensionView({
   return (
     <>
       <div className="compare-page__top">
+        {/* No local back button: the app breadcrumb (compare / <dimension>)
+            already walks back, and the dimension tabs on the right switch
+            sideways. */}
         <div className="compare-page__titles">
-          <button type="button" className="compare-back" onClick={onBack}>
-            ‹ {t('compare.backToFleet')}
-          </button>
           <TermHeader
             name={view.label}
             sub={t('compare.dimSubtitle', {

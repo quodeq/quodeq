@@ -68,7 +68,6 @@ export default function ComparePage({
      these two" action; back pops to the fleet. */
   duel = null,
   onOpenDuel,
-  onBack,
 }) {
   const localProjects = useMemo(
     () => (projects || []).filter((p) => p && (p.id || p.name)),
@@ -274,7 +273,6 @@ export default function ComparePage({
       {duelView ? (
         <CompareDuelView
           duel={duelView}
-          onBack={onBack}
           onOpenProject={openProject}
         />
       ) : dimensionView ? (
@@ -282,7 +280,6 @@ export default function ComparePage({
           view={dimensionView}
           board={board}
           fleet={fleet}
-          onBack={onBack}
           onOpenDimension={openDimension}
           onOpenProject={openProject}
           onOpenPrinciple={openPrinciple}

@@ -79,7 +79,7 @@ function DuelBars({ a, b }) {
   );
 }
 
-export default function CompareDuelView({ duel, onBack, onOpenProject }) {
+export default function CompareDuelView({ duel, onOpenProject }) {
   const { a, b } = duel;
   const gapHint = duel.gap == null
     ? ''
@@ -95,10 +95,9 @@ export default function CompareDuelView({ duel, onBack, onOpenProject }) {
   return (
     <>
       <div className="compare-page__top">
+        {/* No local back button — the app breadcrumb already walks back,
+            same as the dimension screen. */}
         <div className="compare-page__titles">
-          <button type="button" className="compare-back" onClick={onBack}>
-            ‹ {t('compare.duelBack')}
-          </button>
           <TermHeader
             name={t('compare.duelTitle')}
             sub={t('compare.duelSubtitle', { a: a.name, b: b.name, count: duel.sharedCount })}

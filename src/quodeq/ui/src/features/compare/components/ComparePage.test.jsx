@@ -116,31 +116,26 @@ describe('ComparePage', () => {
     expect((await screen.findAllByText('5.9')).length).toBeGreaterThan(0);
   });
 
-  it('expands a row on click; the expansion opens the project overview', async () => {
+  it('a row name opens the project', async () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProject });
-    const name = await screen.findByText('alpha');
+    // Scope to the table: project names also appear in the attention strip.
+    const name = (await screen.findAllByText('alpha'))
+      .find((el) => el.classList.contains('compare-row__name'));
     await userEvent.click(name);
-    // Row click expands the detail (severity, dimensions, actions) instead
-    // of navigating away.
-    expect(onOpenProject).not.toHaveBeenCalled();
-    await userEvent.click(await screen.findByText(/open project/));
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha', 'local'));
   });
 
-  it('keeps multiple rows expanded independently', async () => {
-    renderPage();
-    // Scope to table rows: project names also appear in the attention strip.
-    const rowName = (name) => screen.getAllByText(name)
-      .find((el) => el.classList.contains('compare-row__name'));
+  it('rows carry the trend spark and severity split inline; the expansion is gone', async () => {
+    const { container } = renderPage();
     await screen.findByText('alpha');
-    await userEvent.click(rowName('alpha'));
-    await userEvent.click(rowName('beta'));
-    // Both detail blocks stay open side by side.
-    expect(await screen.findAllByText(/open project/)).toHaveLength(2);
-    // Toggling one closed leaves the other open.
-    await userEvent.click(rowName('alpha'));
-    expect(await screen.findAllByText(/open project/)).toHaveLength(1);
+    // One spark per scored row (both fixtures have a 2-point trend).
+    await waitFor(() => expect(
+      container.querySelectorAll('.compare-row .compare-trendline'),
+    ).toHaveLength(2));
+    // Severity split as colored counts (each fixture row carries 1 critical).
+    expect(screen.getAllByText('1 crit').length).toBeGreaterThan(1);
+    expect(container.querySelector('.compare-rowdetail')).toBeNull();
   });
 
   it('collapses never-evaluated projects into a single line', async () => {
@@ -159,31 +154,12 @@ describe('ComparePage', () => {
     expect(await screen.findByText('beta')).toBeInTheDocument();
   });
 
-  it('expansion lays out facts and actions on one header row, chips below', async () => {
-    const { container } = renderPage();
-    await screen.findByText('alpha');
-    await userEvent.click(screen.getByText('alpha'));
-    const detail = container.querySelector('.compare-rowdetail');
-    const head = detail.querySelector('.compare-rowdetail__head');
-    expect(head).toBeTruthy();
-    // Facts (left) and actions (right) share the header row: no third
-    // sparse row, no dead space to the right of the facts.
-    expect(head.querySelector('.compare-rowdetail__facts')).toBeTruthy();
-    expect(head.querySelector('.compare-rowdetail__actions')).toBeTruthy();
-    // Chips follow as their own wrap line.
-    const children = Array.from(detail.children);
-    expect(children.indexOf(head)).toBeLessThan(
-      children.indexOf(detail.querySelector('.compare-rowdetail__dims')),
-    );
-  });
-
-  it('an expanded row dimension chip opens that project’s own dimension page, not the compare drill-down', async () => {
+  it('a matrix cell opens that project’s own dimension page, not the compare drill-down', async () => {
     const onOpenProjectDimension = vi.fn();
     renderPage({ onOpenProjectDimension });
     await screen.findByText('alpha');
-    await userEvent.click(screen.getByText('alpha'));
-    const chip = await screen.findByTitle('open alpha’s security');
-    await userEvent.click(chip);
+    const matrix = await screen.findByLabelText('Score matrix');
+    await userEvent.click(within(matrix).getByTitle('open security in alpha'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith({
       id: 'alpha', source: 'local', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
     });
@@ -219,7 +195,7 @@ describe('ComparePage', () => {
     expect(screen.getByText(/PRINCIPLE_MATRIX/)).toBeInTheDocument();
   });
 
-  it('drills into a dimension and back', async () => {
+  it('drills into a dimension', async () => {
     renderPage();
     await screen.findByText('alpha');
     const dimButtons = await screen.findAllByText('security');
@@ -227,8 +203,8 @@ describe('ComparePage', () => {
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
     expect(screen.getByText('leads the scope')).toBeInTheDocument();
     expect(screen.getByText('trails the scope')).toBeInTheDocument();
-    await userEvent.click(screen.getByText(/ALL DIMENSIONS/));
-    expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
+    // No local back button: the app breadcrumb owns the way back.
+    expect(screen.queryByText(/ALL DIMENSIONS/)).toBeNull();
   });
 
   it('the header launcher duels an exactly-two scope directly, no popover', async () => {
@@ -240,8 +216,6 @@ describe('ComparePage', () => {
     // security dimension and principle rows (7.0 vs 5.5).
     expect(screen.getAllByText('+1.5').length).toBeGreaterThan(1);
     expect(screen.getByText('alpha leads by 1.5')).toBeInTheDocument();
-    await userEvent.click(screen.getByText(/ALL PROJECTS/));
-    expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
   });
 
   it('the header launcher runs the two-pick flow on larger scopes', async () => {
@@ -255,24 +229,6 @@ describe('ComparePage', () => {
     // First pick pins side A and stays open; second pick navigates.
     await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
     expect(screen.getByLabelText('Clear the first pick')).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole('menuitem', { name: /beta/ }));
-    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
-  });
-
-  it('starts a duel from a row expansion regardless of scope size', async () => {
-    renderPage({
-      projects: PROJECTS.concat([{
-        id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
-      }]),
-    });
-    await screen.findByText('gamma');
-    // Three projects in scope: the header CTA is gone, but any expanded row
-    // can pick an opponent.
-    const rowName = screen.getAllByText('alpha')
-      .find((el) => el.classList.contains('compare-row__name'));
-    await userEvent.click(rowName);
-    const trigger = await screen.findByLabelText(/Compare alpha with/);
-    await userEvent.click(trigger);
     await userEvent.click(await screen.findByRole('menuitem', { name: /beta/ }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });
@@ -390,17 +346,14 @@ describe('ComparePage remote projects', () => {
     const rowName = (await screen.findAllByText('gamma'))
       .find((el) => el.classList.contains('compare-row__name'));
     await userEvent.click(rowName);
-    await userEvent.click(await screen.findByText(/open project/));
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('gamma', 'shared'));
   });
 
   it('duels a local project against a remote one', async () => {
     renderPage();
-    const rowName = (await screen.findAllByText('alpha'))
-      .find((el) => el.classList.contains('compare-row__name'));
-    await userEvent.click(rowName);
-    const trigger = await screen.findByLabelText(/Compare alpha with/);
-    await userEvent.click(trigger);
+    await screen.findByText('gamma');
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /gamma/ }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });

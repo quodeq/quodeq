@@ -106,34 +106,31 @@ function ScopePicker({
   );
 }
 
-/* Duel trigger — one component, two homes. In a row expansion it pins
-   that row as side A and lists opponents. As the HEADER LAUNCHER (no row)
-   it runs the two-pick flow: the first pick pins side A (shown as a
-   removable chip in the side-A identity color), the second navigates to
-   the duel — choosing is the action, no confirm step. With the scope at
-   exactly two projects the launcher skips the popover entirely and duels
-   them directly (absorbing the old sometimes-visible "compare these two"
-   shortcut). The menu renders through a PORTAL at a fixed position: the
-   projects table is an overflow container that would clip an in-flow
-   popover, and it flips upward when the space below cannot fit it. */
+/* Duel trigger — the header launcher's two-pick flow: the first pick pins
+   side A (shown as a removable chip in the side-A identity color), the
+   second navigates to the duel — choosing is the action, no confirm step.
+   With the scope at exactly two projects it skips the popover entirely and
+   duels them directly. The menu renders through a PORTAL at a fixed
+   position: the header sits over overflow containers that would clip an
+   in-flow popover, and it flips upward when the space below cannot fit
+   it. */
 const DUEL_MENU_MAX_H = 260; // keep in sync with the CSS max-height
 
-function DuelTrigger({ row = null, targets, onStart, openDirect = null, launcher = false }) {
+function DuelTrigger({ targets, onStart, openDirect = null }) {
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(null);
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
-  const sideA = row || pinned;
-  const list = targets.filter((other) => other.id !== sideA?.id);
+  const list = targets.filter((other) => other.id !== pinned?.id);
 
   const close = () => { setOpen(false); setPinned(null); };
 
   const toggle = () => {
     if (open) { close(); return; }
     // Exactly-two scope: nothing to pick, duel them directly.
-    if (!row && openDirect) { openDirect(); return; }
+    if (openDirect) { openDirect(); return; }
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
     const spaceBelow = window.innerHeight - r.bottom;
@@ -148,8 +145,8 @@ function DuelTrigger({ row = null, targets, onStart, openDirect = null, launcher
   };
 
   const pick = (other) => {
-    if (!sideA) { setPinned(other); return; }
-    const a = sideA.id;
+    if (!pinned) { setPinned(other); return; }
+    const a = pinned.id;
     close();
     onStart(a, other.id);
   };
@@ -185,20 +182,20 @@ function DuelTrigger({ row = null, targets, onStart, openDirect = null, launcher
       <button
         ref={btnRef}
         type="button"
-        className={`compare-dueltrigger__btn${launcher ? ' compare-dueltrigger__btn--launcher' : ''}`}
+        className="compare-dueltrigger__btn compare-dueltrigger__btn--launcher"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={row ? t('compare.duelWithAria', { project: row.name }) : t('compare.duelLaunchAria')}
+        aria-label={t('compare.duelLaunchAria')}
         onClick={toggle}
       >
         {t('compare.duelOpen')} {open ? '▾' : '▸'}
       </button>
       {open && pos && createPortal(
         <span className="compare-dueltrigger__menu" role="menu" ref={menuRef} style={pos}>
-          {!row && !pinned && (
+          {!pinned && (
             <span className="compare-dueltrigger__hint">{t('compare.duelPickA')}</span>
           )}
-          {!row && pinned && (
+          {pinned && (
             <span className="compare-dueltrigger__pin">
               <span className="compare-dueltrigger__pinName">{pinned.name}</span>
               <span className={`compare-dueltrigger__itemScore ${scoreColorClass(pinned.score)}`}>
@@ -238,121 +235,46 @@ function DuelTrigger({ row = null, targets, onStart, openDirect = null, launcher
   );
 }
 
-function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProjectDimension, openDuelPair }) {
-  return (
-    <div className="compare-rowdetail">
-      {/* One justified header row — facts left, actions right — then the
-          chips as their own wrap line. Three stacked sparse rows left the
-          right half of the expansion dead. */}
-      <div className="compare-rowdetail__head">
-      <div className="compare-rowdetail__facts">
-        <span className="compare-row__sev">
-          <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
-          <SevBadge level="major" format="count-abbr" count={row.severity.major} />
-          <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
-        </span>
-        {row.spark.length > 1 && (
-          <CompareTrendLine scores={row.spark} />
-        )}
-        {row.coveragePct != null && (
-          <span className={row.coveragePct < 80 ? 'compare-row__cov--low' : undefined}>
-            {t('compare.analyzedPct', { pct: row.coveragePct })}
-          </span>
-        )}
-        {row.totalFiles != null && (
-          <span>{t('compare.filesSuffix', { count: nf(row.totalFiles) })}</span>
-        )}
-        {row.commitsSince != null && row.commitsSince > 0 && (
-          <span className="compare-rowdetail__stale">
-            {t('compare.commitsSince', { count: nf(row.commitsSince) })}
-          </span>
-        )}
-      </div>
-      <div className="compare-rowdetail__actions">
-        <button
-          type="button"
-          className="compare-rowdetail__open"
-          onClick={(e) => { e.stopPropagation(); onOpenProject(row.id); }}
-        >
-          {t('compare.openProject')} ›
-        </button>
-        {openDuelPair && duelTargets.length > 0 && (
-          <DuelTrigger
-            row={row}
-            targets={duelTargets}
-            onStart={openDuelPair}
-          />
-        )}
-      </div>
-      </div>
-      <div className="compare-rowdetail__dims">
-        {row.dims.filter((d) => d.score != null).map((dim) => {
-          // A chip inside a project's expansion is project-scoped: it jumps
-          // to THAT project's dimension screen (same cross-project entry as
-          // the standings rows, back pops to Compare). The scope-wide
-          // drill-down belongs to the DIMENSIONS panel below the fleet.
-          // Falls back to the drill-down when the run target is unknowable
-          // — and for remote rows, whose detail pages live behind the
-          // shared source, not local routes.
-          const toProject = !!(dim.fromRunId && onOpenProjectDimension && !row.remote);
-          return (
-            <button
-              key={dim.key}
-              type="button"
-              className="compare-dim-chip compare-dim-chip--inline"
-              title={toProject
-                ? t('compare.openProjectDimension', { name: row.name, dim: dim.label })
-                : t('compare.openDimension', { dim: dim.label })}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (toProject) {
-                  onOpenProjectDimension({ id: row.id, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
-                } else {
-                  openDimension(dim.key);
-                }
-              }}
-            >
-              <span className={scoreColorClass(dim.score)}>{score1(dim.score)}</span>
-              <span className="compare-dim-chip__label">{dim.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, onOpenProjectDimension, openDimension, error, duelTargets, openDuelPair }) {
+/* One line per project — the row IS the summary now: identity, score,
+   30-day spark + delta, violations split by severity, freshness with
+   commits-behind. The score matrix below already carries every
+   per-dimension number, so the old expansion (chips, facts, per-row duel)
+   had nothing left to say; the name opens the project, the same gesture as
+   every other list on this screen, and the header duel button covers
+   head-to-heads. */
+function ProjectRow({ row, rank, onOpenProject, error }) {
   const level = consequenceLevel(consequenceOf(row));
   return (
     <div
-      className={`compare-rowgroup compare-rowgroup--${level}${expanded ? ' compare-rowgroup--open' : ''}`}
+      className={`compare-rowgroup compare-rowgroup--${level}`}
       // The stripe's colour is the project's GRADE; the consequence level
       // only decides whether a stripe shows.
       style={row.hasData ? { '--row-accent': scoreGradeColorVar(row.score) } : undefined}
     >
-      <div
-        className={`compare-row${row.hasData ? '' : ' compare-row--nodata'}`}
-        role="row"
-        tabIndex={0}
-        aria-expanded={row.hasData ? expanded : undefined}
-        onClick={() => (row.hasData ? onToggle(row.id) : undefined)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && row.hasData) onToggle(row.id); }}
-      >
+      <div className={`compare-row${row.hasData ? '' : ' compare-row--nodata'}`} role="row">
         <span className="compare-row__stripe" aria-hidden="true" />
         <span className="compare-row__rank">{rank}</span>
         <span className="compare-row__project">
-          <span className="compare-row__name">{row.name}</span>
+          <button
+            type="button"
+            className="compare-row__name compare-row__namebtn"
+            title={row.name}
+            onClick={() => onOpenProject(row.id)}
+          >
+            {row.name}
+          </button>
           {row.lang && <span className="compare-row__meta">{row.lang}</span>}
           {row.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
         </span>
         {row.hasData ? (
           <>
+            {/* Number + grade colour only — the tier word ("good",
+                "adequate") repeated what both already say. */}
             <span className="compare-row__score">
               <span className={scoreColorClass(row.score)}>{score1(row.score)}</span>
-              <span className="compare-row__tier">{scoreToGradeLabel(row.score) || ''}</span>
             </span>
-            <span className="compare-row__delta">
+            <span className="compare-row__trend">
+              {row.spark.length > 1 && <CompareTrendLine scores={row.spark} />}
               {row.delta != null ? (
                 <TrendBadge delta={row.delta} />
               ) : row.lastDelta != null ? (
@@ -361,22 +283,34 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, onOpenProjec
                 </span>
               ) : null}
             </span>
-            <span className="compare-row__viol">{nf(row.totalViolations)}</span>
+            {/* Severity split on wide views; small tiers swap it for the
+                bare total (see the small-view tiers in compare.css). */}
+            <span
+              className="compare-row__viol"
+              title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
+            >
+              <span className="compare-row__sev">
+                <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
+                <SevBadge level="major" format="count-abbr" count={row.severity.major} />
+                <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
+              </span>
+              <span className="compare-row__violTotal">{nf(row.totalViolations)}</span>
+            </span>
             <span
               className="compare-row__ratio"
               title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
             >
               {complianceRatio(row.totalViolations, row.totalCompliance)}
             </span>
-            <span
-              className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}
-              title={row.commitsSince != null && row.commitsSince > 0
-                ? t('compare.commitsSince', { count: nf(row.commitsSince) })
-                : undefined}
-            >
+            <span className={`compare-row__last${row.stale ? ' compare-row__last--stale' : ''}`}>
               {relativeTime(row.lastISO) || '—'}
+              {row.commitsSince != null && row.commitsSince > 0 && (
+                <span className="compare-row__behind">
+                  {' · '}
+                  {t('compare.behindShort', { count: nf(row.commitsSince) })}
+                </span>
+              )}
             </span>
-            <span className="compare-row__chev" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
           </>
         ) : (
           <span className="compare-row__pending">
@@ -388,16 +322,6 @@ function ProjectRow({ row, rank, expanded, onToggle, onOpenProject, onOpenProjec
           </span>
         )}
       </div>
-      {expanded && row.hasData && (
-        <RowDetail
-          row={row}
-          duelTargets={duelTargets}
-          openDimension={openDimension}
-          onOpenProject={onOpenProject}
-          onOpenProjectDimension={onOpenProjectDimension}
-          openDuelPair={openDuelPair}
-        />
-      )}
     </div>
   );
 }
@@ -408,9 +332,6 @@ export default function CompareFleetView({
   toggleProject, selectAll, selectFlagged, openDimension, openDuel, openDuelPair, onOpenProject,
   onOpenProjectDimension,
 }) {
-  // Any number of rows can hold their detail open at once — comparing two
-  // projects' expansions side by side is the point of this screen.
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
   // The score matrix shows the same projects as the ranked table, in the
   // same order — never-evaluated rows have no numbers to grid.
   const scoredRows = orderedRows.filter((r) => r.hasData);
@@ -425,12 +346,6 @@ export default function CompareFleetView({
     ...attention.slice(3).filter((a) => a.level !== 'clear'),
   ];
   const attnShown = attnOpen ? attnAll : attnAll.slice(0, 3);
-  const toggleRow = (id) => setExpandedIds((cur) => {
-    const next = new Set(cur);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  });
 
   // Never-evaluated projects (settled, no data, no error) collapse into one
   // line; pending and errored rows stay visible individually.
@@ -454,7 +369,6 @@ export default function CompareFleetView({
               targets={scoredRows}
               onStart={openDuelPair}
               openDirect={openDuel}
-              launcher
             />
           )}
           <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
@@ -643,7 +557,7 @@ export default function CompareFleetView({
           <span className="compare-panel__note">
             {sortDir === 'desc' ? t('compare.sortNoteScore') : t('compare.sortNoteScoreAsc')}
             {' · '}
-            {t('compare.rowExpandHint')}
+            {t('compare.rowOpenHint')}
           </span>
         </div>
         <div className="compare-table" role="table">
@@ -652,25 +566,18 @@ export default function CompareFleetView({
             <span className="compare-row__rank" />
             <span className="compare-row__project">{t('compare.colProject')}</span>
             <span className="compare-row__score">{t('compare.colScore')}</span>
-            <span className="compare-row__delta">{t('compare.colDelta')}</span>
+            <span className="compare-row__trend">{t('compare.colDelta')}</span>
             <span className="compare-row__viol">{t('compare.colViolations')}</span>
             <span className="compare-row__ratio">{t('compare.colRatio')}</span>
             <span className="compare-row__last">{t('compare.colLast')}</span>
-            <span className="compare-row__chev" />
           </div>
           {mainRows.map((row, i) => (
             <ProjectRow
               key={row.id}
               row={row}
               rank={i + 1}
-              expanded={expandedIds.has(row.id)}
-              onToggle={toggleRow}
               onOpenProject={onOpenProject}
-              onOpenProjectDimension={onOpenProjectDimension}
-              openDimension={openDimension}
               error={errorsById[row.id]}
-              duelTargets={rows.filter((r) => r.hasData && r.id !== row.id)}
-              openDuelPair={openDuelPair}
             />
           ))}
           {unevaluated.length > 0 && (
@@ -703,11 +610,17 @@ export default function CompareFleetView({
               <span className="compare-row__rank" />
               <span className="compare-row__project compare-row__footLabel">{t('compare.scopeAverage')}</span>
               <span className={`compare-row__score ${scoreColorClass(fleet.score)}`}>{score1(fleet.score)}</span>
-              <span className="compare-row__delta"><TrendBadge delta={fleet.delta} /></span>
-              <span className="compare-row__viol">{nf(fleet.totalViolations)}</span>
+              <span className="compare-row__trend"><TrendBadge delta={fleet.delta} /></span>
+              <span className="compare-row__viol">
+                <span className="compare-row__sev">
+                  <SevBadge level="critical" format="count-abbr" count={fleet.severity.critical} />
+                  <SevBadge level="major" format="count-abbr" count={fleet.severity.major} />
+                  <SevBadge level="minor" format="count-abbr" count={fleet.severity.minor} />
+                </span>
+                <span className="compare-row__violTotal">{nf(fleet.totalViolations)}</span>
+              </span>
               <span className="compare-row__ratio">{complianceRatio(fleet.totalViolations, fleet.totalCompliance)}</span>
               <span className="compare-row__last" />
-              <span className="compare-row__chev" />
             </div>
           )}
         </div>

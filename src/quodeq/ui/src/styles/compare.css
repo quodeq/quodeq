@@ -381,11 +381,6 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 .compare-row--head,
 .compare-row--foot { border-bottom: 1px solid var(--color-border); }
 
-.compare-row[tabindex] { cursor: pointer; }
-
-.compare-row[tabindex]:hover,
-.compare-rowgroup--open > .compare-row { background: var(--color-surface-alt); }
-
 .compare-row--head,
 .compare-row--foot {
   background: var(--color-surface-alt);
@@ -407,26 +402,30 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 .compare-row.compare-row--head > * { font-size: 10px; }
 
 .compare-row--foot { text-transform: lowercase; letter-spacing: normal; font-size: 12px; }
-.compare-row--foot .compare-row__score { font-size: 13px; }
+.compare-row--foot .compare-row__score { font-size: 12px; }
 
-/* cell widths — single-line rows: everything else lives in the expansion */
+/* cell widths — everything lives in the one line now; the expansion is
+   gone (the score matrix carries the per-dimension numbers). */
 .compare-row__stripe { width: 3px; align-self: stretch; flex-shrink: 0; background: transparent; }
 .compare-row__rank { width: 26px; flex-shrink: 0; }
 .compare-row__project { flex: 1 1 200px; min-width: 150px; display: flex; align-items: baseline; gap: 8px; }
-.compare-row__score { width: 96px; flex-shrink: 0; }
-.compare-row__delta { width: 68px; flex-shrink: 0; }
+.compare-row__score { width: 52px; flex-shrink: 0; }
+.compare-row__trend { width: 150px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
 
-/* The 30D column annotates the score column: its badge sits a clear step
+/* The 30D cell annotates the score column: its badge sits a clear step
    below the score's size so the level stays the loudest number in a row. */
-.compare-row__delta .trend-badge {
+.compare-row__trend .trend-badge {
   font-size: 11.5px;
   padding: 0;
   gap: 3px;
 }
-.compare-row__viol { width: 84px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.compare-row__viol { width: 186px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* Small tiers swap the severity split for this bare total. */
+.compare-row__violTotal { display: none; }
 .compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
-.compare-row__last { width: 92px; flex-shrink: 0; }
-.compare-row__chev { width: 20px; flex-shrink: 0; font-size: 10px; color: var(--color-text-muted); text-align: center; }
+.compare-row__last { width: 148px; flex-shrink: 0; white-space: nowrap; }
+.compare-row__behind { color: var(--color-text-muted); }
+.compare-row__last--stale .compare-row__behind { color: inherit; }
 
 /* The stripe speaks the GRADE language (--row-accent, set inline from the
    project's grade colour): the consequence level only decides whether a
@@ -453,6 +452,23 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   white-space: nowrap;
 }
 
+.compare-row__namebtn {
+  font: inherit;
+  /* The shorthand above would undo .compare-row__name's size (this rule
+     sits later in the cascade), so restate it. */
+  font-size: 12.5px;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compare-row__namebtn:hover { color: var(--color-accent); }
+
 .compare-row__meta {
   font-size: 10px;
   color: var(--color-text-muted);
@@ -474,93 +490,15 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   vertical-align: middle;
 }
 
-.compare-row__score { display: flex; align-items: baseline; gap: 7px; font-size: 14px; }
-
-.compare-row__tier {
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-/* ── row expansion (detail on demand) ─────────────────────────────────── */
-
-.compare-rowdetail {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* Left edge aligns under the project column; 10px top so the facts line
-     breathes below the row instead of hugging it. */
-  padding: 10px 16px 12px 41px;
-}
-
-/* Header row of the expansion: facts left, actions right on one line so
-   the detail is two rows, not three, and the right half isn't dead space. */
-.compare-rowdetail__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.compare-rowdetail__facts {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-
-.compare-rowdetail__stale { color: var(--color-warning-text); }
+.compare-row__score { display: flex; align-items: baseline; font-size: 14px; }
 
 /* Severity as plain coloured text (the design's "7c 275m 984n"). */
 .compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
 .compare-row__sev .term-sev-badge { border: none; background: transparent; padding: 0; }
+.compare-row__sev .term-sev-badge--count-abbr { font-size: 10.5px; }
 
 .compare-trendline { display: block; flex-shrink: 0; }
 .compare-trendline polyline { fill: none; stroke-width: 1.5; }
-
-.compare-rowdetail__dims { display: flex; gap: 6px; flex-wrap: wrap; }
-
-.compare-dim-chip--inline {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  font: inherit;
-  font-size: 11.5px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-  border-radius: 5px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-.compare-dim-chip--inline:hover { border-color: var(--color-accent); }
-
-.compare-dim-chip__label { font-size: 10.5px; color: var(--color-text-muted); }
-
-.compare-rowdetail__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.compare-rowdetail__open {
-  font: inherit;
-  font-size: 11px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-.compare-rowdetail__open:hover { color: var(--color-accent); border-color: var(--color-accent); }
-
-.compare-row__cov--low { color: var(--color-warning-text); }
 
 /* ── collapsed never-evaluated projects ───────────────────────────────── */
 
@@ -611,9 +549,16 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 
 .compare-row--nodata .compare-row__name { color: var(--color-text-muted); }
 
+/* Head/foot bands take the score matrix's chrome exactly: the project
+   cell's row padding (10px) would make these bands taller than the
+   matrix's 6px bands, so it is zeroed here, and the foot label speaks at
+   the matrix tfoot's size instead of the old small-caps voice. */
+.compare-row--head .compare-row__project,
+.compare-row--foot .compare-row__project { padding-top: 0; padding-bottom: 0; }
+
 .compare-row__footLabel {
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 12px;
+  letter-spacing: normal;
   text-transform: lowercase;
   color: var(--color-text-muted);
 }
@@ -1483,7 +1428,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 /* shaded 30-day window on the duel trend */
 .compare-duel-trend__window { fill: color-mix(in srgb, var(--color-text) 4%, transparent); }
 
-/* ── duel trigger in a row expansion ────────────────────────────────────
+/* ── duel trigger (header launcher) ────────────────────────────────────
    A button that opens a small opponent menu — choosing navigates, so a
    value-holding select was the wrong control. */
 
@@ -1548,9 +1493,9 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 .compare-dueltrigger__itemScore { font-size: 11.5px; }
 
 /* ── small-view tiers ───────────────────────────────────────────────────
-   The single-line table already fits most widths; below that, shed the
-   ratio and last-evaluated columns and stack the attention strip and the
-   dimensions board. Name, score, delta and violations survive every tier. */
+   Shed by importance: the spark and ratio go first (the delta badge keeps
+   direction), then freshness, and the severity split folds into the bare
+   total. Name, score, delta and a violations number survive every tier. */
 
 @media (max-width: 1100px) {
   .compare-attention--strip { grid-template-columns: 1fr; }
@@ -1561,9 +1506,14 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   .compare-attention--strip .compare-attention__item:last-child { border-bottom: none; }
 }
 
+@media (max-width: 1100px) {
+  .compare-row__trend .compare-trendline { display: none; }
+  .compare-row__trend { width: 60px; }
+  .compare-row__ratio { display: none; }
+}
+
 @media (max-width: 860px) {
   .compare-row__last { display: none; }
-  .compare-row__ratio { display: none; }
   /* Origin chips are secondary metadata; on small screens the name needs
      the room more. */
   .compare-row__remote { display: none; }
@@ -1572,9 +1522,11 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
      to scroll. */
   .compare-row { gap: 8px; padding-right: 10px; }
   .compare-row__rank { width: 20px; }
-  .compare-row__score { width: 78px; }
-  .compare-row__delta { width: 52px; }
+  .compare-row__score { width: 44px; }
+  .compare-row__trend { width: 52px; }
   .compare-row__viol { width: 64px; }
+  .compare-row__viol .compare-row__sev { display: none; }
+  .compare-row__violTotal { display: inline; }
   /* The matrix shrinks a step instead of shedding columns: every number
      still fits more often, and past that the panel scrolls sideways. The
      lead inset drops with the rank-less small layout. */
