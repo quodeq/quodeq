@@ -24,11 +24,23 @@ Open it from the header's **dimension** button, the dimensions board, or a score
 - **Principle matrix** the score matrix again, one column per principle. Headers rank, and a cell opens that project's own principle page.
 - **Standings** projects ranked on this dimension. Clicking a row opens *that project's own screen of the same dimension*; your selected project never changes.
 - **Radar** overlays the leader, the trailer, and the scope average across the dimension's principles. Hovering a standings row draws that project's shape on top.
-- **Principle cards** the scope average per principle with the leader and trailer named. The small bars follow the standings order and carry the standings rank, so the same slot is the same project in every card. Clicking a bar, or the leader/trailer entry, opens that project's own principle page.
+- **Principle cards** the scope average per principle with the leader and trailer named. The small bars follow the standings order and carry the standings rank, so the same slot is the same project in every card.
 
-### Head-to-head
+### The principle page
 
-The header's **duel** button picks the pair: the first click pins side A, the second opens the duel. When the scope holds exactly two projects it skips the picking and duels them directly. The duel view shows per-dimension gaps, principle differences for shared dimensions, and both trends on one chart; gaps always read left minus right.
+Principle cards and matrix cells go one level deeper than the drill-down itself: clicking a bar, a cell, or the leader/trailer entry opens *that project's own principle page*, the same screen its explorer shows, violations and passing checks included. The jump is a detour, not a switch: your selected project stays what it was, and back pops straight to the drill-down. Actions taken there, like dismissing a violation, belong to the project being viewed, not the one selected in the sidebar.
+
+### The duel
+
+The header's **duel** button picks the pair: the first click pins side A, the second opens the duel. When the scope holds exactly two projects it skips the picking and duels them directly. Remote projects duel like any others.
+
+The board reads left versus right. Each side keeps one identity colour throughout, chosen away from the grade colours so a colour never reads as a judgement; scores themselves stay grade-coloured.
+
+- **The versus header** both names (click one to open that project), each side's vitals, and the gap spelled out in plain words in the middle (*leads by* / *dead even*).
+- **DIMENSIONS** every dimension either project scores, as mirrored bars meeting in the middle, with a gap tinted toward the winner. Gaps always read left minus right; a dimension only one side scores shows a dash instead.
+- **SHAPE** both projects' radar on one grid across the shared dimensions.
+- **SCORE_TREND** both score trends on one chart, one point per day (a day's newest run counts), with the 30-day delta window shaded.
+- **PRINCIPLE_DIFFS** every principle difference, grouped by shared dimension; each group heading repeats the dimension's two scores and the gap, so a group reads without scrolling back up.
 
 ### Scope and standards
 
