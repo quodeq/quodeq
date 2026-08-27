@@ -106,51 +106,28 @@ function ScopePicker({
   );
 }
 
-/* Duel trigger — the header launcher's two-pick flow: the first pick pins
-   side A (shown as a removable chip in the side-A identity color), the
-   second navigates to the duel — choosing is the action, no confirm step.
-   With the scope at exactly two projects it skips the popover entirely and
-   duels them directly. The menu renders through a PORTAL at a fixed
-   position: the header sits over overflow containers that would clip an
-   in-flow popover, and it flips upward when the space below cannot fit
-   it. */
-const DUEL_MENU_MAX_H = 260; // keep in sync with the CSS max-height
+/* ── header launcher popovers ──────────────────────────────────────────
+   Duel and dimension share the mechanics: a portal menu at a fixed
+   position (the header sits over overflow containers that would clip an
+   in-flow popover) that flips upward when the space below cannot fit it,
+   and dismisses on outside press, Escape, or any outside scroll/resize
+   (which move the fixed-position anchor). */
+const LAUNCHER_MENU_MAX_H = 260; // keep in sync with the CSS max-height
 
-function DuelTrigger({ targets, onStart, openDirect = null }) {
-  const [open, setOpen] = useState(false);
-  const [pinned, setPinned] = useState(null);
-  const [pos, setPos] = useState(null);
-  const btnRef = useRef(null);
-  const menuRef = useRef(null);
-
-  const list = targets.filter((other) => other.id !== pinned?.id);
-
-  const close = () => { setOpen(false); setPinned(null); };
-
-  const toggle = () => {
-    if (open) { close(); return; }
-    // Exactly-two scope: nothing to pick, duel them directly.
-    if (openDirect) { openDirect(); return; }
-    const r = btnRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const spaceBelow = window.innerHeight - r.bottom;
-    const openUp = spaceBelow < DUEL_MENU_MAX_H + 12 && r.top > spaceBelow;
-    setPos({
-      left: Math.max(8, Math.min(r.left, window.innerWidth - 228)),
-      ...(openUp
-        ? { bottom: window.innerHeight - r.top + 6 }
-        : { top: r.bottom + 6 }),
-    });
-    setOpen(true);
+function launcherMenuPos(btn) {
+  const r = btn?.getBoundingClientRect();
+  if (!r) return null;
+  const spaceBelow = window.innerHeight - r.bottom;
+  const openUp = spaceBelow < LAUNCHER_MENU_MAX_H + 12 && r.top > spaceBelow;
+  return {
+    left: Math.max(8, Math.min(r.left, window.innerWidth - 228)),
+    ...(openUp
+      ? { bottom: window.innerHeight - r.top + 6 }
+      : { top: r.bottom + 6 }),
   };
+}
 
-  const pick = (other) => {
-    if (!pinned) { setPinned(other); return; }
-    const a = pinned.id;
-    close();
-    onStart(a, other.id);
-  };
-
+function useLauncherDismiss(open, btnRef, menuRef, close) {
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => {
@@ -176,6 +153,41 @@ function DuelTrigger({ targets, onStart, openDirect = null }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+}
+
+/* Duel trigger — the two-pick flow: the first pick pins side A (shown as
+   a removable chip), the second navigates to the duel — choosing is the
+   action, no confirm step. With the scope at exactly two projects it
+   skips the popover entirely and duels them directly. */
+function DuelTrigger({ targets, onStart, openDirect = null }) {
+  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(null);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const list = targets.filter((other) => other.id !== pinned?.id);
+
+  const close = () => { setOpen(false); setPinned(null); };
+
+  const toggle = () => {
+    if (open) { close(); return; }
+    // Exactly-two scope: nothing to pick, duel them directly.
+    if (openDirect) { openDirect(); return; }
+    const at = launcherMenuPos(btnRef.current);
+    if (!at) return;
+    setPos(at);
+    setOpen(true);
+  };
+
+  const pick = (other) => {
+    if (!pinned) { setPinned(other); return; }
+    const a = pinned.id;
+    close();
+    onStart(a, other.id);
+  };
+
+  useLauncherDismiss(open, btnRef, menuRef, close);
 
   return (
     <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
@@ -242,6 +254,63 @@ function DuelTrigger({ targets, onStart, openDirect = null }) {
    had nothing left to say; the name opens the project, the same gesture as
    every other list on this screen, and the header duel button covers
    head-to-heads. */
+/* Dimension trigger — the duel button's sibling: one pick, straight into
+   that dimension's drill-down. Same list the DIMENSIONS board shows,
+   with the scope average alongside each name. */
+function DimensionTrigger({ board, onOpen }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const close = () => setOpen(false);
+
+  const toggle = () => {
+    if (open) { close(); return; }
+    const at = launcherMenuPos(btnRef.current);
+    if (!at) return;
+    setPos(at);
+    setOpen(true);
+  };
+
+  useLauncherDismiss(open, btnRef, menuRef, close);
+
+  return (
+    <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="compare-dueltrigger__btn compare-dueltrigger__btn--launcher"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t('compare.dimLaunchAria')}
+        onClick={toggle}
+      >
+        {t('compare.dimOpen')} {open ? '▾' : '▸'}
+      </button>
+      {open && pos && createPortal(
+        <span className="compare-dueltrigger__menu" role="menu" ref={menuRef} style={pos}>
+          {board.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              role="menuitem"
+              className="compare-dueltrigger__item"
+              onClick={() => { close(); onOpen(b.key); }}
+            >
+              <span>{b.label}</span>
+              <span className={`compare-dueltrigger__itemScore ${scoreColorClass(b.avg)}`}>
+                {score1(b.avg)}
+              </span>
+            </button>
+          ))}
+        </span>,
+        document.body,
+      )}
+    </span>
+  );
+}
+
 function ProjectRow({ row, rank, onOpenProject, error }) {
   const level = consequenceLevel(consequenceOf(row));
   return (
@@ -289,12 +358,12 @@ function ProjectRow({ row, rank, onOpenProject, error }) {
               className="compare-row__viol"
               title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
             >
+              <span className="compare-row__violTotal">{nf(row.totalViolations)}</span>
               <span className="compare-row__sev">
                 <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
                 <SevBadge level="major" format="count-abbr" count={row.severity.major} />
                 <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
               </span>
-              <span className="compare-row__violTotal">{nf(row.totalViolations)}</span>
             </span>
             <span
               className="compare-row__ratio"
@@ -370,6 +439,9 @@ export default function CompareFleetView({
               onStart={openDuelPair}
               openDirect={openDuel}
             />
+          )}
+          {board.length > 0 && (
+            <DimensionTrigger board={board} onOpen={openDimension} />
           )}
           <span className="compare-sort" role="group" aria-label={t('compare.sortAria')}>
             <button
@@ -612,12 +684,12 @@ export default function CompareFleetView({
               <span className={`compare-row__score ${scoreColorClass(fleet.score)}`}>{score1(fleet.score)}</span>
               <span className="compare-row__trend"><TrendBadge delta={fleet.delta} /></span>
               <span className="compare-row__viol">
+                <span className="compare-row__violTotal">{nf(fleet.totalViolations)}</span>
                 <span className="compare-row__sev">
                   <SevBadge level="critical" format="count-abbr" count={fleet.severity.critical} />
                   <SevBadge level="major" format="count-abbr" count={fleet.severity.major} />
                   <SevBadge level="minor" format="count-abbr" count={fleet.severity.minor} />
                 </span>
-                <span className="compare-row__violTotal">{nf(fleet.totalViolations)}</span>
               </span>
               <span className="compare-row__ratio">{complianceRatio(fleet.totalViolations, fleet.totalCompliance)}</span>
               <span className="compare-row__last" />

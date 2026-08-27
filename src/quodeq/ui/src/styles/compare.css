@@ -252,7 +252,9 @@
   color: var(--color-text-muted);
   padding: 6px 10px;
   border-bottom: 1px solid var(--color-border);
-  text-align: right;
+  /* Center, per review: header, chip and foot average stack on one axis;
+     only the project lead reads flush-left. */
+  text-align: center;
   max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -260,7 +262,7 @@
 }
 
 .compare-matrix td { padding: 7px 10px; border-top: 1px solid var(--color-border); }
-.compare-matrix__num { text-align: right; }
+.compare-matrix__num { text-align: center; }
 
 /* The "project" title sits flush-left over the project names, and the
    whole lead column takes the SAME inset as the ranked table's name
@@ -410,7 +412,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 .compare-row__rank { width: 26px; flex-shrink: 0; }
 .compare-row__project { flex: 1 1 200px; min-width: 150px; display: flex; align-items: baseline; gap: 8px; }
 .compare-row__score { width: 52px; flex-shrink: 0; }
-.compare-row__trend { width: 150px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.compare-row__trend { width: 150px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
 
 /* The 30D cell annotates the score column: its badge sits a clear step
    below the score's size so the level stays the loudest number in a row. */
@@ -419,11 +421,12 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   padding: 0;
   gap: 3px;
 }
-.compare-row__viol { width: 186px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
-/* Small tiers swap the severity split for this bare total. */
-.compare-row__violTotal { display: none; }
-.compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
-.compare-row__last { width: 148px; flex-shrink: 0; white-space: nowrap; }
+.compare-row__viol { width: 216px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; display: flex; justify-content: center; gap: 10px; }
+/* Magnitude first, split after; small tiers keep the total and drop the
+   split (see the small-view tiers below). */
+.compare-row__violTotal { color: var(--color-text); }
+.compare-row__ratio { width: 52px; flex-shrink: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-muted); text-align: center; }
+.compare-row__last { width: 148px; flex-shrink: 0; white-space: nowrap; text-align: center; }
 .compare-row__behind { color: var(--color-text-muted); }
 .compare-row__last--stale .compare-row__behind { color: inherit; }
 
@@ -490,7 +493,7 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   vertical-align: middle;
 }
 
-.compare-row__score { display: flex; align-items: baseline; font-size: 14px; }
+.compare-row__score { display: flex; align-items: baseline; justify-content: center; font-size: 14px; }
 
 /* Severity as plain coloured text (the design's "7c 275m 984n"). */
 .compare-row__sev { display: flex; gap: 8px; flex-wrap: nowrap; white-space: nowrap; }
@@ -1526,7 +1529,6 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
   .compare-row__trend { width: 52px; }
   .compare-row__viol { width: 64px; }
   .compare-row__viol .compare-row__sev { display: none; }
-  .compare-row__violTotal { display: inline; }
   /* The matrix shrinks a step instead of shedding columns: every number
      still fits more often, and past that the panel scrolls sideways. The
      lead inset drops with the rank-less small layout. */

@@ -195,6 +195,14 @@ describe('ComparePage', () => {
     expect(screen.getByText(/PRINCIPLE_MATRIX/)).toBeInTheDocument();
   });
 
+  it('the header dimension button lists the board and opens the pick', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    await userEvent.click(await screen.findByRole('button', { name: 'Open a dimension drill-down' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /security/ }));
+    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
+  });
+
   it('drills into a dimension', async () => {
     renderPage();
     await screen.findByText('alpha');
