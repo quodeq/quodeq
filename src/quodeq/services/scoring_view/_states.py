@@ -190,7 +190,7 @@ def select_trend_runs(run_infos):
     wait-until-terminal rule.
 
     Used by:
-      - ``dashboard._compute_dashboard_payload`` — history window.
+      - ``_dashboard_history._compute_dashboard_payload`` — history window.
       - ``scoring.get_project_scores`` — the /scores trend.
 
     Args/returns are ``RunInfo``-shaped objects; order is preserved.

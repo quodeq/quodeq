@@ -16,6 +16,7 @@ import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js'
 import { TermHeader } from '../../../components/terminal/index.js';
 import EmptyState from '../../../components/EmptyState.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
+import HistorySkeleton from './HistorySkeleton.jsx';
 import FittedText from '../../../components/FittedText.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
@@ -518,7 +519,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     if (loading) {
       return (
         <HistoryEmptyShell sub={t('overview.loading')}>
-          <LoadingScreen variant="inline" />
+          <HistorySkeleton />
         </HistoryEmptyShell>
       );
     }
@@ -531,7 +532,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
       if (isFetching) {
         return (
           <HistoryEmptyShell sub={t('overview.loading')}>
-            <LoadingScreen variant="inline" />
+            <HistorySkeleton />
           </HistoryEmptyShell>
         );
       }

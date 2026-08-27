@@ -72,6 +72,11 @@ export function useEvaluationLifecycle({ settings, navigation, projects, selecte
       // query just marks it stale (no fetch), so this is a harmless no-op
       // when nobody is looking at that project.
       queryClient.invalidateQueries({ queryKey: projectKeys.scores(job.outputProject, null, 'local') });
+      // The Compare tab holds one slim summary per project; without this a
+      // finished run on ANY project leaves its fleet row stale until the
+      // staleTime expires or the tab remounts. Same harmless-no-op rule as
+      // above when Compare isn't mounted.
+      queryClient.invalidateQueries({ queryKey: projectKeys.compareSummary(job.outputProject, 'local') });
       // Only move the selection to the finished run when the user is
       // already on that project (or has none selected, e.g. first-eval
       // onboarding). Unconditional switching yanked a user browsing

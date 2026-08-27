@@ -6,6 +6,7 @@ import {
   resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
   buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
   buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
+  shouldShowStartupLoader,
 } from './App.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
@@ -156,6 +157,35 @@ describe('ROUTE_RENDERERS onDismiss source gating', () => {
   it('eval-principle-detail (alias route) also gates onDismiss for a shared project', () => {
     const el = ROUTE_RENDERERS['eval-principle-detail']({ evalPrincipal: { principle: 'P', dimension: 'Security' } }, baseProps('shared'));
     expect(el.props.onDismiss).toBeUndefined();
+  });
+
+  // The dismiss-identity contract, parametrized over EVERY dismissing route:
+  // a cross-project entry (Compare's jumps, a parent dimension's fromProject)
+  // must dismiss into the project the finding belongs to, never the global
+  // selection. Third instance of this divergence class (assistant dismiss,
+  // evalprinciple, file) — this test closes it: a new dismissing route with
+  // a cross-project param belongs in this table.
+  describe.each([
+    ['file', { file: { path: 'a.py' }, runId: 'r1', fromProject: 'other-proj' }, { file: { path: 'a.py' }, runId: 'r1' }],
+    ['finding', { finding: {}, principle: 'P', dimension: 'Security', runId: 'r1', fromProject: 'other-proj' }, { finding: {}, principle: 'P', dimension: 'Security', runId: 'r1' }],
+    ['evalprinciple', { evalPrincipal: { principle: 'P', dimension: 'Security', project: 'other-proj', runId: 'r1' } }, { evalPrincipal: { principle: 'P', dimension: 'Security' } }],
+  ])('%s route dismiss identity', (route, foreignParams, localParams) => {
+    const violation = { file: 'a.py', line: 1, principle: 'P', severity: 'major', reason: 'r' };
+
+    it('dismisses into the entry own project when it differs from the selection', async () => {
+      const props = baseProps('local');
+      const el = ROUTE_RENDERERS[route](foreignParams, props);
+      await el.props.onDismiss(violation);
+      expect(props.dismissFinding).toHaveBeenCalledWith('other-proj', expect.any(Object));
+      expect(props.applyDelta).toHaveBeenCalledWith('other-proj', expect.anything(), expect.anything());
+    });
+
+    it('falls back to the selected project when the entry carries none', async () => {
+      const props = baseProps('local');
+      const el = ROUTE_RENDERERS[route](localParams, props);
+      await el.props.onDismiss(violation);
+      expect(props.dismissFinding).toHaveBeenCalledWith('proj1', expect.any(Object));
+    });
   });
 
   // The dashboard must eventually reflect a dismiss even though the delta
@@ -700,6 +730,112 @@ describe('buildNavigationBundle', () => {
   });
 });
 
+// Same pattern as the compare tab's dimension drill-down (PR #1087): the
+// map's viz path and the violations sub-tab are route params, so the browser
+// back button and the breadcrumb see them. Drilling pushes, navigating up to
+// a path already in the trailing run of map entries unwinds history via
+// navGoTo, and view toggles replace in place so flipping never grows
+// history. Params must be spread forward on every hop or _tabKey (the
+// fresh-tab-click reset signal) silently drops and the page resets its
+// cached state mid-drill.
+describe('map/violations view state lives in the nav stack', () => {
+  function mapProps(navOverrides = {}) {
+    return {
+      dashboardData: {
+        latestAccumulated: null, accumulated: null, dashboard: null,
+        selectedDisplayName: 'p1', loading: false, isFetching: false,
+      },
+      navigation: {
+        selectedProject: 'p1', selectedSource: 'local', projects: [], projectsLoaded: true,
+        handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navGoTo: vi.fn(),
+        navStack: [{ page: 'map', _tabKey: 3 }], navStackLength: 1,
+        ...navOverrides,
+      },
+      refreshDashboard: vi.fn(),
+    };
+  }
+
+  it('map: drilling to a new path pushes, with existing params spread forward', () => {
+    const props = mapProps();
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, vizStyle: 'riskmatrix' }, props);
+    el.props.nav.onPathChange('src');
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('map', { _tabKey: 3, vizStyle: 'riskmatrix', path: 'src' });
+    expect(props.navigation.navGoTo).not.toHaveBeenCalled();
+    expect(props.navigation.handleNavigateReplace).not.toHaveBeenCalled();
+  });
+
+  it('map: navigating up to a path already in the trailing map trail unwinds via navGoTo, never pushes a duplicate', () => {
+    const props = mapProps({
+      navStack: [
+        { page: 'map', _tabKey: 3 },
+        { page: 'map', _tabKey: 3, path: 'src' },
+        { page: 'map', _tabKey: 3, path: 'src/app' },
+      ],
+      navStackLength: 3,
+    });
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app' }, props);
+    el.props.nav.onPathChange('');
+    expect(props.navigation.navGoTo).toHaveBeenCalledWith(0);
+    expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('map: the trail scan stops at the first non-map entry, so an older unrelated map entry is not a goTo target', () => {
+    const props = mapProps({
+      navStack: [
+        { page: 'map', _tabKey: 2, path: 'src' },
+        { page: 'overview' },
+        { page: 'map', _tabKey: 3, path: 'src/app' },
+      ],
+      navStackLength: 3,
+    });
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src/app' }, props);
+    el.props.nav.onPathChange('src');
+    expect(props.navigation.navGoTo).not.toHaveBeenCalled();
+    expect(props.navigation.handleNavigate).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src' });
+  });
+
+  it('map: mode/style toggles replace the entry in place, params preserved', () => {
+    const props = mapProps();
+    const el = ROUTE_RENDERERS.map({ _tabKey: 3, path: 'src' }, props);
+    el.props.nav.onVizStyleChange('galaxy');
+    expect(props.navigation.handleNavigateReplace).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src', vizStyle: 'galaxy' });
+    el.props.nav.onGalaxyModeChange('standards');
+    expect(props.navigation.handleNavigateReplace).toHaveBeenCalledWith('map', { _tabKey: 3, path: 'src', galaxyMode: 'standards' });
+    expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('violations: the sub-tab flip replaces the entry (history must not grow), _tabKey preserved', () => {
+    const props = {
+      dashboardData: { latestAccumulated: null, accumulated: null, selectedDisplayName: 'p1', loading: false, isFetching: false },
+      navigation: {
+        selectedProject: 'p1', selectedSource: 'local', projects: [], projectsLoaded: true,
+        handleNavigate: vi.fn(), handleNavigateReplace: vi.fn(), navStackLength: 1,
+      },
+      dismissRefreshKey: 0,
+      refreshDashboard: vi.fn(),
+      scheduleDashboardReconcile: vi.fn(),
+    };
+    const outer = ROUTE_RENDERERS.violations({ _tabKey: 2 }, props);
+    const inner = outer.type(outer.props);
+    expect(inner.props.subTab).toBe('dimension');
+    inner.props.onSubTabChange('file');
+    expect(props.navigation.handleNavigateReplace).toHaveBeenCalledWith('violations', { _tabKey: 2, subTab: 'file' });
+    expect(props.navigation.handleNavigate).not.toHaveBeenCalled();
+  });
+
+  it('buildNavigationBundle forwards navStack and navGoTo (the map drill-up dies without them)', () => {
+    const navStack = [{ page: 'map' }];
+    const navGoTo = vi.fn();
+    const bundle = buildNavigationBundle({
+      state: { navStack, navGoTo },
+      navTab: vi.fn(), navStackLength: 1,
+      isEvaluating: false, showToast: vi.fn(), setWizardEntry: vi.fn(),
+    });
+    expect(bundle.navStack).toBe(navStack);
+    expect(bundle.navGoTo).toBe(navGoTo);
+  });
+});
+
 // Teammate persona, one click deeper than the data pages: with zero LOCAL
 // projects, drill-in pages (file/finding/dimension detail...) must not wall
 // a shared selection behind the add-a-project tour. Same gate class as the
@@ -936,5 +1072,73 @@ describe('projects-load failure threading', () => {
       state, navTab: vi.fn(), navStackLength: 1, isEvaluating: false,
       showToast: vi.fn(), setWizardEntry: vi.fn(),
     }).warmup).toBe(warmup);
+  });
+});
+
+// The startup loader must outlive projectsLoaded: dropping it there hands the
+// user a skeleton flash (loader > skeleton > data) on every boot. It holds
+// until the Overview's data is in, and drops immediately on any dead end
+// where no data will ever arrive (failure, zero projects, nothing selected,
+// query error, or the user restored into a different tab).
+describe('shouldShowStartupLoader', () => {
+  const base = {
+    projectsLoaded: true, projectsLoadFailed: false, projectsCount: 2,
+    selectedProject: 'proj-1', selectedSource: 'local', activeTab: 'overview',
+    dashboard: null, accumulated: null, error: null, loading: true,
+  };
+
+  it('shows before projects load', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsLoaded: false })).toBe(true);
+  });
+
+  it('shows before projects load regardless of the restored tab', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsLoaded: false, activeTab: 'settings' })).toBe(true);
+  });
+
+  it('drops on projects load failure (retry state must be reachable)', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsLoaded: false, projectsLoadFailed: true })).toBe(false);
+  });
+
+  it('holds after projects load while overview data is still loading', () => {
+    expect(shouldShowStartupLoader(base)).toBe(true);
+  });
+
+  it('keeps holding when only the dashboard payload has arrived', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] } })).toBe(true);
+  });
+
+  it('drops once dashboard and accumulated are both in', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] }, accumulated: { dims: [] } })).toBe(false);
+  });
+
+  it('drops on a dashboard query error (error state must be reachable)', () => {
+    expect(shouldShowStartupLoader({ ...base, error: new Error('boom') })).toBe(false);
+  });
+
+  it('drops with zero local projects (onboarding/empty states take over)', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsCount: 0, selectedProject: null })).toBe(false);
+  });
+
+  it('holds for a shared selection even with zero local projects', () => {
+    expect(shouldShowStartupLoader({ ...base, projectsCount: 0, selectedSource: 'shared' })).toBe(true);
+  });
+
+  it('drops when nothing is selected', () => {
+    expect(shouldShowStartupLoader({ ...base, selectedProject: null })).toBe(false);
+  });
+
+  it('drops when the user restored into a non-overview tab', () => {
+    expect(shouldShowStartupLoader({ ...base, activeTab: 'violations' })).toBe(false);
+  });
+
+  it('drops when the queries settle with no data coming (project with no completed evaluations)', () => {
+    // accumulated stays null forever for a run-less project; only `loading`
+    // (dashboard + scores queries combined) says nothing more is in flight.
+    // Without this escape the loader would wall off the empty state forever.
+    expect(shouldShowStartupLoader({ ...base, loading: false })).toBe(false);
+  });
+
+  it('keeps holding while either query is still in flight even with partial data', () => {
+    expect(shouldShowStartupLoader({ ...base, dashboard: { runs: [] }, loading: true })).toBe(true);
   });
 });

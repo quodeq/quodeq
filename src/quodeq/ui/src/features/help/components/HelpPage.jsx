@@ -23,6 +23,7 @@ const SECTIONS = [
   { id: 'providers', labelKey: 'help.navProviders' },
   { id: 'evaluations', labelKey: 'help.navEvaluations' },
   { id: 'overview', labelKey: 'help.navOverview' },
+  { id: 'compare', labelKey: 'help.navCompare' },
   { id: 'dimensions', labelKey: 'help.navDimensions' },
   { id: 'violations', labelKey: 'help.navViolations' },
   { id: 'map', labelKey: 'help.navMap' },

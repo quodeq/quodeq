@@ -16,6 +16,13 @@ const PAGE_LABELS = {
 };
 
 export function labelFor(entry) {
+  // A map drill-down entry carries its folder path (see App.jsx's map
+  // renderer): the crumb shows the folder name, so the trail reads
+  // map / src / components. The root map entry (no path) falls through to
+  // its tab label.
+  if (entry.page === 'map' && entry.path) {
+    return entry.path.split('/').filter(Boolean).pop() || 'map';
+  }
   if (PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
   switch (entry.page) {
     case 'run':           return entry.label || entry.runId || 'run';
@@ -28,15 +35,31 @@ export function labelFor(entry) {
     case 'principle':     return entry.label || 'principle';
     case 'evalprinciple': return entry.label || entry.principleName || 'principle';
     case 'finding':       return entry.label || 'finding';
+    // Fleet entry reads "compare"; a drill-down entry carries its dimension
+    // so the crumb trail reads compare › security, and a head-to-head entry
+    // reads compare › duel.
+    case 'compare':       return entry.duel
+      ? t('compare.crumbDuel')
+      : entry.dimension ? entry.dimension.toLowerCase() : 'compare';
     default:              return entry.label || entry.page;
   }
 }
 
+// How long a pointer must stay down on an earlier segment before the
+// sibling menu opens instead of navigating (mirrors browser back-button
+// press-and-hold).
+const HOLD_TO_OPEN_MS = 450;
+
 /**
  * NavBreadcrumb — the app's address bar, in the TopBar on desktop.
  *
- * Two navigation ideas at two scales, one rule ("click a segment to move
- * within that level"):
+ * Two navigation ideas at two scales, one rule per position:
+ *   - an EARLIER segment navigates back to its level on click, like an
+ *     address bar; its sibling menu opens from the caret, a right-click,
+ *     or press-and-hold (the browser back-button convention);
+ *   - the CURRENT segment has no back target, so click keeps opening the
+ *     jump menu.
+ * Plus:
  *   - collapse-the-middle: deep paths keep the two ends that matter (project
  *     root and where you are); hidden ancestors sit one click away behind a
  *     "…" chip that opens them as a plain list (see crumbModel.js);
@@ -82,6 +105,27 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
     setOpenKey(null);
     if (seg.isProject) onSelectProject?.();
     else onGoTo(seg.index);
+  };
+
+  // Press-and-hold on an earlier jump-bar segment opens its sibling menu
+  // (the browser back-button convention); a released hold must then swallow
+  // the click that follows the pointerup so it doesn't also navigate.
+  const holdTimer = useRef(null);
+  const holdFired = useRef(false);
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
+  const startHold = (key) => {
+    holdFired.current = false;
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      holdFired.current = true;
+      setOpenKey(key);
+    }, HOLD_TO_OPEN_MS);
+  };
+  const cancelHold = () => clearTimeout(holdTimer.current);
+  const consumeHold = () => {
+    const fired = holdFired.current;
+    holdFired.current = false;
+    return fired;
   };
 
   return (
@@ -134,39 +178,77 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
           if (hasMenu) {
             const key = `seg-${seg.index}`;
             const open = openKey === key;
+            const toggleMenu = () => setOpenKey(open ? null : key);
+            const menu = open && (
+              <div className="nav-breadcrumb__menu nav-breadcrumb__menu--siblings" role="menu" aria-label={`Switch ${seg.label}`}>
+                {siblings.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={!!item.current}
+                    // Picking the current sibling means "back to this level".
+                    // onGoTo no-ops when this is already the last entry.
+                    onClick={() => { setOpenKey(null); if (item.current) onGoTo(seg.index); else item.onSelect(); }}
+                  >
+                    <span className="nav-breadcrumb__menu-dot" aria-hidden="true" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            );
+
+            if (isLast) {
+              // Current level: there is no "back" target, so a plain click
+              // keeps opening the jump menu.
+              return (
+                <Fragment key={`${seg.label}-${i}`}>
+                  {sep}
+                  <li className={crumbClass}>
+                    <button
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={open}
+                      onClick={toggleMenu}
+                    >
+                      {seg.label}
+                      <span className="nav-breadcrumb__caret" aria-hidden="true">▾</span>
+                    </button>
+                    {menu}
+                  </li>
+                </Fragment>
+              );
+            }
+
+            // Earlier level: click walks back like an address bar; the
+            // sibling menu opens from the caret button, a right-click, or a
+            // press-and-hold.
             return (
               <Fragment key={`${seg.label}-${i}`}>
                 {sep}
                 <li className={crumbClass}>
                   <button
                     type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={open}
-                    onClick={() => setOpenKey(open ? null : key)}
+                    onClick={() => { if (consumeHold()) return; goTo(seg); }}
+                    onContextMenu={(e) => { e.preventDefault(); setOpenKey(key); }}
+                    onPointerDown={() => startHold(key)}
+                    onPointerUp={cancelHold}
+                    onPointerLeave={cancelHold}
+                    onPointerCancel={cancelHold}
                   >
                     {seg.label}
+                  </button>
+                  <button
+                    type="button"
+                    className="nav-breadcrumb__caret-btn"
+                    aria-label={`Switch ${seg.label}`}
+                    aria-haspopup="menu"
+                    aria-expanded={open}
+                    onClick={toggleMenu}
+                  >
                     <span className="nav-breadcrumb__caret" aria-hidden="true">▾</span>
                   </button>
-                  {open && (
-                    <div className="nav-breadcrumb__menu nav-breadcrumb__menu--siblings" role="menu" aria-label={`Switch ${seg.label}`}>
-                      {siblings.map((item) => (
-                        <button
-                          key={item.key}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={!!item.current}
-                          // Picking the current sibling means "back to this
-                          // level" — from a deeper page it's the only way up
-                          // to it, since the segment itself opens the menu.
-                          // onGoTo no-ops when this is already the last entry.
-                          onClick={() => { setOpenKey(null); if (item.current) onGoTo(seg.index); else item.onSelect(); }}
-                        >
-                          <span className="nav-breadcrumb__menu-dot" aria-hidden="true" />
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {menu}
                 </li>
               </Fragment>
             );

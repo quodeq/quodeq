@@ -157,6 +157,17 @@ export async function sharedGetDashboard(projectId, run = 'latest') {
 }
 
 /**
+ * Slim compare-summary for a shared project — the /compare-summary payload
+ * served from the shared clone's own evaluations root, shape-identical to
+ * the local endpoint so the Compare tab can mix sources row by row.
+ * @param {string} projectId
+ * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
+ */
+export function sharedGetCompareSummary(projectId) {
+  return request(`/shared/projects/${encodeURIComponent(projectId)}/compare-summary`);
+}
+
+/**
  * Get accumulated scores for a shared project.
  * @param {string} projectId
  * @param {string} [asOfRun=null]

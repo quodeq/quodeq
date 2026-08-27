@@ -9,6 +9,8 @@ import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { usePrincipleData } from './explorerDataHooks.js';
 import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
+import DeferredMount from './DeferredMount.jsx';
+import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
 
 function filterTitleSuffix(filter) {
@@ -283,14 +285,20 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
           onFilterChange={setActiveSevFilter}
         />
       )}
-      <VirtualList
-        key={virtualKey}
-        items={items}
-        scrollElement={scrollElement}
-        estimateSize={estimateItemSize(items)}
-        getItemKey={itemKey(items)}
-        renderItem={renderItem}
-      />
+      {/* This page gets all its data through nav params — nothing fetches, so
+          without this split the first paint waits for every visible card's
+          pretext layout effect and the click that navigated here looks
+          ignored. Header first, cards one commit later. */}
+      <DeferredMount fallback={<CardListSkeleton />}>
+        <VirtualList
+          key={virtualKey}
+          items={items}
+          scrollElement={scrollElement}
+          estimateSize={estimateItemSize(items)}
+          getItemKey={itemKey(items)}
+          renderItem={renderItem}
+        />
+      </DeferredMount>
     </>
   );
 });

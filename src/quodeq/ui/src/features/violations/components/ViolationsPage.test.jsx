@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { useState } from 'react';
 import ViolationsPage, { ViolationsSubTabContent } from './ViolationsPage.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 
@@ -163,14 +164,14 @@ describe('ViolationsPage — scenario 9: loader gate, containment, refresh dim',
     expect(screen.getByText('No completed evaluation yet')).toBeInTheDocument();
   });
 
-  it('initial load renders exactly one inline loader inside the page frame', () => {
+  it('initial load renders the violations skeleton inside the page frame, no spinner', () => {
     const { container } = renderPage(baseData({ loading: true, isFetching: true }));
-    expect(container.querySelectorAll('.loading-screen').length).toBe(1);
-    const loader = container.querySelector('.loading-screen--inline');
-    expect(loader).not.toBeNull();
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    const skeleton = container.querySelector('.violations-skeleton');
+    expect(skeleton).not.toBeNull();
     const frame = container.querySelector('.violations-page--terminal');
     expect(frame).not.toBeNull();
-    expect(frame.contains(loader)).toBe(true);
+    expect(frame.contains(skeleton)).toBe(true);
   });
 
   it('applies the refresh dim class to the empty state during a background refetch', () => {
@@ -199,12 +200,13 @@ describe('ViolationsPage — error state + retry feedback (P4-T2)', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it('error + isFetching renders the inline loader instead of the error state', () => {
+  it('error + isFetching renders the skeleton instead of the error state', () => {
     const { container } = renderPage(
       baseData({ selectedSource: 'local', selectedProject: 'p1', projects: [{ id: 'p1', name: 'p1' }], error: 'Failed to load', isFetching: true }),
     );
     expect(screen.queryByText("Couldn't load this project")).toBeNull();
-    expect(container.querySelector('.loading-screen')).toBeTruthy();
+    expect(container.querySelector('.violations-skeleton')).toBeTruthy();
+    expect(container.querySelector('.loading-screen')).toBeNull();
   });
 
   it('data present with a stale error still renders the data, not the error screen', () => {
@@ -214,6 +216,86 @@ describe('ViolationsPage — error state + retry feedback (P4-T2)', () => {
       error: 'Failed to load',
     }));
     expect(screen.queryByText("Couldn't load this project")).toBeNull();
+  });
+});
+
+/* Mimics the App wiring (see ViolationsRoute): `subTab` is a route param and
+   flipping it REPLACES the nav entry in place — history must not grow per
+   flip, so the harness stack length is part of the assertions. */
+function SubTabNavHarness({ data, log }) {
+  const [stack, setStack] = useState([{}]);
+  const top = stack[stack.length - 1];
+  return (
+    <ViolationsPage
+      data={data}
+      callbacks={{}}
+      subTab={top.subTab || 'dimension'}
+      onSubTabChange={(v) => {
+        setStack((s) => {
+          log.push(['replace', v, s.length]);
+          return s.slice(0, -1).concat([{ ...s[s.length - 1], subTab: v }]);
+        });
+      }}
+    />
+  );
+}
+
+describe('ViolationsPage — sub-tab lives in the nav entry (replace, not push)', () => {
+  const DIMS = [{
+    dimension: 'security',
+    violations: [
+      { file: 'src/a.py', severity: 'minor', principle: 'P1' },
+      { file: 'lib/b.py', severity: 'major', principle: 'P2' },
+    ],
+    compliance: [],
+  }];
+  const data = () => ({
+    accumulatedDimensions: DIMS,
+    selectedProject: 'p1',
+    projects: [{ id: 'p1', name: 'p1' }],
+    projectsLoaded: true,
+    projectName: 'p1',
+    loading: false,
+    isFetching: false,
+    dismissRefreshKey: 0,
+    selectedSource: 'local',
+  });
+
+  function renderHarness(log) {
+    const QC = withQueryClient();
+    return render(
+      <QC>
+        <SubTabNavHarness data={data()} log={log} />
+      </QC>
+    );
+  }
+
+  it('flipping to by-file and dismissed replaces the entry in place; the view follows the param', async () => {
+    const log = [];
+    renderHarness(log);
+    // Default sub-tab renders the dimension grid.
+    expect(await screen.findByText('security')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('by-file'));
+    // Replace with the stack still at length 1 — a push would report 2 next.
+    expect(log).toEqual([['replace', 'file', 1]]);
+    // The controlled param round-tripped into the file tree view.
+    expect(await screen.findByText('src')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('dismissed'));
+    expect(log).toEqual([['replace', 'file', 1], ['replace', 'dismissed', 1]]);
+    expect(await screen.findByText('No dismissed violations.')).toBeInTheDocument();
+  });
+
+  it('renders the sub-tab the route param dictates without any interaction', () => {
+    const QC = withQueryClient();
+    render(
+      <QC>
+        <ViolationsPage data={data()} callbacks={{}} subTab="file" onSubTabChange={() => {}} />
+      </QC>
+    );
+    expect(screen.getByText('src')).toBeInTheDocument();
+    expect(screen.getByText('lib')).toBeInTheDocument();
   });
 });
 

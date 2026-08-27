@@ -3,14 +3,17 @@ import { QMarkIcon } from './QMarkIcon.jsx';
 import WarmupNotice from './WarmupNotice.jsx';
 import { t } from '../strings/index.js';
 
+// One short sentence each — the 5s rotation only leaves reading time for
+// about a dozen words, so anything longer gets split into two tips.
 const TIP_KEYS = [
-  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.dimensions',
-  'loading.tips.dismiss', 'loading.tips.fixplans', 'loading.tips.standards',
-  'loading.tips.ignore', 'loading.tips.history', 'loading.tips.compliance',
-  'loading.tips.shared',
+  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.carryforward',
+  'loading.tips.dimensions', 'loading.tips.dismiss', 'loading.tips.fixplans',
+  'loading.tips.standards', 'loading.tips.ignore', 'loading.tips.history',
+  'loading.tips.compliance', 'loading.tips.shared', 'loading.tips.matrix',
+  'loading.tips.duel', 'loading.tips.standardsToggle',
 ];
-const TIPS_DELAY_MS = 3000;
-const TIPS_ROTATE_MS = 8000;
+const TIPS_DELAY_MS = 300;
+const TIPS_ROTATE_MS = 5000;
 const LEAVE_MS = 400;
 
 // Fisher-Yates copy shuffle: each launch walks the tips in a fresh order,

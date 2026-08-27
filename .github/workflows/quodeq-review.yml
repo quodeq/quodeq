@@ -110,6 +110,18 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Pre-warm model
+        # A cold 26B load can eat the evaluation's entire per-call timeout
+        # (two PR runs died at 501s with ollama at 41MB resident). One tiny
+        # generate call loads the model and pins it for the run; never fails
+        # the job — if ollama is truly down the evaluation reports it
+        # properly.
+        if: ${{ env.AI_PROVIDER == 'ollama' }}
+        run: |
+          curl -sS -m 540 http://localhost:11434/api/generate \
+            -d "{\"model\": \"$AI_MODEL\", \"prompt\": \"ok\", \"stream\": false, \"keep_alive\": \"30m\"}" \
+            -o /dev/null && echo "model warm" || echo "warm-up skipped (ollama unreachable or still loading)"
+
       - name: Run evaluation
         id: eval
         env:

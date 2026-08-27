@@ -12,6 +12,7 @@ vi.mock('../../../api/standards.js', () => ({
 // putStandardsVisibility at import time).
 const api = await import('../../../api/standards.js');
 const { useVisibleStandards } = await import('./useVisibleStandards.js');
+const { withQueryClient } = await import('../../../test-utils/withQueryClient.jsx');
 
 function fakeStorage(initial = {}) {
   const map = { ...initial };
@@ -32,7 +33,7 @@ describe('useVisibleStandards', () => {
   // exercise add/remove/toggle without fighting that default.
   it('toggle adds and removes ids, persisting to storage', () => {
     const storage = fakeStorage();
-    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    const { result } = renderHook(() => useVisibleStandards({ storage }), { wrapper: withQueryClient() });
     act(() => result.current.toggle('custom-standard'));
     expect(result.current.visibleIds).toContain('custom-standard');
     expect(JSON.parse(storage._map[Object.keys(storage._map)[0]])).toContain('custom-standard');
@@ -48,13 +49,13 @@ describe('useVisibleStandards', () => {
     const storage = fakeStorage({
       [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(['custom-only']),
     });
-    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    const { result } = renderHook(() => useVisibleStandards({ storage }), { wrapper: withQueryClient() });
     expect(result.current.visibleIds).toEqual(['custom-only']);
   });
 
   it('add is idempotent and remove is a no-op when absent', () => {
     const storage = fakeStorage();
-    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    const { result } = renderHook(() => useVisibleStandards({ storage }), { wrapper: withQueryClient() });
     act(() => result.current.add('custom-standard'));
     const afterFirstAdd = result.current.visibleIds;
     act(() => result.current.add('custom-standard'));
@@ -65,7 +66,7 @@ describe('useVisibleStandards', () => {
 
   it('isVisible reflects the current set', () => {
     const storage = fakeStorage();
-    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    const { result } = renderHook(() => useVisibleStandards({ storage }), { wrapper: withQueryClient() });
     expect(result.current.isVisible('custom-standard')).toBe(false);
     act(() => result.current.add('custom-standard'));
     expect(result.current.isVisible('custom-standard')).toBe(true);
@@ -78,14 +79,14 @@ describe('useVisibleStandards', () => {
     const storage = fakeStorage({
       [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(['owasp-top10']),
     });
-    const { result } = renderHook(() => useVisibleStandards({ storage }));
+    const { result } = renderHook(() => useVisibleStandards({ storage }), { wrapper: withQueryClient() });
     expect(result.current.isVisible('OWASP-Top10')).toBe(true);
   });
 
   it('write-throughs a toggle to the server', async () => {
     const put = vi.spyOn(api, 'putStandardsVisibility').mockResolvedValue({});
     const storage = fakeStorage();
-    const { result } = renderHook(() => useVisibleStandards({ storage, projectId: 'p1' }));
+    const { result } = renderHook(() => useVisibleStandards({ storage, projectId: 'p1' }), { wrapper: withQueryClient() });
     act(() => result.current.toggle('security'));
     await waitFor(() => expect(put).toHaveBeenCalledWith('p1', expect.any(Array)));
   });
@@ -93,7 +94,7 @@ describe('useVisibleStandards', () => {
   it('does not call the server when no project is selected', () => {
     const put = vi.spyOn(api, 'putStandardsVisibility');
     const storage = fakeStorage();
-    const { result } = renderHook(() => useVisibleStandards({ storage, projectId: null }));
+    const { result } = renderHook(() => useVisibleStandards({ storage, projectId: null }), { wrapper: withQueryClient() });
     act(() => result.current.toggle('security'));
     expect(put).not.toHaveBeenCalled();
   });
@@ -101,7 +102,7 @@ describe('useVisibleStandards', () => {
   it('does not break the session when the server write fails', async () => {
     const put = vi.spyOn(api, 'putStandardsVisibility').mockRejectedValue(new Error('offline'));
     const storage = fakeStorage();
-    const { result } = renderHook(() => useVisibleStandards({ storage, projectId: 'p1' }));
+    const { result } = renderHook(() => useVisibleStandards({ storage, projectId: 'p1' }), { wrapper: withQueryClient() });
     act(() => result.current.toggle('custom-standard'));
     await waitFor(() => expect(put).toHaveBeenCalled());
     expect(result.current.visibleIds).toContain('custom-standard');

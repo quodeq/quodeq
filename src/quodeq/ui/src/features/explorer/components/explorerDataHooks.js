@@ -23,7 +23,7 @@ export function computeSeverityCounts(allViolations) {
   return countBySeverity(allViolations);
 }
 
-function computeComplianceByPrinciple(evalData) {
+export function computeComplianceByPrinciple(evalData) {
   const map = new Map();
   for (const c of (evalData?.compliance || [])) {
     if (!map.has(c.principle)) map.set(c.principle, []);

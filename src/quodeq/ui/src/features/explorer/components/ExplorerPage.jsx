@@ -166,7 +166,9 @@ export default function ExplorerPage({
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
     const severityFilter = kind === 'violations' ? 'all' : kind;
-    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab });
+    // fromProject rides along so a file opened from a cross-project
+    // explorer dismisses into ITS project, not the global selection.
+    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
   };
   const onSeverityBadge = (level) => () => handleCardNavigate(level);
 
@@ -255,7 +257,7 @@ export default function ExplorerPage({
         </div>
         <TopOffendingFilesTable
           files={d.topFiles}
-          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab })}
+          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
         />
       </section>
     </div>

@@ -39,6 +39,13 @@ export const projectKeys = {
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
   runScores: (projectId, run, source = "local") => ["project", projectId, source, "runScores", run || "latest"],
+  // Compare tab's slim per-project payload. Lives inside the project subtree
+  // on purpose: dismiss/delete/formula invalidations must reach it, or the
+  // fleet table would keep showing pre-dismissal scores.
+  compareSummary: (projectId, source = "local") => ["project", projectId, source, "compareSummary"],
+  // Per-project enabled-standards set, fetched by Compare so every row is
+  // filtered to that project's own visible dimensions (as Overview does).
+  standardsVisibility: (projectId, source = "local") => ["project", projectId, source, "standardsVisibility"],
   dimensionEval: (projectId, run, dimension, source = "local") => ["project", projectId, source, "dimensionEval", run || "latest", dimension],
 };
 

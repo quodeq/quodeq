@@ -17,6 +17,7 @@ const StandardsPage = lazy(() => import('./features/standards/StandardsPage.jsx'
 const ViolationsPage = lazy(() => import('./features/violations/components/ViolationsPage.jsx'));
 const MapPage = lazy(() => import('./features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('./features/help/components/HelpPage.jsx'));
+const ComparePage = lazy(() => import('./features/compare/components/ComparePage.jsx'));
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 import EmptyState from './components/EmptyState.jsx';
 import EmptyStateWithTour from './features/onboarding/components/EmptyStateWithTour.jsx';
@@ -33,9 +34,15 @@ import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.j
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
-import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
+import { useOneShotGate } from './hooks/useOneShotGate.js';
+import { useLinger } from './hooks/useLinger.js';
+import { warmOverviewChunks } from './bootChunks.js';
+
+// How long the startup loader stays opaque after its data-hold releases,
+// covering the overview's final commit (lazy chart first render).
+const STARTUP_LOADER_LINGER_MS = 250;
 import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
 import { buildProjectRootFile } from './utils/explorerUtils.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
@@ -56,7 +63,7 @@ import { t } from './strings/index.js';
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
-const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula'];
+const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
 const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
 /**
@@ -310,7 +317,10 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     retryLoadProjects: state.retryLoadProjects,
     warmup: state.warmup,
     loadProjects: state.loadProjects,
-    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, handleRunSelect: state.handleRunSelect,
+    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
+    // navStack + navGoTo let a route unwind history to an earlier entry of
+    // its own page (the map's drill-up) instead of pushing a duplicate.
+    navStack: state.navStack, navGoTo: state.navGoTo,
     handleProjectChange: state.handleProjectChange, navTab, navStackLength,
     handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
     historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
@@ -454,6 +464,33 @@ export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCou
   return activeTab === 'overview';
 }
 
+/**
+ * Startup-loader hold. Dropping the loader at projectsLoaded hands the user
+ * a skeleton flash (loader > skeleton > data) on every boot, so on the
+ * default Overview landing it holds until the Overview's data is actually
+ * in. It must drop the moment we know no data is coming: load failure,
+ * zero local projects, nothing selected, a query error, a restored
+ * non-overview tab, or the queries settling empty (`loading` false covers
+ * a project with no completed evaluations, whose `accumulated` stays null
+ * forever) — every one of those renders its own state and an overlay
+ * would wall it off forever. This describes a STATE, not "booting": the
+ * caller must scope it with useOneShotGate or a mid-session project
+ * switch re-triggers it. Exported for unit tests.
+ */
+export function shouldShowStartupLoader({
+  projectsLoaded, projectsLoadFailed, projectsCount, selectedProject,
+  selectedSource, activeTab, dashboard, accumulated, error, loading,
+}) {
+  if (projectsLoadFailed) return false;
+  if (!projectsLoaded) return true;
+  if (activeTab !== 'overview') return false;
+  if ((projectsCount ?? 0) === 0 && selectedSource !== 'shared') return false;
+  if (!selectedProject) return false;
+  if (error) return false;
+  if (dashboard && accumulated) return false;
+  return !!loading;
+}
+
 function renderEvalPrincipleDetail(params, props) {
   const { selectedProject, selectedRun, selectedSource } = props.navigation;
   const evalPrincipal = {
@@ -471,8 +508,14 @@ function renderEvalPrincipleDetail(params, props) {
         // local liveScore/liveGrade. The dashboard refetch covers the
         // accumulated (cross-run) rollup separately.
         const payload = { ...buildDismissPayload(v, evalPrincipal.dimension), run_id: evalPrincipal.runId };
-        const result = await props.dismissFinding(selectedProject, payload);
-        props.applyDelta?.(selectedProject, result?.scores, result?.delta);
+        // The evalPrincipal's own project, NOT the global selection: a
+        // cross-project entry (Compare's principle jump, a parent
+        // dimension's fromProject) must dismiss into the project the
+        // finding belongs to — this is the recurring identity-divergence
+        // class from the assistant dismiss bug.
+        const targetProject = evalPrincipal.project || selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -596,6 +639,12 @@ function ViolationsRoute({ params, props }) {
       }}
       isDirectNav={props.navigation.navStackLength === 1}
       tabKey={params._tabKey || 0}
+      // The by-dimension / by-file / dismissed flip is view state on the SAME
+      // screen: it lives in the route entry so back/forward and the crumb see
+      // it, but flipping replaces (never pushes) so history doesn't grow.
+      // Params are spread forward so _tabKey survives the flip.
+      subTab={params.subTab || 'dimension'}
+      onSubTabChange={(v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v })}
     />
   );
 }
@@ -611,6 +660,25 @@ export const ROUTE_RENDERERS = {
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
+    // The viz drill-down is a real nav-stack entry: drilling into a folder
+    // pushes (browser back climbs back out), and navigating up to a path
+    // that already sits in the trailing run of map entries unwinds history
+    // to it instead of stacking a duplicate. Mode/style toggles replace in
+    // place so flipping them never grows history. Params are spread forward
+    // on every hop so _tabKey (the fresh-tab-click reset signal) survives.
+    const handlePathChange = (path) => {
+      const current = params.path || '';
+      if (path === current) return;
+      const stack = props.navigation.navStack || [];
+      for (let i = stack.length - 2; i >= 0 && stack[i].page === 'map'; i--) {
+        if ((stack[i].path || '') === path) {
+          props.navigation.navGoTo(i);
+          return;
+        }
+      }
+      props.navigation.handleNavigate('map', { ...params, path });
+    };
+    const replaceView = (patch) => props.navigation.handleNavigateReplace('map', { ...params, ...patch });
     return <MapPage
       data={{
         accumulated: acc,
@@ -625,6 +693,16 @@ export const ROUTE_RENDERERS = {
         error: props.dashboardData.error,
       }}
       callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard, onRetry: props.dashboardData.onRetry }}
+      nav={{
+        path: params.path || '',
+        vizStyle: params.vizStyle,
+        viewMode: params.viewMode,
+        galaxyMode: params.galaxyMode,
+        onPathChange: handlePathChange,
+        onVizStyleChange: (v) => replaceView({ vizStyle: v }),
+        onViewModeChange: (v) => replaceView({ viewMode: v }),
+        onGalaxyModeChange: (v) => replaceView({ galaxyMode: v }),
+      }}
       isDirectNav={isDirectNav}
       tabKey={params._tabKey || 0}
     />;
@@ -677,7 +755,7 @@ export const ROUTE_RENDERERS = {
       runId={params.runId}
       dateLabel={params.dateLabel}
       sourceTab={params.sourceTab}
-      selectedSource={props.navigation.selectedSource}
+      selectedSource={params.fromSource || props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}
@@ -707,8 +785,13 @@ export const ROUTE_RENDERERS = {
       severityFilter={params.severityFilter || params.severity || null}
       onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v), run_id: params.runId };
-        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
-        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
+        // The entry's own project, not the global selection: a file opened
+        // from a cross-project explorer (fromProject) must dismiss into the
+        // project the finding belongs to. Same identity rule as the
+        // evalprinciple route.
+        const targetProject = params.fromProject || props.navigation.selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -728,8 +811,10 @@ export const ROUTE_RENDERERS = {
       dimension={params.dimension}
       onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : async (v) => {
         const payload = { ...buildDismissPayload(v, params.dimension), run_id: params.runId };
-        const result = await props.dismissFinding(props.navigation.selectedProject, payload);
-        props.applyDelta?.(props.navigation.selectedProject, result?.scores, result?.delta);
+        // Same identity rule as the file and evalprinciple routes.
+        const targetProject = params.fromProject || props.navigation.selectedProject;
+        const result = await props.dismissFinding(targetProject, payload);
+        props.applyDelta?.(targetProject, result?.scores, result?.delta);
         // One call per suppression mutation: the reconcile marks the project
         // queries stale synchronously AND schedules the debounced active
         // refetch (see scheduleDashboardReconcile in useDashboard.js), so a
@@ -755,6 +840,46 @@ export const ROUTE_RENDERERS = {
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} projectsLoaded={props.navigation.projectsLoaded} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
+  compare: (params, props) => (
+    <ComparePage
+      projects={props.navigation.projects}
+      projectsLoaded={props.navigation.projectsLoaded}
+      dimension={params.dimension || null}
+      onOpenProject={(id, source = 'local') => {
+        // Remote fleet rows open through the shared source; the same
+        // machinery the projects drawer uses for shared selections.
+        props.navigation.handleProjectChange(id, source);
+        props.navigation.navTab('overview');
+      }}
+      // Drill-down is a real nav-stack entry: push from the fleet so the
+      // browser back button returns there; replace when switching between
+      // dimensions so tab-hopping doesn't grow history.
+      onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
+      onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      // Cross-project principle jump: the evalPrincipal carries its own
+      // project, so the selection doesn't change and back pops to Compare.
+      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
+      // Standings row -> that project's own screen of the SAME dimension
+      // (the explorer's cross-project fromProject entry), pushed for the
+      // same back-pops-to-Compare contract.
+      onOpenProjectDimension={(target) => props.navigation.handleNavigate('explorer', {
+        dimension: target.dimName,
+        runId: target.runId,
+        dateLabel: target.dateLabel,
+        fromProject: target.id,
+        // The entry's own source, like its own project: the explorer must
+        // read a local fromProject from the local API even while the
+        // global selection sits on the shared source (and vice versa).
+        fromSource: target.source || 'local',
+        sourceTab: 'compare',
+      })}
+      // Head-to-head is a push like the dimension drill-down: back returns
+      // to the fleet with the two-project scope still selected.
+      duel={params.duel || null}
+      onOpenDuel={(ids) => props.navigation.handleNavigate('compare', { duel: ids })}
+      onBack={props.navigation.navPop}
+    />
+  ),
 };
 
 // The app-level "no local projects" wall in MainContent. Route pages that
@@ -886,13 +1011,20 @@ function MainContent({ activePage, props }) {
  * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, content, drawer }) {
+function AppShell({ sidebar, header, content, drawer, navPending }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
       <div className="app-shell__body">
         {sidebar}
         <div className="app-shell__main-column">
+          {/* Feedback while a navigation's target page renders (useNavStack
+              transition). Must live HERE, outside the scrolling <main>: the
+              .dashboard is position:relative, so an absolutely-positioned bar
+              inside it anchors to the top of the scrollable CONTENT and
+              scrolls out of view — exactly where every detail-page card
+              lives, so the one navigation that needed feedback never got it. */}
+          {navPending && <div className="nav-pending-bar" aria-hidden="true" />}
           <UpdateBanner />
           <main className="dashboard">
             {content}
@@ -909,6 +1041,10 @@ export default function App() {
   const { dismissFinding } = useApi();
   const queryClient = useQueryClient();
   const state = useAppState();
+  // Warm the Overview's lazy chunks (DashboardPage + the recharts chart)
+  // while the startup loader is up — see bootChunks.js for why page-mount
+  // time measured too late.
+  useEffect(() => { warmOverviewChunks(); }, []);
   // Passive shared-repo content signal driving the zero-local-projects flow:
   // wizard auto-open (below), the one-shot landing redirect, and the
   // "browse remote repositories" empty-state actions. Same react-query cache
@@ -1068,6 +1204,26 @@ export default function App() {
     ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
     : null;
   const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
+  // One-shot: the hold predicate describes a state a mid-session project
+  // switch re-enters (Compare's open-project lands on a not-yet-loaded
+  // overview); the gate makes sure the fullscreen loader is boot-only —
+  // after it drops once, switches get the overview skeleton instead.
+  const startupHoldActive = useOneShotGate(shouldShowStartupLoader({
+    projectsLoaded: state.projectsLoaded,
+    projectsLoadFailed: state.projectsLoadFailed,
+    projectsCount: state.projects.length,
+    selectedProject: state.selectedProject,
+    selectedSource: state.selectedSource,
+    activeTab,
+    dashboard: state.dashboard,
+    accumulated: state.accumulated,
+    error: state.error,
+    loading: state.loading,
+  }));
+  // Linger a beat after the hold drops so the overview's final commit (the
+  // lazy chart's first render, ~200ms) happens under a still-opaque loader;
+  // the fade then reveals a finished page instead of a chart placeholder.
+  const showStartupLoader = useLinger(startupHoldActive, STARTUP_LOADER_LINGER_MS);
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
@@ -1255,6 +1411,7 @@ export default function App() {
             <LlamaCppLogProvider>
               <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
               <AppShell
+          navPending={state.navPending}
           drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
             onOpenSettings={() => navTab('settings')} />}
           sidebar={
@@ -1267,6 +1424,14 @@ export default function App() {
                 hasCurrentProjectRuns,
                 sharedProjectInfo: state.sharedProjectInfo,
               })}
+              // Compare needs two analyzed projects to rank anything; below
+              // that the tab is redundant and stays hidden. Remote projects
+              // from the shared repository count toward the pair: one local
+              // project plus published teammates is a comparable fleet.
+              showCompareTab={(() => {
+                const localWithRuns = state.projects.filter((p) => (p.runsCount ?? 0) > 0).length;
+                return localWithRuns >= 2 || (localWithRuns >= 1 && sharedSignal.hasContent);
+              })()}
               selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,
@@ -1312,6 +1477,19 @@ export default function App() {
             />
           }
           content={
+            <>
+              {/* One stable mount for the startup loader, OUTSIDE the
+                  Suspense: inside it, a lazy chunk's suspension unmounts the
+                  loader itself and the plain fallback restarts the fade and
+                  tips from zero (a loader-to-loader flash). Out here it
+                  covers chunk loads AND holds through the Overview's first
+                  data (shouldShowStartupLoader), so boot goes loader ->
+                  content with no skeleton in between. */}
+              <FadingLoadingScreen
+                show={showStartupLoader}
+                tips
+                warmup={state.warmup}
+              />
             <Suspense fallback={<LoadingScreen />}>
               {/* Every route, not just Evaluate. A dead backend is the one
                   failure no page can render around: the Overview's own wall
@@ -1321,22 +1499,6 @@ export default function App() {
               {!state.serverConnected && (
                 <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
               )}
-              {/* Route pushes render the target page in a transition
-                  (useNavStack); this bar is the feedback while that render
-                  runs. Without it a heavy detail page (or a slow webview
-                  engine) leaves the click looking ignored — there is no
-                  yield point where a spinner could otherwise paint. */}
-              {state.navPending && <div className="nav-pending-bar" aria-hidden="true" />}
-              {/* One stable mount for the startup loader: it covers every
-                  route's not-yet-loaded state and fades out when the projects
-                  land, instead of each gate ripping its own copy out of the
-                  DOM on the same frame the content appears. */}
-              <FadingLoadingScreen
-                show={!state.projectsLoaded && !state.projectsLoadFailed}
-                tips
-                warmup={state.warmup}
-              />
-
               <div className="tab-fade" key={activeTab}>
                 <MainContent activePage={activePage} props={contentProps} />
               </div>
@@ -1347,6 +1509,7 @@ export default function App() {
                 />
               )}
             </Suspense>
+            </>
           }
             />
               </VerifiedFindingsProvider>

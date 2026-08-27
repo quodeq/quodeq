@@ -159,6 +159,10 @@ describe("useEvaluationLifecycle background completion: scores refetch", () => {
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: projectKeys.scores("project-a", null, "local") }),
     );
+    // The Compare fleet row for the finished project must refresh too.
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: projectKeys.compareSummary("project-a", "local") }),
+    );
   });
 
   it("invalidates the scores query even when the finished project is not the one currently viewed", () => {

@@ -158,3 +158,21 @@ def test_post_projects_clone_dest_must_be_under_home(client, tmp_path):
     )
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_CLONE_DEST"
+
+
+def test_post_projects_local_repo_path_must_be_directory_not_file(client, tmp_path):
+    """A local repo path pointing at a FILE is rejected with a message that
+    says so (a real registration once slipped through as .../lib/player.js
+    and 404'd forever after)."""
+    a_file = tmp_path / "player.js"
+    a_file.write_text("// not a repo")
+
+    resp = client.post(
+        "/api/projects",
+        json={"repo": str(a_file)},
+        headers=_ORIGIN,
+    )
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "INVALID_REPO"
+    assert "file, not a directory" in body["error"]

@@ -12,6 +12,8 @@ import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
 import { useRegisterWindowSpec, ReportContent, useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
+import DeferredMount from './DeferredMount.jsx';
+import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel, scopeGateRuleLabel } from '../../../strings/labels.js';
 
@@ -355,14 +357,19 @@ const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, on
         />
       )}
 
-      <VirtualList
-        key={virtualKey}
-        items={items}
-        scrollElement={scrollElement}
-        estimateSize={estimateItemSize(items)}
-        getItemKey={itemKey(items)}
-        renderItem={renderItem}
-      />
+      {/* Same two-commit split as PrincipleDetailPage: this page is param-fed
+          (no fetch), so the first paint would otherwise wait for the visible
+          cards' pretext layout effects. */}
+      <DeferredMount fallback={<CardListSkeleton />}>
+        <VirtualList
+          key={virtualKey}
+          items={items}
+          scrollElement={scrollElement}
+          estimateSize={estimateItemSize(items)}
+          getItemKey={itemKey(items)}
+          renderItem={renderItem}
+        />
+      </DeferredMount>
     </>
   );
 });

@@ -19,8 +19,8 @@
   /* Gray (light-mode text) */
   --primitive-gray-900: #1a1816;
   --primitive-gray-700: #3d3a37;
-  --primitive-gray-500: #8a8279;
-  --primitive-gray-400: #a09890;
+  --primitive-gray-500: #726b63;
+  --primitive-gray-400: #90867d;
 
   /* Coral (accent) */
   --primitive-coral-700: #b5543a;
@@ -50,7 +50,7 @@
   --primitive-ifrit-900: #201614;
   --primitive-ifrit-800: #2c201c;
   --primitive-ifrit-700: #3e302a;
-  --primitive-ifrit-500: #9a7a68;
+  --primitive-ifrit-500: #a48777;
   --primitive-ifrit-200: #f0dcc8;
   --primitive-ifrit-accent-light: #c85a10;
   --primitive-ifrit-accent-dark: #e88030;
@@ -58,7 +58,7 @@
   --primitive-ifrit-100: #f0e8de;
   --primitive-ifrit-border-light: #dcc8b4;
   --primitive-ifrit-text-dark: #241810;
-  --primitive-ifrit-text-muted-light: #8a7060;
+  --primitive-ifrit-text-muted-light: #786153;
 
   /* Galadriel palette (nature greens, sage) */
   --primitive-galadriel-50:  #f4f7f4;
@@ -74,7 +74,7 @@
   --primitive-flynn-900: #111822;
   --primitive-flynn-800: #1a2230;
   --primitive-flynn-700: #2a3545;
-  --primitive-flynn-500: #6a8aaa;
+  --primitive-flynn-500: #708fae;
   --primitive-flynn-200: #d4e0f0;
   --primitive-flynn-accent: #00d4ff;
   --primitive-flynn-accent-hover: #33e0ff;
@@ -102,7 +102,7 @@
   --primitive-neo-900:  #111111;
   --primitive-neo-800:  #1a1a1a;
   --primitive-neo-700:  #282828;
-  --primitive-neo-500:  #608060;
+  --primitive-neo-500:  #6b8f6b;
   --primitive-neo-200:  #b0ffb0;
   --primitive-neo-accent: #00ff41;
   --primitive-neo-accent-dark: #008833;
@@ -216,7 +216,7 @@
   --primitive-deckard-100: #e8e4ee;
   --primitive-deckard-border-light: #c8c2d0;
   --primitive-deckard-text-dark: #18141e;
-  --primitive-deckard-text-muted-light: #7a7088;
+  --primitive-deckard-text-muted-light: #686074;
 
   /* Deckard severity — neon pink-red scale */
   --primitive-deckard-sev-critical-light: #e02050;
@@ -287,6 +287,16 @@
   --color-accent-hover: var(--primitive-crimson-600);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-crimson-500) 6%, transparent);
 
+  /* Duel sides — stable IDENTITY hues for head-to-head views. Grade colors
+     cannot tell two projects apart (both sides are often the same tier),
+     so side A rides the theme accent and side B is warm sand, the same in
+     every family: #a1782f in light modes, #d8b36a in dark. Against the
+     original v1.9.1 grade palette sand clears the accent and every grade
+     tier in all 10 contexts (guarded in tools/token_distinctness.mjs), so
+     no per-family counter-hues are needed. */
+  --color-duel-a: var(--color-accent);
+  --color-duel-b: #a1782f;
+
   /* Status */
   --color-danger:  var(--primitive-red-600);
   --color-success: var(--primitive-green-700);
@@ -302,7 +312,14 @@
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
 
-  /* Grade tier colors — Daruma Fire: vivid gold top, warm gray high */
+  /* Grade tier colors: the ORIGINAL v1.9.1 palette, restored 2026-08-26
+     at the user's request after two recolors (metallic ramp, caution
+     descent) were rejected. It deliberately lives in the red channel that
+     severity also uses, and its top tier rides the accent in dark themes;
+     chip vs score context disambiguates, and this sharing is the accepted
+     design. Do not "fix" grade/severity or grade/accent proximity again.
+     tools/token_distinctness.mjs still guards tier legibility and
+     contrast at this palette's own baseline. */
   --color-grade-top-text:    #e0a800;
   --color-grade-top-bg:      color-mix(in srgb, #e0a800 14%, transparent);
   --color-grade-high-text:   #9ca0a8;
@@ -359,7 +376,7 @@
   --logo-needle:         var(--primitive-crimson-300);
   --logo-needle-dark:    var(--primitive-crimson-700);
 
-  /* Compliance — rich gold */
+  /* Compliance — deep emerald; gold now belongs to the grade ramp */
   --color-compliance:        #b08000;
   --color-compliance-bg:     color-mix(in srgb, #b08000 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #b08000 38%, transparent);
@@ -402,12 +419,13 @@
 
     --color-text:         var(--primitive-flynn-200);
     --color-text-muted:   var(--primitive-flynn-500);
-    --color-text-subtle:  #4a6a88;
+    --color-text-subtle:  #4f7292;
 
     --color-accent:       var(--primitive-flynn-accent);
     --color-accent-hover: var(--primitive-flynn-accent-hover);
     --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
     --color-on-accent:    var(--primitive-flynn-950);
+    --color-duel-b:       #d8b36a;
 
     --color-danger:  #e05c4b;
     --color-success: #4caf7d;
@@ -532,12 +550,13 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
 
   --color-text:         var(--primitive-flynn-200);
   --color-text-muted:   var(--primitive-flynn-500);
-  --color-text-subtle:  #4a6a88;
+  --color-text-subtle:  #4f7292;
 
   --color-accent:       var(--primitive-flynn-accent);
   --color-accent-hover: var(--primitive-flynn-accent-hover);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
   --color-on-accent:    var(--primitive-flynn-950);
+  --color-duel-b:       #d8b36a;
 
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
@@ -572,7 +591,7 @@ html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-danger-bg:     color-mix(in srgb, var(--primitive-red-300) 15%, transparent);
   --color-danger-border: color-mix(in srgb, var(--primitive-red-300) 30%, transparent);
 
-  /* Compliance — cool cyan */
+  /* Compliance — spring green, off the cyan accent */
   --color-compliance:        var(--primitive-flynn-accent);
   --color-compliance-bg:     color-mix(in srgb, var(--primitive-flynn-accent) 4%, transparent);
   --color-compliance-border: color-mix(in srgb, var(--primitive-flynn-accent) 38%, transparent);
@@ -661,7 +680,7 @@ html[data-theme="light"]:root, [data-theme="light"] {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
-  /* Compliance — rich gold */
+  /* Compliance — deep emerald; gold now belongs to the grade ramp */
   --color-compliance:        #b08000;
   --color-compliance-bg:     color-mix(in srgb, #b08000 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #b08000 38%, transparent);
@@ -708,11 +727,12 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
 
   --color-text:         var(--primitive-ifrit-200);
   --color-text-muted:   var(--primitive-ifrit-500);
-  --color-text-subtle:  #6a5448;
+  --color-text-subtle:  #856a5b;
 
   --color-accent:       var(--primitive-ifrit-accent-dark);
   --color-accent-hover: #f09040;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-dark) 14%, transparent);
+  --color-duel-b:       #d8b36a;
   --color-on-accent:    var(--primitive-ifrit-950);
 
   --color-danger:  #ff5030;
@@ -728,7 +748,7 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ifrit-sev-minor-dark) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ifrit-sev-minor-dark) 32%, transparent);
 
-  /* Grades — ember glow: gold → amber → orange → red */
+  /* Grades — bright gold cooling to ash; the fire band stays with severity */
   --color-grade-top-text:    #f0b830;
   --color-grade-top-bg:      color-mix(in srgb, #f0b830 12%, transparent);
   --color-grade-high-text:   var(--primitive-ifrit-500);
@@ -749,7 +769,7 @@ html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-danger-bg:     color-mix(in srgb, #ff5030 15%, transparent);
   --color-danger-border: color-mix(in srgb, #ff5030 30%, transparent);
 
-  /* Compliance — warm gold */
+  /* Compliance — spring green, clear of the orange accent and gold grades */
   --color-compliance:        #f0b830;
   --color-compliance-bg:     color-mix(in srgb, #f0b830 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #f0b830 38%, transparent);
@@ -796,10 +816,11 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-border-focus: #1b6b3a;
 
   --color-text:         #162016;
-  --color-text-muted:   #5a7a5a;
-  --color-text-subtle:  #7a9a7a;
+  --color-text-muted:   #4f6b4f;
+  --color-text-subtle:  #688968;
 
   --color-accent:       #1b6b3a;
+  --color-duel-b:       #a1782f;
   --color-accent-hover: #145228;
   --color-accent-soft:  color-mix(in srgb, #1b6b3a 8%, transparent);
   /* Light mode on dark-green accent — explicit white for AA contrast
@@ -820,6 +841,7 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-galadriel-sev-minor-light) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-galadriel-sev-minor-light) 30%, transparent);
 
+  /* Grades — gold withering through sage and dry gray down to lead */
   --color-grade-top-text:    var(--primitive-galadriel-800);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-galadriel-800) 12%, transparent);
   --color-grade-high-text:   var(--primitive-galadriel-500);
@@ -840,7 +862,7 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
-  /* Compliance — forest green */
+  /* Compliance — blue-teal, off the forest-green accent */
   --color-compliance:        #1b6b3a;
   --color-compliance-bg:     color-mix(in srgb, #1b6b3a 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #1b6b3a 38%, transparent);
@@ -884,8 +906,9 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-border-focus: var(--primitive-neo-accent);
   --color-text:         var(--primitive-neo-200);
   --color-text-muted:   var(--primitive-neo-500);
-  --color-text-subtle:  #405040;
+  --color-text-subtle:  #596f59;
   --color-accent:       var(--primitive-neo-accent);
+  --color-duel-b:       #d8b36a;
   --color-accent-hover: #33ff66;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent) 14%, transparent);
   --color-on-accent:    var(--primitive-neo-950);
@@ -900,6 +923,7 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-sev-minor-text:      #b47850;
   --color-sev-minor-bg:        color-mix(in srgb, #b47850 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, #b47850 32%, transparent);
+  /* Grades — phosphor fading from bright mint to dead-pixel gray */
   --color-grade-top-text:    var(--primitive-neo-accent);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-neo-accent) 12%, transparent);
   --color-grade-high-text:   #80ff80;
@@ -918,7 +942,7 @@ html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-danger-bg:     color-mix(in srgb, #ff4040 15%, transparent);
   --color-danger-border: color-mix(in srgb, #ff4040 30%, transparent);
 
-  /* Compliance — matrix green */
+  /* Compliance — teal, off the matrix-green accent */
   --color-compliance:        #00ff41;
   --color-compliance-bg:     color-mix(in srgb, #00ff41 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #00ff41 38%, transparent);
@@ -959,9 +983,10 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-border:       var(--primitive-neo-border-light);
   --color-border-focus: var(--primitive-neo-accent-dark);
   --color-text:         var(--primitive-neo-text-dark);
-  --color-text-muted:   #5a7a5a;
-  --color-text-subtle:  #7a9a7a;
+  --color-text-muted:   #516e51;
+  --color-text-subtle:  #6a8b6a;
   --color-accent:       var(--primitive-neo-accent-dark);
+  --color-duel-b:       #a1782f;
   --color-accent-hover: #006622;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent-dark) 8%, transparent);
   --color-on-accent:    #ffffff;
@@ -976,6 +1001,7 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-sev-minor-text:      var(--primitive-neo-sev-minor-light);
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-neo-sev-minor-light) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-neo-sev-minor-light) 30%, transparent);
+  /* Grades — phosphor fading from deep green to dead-pixel gray */
   --color-grade-top-text:    #006622;
   --color-grade-top-bg:      color-mix(in srgb, #006622 12%, transparent);
   --color-grade-high-text:   #338844;
@@ -994,7 +1020,7 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
-  /* Compliance — deep green */
+  /* Compliance — deep teal, off the green accent */
   --color-compliance:        #008833;
   --color-compliance-bg:     color-mix(in srgb, #008833 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #008833 38%, transparent);
@@ -1033,9 +1059,10 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-border:       var(--primitive-galadriel-700-dark);
   --color-border-focus: var(--primitive-green-400);
   --color-text:         #c8d4c8;
-  --color-text-muted:   #5a7a5a;
-  --color-text-subtle:  #3a5a3a;
+  --color-text-muted:   #7a9d7a;
+  --color-text-subtle:  #548254;
   --color-accent:       var(--primitive-green-400);
+  --color-duel-b:       #d8b36a;
   --color-accent-hover: #6ee7a0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-green-400) 14%, transparent);
   --color-on-accent:    var(--primitive-galadriel-950);
@@ -1050,6 +1077,7 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-sev-minor-text:      var(--primitive-galadriel-sev-minor-dark);
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-galadriel-sev-minor-dark) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-galadriel-sev-minor-dark) 32%, transparent);
+  /* Grades — gold withering through sage and dry gray down to lead */
   --color-grade-top-text:    var(--primitive-green-400);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-green-400) 12%, transparent);
   --color-grade-high-text:   #6a9678;
@@ -1068,7 +1096,7 @@ html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 15%, transparent);
   --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 30%, transparent);
 
-  /* Compliance — bright sage */
+  /* Compliance — bright teal, off the sage-green accent */
   --color-compliance:        #4caf7d;
   --color-compliance-bg:     color-mix(in srgb, #4caf7d 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #4caf7d 38%, transparent);
@@ -1111,11 +1139,12 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
 
   --color-text:         var(--primitive-ifrit-text-dark);
   --color-text-muted:   var(--primitive-ifrit-text-muted-light);
-  --color-text-subtle:  #b0a090;
+  --color-text-subtle:  #917c67;
 
   --color-accent:       var(--primitive-ifrit-accent-light);
   --color-accent-hover: #a84a08;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-light) 8%, transparent);
+  --color-duel-b:       #a1782f;
   --color-on-accent:    #ffffff;
 
   --color-danger:  #b82010;
@@ -1131,7 +1160,7 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ifrit-sev-minor-light) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ifrit-sev-minor-light) 30%, transparent);
 
-  /* Grades — ember glow: gold → warm gray → orange → red */
+  /* Grades — gold cooling to ash; the fire band stays with severity */
   --color-grade-top-text:    #c08000;
   --color-grade-top-bg:      color-mix(in srgb, #c08000 14%, transparent);
   --color-grade-high-text:   var(--primitive-ifrit-text-muted-light);
@@ -1152,7 +1181,7 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
-  /* Compliance — deep amber */
+  /* Compliance — deep green, clear of the orange accent and gold grades */
   --color-compliance:        #c08000;
   --color-compliance-bg:     color-mix(in srgb, #c08000 4%, transparent);
   --color-compliance-border: color-mix(in srgb, #c08000 38%, transparent);
@@ -1197,9 +1226,10 @@ html[data-theme="deckard-dark"]:root, [data-theme="deckard-dark"] {
 
   --color-text:         var(--primitive-deckard-200);
   --color-text-muted:   var(--primitive-deckard-500);
-  --color-text-subtle:  #58506a;
+  --color-text-subtle:  #706687;
 
   --color-accent:       var(--primitive-deckard-accent-dark);
+  --color-duel-b:       #d8b36a;
   --color-accent-hover: #ff60d0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-dark) 14%, transparent);
   --color-on-accent:    var(--primitive-deckard-950);
@@ -1217,7 +1247,7 @@ html[data-theme="deckard-dark"]:root, [data-theme="deckard-dark"] {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-deckard-sev-minor-dark) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-deckard-sev-minor-dark) 32%, transparent);
 
-  /* Grades — neon spectrum: violet → purple-gray → pink → red */
+  /* Grades — violet chrome dimming to dull slate-violet; pink stays severity's */
   --color-grade-top-text:    #b040ff;
   --color-grade-top-bg:      color-mix(in srgb, #b040ff 12%, transparent);
   --color-grade-high-text:   #a098b8;
@@ -1287,9 +1317,10 @@ html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
 
   --color-text:         var(--primitive-deckard-text-dark);
   --color-text-muted:   var(--primitive-deckard-text-muted-light);
-  --color-text-subtle:  #9a90a8;
+  --color-text-subtle:  #857996;
 
   --color-accent:       var(--primitive-deckard-accent-light);
+  --color-duel-b:       #a1782f;
   --color-accent-hover: #b01888;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-light) 8%, transparent);
   --color-on-accent:    #ffffff;
@@ -1307,7 +1338,7 @@ html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-deckard-sev-minor-light) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-deckard-sev-minor-light) 30%, transparent);
 
-  /* Grades — neon spectrum: purple → gray → magenta → red */
+  /* Grades — violet chrome dimming to dull slate-violet; pink stays severity's */
   --color-grade-top-text:    #8020d0;
   --color-grade-top-bg:      color-mix(in srgb, #8020d0 12%, transparent);
   --color-grade-high-text:   var(--primitive-deckard-text-muted-light);

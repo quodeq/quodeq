@@ -25,3 +25,26 @@ describe('Sidebar evaluate nav item — source gating', () => {
     expect(screen.getByTitle('evaluate')).toBeInTheDocument();
   });
 });
+
+// Compare ranks projects against each other, so the tab only exists once at
+// least two projects are analyzed — the parent computes that and passes
+// showCompareTab. When shown it sits directly below overview.
+describe('Sidebar compare nav item — fleet gating', () => {
+  it('is hidden by default (fewer than two analyzed projects)', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} />);
+    expect(screen.queryByTitle('compare')).toBeNull();
+  });
+
+  it('shows directly below overview when showCompareTab is set', () => {
+    render(<Sidebar activeTab="overview" onNavTab={vi.fn()} showCompareTab />);
+    const labels = [...document.querySelectorAll('.sidebar-nav-item .sidebar-nav-label')]
+      .map((el) => el.textContent);
+    expect(labels.indexOf('compare')).toBe(labels.indexOf('overview') + 1);
+  });
+
+  it('still shows when the project tabs are hidden (selected project has no runs)', () => {
+    render(<Sidebar activeTab="compare" onNavTab={vi.fn()} showProjectTabs={false} showCompareTab />);
+    expect(screen.getByTitle('compare')).toBeInTheDocument();
+    expect(screen.queryByTitle('overview')).toBeNull();
+  });
+});

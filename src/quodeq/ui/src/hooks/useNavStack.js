@@ -83,16 +83,23 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     history.back();
   }
 
-  function navReplace(entry) {
-    // Swap the top entry in place (e.g. repositories local/online tab flips):
-    // browser history must NOT grow, or Back has to unwind every flip.
-    // Same purity rule as navPush (#363): state + history as two sequential
-    // statements, never inside the updater.
+  function replaceTop(entry, setStack) {
+    // Swap the top entry in place: browser history must NOT grow, or Back has
+    // to unwind every flip. Same purity rule as navPush (#363): state +
+    // history as two sequential statements, never inside the updater.
     const prev = navStackRef.current;
     const next = [...prev.slice(0, -1), entry];
-    setNavStack(next);
+    setStack(next);
     entriesByIndex.set(next.length - 1, entry);
     history.replaceState({ navIndex: next.length - 1, entry: toHistoryEntry(entry) }, '');
+  }
+
+  function navReplace(entry) {
+    // In-place view-state changes on the SAME screen (repositories tab flips,
+    // typed filters). Plain set, never a transition: this state can be driven
+    // by controlled inputs, and rendering keystrokes at transition priority
+    // makes typing lag.
+    replaceTop(entry, setNavStack);
   }
 
   function navGoTo(index) {
@@ -109,17 +116,28 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     const prev = navStackRef.current;
     const stepsBack = prev.length - 1 - index;
     if (stepsBack <= 0) {
-      navReplace(entry);
+      // Swapping the top entry (the common breadcrumb case: switching
+      // dimension while ON the dimension page) is a real navigation to a
+      // possibly-heavy page — transition it, unlike navReplace's view-state
+      // flips.
+      replaceTop(entry, (next) => startNavTransition(() => setNavStack(next)));
       return;
     }
-    setNavStack([...prev.slice(0, index), entry]);
+    // Same transition rationale as navPush: sibling swaps land on the same
+    // heavy pages (a big dimension from the breadcrumb's jump bar).
+    startNavTransition(() => {
+      setNavStack([...prev.slice(0, index), entry]);
+    });
     rememberEntry(index, entry);
     history.go(-stepsBack);
   }
 
   function navReset() {
     const stepsBack = navStackRef.current.length - 1;
-    setNavStack([{ page: DEFAULT_PAGE }]);
+    // Overview on a large project renders heavy too; same transition.
+    startNavTransition(() => {
+      setNavStack([{ page: DEFAULT_PAGE }]);
+    });
     rememberEntry(0, { page: DEFAULT_PAGE });
     if (stepsBack > 0) history.go(-stepsBack);
   }

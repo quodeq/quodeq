@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
-import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
+import AccumulatedOverviewPanel, { preloadRunHistoryPanel } from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
@@ -8,6 +8,10 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import WarmupNotice from '../../../components/WarmupNotice.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
+
+// Matches the .dashboard-appear animation length (dashboard.css) -- the
+// class is held for this long so re-renders can't cut the fade short.
+const DASHBOARD_APPEAR_MS = 400;
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
@@ -141,6 +145,11 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const { selectedProject, selectedSource, selectedRun, projects = [], sharedProjectInfo = null, dashboard, accumulated, loading, isFetching, scoresPending = false, error, availableRuns = [], dailyRuns, overviewRunIndex = 0, granularity = 'day', onGranularityChange, sharedHasContent = false, customFormula = false, warmup = null } = data;
   const projectInfo = selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo });
   const { onNavigate, onRunSelect, onProjectsReload } = callbacks;
+  // Warm the score-history chunk while the boot loader / skeleton is still
+  // up: the chart is a separate lazy chunk, and without this the first
+  // data-bearing mount commits its placeholder for a beat inside otherwise
+  // real content — the exact flash the startup hold exists to remove.
+  useEffect(() => { preloadRunHistoryPanel(); }, []);
   // After a successful clone-on-add migration the project's repository_info.json
   // has been rewritten with location: "local". Refetch the projects list so the
   // sidebar/header reflect the new state. Fall back to a full reload if no
@@ -254,16 +263,26 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   useEffect(() => {
     if (!isLoading && !showOverviewSkeleton) dashboardAppearedKeyRef.current = dashboardAppearKey;
   }, [isLoading, showOverviewSkeleton, dashboardAppearKey]);
-  const dashboardAppearClass = dashboardAppearNow ? ' dashboard-appear' : '';
-  // Trade-off: the appear class only lives for the one render where it's computed
-  // above -- it doesn't stay latched until dashboardAppearKey next changes -- so any
-  // *unrelated* re-render inside the animation window (e.g. isFetching flipping a
-  // moment after content first appears) drops it and snaps opacity to 1, cutting
-  // the fade short. Latching it across renders was rejected: it would fail to
-  // re-arm on a run switch without reintroducing a loading gap. (The
-  // grace-fallback -> content-ready flip used to be an example of this too, until
-  // the graceElapsed reset above moved to render-phase specifically to stop that
-  // one from self-inflicting a same-tick drop -- see the comment on graceElapsed.)
+  // Hold the class for the animation's duration, not just the one render
+  // where dashboardAppearNow computes true: an unrelated re-render inside
+  // the window (isFetching flipping a moment after content appeared) used
+  // to drop it and snap opacity to 1, cutting the fade short. The className
+  // never toggles mid-window, so the animation runs uninterrupted; removal
+  // after the window is visually a no-op (the animation has finished).
+  // Latching until the key next changes was rejected instead: a key change
+  // then re-applies the class onto a node that still has it, which does not
+  // restart a CSS animation.
+  const [appearHeld, setAppearHeld] = useState(false);
+  const appearTimerRef = useRef(null);
+  useEffect(() => {
+    if (!dashboardAppearNow) return;
+    setAppearHeld(true);
+    clearTimeout(appearTimerRef.current);
+    appearTimerRef.current = setTimeout(() => setAppearHeld(false), DASHBOARD_APPEAR_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboardAppearNow, dashboardAppearKey]);
+  useEffect(() => () => clearTimeout(appearTimerRef.current), []);
+  const dashboardAppearClass = (dashboardAppearNow || appearHeld) ? ' dashboard-appear' : '';
 
   // Sticky "no evaluations yet" latch: once that empty state is showing for
   // this project+source, stay on it through a subsequent load (the post-eval

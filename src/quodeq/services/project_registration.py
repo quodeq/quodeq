@@ -121,7 +121,11 @@ def register_project(
     else:
         target_path = Path(repo_resolved)
         if not target_path.is_dir():
-            raise FileNotFoundError(f"Repo path does not exist: {target_path}")
+            # A path pointing at a FILE is a distinct user mistake from a
+            # missing path (a real registration once slipped through as
+            # .../lib/player.js) — say which one it was.
+            detail = "points at a file, not a directory" if target_path.exists() else "does not exist"
+            raise FileNotFoundError(f"Repo path {detail}: {target_path}")
 
     # Persist the resolved path + ephemeral flag in repository_info.json.
     # A corrupt existing file is treated as empty and rewritten (self-heal);
