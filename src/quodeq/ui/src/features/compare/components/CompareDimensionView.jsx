@@ -220,7 +220,7 @@ export default function CompareDimensionView({
                   // is unknowable — and for remote rows, whose detail pages
                   // live behind the shared source, not local routes.
                   onClick={() => (s.runId && onOpenProjectDimension && !s.row.remote
-                    ? onOpenProjectDimension({ id: s.row.id, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
+                    ? onOpenProjectDimension({ id: s.row.id, source: s.row.source, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
                     : onOpenProject(s.row.id))}
                   onMouseEnter={() => setFocusId(s.row.id)}
                   onMouseLeave={() => setFocusId(null)}

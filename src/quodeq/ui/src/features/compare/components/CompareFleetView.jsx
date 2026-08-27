@@ -269,7 +269,7 @@ function RowDetail({ row, duelTargets, openDimension, onOpenProject, onOpenProje
               onClick={(e) => {
                 e.stopPropagation();
                 if (toProject) {
-                  onOpenProjectDimension({ id: row.id, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
+                  onOpenProjectDimension({ id: row.id, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel });
                 } else {
                   openDimension(dim.key);
                 }
@@ -547,7 +547,7 @@ export default function CompareFleetView({
             title: t('compare.openDimensionIn', { dim: dim.label, project: row.name }),
             onClick: () => (row.remote || !dim.fromRunId || !onOpenProjectDimension
               ? onOpenProject(row.id)
-              : onOpenProjectDimension({ id: row.id, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel })),
+              : onOpenProjectDimension({ id: row.id, source: row.source, runId: dim.fromRunId, dimName: dim.name, dateLabel: dim.fromDateLabel })),
           }])),
         }))}
       />

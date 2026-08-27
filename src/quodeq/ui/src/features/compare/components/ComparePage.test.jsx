@@ -187,7 +187,7 @@ describe('ComparePage', () => {
     const chip = await screen.findByTitle('open alpha’s security');
     await userEvent.click(chip);
     expect(onOpenProjectDimension).toHaveBeenCalledWith({
-      id: 'alpha', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
+      id: 'alpha', source: 'local', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
     });
     expect(screen.queryByText(/PROJECT_STANDINGS/)).toBeNull();
   });
