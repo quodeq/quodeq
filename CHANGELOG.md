@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.10.0] - 2026-08-27
+
+### Features
+- **Compare tab**: every analyzed project ranked on one screen. A scope score with its 30-day delta, fleet-wide violations and compliance, the spread between your best and worst project, and a needs-attention strip ranked by consequence, three cards up front and the rest behind an expand toggle. The projects table reads one line per project: score, the 30-day trend as a spark line, violations split by severity, compliance ratio, and freshness with a commits-behind count; clicking a name opens the project. The tab appears once two projects have runs and follows the standards you have enabled, exactly like the Overview, refreshing the moment you toggle one.
+- **Score matrix**: every score at a glance, projects by dimensions, each cell a chip in its grade color. Per column the best score wears a solid border and the worst a dashed one, and clicking a column header re-ranks the fleet by it. A cell jumps straight into that project's own dimension screen, and columns that do not fit the panel distribute into stacked groups instead of scrolling. The dimension drill-down repeats the grammar one level deeper, projects by principles, with cells opening that project's principle page.
+- **Head-to-head duel**: the duel button picks any two projects (a scope of exactly two goes straight in) and lays them out side by side: the gap in plain words, mirrored per-dimension bars, both score trends on one time axis with the 30-day window shaded, a shape radar, and every shared principle difference on screen at once. Each side keeps a stable identity color chosen away from the grade colors, so a line is a name, not a judgement.
+- **Remote projects join the fleet**: with a shared repository connected, its published projects rank alongside local ones, tagged remote. They count toward the scope score, appear in the attention strip and the matrices, and can duel local projects; a project you also have locally shows once, local prevailing.
+- **Cross-project jumps**: standings, principle cards and matrix cells inside Compare open that project's own dimension or principle page, and back returns you to where you were, your selected project untouched. Map drill-downs and violations sub-tabs join the same navigation stack, and clicking a breadcrumb navigates while holding it opens the sibling menu.
+- **Staleness that means something**: a fleet row says how many commits a project is behind its last scan, not just how old the scan is, and rows refresh themselves the moment a run completes.
+
+### Improvements
+- **Loading shows the page's shape**: the Overview, History, Violations and Compare load behind skeletons that reserve the real layout instead of a spinner, project switches hold the placeholder until the content is ready, and the startup screen keeps its background, rotates one-line tips every five seconds, and fades out over the finished page.
+- **Readable text everywhere**: interface text colors now clear WCAG contrast floors across all theme and mode combinations.
+- **Compare help**: the Help tab explains the fleet view, the matrices, the drill-downs and the duel.
+
+### Fixes
+- **Dismissals from Compare stick**: dismissing a finding reached through a Compare drill-down applies to the project that owns the finding, wherever you came from, with a regression table covering every dismissing route.
+- **Windows text encoding**: the git call behind the commits-since-scan counter reads its output as UTF-8 explicitly, so a Windows machine with a legacy codepage cannot corrupt it.
+
 ## [1.9.1] - 2026-08-24
 
 ### Features
