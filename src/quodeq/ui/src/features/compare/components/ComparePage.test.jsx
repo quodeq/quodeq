@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -11,6 +11,7 @@ vi.mock('../../../api/index.js', () => ({
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
+  putStandardsVisibility: vi.fn(),
 }));
 vi.mock('../../../api/shared.js', () => ({
   sharedListProjects: vi.fn(),
@@ -18,7 +19,6 @@ vi.mock('../../../api/shared.js', () => ({
 }));
 
 import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
-import { getStandardsVisibility } from '../../../api/standards.js';
 import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
@@ -65,8 +65,6 @@ beforeEach(() => {
   getCompareSummary.mockImplementation((id) => Promise.resolve(
     id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5),
   ));
-  // Null ids = no filtering (fail-open), so most tests see the raw payload.
-  getStandardsVisibility.mockResolvedValue({ visibleStandardIds: null, isDefault: true });
   // Default: no shared repository configured — the local-only flow.
   sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
   sharedGetCompareSummary.mockRejectedValue(new Error('unexpected shared fetch'));
@@ -114,35 +112,30 @@ describe('ComparePage', () => {
     renderPage();
     expect(await screen.findByText('alpha')).toBeInTheDocument();
     expect(await screen.findByText('beta')).toBeInTheDocument();
-    expect(await screen.findByText('7.4')).toBeInTheDocument();
-    expect(await screen.findByText('5.9')).toBeInTheDocument();
+    expect((await screen.findAllByText('7.4')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('5.9')).length).toBeGreaterThan(0);
   });
 
-  it('expands a row on click; the expansion opens the project overview', async () => {
+  it('a row name opens the project', async () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProject });
-    const name = await screen.findByText('alpha');
+    // Scope to the table: project names also appear in the attention strip.
+    const name = (await screen.findAllByText('alpha'))
+      .find((el) => el.classList.contains('compare-row__name'));
     await userEvent.click(name);
-    // Row click expands the detail (severity, dimensions, actions) instead
-    // of navigating away.
-    expect(onOpenProject).not.toHaveBeenCalled();
-    await userEvent.click(await screen.findByText(/open project/));
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('alpha', 'local'));
   });
 
-  it('keeps multiple rows expanded independently', async () => {
-    renderPage();
-    // Scope to table rows: project names also appear in the attention strip.
-    const rowName = (name) => screen.getAllByText(name)
-      .find((el) => el.classList.contains('compare-row__name'));
+  it('rows carry the trend spark and severity split inline; the expansion is gone', async () => {
+    const { container } = renderPage();
     await screen.findByText('alpha');
-    await userEvent.click(rowName('alpha'));
-    await userEvent.click(rowName('beta'));
-    // Both detail blocks stay open side by side.
-    expect(await screen.findAllByText(/open project/)).toHaveLength(2);
-    // Toggling one closed leaves the other open.
-    await userEvent.click(rowName('alpha'));
-    expect(await screen.findAllByText(/open project/)).toHaveLength(1);
+    // One spark per scored row (both fixtures have a 2-point trend).
+    await waitFor(() => expect(
+      container.querySelectorAll('.compare-row .compare-trendline'),
+    ).toHaveLength(2));
+    // Severity split as colored counts (each fixture row carries 1 critical).
+    expect(screen.getAllByText('1 crit').length).toBeGreaterThan(1);
+    expect(container.querySelector('.compare-rowdetail')).toBeNull();
   });
 
   it('collapses never-evaluated projects into a single line', async () => {
@@ -161,93 +154,94 @@ describe('ComparePage', () => {
     expect(await screen.findByText('beta')).toBeInTheDocument();
   });
 
-  it('expansion lays out facts and actions on one header row, chips below', async () => {
-    const { container } = renderPage();
-    await screen.findByText('alpha');
-    await userEvent.click(screen.getByText('alpha'));
-    const detail = container.querySelector('.compare-rowdetail');
-    const head = detail.querySelector('.compare-rowdetail__head');
-    expect(head).toBeTruthy();
-    // Facts (left) and actions (right) share the header row: no third
-    // sparse row, no dead space to the right of the facts.
-    expect(head.querySelector('.compare-rowdetail__facts')).toBeTruthy();
-    expect(head.querySelector('.compare-rowdetail__actions')).toBeTruthy();
-    // Chips follow as their own wrap line.
-    const children = Array.from(detail.children);
-    expect(children.indexOf(head)).toBeLessThan(
-      children.indexOf(detail.querySelector('.compare-rowdetail__dims')),
-    );
-  });
-
-  it('an expanded row dimension chip opens that project’s own dimension page, not the compare drill-down', async () => {
+  it('a matrix cell opens that project’s own dimension page, not the compare drill-down', async () => {
     const onOpenProjectDimension = vi.fn();
     renderPage({ onOpenProjectDimension });
     await screen.findByText('alpha');
-    await userEvent.click(screen.getByText('alpha'));
-    const chip = await screen.findByTitle('open alpha’s security');
-    await userEvent.click(chip);
+    const matrix = await screen.findByLabelText('Score matrix');
+    await userEvent.click(within(matrix).getByTitle('open security in alpha'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith({
-      id: 'alpha', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
+      id: 'alpha', source: 'local', runId: 'r2', dimName: 'Security', dateLabel: '25 Aug',
     });
     expect(screen.queryByText(/PROJECT_STANDINGS/)).toBeNull();
   });
 
-  it('drills into a dimension and back', async () => {
+  it('score matrix grids every project; column headers rank by that column', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    const matrix = await screen.findByLabelText('Score matrix');
+    // Both projects' Security scores appear as cells (7.0 and 5.5).
+    expect(within(matrix).getByText('7.0')).toBeInTheDocument();
+    expect(within(matrix).getByText('5.5')).toBeInTheDocument();
+    const rowOrder = () => within(matrix).getAllByRole('row')
+      .map((r) => r.textContent)
+      .filter((tx) => /alpha|beta/.test(tx));
+    // Default order is the table's (score desc): alpha first.
+    expect(rowOrder()[0]).toMatch(/alpha/);
+    // First click ranks best-first (alpha still first), second flips it.
+    const colBtn = within(matrix).getByRole('button', { name: /Rank by security/ });
+    await userEvent.click(colBtn);
+    expect(rowOrder()[0]).toMatch(/alpha/);
+    await userEvent.click(within(matrix).getByRole('button', { name: /Rank by security/ }));
+    expect(rowOrder()[0]).toMatch(/beta/);
+  });
+
+  it('the dimension drill-down carries the principle matrix', async () => {
     renderPage();
     await screen.findByText('alpha');
     const dimButtons = await screen.findAllByText('security');
-    await userEvent.click(dimButtons[0]);
+    await userEvent.click(dimButtons[dimButtons.length - 1]);
+    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
+    expect(screen.getByText(/PRINCIPLE_MATRIX/)).toBeInTheDocument();
+  });
+
+  it('the header dimension button lists the board and opens the pick', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    await userEvent.click(await screen.findByRole('button', { name: 'Open a dimension drill-down' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /security/ }));
+    expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
+  });
+
+  it('drills into a dimension', async () => {
+    renderPage();
+    await screen.findByText('alpha');
+    const dimButtons = await screen.findAllByText('security');
+    await userEvent.click(dimButtons[dimButtons.length - 1]);
     expect(await screen.findByText(/PROJECT_STANDINGS/)).toBeInTheDocument();
     expect(screen.getByText('leads the scope')).toBeInTheDocument();
     expect(screen.getByText('trails the scope')).toBeInTheDocument();
-    await userEvent.click(screen.getByText(/ALL DIMENSIONS/));
-    expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
+    // No local back button: the app breadcrumb owns the way back.
+    expect(screen.queryByText(/ALL DIMENSIONS/)).toBeNull();
   });
 
-  it('opens the head-to-head duel when the scope is exactly two projects', async () => {
+  it('the header launcher duels an exactly-two scope directly, no popover', async () => {
     renderPage();
     await screen.findByText('alpha');
-    // Two projects in the fleet = effective scope of two, so the action shows.
-    const cta = await screen.findByText('compare these two');
-    await userEvent.click(cta);
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
     // Left minus right: +1.5 shows as the overall gap card and again on the
     // security dimension and principle rows (7.0 vs 5.5).
     expect(screen.getAllByText('+1.5').length).toBeGreaterThan(1);
     expect(screen.getByText('alpha leads by 1.5')).toBeInTheDocument();
-    await userEvent.click(screen.getByText(/ALL PROJECTS/));
-    expect(await screen.findByText(/PROJECTS ·/)).toBeInTheDocument();
   });
 
-  it('hides the duel action when more than two projects are in scope', async () => {
+  it('the header launcher runs the two-pick flow on larger scopes', async () => {
     renderPage({
       projects: PROJECTS.concat([{
         id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
       }]),
     });
     await screen.findByText('gamma');
-    expect(screen.queryByText('compare these two')).not.toBeInTheDocument();
-  });
-
-  it('starts a duel from a row expansion regardless of scope size', async () => {
-    renderPage({
-      projects: PROJECTS.concat([{
-        id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { py: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(1),
-      }]),
-    });
-    await screen.findByText('gamma');
-    // Three projects in scope: the header CTA is gone, but any expanded row
-    // can pick an opponent.
-    const rowName = screen.getAllByText('alpha')
-      .find((el) => el.classList.contains('compare-row__name'));
-    await userEvent.click(rowName);
-    const trigger = await screen.findByLabelText(/Compare alpha with/);
-    await userEvent.click(trigger);
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
+    // First pick pins side A and stays open; second pick navigates.
+    await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
+    expect(screen.getByLabelText('Clear the first pick')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('menuitem', { name: /beta/ }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });
 
-  it('hides dimensions a project has disabled, like the Overview', async () => {
+  it('hides dimensions the user has disabled, like the Overview', async () => {
     getCompareSummary.mockImplementation(() => Promise.resolve({
       ...summary(7.0, 7.0),
       dimensions: [
@@ -260,7 +254,9 @@ describe('ComparePage', () => {
         },
       ],
     }));
-    getStandardsVisibility.mockResolvedValue({ visibleStandardIds: ['security'], isDefault: false });
+    // Same browser-local set the Overview filters by (and the Standards
+    // screen's stars write) — the whole point of the shared source of truth.
+    localStorage.setItem('quodeq-visible-standards', JSON.stringify(['security']));
     renderPage();
     await screen.findByText('alpha');
     expect(await screen.findAllByText('security')).not.toHaveLength(0);
@@ -288,7 +284,7 @@ describe('ComparePage', () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProjectDimension, onOpenProject });
     await screen.findByText('alpha');
-    await userEvent.click((await screen.findAllByText('security'))[0]);
+    await userEvent.click((await (async () => { const b = await screen.findAllByText('security'); return b[b.length - 1]; })()));
     await userEvent.click(await screen.findByText('leads the scope'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'r2', dimName: 'Security' }),
@@ -307,7 +303,7 @@ describe('ComparePage', () => {
     const onOpenEvalPrincipal = vi.fn();
     renderPage({ onOpenEvalPrincipal });
     await screen.findByText('alpha');
-    await userEvent.click((await screen.findAllByText('security'))[0]);
+    await userEvent.click((await (async () => { const b = await screen.findAllByText('security'); return b[b.length - 1]; })()));
     // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
     // integrity lead entry, whoever it is, via its accessible title.
     const leads = await screen.findAllByTitle(/open integrity in/);
@@ -358,17 +354,14 @@ describe('ComparePage remote projects', () => {
     const rowName = (await screen.findAllByText('gamma'))
       .find((el) => el.classList.contains('compare-row__name'));
     await userEvent.click(rowName);
-    await userEvent.click(await screen.findByText(/open project/));
     await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('gamma', 'shared'));
   });
 
   it('duels a local project against a remote one', async () => {
     renderPage();
-    const rowName = (await screen.findAllByText('alpha'))
-      .find((el) => el.classList.contains('compare-row__name'));
-    await userEvent.click(rowName);
-    const trigger = await screen.findByLabelText(/Compare alpha with/);
-    await userEvent.click(trigger);
+    await screen.findByText('gamma');
+    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /gamma/ }));
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });

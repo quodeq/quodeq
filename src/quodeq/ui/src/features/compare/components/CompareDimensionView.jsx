@@ -4,14 +4,16 @@
  * the leader / trailer / scope average (hovering a standings row overlays
  * that project too), and one card per principle.
  */
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
+import { buildDimensionAttention } from '../compareModel.js';
 import CompareRadar from './CompareRadar.jsx';
+import CompareMatrix from './CompareMatrix.jsx';
 
 const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
@@ -46,12 +48,17 @@ function PrincipleDonut({ score }) {
 }
 
 export default function CompareDimensionView({
-  view, board, fleet, onBack, onOpenDimension, onOpenProject, onOpenPrinciple,
+  view, board, fleet, onOpenDimension, onOpenProject, onOpenPrinciple,
   onOpenProjectDimension,
 }) {
   // The radar plots leader/trailer/average by default (all N polygons would
   // be unreadable); hovering a standings row overlays that project on top.
   const [focusId, setFocusId] = useState(null);
+  // Everything here already qualified (outlier or hard drop), so the strip
+  // caps at 3 like the fleet's and the rest waits behind the expand toggle.
+  const [attnOpen, setAttnOpen] = useState(false);
+  const dimAttention = buildDimensionAttention(view);
+  const attnShown = attnOpen ? dimAttention : dimAttention.slice(0, 3);
 
   const axes = view.principles.map((p) => ({ label: p.label, value: p.avg }));
   const byKey = (source) => view.principles.map((p) => {
@@ -80,10 +87,10 @@ export default function CompareDimensionView({
   return (
     <>
       <div className="compare-page__top">
+        {/* No local back button: the app breadcrumb (compare / <dimension>)
+            already walks back, and the dimension tabs on the right switch
+            sideways. */}
         <div className="compare-page__titles">
-          <button type="button" className="compare-back" onClick={onBack}>
-            ‹ {t('compare.backToFleet')}
-          </button>
           <TermHeader
             name={view.label}
             sub={t('compare.dimSubtitle', {
@@ -154,6 +161,65 @@ export default function CompareDimensionView({
         />
       </StatStrip>
 
+      {/* Dimension-scoped triage: principles where one project sits far
+          under the rest, and hard 30-day drops. Renders only when it has
+          something to say. */}
+      {dimAttention.length > 0 && (
+        <section className="compare-panel" aria-label={t('compare.dimAttentionAria', { dim: view.label })}>
+          <div className="compare-panel__head">
+            <SectionLabel>{t('compare.attentionHeader', { count: dimAttention.length })}</SectionLabel>
+            <span className="compare-panel__note">{t('compare.dimAttentionNote')}</span>
+            {dimAttention.length > 3 && (
+              <button
+                type="button"
+                className="compare-attention__toggle"
+                onClick={() => setAttnOpen((v) => !v)}
+              >
+                {attnOpen
+                  ? `${t('compare.attentionLess')} ▾`
+                  : `${t('compare.attentionMore', { count: dimAttention.length - 3 })} ▸`}
+              </button>
+            )}
+          </div>
+          <div className="compare-attention compare-attention--strip">
+            {attnShown.map((item, i) => (
+              <Fragment key={`${item.kind}-${item.name}-${item.principleLabel || ''}`}>
+                {/* Same boundary the standards list draws: the trio above
+                    the line, the expanded rest dimmed below it. */}
+                {i === 3 && <div className="compare-attention__divider" aria-hidden="true" />}
+              <div
+                className={`compare-attention__item compare-attention__item--${item.level}${i >= 3 ? ' compare-attention__item--rest' : ''}`}
+                style={{ '--attention-accent': scoreGradeColorVar(item.kind === 'outlier' ? item.score : item.row.score) }}
+              >
+                <div className="compare-attention__top">
+                  <button
+                    type="button"
+                    className="compare-attention__name"
+                    onClick={() => (item.kind === 'outlier'
+                      ? onOpenPrinciple?.(item.cell)
+                      : onOpenProject(item.row.id))}
+                  >
+                    {item.name}
+                  </button>
+                  <span className={`compare-attention__level compare-attention__level--${item.level}`}>
+                    {t(`compare.level${item.level.charAt(0).toUpperCase()}${item.level.slice(1)}`)}
+                  </span>
+                </div>
+                <p className="compare-attention__why">
+                  {item.kind === 'outlier'
+                    ? [
+                      t('compare.dimReasonOutlier', { principle: item.principleLabel, score: score1(item.score) }),
+                      item.gap != null ? t('compare.dimReasonGap', { gap: score1(item.gap) }) : null,
+                    ].filter(Boolean).join(' · ')
+                    : t('compare.dimReasonDrop', { delta: score1(item.delta) })}
+                </p>
+              </div>
+              </Fragment>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="compare-lower compare-lower--dim">
         <section className="compare-panel" aria-label={t('compare.standingsAria')}>
           <div className="compare-panel__head">
@@ -173,7 +239,7 @@ export default function CompareDimensionView({
                   // is unknowable — and for remote rows, whose detail pages
                   // live behind the shared source, not local routes.
                   onClick={() => (s.runId && onOpenProjectDimension && !s.row.remote
-                    ? onOpenProjectDimension({ id: s.row.id, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
+                    ? onOpenProjectDimension({ id: s.row.id, source: s.row.source, runId: s.runId, dimName: s.dimName, dateLabel: s.dateLabel })
                     : onOpenProject(s.row.id))}
                   onMouseEnter={() => setFocusId(s.row.id)}
                   onMouseLeave={() => setFocusId(null)}
@@ -258,6 +324,33 @@ export default function CompareDimensionView({
         </section>
       </div>
 
+      {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
+          one level deeper — projects x principles, cells opening that
+          project's own principle page. */}
+      <CompareMatrix
+        ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
+        header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
+        note={t('compare.matrixNote')}
+        footOverall={view.avg}
+        columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
+        matrixRows={view.standings.map((s) => ({
+          id: s.row.id,
+          name: s.row.name,
+          remote: s.row.remote,
+          overall: s.score,
+          onOpenRow: () => onOpenProject(s.row.id),
+          cells: Object.fromEntries(view.principles.map((p) => {
+            const cell = p.perProject.find((x) => x.id === s.row.id);
+            if (!cell) return [p.key, { score: null }];
+            return [p.key, {
+              score: cell.score,
+              title: t('compare.openDimensionIn', { dim: p.label, project: s.row.name }),
+              onClick: onOpenPrinciple ? () => onOpenPrinciple(cell) : undefined,
+            }];
+          })),
+        }))}
+      />
+
       <section className="compare-panel" aria-label={t('compare.principlesAria')}>
         <div className="compare-panel__head">
           <SectionLabel>{t('compare.principlesHeader', { count: view.principles.length })}</SectionLabel>
@@ -319,6 +412,7 @@ export default function CompareDimensionView({
           ))}
         </div>
       </section>
+
     </>
   );
 }

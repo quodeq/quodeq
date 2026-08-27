@@ -68,7 +68,6 @@ export default function ComparePage({
      these two" action; back pops to the fleet. */
   duel = null,
   onOpenDuel,
-  onBack,
 }) {
   const localProjects = useMemo(
     () => (projects || []).filter((p) => p && (p.id || p.name)),
@@ -103,10 +102,22 @@ export default function ComparePage({
   // One timestamp per mount: staleness/delta windows don't need to tick.
   const now = useMemo(() => new Date().toISOString(), []);
 
-  const rows = useMemo(
-    () => fleetProjects.map((p) => buildRow(p, summariesById[p.id || p.name], now)),
-    [fleetProjects, summariesById, now],
-  );
+  const rows = useMemo(() => {
+    const built = fleetProjects.map((p) => buildRow(p, summariesById[p.id || p.name], now));
+    // Shared summaries pass through unfiltered (a remote project has no
+    // local standards config), so a standard the user disabled everywhere
+    // could re-enter the fleet through a remote row. The fleet speaks the
+    // standards the LOCAL projects have enabled: remote rows trim to that
+    // union. A remote-only fleet keeps everything - there is no local
+    // configuration to defer to.
+    const localKeys = new Set(
+      built.filter((r) => !r.remote).flatMap((r) => r.dims.map((d) => d.key)),
+    );
+    if (!localKeys.size) return built;
+    return built.map((r) => (r.remote
+      ? { ...r, dims: r.dims.filter((d) => localKeys.has(d.key)) }
+      : r));
+  }, [fleetProjects, summariesById, now]);
 
   // Every "open this project" affordance funnels through here: rows carry
   // their own source, so a remote row switches the app to the shared
@@ -262,7 +273,6 @@ export default function ComparePage({
       {duelView ? (
         <CompareDuelView
           duel={duelView}
-          onBack={onBack}
           onOpenProject={openProject}
         />
       ) : dimensionView ? (
@@ -270,7 +280,6 @@ export default function ComparePage({
           view={dimensionView}
           board={board}
           fleet={fleet}
-          onBack={onBack}
           onOpenDimension={openDimension}
           onOpenProject={openProject}
           onOpenPrinciple={openPrinciple}

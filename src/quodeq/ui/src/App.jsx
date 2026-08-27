@@ -755,7 +755,7 @@ export const ROUTE_RENDERERS = {
       runId={params.runId}
       dateLabel={params.dateLabel}
       sourceTab={params.sourceTab}
-      selectedSource={props.navigation.selectedSource}
+      selectedSource={params.fromSource || props.navigation.selectedSource}
       onNavigate={props.navigation.handleNavigate}
       refreshSignal={props.dashboardData.dashboard}
       trend={props.dashboardData.dashboard?.trend || []}
@@ -867,6 +867,10 @@ export const ROUTE_RENDERERS = {
         runId: target.runId,
         dateLabel: target.dateLabel,
         fromProject: target.id,
+        // The entry's own source, like its own project: the explorer must
+        // read a local fromProject from the local API even while the
+        // global selection sits on the shared source (and vice versa).
+        fromSource: target.source || 'local',
         sourceTab: 'compare',
       })}
       // Head-to-head is a push like the dimension drill-down: back returns

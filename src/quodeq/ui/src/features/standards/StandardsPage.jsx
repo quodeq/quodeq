@@ -42,8 +42,13 @@ function StandardsListView({ grouped, loading, error, actions, customizedCounts 
 
 export default function StandardsPage({ onRescan }) {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
-  const { selectedProject } = useAppState();
-  const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards({ projectId: selectedProject });
+  const { selectedProject, selectedSource } = useAppState();
+  // A shared (read-only) project has no local standards file to write; the
+  // per-project PUT would 404 and vanish in persist()'s fire-and-forget
+  // catch. The toggle still lands in the browser-local visible set, which
+  // is what every screen filters by.
+  const visibilityProjectId = selectedSource === 'shared' ? null : selectedProject;
+  const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards({ projectId: visibilityProjectId });
   const { counts: customizedCounts } = useStandardsOverrides(selectedProject);
   const {
     view,
