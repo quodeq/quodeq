@@ -8,7 +8,7 @@
  * coverage, per-dimension chips) lives inside a row's expansion; projects
  * that were never evaluated collapse into a single line.
  */
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
@@ -415,6 +415,16 @@ export default function CompareFleetView({
   // same order — never-evaluated rows have no numbers to grid.
   const scoredRows = orderedRows.filter((r) => r.hasData);
   const [showUnevaluated, setShowUnevaluated] = useState(false);
+  // The strip always leads with the top 3 by consequence (even a healthy
+  // fleet has a "most consequential" trio). Beyond those, only rows that
+  // actually flag ('watch' and up) hide behind the expand toggle — a clear
+  // row past rank 3 is not "needs attention".
+  const [attnOpen, setAttnOpen] = useState(false);
+  const attnAll = [
+    ...attention.slice(0, 3),
+    ...attention.slice(3).filter((a) => a.level !== 'clear'),
+  ];
+  const attnShown = attnOpen ? attnAll : attnAll.slice(0, 3);
   const toggleRow = (id) => setExpandedIds((cur) => {
     const next = new Set(cur);
     if (next.has(id)) next.delete(id);
@@ -516,14 +526,28 @@ export default function CompareFleetView({
       {attention.length > 0 && (
         <section className="compare-panel" aria-label={t('compare.attentionAria')}>
           <div className="compare-panel__head">
-            <SectionLabel>{t('compare.attentionHeader', { count: attention.length })}</SectionLabel>
+            <SectionLabel>{t('compare.attentionHeader', { count: attnAll.length })}</SectionLabel>
             <span className="compare-panel__note">{t('compare.attentionNote')}</span>
+            {attnAll.length > 3 && (
+              <button
+                type="button"
+                className="compare-attention__toggle"
+                onClick={() => setAttnOpen((v) => !v)}
+              >
+                {attnOpen
+                  ? `${t('compare.attentionLess')} ▾`
+                  : `${t('compare.attentionMore', { count: attnAll.length - 3 })} ▸`}
+              </button>
+            )}
           </div>
           <div className="compare-attention compare-attention--strip">
-            {attention.map(({ row, level, reasons, worstDim }) => (
+            {attnShown.map(({ row, level, reasons, worstDim }, i) => (
+              <Fragment key={row.id}>
+                {/* The standards list draws this same boundary: the always-on
+                    trio above the line, the expanded rest dimmed below it. */}
+                {i === 3 && <div className="compare-attention__divider" aria-hidden="true" />}
               <div
-                key={row.id}
-                className={`compare-attention__item compare-attention__item--${level}`}
+                className={`compare-attention__item compare-attention__item--${level}${i >= 3 ? ' compare-attention__item--rest' : ''}`}
                 style={{ '--attention-accent': scoreGradeColorVar(row.score) }}
               >
                 <div className="compare-attention__top">
@@ -561,6 +585,7 @@ export default function CompareFleetView({
                   )}
                 </p>
               </div>
+              </Fragment>
             ))}
           </div>
         </section>

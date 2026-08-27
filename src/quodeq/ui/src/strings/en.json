@@ -154,6 +154,8 @@
   "compare.attentionAria": "Projects needing attention",
   "compare.attentionEmpty": "nothing needs attention",
   "compare.attentionHeader": "NEEDS_ATTENTION · {count}",
+  "compare.attentionLess": "less",
+  "compare.attentionMore": "+{count} more",
   "compare.attentionNote": "ranked by consequence",
   "compare.backToFleet": "ALL DIMENSIONS",
   "compare.cardCompliance": "COMPLIANCE",

@@ -315,10 +315,12 @@ export function buildDimensionsBoard(rows, now, summariesById) {
 }
 
 /**
- * Top-N rows by consequence with machine-readable reasons the component
- * turns into copy. Reasons: worst-dimension, declining, stale, coverage-gap.
+ * Every scored row ranked by consequence, with machine-readable reasons the
+ * component turns into copy (worst-dimension, declining, stale,
+ * coverage-gap). The VIEW caps the strip at 3 and offers the rest behind an
+ * expand toggle, so the cap lives there, not here.
  */
-export function buildAttention(rows, limit = 3) {
+export function buildAttention(rows) {
   return rows
     .filter((r) => r.hasData)
     .map((row) => {
@@ -335,8 +337,7 @@ export function buildAttention(rows, limit = 3) {
       }
       return { row, value, level: consequenceLevel(value), worstDim: worst?.key ?? null, reasons };
     })
-    .sort((a, b) => b.value - a.value)
-    .slice(0, limit);
+    .sort((a, b) => b.value - a.value);
 }
 
 const round1 = (x) => Math.round(x * 10) / 10;
@@ -423,9 +424,10 @@ export function buildDuelView(idA, idB, rows, now, summariesById) {
  * Two signals: a principle where one project sits far under the rest
  * (1.5+ under the next score, or below 4.5 outright), and a standing
  * that dropped hard inside the 30-day window. An empty result means the
- * strip does not render at all.
+ * strip does not render at all. Returns EVERYTHING that qualifies,
+ * weight-sorted; the view caps the strip at 3 behind an expand toggle.
  */
-export function buildDimensionAttention(view, limit = 4) {
+export function buildDimensionAttention(view) {
   if (!view) return [];
   const items = [];
   for (const p of view.principles) {
@@ -459,7 +461,7 @@ export function buildDimensionAttention(view, limit = 4) {
       weight: Math.abs(s.delta) * 2 + (10 - (s.score ?? 10)),
     });
   }
-  return items.sort((a, b) => b.weight - a.weight).slice(0, limit);
+  return items.sort((a, b) => b.weight - a.weight);
 }
 
 /** Drill-down model for one dimension across the scope. */

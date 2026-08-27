@@ -277,6 +277,18 @@ test('buildAttention surfaces reasons for the riskiest projects', () => {
   assert.equal(first.worstDim, 'security');
 });
 
+test('buildAttention returns every scored row, worst first — the view caps the strip', () => {
+  const rows = [8.8, 4.2, 6.1, 7.5, 5.0].map((score, i) => buildRow(
+    makeProject({ id: `p${i}` }),
+    makeSummary({ score, dims: [DIM_SEC(score)] }),
+    NOW,
+  ));
+  const attention = buildAttention(rows);
+  assert.equal(attention.length, rows.length);
+  const values = attention.map((a) => a.value);
+  assert.deepEqual(values, values.slice().sort((a, b) => b - a));
+});
+
 test('buildDimensionView ranks standings and aggregates principles', () => {
   const summaries = {
     a: makeSummary({ dims: [DIM_SEC(6)] }),

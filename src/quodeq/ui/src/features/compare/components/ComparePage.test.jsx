@@ -11,6 +11,7 @@ vi.mock('../../../api/index.js', () => ({
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
+  putStandardsVisibility: vi.fn(),
 }));
 vi.mock('../../../api/shared.js', () => ({
   sharedListProjects: vi.fn(),
@@ -18,7 +19,6 @@ vi.mock('../../../api/shared.js', () => ({
 }));
 
 import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
-import { getStandardsVisibility } from '../../../api/standards.js';
 import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
 
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
@@ -65,8 +65,6 @@ beforeEach(() => {
   getCompareSummary.mockImplementation((id) => Promise.resolve(
     id === 'alpha' ? summary(7.4, 7.0) : summary(5.9, 5.5),
   ));
-  // Null ids = no filtering (fail-open), so most tests see the raw payload.
-  getStandardsVisibility.mockResolvedValue({ visibleStandardIds: null, isDefault: true });
   // Default: no shared repository configured — the local-only flow.
   sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
   sharedGetCompareSummary.mockRejectedValue(new Error('unexpected shared fetch'));
@@ -279,7 +277,7 @@ describe('ComparePage', () => {
     expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
   });
 
-  it('hides dimensions a project has disabled, like the Overview', async () => {
+  it('hides dimensions the user has disabled, like the Overview', async () => {
     getCompareSummary.mockImplementation(() => Promise.resolve({
       ...summary(7.0, 7.0),
       dimensions: [
@@ -292,7 +290,9 @@ describe('ComparePage', () => {
         },
       ],
     }));
-    getStandardsVisibility.mockResolvedValue({ visibleStandardIds: ['security'], isDefault: false });
+    // Same browser-local set the Overview filters by (and the Standards
+    // screen's stars write) — the whole point of the shared source of truth.
+    localStorage.setItem('quodeq-visible-standards', JSON.stringify(['security']));
     renderPage();
     await screen.findByText('alpha');
     expect(await screen.findAllByText('security')).not.toHaveLength(0);

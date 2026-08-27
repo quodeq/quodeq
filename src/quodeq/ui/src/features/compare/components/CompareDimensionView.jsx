@@ -4,7 +4,7 @@
  * the leader / trailer / scope average (hovering a standings row overlays
  * that project too), and one card per principle.
  */
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { TermHeader, StatStrip, Stat, SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
@@ -54,7 +54,11 @@ export default function CompareDimensionView({
   // The radar plots leader/trailer/average by default (all N polygons would
   // be unreadable); hovering a standings row overlays that project on top.
   const [focusId, setFocusId] = useState(null);
+  // Everything here already qualified (outlier or hard drop), so the strip
+  // caps at 3 like the fleet's and the rest waits behind the expand toggle.
+  const [attnOpen, setAttnOpen] = useState(false);
   const dimAttention = buildDimensionAttention(view);
+  const attnShown = attnOpen ? dimAttention : dimAttention.slice(0, 3);
 
   const axes = view.principles.map((p) => ({ label: p.label, value: p.avg }));
   const byKey = (source) => view.principles.map((p) => {
@@ -165,12 +169,26 @@ export default function CompareDimensionView({
           <div className="compare-panel__head">
             <SectionLabel>{t('compare.attentionHeader', { count: dimAttention.length })}</SectionLabel>
             <span className="compare-panel__note">{t('compare.dimAttentionNote')}</span>
+            {dimAttention.length > 3 && (
+              <button
+                type="button"
+                className="compare-attention__toggle"
+                onClick={() => setAttnOpen((v) => !v)}
+              >
+                {attnOpen
+                  ? `${t('compare.attentionLess')} ▾`
+                  : `${t('compare.attentionMore', { count: dimAttention.length - 3 })} ▸`}
+              </button>
+            )}
           </div>
           <div className="compare-attention compare-attention--strip">
-            {dimAttention.map((item) => (
+            {attnShown.map((item, i) => (
+              <Fragment key={`${item.kind}-${item.name}-${item.principleLabel || ''}`}>
+                {/* Same boundary the standards list draws: the trio above
+                    the line, the expanded rest dimmed below it. */}
+                {i === 3 && <div className="compare-attention__divider" aria-hidden="true" />}
               <div
-                key={`${item.kind}-${item.name}-${item.principleLabel || ''}`}
-                className={`compare-attention__item compare-attention__item--${item.level}`}
+                className={`compare-attention__item compare-attention__item--${item.level}${i >= 3 ? ' compare-attention__item--rest' : ''}`}
                 style={{ '--attention-accent': scoreGradeColorVar(item.kind === 'outlier' ? item.score : item.row.score) }}
               >
                 <div className="compare-attention__top">
@@ -196,6 +214,7 @@ export default function CompareDimensionView({
                     : t('compare.dimReasonDrop', { delta: score1(item.delta) })}
                 </p>
               </div>
+              </Fragment>
             ))}
           </div>
         </section>
