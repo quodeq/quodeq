@@ -39,9 +39,10 @@ def _extra_body(config: "ApiTurnConfig") -> dict:
     analysis run and an assistant turn.
     """
     body: dict = {}
-    if _OPENAI_API_HOST in (config.api_base or ""):
-        body["reasoning_effort"] = "none"
-    else:
+    # Ollama only honours `reasoning_effort`; `chat_template_kwargs` is the
+    # llama.cpp/vLLM knob. Local providers get both (see _api_runner).
+    body["reasoning_effort"] = "none"
+    if _OPENAI_API_HOST not in (config.api_base or ""):
         body["chat_template_kwargs"] = {"enable_thinking": False}
     env_ctx = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
     if env_ctx.isdigit() and int(env_ctx) > 0:

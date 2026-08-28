@@ -310,12 +310,13 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
 
     is_openai = _OPENAI_API_HOST in (config.api_base or "")
     extra_body: dict = {}
-    if is_openai:
-        extra_body["reasoning_effort"] = "none"
-    else:
-        # Disable chat-template thinking on reasoning-mode local models
-        # (Gemma 4, Qwen3); without it they burn 1000s of tokens before the
-        # JSON. Ignored by models that don't support thinking.
+    # Disable reasoning-mode thinking (Gemma 4, Qwen3); without it they burn
+    # 1000s of hidden tokens before the JSON and can loop past the read
+    # timeout. Ollama only honours `reasoning_effort` (it silently ignores
+    # `chat_template_kwargs` and top-level `think` on /v1); llama.cpp/vLLM
+    # style servers take `chat_template_kwargs`, so local providers get both.
+    extra_body["reasoning_effort"] = "none"
+    if not is_openai:
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
     if ctx_size <= 0:
