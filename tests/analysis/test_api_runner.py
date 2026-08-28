@@ -200,6 +200,32 @@ class TestRunApiAnalysis:
         assert mock_oa.call_args.kwargs["max_retries"] == 0
 
 
+class TestExtraBodyThinkingControls:
+    """Ollama only honours `reasoning_effort`; `chat_template_kwargs` is a
+    llama.cpp/vLLM convention it silently ignores. Both must go out to local
+    providers or Gemma-style thinking loops blow the read timeout."""
+
+    def _create_kwargs(self, cfg):
+        raw_client = _mock_raw_client('{"findings":[]}')
+        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = raw_client
+            _call_api("prompt", cfg)
+        return raw_client.chat.completions.create.call_args.kwargs
+
+    def test_local_sends_both_thinking_knobs(self, api_config):
+        extra = self._create_kwargs(api_config)["extra_body"]
+        assert extra["reasoning_effort"] == "none"
+        assert extra["chat_template_kwargs"] == {"enable_thinking": False}
+
+    def test_openai_sends_only_reasoning_effort(self):
+        cfg = ApiRunnerConfig(
+            model="gpt", api_base="https://api.openai.com/v1", api_key="k",
+        )
+        extra = self._create_kwargs(cfg)["extra_body"]
+        assert extra["reasoning_effort"] == "none"
+        assert "chat_template_kwargs" not in extra
+
+
 class TestParserDropAccounting:
     """Every finding-shaped object the model emits but we can't keep must be
     counted, so a systemic loss is visible in the logs instead of silent."""

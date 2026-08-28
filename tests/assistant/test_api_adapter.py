@@ -151,7 +151,9 @@ def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
     body = _extra_body(local)
     assert body["chat_template_kwargs"] == {"enable_thinking": False}
     assert body["num_ctx"] == 32768
-    assert "reasoning_effort" not in body
+    # Ollama ignores chat_template_kwargs; reasoning_effort is the knob it
+    # honours, so local providers must get it too.
+    assert body["reasoning_effort"] == "none"
 
 
 def test_extra_body_openai_uses_reasoning_effort(monkeypatch):
