@@ -15,6 +15,7 @@ Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -50,6 +51,12 @@ _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
 # would otherwise block the analysis worker forever. Read budget matches the
 # SDK's own 600s default; a timeout lands in the existing lossy-file branch.
 _CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
+# Default output budget for local calls (QUODEQ_MAX_OUTPUT_TOKENS overrides,
+# 0 disables). Healthy per-batch responses are well under 4k tokens; the cap
+# bounds a runaway generation by output budget instead of only wall clock. A
+# capped response arrives with finish_reason=length and takes the existing
+# lossy path (error marker, re-dispatch next run), so nothing is silently lost.
+_DEFAULT_LOCAL_MAX_TOKENS = 8192
 _SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
     "`snippet` VERBATIM from the source, one or a few contiguous lines, "
@@ -142,6 +149,38 @@ class ApiRunnerConfig:
     context_size: int = 0
     n_subagents: int = 1
     """Pool size this call competes with; scales the local read timeout."""
+
+
+@functools.lru_cache(maxsize=8)
+def _warn_ollama_ctx_noop(api_base: str) -> None:
+    """One warning per base URL: Ollama's /v1 endpoint ignores num_ctx
+    (top-level and nested options alike, verified on 0.33.1), so a configured
+    context size never reaches the model there. The server-side setting is
+    the only lever."""
+    _log.warning(
+        "A context size is configured but %s looks like Ollama, whose "
+        "OpenAI-compatible endpoint ignores per-request num_ctx. Set "
+        "OLLAMA_CONTEXT_LENGTH (or the Ollama app's context-length setting) "
+        "instead.",
+        api_base,
+    )
+
+
+def _resolve_max_tokens(config: ApiRunnerConfig, *, is_openai: bool) -> int | None:
+    """Output budget for one completion call.
+
+    Explicit config wins; otherwise local calls get a default cap and cloud
+    calls stay uncapped. QUODEQ_MAX_OUTPUT_TOKENS overrides the local default
+    (0 disables the cap).
+    """
+    if config.max_tokens is not None:
+        return config.max_tokens
+    if is_openai:
+        return None
+    env_val = os.environ.get("QUODEQ_MAX_OUTPUT_TOKENS", "").strip()
+    if env_val.isdigit():
+        return int(env_val) or None
+    return _DEFAULT_LOCAL_MAX_TOKENS
 
 
 def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeout:
@@ -324,7 +363,12 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         if env_val.isdigit():
             ctx_size = int(env_val)
     if ctx_size > 0:
+        # Kept for proxies (LiteLLM-style) that forward it to Ollama's native
+        # API; direct Ollama ignores it on /v1, hence the warning.
         extra_body["num_ctx"] = ctx_size
+        base = config.api_base or _OLLAMA_DEFAULT_BASE
+        if ":11434" in base:
+            _warn_ollama_ctx_noop(base)
 
     create_kwargs: dict = dict(
         model=config.model,
@@ -339,8 +383,9 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         create_kwargs["response_format"] = {"type": "json_object"}
     if extra_body:
         create_kwargs["extra_body"] = extra_body
-    if config.max_tokens is not None:
-        create_kwargs["max_tokens"] = config.max_tokens
+    max_tokens = _resolve_max_tokens(config, is_openai=is_openai)
+    if max_tokens is not None:
+        create_kwargs["max_tokens"] = max_tokens
 
     timeout = _resolve_timeout(config, is_openai=is_openai)
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
@@ -372,7 +417,8 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
                     "Model %s call timed out after %.0fs. Likely causes: "
                     "--n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 (requests "
                     "queue and the second exceeds the timeout), or context "
-                    "too large (try QUODEQ_CONTEXT_SIZE).",
+                    "too large (on Ollama set OLLAMA_CONTEXT_LENGTH; "
+                    "QUODEQ_CONTEXT_SIZE only reaches non-Ollama providers).",
                     config.model, elapsed,
                 )
             else:
