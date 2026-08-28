@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1] - 2026-08-28
+
+### Fixes
+- **Local analyses no longer stop mid-run**: on thinking-capable local models (Gemma 4, Qwen 3.x) served by Ollama, hidden reasoning could loop indefinitely, time out call after call, and trip the failure-streak breaker with "incomplete dimensions" partway through a run. Thinking is now genuinely disabled for local providers (the previous knob was silently ignored by Ollama), which also makes every local call dramatically faster, seconds instead of minutes. The assistant on local models gets the same treatment.
+- **Runaway generations are bounded**: local model calls carry a default output budget of 8192 tokens (QUODEQ_MAX_OUTPUT_TOKENS overrides it, 0 disables it), so a degenerate generation ends at the budget instead of burning the whole call timeout. A capped response is retried on the next run, nothing is silently lost.
+- **Honest context-size handling on Ollama**: QUODEQ_CONTEXT_SIZE cannot reach a model behind Ollama's OpenAI-compatible endpoint, which ignores per-request context settings. Quodeq now warns once and points at OLLAMA_CONTEXT_LENGTH, and the model-timeout hint no longer recommends a setting that cannot work there.
+
 ## [1.10.0] - 2026-08-27
 
 ### Features

@@ -200,6 +200,100 @@ class TestRunApiAnalysis:
         assert mock_oa.call_args.kwargs["max_retries"] == 0
 
 
+def _create_kwargs(cfg):
+    raw_client = _mock_raw_client('{"findings":[]}')
+    with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        mock_oa.return_value.__enter__.return_value = raw_client
+        _call_api("prompt", cfg)
+    return raw_client.chat.completions.create.call_args.kwargs
+
+
+class TestExtraBodyThinkingControls:
+    """Ollama only honours `reasoning_effort`; `chat_template_kwargs` is a
+    llama.cpp/vLLM convention it silently ignores. Both must go out to local
+    providers or Gemma-style thinking loops blow the read timeout."""
+
+    def test_local_sends_both_thinking_knobs(self, api_config):
+        extra = _create_kwargs(api_config)["extra_body"]
+        assert extra["reasoning_effort"] == "none"
+        assert extra["chat_template_kwargs"] == {"enable_thinking": False}
+
+    def test_openai_sends_only_reasoning_effort(self):
+        cfg = ApiRunnerConfig(
+            model="gpt", api_base="https://api.openai.com/v1", api_key="k",
+        )
+        extra = _create_kwargs(cfg)["extra_body"]
+        assert extra["reasoning_effort"] == "none"
+        assert "chat_template_kwargs" not in extra
+
+
+class TestLocalOutputCap:
+    """Local calls get a default max_tokens so a runaway generation is bounded
+    by output budget, not only by the wall-clock read timeout."""
+
+    def test_local_gets_default_cap(self, api_config):
+        kwargs = _create_kwargs(api_config)
+        assert kwargs["max_tokens"] == 8192
+
+    def test_env_override_and_zero_disables(self, api_config, monkeypatch):
+        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "4096")
+        assert _create_kwargs(api_config)["max_tokens"] == 4096
+        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "0")
+        assert "max_tokens" not in _create_kwargs(api_config)
+
+    def test_explicit_config_wins(self):
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:8000/v1", api_key="k",
+            max_tokens=123,
+        )
+        assert _create_kwargs(cfg)["max_tokens"] == 123
+
+    def test_openai_uncapped_by_default(self):
+        cfg = ApiRunnerConfig(
+            model="gpt", api_base="https://api.openai.com/v1", api_key="k",
+        )
+        assert "max_tokens" not in _create_kwargs(cfg)
+
+
+class TestOllamaCtxNoopWarning:
+    """Ollama's /v1 endpoint ignores num_ctx (top-level and nested options),
+    so a configured context size silently does nothing there. Users must hear
+    about it once instead of debugging truncated context."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_warn_cache(self):
+        from quodeq.analysis._api_runner import _warn_ollama_ctx_noop
+        _warn_ollama_ctx_noop.cache_clear()
+        yield
+        _warn_ollama_ctx_noop.cache_clear()
+
+    def test_warns_once_for_ollama_base(self, caplog):
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:11434/v1", api_key="k",
+            context_size=32768,
+        )
+        with caplog.at_level("WARNING"):
+            _create_kwargs(cfg)
+            _create_kwargs(cfg)
+        hits = [r for r in caplog.records if "OLLAMA_CONTEXT_LENGTH" in r.message]
+        assert len(hits) == 1
+
+    def test_silent_for_non_ollama_base(self, caplog):
+        cfg = ApiRunnerConfig(
+            model="m", api_base="http://localhost:8000/v1", api_key="k",
+            context_size=32768,
+        )
+        with caplog.at_level("WARNING"):
+            extra = _create_kwargs(cfg)["extra_body"]
+        assert extra["num_ctx"] == 32768
+        assert not [r for r in caplog.records if "OLLAMA_CONTEXT_LENGTH" in r.message]
+
+    def test_silent_without_context_size(self, api_config, caplog):
+        with caplog.at_level("WARNING"):
+            _create_kwargs(api_config)
+        assert not [r for r in caplog.records if "OLLAMA_CONTEXT_LENGTH" in r.message]
+
+
 class TestParserDropAccounting:
     """Every finding-shaped object the model emits but we can't keep must be
     counted, so a systemic loss is visible in the logs instead of silent."""
