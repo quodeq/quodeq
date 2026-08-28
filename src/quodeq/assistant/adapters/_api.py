@@ -34,9 +34,9 @@ def _extra_body(config: "ApiTurnConfig") -> dict:
     Local reasoning models (Gemma, Qwen3) otherwise burn thousands of thinking
     tokens before answering — a multi-minute streamed generation that is prone
     to dropped connections ("Connection error"). Disabling chat-template
-    thinking keeps them fast. `num_ctx` is pinned from the same env the
-    analysis path reads, so Ollama doesn't evict/reload the model between an
-    analysis run and an assistant turn.
+    thinking keeps them fast. `num_ctx` mirrors the analysis path but only
+    reaches non-Ollama providers: Ollama's /v1 endpoint ignores per-request
+    num_ctx, so there the model's context comes from the server setting.
     """
     body: dict = {}
     # Ollama only honours `reasoning_effort`; `chat_template_kwargs` is the
