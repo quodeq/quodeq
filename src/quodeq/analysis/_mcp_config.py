@@ -8,20 +8,11 @@ import tempfile
 from pathlib import Path
 
 from quodeq.analysis._config import _AgentParams
+from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.shared._mcp import codex_mcp_override
 
 _SERVER_NAME = "findings"
 _SERVER_MODULE = ["-m", "quodeq.analysis.mcp.findings_server"]
-
-
-def _default_cache_root():
-    """Return the result cache root, honouring QUODEQ_CACHE_ROOT.
-
-    Deferred import breaks the circular dependency:
-    _mcp_config -> cache/__init__ -> dimension_helpers -> _types -> subprocess -> _command -> _mcp_config.
-    """
-    from quodeq.analysis.cache.local import default_cache_root  # noqa: PLC0415
-    return default_cache_root()
 
 
 def _create_mcp_config(

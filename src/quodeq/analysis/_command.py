@@ -17,20 +17,11 @@ from quodeq.analysis._config import (
 )
 from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
+from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.shared._models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 
 _log = logging.getLogger(__name__)
-
-
-def _default_cache_root():
-    """Return the result cache root, honouring QUODEQ_CACHE_ROOT.
-
-    Deferred import breaks the circular dependency:
-    _command -> cache/__init__ -> dimension_helpers -> _types -> subprocess -> _command.
-    """
-    from quodeq.analysis.cache.local import default_cache_root  # noqa: PLC0415
-    return default_cache_root()
 
 
 _DEFAULT_AI_TOOLS = "Glob,Grep,Read"
