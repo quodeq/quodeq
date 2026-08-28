@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
-import { chooseDialog } from "../../../utils/chooseDialog.js";
+import { confirmCancelEvaluation } from "../cancelDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import {
@@ -290,21 +290,16 @@ export function useEvaluation() {
     [startMutation],
   );
 
-  const cancelEvaluation = useCallback(async () => {
-    // Three-button form: dismiss + two cancel variants. The title carries
-    // the "cancel evaluation" verb so the button labels can be terse and
-    // describe the side-effect on findings, not repeat the cancel intent.
-    // Only the destructive option ('discard') is rendered red; 'keep' and
-    // 'dismiss' are neutral so they don't compete visually.
-    const choice = await chooseDialog({
-      title: t("evaluate.cancelTitle"),
-      message: t("evaluate.cancelBody"),
-      cancelLabel: t("evaluate.keepRunning"),
-      actions: [
-        { key: "preserve", label: t("evaluate.keepFindings"), variant: "default" },
-        { key: "discard", label: t("evaluate.discardFindings"), variant: "danger" },
-      ],
-    });
+  // The confirmation UI lives in ../cancelDialog.js (view layer); the hook
+  // only owns the business rule: which mutation to dispatch for a choice.
+  // `confirm` is injectable so a different presentation can drive the same
+  // rule. Guarded with a typeof check because callers commonly wire this
+  // straight to onClick, whose event argument must not shadow the default.
+  const cancelEvaluation = useCallback(async (options) => {
+    const confirm = typeof options?.confirm === "function"
+      ? options.confirm
+      : confirmCancelEvaluation;
+    const choice = await confirm();
     if (!choice) return;
     cancelMutation.mutate({ discard: choice === "discard" });
   }, [cancelMutation]);

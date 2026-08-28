@@ -8,7 +8,7 @@ vi.mock('../../../utils/visibleStandards.js', () => ({
 }));
 
 const { readVisibleStandardIds } = await import('../../../utils/visibleStandards.js');
-const { usePluginDimensions, invalidateDimensionCache } =
+const { usePluginDimensions, invalidateDimensionCache, createDimensionCache } =
   await import('./usePluginDimensions.js');
 
 function makeWrapper(fakeApi) {
@@ -56,5 +56,64 @@ describe('usePluginDimensions', () => {
     });
     await waitFor(() => expect(fakeApi.listPlugins).toHaveBeenCalled());
     expect(result.current.allDimensions).toHaveLength(0);
+  });
+
+  it('accepts an injected cache instance so tests never touch the module singleton', async () => {
+    readVisibleStandardIds.mockReturnValue(['security']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      listPlugins: vi.fn().mockResolvedValue([
+        { dimensions: [{ id: 'security', label: 'Security' }] },
+      ]),
+      listStandards: vi.fn().mockResolvedValue([]),
+    };
+    const { result } = renderHook(() => usePluginDimensions(cache), {
+      wrapper: makeWrapper(fakeApi),
+    });
+    await waitFor(() => expect(result.current.allDimensions).toHaveLength(1));
+    // The isolated instance holds the load; the shared singleton stays cold
+    // (beforeEach invalidated it and nothing above touched it).
+    expect(cache.get()).toHaveLength(1);
+  });
+});
+
+describe('createDimensionCache', () => {
+  const plugins = [{ dimensions: [{ id: 'security', label: 'Security' }] }];
+
+  it('single-flights concurrent loads and reuses the resolved list', async () => {
+    const cache = createDimensionCache();
+    const listPlugins = vi.fn().mockResolvedValue(plugins);
+    const listStandards = vi.fn().mockResolvedValue([]);
+    const [a, b] = await Promise.all([
+      cache.load(listPlugins, listStandards),
+      cache.load(listPlugins, listStandards),
+    ]);
+    expect(a).toBe(b);
+    expect(listPlugins).toHaveBeenCalledTimes(1);
+    expect(listStandards).toHaveBeenCalledTimes(1);
+    // A later load after resolution still reuses the cached promise.
+    await cache.load(listPlugins, listStandards);
+    expect(listPlugins).toHaveBeenCalledTimes(1);
+    expect(cache.get()).toHaveLength(1);
+  });
+
+  it('invalidate() drops the cached list and lets the next load refetch', async () => {
+    const cache = createDimensionCache();
+    const listPlugins = vi.fn().mockResolvedValue(plugins);
+    const listStandards = vi.fn().mockResolvedValue([]);
+    await cache.load(listPlugins, listStandards);
+    cache.invalidate();
+    expect(cache.get()).toBeNull();
+    await cache.load(listPlugins, listStandards);
+    expect(listPlugins).toHaveBeenCalledTimes(2);
+    expect(cache.get()).toHaveLength(1);
+  });
+
+  it('two instances do not share state', async () => {
+    const a = createDimensionCache();
+    const b = createDimensionCache();
+    await a.load(vi.fn().mockResolvedValue(plugins), vi.fn().mockResolvedValue([]));
+    expect(a.get()).toHaveLength(1);
+    expect(b.get()).toBeNull();
   });
 });

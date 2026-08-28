@@ -14,13 +14,16 @@ vi.mock('../../api/index.js', () => ({
 }));
 
 vi.mock('../../utils/gradeThresholds.js', () => ({
-  setGradeThresholds: vi.fn(),
+  // The hook defaults to the module's shared store instance; mock it so the
+  // tests can assert the applied thresholds are pushed without leaking
+  // grading state into the process (the very hazard the store fixed).
+  defaultGradeThresholdsStore: { set: vi.fn() },
 }));
 
 import {
   getGradeFormula, saveGradeFormula, resetGradeFormula, previewGradeFormula,
 } from '../../api/index.js';
-import { setGradeThresholds } from '../../utils/gradeThresholds.js';
+import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
 
 // The hook lives inside the React Query provider tree in the real app, so the
 // tests wrap renderHook in a QueryClientProvider. invalidateSpy lets the
@@ -113,7 +116,7 @@ describe('useGradeFormula', () => {
     await act(async () => { applied = await result.current.apply(); });
 
     expect(saveGradeFormula).toHaveBeenCalledWith(CURRENT);
-    expect(setGradeThresholds).toHaveBeenCalledWith(saved.gradeThresholds);
+    expect(defaultGradeThresholdsStore.set).toHaveBeenCalledWith(saved.gradeThresholds);
     expect(applied).toBe(3);
     expect(result.current.isCustom).toBe(true);
     expect(result.current.draft).toEqual(saved);
@@ -133,7 +136,7 @@ describe('useGradeFormula', () => {
     await act(async () => { await result.current.resetToDefaults(); });
 
     expect(resetGradeFormula).toHaveBeenCalledTimes(1);
-    expect(setGradeThresholds).toHaveBeenCalledWith(DEFAULTS.gradeThresholds);
+    expect(defaultGradeThresholdsStore.set).toHaveBeenCalledWith(DEFAULTS.gradeThresholds);
     expect(result.current.isCustom).toBe(false);
     // Reset also re-baked grades server-side: invalidate the score caches.
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });

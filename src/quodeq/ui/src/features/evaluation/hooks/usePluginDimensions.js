@@ -29,30 +29,51 @@ function deduplicateDimensions(plugins, standards) {
   return seen;
 }
 
-// Module-level cache: loaded once, reused across mounts
-let _cachedDimensions = null;
-let _cachePromise = null;
-
-function _loadDimensions(listPlugins, listStandards) {
-  if (_cachePromise) return _cachePromise;
-  _cachePromise = Promise.all([
-    listPlugins().catch(() => []),
-    listStandards().catch(() => []),
-  ]).then(([plugins, standards]) => {
-    const seen = deduplicateDimensions(plugins, standards);
-    _cachedDimensions = [...seen.values()];
-    return _cachedDimensions;
-  }).catch((err) => {
-    console.warn('Failed to load dimensions:', err);
-    _cachePromise = null; // allow retry on next mount
-    return [];
-  });
-  return _cachePromise;
+/**
+ * Load-once cache for the merged plugin+standards dimension list.
+ *
+ * Instance-scoped state (was two module-level variables) so tests can build
+ * an isolated cache instead of inheriting whichever load happened first in
+ * the process. `load` single-flights: concurrent callers share one in-flight
+ * promise, and a failed load clears it so the next mount can retry.
+ */
+export function createDimensionCache() {
+  let cachedDimensions = null;
+  let cachePromise = null;
+  return {
+    /** Synchronously return the loaded list, or null before first load. */
+    get() {
+      return cachedDimensions;
+    },
+    load(listPlugins, listStandards) {
+      if (cachePromise) return cachePromise;
+      cachePromise = Promise.all([
+        listPlugins().catch(() => []),
+        listStandards().catch(() => []),
+      ]).then(([plugins, standards]) => {
+        const seen = deduplicateDimensions(plugins, standards);
+        cachedDimensions = [...seen.values()];
+        return cachedDimensions;
+      }).catch((err) => {
+        console.warn('Failed to load dimensions:', err);
+        cachePromise = null; // allow retry on next mount
+        return [];
+      });
+      return cachePromise;
+    },
+    invalidate() {
+      cachedDimensions = null;
+      cachePromise = null;
+    },
+  };
 }
 
+// Default instance: loaded once, reused across mounts — the pre-factory
+// module-level behavior every production consumer relies on.
+const defaultDimensionCache = createDimensionCache();
+
 export function invalidateDimensionCache() {
-  _cachedDimensions = null;
-  _cachePromise = null;
+  defaultDimensionCache.invalidate();
 }
 
 function _filterVisible(dims) {
@@ -67,25 +88,31 @@ function _filterVisible(dims) {
 
 /**
  * Loads and caches all plugin dimensions, filtering by visible standard IDs.
+ * @param {ReturnType<typeof createDimensionCache>} [cache] test seam;
+ *   defaults to the shared module singleton.
  * @returns {{ allDimensions: Array, dimLoadError: string|null }}
  */
-export function usePluginDimensions() {
+export function usePluginDimensions(cache = defaultDimensionCache) {
   const { listPlugins, listStandards } = useApi();
-  const [allDimensions, setAllDimensions] = useState(() => _cachedDimensions ? _filterVisible(_cachedDimensions) : []);
+  const [allDimensions, setAllDimensions] = useState(() => {
+    const cached = cache.get();
+    return cached ? _filterVisible(cached) : [];
+  });
   const [dimLoadError, setDimLoadError] = useState(null);
 
   useEffect(() => {
-    if (_cachedDimensions) {
-      setAllDimensions(_filterVisible(_cachedDimensions));
+    const cached = cache.get();
+    if (cached) {
+      setAllDimensions(_filterVisible(cached));
       return;
     }
-    _loadDimensions(listPlugins, listStandards).then((dims) => {
+    cache.load(listPlugins, listStandards).then((dims) => {
       setAllDimensions(_filterVisible(dims));
       setDimLoadError(null);
     }).catch(() => {
       setDimLoadError(t('evaluate.dimensionsLoadFailed'));
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, matching the pre-factory behavior
 
   return { allDimensions, dimLoadError };
 }
