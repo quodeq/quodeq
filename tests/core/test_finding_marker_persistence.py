@@ -75,7 +75,7 @@ class TestMarkerSurvivesPersistence:
         Not redundant with the report path: a marker can clear every other
         boundary and still never reach the SQL projection or the dashboard.
         """
-        assert marker.name in Judgment.model_fields
+        assert marker.name in Judgment.__dataclass_fields__
 
     def test_survives_the_write_whitelist(self, marker):
         flattened = _flatten_findings([_violation(marker)], "P1", _VIOLATION_FIELDS)

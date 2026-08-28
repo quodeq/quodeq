@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -71,7 +72,7 @@ def enrich_judgment(
 ) -> "Judgment":
     """Resolve req_refs for a Judgment, returning the (possibly new) Judgment.
 
-    Judgment is frozen (Pydantic), so we return a model_copy when we have
+    Judgment is a frozen dataclass, so we return a replaced copy when we have
     something new to attach. When the judgment already carries refs, or no
     refs were resolved, the original instance is returned unchanged.
     """
@@ -86,4 +87,4 @@ def enrich_judgment(
     if not resolved:
         return j
     refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in resolved]
-    return j.model_copy(update={"req_refs": refs})
+    return replace(j, req_refs=refs)

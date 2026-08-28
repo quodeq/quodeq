@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from quodeq.core.events.models import EVENT_MODEL_MAP, BaseEvent, EventType
+from quodeq.data.events.codec import event_from_dict, event_to_json
 from quodeq.data.locking import get_file_lock
 
 
@@ -34,7 +35,7 @@ class ActionLogWriter:
             with open(self.log_path, mode="a", encoding="utf-8") as f:
                 self._lock.acquire(f)
                 try:
-                    f.write(event.model_dump_json() + "\n")
+                    f.write(event_to_json(event) + "\n")
                     f.flush()
                 finally:
                     self._lock.release(f)
@@ -68,7 +69,7 @@ def read_action_events(project_dir: Path, *, from_offset: int = 0) -> Iterator[B
                 data = json.loads(line)
                 event_type = EventType(data["event_type"])
                 model_cls = EVENT_MODEL_MAP[event_type]
-                yield model_cls.model_validate(data)
+                yield event_from_dict(model_cls, data)
             except (json.JSONDecodeError, KeyError, ValueError) as e:
                 _logger.warning("Skipping malformed actions.jsonl line: %s", e)
                 continue

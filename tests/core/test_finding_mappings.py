@@ -1,6 +1,8 @@
 """Tests for the centralized finding-shape conversions."""
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from quodeq.core.events.models import Judgment
 from quodeq.core.finding_mappings import (
     finding_to_response_dict,
@@ -104,7 +106,7 @@ class TestWireDictToJudgment:
         d = {"p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,
              "reason": "r", "w": "T"}
         j = wire_dict_to_judgment(d)
-        dumped = j.model_dump()
+        dumped = asdict(j)
         assert dumped["practice_id"] == "P1"
         assert dumped["verdict"] == "violation"
         assert dumped["title"] == "T"

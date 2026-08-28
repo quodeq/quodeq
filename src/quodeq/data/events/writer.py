@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Union
-
-from pydantic import BaseModel
 
 from quodeq.core.events.models import BaseEvent
+from quodeq.data.events.codec import event_to_json
 from quodeq.data.locking import get_file_lock
 
 
@@ -43,7 +40,7 @@ class EventLogWriter:
                 # Apply an exclusive lock on the file before writing.
                 self._lock.acquire(f)
                 try:
-                    line = event.model_dump_json()
+                    line = event_to_json(event)
                     f.write(line + "\n")
                     f.flush()  # Ensure it hits the OS buffer
                 finally:

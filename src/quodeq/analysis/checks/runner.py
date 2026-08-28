@@ -7,6 +7,7 @@ check that can take a run down is worse than a check that does not exist.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from collections.abc import Sequence
@@ -148,7 +149,7 @@ def _gate(j: Judgment, trust_model: TrustModel | None) -> tuple[Judgment, dict]:
         update["provenance_downgrade"] = True
     if row.get(SCOPE_DOWNGRADE_MARKER):
         update["scope_downgrade"] = row[SCOPE_DOWNGRADE_MARKER]
-    return j.model_copy(update=update), row
+    return dataclasses.replace(j, **update), row
 
 
 def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> None:

@@ -5,9 +5,9 @@ a list of bare strings:
 
     {"req_refs": ["CWE-89", "CISQ", "ASVS V5.3.5"], ...}
 
-The current Judgment model declares ``req_refs: List[ReqRef]`` and pydantic
-rejects bare strings during validation. The EventLogReader then silently
-skips the entire event, which means whole runs project as zero findings —
+The current Judgment model declares ``req_refs: List[ReqRef]`` and a strict
+decoder rejects bare strings. The EventLogReader then silently skips the
+entire event, which means whole runs project as zero findings —
 the UI shows the violations from the dimension JSON file, but the score is
 computed off an empty SQL DB and renders 10.0 grade A regardless of how
 many violations exist.
@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 
 from quodeq.core.events.models import JudgmentCreatedEvent
+from quodeq.data.events.codec import event_from_dict
 from quodeq.data.events.reader import EventLogReader
 
 
@@ -44,8 +45,8 @@ _LEGACY_EVENT_JSON = {
 
 
 def test_judgment_model_accepts_bare_string_req_refs() -> None:
-    """Judgment validation must coerce ['CWE-327', 'CISQ'] to ReqRef objects."""
-    event = JudgmentCreatedEvent.model_validate(_LEGACY_EVENT_JSON)
+    """Event decoding must coerce ['CWE-327', 'CISQ'] to ReqRef objects."""
+    event = event_from_dict(JudgmentCreatedEvent, _LEGACY_EVENT_JSON)
     refs = event.payload.req_refs
     assert len(refs) == 2, f"Expected 2 ReqRefs, got {refs}"
     labels = [r.label for r in refs]

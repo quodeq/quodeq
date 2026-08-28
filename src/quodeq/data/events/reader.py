@@ -6,9 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, List, Optional
 
-from pydantic import ValidationError
-
 from quodeq.core.events.models import BaseEvent, EVENT_MODEL_MAP
+from quodeq.data.events.codec import EventDecodeError, event_from_dict
 
 
 _logger = logging.getLogger(__name__)
@@ -55,18 +54,18 @@ class EventLogReader:
                         _logger.warning(f"Missing 'event_type' in {self.log_path} at line {line_num}")
                         continue
                     
-                    # 2. Use the map to find the correct Pydantic model
+                    # 2. Use the map to find the correct event model
                     # We must convert the string to the Enum member
                     from quodeq.core.events.models import EventType
                     event_type = EventType(event_type_str)
-                    
+
                     model_cls = EVENT_MODEL_MAP.get(event_type)
                     if not model_cls:
                         _logger.warning(f"No model mapped for event type {event_type_str} in {self.log_path} at line {line_num}")
                         continue
 
-                    # 3. Validate the full event against the specific model
-                    event = model_cls.model_validate(raw_data)
+                    # 3. Decode the full event against the specific model
+                    event = event_from_dict(model_cls, raw_data)
                     
                     # 4. Checkpoint logic (using strict inequality)
                     if since_timestamp and event.timestamp <= since_timestamp:
@@ -79,12 +78,13 @@ class EventLogReader:
                     # ValueError subclass and would otherwise never match here.
                     _logger.error(f"Malformed JSON in {self.log_path} at line {line_num}")
                     continue
+                except EventDecodeError as e:
+                    # Also a ValueError subclass, so it must precede that catch.
+                    _logger.error(f"Schema mismatch in {self.log_path} at line {line_num}: {e}")
+                    continue
                 except (ValueError, KeyError) as e:
                     # Handles invalid Enum values or missing keys in raw_data
                     _logger.error(f"Invalid event structure in {self.log_path} at line {line_num}: {e}")
-                    continue
-                except ValidationError as e:
-                    _logger.error(f"Schema mismatch in {self.log_path} at line {line_num}: {e}")
                     continue
                 except Exception as e:
                     _logger.error(f"Unexpected error reading {self.log_path} at line {line_num}: {e}")
