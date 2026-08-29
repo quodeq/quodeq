@@ -8,9 +8,9 @@ from pathlib import Path
 
 from flask import Flask, current_app
 
-from quodeq.assistant import AssistantRepository
+from quodeq.assistant import AssistantRepository, AssistantStore
 from quodeq.core.utils.io import resolve_child_dir
-from quodeq.assistant.tools import ToolContext
+from quodeq.assistant.tools import ToolContext, default_findings_repo_factory
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
 from quodeq.services._fs_projects import get_project_info
@@ -161,7 +161,7 @@ def resolve_repo_root(project_id: str) -> str | None:
     return repo_attach_info(project_id)[0]
 
 
-def get_repository(app: Flask) -> AssistantRepository:
+def get_repository(app: Flask) -> AssistantStore:
     if not hasattr(app, "_assistant_repository"):
         app._assistant_repository = AssistantRepository(
             Path(app.config["ASSISTANT_DB_PATH"])
@@ -224,6 +224,7 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
         read_only=(source == "shared"),
         score_cache_path=score_cache_path,
         visible_standard_ids=load_visible_standard_ids(repo_root),
+        findings_repo_factory=default_findings_repo_factory,
     )
 
 
@@ -238,7 +239,7 @@ def local_provider_busy(provider_id: str) -> bool:
     return any(j.status == "running" for j in jobs.list_jobs(limit=20))
 
 
-def event_frames(repository: AssistantRepository, session_id: str, after_seq: int):
+def event_frames(repository: AssistantStore, session_id: str, after_seq: int):
     """Generator of (seq, frame) tuples or ``None`` heartbeats.
 
     Replays stored events after ``after_seq``, then polls indefinitely,

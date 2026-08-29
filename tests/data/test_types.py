@@ -1,4 +1,4 @@
-"""DTO fixtures and serialization/error-handling tests for quodeq.core.types."""
+"""DTO fixtures, to_camel_dict serialization, and quodeq.data.mappers error-handling tests."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from quodeq.core.types import (
     ViolationSummary,
     to_camel_dict,
 )
-from quodeq.core.types.mappers import (
+from quodeq.data.mappers import (
     parse_dimension_result,
     parse_finding,
     parse_job_snapshot,

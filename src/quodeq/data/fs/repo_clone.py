@@ -36,6 +36,24 @@ def _get_clone_timeout(env: dict[str, str] | None = None) -> int:
         return _DEFAULT_CLONE_TIMEOUT_S
 
 
+def clone_repo(url: str, dest: Path, extra_args: list[str], *, timeout_s: int) -> None:
+    """Run ``git clone`` for *url* into *dest* (the external-process seam).
+
+    LFS smudge is skipped and the locale pinned to C so stderr carries the
+    English markers callers classify on. Raises the raw ``subprocess`` /
+    ``OSError`` failures unchanged — the services layer owns retry
+    orchestration and mapping them to user-facing clone errors.
+    """
+    env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
+    subprocess.run(
+        ["git", "clone", "--progress", *extra_args, "--", url, str(dest)],
+        check=True,
+        env=env,
+        timeout=timeout_s,
+        capture_output=True,
+    )
+
+
 def _legacy_tempdir_clone(repo_input: str) -> str:
     """Fall-back path: fresh ``mkdtemp`` + ``git clone`` every call.
 

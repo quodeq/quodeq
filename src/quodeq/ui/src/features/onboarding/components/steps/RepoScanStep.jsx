@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getProjectScan as apiGetProjectScan } from '../../../../api/index.js';
 import { TermHeader, TermInput, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
@@ -16,7 +17,7 @@ function friendlyCloneError(err) {
   return apiErrorMessage(err, 'onboarding.cloneFailed');
 }
 
-export default function RepoScanStep({ state, actions, createProject, getProjectInfo, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
+export default function RepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
   const sub = state.repoScanSubState;
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [subStep, setSubStep] = useState('input'); // 'input' | 'cloneTarget'
@@ -32,12 +33,13 @@ export default function RepoScanStep({ state, actions, createProject, getProject
       const info = await getProjectInfo(existingProjectId);
       if (info.runsCount > 0) return false;
       // Timeout so a backend that accepts but never responds cannot stall
-      // the resume flow; the catch below falls back to the normal error UI.
-      const scanRes = await fetch(`/api/projects/${encodeURIComponent(existingProjectId)}/scan`, {
+      // the resume flow; the catch below falls back to the normal error UI
+      // (the adapter rejects on non-2xx too, landing in the same catch).
+      // The explicit `timeout` lifts the adapter's 30s default to match.
+      const scanData = await getProjectScan(existingProjectId, {
         signal: AbortSignal.timeout(120000),
+        timeout: 120000,
       });
-      if (!scanRes.ok) return false;
-      const scanData = await scanRes.json();
       actions.succeedScan(existingProjectId, scanData);
       return true;
     } catch {

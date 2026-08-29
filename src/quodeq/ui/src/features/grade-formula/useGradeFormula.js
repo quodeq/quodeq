@@ -4,7 +4,7 @@ import {
   getGradeFormula, saveGradeFormula, resetGradeFormula, previewGradeFormula,
 } from '../../api/index.js';
 import { projectKeys } from '../../api/queryKeys.js';
-import { setGradeThresholds } from '../../utils/gradeThresholds.js';
+import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
 import { t } from '../../strings/index.js';
 
 const PREVIEW_DEBOUNCE_MS = 250;
@@ -12,8 +12,11 @@ const PREVIEW_DEBOUNCE_MS = 250;
 /**
  * Grade-formula editor state: server params, dirty draft, debounced preview.
  * projectId: project used for the live preview (may be null).
+ * thresholdsStore: grade-thresholds store apply/reset push the applied
+ * boundaries into; defaults to the app-wide store, injectable so tests
+ * don't leak grading state into the rest of the process.
  */
-export default function useGradeFormula(projectId) {
+export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const [saved, setSaved] = useState(null);     // params dict as saved server-side
   const [draft, setDraft] = useState(null);     // params dict being edited
   const [isCustom, setIsCustom] = useState(false);
@@ -90,7 +93,7 @@ export default function useGradeFormula(projectId) {
     try {
       const d = await saveGradeFormula(draft);
       setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
-      setGradeThresholds(d.current.gradeThresholds);
+      thresholdsStore.set(d.current.gradeThresholds);
       setPartialNotice(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
@@ -101,14 +104,14 @@ export default function useGradeFormula(projectId) {
     } finally {
       setBusy(false);
     }
-  }, [draft, requestPreview, invalidateScoreQueries]);
+  }, [draft, requestPreview, invalidateScoreQueries, thresholdsStore]);
 
   const resetToDefaults = useCallback(async () => {
     setBusy(true); setError(null); setPartialNotice(null);
     try {
       const d = await resetGradeFormula();
       setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
-      setGradeThresholds(d.current.gradeThresholds);
+      thresholdsStore.set(d.current.gradeThresholds);
       setPartialNotice(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
@@ -117,7 +120,7 @@ export default function useGradeFormula(projectId) {
     } finally {
       setBusy(false);
     }
-  }, [requestPreview, invalidateScoreQueries]);
+  }, [requestPreview, invalidateScoreQueries, thresholdsStore]);
 
   return { draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults };
 }

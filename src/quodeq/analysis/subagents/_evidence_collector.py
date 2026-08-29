@@ -12,7 +12,9 @@ from typing import Any
 
 from quodeq.analysis._types import RunConfig
 from quodeq.core.evidence.model import Evidence
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.analysis.subagents.pool import SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
 from quodeq.analysis._runner_markers import cleanup_stream
@@ -51,5 +53,7 @@ def _collect_evidence(
         ),
         compiled_dir=compiled_dir,
         evaluators_dir=config.evaluators_dir,
+        req_map_reader=read_req_to_principle_map,
+        cwe_url_template=cwe_url_template(),
     )
     return ev

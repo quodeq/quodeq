@@ -8,6 +8,7 @@ import os
 import subprocess as _subprocess
 from pathlib import Path
 
+from quodeq.services.ports import clone_repo
 from quodeq.data.fs.shared_repo import remove_clone_dir
 from quodeq.shared._env import env_int
 
@@ -85,15 +86,10 @@ _RETRYABLE_KINDS = ("network", "unknown")
 
 
 def _clone_once(url: str, clone_dest: Path, extra_args: list[str]) -> None:
-    env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
+    # The subprocess invocation lives in the data layer (ports.clone_repo);
+    # this function owns mapping its raw failures onto CloneError kinds.
     try:
-        _subprocess.run(
-            ["git", "clone", "--progress", *extra_args, "--", url, str(clone_dest)],
-            check=True,
-            env=env,
-            timeout=_GIT_CLONE_TIMEOUT_S,
-            capture_output=True,
-        )
+        clone_repo(url, clone_dest, extra_args, timeout_s=_GIT_CLONE_TIMEOUT_S)
     except _subprocess.CalledProcessError as exc:
         raw = exc.stderr
         if isinstance(raw, bytes):

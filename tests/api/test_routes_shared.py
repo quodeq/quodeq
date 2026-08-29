@@ -36,20 +36,14 @@ def client(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _clean_publish_status():
-    """Snapshot and restore the module-level publish status dict.
+def _clean_publish_status(monkeypatch):
+    """Give each test a fresh module-default PublishStatus.
 
-    ``shared_publish._STATUS`` is a process-global mutated by the real
-    publish job (tests/services/test_shared_publish_job.py) and by the
-    monkeypatched routes below, so each test here must start and end from
-    a clean slate to stay hermetic across the whole suite.
+    The routes read the module default, still shared process-wide in
+    production, so each test here swaps in its own instance to stay
+    hermetic across the whole suite.
     """
-    with shared_publish._STATUS_LOCK:
-        snapshot = dict(shared_publish._STATUS)
-    yield
-    with shared_publish._STATUS_LOCK:
-        shared_publish._STATUS.clear()
-        shared_publish._STATUS.update(snapshot)
+    monkeypatch.setattr(shared_publish, "_default_status", shared_publish.PublishStatus())
 
 
 # --- GET /api/shared/status --------------------------------------------------

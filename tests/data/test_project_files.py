@@ -34,6 +34,50 @@ class TestReadRepositoryInfo:
         assert read_repository_info(tmp_path) == {"path": "/x"}
 
 
+class TestRepositoryInfoExists:
+    def test_absent_returns_false(self, tmp_path):
+        from quodeq.data.fs.project_files import repository_info_exists
+
+        assert repository_info_exists(tmp_path) is False
+
+    def test_present_even_corrupt_returns_true(self, tmp_path):
+        from quodeq.data.fs.project_files import repository_info_exists
+
+        (tmp_path / "repository_info.json").write_text("{nope")
+        assert repository_info_exists(tmp_path) is True
+
+
+class TestReadScanTotalFiles:
+    def test_reads_total_files(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text(json.dumps({"total_files": 1855}))
+        assert read_scan_total_files(tmp_path) == 1855
+
+    def test_zero_when_missing(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        assert read_scan_total_files(tmp_path) == 0
+
+    def test_zero_when_corrupt(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text("{nope")
+        assert read_scan_total_files(tmp_path) == 0
+
+    def test_zero_when_not_int(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text(json.dumps({"total_files": "many"}))
+        assert read_scan_total_files(tmp_path) == 0
+
+    def test_zero_when_non_dict_json(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text("[1, 2]")
+        assert read_scan_total_files(tmp_path) == 0
+
+
 class TestWriteRepositoryInfo:
     def test_round_trip(self, tmp_path):
         from quodeq.data.fs.project_files import (

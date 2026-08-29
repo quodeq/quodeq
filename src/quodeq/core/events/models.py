@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Dict, Generic, List, Optional, TypeVar
 from uuid import uuid4, UUID
-
-from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from quodeq.core.types.req_ref import ReqRef
 
@@ -26,24 +25,24 @@ class EventType(str, Enum):
     FINDING_UNVERIFIED = "FINDING_UNVERIFIED"
 
 
-class BaseEvent(BaseModel, Generic[T]):
+@dataclass(frozen=True, kw_only=True)
+class BaseEvent(Generic[T]):
     """Base class for all events in the quodeq event log."""
-    model_config = ConfigDict(frozen=True)
 
-    event_id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    event_id: UUID = field(default_factory=uuid4)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: EventType
     payload: T
 
 
-class Judgment(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class Judgment:
     """What the LLM produced about a single piece of code.
 
     Immutable. The canonical type for findings in the Event Log. Verdict is
     "violation" or "compliance" -- "dismissed" is NOT a valid Judgment verdict;
     that's a derived view-only state on Finding.
     """
-    model_config = ConfigDict(frozen=True)
 
     # Required
     practice_id: str
@@ -63,7 +62,7 @@ class Judgment(BaseModel):
     scope: Optional[str] = None
     confidence: int = 100
     req: Optional[str] = None
-    req_refs: List[ReqRef] = Field(default_factory=list)
+    req_refs: List[ReqRef] = field(default_factory=list)
     cwe: Optional[str] = None
     # True when the deterministic provenance gate (#639) de-escalated this
     # finding from critical to major. UI/DB-visible audit marker (#656); the
@@ -81,32 +80,6 @@ class Judgment(BaseModel):
     # app still shows every finding in the run).
     carried_forward: bool = False
 
-    @field_validator("req_refs", mode="before")
-    @classmethod
-    def _coerce_legacy_req_refs(cls, value: Any) -> Any:
-        """Accept the legacy bare-string format for ``req_refs``.
-
-        Historical events.jsonl files stored req_refs as a list of bare
-        strings (e.g. ``["CWE-89", "CISQ"]``) before the ReqRef struct was
-        introduced. Strict validation rejected the whole event, which made
-        EventLogReader silently skip it — producing empty grade tables and
-        nonsensical scores for any pre-refactor run.
-
-        Coerce strings to ``ReqRef(label=<string>, url="")`` so legacy events
-        round-trip cleanly. The empty url means the UI's filterValidRefs()
-        drops them from links (it requires http(s)://), which is the right
-        behaviour: there is no URL to recover.
-        """
-        if not isinstance(value, list):
-            return value
-        coerced = []
-        for item in value:
-            if isinstance(item, str):
-                coerced.append(ReqRef(label=item, url=""))
-            else:
-                coerced.append(item)
-        return coerced
-
     def is_violation(self) -> bool:
         return self.verdict == "violation"
 
@@ -118,14 +91,16 @@ class Judgment(BaseModel):
 JudgmentPayload = Judgment
 
 
+@dataclass(frozen=True, kw_only=True)
 class JudgmentCreatedEvent(BaseEvent[Judgment]):
     """Event emitted whenever a new judgment is found and recorded."""
+
     event_type: EventType = EventType.JUDGMENT_CREATED
 
 
-class FindingDismissed(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class FindingDismissed:
     """User dismissed a finding identified by (req, file, line)."""
-    model_config = ConfigDict(frozen=True)
 
     req: str
     file: str
@@ -133,26 +108,28 @@ class FindingDismissed(BaseModel):
     reason: Optional[str] = None
 
 
-class FindingUndismissed(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class FindingUndismissed:
     """User restored a previously dismissed finding."""
-    model_config = ConfigDict(frozen=True)
 
     req: str
     file: str
     line: int
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingDismissedEvent(BaseEvent[FindingDismissed]):
     event_type: EventType = EventType.FINDING_DISMISSED
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingUndismissedEvent(BaseEvent[FindingUndismissed]):
     event_type: EventType = EventType.FINDING_UNDISMISSED
 
 
-class FindingVerified(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class FindingVerified:
     """User confirmed a finding is a real defect, identified by (req, file, line)."""
-    model_config = ConfigDict(frozen=True)
 
     req: str
     file: str
@@ -160,19 +137,21 @@ class FindingVerified(BaseModel):
     note: Optional[str] = None
 
 
-class FindingUnverified(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class FindingUnverified:
     """User cleared a previously verified badge."""
-    model_config = ConfigDict(frozen=True)
 
     req: str
     file: str
     line: int
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingVerifiedEvent(BaseEvent[FindingVerified]):
     event_type: EventType = EventType.FINDING_VERIFIED
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingUnverifiedEvent(BaseEvent[FindingUnverified]):
     event_type: EventType = EventType.FINDING_UNVERIFIED
 
@@ -185,4 +164,14 @@ EVENT_MODEL_MAP: Dict[EventType, type[BaseEvent]] = {
     EventType.FINDING_UNDISMISSED: FindingUndismissedEvent,
     EventType.FINDING_VERIFIED: FindingVerifiedEvent,
     EventType.FINDING_UNVERIFIED: FindingUnverifiedEvent,
+}
+
+# Payload class per event type. The decoder (data.events.codec) uses it to
+# construct the nested payload dataclass for each event model.
+PAYLOAD_MODEL_MAP: Dict[EventType, type] = {
+    EventType.JUDGMENT_CREATED: Judgment,
+    EventType.FINDING_DISMISSED: FindingDismissed,
+    EventType.FINDING_UNDISMISSED: FindingUndismissed,
+    EventType.FINDING_VERIFIED: FindingVerified,
+    EventType.FINDING_UNVERIFIED: FindingUnverified,
 }

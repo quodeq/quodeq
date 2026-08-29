@@ -2,9 +2,17 @@
 
 These produce the same numeric results as services/rescore.py because they
 call the same scoring primitives. Inputs assume dismissed findings have been
-filtered upstream (the projector reads ``WHERE verdict != 'dismissed'`` from SQL).
+filtered upstream by the caller.
 
-Output dicts match the row shape expected by SQLiteStateStore writers.
+Output dicts are the neutral domain result contract; persistence adapters
+map them to their own schema (never the other way round):
+
+- principle grade (``compute_principle_grade``):
+  ``principle_id``, ``score``, ``grade``, ``finding_count``, ``dismissed_count``
+- dimension score (``compute_dimension_score``):
+  ``dimension``, ``score``, ``grade``
+- run score (``compute_run_score``):
+  ``score``, ``grade``
 """
 from __future__ import annotations
 
@@ -75,7 +83,8 @@ def compute_principle_grade(
     but ``Insufficient`` in the CLI's evaluation JSON — and the
     dashboard's overlaid SQL grades drifted away from the CLI's report.
 
-    Returns a dict suitable for SQLiteStateStore.record_principle_grade.
+    Returns a principle-grade result dict (keys listed in the module
+    docstring).
     """
     if not findings and not compliance:
         return {

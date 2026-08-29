@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { registerProject, listStandards, getProjectInfo } from '../../../api/index.js';
+import { registerProject, listStandards, getProjectInfo, getProjectScan } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
@@ -52,8 +52,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   useEffect(() => {
     if (!entry.presetProjectId) return;
     // Fetch the project's scan data so the resume flow shows the same summary.
-    fetch(`/api/projects/${encodeURIComponent(entry.presetProjectId)}/scan`)
-      .then((res) => res.ok ? res.json() : null)
+    getProjectScan(entry.presetProjectId)
       .then((scan) => {
         if (!scan) return;
         wizard.succeedScan(entry.presetProjectId, scan);

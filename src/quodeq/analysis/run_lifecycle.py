@@ -1,4 +1,11 @@
-"""RunLifecycleContext — unifies status + heartbeat + signal handlers + atexit + exception mapping.
+"""RunLifecycleContext — the run's lifecycle context manager.
+
+Composed from collaborators that each own one concern: ``_StatusWriter``
+(every status.json write), ``_SignalGuard`` (install/restore of the run's
+signal handlers), ``_AtexitGuard`` (the process-exit fallback hook), plus the
+shared heartbeat/resource samplers. The context wires them together and keeps
+the exception→state mapping in ``__exit__`` — deciding which terminal state
+an exit maps to is the context manager's own job.
 
 Intended usage:
 
@@ -47,8 +54,101 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+class _StatusWriter:
+    """Owns every status.json write for one run.
+
+    The run's identity (dir, job, start time, dimensions) is fixed at
+    construction; the presentation fields (phase, deadline, ...) are plain
+    mutable attributes the context updates as the run progresses. ``write``
+    is the single place that knows the full status row, so the normal-path,
+    signal-path, and atexit-path writes cannot drift apart.
+    """
+
+    def __init__(
+        self,
+        run_dir: Path,
+        job_id: str,
+        dimensions: list[str],
+        *,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
+    ) -> None:
+        self.run_dir = run_dir
+        self.job_id = job_id
+        self.started_at = _now_iso()
+        self.dimensions = list(dimensions)
+        self.phase: str | None = None
+        self.current_dimension: str | None = None
+        self.deadline_at: str | None = None
+        self.time_limit_s: int | None = None
+        self.ai_provider = ai_provider
+        self.ai_model = ai_model
+
+    def write(self, state: RunState, *, exit_reason: str | None = None) -> None:
+        write_status(
+            self.run_dir,
+            state=state,
+            job_id=self.job_id,
+            started_at=self.started_at,
+            dimensions=self.dimensions,
+            phase=self.phase,
+            current_dimension=self.current_dimension,
+            exit_reason=exit_reason,
+            deadline_at=self.deadline_at,
+            ai_provider=self.ai_provider,
+            ai_model=self.ai_model,
+            time_limit_s=self.time_limit_s,
+        )
+
+
+class _SignalGuard:
+    """Install *handler* on the run's signals; restore the originals after."""
+
+    def __init__(self, handler: Any) -> None:
+        self._handler = handler
+        self._previous: dict[int, Any] = {}
+
+    def install(self) -> None:
+        for sig in _SIGNALS_TO_HANDLE:
+            try:
+                self._previous[sig] = signal.getsignal(sig)
+                signal.signal(sig, self._handler)
+            except (OSError, ValueError):
+                # Can fail in non-main threads; tests may run under such a case.
+                pass
+
+    def restore(self) -> None:
+        for sig, prev in self._previous.items():
+            try:
+                signal.signal(sig, prev)
+            except (OSError, ValueError):
+                pass
+        self._previous.clear()
+
+
+class _AtexitGuard:
+    """Register *callback* with atexit once, and deregister it once."""
+
+    def __init__(self, callback: Any) -> None:
+        self._callback = callback
+        self._registered = False
+
+    def register(self) -> None:
+        atexit.register(self._callback)
+        self._registered = True
+
+    def deregister(self) -> None:
+        if not self._registered:
+            return
+        try:
+            atexit.unregister(self._callback)
+        except Exception:
+            pass
+        self._registered = False
+
+
 class RunLifecycleContext:
-    """Context manager bundling lifecycle state + heartbeat + signals + atexit."""
+    """Context manager composing status writes, heartbeat, signals, and atexit."""
 
     def __init__(
         self,
@@ -61,20 +161,16 @@ class RunLifecycleContext:
         ai_model: str | None = None,
     ) -> None:
         self._run_dir = run_dir
-        self._job_id = job_id
         self._dimensions = list(dimensions)
-        self._started_at = _now_iso()
         self._current_state = RunState.PENDING
-        self._phase: str | None = None
-        self._current_dimension: str | None = None
-        self._deadline_at: str | None = None
-        self._time_limit_s: int | None = None
-        self._ai_provider = ai_provider
-        self._ai_model = ai_model
+        self._status = _StatusWriter(
+            run_dir, job_id, dimensions,
+            ai_provider=ai_provider, ai_model=ai_model,
+        )
         self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
         self._resources = ResourceSampler()
-        self._previous_handlers: dict[int, Any] = {}
-        self._atexit_registered = False
+        self._signals = _SignalGuard(self._handle_signal)
+        self._atexit = _AtexitGuard(self._finalize_on_atexit)
         self._pending_exit_reason: str | None = None
 
     # ---- Context protocol --------------------------------------------------
@@ -86,9 +182,8 @@ class RunLifecycleContext:
         # treat its existence as "safe to signal", so a SIGTERM landing in the
         # gap would hit the default handler and kill the run with the status
         # stuck at pending.
-        self._install_signal_handlers()
-        atexit.register(self._finalize_on_atexit)
-        self._atexit_registered = True
+        self._signals.install()
+        self._atexit.register()
         self._write(RunState.PENDING)
         self._seed_dimension_states()
         self._transition(RunState.RUNNING)
@@ -154,8 +249,8 @@ class RunLifecycleContext:
             if self._current_state not in TERMINAL_STATES:
                 exc_name = exc_type.__name__ if exc_type else "UnknownError"
                 self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
-        self._restore_signal_handlers()
-        self._deregister_atexit()
+        self._signals.restore()
+        self._atexit.deregister()
         return False  # never swallow exceptions
 
     # ---- Transition API ----------------------------------------------------
@@ -164,13 +259,13 @@ class RunLifecycleContext:
         self._transition(RunState.FINALIZING)
 
     def set_phase(self, phase: str | None, current_dimension: str | None = None) -> None:
-        self._phase = phase
-        self._current_dimension = current_dimension
+        self._status.phase = phase
+        self._status.current_dimension = current_dimension
         self._write(self._current_state)
 
     def set_deadline(self, deadline_at: str | None) -> None:
         """Record the run-level deadline. Visible immediately in status.json."""
-        self._deadline_at = deadline_at
+        self._status.deadline_at = deadline_at
         self._write(self._current_state)
 
     def set_time_limit(self, seconds: int | None) -> None:
@@ -180,7 +275,7 @@ class RunLifecycleContext:
         dashboard runs after a server restart) can surface the budget the
         run was actually started with.
         """
-        self._time_limit_s = seconds
+        self._status.time_limit_s = seconds
         self._write(self._current_state)
 
     def set_exit_reason(self, reason: str | None) -> None:
@@ -201,20 +296,7 @@ class RunLifecycleContext:
         self._write(new_state, exit_reason=exit_reason)
 
     def _write(self, state: RunState, *, exit_reason: str | None = None) -> None:
-        write_status(
-            self._run_dir,
-            state=state,
-            job_id=self._job_id,
-            started_at=self._started_at,
-            dimensions=self._dimensions,
-            phase=self._phase,
-            current_dimension=self._current_dimension,
-            exit_reason=exit_reason,
-            deadline_at=self._deadline_at,
-            ai_provider=self._ai_provider,
-            ai_model=self._ai_model,
-            time_limit_s=self._time_limit_s,
-        )
+        self._status.write(state, exit_reason=exit_reason)
 
     def _seed_dimension_states(self) -> None:
         """Initialise dimensions.json with one PENDING entry per dim."""
@@ -243,10 +325,10 @@ class RunLifecycleContext:
 
     def _deadline_has_passed(self) -> bool:
         """True when the run's own deadline is set and already behind us."""
-        if not self._deadline_at:
+        if not self._status.deadline_at:
             return False
         try:
-            deadline = datetime.fromisoformat(self._deadline_at)
+            deadline = datetime.fromisoformat(self._status.deadline_at)
         except (TypeError, ValueError):
             return False
         if deadline.tzinfo is None:
@@ -282,63 +364,33 @@ class RunLifecycleContext:
                     _logger.warning("failed to mark dim %s incomplete: %s", dim, exc)
         return flipped
 
-    def _install_signal_handlers(self) -> None:
-        def _handle(signum: int, frame: Any) -> None:
-            try:
-                name = signal.Signals(signum).name
-            except ValueError:
-                name = f"signal_{signum}"
-            # A signal landing AFTER the run's own deadline is the watchdog
-            # enforcing the time budget (SIGTERM at deadline+grace), not a
-            # user cancel. Label it "deadline" — the UI maps that to "time
-            # limit reached", not an error — and close out running dims. The
-            # state stays CANCELLED either way: salvage scoring triggers key
-            # off terminal failed/cancelled and must keep firing.
-            deadline_enforced = self._deadline_has_passed()
-            exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
-            # Signal worker threads (subagent pool, AI CLI subprocess monitors)
-            # to stop waiting on long-running operations and terminate promptly.
-            cancellation.request_cancel()
-            # Avoid using the transition-validating path — we may be mid-state.
-            self._heartbeat.stop()
-            self._resources.stop()
-            write_status(
-                self._run_dir,
-                state=RunState.CANCELLED,
-                job_id=self._job_id,
-                started_at=self._started_at,
-                dimensions=self._dimensions,
-                phase=self._phase,
-                current_dimension=self._current_dimension,
-                exit_reason=exit_reason,
-                deadline_at=self._deadline_at,
-                ai_provider=self._ai_provider,
-                ai_model=self._ai_model,
-                time_limit_s=self._time_limit_s,
-            )
-            self._current_state = RunState.CANCELLED
-            # Close out every unfinished dim, not just on the deadline path: a
-            # plain cancel left the in-flight dimension stuck at 'running' and
-            # the untouched ones at 'pending' for the life of the run dir.
-            self._mark_unfinished_dims_incomplete(
-                "time_limit" if deadline_enforced else "cancelled")
-            raise SystemExit(128 + signum)
-
-        for sig in _SIGNALS_TO_HANDLE:
-            try:
-                self._previous_handlers[sig] = signal.getsignal(sig)
-                signal.signal(sig, _handle)
-            except (OSError, ValueError):
-                # Can fail in non-main threads; tests may run under such a case.
-                pass
-
-    def _restore_signal_handlers(self) -> None:
-        for sig, prev in self._previous_handlers.items():
-            try:
-                signal.signal(sig, prev)
-            except (OSError, ValueError):
-                pass
-        self._previous_handlers.clear()
+    def _handle_signal(self, signum: int, frame: Any) -> None:
+        try:
+            name = signal.Signals(signum).name
+        except ValueError:
+            name = f"signal_{signum}"
+        # A signal landing AFTER the run's own deadline is the watchdog
+        # enforcing the time budget (SIGTERM at deadline+grace), not a
+        # user cancel. Label it "deadline" — the UI maps that to "time
+        # limit reached", not an error — and close out running dims. The
+        # state stays CANCELLED either way: salvage scoring triggers key
+        # off terminal failed/cancelled and must keep firing.
+        deadline_enforced = self._deadline_has_passed()
+        exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
+        # Signal worker threads (subagent pool, AI CLI subprocess monitors)
+        # to stop waiting on long-running operations and terminate promptly.
+        cancellation.request_cancel()
+        # Avoid using the transition-validating path — we may be mid-state.
+        self._heartbeat.stop()
+        self._resources.stop()
+        self._status.write(RunState.CANCELLED, exit_reason=exit_reason)
+        self._current_state = RunState.CANCELLED
+        # Close out every unfinished dim, not just on the deadline path: a
+        # plain cancel left the in-flight dimension stuck at 'running' and
+        # the untouched ones at 'pending' for the life of the run dir.
+        self._mark_unfinished_dims_incomplete(
+            "time_limit" if deadline_enforced else "cancelled")
+        raise SystemExit(128 + signum)
 
     def _finalize_on_atexit(self) -> None:
         current = read_status(self._run_dir)
@@ -350,26 +402,4 @@ class RunLifecycleContext:
         # We exited without a terminal state — write cancelled.
         self._heartbeat.stop()
         self._resources.stop()
-        write_status(
-            self._run_dir,
-            state=RunState.CANCELLED,
-            job_id=self._job_id,
-            started_at=self._started_at,
-            dimensions=self._dimensions,
-            phase=self._phase,
-            current_dimension=self._current_dimension,
-            exit_reason="atexit_unfinalized",
-            deadline_at=self._deadline_at,
-            ai_provider=self._ai_provider,
-            ai_model=self._ai_model,
-            time_limit_s=self._time_limit_s,
-        )
-
-    def _deregister_atexit(self) -> None:
-        if not self._atexit_registered:
-            return
-        try:
-            atexit.unregister(self._finalize_on_atexit)
-        except Exception:
-            pass
-        self._atexit_registered = False
+        self._status.write(RunState.CANCELLED, exit_reason="atexit_unfinalized")

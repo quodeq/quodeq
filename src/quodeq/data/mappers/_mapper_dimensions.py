@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .dimension import DimensionResult, DimensionSummary, GradeBreakdown
-from .report import PrincipleGrade
+from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
+from quodeq.core.types.report import PrincipleGrade
 
 from ._mapper_helpers import (
     _bool,

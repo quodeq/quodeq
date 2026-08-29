@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 
 from quodeq.shared._env import _env_int
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
@@ -50,11 +50,11 @@ class AnalysisConfig:
     work_dir: Path | None = None
     context_size: int = 0
     # Optional ``RunConfig`` carrier so the API path can build a per-file
-    # cache writer (Task 3.5). Typed loosely to avoid a circular import:
-    # ``_types`` imports from ``subprocess`` which re-exports ``HeartbeatCallback``
-    # from this module. Stored as ``Any`` and read back as a ``RunConfig`` by
-    # the API runner. ``None`` keeps legacy callers (no cache writes) working.
-    run_config: Any = None
+    # cache writer (Task 3.5). ``None`` keeps legacy callers (no cache
+    # writes) working. The import stays under TYPE_CHECKING (annotations are
+    # lazy via ``from __future__ import annotations``) so ``_types`` can
+    # import this module at runtime without a cycle.
+    run_config: RunConfig | None = None
 
 
 @dataclass(frozen=True)

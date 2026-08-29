@@ -96,36 +96,32 @@ def test_discard_blocked_while_turn_in_flight(app, client, repo):
     # was the only mutating workspace route with no turn-slot claim. A held
     # slot must 409 discard and leave the worktree intact.
     sid, store, manager = _session_with_worktree(app, client, repo)
-    import quodeq.api.assistant_routes as ar
-    with ar._running_lock:
-        ar._running_turns.add(sid)
+    state = app.extensions["assistant_turns"]
+    assert state.try_claim_turn(sid)
     try:
         resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
         assert resp.status_code == 409
         assert manager.path.exists()
         assert store.get_worktree(sid)["status"] == "active"
     finally:
-        with ar._running_lock:
-            ar._running_turns.discard(sid)
+        state.release_turn(sid)
 
 
 def test_discard_claims_turn_slot_and_releases(app, client, repo, monkeypatch):
     sid, store, _ = _session_with_worktree(app, client, repo)
-    import quodeq.api.assistant_routes as ar
+    state = app.extensions["assistant_turns"]
     from quodeq.assistant.worktree import WorktreeManager
     seen = {}
     orig = WorktreeManager.remove
 
     def spy(self, delete_branch=True):
-        with ar._running_lock:
-            seen["claimed"] = sid in ar._running_turns
+        seen["claimed"] = state.is_turn_claimed(sid)
         return orig(self, delete_branch=delete_branch)
 
     monkeypatch.setattr(WorktreeManager, "remove", spy)
     resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
     assert resp.status_code == 200 and seen["claimed"] is True
-    with ar._running_lock:
-        assert sid not in ar._running_turns  # released after
+    assert not state.is_turn_claimed(sid)  # released after
 
 
 def test_pr_fail_soft_keeps_branch(app, client, repo, monkeypatch):
@@ -140,33 +136,29 @@ def test_pr_fail_soft_keeps_branch(app, client, repo, monkeypatch):
 
 def test_apply_blocked_while_turn_in_flight(app, client, repo, monkeypatch):
     sid, store, _ = _session_with_worktree(app, client, repo)
-    import quodeq.api.assistant_routes as ar
-    with ar._running_lock:
-        ar._running_turns.add(sid)
+    state = app.extensions["assistant_turns"]
+    assert state.try_claim_turn(sid)
     try:
         resp = client.post(f"/api/assistant/sessions/{sid}/workspace/apply")
         assert resp.status_code == 409
         assert store.get_worktree(sid)["status"] == "active"
     finally:
-        with ar._running_lock:
-            ar._running_turns.discard(sid)
+        state.release_turn(sid)
 
 
 def test_apply_claims_turn_slot_during_apply_and_releases(app, client, repo, monkeypatch):
     sid, store, _ = _session_with_worktree(app, client, repo)
-    import quodeq.api.assistant_routes as ar
+    state = app.extensions["assistant_turns"]
     from quodeq.assistant.worktree import WorktreeManager
     seen = {}
     orig = WorktreeManager.apply_to_repo
     def spy(self):
-        with ar._running_lock:
-            seen["claimed"] = sid in ar._running_turns
+        seen["claimed"] = state.is_turn_claimed(sid)
         return orig(self)
     monkeypatch.setattr(WorktreeManager, "apply_to_repo", spy)
     resp = client.post(f"/api/assistant/sessions/{sid}/workspace/apply")
     assert resp.status_code == 200 and seen["claimed"] is True
-    with ar._running_lock:
-        assert sid not in ar._running_turns  # released after
+    assert not state.is_turn_claimed(sid)  # released after
 
 
 def test_apply_survives_remove_failure(app, client, repo, monkeypatch):

@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
@@ -47,11 +50,16 @@ def score_dimension_from_evidence(
     source_file_count: int,
     files_read: int,
     params: ScoringParams,
+    standard_dirs_fn: Callable[[], tuple[Path | None, Path | None]] | None = None,
 ) -> ScoringResult | None:
     """Score `dim_id` from run_dir's evidence jsonl, excluding suppressed findings.
 
     Returns None when the evidence file is missing/empty/unparseable so the
     caller can fall back to the legacy in-place formula.
+
+    *standard_dirs_fn* resolves ``(compiled_dir, evaluators_dir)``; None keeps
+    the module-level :func:`standard_dirs` (global config resolution) so
+    existing callers stay valid while tests can substitute fixed dirs.
     """
     # dim_id / run_dir are built from request-supplied values. Guard with the
     # path-injection remediation CodeQL recommends: normalize with
@@ -68,12 +76,14 @@ def score_dimension_from_evidence(
     jsonl = Path(candidate)
     if not jsonl.is_file() or jsonl.stat().st_size == 0:
         return None
-    compiled_dir, evaluators_dir = standard_dirs()
+    compiled_dir, evaluators_dir = (standard_dirs_fn or standard_dirs)()
     try:
         evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=source_file_count, files_read=files_read,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+            req_map_reader=read_req_to_principle_map,
+            cwe_url_template=cwe_url_template())
     except (OSError, ValueError, KeyError) as exc:
         _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None

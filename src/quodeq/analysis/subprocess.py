@@ -12,7 +12,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from quodeq.analysis._command import (
@@ -273,8 +273,14 @@ _CREDENTIAL_LOADERS: dict[str, Callable[[], str | None]] = {
 }
 
 
-def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
+def _resolve_provider_config(
+    cfg: AnalysisConfig, env: Mapping[str, str],
+) -> tuple[str, str, str]:
     """Look up model, api_base, and api_key from provider config.
+
+    Credentials come from *env*, injected by the public entry point
+    (``run_analysis``) so this resolution logic never touches process-global
+    environment state itself.
 
     Raises AnalysisError if model or api_base are missing.
     """
@@ -285,7 +291,7 @@ def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
     model = cfg.ai_model or provider_cfg.get("model", "")
     api_base = provider_cfg.get("api_base", "")
     api_key_env = provider_cfg.get("api_key_env", "")
-    api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    api_key = env.get(api_key_env, "") if api_key_env else ""
     if not api_key:
         loader = _CREDENTIAL_LOADERS.get(ai_cmd)
         if loader is not None:
@@ -390,6 +396,7 @@ def _batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
 
 def _run_api_analysis_bridge(
     work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
+    env: Mapping[str, str],
 ) -> None:
     """Run analysis via direct API call (new behavior).
 
@@ -400,7 +407,7 @@ def _run_api_analysis_bridge(
     """
     from quodeq.analysis import _api_runner
 
-    model, api_base, api_key = _resolve_provider_config(cfg)
+    model, api_base, api_key = _resolve_provider_config(cfg, env)
 
     jsonl_file = cfg.jsonl_file
     if jsonl_file is None:
@@ -474,13 +481,19 @@ def _run_api_analysis_bridge(
 def run_analysis(
     work_dir: Path, prompt: str, stream_file: Path,
     config: AnalysisConfig | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
-    """Run AI analysis, dispatching to CLI or API runner based on provider type."""
+    """Run AI analysis, dispatching to CLI or API runner based on provider type.
+
+    *env* supplies provider credentials; the default is resolved here, at the
+    public boundary, so the resolution logic below stays injectable.
+    """
     cfg = config or AnalysisConfig()
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
     provider_type = _get_provider_type(ai_cmd)
 
     if provider_type == "api":
-        _run_api_analysis_bridge(work_dir, prompt, stream_file, cfg)
+        _run_api_analysis_bridge(work_dir, prompt, stream_file, cfg,
+                                 os.environ if env is None else env)
     else:
         _run_cli_analysis(work_dir, prompt, stream_file, cfg)

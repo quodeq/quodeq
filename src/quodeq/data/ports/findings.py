@@ -21,12 +21,21 @@ class FindingsRepository(Protocol):
         """Return all findings for a dimension."""
         ...
 
+    def list_all(self) -> list[Finding]:
+        """Return every finding regardless of dimension, in insertion order."""
+        ...
+
     def count_by_dimension(self) -> dict[str, int]:
         """Return total finding counts grouped by dimension."""
         ...
 
-    def search(self, query: str, limit: int = 100) -> list[Finding]:
-        """FTS5 search across reason and snippet."""
+    def search(self, query: str, limit: int = 100, *,
+               exclude_dimensions: list[str] | None = None) -> list[Finding]:
+        """FTS5 search across reason and snippet.
+
+        ``exclude_dimensions`` drops whole dimensions from the result BEFORE
+        the limit is applied (case-insensitive match on the stored dimension).
+        """
         ...
 
     def set_verdict(self, *, practice_id: str, file: str, line: int, verdict: str) -> int:

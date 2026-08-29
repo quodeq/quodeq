@@ -17,7 +17,7 @@ from quodeq.assistant.skills import load_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.assistant.tools._write_tools import register_write_tools
 from quodeq.assistant.worktree import ensure_session_worktree
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from quodeq.data.ports.assistant import AssistantStore
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 
 _logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
     return args
 
 
-def run_turn(request: TurnRequest, *, repository: AssistantRepository,
+def run_turn(request: TurnRequest, *, repository: AssistantStore,
              tool_ctx: ToolContext, turn_fn=None, capability_fn=None,
              cli_turn_fn=None, cancel: CancelToken | None = None) -> None:
     turn_fn = turn_fn or run_api_turn

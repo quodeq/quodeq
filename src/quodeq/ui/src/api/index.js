@@ -61,6 +61,22 @@ export async function getProjectInfo(projectId) {
 }
 
 /**
+ * Scan summary for a registered project (file counts, languages, branches).
+ *
+ * `signal` lets a caller cap the wait with its own AbortSignal (e.g.
+ * `AbortSignal.timeout(...)`); pass a matching `timeout` alongside it when
+ * the cap exceeds request()'s 30s default, or the internal timer aborts
+ * first. Rejects on any non-2xx response, like every other adapter call.
+ *
+ * @param {string} projectId
+ * @param {{ signal?: AbortSignal, timeout?: number }} [options]
+ * @returns {Promise<Object>} raw scan payload
+ */
+export function getProjectScan(projectId, { signal, timeout } = {}) {
+  return request(`/projects/${encodeURIComponent(projectId)}/scan`, { signal, timeout });
+}
+
+/**
  * @param {string} projectId
  * @returns {Promise<Object>}
  */

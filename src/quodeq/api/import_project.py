@@ -14,6 +14,7 @@ import shutil
 import tempfile
 import uuid as _uuid
 import zipfile
+from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,23 @@ _MAX_PATH_DEPTH = 64  # limit on path components to bound recursion-style attack
 _ACTION_REPLACE = "replace"
 _ACTION_COPY = "copy"
 _ALLOWED_ACTIONS = frozenset({_ACTION_REPLACE, _ACTION_COPY})
+
+
+@dataclass(frozen=True)
+class ImportOutcome:
+    """Plain result of :func:`import_zip_stream`: HTTP status + JSON-safe body.
+
+    Framework-free by design — the Flask wrappers (``import_project`` here,
+    ``shared_pull`` in routes_shared) convert it via ``jsonify`` exactly once.
+    """
+
+    status: int
+    body: dict[str, Any]
+
+
+def _error_outcome(message: str, status: int, code: str) -> ImportOutcome:
+    body, http_status = error_response(message, status, code)
+    return ImportOutcome(http_status, body)
 
 
 class _ImportError(Exception):
@@ -241,7 +259,7 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
 def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
     """Walk existing projects to see if any other UUID matches this identity.
 
-    Mirrors ``routes_project_list._find_existing_project`` but takes a
+    Mirrors ``services._fs_project_helpers.find_existing_project`` but takes a
     ``ProjectIdentity`` directly and ignores the candidate UUID being imported.
     """
     if not reports_root.is_dir():
@@ -323,10 +341,9 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
           collision returned from a previous attempt.
 
     Parses the multipart request for file and action parameters, then
-    delegates validation and extraction to ``import_zip_stream``. The zip
-    stream itself has no dependency on request.files/request.form, but this
-    handler must run inside a Flask request context to access request.form
-    and request.remote_addr for logging.
+    delegates validation and extraction to ``import_zip_stream`` and converts
+    its plain ``ImportOutcome`` to a Flask response — the single place this
+    route touches ``jsonify``.
     """
     upload = request.files.get("file")
     if upload is None or not upload.filename:
@@ -334,43 +351,46 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
         return jsonify(body), status
 
     action = (request.form.get("action") or "").strip().lower() or None
-    return import_zip_stream(upload, reports_dir, action)
+    outcome = import_zip_stream(upload, reports_dir, action, remote_addr=request.remote_addr)
+    return jsonify(outcome.body), outcome.status
 
 
-def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Response | tuple[Response, int]:
+def import_zip_stream(
+    stream: Any, reports_dir: str, action: str | None, *,
+    remote_addr: str | None = None,
+) -> ImportOutcome:
     """Validate and materialize a project zip *stream* into *reports_dir*.
 
     Contains all the hardened validation (path traversal, zip-bomb ratio,
     symlinks, member limits, collision handling) that used to live directly
     in ``import_project``. *stream* is anything with a ``.read(n)`` method
     (a Werkzeug ``FileStorage``, an ``io.BytesIO``, or a plain file handle) —
-    this function never touches ``flask.request.files``, so it is callable
-    from any caller that already has zip bytes, such as the shared-repo
-    "pull local copy" route.
+    this function never touches Flask, so it is callable from any caller that
+    already has zip bytes, such as the shared-repo "pull local copy" route.
+    It returns a plain :class:`ImportOutcome`; the caller decides how to
+    deliver it.
 
     *action* is optional, ``"replace"`` or ``"copy"`` to resolve a 409
-    collision returned from a previous attempt.
+    collision returned from a previous attempt. *remote_addr* is only for the
+    success audit log; HTTP callers pass the request's remote address.
     """
     if action is not None and action not in _ALLOWED_ACTIONS:
-        body, status = error_response(
+        return _error_outcome(
             f"Invalid action; expected one of {sorted(_ALLOWED_ACTIONS)}.",
             HTTPStatus.BAD_REQUEST, "INVALID_ACTION",
         )
-        return jsonify(body), status
 
     size_limit = _max_zip_size_bytes()
     raw = stream.read(size_limit + 1)
     if len(raw) > size_limit:
-        body, status = error_response(
+        return _error_outcome(
             f"Archive exceeds the {size_limit // (1024 * 1024)} MB import limit.",
             HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE",
         )
-        return jsonify(body), status
 
     reports_root = Path(reports_dir).resolve()
     if not reports_root.is_dir():
-        body, status = error_response("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
-        return jsonify(body), status
+        return _error_outcome("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
 
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
@@ -406,13 +426,13 @@ def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Resp
                 elif action == _ACTION_COPY:
                     target_uuid = str(_uuid.uuid4())
                 else:
-                    return jsonify({
+                    return ImportOutcome(HTTPStatus.CONFLICT, {
                         "error": "Project already exists",
                         "code": "PROJECT_EXISTS",
                         "kind": "same_uuid",
                         "existingProjectId": top_dir,
                         "projectName": identity.project_name,
-                    }), HTTPStatus.CONFLICT
+                    })
             elif same_identity_uuid is not None:
                 if action == _ACTION_COPY:
                     # No UUID collision, so the incoming UUID is fine — both
@@ -421,20 +441,19 @@ def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Resp
                 elif action == _ACTION_REPLACE:
                     # 'replace' on identity collision is ambiguous (two UUIDs
                     # for the same repo). Refuse rather than guess.
-                    body, status = error_response(
+                    return _error_outcome(
                         "Cannot replace: a different project with the same repo identity already exists. "
                         "Use 'copy' to import as a separate project.",
                         HTTPStatus.CONFLICT, "AMBIGUOUS_REPLACE",
                     )
-                    return jsonify(body), status
                 else:
-                    return jsonify({
+                    return ImportOutcome(HTTPStatus.CONFLICT, {
                         "error": "A project for this repository already exists",
                         "code": "PROJECT_EXISTS",
                         "kind": "same_identity",
                         "existingProjectId": same_identity_uuid,
                         "projectName": identity.project_name,
-                    }), HTTPStatus.CONFLICT
+                    })
 
             # Stage the extraction in a sibling tmpdir so commit is a single rename.
             staging = Path(tempfile.mkdtemp(prefix="quodeq_import_", dir=str(reports_root)))
@@ -456,27 +475,24 @@ def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Resp
             _update_index(reports_root, identity, target_uuid)
 
     except _ImportError as exc:
-        body, status = error_response(str(exc), exc.status, exc.code)
-        return jsonify(body), status
+        return _error_outcome(str(exc), exc.status, exc.code)
     except zipfile.BadZipFile:
-        body, status = error_response(
+        return _error_outcome(
             "File is not a valid zip archive.",
             HTTPStatus.BAD_REQUEST, "BAD_ZIP",
         )
-        return jsonify(body), status
     except OSError as exc:
         _logger.warning("import: filesystem error: %s", exc)
-        body, status = error_response(
+        return _error_outcome(
             "Failed to write imported project. Check disk space and permissions.",
             HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
         )
-        return jsonify(body), status
 
     _logger.info(
         "import_project: source_uuid=%s target_uuid=%s action=%s remote_addr=%s",
-        top_dir, target_uuid, action, request.remote_addr,
+        top_dir, target_uuid, action, remote_addr,
     )
-    return jsonify({
+    return ImportOutcome(HTTPStatus.OK, {
         "imported": True,
         "projectId": target_uuid,
         "sourceProjectId": top_dir,
@@ -486,4 +502,4 @@ def import_zip_stream(stream: Any, reports_dir: str, action: str | None) -> Resp
 
 
 # Re-export for routing module.
-__all__ = ["import_project", "import_zip_stream"]
+__all__ = ["ImportOutcome", "import_project", "import_zip_stream"]

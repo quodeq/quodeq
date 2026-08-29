@@ -603,9 +603,47 @@ class TestBundledStandard:
     def test_the_context_parses_the_tree_once_per_context(self, project):
         """Three checkers over one context must not be three walks of the tree."""
         from quodeq.analysis.checks.registry import CheckContext
+        from quodeq.data.fs.import_graph import build_import_graph
+        from quodeq.data.fs.symbol_uses import build_symbol_uses
 
         context = CheckContext(root=project, source_files=SOURCES,
-                               dimension="clean-architecture")
+                               dimension="clean-architecture",
+                               graph_builder=build_import_graph,
+                               symbol_uses_builder=build_symbol_uses)
 
         assert context.graph() is context.graph()
         assert context.config_symbol_uses() is context.config_symbol_uses()
+
+    def test_the_context_uses_the_injected_graph_builder(self, tmp_path):
+        """An in-memory graph can be supplied without touching the filesystem."""
+        from quodeq.analysis.checks.registry import CheckContext
+        from quodeq.core.checks.model import ImportGraph
+
+        fake_graph = ImportGraph(first_party=frozenset({"app"}))
+        calls: list[tuple] = []
+
+        def fake_builder(root, paths):
+            calls.append((root, tuple(paths)))
+            return fake_graph
+
+        context = CheckContext(root=tmp_path, source_files=("app/x.py",),
+                               dimension="clean-architecture",
+                               graph_builder=fake_builder)
+
+        assert context.graph() is fake_graph
+        assert context.graph() is fake_graph  # memoised: builder ran once
+        assert len(calls) == 1
+
+    def test_the_context_without_a_builder_refuses_instead_of_reading_disk(self, tmp_path):
+        """No builder injected -> a clear error, never a hidden fs fallback."""
+        import pytest
+
+        from quodeq.analysis.checks.registry import CheckContext
+
+        context = CheckContext(root=tmp_path, source_files=("app/x.py",),
+                               dimension="clean-architecture")
+
+        with pytest.raises(RuntimeError, match="graph_builder"):
+            context.graph()
+        with pytest.raises(RuntimeError, match="symbol_uses_builder"):
+            context.config_symbol_uses()

@@ -133,6 +133,47 @@ class TestDismissedSnippetReaders:
         assert read_semantic_eligible_dismissals(tmp_path) == []
 
 
+class TestReadActiveFindings:
+    """The scores response builder (services.scoring) used to inline this SELECT."""
+
+    def test_returns_only_non_dismissed_rows_in_id_order(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_active_findings
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10)
+        _seed(tmp_path, req="X-2", file="src/b.py", line=20, practice_id="P2",
+              verdict="compliance")
+        _seed(tmp_path, req="X-3", file="src/c.py", line=30, practice_id="P3")
+        store = SQLiteStateStore(tmp_path)
+        store.update_verdict(req="X-3", file="src/c.py", line=30, verdict="dismissed")
+
+        rows = read_active_findings(tmp_path)
+
+        assert [r["requirement"] for r in rows] == ["X-1", "X-2"]
+        assert [r["verdict"] for r in rows] == ["violation", "compliance"]
+
+    def test_row_shape_matches_row_to_finding_contract(self, tmp_path):
+        from quodeq.data.sqlite._row_mappers import row_to_finding
+        from quodeq.data.sqlite.findings_queries import read_active_findings
+
+        _seed(tmp_path)
+        (row,) = read_active_findings(tmp_path)
+
+        assert {
+            "id", "practice_id", "dimension", "requirement", "verdict",
+            "severity", "file", "line", "end_line", "title", "reason",
+            "snippet", "violation_type", "context", "scope", "req_refs_json",
+            "confidence", "provenance_downgrade", "scope_downgrade_json",
+        } <= set(row)
+        f = row_to_finding(row)
+        assert (f.req, f.file, f.line) == ("X-1", "src/a.py", 10)
+        assert f.dimension == "clean-architecture"
+
+    def test_empty_db_returns_no_rows(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_active_findings
+
+        assert read_active_findings(tmp_path) == []
+
+
 def test_precedent_carries_no_database_dependency():
     """context/precedent.py must not import the sqlite connection helper."""
     import quodeq.context.precedent as precedent

@@ -23,7 +23,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum as _Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import httpx
 import openai
@@ -547,6 +547,59 @@ def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[d
 # Public entry point
 # ---------------------------------------------------------------------------
 
+def _derive_run_paths(jsonl_file: Path) -> tuple[Path | None, Path | None]:
+    """``(project_dir, run_dir)`` derived from the evidence file location.
+
+    *jsonl_file* is ``<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl``,
+    so the project directory is its great-grandparent and the run directory
+    its grandparent. Used by the context-enricher pipeline to load prior
+    dismissals as precedents (fingerprints and, when the semantic-precedents
+    flag is on, the embedded corpus).
+    """
+    project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
+    run_dir = jsonl_file.parent.parent if jsonl_file else None
+    return project_dir, run_dir
+
+
+def _build_event_log(run_dir: Path):
+    """EventLogWriter on the run's ``events.jsonl``.
+
+    Lazy import: ``quodeq.data.events`` stays off the import path for
+    callers that never reach the write phase.
+    """
+    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
+    return EventLogWriter(run_dir / "events.jsonl")
+
+
+def _build_cache_writer(
+    run_config: RunConfig | None, dim_id: str | None,
+) -> Callable | None:
+    """The ``on_file_done`` cache-writer closure, or None to skip caching.
+
+    Both *run_config* and *dim_id* are required for the synchronous
+    cache-write path; legacy callers that omit either get None (no cache is
+    written). Imports stay lazy so the cache machinery loads only when the
+    path is actually enabled.
+    """
+    if run_config is None or dim_id is None:
+        return None
+    from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+    model_id = (
+        run_config.options.subagent_model
+        or run_config.options.ai_model
+        or "unknown"
+    )
+    from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
+    return build_cache_writer(
+        cache_root=_dcr(),
+        src_root=run_config.src,
+        standards_dir=run_config.standards_dir,
+        dimension=dim_id,
+        model_id=model_id,
+        language=run_config.language or "",
+    )
+
+
 def run_api_analysis(
     *,
     prompt: str,
@@ -608,13 +661,7 @@ def run_api_analysis(
 
     _infer_end_line(findings)
 
-    # jsonl_file is `<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl`,
-    # so the project directory is its great-grandparent and the run
-    # directory its grandparent. Used by the context-enricher pipeline to
-    # load prior dismissals as precedents (fingerprints and, when the
-    # semantic-precedents flag is on, the embedded corpus).
-    project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
-    run_dir = jsonl_file.parent.parent if jsonl_file else None
+    project_dir, run_dir = _derive_run_paths(jsonl_file)
     ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir, run_dir)
 
     _log.debug(
@@ -624,29 +671,9 @@ def run_api_analysis(
         "error" if was_lossy else "ok",
     )
 
-    events_log = jsonl_file.parent.parent / "events.jsonl"
-
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
-    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
-    event_log = EventLogWriter(events_log)
-
-    cache_writer = None
-    if run_config is not None and dim_id is not None:
-        from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
-        model_id = (
-            run_config.options.subagent_model
-            or run_config.options.ai_model
-            or "unknown"
-        )
-        from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
-        cache_writer = build_cache_writer(
-            cache_root=_dcr(),
-            src_root=run_config.src,
-            standards_dir=run_config.standards_dir,
-            dimension=dim_id,
-            model_id=model_id,
-            language=run_config.language or "",
-        )
+    event_log = _build_event_log(jsonl_file.parent.parent)
+    cache_writer = _build_cache_writer(run_config, dim_id)
 
     with open(jsonl_file, "a", encoding="utf-8") as fh:
         router = FindingsRouter(

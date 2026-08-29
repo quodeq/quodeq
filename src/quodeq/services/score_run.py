@@ -9,10 +9,19 @@ import json
 import logging
 from pathlib import Path
 
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
+from quodeq.services.ports import (
+    dimension_queue_file,
+    list_dimension_evidence,
+    queue_file_exists,
+    read_queue_files_count,
+    read_scan_total_files,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -24,31 +33,14 @@ def _read_queue_files_count(queue_path: Path) -> int:
     ``filesRead: 0``, which the ``scoring_view`` trust rule rejects as
     untrustworthy. Returning the queue's taken count yields a faithful
     coverage figure: every file that was actually dispatched to an agent.
+    The read mechanics live in ``data.fs.run_files``.
     """
-    try:
-        data = json.loads(queue_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
-    taken = data.get("taken") if isinstance(data, dict) else None
-    if not isinstance(taken, list):
-        return 0
-    total = 0
-    for entry in taken:
-        files = entry.get("files") if isinstance(entry, dict) else None
-        if isinstance(files, list):
-            total += len(files)
-    return total
+    return read_queue_files_count(queue_path)
 
 
 def _read_project_source_file_count(reports_dir: str, project: str) -> int:
     """Read ``scan.json`` total_files for the project. Returns 0 on failure."""
-    scan_path = Path(reports_dir) / project / "scan.json"
-    try:
-        data = json.loads(scan_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
-    raw = data.get("total_files") if isinstance(data, dict) else None
-    return int(raw) if isinstance(raw, int) else 0
+    return read_scan_total_files(Path(reports_dir) / project)
 
 
 def score_completed_evidence(reports_dir: str, job: dict) -> None:
@@ -70,9 +62,10 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
 
     _log = _logger
 
-    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
-    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
-    if not evidence_dir.is_dir():
+    run_dir = Path(reports_dir) / project / run_id
+    evaluation_dir = run_dir / "evaluation"
+    evidence_entries = list_dimension_evidence(run_dir)
+    if evidence_entries is None:
         return
 
     evaluation_dir.mkdir(parents=True, exist_ok=True)
@@ -84,29 +77,29 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     compiled_dir, evaluators_dir = standard_dirs()
 
     from quodeq.data.fs.dimensions_state_store import read_dimensions
-    dim_states = read_dimensions(Path(reports_dir) / project / run_id).get("dimensions", {})
+    dim_states = read_dimensions(run_dir).get("dimensions", {})
 
-    for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
-        dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
+    for dim_id, jsonl_path, evidence_size in evidence_entries:
         eval_file = evaluation_dir / f"{dim_id}.json"
         if eval_file.exists():
             continue  # already scored
         if dim_states.get(dim_id, {}).get("state") == "incomplete":
             _logger.info("Skipping scoring for incomplete dim %s", dim_id)
             continue
-        if jsonl_path.stat().st_size == 0:
+        if evidence_size == 0:
             continue  # no findings
         # Only score dimensions that passed verification (analysis queue exists)
-        queue_file = evidence_dir / f"{dim_id}_queue.json"
-        if not queue_file.exists():
+        if not queue_file_exists(run_dir, dim_id):
             continue  # verification not completed for this dimension
 
-        files_read = _read_queue_files_count(queue_file)
+        files_read = _read_queue_files_count(dimension_queue_file(run_dir, dim_id))
         try:
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=source_file_count, files_read=files_read,
-            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+                req_map_reader=read_req_to_principle_map,
+                cwe_url_template=cwe_url_template())
             if evidence is None:
                 continue
             scores = score_evidence(evidence, mode="numerical", params=params)

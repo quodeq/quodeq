@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .job import JobSnapshot
-from .project import ProjectEntry, ProjectMetadata
+from quodeq.core.types.job import JobSnapshot
+from quodeq.core.types.project import ProjectEntry, ProjectMetadata
 
 from ._mapper_helpers import (
     _int,

@@ -8,6 +8,7 @@ callers and patch targets are unchanged.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.core.types import to_camel_dict
@@ -19,6 +20,7 @@ from quodeq.core.types.dimension import DimensionResult, DimensionSummary, Grade
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.ports import GradeTablesReader, read_active_findings, row_to_finding
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.shared.validation import validate_path_segment
@@ -148,20 +150,30 @@ def _build_summary_from_dim_dicts(
     return to_camel_dict(summary)
 
 
+def _default_grade_tables_reader(run_dir: Path) -> GradeTablesReader:
+    """Composition fallback: the concrete SQLite state store.
+
+    The public caller (``scoring.get_scores_raw``) passes ``store_factory``
+    explicitly; this lazy default keeps direct callers of the facade helper
+    working without a module-level SQLite import in the services layer.
+    """
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+    return SQLiteStateStore(run_dir)
+
+
 def _build_response_from_grade_tables(
     run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
+    store_factory: Callable[[Path], GradeTablesReader] | None = None,
 ) -> dict:
     """Build the full scores response from SQL grade tables + findings.
 
-    Reads dimension_scores and principle_grades from the state store, reads
-    active (non-dismissed) findings from the findings table, and assembles
-    the same camelCase dict shape as the legacy rescore path.
+    Reads dimension_scores and principle_grades from the grade-tables reader
+    built by *store_factory* (the SQLite state store by default), reads
+    active (non-dismissed) findings via the adapter-side
+    ``read_active_findings``, and assembles the same camelCase dict shape as
+    the legacy rescore path.
     """
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-    from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-    from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: PLC0415
-
-    store = SQLiteStateStore(run_dir)
+    store = (store_factory or _default_grade_tables_reader)(run_dir)
     dim_rows = store.read_dimension_scores()
     p_rows = store.read_principle_grades()
 
@@ -170,25 +182,10 @@ def _build_response_from_grade_tables(
     for p in p_rows:
         p_rows_by_dim.setdefault(p["dimension"], []).append(p)
 
-    # Read active findings grouped by dimension and verdict.
-    _SELECT_ACTIVE = (
-        "SELECT id, practice_id, dimension, requirement, verdict, severity, "
-        "file, line, end_line, title, reason, snippet, violation_type, context, "
-        "scope, req_refs_json, confidence, provenance_downgrade, "
-        "scope_downgrade_json "
-        "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
-    )
-
-    def _dict_row(cursor, row):  # noqa: ANN001
-        return {col[0]: row[i] for i, col in enumerate(cursor.description)}
-
+    # Active findings grouped by dimension and verdict.
     violations_by_dim: dict[str, list[Finding]] = {}
     compliance_by_dim: dict[str, list[Finding]] = {}
-    with open_evaluation_db(run_dir) as conn:
-        conn.row_factory = _dict_row
-        rows = conn.execute(_SELECT_ACTIVE).fetchall()
-
-    for row in rows:
+    for row in read_active_findings(run_dir):
         f = row_to_finding(row)
         dim = f.dimension or ""
         if f.verdict == "violation":

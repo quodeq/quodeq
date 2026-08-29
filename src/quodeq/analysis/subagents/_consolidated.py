@@ -9,7 +9,9 @@ from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
@@ -96,6 +98,8 @@ def _collect_consolidated_results(
     return parse_jsonl_to_evidence_by_dimension(
         merged_jsonl, ev_ctx, compiled_dir=paths.compiled_dir,
         evaluators_dir=config.evaluators_dir,
+        req_map_reader=read_req_to_principle_map,
+        cwe_url_template=cwe_url_template(),
     )
 
 

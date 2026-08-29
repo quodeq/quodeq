@@ -10,6 +10,7 @@ from quodeq.core.events.models import (
     FindingUndismissed,
     FindingUndismissedEvent,
 )
+from quodeq.data.events.codec import event_to_json
 
 
 def test_finding_dismissed_payload_required_fields():
@@ -42,7 +43,7 @@ def test_event_model_map_includes_new_events():
 
 def test_finding_dismissed_event_round_trips_through_json():
     event = FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10, reason="x"))
-    line = event.model_dump_json()
+    line = event_to_json(event)
     data = json.loads(line)
     assert data["event_type"] == "FINDING_DISMISSED"
     assert data["payload"]["req"] == "R1"

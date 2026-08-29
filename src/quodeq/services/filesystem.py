@@ -200,6 +200,9 @@ class FilesystemActionProvider(ActionProvider):
     def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
         return self._tooling.browse_repo(path, include_files)
 
+    def browse_mkdir(self, parent: str, name: str) -> dict[str, Any]:
+        return self._tooling.browse_mkdir(parent, name)
+
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
         return self._tooling.get_ai_clients(env)
 

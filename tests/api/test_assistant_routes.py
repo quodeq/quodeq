@@ -734,21 +734,24 @@ def test_stop_cancels_running_turn_and_frees_the_token(client, monkeypatch):
 # global rate limiter, so the events endpoint caps concurrently open streams.
 # ---------------------------------------------------------------------------
 
-def test_events_stream_returns_429_above_cap(client, monkeypatch):
-    from quodeq.api import assistant_routes
+def test_events_stream_returns_429_above_cap(app, client):
+    state = app.extensions["assistant_turns"]
 
     sid = client.post("/api/assistant/sessions",
                       json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
-    monkeypatch.setattr(assistant_routes, "_open_sse_streams",
-                        assistant_routes._MAX_SSE_STREAMS)
-    resp = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
-    assert resp.status_code == 429
-    assert "error" in resp.get_json()
+    slots_taken = 0
+    while state.try_open_sse_stream():  # saturate this app's cap
+        slots_taken += 1
+    try:
+        resp = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
+        assert resp.status_code == 429
+        assert "error" in resp.get_json()
+    finally:
+        for _ in range(slots_taken):
+            state.close_sse_stream()
 
 
-def test_events_stream_releases_slot_when_stream_ends(client, monkeypatch):
-    from quodeq.api import assistant_routes
-
+def test_events_stream_releases_slot_when_stream_ends(app, client, monkeypatch):
     monkeypatch.setattr("quodeq.api._assistant_helpers._POLL_SECONDS", 0.001)
     monkeypatch.setattr("quodeq.api._assistant_helpers._IDLE_LIMIT", 5)
     sid = client.post("/api/assistant/sessions",
@@ -757,16 +760,38 @@ def test_events_stream_releases_slot_when_stream_ends(client, monkeypatch):
     assert stream.status_code == 200
     stream.get_data(as_text=True)  # drain to completion
     stream.close()
-    assert assistant_routes._open_sse_streams == 0
+    assert app.extensions["assistant_turns"].open_sse_streams == 0
 
 
-def test_events_stream_404_does_not_consume_slot(client):
-    from quodeq.api import assistant_routes
-
-    before = assistant_routes._open_sse_streams
+def test_events_stream_404_does_not_consume_slot(app, client):
+    state = app.extensions["assistant_turns"]
+    before = state.open_sse_streams
     resp = client.get("/api/assistant/sessions/nope/events?after=0")
     assert resp.status_code == 404
-    assert assistant_routes._open_sse_streams == before
+    assert state.open_sse_streams == before
+
+
+def test_turn_state_instances_are_independent():
+    """Two apps in one process (each with its own AssistantTurnState) must not
+    share turn slots, cancel tokens, or SSE stream counts."""
+    from quodeq.api.assistant_routes import AssistantTurnState
+
+    a, b = AssistantTurnState(), AssistantTurnState()
+    assert a.try_claim_turn("s1")
+    assert not a.try_claim_turn("s1")
+    assert b.try_claim_turn("s1")  # b has its own slot registry
+    assert b.claim_turn("s2") is not None
+    assert a.cancel_token("s2") is None  # token registered on b only
+    a.release_turn("s1")
+    assert not a.is_turn_claimed("s1")
+    assert b.is_turn_claimed("s1")
+
+    small = AssistantTurnState(max_sse_streams=1)
+    assert small.try_open_sse_stream()
+    assert not small.try_open_sse_stream()  # small's cap reached
+    assert b.try_open_sse_stream()          # b's counter unaffected
+    small.close_sse_stream()
+    assert small.open_sse_streams == 0
 
 
 # ---- source-aware create route ---------------------------------------------

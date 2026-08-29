@@ -6,9 +6,12 @@ import sys
 from io import StringIO
 from unittest.mock import patch
 
-from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
-from quodeq.analysis.subagents.file_queue import FileQueue
+
+# The analysis-layer imports (findings_server, FileQueue) are deferred into
+# the two helpers that need them so that tests/core consumers of
+# _evidence_line/make_evidence_with_confidence stay decoupled from the
+# analysis layer and its framework dependencies.
 
 _TEST_PRINCIPLE = "ts-001"
 _TEST_DIMENSION = "security"
@@ -19,6 +22,8 @@ _TEST_REASON = "injection"
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):
     """Mock run_analysis that writes some findings and drains the queue."""
+    from quodeq.analysis.subagents.file_queue import FileQueue  # noqa: PLC0415
+
     stream_file.parent.mkdir(parents=True, exist_ok=True)
     stream_file.write_text("")
     if config.queue_path:
@@ -44,6 +49,8 @@ def _make_request(method: str, req_id: int = 1, params: dict | None = None) -> s
 
 def _run_server(input_lines: list[str], findings_file: str) -> list[dict]:
     """Feed *input_lines* to the MCP server and return parsed response dicts."""
+    from quodeq.analysis.mcp import findings_server as mcp_findings  # noqa: PLC0415
+
     stdin_text = "\n".join(input_lines) + "\n"
     stdout_buf = StringIO()
     with patch.object(sys, "stdin", StringIO(stdin_text)), \

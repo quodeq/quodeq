@@ -1,8 +1,8 @@
 """Requirement-to-principle mapping helpers for evidence grouping."""
 from __future__ import annotations
 
-import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +11,11 @@ from quodeq.core.events.models import Judgment
 _logger = logging.getLogger(__name__)
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+# Reads ``<directory>/<dimension>.json`` into a req-id → principle-name map.
+# Injected by outer layers (see quodeq.data.fs.standards_loader.
+# read_req_to_principle_map); core itself never touches the filesystem.
+ReqMapReader = Callable[[Path, str], "dict[str, str] | None"]
 
 
 def _sev_rank(sev: str) -> int:
@@ -28,40 +33,11 @@ class _GroupedJudgments:
     quarantined: int = 0
 
 
-def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = None) -> dict[str, str]:
-    """Build a mapping from requirement IDs to principle names for custom evaluators.
-
-    Cached per dimension — evaluator files don't change during a single run.
-    The *evaluators_dir* must be supplied by the caller (typically from
-    RunConfig); the core layer does not resolve paths itself.
-    """
-    if evaluators_dir is None or not evaluators_dir.is_dir():
-        return {}
-    path = evaluators_dir / f"{dimension}.json"
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        mapping: dict[str, str] = {}
-        for principle in data.get("principles", []):
-            pname = principle.get("name", "")
-            for req in principle.get("requirements", []):
-                rid = req.get("id", "")
-                if rid and pname:
-                    mapping[rid] = pname
-        return mapping
-    except (OSError, ValueError, AttributeError, TypeError):
-        # AttributeError/TypeError: a valid-JSON-but-non-dict payload (a list
-        # or null at the top level, or non-dict principle/requirement items)
-        # makes .get() raise. The contract is an empty map on any malformed
-        # input so callers stay permissive, never a crash.
-        return {}
-
-
 def _resolve_req_to_principle_map(
     dimension: str,
     evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
+    req_map_reader: ReqMapReader | None = None,
 ) -> dict[str, str]:
     """Resolve the requirement-to-principle map for *dimension*.
 
@@ -70,11 +46,16 @@ def _resolve_req_to_principle_map(
     standard (compiled_dir). On real installs the evaluators dir exists but
     is empty for built-in dimensions, so without the fallback the map is
     empty and standard-validation callers silently go permissive.
+
+    The directories are only ever handed to *req_map_reader*; core performs
+    no file I/O itself, so without a reader the map is empty (permissive).
     """
-    mapping = _build_req_to_principle_map(dimension, evaluators_dir)
-    if not mapping:
-        mapping = _build_req_to_principle_map(dimension, compiled_dir)
-    return mapping
+    if req_map_reader is None:
+        return {}
+    mapping = req_map_reader(evaluators_dir, dimension) if evaluators_dir is not None else None
+    if not mapping and compiled_dir is not None:
+        mapping = req_map_reader(compiled_dir, dimension)
+    return mapping or {}
 
 
 def _id_shape(req_id: str) -> tuple[str, str] | None:
@@ -161,15 +142,18 @@ class PrincipleResolver:
 def build_principle_resolver(
     dimension: str, evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
+    *, req_map_reader: ReqMapReader | None = None,
 ) -> PrincipleResolver:
     """Build the resolver for *dimension* from its standard.
 
     A custom evaluator standard wins; otherwise the compiled built-in standard.
-    An unknown/blank dimension yields a permissive resolver. The directories must
-    be supplied by the caller; the core layer does not resolve paths itself.
+    An unknown/blank dimension yields a permissive resolver. The directories and
+    *req_map_reader* must be supplied by the caller; the core layer does not
+    resolve paths or read files itself.
     """
     mapping = (
-        _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir)
+        _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir,
+                                      req_map_reader)
         if dimension else {}
     )
     return PrincipleResolver(mapping, frozenset(p for p in mapping.values() if p))
@@ -178,15 +162,17 @@ def build_principle_resolver(
 def principle_names_for_dimension(
     dimension: str, evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
+    *, req_map_reader: ReqMapReader | None = None,
 ) -> set[str]:
     """Return the principle names defined by *dimension*'s standard.
 
     Empty when no standard is available from either source, so callers stay
     permissive (no standard to validate against) rather than dropping
-    everything. The directories must be supplied by the caller; the core
-    layer does not resolve paths itself.
+    everything. The directories and *req_map_reader* must be supplied by the
+    caller; the core layer does not resolve paths or read files itself.
     """
-    mapping = _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir)
+    mapping = _resolve_req_to_principle_map(dimension, evaluators_dir, compiled_dir,
+                                            req_map_reader)
     return {p for p in mapping.values() if p}
 
 
@@ -195,8 +181,10 @@ def _group_judgments(
     dimension: str = "",
     evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
+    *, req_map_reader: ReqMapReader | None = None,
 ) -> _GroupedJudgments:
-    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir)
+    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir,
+                                        req_map_reader=req_map_reader)
     sc_violations: dict[str, list[Judgment]] = {}
     sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}

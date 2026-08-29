@@ -1,7 +1,10 @@
-"""Public API for type mappers -- re-exports from focused peer modules.
+"""Raw-dict -> core.types dataclass deserialization (adapter layer).
 
-All mapper functions are split by entity type into private modules;
-``from quodeq.core.types.mappers import X`` keeps working via re-exports.
+Translating external JSON shapes (snake/camelCase wire payloads, report
+files) into core entities is adapter work, so it lives here in ``data``
+rather than beside the entities themselves. All mapper functions are split
+by entity type into private modules; ``from quodeq.data.mappers import X``
+is the public surface via these re-exports.
 """
 
 from __future__ import annotations

@@ -7,6 +7,7 @@ already hold the parsed data should use the pure functions directly.
 """
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -83,6 +84,36 @@ def load_requirement_checks(
     if not data:
         return {}
     return extract_requirement_checks(data)
+
+
+def read_req_to_principle_map(directory: Path, dimension: str) -> dict[str, str] | None:
+    """Read ``<directory>/<dimension>.json`` into a req-id → principle-name map.
+
+    The file-reading half of ``core.evidence._req_mapping``: core injects this
+    as its ``req_map_reader`` so evidence grouping never touches the
+    filesystem itself. The contract is an empty map on any missing, unreadable
+    or malformed input so callers stay permissive, never a crash.
+    """
+    if directory is None or not directory.is_dir():
+        return {}
+    path = directory / f"{dimension}.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mapping: dict[str, str] = {}
+        for principle in data.get("principles", []):
+            pname = principle.get("name", "")
+            for req in principle.get("requirements", []):
+                rid = req.get("id", "")
+                if rid and pname:
+                    mapping[rid] = pname
+        return mapping
+    except (OSError, ValueError, AttributeError, TypeError):
+        # AttributeError/TypeError: a valid-JSON-but-non-dict payload (a list
+        # or null at the top level, or non-dict principle/requirement items)
+        # makes .get() raise.
+        return {}
 
 
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:

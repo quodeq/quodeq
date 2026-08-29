@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from .dashboard import TrendPoint
-from .finding import Finding
-from .violation import ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
+from quodeq.core.types.dashboard import TrendPoint
+from quodeq.core.types.finding import Finding
+from quodeq.core.types.violation import ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
 
 from ._mapper_findings import parse_finding
 from ._mapper_helpers import (

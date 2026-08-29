@@ -222,6 +222,10 @@ class SQLiteStateStore:
             )
             conn.commit()
 
+    # The grade writers below persist the neutral domain result dicts from
+    # core/scoring/projector_scoring.py 1:1 (today's columns happen to match
+    # the contract keys). If a column is renamed, added, or dropped, the
+    # dict->column mapping changes HERE — the domain contract does not move.
     def batch_rewrite_grades(
         self,
         principle_rows: "list[tuple[str, dict]]",

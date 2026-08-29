@@ -3,18 +3,18 @@
 # Regenerate intentionally: python tools/check_imports.py --update-baseline
 src/quodeq/analysis/subprocess.py:264:llm_bridge
 src/quodeq/api/_evaluation_routes.py:21:analysis
-src/quodeq/api/import_project.py:31:data
 src/quodeq/api/import_project.py:32:data
 src/quodeq/api/import_project.py:33:data
+src/quodeq/api/import_project.py:34:data
 src/quodeq/api/llm_bridge_routes.py:8:llm_bridge
-src/quodeq/api/routes_project_list.py:289:analysis
+src/quodeq/api/routes_project_list.py:255:analysis
 src/quodeq/ci/review.py:129:cli_parser
 src/quodeq/ci/review.py:147:_cli_evaluation
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/llm_bridge/_providers.py:6:analysis
 src/quodeq/services/_external_jobs.py:21:analysis
-src/quodeq/services/evaluation_mixin.py:360:analysis
+src/quodeq/services/evaluation_mixin.py:361:analysis
 src/quodeq/services/jobs.py:20:analysis
 src/quodeq/services/scan_progress.py:23:analysis
-src/quodeq/services/score_run.py:14:analysis
-src/quodeq/services/tooling_mixin.py:17:analysis
+src/quodeq/services/score_run.py:16:analysis
+src/quodeq/services/tooling_mixin.py:18:analysis

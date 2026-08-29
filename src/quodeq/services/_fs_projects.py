@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextvars
-import json
 import logging
 import shutil
 from concurrent.futures import ThreadPoolExecutor
@@ -20,6 +19,11 @@ from quodeq.services._fs_project_helpers import (
     _backfill_onboarding_field,
     _build_project_entry,
     _max_projects_listed,
+)
+from quodeq.services.ports import (
+    read_repository_info,
+    repository_info_exists,
+    write_repository_info,
 )
 from quodeq.data.fs.report_parser.runs import list_runs, safe_read_dir
 from quodeq.data.fs.repo_handler import is_valid_repo_url
@@ -59,17 +63,13 @@ def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[
     parent_ids: set[str] = set()
     subproject_ids: set[str] = set()
     for name in dir_names:
-        info_path = reports_root / name / "repository_info.json"
-        if not info_path.exists():
+        info = read_repository_info(reports_root / name)
+        if info is None:
             continue
-        try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
-            parent = info.get("parent")
-            if parent:
-                parent_ids.add(parent)
-                subproject_ids.add(name)
-        except (json.JSONDecodeError, OSError):
-            continue
+        parent = info.get("parent")
+        if parent:
+            parent_ids.add(parent)
+            subproject_ids.add(name)
     return parent_ids, subproject_ids
 
 
@@ -114,7 +114,7 @@ def build_project_list(
     # runs nor a project record (stray non-project dirs) are dropped.
     registered_ids = {
         name for name in dir_names
-        if (reports_root / name / "repository_info.json").exists()
+        if repository_info_exists(reports_root / name)
     }
 
     def _build_one(name: str) -> ProjectEntry | None:
@@ -148,11 +148,10 @@ def build_project_list(
 def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
     """Update the path stored in a project's metadata."""
     reports_root = Path(reports_dir).resolve()
-    info_path = (reports_root / project).resolve()
-    if not info_path.is_relative_to(reports_root):
+    project_dir = (reports_root / project).resolve()
+    if not project_dir.is_relative_to(reports_root):
         return False
-    info_path = info_path / "repository_info.json"
-    if not info_path.exists():
+    if not repository_info_exists(project_dir):
         return False
 
     try:
@@ -175,14 +174,12 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         resolved_path = str(resolved)
         location = "local"
 
-    try:
-        info = json.loads(info_path.read_text(encoding="utf-8"))
-        info["path"] = resolved_path
-        info["location"] = location
-        info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
-        return True
-    except (json.JSONDecodeError, OSError):
+    info = read_repository_info(project_dir)
+    if info is None:
         return False
+    info["path"] = resolved_path
+    info["location"] = location
+    return write_repository_info(project_dir, info)
 
 
 def delete_project(reports_dir: str, project: str) -> bool:
@@ -216,14 +213,11 @@ def delete_project(reports_dir: str, project: str) -> bool:
 
 def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
     """Return project metadata including discipline and available dimensions."""
-    info_path = (Path(reports_dir) / project / "repository_info.json").resolve()
-    if not info_path.is_relative_to(Path(reports_dir).resolve()):
+    project_dir = (Path(reports_dir) / project).resolve()
+    if not project_dir.is_relative_to(Path(reports_dir).resolve()):
         return None
-    if not info_path.exists():
-        return None
-    try:
-        info = json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    info = read_repository_info(project_dir)
+    if info is None:
         return None
 
     discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)

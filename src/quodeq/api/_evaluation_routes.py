@@ -20,6 +20,7 @@ from quodeq.api.helpers import error_response, scan_target_error, validate_evalu
 from quodeq.core.types import to_camel_dict
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
+from quodeq.services.active_evaluation import find_active_evaluation
 from quodeq.services.base import ActionProvider
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress
@@ -103,6 +104,17 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         states = {s for s in (v.strip() for v in state_arg.split(",")) if s} or None
         items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir(), states=states)
         return jsonify([to_camel_dict(j) for j in items])
+
+    @app.get("/api/evaluations/active")
+    def get_active_evaluation() -> Response:
+        """Return the first non-stale running evaluation job, or JSON null.
+
+        Single authoritative answer to "is an evaluation actually running":
+        the staleness rule lives in services.active_evaluation, so shells
+        (native window, frontend) consume it instead of re-deriving it.
+        """
+        job = find_active_evaluation(provider, _reports_dir())
+        return jsonify(to_camel_dict(job) if job is not None else None)
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:

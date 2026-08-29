@@ -1,50 +1,32 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { buildFileTree, treeNodeToFileObj } from '../viz/index.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import { listStandards } from '../../../api/standards.js';
+import { readString, writeString } from '../../../adapters/storage.js';
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
+import { findSubtree, buildBreadcrumbPath } from './mapTree.js';
+import { useDashboardFullHeight } from './useDashboardFullHeight.js';
+import { useVisibleStandards } from './useVisibleStandards.js';
+
+// Re-exported so existing importers of the tree helpers keep one seam; the
+// implementations live in mapTree.js (pure, unit-testable without the hook).
+export { findSubtree, buildBreadcrumbPath } from './mapTree.js';
 
 const MAP_LABELS_KEY = 'quodeq-map-labels';
 const MAP_DARK_KEY = 'quodeq-map-dark';
-const MAX_TREE_DEPTH = 64;
 
-function findSubtree(root, path) {
-  if (!path) return root;
-  function walk(node, depth = 0) {
-    if (depth > MAX_TREE_DEPTH) return null;
-    if (node.path === path) return node;
-    for (const child of node.children) {
-      if (path === child.path || path.startsWith(child.path + '/')) {
-        const found = walk(child, depth + 1);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-  return walk(root) || root;
-}
-
-function buildBreadcrumbPath(root, path) {
-  if (!path) return [];
-  const crumbs = [];
-  let node = root;
-  while (node && node.path !== path) {
-    const child = node.children.find((c) => path === c.path || path.startsWith(c.path + '/'));
-    if (!child) break;
-    crumbs.push({ name: child.name, path: child.path });
-    node = child;
-  }
-  return crumbs;
-}
-
+/**
+ * Map page state, as composition: DOM sizing (useDashboardFullHeight), the
+ * standards fetch (useVisibleStandards), storage via the shared adapters
+ * (adapters/storage.js + pageStateCache), and the pure tree logic (mapTree.js).
+ */
 export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
   const selectedProject = data?.projectName || data?.selectedProject || '__map__';
 
   // Drill path and mode/style toggles live in the nav-stack entry (route
   // params), not component state — drilling pushes a history entry, toggling
-  // replaces one (see App.jsx's map renderer), and browser back/forward and
-  // the breadcrumb restore them. Defaults apply when a fresh tab entry
+  // replaces one (see the app's map route renderer), and browser back/forward
+  // and the breadcrumb restore them. Defaults apply when a fresh tab entry
   // carries no params yet. Standalone renders (tests) may pass no nav
   // bundle; the setters then no-op.
   const {
@@ -72,47 +54,33 @@ export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
   });
 
   // Lock parent to viewport height while map is active.
-  // Uses document.querySelector because the .dashboard ancestor is outside
-  // this component's React tree. A ref-based approach would require
-  // threading a ref from a distant parent.
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const dashboard = document.querySelector('.dashboard');
-    if (dashboard) {
-      dashboard.classList.add('dashboard--fullheight');
-      return () => dashboard.classList.remove('dashboard--fullheight');
-    }
-  }, []);
+  useDashboardFullHeight();
 
   // Refresh data on mount and on tab re-click
   useEffect(() => {
     callbacks?.onRefresh?.();
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch standard types for galaxy constellation grouping
-  const [standardTypes, setStandardTypes] = useState({});
-  useEffect(() => {
-    listStandards().then(stds => {
-      const map = {};
-      stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || 'custom'; });
-      setStandardTypes(map);
-    }).catch(() => {});
-  }, []);
+  // Standard types for galaxy constellation grouping.
+  const { standardTypes } = useVisibleStandards();
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
-  const [showLabels, _setShowLabels] = useState(() => { try { const v = localStorage.getItem(MAP_LABELS_KEY); return v === null ? true : v === '1'; } catch { return true; } });
-  const setShowLabels = (v) => { _setShowLabels(v); try { localStorage.setItem(MAP_LABELS_KEY, v ? '1' : '0'); } catch {} };
+  const [showLabels, _setShowLabels] = useState(() => {
+    const v = readString(MAP_LABELS_KEY);
+    return v === null ? true : v === '1';
+  });
+  const setShowLabels = (v) => { _setShowLabels(v); writeString(MAP_LABELS_KEY, v ? '1' : '0'); };
   const appIsDark = useThemeIsDark();
   const [darkMode, _setDarkMode] = useState(() => {
     if (appIsDark) return true;
-    try { const v = localStorage.getItem(MAP_DARK_KEY); return v === null ? false : v === '1'; } catch { return false; }
+    return readString(MAP_DARK_KEY) === '1';
   });
-  const setDarkMode = (v) => { _setDarkMode(v); try { localStorage.setItem(MAP_DARK_KEY, v ? '1' : '0'); } catch {} };
+  const setDarkMode = (v) => { _setDarkMode(v); writeString(MAP_DARK_KEY, v ? '1' : '0'); };
   // A dark app theme always forces dark viz; back on light, restore the
   // user's stored viz preference (defaulting to light when none is stored).
   useEffect(() => {
     if (appIsDark) { _setDarkMode(true); }
-    else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? false : v === '1'); } catch { _setDarkMode(false); } }
+    else { _setDarkMode(readString(MAP_DARK_KEY) === '1'); }
   }, [appIsDark]);
   // Tab re-click needs no path reset here anymore: navTab creates a fresh
   // entry with no path param, so the controlled currentPath above is already

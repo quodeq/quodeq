@@ -62,7 +62,9 @@ imports rather than add entries). Regenerate the baseline only with justificatio
 - Private modules use `_` prefix (e.g., `_fs_projects.py`).
 - Public APIs live in the parent `__init__.py` with re-exports for backward compatibility.
 - Frozen dataclasses for data transfer objects.
-- `services/ports.py` is the single boundary between services and data layers (a convention — `tools/check_imports.py` allows any services→data import; keep new ones behind ports.py anyway).
+- `services/ports.py` is the single boundary between services and data layers: it re-exports the data functions services use and hosts the Protocols services accept as injected seams (`StandardsStore`, `GradeTablesReader`). `tools/check_imports.py` allows any services→data import — this is a convention, not an enforcement point — but new or edited services code imports through ports.py.
+- Ports for concrete adapters live in `data/ports/` (`FindingsRepository`, `AssistantStore`); consumers annotate against the Protocol, composition roots construct the SQLite classes.
+- Entities in `core/` are plain frozen dataclasses (stdlib only). Serialization lives in adapters: the event-log JSON codec is `data/events/codec.py`, dict→dataclass mappers are `data/mappers/`, and env-derived settings are resolved in `config/` (e.g. `config/evidence_env.py`) and passed inward as parameters.
 
 ## Runtime State Model
 
@@ -77,7 +79,7 @@ Each evaluation has a directory under `~/.quodeq/evaluations/<project_uuid>/<run
 | `.pid` | CLI (`_cli_evaluation.py`) | OS PID. Used by the cancel flow (`services/_external_jobs.py`) to deliver SIGTERM. |
 | `evidence/manifest.json` | Analysis engine | Scan inputs. Presence marks "a run was started." |
 | `evidence/<dim>_evidence.jsonl` | Subagent pool (via `analysis/mcp/router.py::FindingsRouter`) | **Durable findings log.** Append-only stream, source of truth. JSONL is human-readable, recoverable from any disk, and never deleted by the system. |
-| `events.jsonl` | Analysis MCP server (`analysis/mcp/findings_server.py`) + mutation services (dismiss/verify) via `core/events/writer.py::EventLogWriter` | **Event Log.** Append-only stream of typed events (`RUN_STARTED`, `JUDGMENT_CREATED`, `FINDING_DISMISSED`, …) defined in `core/events/models.py`. |
+| `events.jsonl` | Analysis MCP server (`analysis/mcp/findings_server.py`) + mutation services (dismiss/verify) via `data/events/writer.py::EventLogWriter` | **Event Log.** Append-only stream of typed events (`RUN_STARTED`, `JUDGMENT_CREATED`, `FINDING_DISMISSED`, …) defined in `core/events/models.py`. |
 | `evaluation.db` | Projection layer (`data/projection/projector.py::Projector` → `data/sqlite/findings_repository.py::SqliteFindingsRepository`) | **State Store: indexed projection of the Event Log.** SQLite + FTS5. Reads self-ensure the store is fresh against `events.jsonl` before returning rows; `services/_post_run_hook.py` also projects when a JobManager job finishes. Deleted-or-absent → rebuilt from the Event Log; loader falls back to JSONL/JSON. Set `QUODEQ_DISABLE_SQLITE=1` to skip both the write and the read for instant rollback. |
 | `evaluation/<dim>.json` | Scoring engine | Per-dimension report (the UI's "report" artifact). |
 | `run.log` | CLI + dashboard subprocess | Verbatim stderr tee. Consumed by the live-terminal SSE endpoint and for historical replay. |

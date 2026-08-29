@@ -303,7 +303,7 @@ class TestSizeAwareBatching:
             "quodeq.analysis._api_runner.run_api_analysis",
             side_effect=lambda **kw: calls.append(kw["source_file_paths"]),
         ):
-            _run_api_analysis_bridge(src, "prompt", tmp_path / "a1.stream", cfg)
+            _run_api_analysis_bridge(src, "prompt", tmp_path / "a1.stream", cfg, {})
 
         # 120B each with a 150B budget: every file gets its own call.
         assert calls == [["a.py"], ["b.py"], ["c.py"]]

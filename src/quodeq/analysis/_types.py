@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from quodeq.analysis import dispatch_policy
 from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
-from quodeq.analysis.subprocess import HeartbeatCallback
+from quodeq.analysis._config import HeartbeatCallback
 
 if TYPE_CHECKING:
     from quodeq.analysis.cache.dimension_helpers import ClassifyResult

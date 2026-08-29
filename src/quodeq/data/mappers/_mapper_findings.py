@@ -6,7 +6,7 @@ SeverityTally, and Totals instances.
 
 from __future__ import annotations
 
-from .finding import Finding, ReqRef, SeverityTally, Totals
+from quodeq.core.types.finding import Finding, ReqRef, SeverityTally, Totals
 
 from ._mapper_helpers import (
     _bool,

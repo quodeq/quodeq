@@ -15,7 +15,7 @@ from quodeq.core.standards.visibility import (
     partition_visible,
 )
 from quodeq.core.types import to_camel_dict
-from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.data.ports.findings import FindingsRepository
 from quodeq.services import _fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -34,6 +34,23 @@ def _validate_dimension(dimension: str) -> str:
     if not isinstance(dimension, str) or not _DIMENSION_RE.fullmatch(dimension):
         raise ToolError(f"invalid dimension: {dimension!r}")
     return dimension
+
+
+def default_findings_repo_factory(run_dir: Path) -> FindingsRepository:
+    """Composition fallback: the concrete SQLite findings repository.
+
+    Real composition roots (``api._assistant_helpers.build_tool_context``,
+    the MCP server) pass ``ToolContext.findings_repo_factory`` explicitly;
+    this lazy default keeps directly-constructed contexts working without
+    coupling the context module — or this module's import time — to SQLite.
+    """
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+    return SqliteFindingsRepository(run_dir)
+
+
+def _findings_repo(ctx: ToolContext, run_dir: Path) -> FindingsRepository:
+    factory = ctx.findings_repo_factory or default_findings_repo_factory
+    return factory(run_dir)
 
 
 def _require_run(ctx: ToolContext):
@@ -242,7 +259,7 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
         # miss anyway.
         if (ctx.run_dir / "evaluation.db").is_file():
             try:
-                for f in SqliteFindingsRepository(ctx.run_dir).list_all():
+                for f in _findings_repo(ctx, ctx.run_dir).list_all():
                     keys.add((str(f.req or ""), str(f.file or ""), _coerce_line(f.line)))
             except Exception:  # noqa: BLE001 - a corrupt db must not block the read
                 _logger.warning(
@@ -268,7 +285,7 @@ def _severity_key(v: dict):
 
 def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     run_dir = _require_run(ctx)
-    repo = SqliteFindingsRepository(run_dir)
+    repo = _findings_repo(ctx, run_dir)
     # Hidden dims must be known BEFORE the query runs, so the exclusion can be
     # pushed into SQL ahead of LIMIT (see SqliteFindingsRepository.search).
     # Filtering the returned rows afterward is not equivalent: rows are

@@ -2,6 +2,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getGradeThresholds, setGradeThresholds, resetGradeThresholds, scoreToGradeLabel,
+  createGradeThresholdsStore, defaultGradeThresholdsStore,
 } from './gradeThresholds.js';
 
 beforeEach(() => resetGradeThresholds());
@@ -53,4 +54,35 @@ test('setGradeThresholds ignores junk', () => {
   setGradeThresholds(undefined);
   setGradeThresholds([]);
   assert.equal(scoreToGradeLabel(9.2), 'Exemplary');
+});
+
+// ── store isolation (createGradeThresholdsStore) ───────────────────────
+
+test('two store instances do not share state', () => {
+  const a = createGradeThresholdsStore();
+  const b = createGradeThresholdsStore();
+  a.set([[9.5, 'Exemplary'], [8, 'Good'], [6, 'Adequate'], [4, 'Poor']]);
+  assert.equal(a.scoreToGradeLabel(9.2), 'Good');
+  // b (and the module default) still grade with the defaults.
+  assert.equal(b.scoreToGradeLabel(9.2), 'Exemplary');
+  assert.equal(scoreToGradeLabel(9.2), 'Exemplary');
+});
+
+test('an isolated store supports the full get/set/reset/label surface', () => {
+  const s = createGradeThresholdsStore();
+  assert.deepEqual(s.get(), [[9, 'Exemplary'], [7, 'Good'], [5, 'Adequate'], [3, 'Poor']]);
+  s.set([[6, 'Good'], [2, 'Poor']]);
+  assert.equal(s.scoreToGradeLabel(6.5), 'Good');
+  assert.equal(s.scoreToGradeLabel(1), 'Critical');
+  assert.ok(Object.isFrozen(s.get()));
+  s.reset();
+  assert.equal(s.scoreToGradeLabel(9.2), 'Exemplary');
+});
+
+test('the named exports delegate to the default store instance', () => {
+  defaultGradeThresholdsStore.set([[9.5, 'Exemplary'], [8, 'Good'], [6, 'Adequate'], [4, 'Poor']]);
+  assert.equal(scoreToGradeLabel(9.2), 'Good');
+  assert.deepEqual(getGradeThresholds(), defaultGradeThresholdsStore.get());
+  resetGradeThresholds();
+  assert.equal(defaultGradeThresholdsStore.scoreToGradeLabel(9.2), 'Exemplary');
 });

@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import shutil
 import threading
 import time
 from pathlib import Path
 
+from quodeq.services.ports import (
+    copy_file_if_exists,
+    copy_matching_files,
+    ensure_dir,
+    replace_json_file,
+)
 from quodeq.data.actions_log import ACTIONS_LOG_FILENAME
 from quodeq.data.fs.shared_repo import (
     MARKER_FILENAME,
@@ -55,31 +59,23 @@ def list_completed_runs(project_dir: Path) -> list[Path]:
 
 
 def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
-    dest_run_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(dest_run_dir)
     for name in _RUN_FILES:
-        src = run_dir / name
-        if src.exists():
-            shutil.copy2(src, dest_run_dir / name)
+        copy_file_if_exists(run_dir / name, dest_run_dir / name)
     evidence = run_dir / _EVIDENCE_DIR
     if evidence.is_dir():
         dest_evidence = dest_run_dir / _EVIDENCE_DIR
-        dest_evidence.mkdir(exist_ok=True)
-        manifest = evidence / "manifest.json"
-        if manifest.exists():
-            shutil.copy2(manifest, dest_evidence / "manifest.json")
-        for src in sorted(evidence.glob("*_evidence.jsonl")):
-            shutil.copy2(src, dest_evidence / src.name)
+        ensure_dir(dest_evidence)
+        copy_file_if_exists(evidence / "manifest.json", dest_evidence / "manifest.json")
+        copy_matching_files(evidence, dest_evidence, "*_evidence.jsonl")
     evaluation = run_dir / _EVALUATION_DIR
     if evaluation.is_dir():
-        dest_evaluation = dest_run_dir / _EVALUATION_DIR
-        dest_evaluation.mkdir(exist_ok=True)
         # Frozen eval-time per-dimension scores (e.g. security.json) are the
         # source of truth read_run_data() needs to render a dashboard at
         # all -- without them a published clone renders an EMPTY dashboard.
         # Pattern-bounded like the evidence glob above: only .json files,
         # nothing else (markdown companions, stray files) from that dir.
-        for src in sorted(evaluation.glob("*.json")):
-            shutil.copy2(src, dest_evaluation / src.name)
+        copy_matching_files(evaluation, dest_run_dir / _EVALUATION_DIR, "*.json")
 
 
 def _timestamp_key(line: str) -> tuple[int, str]:
@@ -128,18 +124,17 @@ def _publish_attribution(clone_root: Path) -> str:
 
 
 def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
-    dest_project_dir.mkdir(parents=True, exist_ok=True)
-    info = project_dir / "repository_info.json"
-    if info.exists():
-        shutil.copy2(info, dest_project_dir / "repository_info.json")
+    ensure_dir(dest_project_dir)
+    copy_file_if_exists(
+        project_dir / "repository_info.json",
+        dest_project_dir / "repository_info.json",
+    )
     # Project-level scan.json (quick-scan coverage metadata: total_files etc.)
     # is consumed by _fs_reports._enrich_with_coverage and the project-card
     # coverage reader -- without it, a published clone's dashboard/card never
     # shows a coverage header. Copied only when present; a project scanned
     # before this field existed simply stays absent on the clone too.
-    scan = project_dir / _SCAN_FILENAME
-    if scan.exists():
-        shutil.copy2(scan, dest_project_dir / _SCAN_FILENAME)
+    copy_file_if_exists(project_dir / _SCAN_FILENAME, dest_project_dir / _SCAN_FILENAME)
     merge_actions_log(
         project_dir / ACTIONS_LOG_FILENAME,
         dest_project_dir / ACTIONS_LOG_FILENAME,
@@ -160,10 +155,7 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
         "publishedBy": _publish_attribution(clone_root),
         "publishedAt": int(time.time()),
     }
-    meta_path = dest_project_dir / PUBLISHED_META_FILENAME
-    tmp = meta_path.with_suffix(meta_path.suffix + ".tmp")
-    tmp.write_text(json.dumps(meta), encoding="utf-8")
-    os.replace(tmp, meta_path)
+    replace_json_file(dest_project_dir / PUBLISHED_META_FILENAME, meta)
 
     return len(runs)
 
@@ -321,38 +313,68 @@ def _local_branch_name(repo: Path) -> str:
     return name if ok and name and name != "HEAD" else "main"
 
 
-_STATUS_LOCK = threading.Lock()
-_STATUS: dict = {
-    "state": "idle",
-    "project": None,
-    "runs": None,
-    "error": None,
-    "finished_at": None,
-}
+class PublishStatus:
+    """Lock-guarded publish job status (states: idle/running/done/error).
+
+    Instantiable so tests get isolated status; production shares the
+    module-default instance below — a single global publish slot.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._status: dict = {
+            "state": "idle",
+            "project": None,
+            "runs": None,
+            "error": None,
+            "finished_at": None,
+        }
+
+    def copy(self) -> dict:
+        with self._lock:
+            return dict(self._status)
+
+    def set(self, **fields) -> None:
+        with self._lock:
+            self._status.update(fields)
+
+    def claim(self, project_id: str) -> bool:
+        """Atomically take the publish slot; False when a publish is running."""
+        with self._lock:
+            if self._status["state"] == "running":
+                return False
+            self._status.update(
+                state="running", project=project_id, runs=None, error=None,
+                finished_at=None,
+            )
+            return True
 
 
-def get_publish_status() -> dict:
-    with _STATUS_LOCK:
-        return dict(_STATUS)
+_default_status = PublishStatus()
 
 
-def _run_publish(project_id: str, url: str, evaluations_root: Path) -> None:
+def get_publish_status(status: PublishStatus | None = None) -> dict:
+    return (status or _default_status).copy()
+
+
+def _run_publish(
+    project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+) -> None:
     try:
         count = publish_project(project_id, url, evaluations_root=evaluations_root)
-        with _STATUS_LOCK:
-            _STATUS.update(
-                state="done", runs=count, error=None, finished_at=time.time()
-            )
+        status.set(state="done", runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
-        with _STATUS_LOCK:
-            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error=str(exc), finished_at=time.time())
     except Exception as exc:  # never leave the job stuck in "running"
         logger.exception("unexpected publish failure")
-        with _STATUS_LOCK:
-            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error=str(exc), finished_at=time.time())
 
 
-def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> str:
+def start_publish(
+    project_id: str, url: str, *,
+    evaluations_root: Path,
+    status: PublishStatus | None = None,
+) -> str:
     """Kick off a background publish.
 
     Returns "started", "already_running" (another publish holds the slot),
@@ -360,20 +382,17 @@ def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> str:
     carries the error). Callers must not collapse the last two: one is a
     409-style conflict, the other a server-side failure.
     """
-    with _STATUS_LOCK:
-        if _STATUS["state"] == "running":
-            return "already_running"
-        _STATUS.update(
-            state="running", project=project_id, runs=None, error=None, finished_at=None
-        )
+    status = status or _default_status
+    if not status.claim(project_id):
+        return "already_running"
     try:
         thread = threading.Thread(
-            target=_run_publish, args=(project_id, url, evaluations_root), daemon=True
+            target=_run_publish, args=(project_id, url, evaluations_root, status),
+            daemon=True,
         )
         thread.start()
     except Exception as exc:
-        with _STATUS_LOCK:
-            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error=str(exc), finished_at=time.time())
         logger.exception("failed to start publish thread")
         return "failed"
     return "started"

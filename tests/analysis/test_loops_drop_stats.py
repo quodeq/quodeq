@@ -20,10 +20,10 @@ from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 
 
 @pytest.fixture(autouse=True)
-def _reset_accumulator():
-    _drop_stats.consume()
-    yield
-    _drop_stats.consume()
+def _isolated_counter(monkeypatch):
+    # The loops report through the module-default counter; swap in a fresh
+    # instance so nothing leaks in from (or out to) other tests.
+    monkeypatch.setattr(_drop_stats, "_default_counter", _drop_stats.DropStatsCounter())
 
 
 @pytest.fixture(autouse=True)
