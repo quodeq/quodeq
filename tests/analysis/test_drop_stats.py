@@ -20,10 +20,10 @@ from quodeq.analysis import _drop_stats
 
 
 @pytest.fixture(autouse=True)
-def _reset_accumulator():
-    _drop_stats.consume()
-    yield
-    _drop_stats.consume()
+def _isolated_counter(monkeypatch):
+    # The module wrappers delegate to the default counter; swap in a fresh
+    # instance so nothing leaks in from (or out to) other tests.
+    monkeypatch.setattr(_drop_stats, "_default_counter", _drop_stats.DropStatsCounter())
 
 
 @pytest.fixture(autouse=True)
@@ -51,6 +51,24 @@ class TestAccumulator:
 
     def test_ratio_is_zero_when_nothing_parsed(self):
         assert _drop_stats.DropStats().ratio == 0.0
+
+    def test_counter_instances_are_independent(self):
+        a, b = _drop_stats.DropStatsCounter(), _drop_stats.DropStatsCounter()
+        a.record(dropped=2, kept=8)
+        b.record(dropped=1, kept=0)
+        assert a.consume() == _drop_stats.DropStats(dropped=2, kept=8)
+        assert b.consume() == _drop_stats.DropStats(dropped=1, kept=0)
+
+    def test_report_accepts_an_explicit_counter(self, caplog):
+        counter = _drop_stats.DropStatsCounter()
+        counter.record(dropped=1, kept=9)
+        with caplog.at_level(logging.INFO):
+            stats = _drop_stats.report_run_drop_stats(counter)
+        assert stats.dropped == 1 and stats.kept == 9
+        assert "dropped 1 of 10" in caplog.text
+        # The explicit counter was consumed; the default stayed untouched.
+        assert counter.consume().parsed == 0
+        assert _drop_stats.consume().parsed == 0
 
 
 class TestReport:

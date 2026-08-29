@@ -5,14 +5,14 @@ emitted but validation rejected. Each call already logs that count as a
 WARNING, but a systemic output-shape problem (a prompt or model change that
 malformes findings across many files) drowns in thousands of per-call lines.
 
-This module accumulates the per-call (dropped, kept) counts process-wide —
-the whole run (all dimensions, all pool worker threads) executes in one
-process, so a lock-guarded module counter is the aggregation seam. The
-dimension loops call :func:`report_run_drop_stats` once at end of run to
-log the aggregate, elevate a single warning when the drop ratio crosses
-:data:`DROP_RATIO_WARN_THRESHOLD`, and emit a structured ``drop_stats``
-marker for the dashboard stream (mirroring the per-dim ``cache_stats``
-marker).
+This module accumulates the per-call (dropped, kept) counts in a
+:class:`DropStatsCounter` — the whole run (all dimensions, all pool worker
+threads) executes in one process, so the module-default instance is the
+aggregation seam. The dimension loops call :func:`report_run_drop_stats`
+once at end of run to log the aggregate, elevate a single warning when the
+drop ratio crosses :data:`DROP_RATIO_WARN_THRESHOLD`, and emit a structured
+``drop_stats`` marker for the dashboard stream (mirroring the per-dim
+``cache_stats`` marker).
 
 Deliberately stdlib-only: ``_loops`` imports this module, and must not pull
 in ``_api_runner`` (which requires the ``quodeq[api]`` extra).
@@ -48,40 +48,58 @@ class DropStats:
         return self.dropped / self.parsed if self.parsed else 0.0
 
 
-_lock = threading.Lock()
-_dropped = 0
-_kept = 0
+class DropStatsCounter:
+    """Lock-guarded (dropped, kept) accumulator with consume-and-reset reads.
+
+    Instantiable so tests (or any future concurrent-run host) get isolated
+    counts; production shares the module-default instance below.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._dropped = 0
+        self._kept = 0
+
+    def record(self, *, dropped: int, kept: int) -> None:
+        """Accumulate one API call's parse counts. Thread-safe."""
+        with self._lock:
+            self._dropped += dropped
+            self._kept += kept
+
+    def consume(self) -> DropStats:
+        """Return the accumulated totals and reset the accumulator.
+
+        Consume-and-reset keeps sequential runs in one process independent.
+        """
+        with self._lock:
+            stats = DropStats(dropped=self._dropped, kept=self._kept)
+            self._dropped = 0
+            self._kept = 0
+        return stats
+
+
+_default_counter = DropStatsCounter()
 
 
 def record(*, dropped: int, kept: int) -> None:
-    """Accumulate one API call's parse counts. Thread-safe."""
-    global _dropped, _kept
-    with _lock:
-        _dropped += dropped
-        _kept += kept
+    """Accumulate one API call's parse counts on the run-wide default counter."""
+    _default_counter.record(dropped=dropped, kept=kept)
 
 
 def consume() -> DropStats:
-    """Return the accumulated totals and reset the accumulator.
-
-    Consume-and-reset keeps sequential runs in one process independent.
-    """
-    global _dropped, _kept
-    with _lock:
-        stats = DropStats(dropped=_dropped, kept=_kept)
-        _dropped = 0
-        _kept = 0
-    return stats
+    """Consume-and-reset the run-wide default counter."""
+    return _default_counter.consume()
 
 
-def report_run_drop_stats() -> DropStats:
+def report_run_drop_stats(counter: DropStatsCounter | None = None) -> DropStats:
     """Log the run's aggregate drop ratio and emit the ``drop_stats`` marker.
 
+    Reads (and resets) *counter*, defaulting to the run-wide module counter.
     Silent no-op when no API calls were recorded (CLI-provider runs, or a
     run where the model emitted no finding-shaped objects at all) — there
     is no ratio to report and the marker would be noise.
     """
-    stats = consume()
+    stats = (counter or _default_counter).consume()
     if stats.parsed == 0:
         return stats
     _logger.info(

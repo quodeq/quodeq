@@ -313,38 +313,68 @@ def _local_branch_name(repo: Path) -> str:
     return name if ok and name and name != "HEAD" else "main"
 
 
-_STATUS_LOCK = threading.Lock()
-_STATUS: dict = {
-    "state": "idle",
-    "project": None,
-    "runs": None,
-    "error": None,
-    "finished_at": None,
-}
+class PublishStatus:
+    """Lock-guarded publish job status (states: idle/running/done/error).
+
+    Instantiable so tests get isolated status; production shares the
+    module-default instance below — a single global publish slot.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._status: dict = {
+            "state": "idle",
+            "project": None,
+            "runs": None,
+            "error": None,
+            "finished_at": None,
+        }
+
+    def copy(self) -> dict:
+        with self._lock:
+            return dict(self._status)
+
+    def set(self, **fields) -> None:
+        with self._lock:
+            self._status.update(fields)
+
+    def claim(self, project_id: str) -> bool:
+        """Atomically take the publish slot; False when a publish is running."""
+        with self._lock:
+            if self._status["state"] == "running":
+                return False
+            self._status.update(
+                state="running", project=project_id, runs=None, error=None,
+                finished_at=None,
+            )
+            return True
 
 
-def get_publish_status() -> dict:
-    with _STATUS_LOCK:
-        return dict(_STATUS)
+_default_status = PublishStatus()
 
 
-def _run_publish(project_id: str, url: str, evaluations_root: Path) -> None:
+def get_publish_status(status: PublishStatus | None = None) -> dict:
+    return (status or _default_status).copy()
+
+
+def _run_publish(
+    project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+) -> None:
     try:
         count = publish_project(project_id, url, evaluations_root=evaluations_root)
-        with _STATUS_LOCK:
-            _STATUS.update(
-                state="done", runs=count, error=None, finished_at=time.time()
-            )
+        status.set(state="done", runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
-        with _STATUS_LOCK:
-            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error=str(exc), finished_at=time.time())
     except Exception as exc:  # never leave the job stuck in "running"
         logger.exception("unexpected publish failure")
-        with _STATUS_LOCK:
-            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error=str(exc), finished_at=time.time())
 
 
-def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> str:
+def start_publish(
+    project_id: str, url: str, *,
+    evaluations_root: Path,
+    status: PublishStatus | None = None,
+) -> str:
     """Kick off a background publish.
 
     Returns "started", "already_running" (another publish holds the slot),
@@ -352,20 +382,17 @@ def start_publish(project_id: str, url: str, *, evaluations_root: Path) -> str:
     carries the error). Callers must not collapse the last two: one is a
     409-style conflict, the other a server-side failure.
     """
-    with _STATUS_LOCK:
-        if _STATUS["state"] == "running":
-            return "already_running"
-        _STATUS.update(
-            state="running", project=project_id, runs=None, error=None, finished_at=None
-        )
+    status = status or _default_status
+    if not status.claim(project_id):
+        return "already_running"
     try:
         thread = threading.Thread(
-            target=_run_publish, args=(project_id, url, evaluations_root), daemon=True
+            target=_run_publish, args=(project_id, url, evaluations_root, status),
+            daemon=True,
         )
         thread.start()
     except Exception as exc:
-        with _STATUS_LOCK:
-            _STATUS.update(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error=str(exc), finished_at=time.time())
         logger.exception("failed to start publish thread")
         return "failed"
     return "started"

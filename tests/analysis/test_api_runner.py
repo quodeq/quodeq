@@ -572,11 +572,12 @@ class TestDropStatsRecording:
     """
 
     @pytest.fixture(autouse=True)
-    def _reset_accumulator(self):
+    def _isolated_counter(self, monkeypatch):
+        # _call_api records through the module-default counter; swap in a
+        # fresh instance so nothing leaks in from (or out to) other tests.
         from quodeq.analysis import _drop_stats
-        _drop_stats.consume()
-        yield
-        _drop_stats.consume()
+        monkeypatch.setattr(
+            _drop_stats, "_default_counter", _drop_stats.DropStatsCounter())
 
     def test_call_with_malformed_finding_records_drop_and_kept(self, api_config):
         from quodeq.analysis import _drop_stats

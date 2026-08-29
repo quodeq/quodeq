@@ -45,6 +45,10 @@ class LoopContext:
     submit_fn: Callable[[], None]
     max_files_per_agent: int | None = None
     deadline_at: float | None = None
+    # Injectable cancellation check; the default binds the process-wide
+    # signal here (the composition seam) so the loops never touch the
+    # singleton themselves and tests can pass an isolated callable.
+    is_cancelled: Callable[[], bool] = cancellation.is_cancelled
 
 
 def scout_loop(ctx: LoopContext) -> None:
@@ -54,7 +58,7 @@ def scout_loop(ctx: LoopContext) -> None:
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
     )
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
-    if cancellation.is_cancelled():
+    if ctx.is_cancelled():
         return
     ctx.submit_fn()
     while ctx.futures:
@@ -84,7 +88,7 @@ def scout_loop(ctx: LoopContext) -> None:
 def immediate_loop(ctx: LoopContext) -> None:
     """Launch all agents immediately, respawning as they complete."""
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
-    if cancellation.is_cancelled():
+    if ctx.is_cancelled():
         return
     for _ in range(ctx.n_agents):
         ctx.submit_fn()

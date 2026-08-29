@@ -90,6 +90,11 @@ def create_app(
     provider = provider or _default_provider()
     app.config["_provider"] = provider
 
+    # Per-app assistant turn/SSE registry (composition root for the state the
+    # assistant routes used to keep in module globals).
+    from quodeq.api.assistant_routes import AssistantTurnState
+    app.extensions["assistant_turns"] = AssistantTurnState()
+
     from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir

@@ -28,41 +28,104 @@ from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import read_state
 from quodeq.services.shared_settings import read_settings
 
-_running_turns: set[str] = set()
-# Cancel token per session with a /messages turn in flight; the /stop route
-# fires it. Workspace actions (apply/pr) claim the turn slot too but are not
-# stoppable, so they never appear here.
-_cancel_tokens: dict[str, CancelToken] = {}
-_running_lock = threading.Lock()
-
 # Each open assistant SSE stream pins a server worker thread for its whole
 # lifetime, and the global rate limiter exempts GETs — without a cap an
 # authenticated caller can exhaust every worker with idle streams. 16 is
 # generous for the real UI (one stream per open drawer/tab).
 _MAX_SSE_STREAMS = 16
-_open_sse_streams = 0
-_sse_lock = threading.Lock()
+
+
+class AssistantTurnState:
+    """Per-app registry of running turns, cancel tokens, and open SSE streams.
+
+    One instance per Flask app (``app.extensions["assistant_turns"]``,
+    created in ``create_app``) so two apps in one process — or two tests —
+    never share turn slots. Lock granularity matches the former module
+    globals: one lock guards the turn/token registry, another the SSE
+    stream counter.
+    """
+
+    def __init__(self, max_sse_streams: int = _MAX_SSE_STREAMS) -> None:
+        self._running_turns: set[str] = set()
+        # Cancel token per session with a /messages turn in flight; the /stop
+        # route fires it. Workspace actions (apply/pr) claim the turn slot too
+        # but are not stoppable, so they never appear here.
+        self._cancel_tokens: dict[str, CancelToken] = {}
+        self._running_lock = threading.Lock()
+        self._max_sse_streams = max_sse_streams
+        self._open_sse_streams = 0
+        self._sse_lock = threading.Lock()
+
+    def try_claim_turn(self, sid: str) -> bool:
+        """Atomically claim the per-session turn slot for a workspace action
+        so a concurrent /messages turn (or another apply/pr) 409s instead of
+        racing the same worktree. Returns False if already claimed."""
+        with self._running_lock:
+            if sid in self._running_turns:
+                return False
+            self._running_turns.add(sid)
+            return True
+
+    def claim_turn(self, sid: str) -> CancelToken | None:
+        """Claim the turn slot for a /messages turn and mint its cancel token
+        in one atomic step. Returns None when the slot is already claimed."""
+        with self._running_lock:
+            if sid in self._running_turns:
+                return None
+            self._running_turns.add(sid)
+            token = self._cancel_tokens[sid] = CancelToken()
+            return token
+
+    def release_turn(self, sid: str) -> None:
+        """Free the per-session turn slot and drop the turn's cancel token.
+
+        Workspace actions never register a token, so the pop is a no-op for
+        them; the slot is exclusive, so it can only ever drop this turn's own
+        token."""
+        with self._running_lock:
+            self._running_turns.discard(sid)
+            self._cancel_tokens.pop(sid, None)
+
+    def is_turn_claimed(self, sid: str) -> bool:
+        with self._running_lock:
+            return sid in self._running_turns
+
+    def cancel_token(self, sid: str) -> CancelToken | None:
+        with self._running_lock:
+            return self._cancel_tokens.get(sid)
+
+    def try_open_sse_stream(self) -> bool:
+        """Take one SSE slot; False when the cap is reached (caller 429s)."""
+        with self._sse_lock:
+            if self._open_sse_streams >= self._max_sse_streams:
+                return False
+            self._open_sse_streams += 1
+            return True
+
+    def close_sse_stream(self) -> None:
+        with self._sse_lock:
+            self._open_sse_streams -= 1
+
+    @property
+    def open_sse_streams(self) -> int:
+        with self._sse_lock:
+            return self._open_sse_streams
+
+
+def _turn_state(app: Flask) -> AssistantTurnState:
+    """The app's turn registry. ``create_app`` instantiates it; setdefault
+    keeps bare test apps (register_assistant_routes on a plain Flask) working."""
+    return app.extensions.setdefault("assistant_turns", AssistantTurnState())
 
 
 def _try_claim_turn(sid: str) -> bool:
-    """Atomically claim the per-session turn slot for a workspace action so a
-    concurrent /messages turn (or another apply/pr) 409s instead of racing the
-    same worktree. Returns False if already claimed."""
-    with _running_lock:
-        if sid in _running_turns:
-            return False
-        _running_turns.add(sid)
-        return True
+    """Request-context shim for the workspace routes (see AssistantTurnState)."""
+    return _turn_state(current_app).try_claim_turn(sid)
 
 
 def _release_turn(sid: str) -> None:
-    """Free the per-session turn slot and drop the turn's cancel token.
-
-    Workspace actions never register a token, so the pop is a no-op for them;
-    the slot is exclusive, so it can only ever drop this turn's own token."""
-    with _running_lock:
-        _running_turns.discard(sid)
-        _cancel_tokens.pop(sid, None)
+    """Request-context shim for the workspace routes (see AssistantTurnState)."""
+    _turn_state(current_app).release_turn(sid)
 
 
 def _api_provider(provider_id: str) -> dict | None:
@@ -153,9 +216,11 @@ def _turn_endpoint(provider: str, body: dict, provider_cfg: dict) -> tuple[str, 
     return provider_cfg.get("api_base", ""), body.get("apiKey") or provider_cfg.get("api_key")
 
 
-def _start_turn_worker(sid: str, turn: TurnRequest, repo, tool_ctx, cancel: CancelToken) -> None:
+def _start_turn_worker(state: AssistantTurnState, sid: str, turn: TurnRequest,
+                       repo, tool_ctx, cancel: CancelToken) -> None:
     """Run the turn on a daemon thread, freeing the session's turn slot when it
-    ends however it ends."""
+    ends however it ends. Takes *state* directly: the worker thread has no app
+    context, so it cannot resolve current_app."""
     def _worker():
         try:
             if tool_ctx.score_cache_path is not None:
@@ -164,12 +229,13 @@ def _start_turn_worker(sid: str, turn: TurnRequest, repo, tool_ctx, cancel: Canc
             else:
                 run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
         finally:
-            _release_turn(sid)
+            state.release_turn(sid)
 
     threading.Thread(target=_worker, daemon=True).start()
 
 
 def register_assistant_routes(app: Flask) -> None:
+    _turn_state(app)  # ensure the registry exists even on bare test apps
     register_assistant_workspace_routes(app)
 
     @app.post("/api/assistant/sessions")
@@ -238,15 +304,14 @@ def register_assistant_routes(app: Flask) -> None:
             return jsonify({"error": "text required"}), 400
         if local_provider_busy(session["provider"]):
             return jsonify({"error": "model busy with analysis"}), 409
-        with _running_lock:
-            if sid in _running_turns:
-                return jsonify({"error": "a turn is already running"}), 409
-            _running_turns.add(sid)
-            cancel = _cancel_tokens[sid] = CancelToken()
+        state = _turn_state(app)
+        cancel = state.claim_turn(sid)
+        if cancel is None:
+            return jsonify({"error": "a turn is already running"}), 409
         # Everything from here through Thread.start() must free the slot on
         # failure — otherwise an exception (e.g. build_tool_context blowing
-        # up) leaves `sid` in `_running_turns` forever and every future POST
-        # to this session 409s permanently.
+        # up) leaves `sid` claimed forever and every future POST to this
+        # session 409s permanently.
         try:
             provider_cfg = _api_provider(session["provider"]) or {}
             api_base, api_key = _turn_endpoint(session["provider"], body, provider_cfg)
@@ -260,12 +325,12 @@ def register_assistant_routes(app: Flask) -> None:
                                and (session.get("source") or "local") == "local"),
             )
             tool_ctx = build_tool_context(app, session)
-            _start_turn_worker(sid, turn, repo, tool_ctx, cancel)
+            _start_turn_worker(state, sid, turn, repo, tool_ctx, cancel)
         except SharedSourceUnavailable as exc:
-            _release_turn(sid)
+            state.release_turn(sid)
             return jsonify({"error": str(exc)}), 409
         except Exception:
-            _release_turn(sid)
+            state.release_turn(sid)
             raise
         return jsonify({"accepted": True}), 202
 
@@ -273,8 +338,7 @@ def register_assistant_routes(app: Flask) -> None:
     def stop_assistant_turn(sid: str):
         if get_repository(app).get_session(sid) is None:
             return jsonify({"error": "unknown session"}), 404
-        with _running_lock:
-            token = _cancel_tokens.get(sid)
+        token = _turn_state(app).cancel_token(sid)
         if token is None:
             return jsonify({"error": "no turn running"}), 409
         # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
@@ -295,13 +359,12 @@ def register_assistant_routes(app: Flask) -> None:
         except ValueError:
             after = 0
 
-        global _open_sse_streams
-        with _sse_lock:
-            if _open_sse_streams >= _MAX_SSE_STREAMS:
-                return jsonify({"error": "too many open event streams"}), 429
-            _open_sse_streams += 1
+        state = _turn_state(app)
+        if not state.try_open_sse_stream():
+            return jsonify({"error": "too many open event streams"}), 429
 
         released = False
+        release_guard = threading.Lock()
 
         def _release_stream():
             # Idempotent: runs from both the generator's finally and the
@@ -309,12 +372,11 @@ def register_assistant_routes(app: Flask) -> None:
             # the client drops before the generator is ever started, in which
             # case a generator finally never executes).
             nonlocal released
-            global _open_sse_streams
-            with _sse_lock:
+            with release_guard:
                 if released:
                     return
                 released = True
-                _open_sse_streams -= 1
+            state.close_sse_stream()
 
         def _generate():
             # SSE comments (":keepalive") are invisible to EventSource — only
