@@ -134,7 +134,9 @@ def get_scores_raw(
             repo.ensure_projected()
             store = SQLiteStateStore(run_dir)
             if store.read_dimension_scores():
-                return _build_response_from_grade_tables(run_dir, params=params)
+                return _build_response_from_grade_tables(
+                    run_dir, params=params, store_factory=SQLiteStateStore,
+                )
         except sqlite3.DatabaseError:
             # evaluation.db is unreadable by this binary: it was written by a
             # newer Quodeq (SchemaVersionError, a DatabaseError subclass) or is

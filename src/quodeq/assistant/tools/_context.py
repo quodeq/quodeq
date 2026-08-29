@@ -1,15 +1,17 @@
 """Shared per-session context handed to every tool handler."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from quodeq.data.ports.assistant import AssistantStore
+from quodeq.data.ports.findings import FindingsRepository
 
 
 @dataclass(frozen=True)
 class ToolContext:
-    repository: AssistantRepository
+    repository: AssistantStore
     session_id: str
     run_dir: Path | None
     repo_root: Path | None
@@ -42,3 +44,9 @@ class ToolContext:
     # explicit "no filtering" opt-out, kept for any future caller that wants
     # it, not something production code paths produce.
     visible_standard_ids: tuple[str, ...] | None = None
+    # Builds the per-run findings reader for the read tools. Composition
+    # roots (api/_assistant_helpers.build_tool_context, the MCP server) pass
+    # the concrete SQLite factory; tests can inject a fake. None falls back
+    # to the SQLite default inside the tools module so directly-constructed
+    # contexts keep working.
+    findings_repo_factory: Callable[[Path], FindingsRepository] | None = None

@@ -19,7 +19,7 @@ from quodeq.assistant.adapters._cli_spawn import (
 from quodeq.assistant.adapters._linereader import iter_lines
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.mcp import _config as mcp_config
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
+from quodeq.data.ports.assistant import AssistantStore
 from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
 
 _logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ def _raw_error_line(line: str) -> str | None:
 
 def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
               prior_session_id: str | None, new_session_id: str,
-              repository: AssistantRepository, emit: Callable[[dict], None],
+              repository: AssistantStore, emit: Callable[[dict], None],
               spawn_fn, cancel: CancelToken) -> tuple[str, str | None, int, str | None, str | None]:
     mcp_config_path = None
     mcp_config_arg = None
@@ -204,7 +204,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
 
 
 def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str,
-                 prior_session_id: str | None, repository: AssistantRepository,
+                 prior_session_id: str | None, repository: AssistantStore,
                  emit: Callable[[dict], None], spawn_fn=None,
                  cancel: CancelToken | None = None) -> str:
     spawn_fn = spawn_fn or spawn_turn

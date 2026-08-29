@@ -14,6 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from quodeq.core.scoring.params import ScoringParams
+
 # Per-project JSON artifacts: repository_info.json, scan.json.
 from quodeq.data.fs.project_files import (  # noqa: F401
     read_repository_info,
@@ -59,6 +61,11 @@ from quodeq.data.fs.report_parser.finding_details import (  # noqa: F401
 # Git clone subprocess invocation.
 from quodeq.data.fs.repo_clone import clone_repo  # noqa: F401
 
+# Per-run findings-table reads (SQL stays in the adapter) and the row-dict →
+# Finding mapper that decodes what those reads return.
+from quodeq.data.sqlite.findings_queries import read_active_findings  # noqa: F401
+from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: F401
+
 # Custom-standard file mechanics (see StandardsStore below).
 from quodeq.data.fs.standards_store import (  # noqa: F401
     compiled_exists,
@@ -67,6 +74,22 @@ from quodeq.data.fs.standards_store import (  # noqa: F401
     standard_exists,
     standard_path,
 )
+
+
+class GradeTablesReader(Protocol):
+    """Read seam over a run's SQL grade tables (dimension/principle scores).
+
+    The concrete implementation is ``data.sqlite.state_store.SQLiteStateStore``;
+    ``services.scoring`` accepts a ``Callable[[Path], GradeTablesReader]``
+    factory so the response builder can be driven by a fake without a real
+    SQLite file.
+    """
+
+    def read_dimension_scores(self) -> list[dict]: ...
+
+    def read_principle_grades(self) -> list[dict]: ...
+
+    def read_run_score_from_dim_scores(self, params: ScoringParams | None = None) -> dict: ...
 
 
 class StandardsStore(Protocol):

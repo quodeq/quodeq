@@ -19,6 +19,34 @@ from quodeq.data.sqlite.connection import open_evaluation_db
 _logger = logging.getLogger(__name__)
 
 
+_SELECT_ACTIVE = (
+    "SELECT id, practice_id, dimension, requirement, verdict, severity, "
+    "file, line, end_line, title, reason, snippet, violation_type, context, "
+    "scope, req_refs_json, confidence, provenance_downgrade, "
+    "scope_downgrade_json "
+    "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
+)
+
+
+def _dict_row(cursor, row):  # noqa: ANN001
+    return {col[0]: row[i] for i, col in enumerate(cursor.description)}
+
+
+def read_active_findings(run_dir: Path) -> list[dict]:
+    """Every non-dismissed finding row in *run_dir*, as column-keyed dicts.
+
+    Feeds the SQL-backed scores response (services.scoring). Rows keep the
+    raw column names/values; mapping to ``Finding`` is the caller's concern
+    (``row_to_finding``). Unlike the best-effort readers above, this opens
+    the database unconditionally (creating an empty one when absent) —
+    callers only reach it after the grade tables answered, so the database
+    already exists on every production path.
+    """
+    with open_evaluation_db(run_dir) as conn:
+        conn.row_factory = _dict_row
+        return conn.execute(_SELECT_ACTIVE).fetchall()
+
+
 def read_finding_details(run_dir: Path, keys: set[tuple]) -> dict[tuple, dict]:
     """Return finding-detail dicts for the ``(requirement, file, line)``
     *keys* present in *run_dir*'s findings table.

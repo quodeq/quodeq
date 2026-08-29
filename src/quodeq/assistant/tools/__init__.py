@@ -3,13 +3,16 @@ from quodeq.assistant.tools._actions import register_action_tools
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._context_tool import register_context_tool
 from quodeq.assistant.tools._overview import register_overview_tools
-from quodeq.assistant.tools._read_tools import register_read_tools
+from quodeq.assistant.tools._read_tools import (
+    default_findings_repo_factory,
+    register_read_tools,
+)
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import register_repo_tools
 from quodeq.assistant.tools._web_tools import register_web_tools
 
 __all__ = ["ToolContext", "ToolError", "ToolRegistry", "ToolSpec", "build_registry",
-           "register_web_tools"]
+           "default_findings_repo_factory", "register_web_tools"]
 
 
 def build_registry(ctx: ToolContext) -> ToolRegistry:
