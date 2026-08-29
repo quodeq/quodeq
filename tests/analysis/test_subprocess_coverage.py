@@ -304,7 +304,7 @@ class TestRunApiAnalysisBridge:
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              pytest.raises(Exception, match="No model configured"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
     def test_raises_when_no_api_base(self, tmp_path):
         stream = tmp_path / "stream.json"
@@ -313,7 +313,7 @@ class TestRunApiAnalysisBridge:
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              pytest.raises(Exception, match="No API base URL configured"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
     def test_empty_queue_writes_complete_marker_and_preserves_shared_jsonl(self, tmp_path):
         """Empty queue: write the per-agent stream 'complete' marker, but
@@ -334,7 +334,7 @@ class TestRunApiAnalysisBridge:
         provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
         assert "complete" in stream.read_text()
         assert jsonl.read_text() == '{"t":"violation","p":"X","file":"a.py","line":1}\n'
@@ -350,7 +350,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
              patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
             mock_api.assert_called_once()
             assert stream.read_text().strip() != ""
 
@@ -373,7 +373,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
              patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
         assert mock_api.call_args.kwargs["config"].n_subagents == 3
 
@@ -389,7 +389,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
              patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
         assert mock_api.call_args.kwargs["config"].n_subagents == 1
 
@@ -425,7 +425,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.subprocess.assemble_api_prompt", return_value="prompt") as mock_assemble, \
              patch("quodeq.analysis._api_runner.run_api_analysis"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
+            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
         mock_assemble.assert_called_once()
         trust_model = mock_assemble.call_args.kwargs["trust_model"]
@@ -443,31 +443,32 @@ class TestRunApiAnalysisBridge:
 # ---------------------------------------------------------------------------
 
 class TestResolveProviderConfig:
-    def test_reads_api_key_from_env(self, monkeypatch):
+    def test_reads_api_key_from_injected_env(self, monkeypatch):
         provider = {"myprovider": {"type": "api", "model": "m", "api_base": "http://x", "api_key_env": "MY_KEY"}}
-        monkeypatch.setenv("MY_KEY", "secret")
+        # The injected mapping is the only credential source: a conflicting
+        # process env var must be ignored.
+        monkeypatch.setenv("MY_KEY", "process-env-value")
         cfg = AnalysisConfig(ai_cmd="myprovider", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _, _, key = _resolve_provider_config(cfg)
+            _, _, key = _resolve_provider_config(cfg, {"MY_KEY": "secret"})
         assert key == "secret"
 
-    def test_required_api_key_missing_raises(self, monkeypatch):
+    def test_required_api_key_missing_raises(self):
         provider = {"openrouter": {
             "type": "api", "model": "m", "api_base": "https://openrouter.ai/api/v1",
             "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
         }}
-        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         cfg = AnalysisConfig(ai_cmd="openrouter", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
             with pytest.raises(Exception, match="OPENROUTER_API_KEY"):
-                _resolve_provider_config(cfg)
+                _resolve_provider_config(cfg, {})
 
     def test_omlx_falls_back_to_read_omlx_api_key(self):
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value="omlx-key"):
-            _, _, key = _resolve_provider_config(cfg)
+            _, _, key = _resolve_provider_config(cfg, {})
         assert key == "omlx-key"
 
     def test_omlx_empty_key_when_not_configured(self):
@@ -475,7 +476,7 @@ class TestResolveProviderConfig:
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value=""):
-            _, _, key = _resolve_provider_config(cfg)
+            _, _, key = _resolve_provider_config(cfg, {})
         assert key == ""
 
     def test_credential_registry_dispatches_registered_provider(self, monkeypatch):
@@ -488,7 +489,7 @@ class TestResolveProviderConfig:
             provider = {"testprovider": {"type": "api", "model": "m", "api_base": "http://tp/v1"}}
             cfg = AnalysisConfig(ai_cmd="testprovider", ai_model="m")
             with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-                _, _, key = _resolve_provider_config(cfg)
+                _, _, key = _resolve_provider_config(cfg, {})
             assert key == "registry-key"
         finally:
             _CREDENTIAL_LOADERS.pop("testprovider", None)
@@ -499,7 +500,7 @@ class TestResolveProviderConfig:
         provider = {"newprovider": {"type": "api", "model": "m", "api_base": "http://np/v1"}}
         cfg = AnalysisConfig(ai_cmd="newprovider", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _, _, key = _resolve_provider_config(cfg)
+            _, _, key = _resolve_provider_config(cfg, {})
         assert key == ""
 
 

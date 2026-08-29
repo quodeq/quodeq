@@ -21,6 +21,7 @@ from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
 from quodeq.core.evidence._jsonl import judgment_to_dict
 from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.data.fs.standards_loader import load_requirement_checks
 
@@ -217,7 +218,8 @@ def apply_deterministic_checks(
         gated.append(judgment)
         rows.append(row)
 
-    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir)
+    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir,
+                                        req_map_reader=read_req_to_principle_map)
     added = _merge_into_evidence(evidence, gated, resolver)
     if added and jsonl_path is not None:
         _persist(jsonl_path, gated, rows)

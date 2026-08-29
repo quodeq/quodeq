@@ -14,7 +14,9 @@ import os
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
@@ -73,7 +75,9 @@ def score_dimension_from_evidence(
         evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=source_file_count, files_read=files_read,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+            req_map_reader=read_req_to_principle_map,
+            cwe_url_template=cwe_url_template())
     except (OSError, ValueError, KeyError) as exc:
         _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None

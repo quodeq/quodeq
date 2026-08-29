@@ -16,5 +16,5 @@ src/quodeq/services/_external_jobs.py:21:analysis
 src/quodeq/services/evaluation_mixin.py:360:analysis
 src/quodeq/services/jobs.py:20:analysis
 src/quodeq/services/scan_progress.py:23:analysis
-src/quodeq/services/score_run.py:14:analysis
+src/quodeq/services/score_run.py:16:analysis
 src/quodeq/services/tooling_mixin.py:17:analysis

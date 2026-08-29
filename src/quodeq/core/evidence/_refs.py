@@ -1,7 +1,6 @@
 """Reference resolution helpers for evidence judgments."""
 from __future__ import annotations
 
-import os
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,19 +11,10 @@ from quodeq.core.types.req_ref import ReqRef
 if TYPE_CHECKING:
     from quodeq.core.events.models import Judgment
 
+# Outer layers resolve the QUODEQ_CWE_URL_TEMPLATE override (see
+# quodeq.config.evidence_env.cwe_url_template) and pass it in; core only
+# knows the packaged default.
 _CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.html"
-
-
-def _cwe_url_template(env: dict[str, str] | None = None) -> str:
-    """Return the CWE URL template, reading from env lazily.
-
-    *env* overrides ``os.environ`` when provided (e.g. for testing).
-    When ``None``, falls back to ``os.environ``.
-    """
-    return (env if env is not None else os.environ).get(
-        "QUODEQ_CWE_URL_TEMPLATE",
-        _CWE_URL_TEMPLATE_DEFAULT,
-    )
 
 
 def resolve_llm_refs(
@@ -43,7 +33,7 @@ def resolve_llm_refs(
     if not llm_refs:
         return None
     if cwe_url_template is None:
-        cwe_url_template = _cwe_url_template()
+        cwe_url_template = _CWE_URL_TEMPLATE_DEFAULT
     by_label = {r["label"]: r for r in (all_req_refs or [])}
     result = []
     upper_labels = {k.upper(): r for k, r in by_label.items()}
@@ -69,6 +59,7 @@ def enrich_judgment(
     llm_refs: list[str] | None,
     compiled_dir: Path | None,
     req_refs_cache: dict[str, dict[str, list[dict]]],
+    cwe_url_template: str | None = None,
 ) -> "Judgment":
     """Resolve req_refs for a Judgment, returning the (possibly new) Judgment.
 
@@ -83,7 +74,7 @@ def enrich_judgment(
         if j.dimension not in req_refs_cache:
             req_refs_cache[j.dimension] = load_compiled_refs(str(compiled_dir), j.dimension)
         all_req_refs = req_refs_cache[j.dimension].get(j.req)
-    resolved = resolve_llm_refs(llm_refs, all_req_refs)
+    resolved = resolve_llm_refs(llm_refs, all_req_refs, cwe_url_template)
     if not resolved:
         return j
     refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in resolved]

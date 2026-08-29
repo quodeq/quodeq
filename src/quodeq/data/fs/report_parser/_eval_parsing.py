@@ -8,6 +8,7 @@ from typing import Any
 
 from quodeq.core.types._serialization import to_camel_dict
 from quodeq.core.evidence._req_mapping import principle_names_for_dimension
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.shared.utils import read_json
 from quodeq.data.fs.report_parser._report_parsing import build_finding, empty_severity_buckets
 from quodeq.data.fs.report_parser._principle_map import build_principle_map
@@ -35,7 +36,8 @@ def parse_eval_from_json(
         _logger.warning("Failed to parse evaluation %s: %s", json_path.name, exc)
         return None
 
-    canonical = principle_names_for_dimension(dimension, compiled_dir=compiled_dir)
+    canonical = principle_names_for_dimension(dimension, compiled_dir=compiled_dir,
+                                              req_map_reader=read_req_to_principle_map)
 
     def _in_standard(name: Any) -> bool:
         # Permissive when no standard is available (canonical empty).

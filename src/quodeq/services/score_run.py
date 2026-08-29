@@ -9,7 +9,9 @@ import json
 import logging
 from pathlib import Path
 
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
@@ -106,7 +108,9 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=source_file_count, files_read=files_read,
-            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+            ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+                req_map_reader=read_req_to_principle_map,
+                cwe_url_template=cwe_url_template())
             if evidence is None:
                 continue
             scores = score_evidence(evidence, mode="numerical", params=params)

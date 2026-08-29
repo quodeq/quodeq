@@ -25,6 +25,7 @@ import pytest
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
 from quodeq.core.evidence._jsonl import parse_jsonl_line
 from quodeq.core.evidence._req_mapping import _group_judgments, build_principle_resolver
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 
 _DIMENSION = "demo"
 
@@ -78,20 +79,23 @@ def _report_violation_count(evidence_path: Path, compiled: Path) -> int:
         parsed = parse_jsonl_line(line)
         if parsed is not None:
             judgments.append(parsed[0])
-    grouped = _group_judgments(judgments, dimension=_DIMENSION, compiled_dir=compiled)
+    grouped = _group_judgments(judgments, dimension=_DIMENSION, compiled_dir=compiled,
+                               req_map_reader=read_req_to_principle_map)
     return sum(len(v) for v in grouped.violations.values())
 
 
 def test_live_counter_matches_report_violation_count(evidence, compiled_dir):
     """The invariant: both paths agree on how many violations exist."""
-    resolver = build_principle_resolver(_DIMENSION, compiled_dir=compiled_dir)
+    resolver = build_principle_resolver(_DIMENSION, compiled_dir=compiled_dir,
+                                        req_map_reader=read_req_to_principle_map)
     tally = tally_unique_findings(evidence, resolver=resolver)
     assert tally.violations == _report_violation_count(evidence, compiled_dir)
 
 
 def test_unmappable_finding_is_counted_as_quarantined_not_dropped(evidence, compiled_dir):
     """Excluded from the violation count, but carried so it is not lost."""
-    resolver = build_principle_resolver(_DIMENSION, compiled_dir=compiled_dir)
+    resolver = build_principle_resolver(_DIMENSION, compiled_dir=compiled_dir,
+                                        req_map_reader=read_req_to_principle_map)
     tally = tally_unique_findings(evidence, resolver=resolver)
     assert tally.violations == 3
     assert tally.quarantined == 1
@@ -111,7 +115,8 @@ def test_duplicates_are_folded_before_the_quarantine_check(tmp_path, compiled_di
     line = json.dumps({"req": "N/A", "t": "violation", "d": _DIMENSION,
                        "file": "d.py", "line": 4})
     p.write_text((line + "\n") * 3, encoding="utf-8")
-    resolver = build_principle_resolver(_DIMENSION, compiled_dir=compiled_dir)
+    resolver = build_principle_resolver(_DIMENSION, compiled_dir=compiled_dir,
+                                        req_map_reader=read_req_to_principle_map)
     tally = tally_unique_findings(p, resolver=resolver)
     assert tally.quarantined == 1
     assert tally.duplicates == 2

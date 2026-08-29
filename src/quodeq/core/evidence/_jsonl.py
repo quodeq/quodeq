@@ -122,7 +122,10 @@ def judgment_to_dict(j: Judgment) -> dict:
     return d
 
 
-def parse_judgments(lines: Iterable[str], compiled_dir: Path | None) -> list[Judgment]:
+def parse_judgments(
+    lines: Iterable[str], compiled_dir: Path | None,
+    cwe_url_template: str | None = None,
+) -> list[Judgment]:
     """Parse JSONL lines and return enriched Judgment objects."""
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
@@ -130,7 +133,8 @@ def parse_judgments(lines: Iterable[str], compiled_dir: Path | None) -> list[Jud
         result = parse_jsonl_line(line)
         if result is not None:
             j, llm_refs = result
-            j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
+            j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache,
+                                cwe_url_template=cwe_url_template)
             judgments.append(j)
     return judgments
 
@@ -138,10 +142,11 @@ def parse_judgments(lines: Iterable[str], compiled_dir: Path | None) -> list[Jud
 def read_judgments(
     jsonl_file: Path, compiled_dir: Path | None,
     open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
+    cwe_url_template: str | None = None,
 ) -> list[Judgment]:
     """Read JSONL lines from a file and return enriched Judgment objects."""
     if not jsonl_file.exists():
         return []
     opener = open_fn or open_text
     with opener(jsonl_file) as _jf:
-        return parse_judgments(_jf, compiled_dir)
+        return parse_judgments(_jf, compiled_dir, cwe_url_template=cwe_url_template)

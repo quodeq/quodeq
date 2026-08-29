@@ -43,6 +43,21 @@ def _ctx() -> EvidenceContext:
     )
 
 
+def _read_map(directory: Path, dimension: str) -> dict[str, str]:
+    """Inline stand-in for data.fs.standards_loader.read_req_to_principle_map,
+    so this core-layer test injects the reader without importing the adapter."""
+    path = directory / f"{dimension}.json"
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        req.get("id", ""): principle.get("name", "")
+        for principle in data.get("principles", [])
+        for req in principle.get("requirements", [])
+        if req.get("id") and principle.get("name")
+    }
+
+
 def test_unmappable_finding_not_grouped_as_phantom_principle(tmp_path):
     compiled = tmp_path / "compiled"
     _write_compiled_standard(compiled, "maintainability", {
@@ -61,7 +76,8 @@ def test_unmappable_finding_not_grouped_as_phantom_principle(tmp_path):
     ]
     jsonl.write_text("\n".join(json.dumps(f) for f in findings) + "\n", encoding="utf-8")
 
-    result = parse_jsonl_to_evidence_by_dimension(jsonl, _ctx(), evaluators_dir=compiled)
+    result = parse_jsonl_to_evidence_by_dimension(jsonl, _ctx(), evaluators_dir=compiled,
+                                                   req_map_reader=_read_map)
 
     maint = result["maintainability"]
     assert "N/A" not in maint.principles
@@ -79,7 +95,8 @@ def test_unmappable_finding_is_logged(tmp_path, caplog):
     }) + "\n", encoding="utf-8")
 
     with caplog.at_level(logging.WARNING):
-        parse_jsonl_to_evidence_by_dimension(jsonl, _ctx(), evaluators_dir=compiled)
+        parse_jsonl_to_evidence_by_dimension(jsonl, _ctx(), evaluators_dir=compiled,
+                                                   req_map_reader=_read_map)
 
     assert any(
         "N/A" in r.getMessage() or "unmapped" in r.getMessage().lower()
@@ -115,6 +132,7 @@ def test_empty_evaluators_dir_falls_back_to_compiled_standard(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         result = parse_jsonl_to_evidence_by_dimension(
             jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
+        req_map_reader=_read_map,
         )
 
     maint = result["maintainability"]
@@ -145,6 +163,7 @@ def test_single_dimension_parse_falls_back_to_compiled_standard(tmp_path):
 
     evidence = parse_jsonl_to_evidence(
         jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
+        req_map_reader=_read_map,
     )
 
     assert "N/A" not in evidence.principles
@@ -172,6 +191,7 @@ def test_custom_evaluator_standard_takes_precedence_over_compiled(tmp_path):
 
     result = parse_jsonl_to_evidence_by_dimension(
         jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
+        req_map_reader=_read_map,
     )
 
     assert set(result["maintainability"].principles.keys()) == {"CustomP"}
@@ -193,6 +213,7 @@ def test_permissive_when_neither_source_has_standard(tmp_path):
 
     result = parse_jsonl_to_evidence_by_dimension(
         jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
+        req_map_reader=_read_map,
     )
 
     assert set(result["maintainability"].principles.keys()) == {"Modularity"}

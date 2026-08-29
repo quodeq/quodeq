@@ -8,7 +8,7 @@ from typing import Iterable
 
 from quodeq.core.types import Finding, ViolationResponse
 from quodeq.core.evidence._req_mapping import PrincipleResolver, build_principle_resolver
-from quodeq.data.fs.standards_loader import build_req_refs_lookup
+from quodeq.data.fs.standards_loader import build_req_refs_lookup, read_req_to_principle_map
 from quodeq.data.fs.stream_files import count_files_in_stream
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
@@ -106,6 +106,7 @@ def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResol
     validate_path_segment(dimension)  # dimension reaches a path join downstream
     return build_principle_resolver(
         dimension, default_paths().evaluators_dir, compiled_dir,
+        req_map_reader=read_req_to_principle_map,
     )
 
 

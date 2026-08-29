@@ -23,6 +23,7 @@ from pathlib import Path
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
 from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services.suppression import build_matcher, project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.data.fs.dimensions_state_store import read_dimensions
@@ -417,7 +418,8 @@ def build_scan_progress(
         tally = tally_unique_findings(
             evidence_dir / f"{dim_id}_evidence.jsonl",
             suppressed=matcher.is_suppressed if matcher.active else None,
-            resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir),
+            resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir,
+                                              req_map_reader=read_req_to_principle_map),
         )
         elapsed = _dim_elapsed_s(dim_id, run_dir, d_state, record)
         active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0

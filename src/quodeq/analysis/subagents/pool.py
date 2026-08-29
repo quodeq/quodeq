@@ -21,6 +21,7 @@ from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 
@@ -119,6 +120,7 @@ class SubagentPool:
                 self._dimension_key,
                 getattr(run_config, "evaluators_dir", None),
                 self._base_config.compiled_dir,
+                req_map_reader=read_req_to_principle_map,
             ),
         )
         hb = threading.Thread(

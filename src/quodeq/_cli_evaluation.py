@@ -19,7 +19,9 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
+from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
 from quodeq.analysis.scoring_pipeline import run_full
@@ -211,7 +213,9 @@ def _count_excluded_findings(
         evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=0, files_read=0,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+            req_map_reader=read_req_to_principle_map,
+            cwe_url_template=cwe_url_template())
     except (OSError, ValueError, KeyError):
         return 0
     if evidence is None:
