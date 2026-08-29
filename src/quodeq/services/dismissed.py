@@ -6,10 +6,10 @@ evaluation.db (aggregated across runs).
 """
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from pathlib import Path
 
+from quodeq.services.ports import read_finding_details_from_json_eval
 from quodeq.services.suppression_keys import is_dismissed
 from quodeq.core.events.models import (
     EventType,
@@ -108,37 +108,11 @@ def _enrich_from_json_eval(run_dir: Path, keys: set[tuple], out: dict[tuple, dic
     field the Dismissed tab needs (principle, severity, title, reason,
     snippet, context, req_refs); ``dimension`` comes from the filename so
     the entry stays linked to its standard for the restore/delete flows.
+    The walk and field mapping live in the data layer beside the SQL twin;
+    ``setdefault`` preserves the first-run-wins merge across runs.
     """
-    eval_dir = run_dir / "evaluation"
-    if not eval_dir.is_dir():
-        return
-    for path in eval_dir.iterdir():
-        if path.suffix != ".json":
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        dimension = path.stem
-        for v in (data.get("violations") or []):
-            req = str(v.get("req") or "")
-            file = str(v.get("file") or "")
-            try:
-                line = int(v.get("line") or 0)
-            except (TypeError, ValueError):
-                line = 0
-            key = (req, file, line)
-            if key not in keys or key in out:
-                continue
-            out[key] = {
-                "req": req, "file": file, "line": line,
-                "dimension": dimension, "principle": v.get("principle") or "",
-                "severity": v.get("severity") or "", "title": v.get("title") or "",
-                "reason": v.get("reason") or "", "snippet": v.get("snippet") or "",
-                "context": v.get("context") or "", "scope": v.get("scope") or "",
-                "endLine": int(v.get("end_line") or v.get("endLine") or 0),
-                "reqRefs": v.get("req_refs") or v.get("reqRefs") or [],
-            }
+    for key, detail in read_finding_details_from_json_eval(run_dir, keys).items():
+        out.setdefault(key, detail)
 
 
 def load_dismissed(

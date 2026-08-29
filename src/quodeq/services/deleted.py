@@ -5,51 +5,35 @@ deleted list permanently suppresses any finding whose
 ``(dimension, principle, file)`` matches an entry. Future scans will not
 surface those findings again. Deletion is one-way: there is no restore.
 
-The on-disk file ``deleted.json`` lives next to ``dismissed.json`` and is
-guarded by the same kind of POSIX file lock used by ``dismissed.py``.
+The on-disk file ``deleted.json`` lives next to ``dismissed.json``; its
+format and lock mechanics live in ``quodeq.data.fs.deleted_store`` — this
+module keeps the business rules only (key semantics, deduplication,
+sweeping matching dismissed entries).
 """
 from __future__ import annotations
 
-import json
 import logging
-import os
-from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.services.dismissed import load_dismissed
+from quodeq.services.ports import (
+    locked_deleted_store,
+    read_deleted_entries,
+    write_deleted_entries,
+)
 from quodeq.services.suppression_keys import is_deleted
 from quodeq.core.events.models import (
     FindingUndismissed,
     FindingUndismissedEvent,
 )
 from quodeq.core.types.finding import Finding
-from quodeq.data._file_lock import lock_file, unlock_file
 from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.dismissed import recount_totals
 
 
 _logger = logging.getLogger(__name__)
-
-_FILENAME = "deleted.json"
-
-
-def _deleted_path(project_dir: Path) -> Path:
-    return project_dir / _FILENAME
-
-
-@contextmanager
-def _locked(project_dir: Path):
-    lock_path = project_dir / "deleted.json.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
-    try:
-        lock_file(fd)
-        yield
-    finally:
-        unlock_file(fd)
-        os.close(fd)
 
 
 def _key(entry: dict) -> tuple:
@@ -62,16 +46,7 @@ def _key(entry: dict) -> tuple:
 
 def load_deleted(project_dir: Path) -> list[dict]:
     """Load deleted suppressions for a project. Returns empty list if none."""
-    path = _deleted_path(project_dir)
-    if not path.exists():
-        return []
-    try:
-        items = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    if not isinstance(items, list):
-        return []
-    return items
+    return read_deleted_entries(project_dir)
 
 
 def deleted_keys(project_dir: Path) -> set[tuple]:
@@ -88,14 +63,6 @@ def _entry_from_finding(finding: dict) -> dict:
     }
 
 
-def _write_deleted(project_dir: Path, entries: list[dict]) -> None:
-    path = _deleted_path(project_dir)
-    if entries:
-        path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
-    elif path.exists():
-        path.unlink()
-
-
 def delete_finding(project_dir: Path, finding: dict) -> int:
     """Permanently suppress a finding by (dimension, principle, file).
 
@@ -107,11 +74,11 @@ def delete_finding(project_dir: Path, finding: dict) -> int:
     if not new_key[1] or not new_key[2]:
         return 0
     swept = 0
-    with _locked(project_dir):
+    with locked_deleted_store(project_dir):
         existing = load_deleted(project_dir)
         if new_key not in {_key(e) for e in existing}:
             existing.append(_entry_from_finding(finding))
-            _write_deleted(project_dir, existing)
+            write_deleted_entries(project_dir, existing)
         swept = _sweep_dismissed_matching(project_dir, new_key)
     return swept
 
@@ -124,7 +91,7 @@ def delete_all_dismissed(project_dir: Path) -> int:
     undismisses all of them via the action log.
     Returns the count of dismissed entries removed.
     """
-    with _locked(project_dir):
+    with locked_deleted_store(project_dir):
         dismissed_entries = load_dismissed(project_dir)
         if not dismissed_entries:
             return 0
@@ -136,7 +103,7 @@ def delete_all_dismissed(project_dir: Path) -> int:
                 continue
             existing.append(_entry_from_finding(entry))
             existing_keys.add(k)
-        _write_deleted(project_dir, existing)
+        write_deleted_entries(project_dir, existing)
         # Undismiss all via the action log.
         count = len(dismissed_entries)
         writer = ActionLogWriter(project_dir)

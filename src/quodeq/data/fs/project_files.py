@@ -20,6 +20,17 @@ REPOSITORY_INFO_FILENAME = "repository_info.json"
 SCAN_FILENAME = "scan.json"
 
 
+def repository_info_exists(project_dir: Path) -> bool:
+    """True when ``repository_info.json`` exists.
+
+    Pure presence probe — an unreadable record still marks the directory
+    as a registered project, so callers that only need "is this a
+    project?" must not fold it into :func:`read_repository_info`'s
+    None-on-corrupt contract.
+    """
+    return (project_dir / REPOSITORY_INFO_FILENAME).exists()
+
+
 def read_repository_info(project_dir: Path) -> dict | None:
     """Parsed ``repository_info.json``, or None when absent, corrupt, or
     not a JSON object."""
@@ -41,6 +52,16 @@ def write_repository_info(project_dir: Path, data: dict) -> bool:
     except OSError:
         return False
     return True
+
+
+def read_scan_total_files(project_dir: Path) -> int:
+    """``total_files`` from ``scan.json``; 0 when absent, corrupt, or non-int."""
+    try:
+        data = json.loads((project_dir / SCAN_FILENAME).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    raw = data.get("total_files") if isinstance(data, dict) else None
+    return int(raw) if isinstance(raw, int) else 0
 
 
 def write_scan_json(scan: ScanData, output_dir: Path) -> None:

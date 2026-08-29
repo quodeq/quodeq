@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.services.ports import read_dispatched_cache_keys, remove_matching_files
 from quodeq.services.project_registration import mark_onboarding_complete, register_project
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.shared.provider_env import provider_env_exports
@@ -388,18 +389,10 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
     if not evidence_dir.is_dir():
         return
 
-    cache = None
-    for sidecar in evidence_dir.glob("*_dispatch_keys.json"):
-        try:
-            keys = json.loads(sidecar.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            _logger.warning("Could not read sidecar %s: %s", sidecar, exc)
-            continue
-        if not isinstance(keys, dict):
-            continue
-        if cache is None:
-            cache = _open_cache()
-        for key in keys.values():
+    keys = read_dispatched_cache_keys(evidence_dir)
+    if keys:
+        cache = _open_cache()
+        for key in keys:
             try:
                 cache.delete(key)
             except Exception as exc:  # noqa: BLE001
@@ -412,11 +405,4 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
         # as scratch but deliberately not fed to the cache-deletion loop above.
         "*_replayed_unconsolidated_keys.json",
     )
-    for pattern in scratch_patterns:
-        for victim in evidence_dir.glob(pattern):
-            try:
-                victim.unlink()
-            except FileNotFoundError:
-                pass
-            except OSError as exc:
-                _logger.warning("Could not discard %s: %s", victim, exc)
+    remove_matching_files(evidence_dir, scratch_patterns)

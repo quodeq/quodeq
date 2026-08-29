@@ -241,7 +241,7 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
 def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
     """Walk existing projects to see if any other UUID matches this identity.
 
-    Mirrors ``routes_project_list._find_existing_project`` but takes a
+    Mirrors ``services._fs_project_helpers.find_existing_project`` but takes a
     ``ProjectIdentity`` directly and ignores the candidate UUID being imported.
     """
     if not reports_root.is_dir():

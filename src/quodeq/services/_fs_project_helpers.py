@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
-from quodeq.data.fs.project_files import read_repository_info, write_repository_info
+from quodeq.services.ports import (
+    read_repository_info,
+    repository_info_exists,
+    write_repository_info,
+)
 from quodeq.services._fs_metadata import (
     _check_path_exists,
     _extract_project_metadata,
@@ -108,6 +111,56 @@ def _build_project_entry(
         origin_url=info.get("originUrl"),
         summary_pending=summary_pending,
     )
+
+
+def find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
+    """Return an existing project UUID matching the given repo identity, or None.
+
+    Walks the reports directory looking for a project whose repository
+    record matches the resolved repo path/url, project name and (optional)
+    scope_path. Pure read-only check — never mutates state. Used by the
+    create-project route as its duplicate pre-flight.
+    """
+    from quodeq.shared.utils import is_repo_url, project_name_from_repo  # noqa: PLC0415
+
+    try:
+        is_url = is_repo_url(repo)
+    except ValueError:
+        return None
+    repo_resolved = repo if is_url else str(Path(repo).resolve())
+    expected_name = project_name_from_repo(repo)
+    reports_path = Path(reports_root)
+    if not reports_path.is_dir():
+        return None
+    for child in reports_path.iterdir():
+        if not child.is_dir():
+            continue
+        data = read_repository_info(child)
+        if data is None:
+            continue
+        if data.get("name") != expected_name:
+            continue
+        if data.get("path") != repo_resolved:
+            continue
+        if (data.get("scopePath") or None) != (scope_path or None):
+            continue
+        return child.name
+    return None
+
+
+def project_record_exists(project_dir: Path) -> bool:
+    """True when the project's repository record exists on disk.
+
+    Presence only — an unreadable record still counts (see
+    :func:`read_project_record` for the content read). Gives the API layer
+    a service-level entry so routes keep zero filesystem code.
+    """
+    return repository_info_exists(project_dir)
+
+
+def read_project_record(project_dir: Path) -> dict | None:
+    """The project's repository record; None when absent or unreadable."""
+    return read_repository_info(project_dir)
 
 
 def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntry]) -> str | None:

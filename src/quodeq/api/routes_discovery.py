@@ -1,7 +1,6 @@
 """Discovery routes: AI clients, plugins, and filesystem browsing."""
 from __future__ import annotations
 
-import logging
 from http import HTTPStatus
 from pathlib import Path
 
@@ -11,8 +10,6 @@ from quodeq.api.helpers import error_response
 from quodeq.core.types import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.plugin_discovery import discover_plugins
-
-_logger = logging.getLogger(__name__)
 
 # Error keyword returned by browse_repo when the path exists but is not a directory.
 _BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
@@ -43,40 +40,37 @@ def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
     return jsonify(payload)
 
 
-def _handle_browse_mkdir() -> Response | tuple[Response, int]:
-    """Handle POST /api/browse/mkdir — create a new subdirectory."""
+# Provider mkdir error codes -> (HTTP status, API error code). The messages
+# come through verbatim from the provider so the responses stay identical to
+# when this handler did the filesystem work itself.
+_MKDIR_ERROR_MAP = {
+    "MISSING_FIELDS": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
+    "INVALID_NAME": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
+    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, "FORBIDDEN"),
+    "PARENT_NOT_FOUND": (HTTPStatus.NOT_FOUND, "NOT_FOUND"),
+    "ALREADY_EXISTS": (HTTPStatus.CONFLICT, "CONFLICT"),
+    "MKDIR_FAILED": (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
+}
+
+
+def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response, int]:
+    """Handle POST /api/browse/mkdir — create a new subdirectory.
+
+    Validation and the mkdir itself live in the provider (mirroring
+    ``_handle_browse``); this handler only shapes the HTTP response.
+    """
     data = request.get_json(silent=True) or {}
     parent = data.get("path", "").strip()
     name = data.get("name", "").strip()
-    if not parent or not name:
-        body, status = error_response("path and name are required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-    if "/" in name or "\\" in name or name in (".", ".."):
-        body, status = error_response("Invalid folder name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-    resolved = Path(parent).resolve()
-    home = Path.home().resolve()
-    if not resolved.is_relative_to(home):
-        body, status = error_response(
-            "Path must be within the user's home directory",
-            HTTPStatus.FORBIDDEN,
-            "FORBIDDEN",
+    payload = provider.browse_mkdir(parent, name)
+    if "error" in payload:
+        http_status, code = _MKDIR_ERROR_MAP.get(
+            payload.get("error_code"),
+            (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
         )
+        body, status = error_response(payload["error"], http_status, code)
         return jsonify(body), status
-    if not resolved.is_dir():
-        body, status = error_response("Parent path not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    target = resolved / name
-    try:
-        target.mkdir(parents=False, exist_ok=False)
-    except FileExistsError:
-        body, status = error_response("Folder already exists", HTTPStatus.CONFLICT, "CONFLICT")
-        return jsonify(body), status
-    except OSError as exc:
-        _logger.warning("Could not create folder %s: %s", name, exc)
-        body, status = error_response("Could not create folder", HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR")
-        return jsonify(body), status
-    return jsonify({"created": True, "path": str(target)})
+    return jsonify(payload)
 
 
 def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
@@ -100,4 +94,4 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.post("/api/browse/mkdir")
     def browse_mkdir() -> Response | tuple[Response, int]:
-        return _handle_browse_mkdir()
+        return _handle_browse_mkdir(provider)

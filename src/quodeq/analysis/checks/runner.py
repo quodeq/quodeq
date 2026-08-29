@@ -8,9 +8,8 @@ check that can take a run down is worse than a check that does not exist.
 from __future__ import annotations
 
 import dataclasses
-import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from quodeq.analysis.checks.registry import CHECKERS, CheckContext
@@ -22,6 +21,7 @@ from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
 from quodeq.core.evidence._jsonl import judgment_to_dict
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.data.fs.stream_files import append_jsonl_rows
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.data.fs.standards_loader import load_requirement_checks
 
@@ -166,12 +166,7 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
     even though both markers now also live on the ``Judgment`` itself for
     the events.jsonl mirror below.
     """
-    try:
-        with jsonl_path.open("a", encoding="utf-8") as out:
-            for row in rows:
-                out.write(json.dumps(row) + "\n")
-    except OSError:
-        _logger.warning("checks: could not append to %s", jsonl_path, exc_info=True)
+    append_jsonl_rows(jsonl_path, rows)
 
     from quodeq.data.events.writer import EventLogWriter
 
@@ -193,12 +188,17 @@ def apply_deterministic_checks(
     jsonl_path: Path | None,
     evaluators_dir: Path | None = None,
     trust_model: TrustModel | None = None,
+    persist_fn: Callable[[Path, list[Judgment], list[dict]], None] | None = None,
 ) -> int:
     """Run *dimension*'s checkers and fold the findings into *evidence*.
 
     Returns how many findings were added. The evidence is updated before
     anything is written, so a persistence failure costs the run's record of
     these findings but never the score the user is shown for this run.
+
+    *persist_fn* injects the persistence sink (same signature as
+    :func:`_persist`, the default): callers can substitute their own
+    writer without this module touching it.
     """
     judgments = deterministic_judgments(
         root=root, source_files=source_files, dimension=dimension,
@@ -222,7 +222,7 @@ def apply_deterministic_checks(
                                         req_map_reader=read_req_to_principle_map)
     added = _merge_into_evidence(evidence, gated, resolver)
     if added and jsonl_path is not None:
-        _persist(jsonl_path, gated, rows)
+        (persist_fn or _persist)(jsonl_path, gated, rows)
     return added
 
 

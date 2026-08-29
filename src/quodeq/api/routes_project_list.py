@@ -16,50 +16,17 @@ from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
 from quodeq.services._fs_clone import CloneError
+from quodeq.services._fs_project_helpers import (
+    find_existing_project,
+    project_record_exists,
+    read_project_record,
+)
 from quodeq.services._fs_scan import scan_project
 from quodeq.services._warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import contained_path, validate_path_segment, validate_relative_scope
 
 _logger = logging.getLogger(__name__)
-
-
-def _find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
-    """Return an existing project UUID matching the given repo identity, or None.
-
-    Walks the reports directory looking for a project whose
-    ``repository_info.json`` matches the resolved repo path/url, project name
-    and (optional) scope_path. Pure read-only check — never mutates state.
-    """
-    from quodeq.shared.utils import is_repo_url, project_name_from_repo
-
-    try:
-        is_url = is_repo_url(repo)
-    except ValueError:
-        return None
-    repo_resolved = repo if is_url else str(Path(repo).resolve())
-    expected_name = project_name_from_repo(repo)
-    reports_path = Path(reports_root)
-    if not reports_path.is_dir():
-        return None
-    for child in reports_path.iterdir():
-        if not child.is_dir():
-            continue
-        info_file = child / "repository_info.json"
-        if not info_file.exists():
-            continue
-        try:
-            data = json.loads(info_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            continue
-        if data.get("name") != expected_name:
-            continue
-        if data.get("path") != repo_resolved:
-            continue
-        if (data.get("scopePath") or None) != (scope_path or None):
-            continue
-        return child.name
-    return None
 
 
 def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
@@ -230,15 +197,14 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             except (json.JSONDecodeError, OSError):
                 pass
 
-        # Check if local — read repository_info.json
-        info_path = project_dir / "repository_info.json"
-        if not info_path.exists():
+        # Check if local — read the project's repository record (via the
+        # service layer; the route keeps no repository_info.json knowledge).
+        if not project_record_exists(project_dir):
             body, status = error_response("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
 
-        try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        info = read_project_record(project_dir)
+        if info is None:
             body, status = error_response("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
             return jsonify(body), status
 
@@ -395,7 +361,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         # Pre-flight: detect duplicates by walking existing project
         # directories. Returns None if no match.
-        existing = _find_existing_project(reports_root, repo, scope_path)
+        existing = find_existing_project(reports_root, repo, scope_path)
         if existing is not None:
             return (
                 jsonify({"error": "Project already exists", "existingProjectId": existing}),

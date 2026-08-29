@@ -8,7 +8,6 @@ stays a pure read and re-enqueues anything still pending (self-healing).
 """
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import time
@@ -36,12 +35,10 @@ def _enumerate_projects(reports_dir: str) -> list[tuple[str, str]]:
 
 
 def _project_display_name(reports_dir: str, project_id: str) -> str:
-    info_path = Path(reports_dir) / project_id / "repository_info.json"
-    try:
-        info = json.loads(info_path.read_text(encoding="utf-8"))
-        return info.get("displayName") or info.get("name") or project_id
-    except (OSError, ValueError):
-        return project_id
+    from quodeq.services.ports import read_repository_info  # noqa: PLC0415
+
+    info = read_repository_info(Path(reports_dir) / project_id) or {}
+    return info.get("displayName") or info.get("name") or project_id
 
 
 def _warm_project(reports_dir: str, project_id: str) -> None:

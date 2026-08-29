@@ -130,6 +130,13 @@ class ToolingActions(Protocol):
         """List directories at the given path for repository browsing."""
         ...
 
+    def browse_mkdir(self, parent: str, name: str) -> dict:
+        """Create subdirectory *name* under *parent* (jailed to the home dir).
+
+        Returns ``{"created": True, "path": ...}`` or an
+        ``{"error", "error_code"}`` payload the route maps to HTTP."""
+        ...
+
     def get_ai_clients(self) -> dict:
         """Return available AI CLI clients."""
         ...

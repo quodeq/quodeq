@@ -24,6 +24,7 @@ from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
 from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.services.ports import count_active_agent_streams, read_scan_total_files
 from quodeq.services.suppression import build_matcher, project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.data.fs.dimensions_state_store import read_dimensions
@@ -77,30 +78,14 @@ def _read_json(path: Path) -> dict | None:
 
 def _project_total_files(run_dir: Path) -> int:
     """Read project_files (upper bound for pending dims) from scan.json."""
-    project_dir = run_dir.parent
-    scan = _read_json(project_dir / "scan.json")
-    if not scan:
-        return 0
-    raw = scan.get("total_files")
-    return int(raw) if isinstance(raw, int) else 0
+    return read_scan_total_files(run_dir.parent)
 
 
 def _active_agents(evidence_dir: Path, dim_id: str) -> int:
     """Heuristic: count <dim>_agent-*.stream files modified in the last 30s."""
-    if not evidence_dir.is_dir():
-        return 0
-    cutoff = time.time() - _AGENT_ACTIVE_WINDOW_S
-    count = 0
-    try:
-        for p in evidence_dir.glob(f"{dim_id}_agent-*.stream"):
-            try:
-                if p.stat().st_mtime >= cutoff:
-                    count += 1
-            except OSError:
-                continue
-    except OSError:
-        pass
-    return count
+    return count_active_agent_streams(
+        evidence_dir, dim_id, window_s=_AGENT_ACTIVE_WINDOW_S,
+    )
 
 
 def _dim_state(
