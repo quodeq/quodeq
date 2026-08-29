@@ -335,7 +335,10 @@ def register_shared_routes(app: Flask) -> None:
 
         try:
             with zip_path.open("rb") as stream:
-                return import_zip_stream(stream, reports_dir(), action)
+                outcome = import_zip_stream(
+                    stream, reports_dir(), action, remote_addr=request.remote_addr,
+                )
+            return jsonify(outcome.body), outcome.status
         except OSError:
             _logger.exception("Failed to read zip for shared pull of %s", project)
             body, status = error_response(

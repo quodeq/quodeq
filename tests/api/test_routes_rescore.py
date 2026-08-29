@@ -26,10 +26,10 @@ def test_rescore_requires_project(client):
     assert "project" in data.get("error", "").lower()
 
 
-@patch("quodeq.api.routes_rescore.read_run_data")
-@patch("quodeq.api.routes_rescore.list_runs")
-@patch("quodeq.api.routes_rescore.load_dismissed_keys")
-@patch("quodeq.api.routes_rescore.rescore_dimensions")
+@patch("quodeq.services.rescore_run.read_run_data")
+@patch("quodeq.services.rescore_run.list_runs")
+@patch("quodeq.services.rescore_run.load_dismissed_keys")
+@patch("quodeq.services.rescore_run.rescore_dimensions")
 def test_rescore_returns_rescored_data(mock_rescore, mock_dismissed, mock_list_runs, mock_read_run, tmp_path, client):
     # The route resolves both the project and the run against the directory
     # listing, so the evaluations root has to actually contain them. list_runs
