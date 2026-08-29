@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .plugin import PluginDimension, PluginInfo
+from quodeq.core.types.plugin import PluginDimension, PluginInfo
 
 from ._mapper_helpers import (
     _int,

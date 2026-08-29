@@ -89,7 +89,7 @@ def _build_registry(tmp_path, repo_root, monkeypatch):
     hidden-standards wiring on top of it, not re-proving accumulation.
     """
     monkeypatch.setattr(
-        "quodeq.assistant.tools._overview._fs_reports.get_accumulated",
+        "quodeq.assistant.tools._overview.get_accumulated",
         lambda *a: _ACCUMULATED)
     monkeypatch.setattr(
         "quodeq.assistant.tools._read_tools._fs_reports.get_accumulated",

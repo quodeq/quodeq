@@ -12,7 +12,7 @@ from pathlib import Path
 
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
-from quodeq.core.types.mappers import parse_dimension_result
+from quodeq.data.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
 from quodeq.data.fs.report_parser._external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map

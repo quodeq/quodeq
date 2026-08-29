@@ -198,6 +198,29 @@ def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch
     assert out is None
 
 
+def test_injected_standard_dirs_fn_replaces_global_resolution(run_dir, monkeypatch):
+    """standard_dirs_fn is an injected dependency: when a caller supplies one,
+    the module-level standard_dirs() (global default_paths resolution) must
+    not run at all."""
+    calls = []
+
+    def fake_dirs():
+        calls.append(True)
+        return (None, None)
+
+    def global_must_not_run():
+        raise AssertionError("global standard_dirs() used despite injection")
+
+    monkeypatch.setattr(
+        "quodeq.services.evidence_rescore.standard_dirs", global_must_not_run)
+    out = score_dimension_from_evidence(
+        run_dir, DIM, dismissed=set(), deleted=set(),
+        source_file_count=10, files_read=5, params=DEFAULT_PARAMS,
+        standard_dirs_fn=fake_dirs)
+    assert out is not None
+    assert calls == [True]
+
+
 def test_dismiss_by_principle_key_matches_no_req_finding(run_dir):
     """The UI stores a dismiss key as `req || principle`. For a finding whose
     evidence row carries no req, the stored key is (principle, file, line);

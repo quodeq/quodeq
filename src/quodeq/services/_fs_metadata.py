@@ -131,25 +131,30 @@ def _compute_summary(
         # diverging from the score shown everywhere else.
         from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
         from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-        from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
         dismissed = dismissed_keys(project_dir)
         deleted = deleted_keys(project_dir)
-        if dismissed or deleted:
-            # Per-dimension run_dir: each dimension is rescored from the
-            # evidence of the run it was actually sourced from.
-            acc_dims = [
-                _rescore_dimension(
-                    d, dismissed, deleted, params=params,
-                    run_dir=run_dir_by_dim.get(dim_name),
-                )
-                for dim_name, d in latest_by_dim.items()
-            ]
-        if not acc_dims:
-            return {"grade": None, "score": None, "files": files_count}
-        summary = summarize_dimensions(acc_dims, params)
-        return {"grade": summary.overall_grade, "score": summary.numeric_average, "files": files_count}
     except (OSError, json.JSONDecodeError, KeyError):
+        # Adapter errors only: a run/triage file that is missing, unreadable,
+        # or malformed genuinely means "no data for the card".
         return {"grade": None, "score": None, "files": None}
+    # From here on it is business math over already-loaded data. It stays
+    # OUTSIDE the try: a KeyError raised by a rescoring/summarising bug must
+    # surface, not silently downgrade the card to {"grade": None}.
+    if dismissed or deleted:
+        from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+        # Per-dimension run_dir: each dimension is rescored from the
+        # evidence of the run it was actually sourced from.
+        acc_dims = [
+            _rescore_dimension(
+                d, dismissed, deleted, params=params,
+                run_dir=run_dir_by_dim.get(dim_name),
+            )
+            for dim_name, d in latest_by_dim.items()
+        ]
+    if not acc_dims:
+        return {"grade": None, "score": None, "files": files_count}
+    summary = summarize_dimensions(acc_dims, params)
+    return {"grade": summary.overall_grade, "score": summary.numeric_average, "files": files_count}
 
 
 def _summary_version(

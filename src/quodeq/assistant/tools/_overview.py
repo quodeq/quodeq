@@ -3,15 +3,15 @@
 The run-scoped tools in ``_read_tools`` read a single ``run_dir``. On the
 overview the user sees the *accumulated* view aggregated across recent runs,
 so there is no single run to read. ``get_overview`` fills that gap by calling
-``services._fs_reports.get_accumulated`` (assistant→services is a legal
-import) and trimming the payload to what a chat needs.
+``quodeq.services.get_accumulated`` (assistant→services is a legal import)
+and trimming the payload to what a chat needs.
 """
 from __future__ import annotations
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_entries_visible
-from quodeq.services import _fs_reports
+from quodeq.services import get_accumulated
 from quodeq.services.scoring import rescore_accumulated
 
 # Severity buckets recomputed for the filtered summary. Unknown/missing
@@ -26,7 +26,7 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
             "Call get_context to confirm scope, then ask the user to open a "
             "project overview."
         )
-    payload = _fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
+    payload = get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
     if payload is None:
         raise ToolError(f"no accumulated data for project: {ctx.project_id}")
     # Project-wide dismiss/delete rescore: the raw accumulated payload keeps

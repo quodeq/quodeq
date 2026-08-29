@@ -20,8 +20,10 @@ from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
 from quodeq.core.evidence._jsonl import judgment_to_dict
 from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.data.fs.import_graph import build_import_graph
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.data.fs.stream_files import append_jsonl_rows
+from quodeq.data.fs.symbol_uses import build_symbol_uses
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.data.fs.standards_loader import load_requirement_checks
 
@@ -53,8 +55,12 @@ def deterministic_judgments(
     if not declared:
         return []
 
+    # Composition point: the fs-backed builders are injected here so
+    # CheckContext itself never imports the data.fs adapters.
     context = CheckContext(root=Path(root), source_files=tuple(source_files),
-                           dimension=dimension)
+                           dimension=dimension,
+                           graph_builder=build_import_graph,
+                           symbol_uses_builder=build_symbol_uses)
     out: list[Judgment] = []
     for name in sorted(declared):
         checker = CHECKERS.get(name)

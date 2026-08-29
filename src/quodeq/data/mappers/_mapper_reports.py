@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from .evidence import EvidenceFileMeta
-from .finding import Totals
-from .report import ParsedReport, PrincipleGrade
+from quodeq.core.types.evidence import EvidenceFileMeta
+from quodeq.core.types.finding import Totals
+from quodeq.core.types.report import ParsedReport, PrincipleGrade
 
 from ._mapper_helpers import _opt_int, _opt_str
 from ._mapper_findings import _parse_finding_list, parse_totals
