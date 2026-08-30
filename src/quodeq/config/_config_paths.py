@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from quodeq.config.standards_env import evaluators_dir as _default_evaluators_dir
 
 
 @dataclass(frozen=True)
@@ -16,11 +17,10 @@ class ConfigPaths:
     standards_dir: Path | None = None
     env_file: Path | None = None
     gitignore_file: Path | None = None
-
-    @property
-    def evaluators_dir(self) -> Path:
-        """Global directory for custom evaluator JSON files."""
-        return Path(os.environ.get("QUODEQ_EVALUATORS_DIR", str(Path.home() / ".quodeq" / "evaluators")))
+    # Resolved once at construction (config/standards_env.evaluators_dir), not
+    # read live on every access; api/app.py already snapshots this into
+    # app.config at startup, so the timing narrows rather than changes.
+    evaluators_dir: Path = field(default_factory=_default_evaluators_dir)
 
     @property
     def vroot(self) -> Path:

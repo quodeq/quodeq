@@ -4,30 +4,14 @@ from __future__ import annotations
 
 import errno
 import logging
-import os
 import subprocess as _subprocess
 from pathlib import Path
 
 from quodeq.services.ports import clone_repo
 from quodeq.data.fs.shared_repo import remove_clone_dir
-from quodeq.shared._env import env_int
+from quodeq.config.clone_env import clone_shallow_months, git_clone_timeout_s
 
 _logger = logging.getLogger(__name__)
-
-_GIT_CLONE_TIMEOUT_S = env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1)
-
-# One month of slack over the default git churn lookback (git_lookback_months,
-# 3) so the boundary commit is never cut off. Raise QUODEQ_CLONE_SHALLOW_MONTHS
-# when a project configures a larger lookback; 0 forces full-history clones.
-_DEFAULT_SHALLOW_MONTHS = 4
-
-
-def _shallow_months() -> int:
-    raw = os.environ.get("QUODEQ_CLONE_SHALLOW_MONTHS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_SHALLOW_MONTHS
-    except ValueError:
-        return _DEFAULT_SHALLOW_MONTHS
 
 
 class CloneError(RuntimeError):
@@ -85,11 +69,14 @@ def _classify_stderr(stderr: str) -> str:
 _RETRYABLE_KINDS = ("network", "unknown")
 
 
-def _clone_once(url: str, clone_dest: Path, extra_args: list[str]) -> None:
+def _clone_once(
+    url: str, clone_dest: Path, extra_args: list[str], *, timeout_s: int | None = None,
+) -> None:
     # The subprocess invocation lives in the data layer (ports.clone_repo);
     # this function owns mapping its raw failures onto CloneError kinds.
+    resolved_timeout = timeout_s if timeout_s is not None else git_clone_timeout_s()
     try:
-        clone_repo(url, clone_dest, extra_args, timeout_s=_GIT_CLONE_TIMEOUT_S)
+        clone_repo(url, clone_dest, extra_args, timeout_s=resolved_timeout)
     except _subprocess.CalledProcessError as exc:
         raw = exc.stderr
         if isinstance(raw, bytes):
@@ -111,27 +98,34 @@ def _clone_once(url: str, clone_dest: Path, extra_args: list[str]) -> None:
         raise CloneError(kind, f"git clone could not start: {exc}") from exc
 
 
-def run_git_clone(url: str, clone_dest: Path) -> None:
+def run_git_clone(
+    url: str, clone_dest: Path, *, timeout_s: int | None = None, shallow_months: int | None = None,
+) -> None:
     """Execute ``git clone`` for *url* into *clone_dest*. Raises CloneError on failure.
 
     Clones shallow by default (``--single-branch``, ``--no-tags``,
     ``--shallow-since``): the working copy is evaluated at HEAD and the only
     history consumer is git churn scoring, whose lookback the default window
-    covers (see ``_DEFAULT_SHALLOW_MONTHS``). Branch evaluations against such
-    a clone rely on ``_cli_resolution._fetch_branch`` fetching the missing
-    branch on demand. Shallow requests the remote cannot satisfy (e.g. no
-    commits inside the window) fall back to one full clone. A shallow working
-    copy can be completed manually with ``git fetch --unshallow``.
+    covers (see ``config.clone_env.clone_shallow_months``). Branch evaluations
+    against such a clone rely on ``_cli_resolution._fetch_branch`` fetching
+    the missing branch on demand. Shallow requests the remote cannot satisfy
+    (e.g. no commits inside the window) fall back to one full clone. A
+    shallow working copy can be completed manually with ``git fetch
+    --unshallow``.
+
+    *timeout_s* and *shallow_months* default to the config-resolved values
+    (each getter call is lazy, so env overrides set after import still apply).
     """
-    months = _shallow_months()
+    months = shallow_months if shallow_months is not None else clone_shallow_months()
     if months <= 0:
-        _clone_once(url, clone_dest, [])
+        _clone_once(url, clone_dest, [], timeout_s=timeout_s)
         return
     try:
         _clone_once(
             url,
             clone_dest,
             ["--single-branch", "--no-tags", f"--shallow-since={months} months ago"],
+            timeout_s=timeout_s,
         )
     except CloneError as exc:
         if not exc.retryable:
@@ -141,4 +135,4 @@ def run_git_clone(url: str, clone_dest: Path) -> None:
         # killed or on checkout-phase errors; a leftover partial dir would
         # turn the retry into a bogus dest_exists failure.
         remove_clone_dir(clone_dest)
-        _clone_once(url, clone_dest, [])
+        _clone_once(url, clone_dest, [], timeout_s=timeout_s)

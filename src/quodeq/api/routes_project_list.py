@@ -270,6 +270,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         ``ephemeral`` are ignored.
         """
         from quodeq.services.project_registration import register_project
+        from quodeq.shared._env import get_clones_dir
         from quodeq.shared.utils import is_repo_url
 
         data = request.get_json(silent=True) or {}
@@ -385,6 +386,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
                 scope_path=scope_path,
                 clone_dest=clone_dest,
                 ephemeral=ephemeral,
+                clones_dir=get_clones_dir(),
             )
         except (FileNotFoundError, ValueError) as exc:
             _rollback_new_dirs(reports_root, before)

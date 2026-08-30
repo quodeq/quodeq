@@ -1,7 +1,7 @@
 # Grandfathered layer-import violations. Do NOT add entries without
 # justification -- the goal is to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_imports.py --update-baseline
-src/quodeq/analysis/subprocess.py:264:llm_bridge
+src/quodeq/analysis/subprocess.py:283:llm_bridge
 src/quodeq/api/_evaluation_routes.py:21:analysis
 src/quodeq/api/import_project.py:32:data
 src/quodeq/api/import_project.py:33:data

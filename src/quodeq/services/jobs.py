@@ -92,6 +92,7 @@ class JobManager:
         job_store: JobStore | None = None,
         on_job_complete: Callable[[str, Job], None] | None = None,
         reports_root: Path | None = None,
+        job_timeout_cap_s: float | None = None,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
@@ -99,6 +100,9 @@ class JobManager:
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
+        # Injection seam for the hard job-duration cap; None means "fall back
+        # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
+        self._job_timeout_cap_s_override = job_timeout_cap_s
         # _run_log_writers and _pre_marker_buffer are owned exclusively by the
         # per-job _consume_stream thread started in start_job(). No other code
         # path may read or mutate these dicts — doing so reintroduces the
@@ -427,10 +431,13 @@ class JobManager:
 
         Was hard-coded to 7200 (2h), which silently SIGKILLed long Ollama
         runs even when the user had configured a much longer ``--time-limit``.
-        Now opt-in: set ``QUODEQ_JOB_TIMEOUT_S`` to a positive number to
-        re-enable a wall-clock cap. Otherwise the watchdog only enforces
-        the user-set ``deadline_at`` (with a grace window).
+        Now opt-in: pass ``job_timeout_cap_s`` to the constructor, or set
+        ``QUODEQ_JOB_TIMEOUT_S`` to a positive number to re-enable a
+        wall-clock cap that way. Otherwise the watchdog only enforces the
+        user-set ``deadline_at`` (with a grace window).
         """
+        if self._job_timeout_cap_s_override is not None:
+            return self._job_timeout_cap_s_override
         return env_float("QUODEQ_JOB_TIMEOUT_S", 0.0, minimum=0.0)
 
     def _watchdog_should_kill(self, job_id: str, started_at: float) -> bool:

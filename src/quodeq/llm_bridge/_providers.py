@@ -23,32 +23,43 @@ def get_provider_type(provider_id: str) -> str:
 LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 
 
-# Configurable via QUODEQ_LOCAL_API_MARKERS (comma-separated).
 # Default markers detect common local LLM server patterns.
-_LOCAL_API_MARKERS_DEFAULT = {"11434", "localhost", "127.0.0.1", "ollama"}
-_env_markers = os.environ.get("QUODEQ_LOCAL_API_MARKERS")
-_LOCAL_API_MARKERS: set[str] = (
-    {m.strip() for m in _env_markers.split(",") if m.strip()}
-    if _env_markers is not None
-    else _LOCAL_API_MARKERS_DEFAULT
-)
+_LOCAL_API_MARKERS_DEFAULT = frozenset({"11434", "localhost", "127.0.0.1", "ollama"})
 
 
-def _is_local_api(provider_id: str) -> bool:
+def _local_api_markers(env: dict[str, str] | None = None) -> frozenset[str]:
+    """Return the local-API detection markers, honoring QUODEQ_LOCAL_API_MARKERS.
+
+    Unset means the packaged defaults. Explicitly set (comma-separated,
+    even to an empty string) means exactly the given markers, so setting
+    QUODEQ_LOCAL_API_MARKERS="" disables local-API detection entirely. This
+    unset-vs-empty distinction is security-adjacent: classify_provider's
+    result gates the assistant's in-process web tools (search_web/fetch_url
+    are only ever registered for local-api providers).
+    """
+    environ = env if env is not None else os.environ
+    raw = environ.get("QUODEQ_LOCAL_API_MARKERS")
+    if raw is None:
+        return _LOCAL_API_MARKERS_DEFAULT
+    return frozenset(m.strip() for m in raw.split(",") if m.strip())
+
+
+def _is_local_api(provider_id: str, *, markers: frozenset[str] | None = None) -> bool:
     """Check if an API provider is local (e.g. Ollama)."""
     configs = get_provider_configs()
     cfg = configs.get(provider_id, {})
     # `or ""`: a present-but-null api_base returns None from .get(default),
     # which would crash the .lower() below.
     api_base = cfg.get("api_base") or ""
-    return any(marker in api_base.lower() for marker in _LOCAL_API_MARKERS)
+    resolved_markers = markers if markers is not None else _local_api_markers()
+    return any(marker in api_base.lower() for marker in resolved_markers)
 
 
-def classify_provider(provider_id: str) -> str:
+def classify_provider(provider_id: str, *, markers: frozenset[str] | None = None) -> str:
     """Classify a provider as 'cli', 'local-api', or 'cloud-api'."""
     ptype = get_provider_type(provider_id)
     if ptype == "cli":
         return "cli"
-    if _is_local_api(provider_id):
+    if _is_local_api(provider_id, markers=markers):
         return "local-api"
     return "cloud-api"

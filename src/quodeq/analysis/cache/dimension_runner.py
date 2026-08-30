@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 from dataclasses import replace
 from pathlib import Path
@@ -38,6 +37,7 @@ from typing import Any
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
+from quodeq.config.analysis_env import failure_streak_override
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache._failure_streak import (
     CircuitBreakerError,
@@ -72,18 +72,16 @@ _logger = logging.getLogger(__name__)
 _PERSIST_INTERVAL_S = 30.0
 
 
-def _resolve_failure_streak_threshold(opts: AnalysisOptions) -> int:
+def _resolve_failure_streak_threshold(
+    opts: AnalysisOptions, *, override: int | None = None,
+) -> int:
     """Return the effective breaker threshold.
 
-    Priority: ``QUODEQ_FAILURE_STREAK`` env var > options field. Negative or
-    non-integer env values fall back to the options field. 0 disables.
+    Priority: *override* (when given) > options field. 0 disables; negative
+    values clamp to 0.
     """
-    raw = os.environ.get("QUODEQ_FAILURE_STREAK")
-    if raw is not None:
-        try:
-            return max(0, int(raw))
-        except ValueError:
-            pass
+    if override is not None:
+        return max(0, override)
     return max(0, opts.failure_streak_threshold)
 
 
@@ -471,7 +469,10 @@ def process_dimension_with_cache(
         jsonl.touch()
 
     breaker = FailureStreakWatcher(
-        jsonl, threshold=_resolve_failure_streak_threshold(config.options),
+        jsonl,
+        threshold=_resolve_failure_streak_threshold(
+            config.options, override=failure_streak_override(),
+        ),
     )
     breaker.start()
 

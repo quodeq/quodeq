@@ -69,12 +69,15 @@ def register_project(
     *,
     clone_dest: str | None = None,
     ephemeral: bool = False,
+    clones_dir: Path | None = None,
 ) -> str:
     """Resolve/register project and run a scan.
 
     For URL inputs, clones the repo before scanning. Either *clone_dest* (a
     user-chosen parent directory) or *ephemeral=True* must be set when *repo*
-    is a URL. Ephemeral clones land under ``~/.quodeq/clones/<uuid>/``.
+    is a URL. Ephemeral clones land under ``~/.quodeq/clones/<uuid>/`` by
+    default; pass *clones_dir* to use a different (already-resolved) base
+    directory instead of re-reading QUODEQ_CLONES_DIR here.
 
     For local path inputs, scans in place; *clone_dest* and *ephemeral* are
     ignored.
@@ -112,7 +115,7 @@ def register_project(
     # Resolve the on-disk path the project will live at.
     if is_url:
         if ephemeral:
-            target_path = get_clones_dir() / project_uuid
+            target_path = (clones_dir or get_clones_dir()) / project_uuid
         else:
             target_path = Path(clone_dest).resolve() / project_name
         target_path.parent.mkdir(parents=True, exist_ok=True)

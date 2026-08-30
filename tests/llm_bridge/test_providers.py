@@ -8,6 +8,7 @@ from quodeq.llm_bridge._providers import (
     get_provider_configs,
     get_provider_type,
     classify_provider,
+    _local_api_markers,
 )
 
 
@@ -29,6 +30,25 @@ class TestIsLocalApiNullApiBase:
         cfgs = {"weird": {"type": "api", "api_base": None}}
         with patch.object(_providers, "get_provider_configs", return_value=cfgs):
             assert _providers._is_local_api("weird") is False
+
+
+class TestLocalApiMarkers:
+    """Unset vs set-but-empty QUODEQ_LOCAL_API_MARKERS must resolve differently:
+    this gates whether the assistant's web tools (search_web/fetch_url) ever
+    get registered for an 'api'-type provider, so unset must not silently
+    behave the same as "no markers"."""
+
+    def test_unset_env_returns_defaults(self):
+        result = _local_api_markers(env={})
+        assert result == frozenset({"11434", "localhost", "127.0.0.1", "ollama"})
+
+    def test_set_but_empty_env_returns_empty_set(self):
+        result = _local_api_markers(env={"QUODEQ_LOCAL_API_MARKERS": ""})
+        assert result == frozenset()
+
+    def test_set_env_parses_comma_separated_markers(self):
+        result = _local_api_markers(env={"QUODEQ_LOCAL_API_MARKERS": "foo, bar"})
+        assert result == frozenset({"foo", "bar"})
 
 
 class TestGetProviderType:

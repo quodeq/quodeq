@@ -14,8 +14,8 @@ import tempfile as _tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.config.clone_env import git_clone_timeout_s
 from quodeq.config.paths import default_paths
-from quodeq.shared._env import env_int
 from quodeq.shared.utils import is_repo_url, project_name_from_repo, read_json
 from quodeq.shared.validation import validate_path_segment
 from quodeq.analysis.manifest import SourceManifest, build_manifest, detect_language
@@ -32,7 +32,7 @@ _logger = logging.getLogger(__name__)
 _WORKTREE_TIMEOUT_S = 30
 # Branch fetches go over the network; give them the clone budget, not the
 # local worktree one.
-_FETCH_TIMEOUT_S = env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1)
+_FETCH_TIMEOUT_S = git_clone_timeout_s()
 
 
 # ---------------------------------------------------------------------------

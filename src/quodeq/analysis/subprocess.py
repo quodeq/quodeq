@@ -184,13 +184,30 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     return selected
 
 
-_MAX_STANDARDS_CHARS = int(os.environ.get("QUODEQ_MAX_STANDARDS_CHARS", "50000"))  # Allow full standards for models with large context
+_DEFAULT_MAX_STANDARDS_CHARS = 50000  # Allow full standards for models with large context
+
+
+def _max_standards_chars(env: dict[str, str] | None = None) -> int:
+    """Max chars of standards text to include in an API prompt.
+
+    Read per call (not at import) so QUODEQ_MAX_STANDARDS_CHARS can be
+    raised together with QUODEQ_MAX_API_PROMPT_CHARS / QUODEQ_CONTEXT_SIZE
+    when running larger-context models. Malformed values fall back to the
+    default instead of raising.
+    """
+    raw = (env or os.environ).get("QUODEQ_MAX_STANDARDS_CHARS", "")
+    try:
+        return int(raw) if raw else _DEFAULT_MAX_STANDARDS_CHARS
+    except ValueError:
+        return _DEFAULT_MAX_STANDARDS_CHARS
 
 
 def _load_standards_text(
     compiled_dir: Path | None,
     dimension: str | None,
     overrides: dict | None = None,
+    *,
+    max_chars: int | None = None,
 ) -> str:
     """Load compiled standards as structured JSON for the API prompt.
 
@@ -203,8 +220,10 @@ def _load_standards_text(
     supplied, placeholder templates in requirement text are resolved before
     the text is sent to the model.
 
-    Truncates to _MAX_STANDARDS_CHARS to keep prompts within context limits.
+    Truncates to *max_chars* (default :func:`_max_standards_chars`) to keep
+    prompts within context limits.
     """
+    limit = max_chars if max_chars is not None else _max_standards_chars()
     if not compiled_dir or not dimension:
         return ""
     json_path = compiled_dir / f"{dimension}.json"
@@ -213,10 +232,10 @@ def _load_standards_text(
             data = _json.loads(json_path.read_text(encoding="utf-8"))
             text = _render_standards_grouped(data, overrides=overrides)
             if text:
-                if len(text) > _MAX_STANDARDS_CHARS:
+                if len(text) > limit:
                     _log.info("Truncating %s standards from %d to %d chars for API prompt",
-                              dimension, len(text), _MAX_STANDARDS_CHARS)
-                    text = text[:_MAX_STANDARDS_CHARS] + "\n\n[... standards truncated for context limits ...]"
+                              dimension, len(text), limit)
+                    text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
                 return text
         except (OSError, _json.JSONDecodeError):
             pass
@@ -224,8 +243,8 @@ def _load_standards_text(
     if md_path.exists():
         try:
             text = md_path.read_text(encoding="utf-8")
-            if len(text) > _MAX_STANDARDS_CHARS:
-                text = text[:_MAX_STANDARDS_CHARS] + "\n\n[... standards truncated for context limits ...]"
+            if len(text) > limit:
+                text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
             return text
         except OSError:
             pass
