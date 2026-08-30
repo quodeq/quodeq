@@ -232,9 +232,11 @@ class TestGetProjectInfo:
             "location": "local",
             "path": str(tmp_path),
         }))
-        with patch("quodeq.services._fs_projects._list_available_dimensions_for_discipline", return_value=["sec"]):
-            with patch("quodeq.services._fs_projects._has_fingerprints", return_value=False):
-                result = get_project_info(str(tmp_path), "proj-uuid")
+        result = get_project_info(
+            str(tmp_path), "proj-uuid",
+            list_dimensions=lambda **_kw: ["sec"],
+            has_fingerprints=lambda *_a: False,
+        )
         assert result is not None
         assert result["name"] == "test"
         assert result["discipline"] == "software"
@@ -258,10 +260,12 @@ class TestGetProjectInfo:
             "location": "online",
             "path": "/local/path",  # Not a URL
         }))
-        with patch("quodeq.services._fs_projects._list_available_dimensions_for_discipline", return_value=[]):
-            with patch("quodeq.services._fs_projects._has_fingerprints", return_value=False):
-                with patch("quodeq.services._fs_projects._infer_discipline", return_value=None):
-                    result = get_project_info(str(tmp_path), "proj-uuid")
+        with patch("quodeq.services._fs_projects._infer_discipline", return_value=None):
+            result = get_project_info(
+                str(tmp_path), "proj-uuid",
+                list_dimensions=lambda **_kw: [],
+                has_fingerprints=lambda *_a: False,
+            )
         assert result is not None
         assert result["pathMissing"] is True
 

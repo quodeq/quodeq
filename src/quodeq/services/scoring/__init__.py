@@ -319,7 +319,7 @@ def get_project_scores(
     # unchanged -- so the Overview has to be able to say so next to the grade.
     # Computed outside the accumulated cache: it is a file-existence check, and
     # keeping it out of the cached payload avoids another version input.
-    scoring_meta = {"customFormula": is_custom()}
+    scoring_meta = {"customFormula": (d.is_custom_formula or is_custom)()}
 
     all_runs = list_runs(reports_root, project)
     if not all_runs:

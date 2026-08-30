@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -295,12 +296,16 @@ def _write_findings(
 def process_dimension_with_cache(
     config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
     callbacks: DimensionCallbacks,
-    *, cache: CacheBackend | None = None,
+    *,
+    cache: CacheBackend | None = None,
+    dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents,
+    persist_interval_s: float = _PERSIST_INTERVAL_S,
 ) -> Evidence | None:
     """V2 entry point — content-addressed cache replaces V1 change detection.
 
-    Falls through to ``process_dimension_with_subagents`` when there's
-    no source-file list to classify (matches V1's no-files fallback).
+    Falls through to *dispatcher* (defaults to
+    ``process_dimension_with_subagents``) when there's no source-file list
+    to classify (matches V1's no-files fallback).
     """
     if cache is None:
         cache = LocalFileBackend()
@@ -321,7 +326,7 @@ def process_dimension_with_cache(
     if not files:
         # Nothing to classify — defer to existing path so the no-files
         # warning + single-agent fallback runs unchanged.
-        return process_dimension_with_subagents(config, dim_id, idx, ctx, callbacks)
+        return dispatcher(config, dim_id, idx, ctx, callbacks)
 
     # Clean-scan (incremental=False) means "I want fresh analysis." The user's
     # mental model: cancelled clean-scan + retry should NOT short-circuit on
@@ -448,7 +453,7 @@ def process_dimension_with_cache(
     stop_event = threading.Event()
     watcher = threading.Thread(
         target=_periodic_persist,
-        args=(stop_event, _persist_now, _PERSIST_INTERVAL_S),
+        args=(stop_event, _persist_now, persist_interval_s),
         daemon=True,
         name=f"v2-cache-persist-{dim_id}",
     )
@@ -477,7 +482,7 @@ def process_dimension_with_cache(
     breaker.start()
 
     try:
-        miss_evidence = process_dimension_with_subagents(
+        miss_evidence = dispatcher(
             miss_config, dim_id, idx, ctx, callbacks,
         )
     finally:

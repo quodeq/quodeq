@@ -192,14 +192,11 @@ class TestAllHits:
             ))
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         # No dispatch happened.
         assert dispatcher.calls == []
@@ -250,14 +247,11 @@ class TestProvenanceSurfacing:
         logger.addHandler(handler)
         dispatcher = FakeDispatcher(src)
         try:
-            with patch(
-                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-                new=dispatcher,
-            ):
-                process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                )
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+                dispatcher=dispatcher,
+            )
         finally:
             logger.removeHandler(handler)
 
@@ -279,14 +273,11 @@ class TestModelSwitchReuse:
         # config_a model is "test-model" (the _make_config default).
 
         d1 = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d1,
-        ):
-            process_dimension_with_cache(
-                config_a, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config_a, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=d1,
+        )
         assert len(d1.calls) == 1  # cold cache -> dispatched the misses
 
         # Same project, different model.
@@ -299,14 +290,11 @@ class TestModelSwitchReuse:
         logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
         logger.addHandler(handler)
         try:
-            with patch(
-                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-                new=d2,
-            ):
-                ev = process_dimension_with_cache(
-                    config_b, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                )
+            ev = process_dimension_with_cache(
+                config_b, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+                dispatcher=d2,
+            )
         finally:
             logger.removeHandler(handler)
 
@@ -352,15 +340,12 @@ class TestGcWiring:
 
         config, src = _setup(tmp_path, {"a.py": "x"})
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            # cache=None -> production default-backend path -> GC fires.
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=None,
-            )
+        # cache=None -> production default-backend path -> GC fires.
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=None,
+            dispatcher=dispatcher,
+        )
 
         assert not (legacy_dir / "entry.json").exists()
 
@@ -370,14 +355,11 @@ class TestAllMisses:
         config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         # Dispatch happened with all files (file filter == all source files).
         assert len(dispatcher.calls) == 1
@@ -397,18 +379,16 @@ class TestAllMisses:
         config, src = _setup(tmp_path, {"a.py": "x"})
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            )
-            # Run 2 — should not dispatch.
-            dispatcher.calls.clear()
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
+        # Run 2 — should not dispatch.
+        dispatcher.calls.clear()
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
         assert dispatcher.calls == []
 
 
@@ -426,13 +406,10 @@ class TestPartialHits:
         ))
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         # Dispatcher saw only the misses.
         assert len(dispatcher.calls) == 1
@@ -458,13 +435,10 @@ class TestDispatchFailure:
         def failing_dispatcher(*args, **kwargs):
             return None
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=failing_dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+            dispatcher=failing_dispatcher,
+        )
         assert ev is None
 
         # No cache entry was written for the failed dispatch.
@@ -478,13 +452,10 @@ class TestNoSourceFiles:
         config, src = _setup(tmp_path, {})
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
         # Dispatcher was called (even with no files — same as V1 behaviour).
         assert len(dispatcher.calls) == 1
 
@@ -524,14 +495,11 @@ class TestDispatchKeysSidecar:
         config, src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         sidecar = (config.work_dir or config.src) / "security_dispatch_keys.json"
         assert sidecar.is_file()
@@ -557,14 +525,11 @@ class TestDispatchKeysSidecar:
         ))
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         assert dispatcher.calls == []  # confirm we hit the all-hits path
         sidecar = (config.work_dir or config.src) / "security_dispatch_keys.json"
@@ -606,15 +571,12 @@ class TestCircuitBreakerWiring:
             return _make_dummy_evidence(files_read=2)
 
         try:
-            with patch(
-                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-                new=err_dispatcher,
-            ):
-                with pytest.raises(CircuitBreakerError) as excinfo:
-                    process_dimension_with_cache(
-                        config, "security", idx=1, ctx=_make_ctx(),
-                        callbacks=_make_callbacks(), cache=cache,
-                    )
+            with pytest.raises(CircuitBreakerError) as excinfo:
+                process_dimension_with_cache(
+                    config, "security", idx=1, ctx=_make_ctx(),
+                    callbacks=_make_callbacks(), cache=cache,
+                    dispatcher=err_dispatcher,
+                )
             assert excinfo.value.reason == "circuit_breaker"
             assert cancellation.is_cancelled()
         finally:
@@ -644,15 +606,12 @@ class TestCircuitBreakerWiring:
             return _make_dummy_evidence(files_read=10)
 
         try:
-            with patch(
-                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-                new=err_dispatcher,
-            ):
-                # Should NOT raise CircuitBreakerError.
-                ev = process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                )
+            # Should NOT raise CircuitBreakerError.
+            ev = process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+                dispatcher=err_dispatcher,
+            )
             assert ev is not None
             assert not cancellation.is_cancelled()
         finally:
@@ -714,14 +673,11 @@ class TestCarryOrder:
                 }) + "\n")
             return _make_dummy_evidence(files_read=1)
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(),
-                _make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(),
+            _make_callbacks(), cache=cache,
+            dispatcher=fake_dispatch,
+        )
 
         jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
         lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
@@ -837,14 +793,11 @@ class TestCachedFindingsReachEventLog:
         # The runner derives this from the per-dim JSONL path internally.
         events_log = (config.work_dir or config.src).parent / "events.jsonl"
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         assert dispatcher.calls == [], "all-hits path must not dispatch"
 
@@ -898,14 +851,11 @@ class TestCachedFindingsReachEventLog:
                 }) + "\n")
             return _make_dummy_evidence(files_read=1)
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=fake_dispatch,
+        )
 
         events = self._read_events(events_log)
         carry_files = {
@@ -979,14 +929,11 @@ class TestEvidenceFileCreatedBeforeBreaker:
         )
         breaker_logger.addHandler(handler)
         try:
-            with patch(
-                "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-                new=silent_dispatcher,
-            ):
-                process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                )
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache,
+                dispatcher=silent_dispatcher,
+            )
         finally:
             breaker_logger.removeHandler(handler)
             cancellation.reset()
@@ -1045,14 +992,11 @@ class TestCacheReplayAppliesProvenanceGate:
             model_id="test-model",
         ))
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
         assert dispatcher.calls == [], "all-hits path must not dispatch"
         return config, dispatcher
 
@@ -1167,14 +1111,11 @@ class TestCacheReplayAppliesScopeGate:
             model_id="test-model",
         ))
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
         assert dispatcher.calls == [], "all-hits path must not dispatch"
         return config
 
@@ -1307,14 +1248,11 @@ class TestFilesReadReflectsAnalyzedCount:
             ))
 
         dispatcher = FakeDispatcher(src)
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=dispatcher,
+        )
 
         assert dispatcher.calls == [], "all-hits path must not dispatch"
         assert ev is not None
@@ -1360,14 +1298,11 @@ class TestFilesReadReflectsAnalyzedCount:
                 }) + "\n")
             return _make_dummy_evidence(files_read=2)
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=mixed_dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=mixed_dispatcher,
+        )
 
         assert ev is not None
         # a.py = cache hit (1). b.py = ok dispatch (1). c.py = errored (0).
@@ -1402,14 +1337,11 @@ class TestFilesReadReflectsAnalyzedCount:
         def failing_dispatcher(*args, **kwargs):
             return None
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=failing_dispatcher,
-        ):
-            ev = process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        ev = process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache,
+            dispatcher=failing_dispatcher,
+        )
 
         assert ev is not None, (
             "dispatch returned None but cached findings should still produce "
@@ -1488,12 +1420,8 @@ class TestBreakerSalvage:
         config, _src = _setup(tmp_path, {"a.py": "x"})
         config = replace(
             config, options=replace(config.options, failure_streak_threshold=3))
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=_SalvageDispatcher(n_errors=3),
-        ):
-            ev = process_dimension_with_cache(
-                config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache)
+        ev = process_dimension_with_cache(
+            config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache, dispatcher=_SalvageDispatcher(n_errors=3))
         assert ev is not None, "breaker trip should salvage collected findings, not discard"
         assert ev.exit_reason == "failure_streak"
         assert ev.principles, "salvaged Evidence should carry the collected findings"
@@ -1502,10 +1430,6 @@ class TestBreakerSalvage:
         config, _src = _setup(tmp_path, {"a.py": "x"})
         config = replace(
             config, options=replace(config.options, failure_streak_threshold=3))
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=_AllErrorsDispatcher(n_errors=3),
-        ):
-            with pytest.raises(CircuitBreakerError):
-                process_dimension_with_cache(
-                    config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache)
+        with pytest.raises(CircuitBreakerError):
+            process_dimension_with_cache(
+                config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache, dispatcher=_AllErrorsDispatcher(n_errors=3))

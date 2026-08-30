@@ -8,7 +8,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
@@ -213,8 +213,18 @@ def delete_project(reports_dir: str, project: str) -> bool:
     return children_removed
 
 
-def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
-    """Return project metadata including discipline and available dimensions."""
+def get_project_info(
+    reports_dir: str, project: str,
+    *,
+    list_dimensions: Callable[..., tuple[str, ...]] = _list_available_dimensions_for_discipline,
+    has_fingerprints: Callable[[Path, str], bool] = _has_fingerprints,
+) -> dict[str, Any] | None:
+    """Return project metadata including discipline and available dimensions.
+
+    *list_dimensions* and *has_fingerprints* are injection seams for tests,
+    defaulting to the production collaborators of the same name
+    (``_list_available_dimensions_for_discipline``, ``_has_fingerprints``).
+    """
     project_dir = (Path(reports_dir) / project).resolve()
     if not project_dir.is_relative_to(Path(reports_dir).resolve()):
         return None
@@ -224,9 +234,9 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
 
     discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
     available_dimensions = (
-        _list_available_dimensions_for_discipline(log=SHARED_LOG) if discipline else []
+        list_dimensions(log=SHARED_LOG) if discipline else []
     )
-    has_fingerprints = _has_fingerprints(Path(reports_dir), project)
+    fingerprints_found = has_fingerprints(Path(reports_dir), project)
     path_missing = (
         info.get("location") == "online"
         and not (info.get("path", "").startswith(("https://", "git@")))
@@ -239,6 +249,6 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
         **info,
         "discipline": discipline,
         "availableDimensions": available_dimensions,
-        "hasFingerprints": has_fingerprints,
+        "hasFingerprints": fingerprints_found,
         "pathMissing": path_missing,
     }

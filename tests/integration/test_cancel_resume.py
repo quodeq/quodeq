@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -189,14 +188,10 @@ class TestResumeAfterCancel:
 
         # Run 1: cancel after 2 files complete.
         d1 = _ScriptedDispatcher(work_dir, behavior="first_two_ok_then_cancel")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d1,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+        )
         # First run dispatched all 4 files into the pool (cancel happens AFTER
         # the dispatcher returns). Two have ok markers, two don't.
         assert d1.calls[0] == {"a.py", "b.py", "c.py", "d.py"}
@@ -206,14 +201,10 @@ class TestResumeAfterCancel:
 
         # Run 2: clean dispatch of remaining files only.
         d2 = _ScriptedDispatcher(work_dir, behavior="ok_all")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d2,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+        )
         # Second run only dispatched the two files that didn't get an ok marker.
         assert d2.calls[0] == {"c.py", "d.py"}
 
@@ -239,14 +230,10 @@ class TestDiscardForcesFullRedispatch:
         config = replace(config, work_dir=run_dir / "evidence")
 
         d1 = _ScriptedDispatcher(run_dir / "evidence", behavior="first_two_ok_then_cancel")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d1,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+        )
         cancellation.reset()
 
         # Mark the dim as incomplete in dimensions.json, then discard.
@@ -259,27 +246,19 @@ class TestDiscardForcesFullRedispatch:
         # (written by S1.E's dim runner). Confirm before invoking discard.
         assert (run_dir / "evidence" / "security_dispatch_keys.json").is_file()
 
-        with patch(
-            "quodeq.services.evaluation_mixin._open_cache",
-            lambda: cache,
-        ):
-            _discard_run_state(str(reports_dir), {
-                "outputProject": "proj", "outputRunId": "run-1",
-            })
+        _discard_run_state(str(reports_dir), {
+            "outputProject": "proj", "outputRunId": "run-1",
+        }, cache=cache)
 
         # JSONL wiped; cache entries for both ok files removed.
         assert not (run_dir / "evidence" / "security_evidence.jsonl").exists()
 
         # Run 2 dispatches every file (no cache hits).
         d2 = _ScriptedDispatcher(run_dir / "evidence", behavior="ok_all")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d2,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+        )
         assert d2.calls[0] == {"a.py", "b.py", "c.py", "d.py"}
 
 
@@ -292,25 +271,17 @@ class TestTokenOutMidFile:
         )
 
         d1 = _ScriptedDispatcher(work_dir, behavior="first_one_token_limit")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d1,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+        )
 
         # Second run: only the error-marked file should re-dispatch.
         d2 = _ScriptedDispatcher(work_dir, behavior="ok_all")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d2,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+        )
         assert d2.calls[0] == {"a.py"}
 
 
@@ -323,15 +294,11 @@ class TestBreakerTrip:
         )
 
         dispatcher = _ScriptedDispatcher(work_dir, behavior="all_errors")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=dispatcher,
-        ):
-            with pytest.raises(CircuitBreakerError):
-                process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                )
+        with pytest.raises(CircuitBreakerError):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher,
+            )
         assert cancellation.is_cancelled()
 
 
@@ -404,25 +371,17 @@ class TestCrashPathPreservesLikeCancel:
                 raise RuntimeError("crashed mid-dispatch")
 
         d1 = _CrashAfterTwo()
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d1,
-        ):
-            with pytest.raises(RuntimeError):
-                process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                )
+        with pytest.raises(RuntimeError):
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+            )
 
         # Second run: a.py and b.py were cached (had ok markers); c.py
         # was never reached, so it dispatches.
         d2 = _ScriptedDispatcher(work_dir, behavior="ok_all")
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=d2,
-        ):
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+        )
         assert d2.calls[0] == {"c.py"}

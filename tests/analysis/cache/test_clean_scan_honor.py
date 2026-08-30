@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -174,13 +173,10 @@ class TestDispatchBypassesCacheOnCleanScan:
             parse_evidence=_parse_dimension_evidence,
         )
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), callbacks, cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), callbacks, cache=cache,
+            dispatcher=fake_dispatcher,
+        )
 
         # All files re-dispatched, NOT served from cache.
         assert sorted(dispatched_files) == ["a.py", "b.py"]
@@ -228,13 +224,10 @@ class TestDispatchBypassesCacheOnCleanScan:
             parse_evidence=_parse_dimension_evidence,
         )
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatcher,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), callbacks, cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), callbacks, cache=cache,
+            dispatcher=fake_dispatcher,
+        )
 
         # Cache entry was overwritten with the fresh dispatch result.
         entry = cache.get(old_key)
@@ -290,22 +283,19 @@ class TestCleanScanInvalidates:
                 source_file_count=2, files_read=1, coverage_pct=50.0, principles={},
             )
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
-        ):
-            from quodeq.analysis.subagents.runner import DimensionCallbacks
-            from quodeq.analysis._dimension_steps import (
-                _build_dimension_prompt, _parse_dimension_evidence, _run_dimension_analysis,
-            )
-            callbacks = DimensionCallbacks(
-                build_prompt=_build_dimension_prompt,
-                run_analysis=_run_dimension_analysis,
-                parse_evidence=_parse_dimension_evidence,
-            )
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), callbacks, cache=cache,
-            )
+        from quodeq.analysis.subagents.runner import DimensionCallbacks
+        from quodeq.analysis._dimension_steps import (
+            _build_dimension_prompt, _parse_dimension_evidence, _run_dimension_analysis,
+        )
+        callbacks = DimensionCallbacks(
+            build_prompt=_build_dimension_prompt,
+            run_analysis=_run_dimension_analysis,
+            parse_evidence=_parse_dimension_evidence,
+        )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), callbacks, cache=cache,
+            dispatcher=fake_dispatch,
+        )
 
         # a.py: re-dispatched, ok marker, repopulated under same key with FRESH content.
         a_entry = cache.get(build_cache_key_for_file(config, "a.py", "security"))
@@ -345,22 +335,19 @@ class TestCleanScanInvalidates:
                 source_file_count=1, files_read=1, coverage_pct=100.0, principles={},
             )
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=noop_dispatch,
-        ):
-            from quodeq.analysis.subagents.runner import DimensionCallbacks
-            from quodeq.analysis._dimension_steps import (
-                _build_dimension_prompt, _parse_dimension_evidence, _run_dimension_analysis,
-            )
-            callbacks = DimensionCallbacks(
-                build_prompt=_build_dimension_prompt,
-                run_analysis=_run_dimension_analysis,
-                parse_evidence=_parse_dimension_evidence,
-            )
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), callbacks, cache=cache,
-            )
+        from quodeq.analysis.subagents.runner import DimensionCallbacks
+        from quodeq.analysis._dimension_steps import (
+            _build_dimension_prompt, _parse_dimension_evidence, _run_dimension_analysis,
+        )
+        callbacks = DimensionCallbacks(
+            build_prompt=_build_dimension_prompt,
+            run_analysis=_run_dimension_analysis,
+            parse_evidence=_parse_dimension_evidence,
+        )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), callbacks, cache=cache,
+            dispatcher=noop_dispatch,
+        )
 
         # All-hits path; entry survives untouched.
         entry_after = cache.get(key_before)

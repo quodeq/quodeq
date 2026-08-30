@@ -156,12 +156,20 @@ def accumulated_cache_version(
 def per_run_versions(
     project_dir: Path, project: str, params: ScoringParams,
     runs: list[tuple[str, str]],
+    *,
+    dismissed: set[tuple] | None = None,
+    deleted: set[tuple] | None = None,
 ) -> list[tuple[str, str, str]]:
     """``(run_id, status, scoped_version)`` per run, from persisted/lazy run_keys.
 
     *runs* is a list of ``(run_id, status)`` pairs. The returned ``status`` is
     folded into the accumulated version so a status transition invalidates the
     cache (see :func:`accumulated_cache_version`).
+
+    *dismissed* and *deleted* default to a fresh lookup (``dismissed_keys`` /
+    ``deleted_keys``) when omitted — an injection seam for tests, in place of
+    patching those module attributes (this function used to re-import both
+    names in its body on every call, which made such a patch a no-op).
 
     Only TERMINAL runs persist their key sets: an in-progress run's findings
     table is still being written as dimensions finish, so its key set is partial.
@@ -172,10 +180,11 @@ def per_run_versions(
     their scoped version from a fresh ``read_run_key_sets`` each call and never
     write it back, mirroring ``_trend_fetcher.version_for``.
     """
-    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
     from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
-    dismissed, deleted = dismissed_keys(project_dir), deleted_keys(project_dir)
+    if dismissed is None:
+        dismissed = dismissed_keys(project_dir)
+    if deleted is None:
+        deleted = deleted_keys(project_dir)
     with open_score_cache() as conn:
         cached = load_run_keys_or_empty(conn, project)
     out: list[tuple[str, str, str]] = []

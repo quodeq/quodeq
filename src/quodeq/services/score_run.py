@@ -47,7 +47,13 @@ def _read_project_source_file_count(reports_dir: str, project: str) -> int:
     return read_scan_total_files(Path(reports_dir) / project)
 
 
-def score_completed_evidence(reports_dir: str, job: dict) -> None:
+def score_completed_evidence(
+    reports_dir: str, job: dict,
+    *,
+    parser=parse_jsonl_to_evidence,
+    scorer=score_evidence,
+    reporter=write_dimension_report,
+) -> None:
     """Score any dimensions that have evidence but no evaluation report.
 
     Called after cancellation so completed dimensions are preserved in the
@@ -58,6 +64,10 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     these, the scored eval has ``filesRead: 0``, which ``scoring_view``'s
     trust rule rejects — the user sees the cancelled run's data fall
     through to an older run's stale value despite real findings on disk.
+
+    *parser*, *scorer* and *reporter* are injection seams for tests: each
+    defaults to the production collaborator it replaces
+    (``parse_jsonl_to_evidence``, ``score_evidence``, ``write_dimension_report``).
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
@@ -96,7 +106,7 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
 
         files_read = _read_queue_files_count(dimension_queue_file(run_dir, dim_id))
         try:
-            evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
+            evidence = parser(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=source_file_count, files_read=files_read,
             ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
@@ -106,8 +116,8 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
                 on_malformed_line=log_malformed_jsonl_line)
             if evidence is None:
                 continue
-            scores = score_evidence(evidence, mode="numerical", params=params)
-            write_dimension_report(evidence, scores, dim_id, evaluation_dir)
+            scores = scorer(evidence, mode="numerical", params=params)
+            reporter(evidence, scores, dim_id, evaluation_dir)
             _log.info(
                 "Scored cancelled dimension '%s' for run %s (files_read=%d)",
                 dim_id, run_id[:8], files_read,

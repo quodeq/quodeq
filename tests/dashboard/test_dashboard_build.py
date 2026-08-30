@@ -147,6 +147,7 @@ class TestStaticDistDefaulted:
     def test_defaulted_calls_maybe_build_ui(self, tmp_path, monkeypatch):
         from quodeq.dashboard import runner
         from quodeq.dashboard import _server as _server_mod
+        from quodeq.dashboard._probes import DashboardHooks
         from tests.conftest import DummyProcess
 
         build_called = []
@@ -157,21 +158,22 @@ class TestStaticDistDefaulted:
             return static
 
         config = self._make_config(tmp_path, static_dist_defaulted=True, no_build=False)
-        monkeypatch.setattr(runner, "maybe_build_ui", fake_build)
-        monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
-        monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *a, **k: None)
+        hooks = DashboardHooks(
+            build_ui=fake_build, check_prereqs=lambda: None, kill_stale=lambda *a, **k: None,
+        )
         monkeypatch.setattr(
             runner, "_ensure_action_api",
             lambda *a, **k: ("http://127.0.0.1:7863", DummyProcess()),
         )
         monkeypatch.setattr(_server_mod, "serve_and_wait", lambda *a: None)
 
-        runner.run_dashboard(config)
+        runner.run_dashboard(config, hooks=hooks)
         assert build_called, "maybe_build_ui should be called when static_dist is defaulted"
 
     def test_explicit_static_dist_skips_build(self, tmp_path, monkeypatch):
         from quodeq.dashboard import runner
         from quodeq.dashboard import _server as _server_mod
+        from quodeq.dashboard._probes import DashboardHooks
         from tests.conftest import DummyProcess
 
         build_called = []
@@ -181,16 +183,16 @@ class TestStaticDistDefaulted:
             return tmp_path / "static"
 
         config = self._make_config(tmp_path, static_dist_defaulted=False)
-        monkeypatch.setattr(runner, "maybe_build_ui", fake_build)
-        monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
-        monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *a, **k: None)
+        hooks = DashboardHooks(
+            build_ui=fake_build, check_prereqs=lambda: None, kill_stale=lambda *a, **k: None,
+        )
         monkeypatch.setattr(
             runner, "_ensure_action_api",
             lambda *a, **k: ("http://127.0.0.1:7863", DummyProcess()),
         )
         monkeypatch.setattr(_server_mod, "serve_and_wait", lambda *a: None)
 
-        runner.run_dashboard(config)
+        runner.run_dashboard(config, hooks=hooks)
         assert not build_called, "maybe_build_ui should not be called when --static-dist is explicit"
 
     def test_cli_sets_defaulted_flag(self):

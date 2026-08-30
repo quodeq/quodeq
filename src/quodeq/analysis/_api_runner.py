@@ -35,6 +35,7 @@ from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
+    from quodeq.data.events.writer import EventLogWriter
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
@@ -611,6 +612,9 @@ def run_api_analysis(
     source_file_paths: list[str] | None = None,
     run_config: RunConfig | None = None,
     dim_id: str | None = None,
+    event_log: EventLogWriter | None = None,
+    cache_writer: Callable | None = None,
+    router_factory: Callable[..., FindingsRouter] = FindingsRouter,
 ) -> None:
     """Call the LLM and write findings as JSONL evidence through ``FindingsRouter``.
 
@@ -645,6 +649,14 @@ def run_api_analysis(
     passed to ``FindingsRouter(on_file_done=...)`` so every clean ``ok``
     marker writes its per-file cache entry to disk before returning. Legacy
     callers that omit either remain unchanged -- no cache is written.
+
+    *event_log*, *cache_writer* and *router_factory* are injection seams for
+    tests: each defaults to the production collaborator it replaces
+    (``_build_event_log``, ``_build_cache_writer(run_config, dim_id)``,
+    ``FindingsRouter``) when omitted. ``cache_writer`` is resolved with an
+    explicit ``is None`` check rather than truthiness -- ``None`` is also
+    ``_build_cache_writer``'s legitimate "no cache" result, so it must stay
+    ``None`` once resolved, not get re-built on a later falsy check.
     """
     # A fatal provider error (quota/auth/billing) still writes 'error'
     # markers first -- the breaker and reachability guard rely on them --
@@ -672,11 +684,13 @@ def run_api_analysis(
     )
 
     jsonl_file.parent.mkdir(parents=True, exist_ok=True)
-    event_log = _build_event_log(jsonl_file.parent.parent)
-    cache_writer = _build_cache_writer(run_config, dim_id)
+    if event_log is None:
+        event_log = _build_event_log(jsonl_file.parent.parent)
+    if cache_writer is None:
+        cache_writer = _build_cache_writer(run_config, dim_id)
 
     with open(jsonl_file, "a", encoding="utf-8") as fh:
-        router = FindingsRouter(
+        router = router_factory(
             fh, context=ctx, event_log=event_log, on_file_done=cache_writer,
         )
         for f in findings:

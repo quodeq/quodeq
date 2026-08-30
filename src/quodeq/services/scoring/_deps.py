@@ -32,6 +32,7 @@ class ScoringDeps:
     recompute_summary: Callable | None = None
     findings_repo_factory: Callable[[Path], FindingsRepository] | None = None
     grade_tables_factory: Callable[[Path], GradeTablesReader] | None = None
+    is_custom_formula: Callable[[], bool] | None = None
 
 
 _NO_DEPS = ScoringDeps()

@@ -35,8 +35,6 @@ def test_write_findings_does_not_mutate_the_source_dicts(tmp_path: Path):
     assert "carried_forward" not in source[0]
 
 
-from unittest.mock import patch
-
 from quodeq.analysis.cache.entry import CacheEntry
 from tests.analysis.cache.test_dimension_runner import (
     _make_callbacks, _make_ctx, _make_dummy_evidence, _setup, cache,
@@ -66,13 +64,10 @@ def test_only_cache_replays_are_flagged(tmp_path: Path, cache):
             out.write(json.dumps({"_marker": "file_done", "file": "b.py", "status": "ok"}) + "\n")
         return _make_dummy_evidence(files_read=1)
 
-    with patch(
-        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-        new=fake_dispatch,
-    ):
-        process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        )
+    process_dimension_with_cache(
+        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        dispatcher=fake_dispatch,
+    )
 
     jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
     lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
@@ -153,13 +148,10 @@ def test_all_unconsolidated_hits_are_still_written(tmp_path: Path, cache):
             out.write(json.dumps({"_marker": "file_done", "file": "b.py", "status": "ok"}) + "\n")
         return _make_dummy_evidence(files_read=1)
 
-    with patch(
-        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-        new=fake_dispatch,
-    ):
-        process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        )
+    process_dimension_with_cache(
+        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        dispatcher=fake_dispatch,
+    )
 
     jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
     lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
@@ -194,13 +186,10 @@ def test_salvage_path_keeps_unconsolidated_hits_when_dispatch_returns_none(
     def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
         return None
 
-    with patch(
-        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-        new=fake_dispatch,
-    ):
-        evidence = process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        )
+    evidence = process_dimension_with_cache(
+        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        dispatcher=fake_dispatch,
+    )
 
     assert evidence is not None, (
         "salvage-path guard dropped an all-unconsolidated dimension's findings"
@@ -239,13 +228,10 @@ def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
             out.write(json.dumps({"_marker": "file_done", "file": "c.py", "status": "ok"}) + "\n")
         return _make_dummy_evidence(files_read=1)
 
-    with patch(
-        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-        new=fake_dispatch,
-    ):
-        process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        )
+    process_dimension_with_cache(
+        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        dispatcher=fake_dispatch,
+    )
 
     jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
     lines = [json.loads(ln) for ln in jsonl_path.read_text().splitlines() if ln.strip()]
@@ -351,13 +337,10 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
     # Run 1: dispatches a.py, then the user cancels with "keep findings".
     # A cancelled run never calls mark_run_consolidated.
     config1, run_dir1 = _run_config("run1")
-    with patch(
-        "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-        new=fake_dispatch,
-    ):
-        process_dimension_with_cache(
-            config1, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
-        )
+    process_dimension_with_cache(
+        config1, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
+        dispatcher=fake_dispatch,
+    )
     (run_dir1 / "status.json").write_text(json.dumps({"state": "cancelled"}))
     mark_run_consolidated(run_dir1, shared_cache)  # no-op: not done
 

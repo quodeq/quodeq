@@ -11,29 +11,24 @@ import typing
 import webbrowser
 from pathlib import Path
 
-from quodeq.dashboard._api_health import ApiConfig, action_api_healthy
+from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import DashboardConfig
-from quodeq.dashboard._networking import (
-    _MAX_PORT_SCAN_TRIES,
-    _allow_plaintext_http,
-    _is_port_open,
-    _local_hosts,
-)
+from quodeq.dashboard._networking import _MAX_PORT_SCAN_TRIES, _allow_plaintext_http
 from quodeq.dashboard._frozen import subprocess_cmd
-from quodeq.dashboard._process import (
-    _PROCESS_WAIT_TIMEOUT_S,
-    _spawn_and_wait_local,
-    _wait_for_process,
-)
+from quodeq.dashboard._probes import ApiProbes
+from quodeq.dashboard._process import _PROCESS_WAIT_TIMEOUT_S, _wait_for_process
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
 _HTTP_SCHEME = "http"
 
 
-def _guard_plaintext_http(host: str, allow_plaintext: bool | None = None) -> None:
+def _guard_plaintext_http(
+    host: str, allow_plaintext: bool | None = None, *, probes: ApiProbes | None = None,
+) -> None:
     """Refuse plaintext HTTP to a non-local host unless explicitly opted in."""
-    if host in _local_hosts():
+    probes = probes or ApiProbes()
+    if host in probes.local_hosts():
         return
     if _allow_plaintext_http(allow_plaintext):
         logging.getLogger(__name__).warning(
@@ -52,16 +47,18 @@ def _ensure_action_api(
     start_port: int,
     max_tries: int = _MAX_PORT_SCAN_TRIES,
     api_config: ApiConfig | None = None,
+    *, probes: ApiProbes | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
+    probes = probes or ApiProbes()
     cfg = api_config or ApiConfig()
-    _guard_plaintext_http(host, cfg.allow_plaintext)
+    _guard_plaintext_http(host, cfg.allow_plaintext, probes=probes)
     for port in range(start_port, start_port + max_tries):
         base_url = f"{_HTTP_SCHEME}://{host}:{port}"
-        if _is_port_open(host, port):
-            if action_api_healthy(base_url):
+        if probes.is_port_open(host, port):
+            if probes.api_healthy(base_url):
                 return base_url, None
             continue
-        return _spawn_and_wait_local(port, base_url, cfg)
+        return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
@@ -70,14 +67,16 @@ def _ensure_action_api_forced(
     port: int,
     static_dist: Path | None = None,
     evaluations_dir: str | None = None,
+    *, probes: ApiProbes | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
-    _guard_plaintext_http(host)
+    probes = probes or ApiProbes()
+    _guard_plaintext_http(host, probes=probes)
     base_url = f"http://{host}:{port}"
-    if _is_port_open(host, port):
-        if action_api_healthy(base_url):
+    if probes.is_port_open(host, port):
+        if probes.api_healthy(base_url):
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    return _spawn_and_wait_local(
+    return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )
 

@@ -1,6 +1,7 @@
 """Git-based file scoring -- churn and recency signals for file prioritization."""
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -35,15 +36,22 @@ def _iter_git_log(src: Path, months: int = 3):
     """Yield git log lines one at a time (streaming, no full materialization).
 
     Process execution lives in ``data/git_cli.stream_log_names``; this
-    wrapper keeps the scoring-local seam that tests patch by name, and the
-    repo pre-check that skips non-git sources without spawning anything.
+    wrapper adds the repo pre-check that skips non-git sources without
+    spawning anything. This is the default ``log_source`` for
+    ``compute_git_scores``; tests inject a fake instead of patching by name.
     """
     if not _has_git(src):
         return
     yield from stream_log_names(src, months=months, timeout=_GIT_LOG_TIMEOUT_S)
 
 
-def compute_git_scores(files: list[str], src: Path, config: dict | None = None) -> dict[str, float]:
+def compute_git_scores(
+    files: list[str],
+    src: Path,
+    config: dict | None = None,
+    *,
+    log_source: Callable[[Path, int], Iterable[str]] = _iter_git_log,
+) -> dict[str, float]:
     """Layer 4: git churn and recency scoring."""
     cfg = config or {}
     file_set = set(files)
@@ -52,7 +60,7 @@ def compute_git_scores(files: list[str], src: Path, config: dict | None = None) 
 
     current_date = ""
     has_lines = False
-    for raw_line in _iter_git_log(src, cfg.get("git_lookback_months", 3)):
+    for raw_line in log_source(src, cfg.get("git_lookback_months", 3)):
         has_lines = True
         line = raw_line.strip()
         if not line:
