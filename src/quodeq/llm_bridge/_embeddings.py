@@ -77,8 +77,31 @@ def embed_texts(
     return [list(item.embedding) for item in items]
 
 
-_availability_cache: dict[tuple[str, str], bool] = {}
-_availability_lock = threading.Lock()
+class EmbeddingAvailabilityCache:
+    """Lock-guarded per-process cache of (model, base_url) -> availability.
+
+    Instantiable so tests get isolated caches; production shares the
+    module-default instance below.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._cache: dict[tuple[str, str], bool] = {}
+
+    def get(self, key: tuple[str, str]) -> bool | None:
+        with self._lock:
+            return self._cache.get(key)
+
+    def set(self, key: tuple[str, str], value: bool) -> None:
+        with self._lock:
+            self._cache[key] = value
+
+    def clear(self) -> None:
+        with self._lock:
+            self._cache.clear()
+
+
+_availability_cache = EmbeddingAvailabilityCache()
 
 
 def embedding_model_available(
@@ -86,16 +109,19 @@ def embedding_model_available(
     base_url: str,
     *,
     lister: Callable[[str], list[dict[str, Any]]] | None = None,
+    cache: EmbeddingAvailabilityCache | None = None,
 ) -> bool:
     """True when *model* is served at *base_url*. Cached per process.
 
     Ollama bases are probed via /api/tags (list_ollama_models); non-Ollama
     OpenAI-compatible bases return True permissively — they fail gracefully
-    at call time. The cache keeps the per-call API path cheap.
+    at call time. The cache keeps the per-call API path cheap. Reads (and
+    writes) *cache*, defaulting to the module-wide instance production
+    shares.
     """
+    cache = cache or _availability_cache
     key = (model, base_url)
-    with _availability_lock:
-        cached = _availability_cache.get(key)
+    cached = cache.get(key)
     if cached is not None:
         return cached
     if lister is None:
@@ -106,18 +132,15 @@ def embedding_model_available(
             from quodeq.llm_bridge._ollama import list_ollama_models  # noqa: PLC0415
             lister = list_ollama_models
         else:
-            with _availability_lock:
-                _availability_cache[key] = True
+            cache.set(key, True)
             return True
     names = {m.get("name", "") for m in lister(base_url)}
     tagged = model if ":" in model else f"{model}:latest"
     result = model in names or tagged in names
-    with _availability_lock:
-        _availability_cache[key] = result
+    cache.set(key, result)
     return result
 
 
 def reset_embedding_availability_cache() -> None:
-    """Test hook: clear the per-process availability cache."""
-    with _availability_lock:
-        _availability_cache.clear()
+    """Test hook: clear the module-wide per-process availability cache."""
+    _availability_cache.clear()

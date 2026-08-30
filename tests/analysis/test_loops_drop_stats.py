@@ -20,13 +20,6 @@ from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 
 
 @pytest.fixture(autouse=True)
-def _isolated_counter(monkeypatch):
-    # The loops report through the module-default counter; swap in a fresh
-    # instance so nothing leaks in from (or out to) other tests.
-    monkeypatch.setattr(_drop_stats, "_default_counter", _drop_stats.DropStatsCounter())
-
-
-@pytest.fixture(autouse=True)
 def _propagate_quodeq_logs():
     # The quodeq logger has propagate=False (StderrHandler only); flip it so
     # pytest's caplog handler (on the root logger) receives the records.
@@ -46,17 +39,21 @@ def _loop_config() -> MagicMock:
 
 
 def test_per_dimension_loop_reports_drop_stats_at_end(caplog):
-    _drop_stats.record(dropped=1, kept=9)
+    # An injected counter, not the module-default: isolation via injection,
+    # not fixture-patched module state.
+    counter = _drop_stats.DropStatsCounter()
+    counter.record(dropped=1, kept=9)
     with caplog.at_level(logging.INFO):
-        run_per_dimension_loop(_loop_config(), [], MagicMock(), runner=MagicMock())
+        run_per_dimension_loop(_loop_config(), [], MagicMock(), runner=MagicMock(), drop_counter=counter)
     assert "dropped 1 of 10" in caplog.text
     # The loop's report consumed the accumulator.
-    assert _drop_stats.consume().parsed == 0
+    assert counter.consume().parsed == 0
 
 
 def test_incremental_loop_reports_drop_stats_at_end(caplog):
-    _drop_stats.record(dropped=1, kept=9)
+    counter = _drop_stats.DropStatsCounter()
+    counter.record(dropped=1, kept=9)
     with caplog.at_level(logging.INFO):
-        run_incremental_loop(_loop_config(), [], MagicMock(), runner=MagicMock())
+        run_incremental_loop(_loop_config(), [], MagicMock(), runner=MagicMock(), drop_counter=counter)
     assert "dropped 1 of 10" in caplog.text
-    assert _drop_stats.consume().parsed == 0
+    assert counter.consume().parsed == 0

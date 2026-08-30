@@ -23,13 +23,17 @@ import pytest
 from quodeq.analysis._dim_estimates import compute_dim_estimates
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
+from quodeq.analysis.dispatch_policy import DispatchPolicy
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents._source_files import _list_source_files
 
 CAP = 200  # small test cap, applied via QUODEQ_MAX_API_FILE_SIZE
+_TEST_PROVIDER = "test-provider"
 
 
-def _make_config(src: Path, file_names: list[str]) -> RunConfig:
+def _make_config(
+    src: Path, file_names: list[str], *, dispatch: DispatchPolicy | None = None,
+) -> RunConfig:
     target = AnalysisTarget(
         name="t", language="python", source_files=sorted(file_names),
         total_files=len(file_names),
@@ -40,6 +44,7 @@ def _make_config(src: Path, file_names: list[str]) -> RunConfig:
         src=src, language="python", standards_dir=None,
         work_dir=src, manifest=manifest,
         options=AnalysisOptions(subagent_model="test-model", incremental=False),
+        dispatch=dispatch,
     )
 
 
@@ -51,17 +56,31 @@ def _write_repo(src: Path) -> None:
 
 
 @pytest.fixture
-def api_provider(monkeypatch):
+def api_provider(monkeypatch) -> DispatchPolicy:
+    """A literal API-type DispatchPolicy.
+
+    ``default_dispatch_policy()`` (the factory every un-injected caller —
+    the module-level wrapper functions, ``RunConfig._policy()`` — resolves
+    through) reads ``get_provider_configs()`` from inside
+    ``dispatch_policy.py``'s own body. Patching it there, rather than
+    patching ``default_dispatch_policy`` itself, reaches every caller
+    regardless of which module imported the factory by name.
+    """
+    configs = {_TEST_PROVIDER: {"type": "api"}}
     monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", str(CAP))
-    with patch("quodeq.analysis.dispatch_policy.provider_is_api", return_value=True):
-        yield
+    monkeypatch.setenv("AI_CMD", _TEST_PROVIDER)
+    monkeypatch.setattr("quodeq.analysis.dispatch_policy.get_provider_configs", lambda: configs)
+    return DispatchPolicy(provider_configs=configs, ai_cmd=_TEST_PROVIDER, file_size_cap=CAP)
 
 
 @pytest.fixture
-def cli_provider(monkeypatch):
+def cli_provider(monkeypatch) -> DispatchPolicy:
+    """A literal CLI-type DispatchPolicy. See :func:`api_provider`."""
+    configs = {_TEST_PROVIDER: {"type": "cli"}}
     monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", str(CAP))
-    with patch("quodeq.analysis.dispatch_policy.provider_is_api", return_value=False):
-        yield
+    monkeypatch.setenv("AI_CMD", _TEST_PROVIDER)
+    monkeypatch.setattr("quodeq.analysis.dispatch_policy.get_provider_configs", lambda: configs)
+    return DispatchPolicy(provider_configs=configs, ai_cmd=_TEST_PROVIDER, file_size_cap=CAP)
 
 
 class TestEnumerationAppliesCap:
@@ -132,23 +151,55 @@ class TestEnumerationAppliesCap:
 
 
 class TestCoverageDenominator:
-    def test_source_file_count_reflects_api_eligibility(
-        self, tmp_path: Path, api_provider,
-    ):
-        src = tmp_path / "src"
-        _write_repo(src)
-        config = _make_config(src, ["small.py", "big.py"])
+    """``source_file_count`` -- the coverage denominator -- reads the
+    RunConfig's DispatchPolicy. No env, no patching, no real files:
+    ``stat_size`` is a literal in-memory lookup.
+    """
+
+    _SIZES = {"small.py": 10, "big.py": CAP + 1}
+
+    @staticmethod
+    def _stat_size(path: Path) -> int:
+        return TestCoverageDenominator._SIZES[path.name]
+
+    def test_source_file_count_reflects_api_eligibility(self, tmp_path: Path):
+        policy = DispatchPolicy(
+            provider_configs={_TEST_PROVIDER: {"type": "api"}},
+            ai_cmd=_TEST_PROVIDER, file_size_cap=CAP, stat_size=self._stat_size,
+        )
+        config = _make_config(tmp_path / "src", ["small.py", "big.py"], dispatch=policy)
 
         assert config.source_file_count == 1
 
-    def test_source_file_count_unchanged_for_cli_provider(
-        self, tmp_path: Path, cli_provider,
-    ):
+    def test_source_file_count_unchanged_for_cli_provider(self, tmp_path: Path):
+        policy = DispatchPolicy(
+            provider_configs={_TEST_PROVIDER: {"type": "cli"}},
+            ai_cmd=_TEST_PROVIDER, file_size_cap=CAP, stat_size=self._stat_size,
+        )
+        config = _make_config(tmp_path / "src", ["small.py", "big.py"], dispatch=policy)
+
+        assert config.source_file_count == 2
+
+
+class TestDispatchPolicyParity:
+    """The queue/denominator divergence-bug guard (the "perpetual 97%"
+    coverage bug): ``_list_source_files`` (queue/estimates enumeration) and
+    ``RunConfig._policy()`` (the coverage denominator) must agree on which
+    files are dispatchable for the SAME RunConfig. A future change that lets
+    one of these paths resolve a different DispatchPolicy than the other
+    reintroduces the bug this module's docstring describes.
+    """
+
+    def test_list_source_files_matches_policy_split(self, tmp_path: Path, api_provider):
         src = tmp_path / "src"
         _write_repo(src)
         config = _make_config(src, ["small.py", "big.py"])
+        all_files = config.manifest.source_files
 
-        assert config.source_file_count == 2
+        files, _ext, _excluded = _list_source_files(config, "security")
+        dispatchable, _excluded2 = config._policy().split_api_dispatchable(config.src, all_files)
+
+        assert files == dispatchable
 
 
 class TestWorkerNeverDropsSilently:

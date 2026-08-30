@@ -22,10 +22,10 @@ OTHER_DIM = "standards"
 
 
 @pytest.fixture(autouse=True)
-def _clear_caches():
-    fingerprint._hash_standards.cache_clear()
-    yield
-    fingerprint._hash_standards.cache_clear()
+def _clear_caches(monkeypatch):
+    # Fresh HashCache per test: isolation via injection (swapping the
+    # module-default instance), not a cache_clear() attribute hook.
+    monkeypatch.setattr(fingerprint, "_hash_cache", fingerprint.HashCache())
 
 
 def _write_compiled(standards_dir: Path, dimension: str) -> None:
@@ -59,7 +59,7 @@ def _set_override(config: RunConfig, value: int | None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(
             {"version": 1, "overrides": {"M-ANA-2": {"max_lines": value}}}))
-    fingerprint._hash_standards.cache_clear()
+    fingerprint.reset_hash_caches()
 
 
 def test_override_shifts_key_and_revert_restores_it(config: RunConfig):

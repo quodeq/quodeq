@@ -10,7 +10,7 @@ from dataclasses import replace
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._drop_stats import report_run_drop_stats
+from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError, FatalProviderError
@@ -294,6 +294,7 @@ def run_incremental_loop(
     *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
     log: LogSink = NULL_LOG,
+    drop_counter: DropStatsCounter | None = None,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
 
@@ -419,7 +420,7 @@ def run_incremental_loop(
     )
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
-    report_run_drop_stats()
+    report_run_drop_stats(drop_counter)
     _raise_on_fatal_cancel(_run_dir_for(config), log=log)
     check_zero_findings(
         result, config.source_file_count,
@@ -435,6 +436,7 @@ def run_per_dimension_loop(
     *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
     log: LogSink = NULL_LOG,
+    drop_counter: DropStatsCounter | None = None,
 ) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension).
 
@@ -534,7 +536,7 @@ def run_per_dimension_loop(
     )
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
-    report_run_drop_stats()
+    report_run_drop_stats(drop_counter)
     _raise_on_fatal_cancel(_run_dir_for(config), log=log)
     check_zero_findings(
         result, config.source_file_count, skipped_count,

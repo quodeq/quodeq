@@ -59,10 +59,24 @@ class _ProviderConfigCache:
                         self._configs = _PROVIDER_CONFIGS_FALLBACK
         return self._configs
 
+    def reset(self) -> None:
+        """Drop the cached configs, forcing the next :meth:`get` to reload."""
+        with self._lock:
+            self._configs = None
+
 
 _provider_config_cache = _ProviderConfigCache()
 
 
-def get_provider_configs() -> dict[str, dict]:
-    """Return provider configurations, loading from disk on first call."""
-    return _provider_config_cache.get()
+def get_provider_configs(*, cache: _ProviderConfigCache | None = None) -> dict[str, dict]:
+    """Return provider configurations, loading from disk on first call.
+
+    Reads (and lazily populates) *cache*, defaulting to the module-wide
+    instance production code shares.
+    """
+    return (cache or _provider_config_cache).get()
+
+
+def reset_provider_config_cache() -> None:
+    """Reset the module-wide provider config cache. Test-isolation seam."""
+    _provider_config_cache.reset()

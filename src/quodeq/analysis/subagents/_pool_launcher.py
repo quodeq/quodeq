@@ -115,10 +115,11 @@ class LaunchPoolParams:
 
 def _launch_pool(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
+    *, env: dict[str, str] | None = None,
 ) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
+    subagent_model = config.options.subagent_model or _default_subagent_model(env) or config.options.ai_model
     queue_size = len(params.all_files) if params.all_files is not None else 0
     time_limit = _resolve_time_limit(config.options.time_limit, queue_size)
     base_user_budget = config.options.time_limit if config.options.time_limit is not None else DEFAULT_TIME_LIMIT
@@ -154,8 +155,8 @@ def _launch_pool(
 
     # Skip scout mode for providers without per-token billing (e.g. Codex with
     # ChatGPT subscription).  Launch all agents immediately for faster results.
-    ai_cmd = get_ai_cmd()
-    use_scout = ai_cmd not in _non_scout_providers()
+    ai_cmd = get_ai_cmd(env)
+    use_scout = ai_cmd not in _non_scout_providers(env)
 
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from quodeq.config.paths import default_paths
 from quodeq.analysis.subprocess import AnalysisError
+from quodeq.analysis.dispatch_policy import default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -422,6 +423,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             diff_from=diff_from,
             skip_scoring=skip_scoring,
         ),
+        dispatch=default_dispatch_policy(env=_env),
     )
 
 
