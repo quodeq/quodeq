@@ -16,7 +16,7 @@ import { computeOverallProgress } from './features/evaluation/components/scanPro
 import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
+import { readActiveProviderSelection, readActiveProviderModel } from './utils/effectiveProviderSettings.js';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
 import { useStartupTheme, useStartupLoader } from './hooks/useStartupTheme.js';
@@ -218,10 +218,10 @@ export default function App() {
     }
   }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
-  const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
-    ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
-    : null;
+  // NOT memoized on purpose: a per-render read is what makes this pick up a
+  // Settings change (active provider/model) without its own change listener.
+  const sidebarProvider = readActiveProviderSelection();
+  const sidebarModel = readActiveProviderModel(sidebarProvider);
   const { activePage, navStack, navPop, navGoTo, navSwapAt, navTab, activeTab } = state;
   // Boot-only fullscreen loader: one-shot hold plus a short linger — see
   // hooks/useStartupTheme.js for the predicate and gating rationale.

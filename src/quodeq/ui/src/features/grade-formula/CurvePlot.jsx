@@ -1,4 +1,5 @@
 import { t } from '../../strings/index.js';
+import { baseCurve, ceilingCurve } from './curveMath.js';
 const W = 220;
 const H = 130;
 const PAD_L = 26;
@@ -21,8 +22,8 @@ function pathFor(fn) {
 
 /** Base + ceiling curves with the compliance-lift zone shaded between them. */
 export default function CurvePlot({ baseK, ceilScale, thresholds }) {
-  const base = (wv) => (wv === 0 ? 10 : 10 / (1 + baseK * wv));
-  const ceiling = (wv) => (wv === 0 ? 10 : 10 - Math.log2(1 + wv) * ceilScale);
+  const base = (wv) => baseCurve(wv, baseK);
+  const ceiling = (wv) => ceilingCurve(wv, ceilScale);
   const basePath = pathFor(base);
   const ceilPath = pathFor(ceiling);
   const zone = `${ceilPath} L ${basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;

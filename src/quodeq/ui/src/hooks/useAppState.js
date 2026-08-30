@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { LOCALE } from '../strings/index.js';
+import { LOCALE, t } from '../strings/index.js';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSidePane } from '../features/side-pane/SidePaneContext.jsx';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { usePrefetchAdjacentRuns } from '../features/dashboard/hooks/usePrefetchAdjacentRuns.js';
 import { buildPeriodRuns } from '../utils/dailyGrouping.js';
@@ -61,12 +62,20 @@ function computeDerivedState(accumulated, dashboard, selectedProject, projects) 
 
 function useProjects({ onNoProjects }) {
   const projectState = useProjectState({ onNoProjects });
-  const projectActions = useProjectActions({
-    projects: projectState.projects,
-    selectedProject: projectState.selectedProject,
-    handleProjectChange: projectState.handleProjectChange,
-    loadProjects: projectState.loadProjects,
-  });
+  const { showToast } = useSidePane();
+  const projectActions = useProjectActions(
+    {
+      projects: projectState.projects,
+      selectedProject: projectState.selectedProject,
+      handleProjectChange: projectState.handleProjectChange,
+      loadProjects: projectState.loadProjects,
+    },
+    // Route project-action failures through the toast (SidePaneProvider
+    // precedent, e.g. EvaluationForm's onValidationFail) instead of a
+    // blocking alert() -- render the message here so useProjectActions
+    // stays presentation-agnostic.
+    { onError: (messageKey, vars) => showToast(t(messageKey, vars)) },
+  );
   return { ...projectState, ...projectActions };
 }
 

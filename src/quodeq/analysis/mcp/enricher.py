@@ -6,7 +6,6 @@ all transformation here and keeps only routing concerns (dedup, I/O, events).
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
@@ -22,8 +21,7 @@ from quodeq.context.precedent import (
 )
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
-
-_logger = logging.getLogger(__name__)
+from quodeq.core.observability import NULL_LOG, LogSink
 
 _FINDING_SCHEMA_VERSION = 1
 # These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
@@ -134,6 +132,7 @@ def _apply_precedent_downweight(
     finding: dict[str, object],
     fingerprints: set[str] | None,
     corpus: PrecedentCorpus | None = None,
+    *, log: LogSink = NULL_LOG,
 ) -> None:
     """Drop confidence to ~25 when this finding matches a prior dismissal.
 
@@ -157,9 +156,9 @@ def _apply_precedent_downweight(
             score = corpus.match(text)
             if score is not None and score >= corpus.threshold:
                 matched = True
-                _logger.debug(
-                    "Semantic precedent match (%.3f) for %s:%s",
-                    score, finding.get("file"), finding.get("line"),
+                log.debug(
+                    f"Semantic precedent match ({score:.3f}) for "
+                    f"{finding.get('file')}:{finding.get('line')}"
                 )
 
     if not matched:
@@ -185,6 +184,7 @@ class FindingEnricher:
         self,
         context: CompiledContext,
         file_reader: FileReader | None = None,
+        *, log: LogSink = NULL_LOG,
     ) -> None:
         self._refs = context.compiled_refs
         self._reqs = context.compiled_reqs
@@ -196,6 +196,7 @@ class FindingEnricher:
         self._precedent_fingerprints = context.precedent_fingerprints
         self._precedent_corpus = context.precedent_corpus
         self._read_file: Callable[[Path], str] = file_reader or _default_read_file
+        self._log = log
 
     def dedup_key(self, args: dict) -> tuple:
         """Compute the deduplication key for a raw finding args dict."""
@@ -227,10 +228,10 @@ class FindingEnricher:
         declared = args.get("d")
         if req_dim:
             if declared and declared != req_dim:
-                _logger.warning(
-                    "Rerouting finding from declared dimension %r to %r per "
-                    "requirement %r (severity=%s, file=%s)",
-                    declared, req_dim, req, args.get("severity"), args.get("file"),
+                self._log.warning(
+                    f"Rerouting finding from declared dimension {declared!r} to "
+                    f"{req_dim!r} per requirement {req!r} "
+                    f"(severity={args.get('severity')}, file={args.get('file')})"
                 )
             finding["d"] = req_dim
         elif not declared and self._dimension:
@@ -246,6 +247,7 @@ class FindingEnricher:
         _apply_shape_downweight(finding, self._project_shape)
         _apply_precedent_downweight(
             finding, self._precedent_fingerprints, self._precedent_corpus,
+            log=self._log,
         )
         # Gates the LIVE path only: this method runs once per freshly-dispatched
         # finding, before it ever reaches the cache. A cached finding replayed on

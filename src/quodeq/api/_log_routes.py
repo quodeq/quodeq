@@ -1,15 +1,25 @@
-"""Log streaming routes — exposes buffered server logs via REST."""
+"""Log streaming routes — exposes buffered server logs via REST, plus a
+tiny standalone viewer page.
+
+The viewer's CSS/JS are served from their own explicit routes (rather than
+inlined into the HTML) so the page's own script-src 'self' CSP directive
+(api/security.py) doesn't block it -- an inline <script> tag was silently
+dead in real browsers before this split.
+"""
 from __future__ import annotations
+
+from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._log_buffer import LogBuffer
 
 _LOG_POLL_INTERVAL_MS = 2000
+_PAGES_DIR = Path(__file__).resolve().parent / "pages"
 
 
 def register_log_routes(app: Flask, log_buffer: LogBuffer) -> None:
-    """Register the /api/logs endpoint."""
+    """Register the /api/logs endpoint and the /logs viewer page."""
 
     @app.get("/api/logs")
     def get_logs() -> Response:
@@ -18,60 +28,16 @@ def register_log_routes(app: Flask, log_buffer: LogBuffer) -> None:
 
     @app.get("/logs")
     def logs_page() -> Response:
-        html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Quodeq — Server Logs</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0d1117; color: #c9d1d9;
-    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 13px; line-height: 1.7;
-    padding: 16px;
-  }
-  h1 {
-    font-size: 14px; font-weight: 500;
-    color: #8b949e; margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #21262d;
-  }
-  #logs { white-space: pre-wrap; word-break: break-word; }
-  .ts { color: #484f58; }
-</style>
-</head>
-<body>
-<h1>Quodeq Server Logs</h1>
-<div id="logs"></div>
-<script>
-let since = -1;
-const el = document.getElementById('logs');
-async function poll() {
-  try {
-    const url = '/api/logs' + (since >= 0 ? '?since=' + since : '');
-    const r = await fetch(url);
-    if (!r.ok) return;
-    const data = await r.json();
-    if (data.lines.length) {
-      const frag = document.createDocumentFragment();
-      data.lines.forEach(e => {
-        const line = document.createElement('div');
-        const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
-        const ets = ts.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        line.innerHTML = '<span class="ts">[' + ets + ']</span> ' +
-          e.line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        frag.appendChild(line);
-        since = e.index;
-      });
-      el.appendChild(frag);
-      window.scrollTo(0, document.body.scrollHeight);
-    }
-  } catch (e) { console.warn('poll error', e); }
-}
-poll();
-setInterval(poll, %d);
-</script>
-</body>
-</html>""" % _LOG_POLL_INTERVAL_MS
+        html = (_PAGES_DIR / "logs.html").read_text(encoding="utf-8")
         return Response(html, content_type="text/html")
+
+    @app.get("/logs.css")
+    def logs_css() -> Response:
+        css = (_PAGES_DIR / "logs.css").read_text(encoding="utf-8")
+        return Response(css, content_type="text/css")
+
+    @app.get("/logs.js")
+    def logs_js() -> Response:
+        template = (_PAGES_DIR / "logs.js").read_text(encoding="utf-8")
+        js = template.replace("{{POLL_INTERVAL_MS}}", str(_LOG_POLL_INTERVAL_MS))
+        return Response(js, content_type="application/javascript")

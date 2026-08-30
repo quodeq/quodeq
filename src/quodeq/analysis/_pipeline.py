@@ -14,6 +14,8 @@ from quodeq.analysis._loops import (
     run_per_dimension_loop,
 )
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
+from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
@@ -24,6 +26,7 @@ from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.utils import get_ai_cmd
 
 _LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
@@ -77,7 +80,7 @@ def _run_dry_run(
         # Dim states must move to DONE here just like the real loops: the
         # lifecycle flips anything still pending at exit to INCOMPLETE and
         # stamps the run exit_reason=incomplete_dimensions.
-        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
+        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=SHARED_LOG)
         log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
         emit_marker("analyzing", dimension=dimension)
         ev = Evidence(
@@ -96,7 +99,7 @@ def _run_dry_run(
             jsonl_path.touch()
         emit_marker("scoring", dimension=dimension)
         result[dimension] = ev
-        _safe_write_dim_state(run_dir, dimension, DimState.DONE)
+        _safe_write_dim_state(run_dir, dimension, DimState.DONE, log=SHARED_LOG)
         if on_dimension_done:
             on_dimension_done(dimension, ev)
     return result
@@ -110,7 +113,7 @@ def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> None:
     if not config.work_dir:
         return  # dev mode (no run_dir) — nothing for the dashboard to read
     try:
-        estimates = compute_dim_estimates(config, dimensions)
+        estimates = compute_dim_estimates(config, dimensions, log=SHARED_LOG)
     except (OSError, ValueError, KeyError, RuntimeError):
         return
     write_dim_estimates(config.work_dir.parent, estimates)
@@ -141,7 +144,17 @@ def _run_dimensions(
     # One runner per run. Per-run construction (vs. a module-level
     # singleton) makes test substitution and concurrency-safety obvious:
     # each evaluation owns its own DimensionCallbacks instance.
-    runner = DimensionRunner()
+    #
+    # Cache is constructed here (composition root) rather than left for
+    # process_dimension_with_cache to default lazily, so every dimension
+    # in this run shares one LocalFileBackend. The legacy-entry GC that
+    # used to ride along with the lazy default is called explicitly here
+    # instead -- it's still once-per-(root, schema)-per-process (see
+    # maybe_collect_legacy_entries's own memo), just triggered at runner
+    # construction instead of on the first cache-is-None dimension call.
+    cache = LocalFileBackend()
+    maybe_collect_legacy_entries(cache.root)
+    runner = DimensionRunner(cache=cache)
 
     # Set the run-level deadline once, just before the dim loop starts.
     # Skipped for dry runs (already returned above), unlimited budget, or
@@ -164,6 +177,7 @@ def _run_dimensions(
             config, dimensions, ctx,
             runner=runner,
             on_dimension_done=on_dimension_done,
+            log=SHARED_LOG,
         )
 
     if config.options.incremental:
@@ -176,6 +190,7 @@ def _run_dimensions(
             config, dimensions, ctx,
             runner=runner,
             on_dimension_done=on_dimension_done,
+            log=SHARED_LOG,
         )
 
     # Clean-scan path: full re-analysis, no carry-forward. Reached only
@@ -207,6 +222,7 @@ def _run_dimensions(
         config, dimensions, ctx,
         runner=runner,
         on_dimension_done=on_dimension_done,
+        log=SHARED_LOG,
     )
 
 

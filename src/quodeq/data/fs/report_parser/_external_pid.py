@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from quodeq.core.utils.io import resolve_child_dir
-from quodeq.data.sqlite._index_sync import _is_pid_alive
+from quodeq.shared.process import is_pid_alive
 
 _PID_FILENAME = ".pid"
 
@@ -53,8 +53,8 @@ def resolve_external_pid(project_dir: Path, run_id: str) -> int | None:
         pid = int(pid_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return None
-    # _is_pid_alive rather than os.kill(pid, 0) -- signal 0 is unsafe on
+    # is_pid_alive rather than os.kill(pid, 0) -- signal 0 is unsafe on
     # Windows (CTRL_C_EVENT can broadcast Ctrl+C to the calling process).
-    if not _is_pid_alive(pid):
+    if not is_pid_alive(pid):
         return None
     return pid

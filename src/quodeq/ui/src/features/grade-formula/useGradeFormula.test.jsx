@@ -90,6 +90,36 @@ describe('useGradeFormula', () => {
     expect(previewGradeFormula).toHaveBeenCalledWith('proj', expect.objectContaining({ baseK: 9 }));
   });
 
+  it('update() clamps floorMinor against the current floorMajor (gradeFormulaRules.clampFloors)', async () => {
+    const { result } = renderGradeFormula('proj');
+    await waitFor(() => expect(result.current.draft).toEqual(CURRENT));
+
+    // CURRENT: floorMinor=8, floorMajor=5. Dragging floorMinor down to 3
+    // must clamp up to floorMajor (5), matching the sliders' old inline
+    // behaviour now centralized in the update() funnel.
+    act(() => { result.current.update({ floorMinor: 3 }); });
+    expect(result.current.draft.floorMinor).toBe(5);
+  });
+
+  it('update() clamps floorMajor against the current floorMinor (gradeFormulaRules.clampFloors)', async () => {
+    const { result } = renderGradeFormula('proj');
+    await waitFor(() => expect(result.current.draft).toEqual(CURRENT));
+
+    // CURRENT: floorMinor=8, floorMajor=5. Pushing floorMajor up to 10 must
+    // clamp down to floorMinor (8).
+    act(() => { result.current.update({ floorMajor: 10 }); });
+    expect(result.current.draft.floorMajor).toBe(8);
+  });
+
+  it('update() does not touch floors on an unrelated patch (clampFloors no-op)', async () => {
+    const { result } = renderGradeFormula('proj');
+    await waitFor(() => expect(result.current.draft).toEqual(CURRENT));
+
+    act(() => { result.current.update({ gradeThresholds: [[9, 'Exemplary']] }); });
+    expect(result.current.draft.floorMinor).toBe(CURRENT.floorMinor);
+    expect(result.current.draft.floorMajor).toBe(CURRENT.floorMajor);
+  });
+
   it('does not request a preview when projectId is null', async () => {
     vi.useFakeTimers();
     const { result } = renderGradeFormula(null);

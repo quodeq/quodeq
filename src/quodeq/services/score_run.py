@@ -15,10 +15,14 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 from quodeq.services.ports import (
     dimension_queue_file,
+    dimension_report_exists,
+    ensure_dir,
     list_dimension_evidence,
     queue_file_exists,
+    read_dimensions,
     read_queue_files_count,
     read_scan_total_files,
 )
@@ -43,7 +47,13 @@ def _read_project_source_file_count(reports_dir: str, project: str) -> int:
     return read_scan_total_files(Path(reports_dir) / project)
 
 
-def score_completed_evidence(reports_dir: str, job: dict) -> None:
+def score_completed_evidence(
+    reports_dir: str, job: dict,
+    *,
+    parser=parse_jsonl_to_evidence,
+    scorer=score_evidence,
+    reporter=write_dimension_report,
+) -> None:
     """Score any dimensions that have evidence but no evaluation report.
 
     Called after cancellation so completed dimensions are preserved in the
@@ -54,6 +64,10 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     these, the scored eval has ``filesRead: 0``, which ``scoring_view``'s
     trust rule rejects — the user sees the cancelled run's data fall
     through to an older run's stale value despite real findings on disk.
+
+    *parser*, *scorer* and *reporter* are injection seams for tests: each
+    defaults to the production collaborator it replaces
+    (``parse_jsonl_to_evidence``, ``score_evidence``, ``write_dimension_report``).
     """
     project = job.get("outputProject")
     run_id = job.get("outputRunId")
@@ -68,7 +82,7 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     if evidence_entries is None:
         return
 
-    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(evaluation_dir)
     source_file_count = _read_project_source_file_count(reports_dir, project)
     params = load_params()
     # Same standard dirs as a completed run's scoring, so off-standard
@@ -76,12 +90,10 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     from quodeq.services.evidence_rescore import standard_dirs  # noqa: PLC0415
     compiled_dir, evaluators_dir = standard_dirs()
 
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
     dim_states = read_dimensions(run_dir).get("dimensions", {})
 
     for dim_id, jsonl_path, evidence_size in evidence_entries:
-        eval_file = evaluation_dir / f"{dim_id}.json"
-        if eval_file.exists():
+        if dimension_report_exists(evaluation_dir, dim_id):
             continue  # already scored
         if dim_states.get(dim_id, {}).get("state") == "incomplete":
             _logger.info("Skipping scoring for incomplete dim %s", dim_id)
@@ -94,16 +106,18 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
 
         files_read = _read_queue_files_count(dimension_queue_file(run_dir, dim_id))
         try:
-            evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
+            evidence = parser(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=source_file_count, files_read=files_read,
             ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
                 req_map_reader=read_req_to_principle_map,
-                cwe_url_template=cwe_url_template())
+                cwe_url_template=cwe_url_template(),
+                on_quarantine=log_quarantined_findings,
+                on_malformed_line=log_malformed_jsonl_line)
             if evidence is None:
                 continue
-            scores = score_evidence(evidence, mode="numerical", params=params)
-            write_dimension_report(evidence, scores, dim_id, evaluation_dir)
+            scores = scorer(evidence, mode="numerical", params=params)
+            reporter(evidence, scores, dim_id, evaluation_dir)
             _log.info(
                 "Scored cancelled dimension '%s' for run %s (files_read=%d)",
                 dim_id, run_id[:8], files_read,

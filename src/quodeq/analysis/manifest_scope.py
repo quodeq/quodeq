@@ -8,13 +8,13 @@ layer violation.
 from __future__ import annotations
 
 import os
-import sys
 
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 def _filter_manifest_by_scope(
-    manifest: SourceManifest | None, scope_path: str,
+    manifest: SourceManifest | None, scope_path: str, *, log: LogSink = NULL_LOG,
 ) -> SourceManifest | None:
     """Narrow a manifest to only files under *scope_path*.
 
@@ -47,9 +47,11 @@ def _filter_manifest_by_scope(
             all_stats[k] = all_stats.get(k, 0) + v
 
     if scoped_targets:
-        print(f"Scope filter: {total} files under '{scope_path}'", file=sys.stderr)
+        log.info(f"Scope filter: {total} files under '{scope_path}'")
         return SourceManifest(targets=scoped_targets, total_files=total, language_stats=all_stats)
 
-    print(f"No source files found under scope '{scope_path}'", file=sys.stderr)
-    print("The scoped folder contains no recognized source code files.", file=sys.stderr)
+    log.warning(
+        f"No source files found under scope '{scope_path}'. "
+        "The scoped folder contains no recognized source code files."
+    )
     return None

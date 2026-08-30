@@ -2,7 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from quodeq.data.ports.findings import FindingsRepository
+    from quodeq.services.ports import GradeTablesReader
 
 
 @dataclass(frozen=True)
@@ -24,6 +30,9 @@ class ScoringDeps:
     rescore_dimension: Callable | None = None
     rescore_runs_by_dimension: Callable | None = None
     recompute_summary: Callable | None = None
+    findings_repo_factory: Callable[[Path], FindingsRepository] | None = None
+    grade_tables_factory: Callable[[Path], GradeTablesReader] | None = None
+    is_custom_formula: Callable[[], bool] | None = None
 
 
 _NO_DEPS = ScoringDeps()

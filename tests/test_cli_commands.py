@@ -112,11 +112,12 @@ class TestExecutePipeline:
 # ---------------------------------------------------------------------------
 
 class TestSaveManifest:
+    @patch("quodeq._cli_evaluation.manifest_to_dict")
     @patch("quodeq._cli_evaluation.write_text")
-    def test_saves_when_manifest_exists(self, mock_write, tmp_path):
+    def test_saves_when_manifest_exists(self, mock_write, mock_to_dict, tmp_path):
         from quodeq.cli import _save_manifest
         manifest = MagicMock()
-        manifest.to_dict.return_value = {"targets": []}
+        mock_to_dict.return_value = {"targets": []}
         _save_manifest(manifest, tmp_path)
         mock_write.assert_called_once()
 
@@ -124,11 +125,12 @@ class TestSaveManifest:
         from quodeq.cli import _save_manifest
         _save_manifest(None, tmp_path)  # should not raise
 
+    @patch("quodeq._cli_evaluation.manifest_to_dict")
     @patch("quodeq._cli_evaluation.write_text", side_effect=OSError("fail"))
-    def test_os_error_silenced(self, mock_write, tmp_path):
+    def test_os_error_silenced(self, mock_write, mock_to_dict, tmp_path):
         from quodeq.cli import _save_manifest
         manifest = MagicMock()
-        manifest.to_dict.return_value = {}
+        mock_to_dict.return_value = {}
         _save_manifest(manifest, tmp_path)  # should not raise
 
 

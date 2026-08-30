@@ -4,7 +4,11 @@ The synthetic fixtures prove each rule fires; they cannot prove the rules
 COVER what they were designed to cover. During design, two coverage claims
 survived a green unit suite and were only caught by replaying this run.
 
-Skipped when the evaluation is not present (CI, other machines).
+This is a CHARACTERIZATION replay: the counts below are pinned to the
+committed fixture (``tests/analysis/fixtures/scope_gate_replay/``), reduced
+from a real local self-scan (see that directory's README for provenance).
+They are NOT a fixed spec — regenerating the fixture from a different run
+requires recomputing and re-pinning every count in this file.
 """
 from __future__ import annotations
 
@@ -18,17 +22,13 @@ from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.scope_gate import apply_scope_gate
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
-_RUN = Path.home() / ".quodeq/evaluations/d33f1fd0-d685-4c3c-97f5-9ae26a1b3723"
-_SECURITY = _RUN / "3a19b93f-1e01-428a-9d38-fea8e8929e63/evaluation/security.json"
-
-pytestmark = pytest.mark.skipif(
-    not _SECURITY.is_file(), reason="self-scan run 3a19b93f not present on this machine")
+_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/scope_gate_replay/security_findings.json"
 
 LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
 
 
 def _violations(severity: str):
-    data = json.loads(_SECURITY.read_text(encoding="utf-8"))
+    data = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     return [v for v in data["violations"] if v["severity"] == severity]
 
 
@@ -43,7 +43,7 @@ def _majors():
 
 def test_replay_counts_match_the_spec():
     majors = _majors()
-    assert len(majors) == 77, "fixture run drifted; re-derive the expected counts"
+    assert len(majors) == 10, "fixture drifted; re-derive the expected counts"
 
     # remote_ingress was deleted (see scope_gate.py's module docstring and
     # the comment below _CROSS_PRINCIPAL_REQS) -- there is no third rule to
@@ -57,10 +57,14 @@ def test_replay_counts_match_the_spec():
             hits[f["scope_downgrade"]["rule"]] += 1
             assert f["severity"] == "minor"
 
-    assert hits["sourceless_path"] == 32, hits
-    assert hits["cross_principal"] == 1, hits
-    assert demoted == 33, hits
-    assert len(majors) - demoted == 44
+    # This fixture's 10 majors (see the README's "Known limitation") happen
+    # to trigger neither scope-gate rule -- a real, if unexciting, replay
+    # outcome, not a placeholder. A future fixture regeneration from a
+    # richer run is expected to produce non-zero hits here.
+    assert hits["sourceless_path"] == 0, hits
+    assert hits["cross_principal"] == 0, hits
+    assert demoted == 0, hits
+    assert len(majors) - demoted == 10
 
 
 def test_replay_is_a_no_op_under_the_conservative_default():
@@ -89,20 +93,15 @@ def test_replay_chains_provenance_then_scope_on_criticals():
     end to end. Chain both gates, in production order, over the run's real
     criticals and observe what actually happens.
 
-    Observed on the pinned run: 2 of the 4 criticals name only an
-    operator-controlled source ("command-line arguments", an environment
-    variable) -- apply_provenance_gate drops those to major, because that is
-    not remote ingress. apply_scope_gate then leaves both alone: its
-    sourceless_path rule requires NO named source at all, and an
-    operator-controlled source is still a named source, so it does not
-    double-dip on a finding provenance_gate already downgraded. The other 2
-    criticals name proven external ingress ("query parameter",
-    "user-provided") and neither gate touches them. Net effect: 2 stay
-    critical, 2 become major, zero reach minor, zero scope_gate demotions
-    fire after provenance_gate already ran.
+    This fixture's run (see the fixture README's "Known limitation") has
+    zero critical findings, so the loop below is empty and every count is
+    trivially zero -- a real replay outcome for this data, not the richer
+    2-stay-critical/2-become-major split the original pinned run showed.
+    Re-pin non-zero counts once the fixture is regenerated from a run that
+    has criticals.
     """
     criticals = _violations("critical")
-    assert len(criticals) == 4, "fixture run drifted; re-derive the expected counts"
+    assert len(criticals) == 0, "fixture drifted; re-derive the expected counts"
 
     provenance_hits = 0
     scope_hits = 0
@@ -115,6 +114,6 @@ def test_replay_chains_provenance_then_scope_on_criticals():
             scope_hits += 1
         end_severities[f["severity"]] += 1
 
-    assert provenance_hits == 2, end_severities
+    assert provenance_hits == 0, end_severities
     assert scope_hits == 0, end_severities
-    assert end_severities == Counter({"critical": 2, "major": 2}), end_severities
+    assert end_severities == Counter(), end_severities

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
@@ -20,6 +20,7 @@ from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _c
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis._runner_markers import cleanup_stream
 from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class _ConsolidatedPaths:
 class _ConsolidatedRunContext:
     """Grouped context for consolidated result collection."""
     dimensions: list[str]
-    ctx: Any
+    ctx: _AnalysisContext
     results: list[Any]
     files: list[str]
     exit_reason: str | None = None
@@ -100,10 +101,12 @@ def _collect_consolidated_results(
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
         cwe_url_template=cwe_url_template(),
+        on_quarantine=log_quarantined_findings,
+        on_malformed_line=log_malformed_jsonl_line,
     )
 
 
-def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
+def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext) -> str:
     """Build the consolidated prompt for multi-dimension analysis."""
     return build_consolidated_prompt(
         dimensions=dimensions,
@@ -125,7 +128,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
 
 
 def process_consolidated_dimensions(
-    config: "RunConfig", dimensions: list[str], ctx: Any,
+    config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None

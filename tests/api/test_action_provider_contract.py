@@ -6,6 +6,7 @@ def test_action_provider_contract_methods():
     """Verify ActionProvider Protocol declares all expected methods."""
     for name in [
         "list_projects",
+        "create_project",
         "get_dashboard",
         "get_accumulated",
         "get_dimension_eval",

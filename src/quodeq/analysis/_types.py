@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.analysis import dispatch_policy
 from quodeq.analysis._dimensions import DimensionsConfig
+from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis._config import HeartbeatCallback
 
@@ -86,6 +86,24 @@ class RunConfig:
     # tests and one-shot callers that construct a fresh RunConfig get the
     # original behaviour without any wiring.
     _classify_cache: "dict[str, tuple[tuple[str, ...], ClassifyResult]] | None" = None
+    # Explicit DispatchPolicy for this run. ``None`` means "resolve a fresh
+    # live snapshot on demand" via :meth:`_policy` — see there for why that
+    # resolution is deliberately NOT cached onto this field.
+    dispatch: DispatchPolicy | None = None
+
+    def _policy(self) -> DispatchPolicy:
+        """The DispatchPolicy for this run: the explicit override, or a
+        fresh live snapshot.
+
+        Deliberately NON-memoizing: caching the resolved snapshot back onto
+        ``self.dispatch`` would leak a shared value across
+        ``dataclasses.replace()`` copies of this RunConfig (replace() copies
+        field VALUES, so a cached policy set on one copy would silently
+        become "the" policy read by every later copy). The cost of
+        rebuilding a plain-value snapshot per call is negligible next to an
+        AI analysis run.
+        """
+        return self.dispatch or default_dispatch_policy()
 
     @property
     def source_file_count(self) -> int:
@@ -104,9 +122,10 @@ class RunConfig:
             files, total = self.manifest.source_files, self.manifest.total_files
         else:
             return 0
-        if not files or not dispatch_policy.provider_is_api():
+        policy = self._policy()
+        if not files or not policy.provider_is_api():
             return total
-        dispatchable, _excluded = dispatch_policy.split_api_dispatchable(self.src, files)
+        dispatchable, _excluded = policy.split_api_dispatchable(self.src, files)
         return len(dispatchable)
 
 

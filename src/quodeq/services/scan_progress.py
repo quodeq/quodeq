@@ -14,17 +14,24 @@ Sources:
 """
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
 from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.services.ports import count_active_agent_streams, read_scan_total_files
+from quodeq.services.ports import (
+    count_active_agent_streams,
+    dimension_evidence_file,
+    file_mtime,
+    latest_dim_activity_mtime,
+    read_queue_state,
+    read_run_status_json,
+    read_scan_total_files,
+    tally_unique_findings,
+)
 from quodeq.services.suppression import build_matcher, project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.data.fs.dimensions_state_store import read_dimensions
@@ -67,13 +74,6 @@ class _ScanProgress:
     # only that it did.
     exit_reason: str | None = None
     dimensions: list[_DimProgress] = field(default_factory=list)
-
-
-def _read_json(path: Path) -> dict | None:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return None
 
 
 def _project_total_files(run_dir: Path) -> int:
@@ -198,7 +198,7 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str, record: dict | None =
     if stamped is not None:
         return stamped
     queue = run_dir / "evidence" / f"{dim_id}_queue.json"
-    qstate = _read_json(queue)
+    qstate = read_queue_state(queue)
     if qstate is None:
         return None
     take_ts = _queue_take_timestamps(qstate)
@@ -207,24 +207,19 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str, record: dict | None =
         if take_ts:
             start = min(take_ts)
         else:
-            try:
-                start = queue.stat().st_mtime
-            except OSError:
+            mtime = file_mtime(queue)
+            if mtime is None:
                 return None
+            start = mtime
     if state == "running":
         return max(0.0, time.time() - start)
     # done: latest activity signal still on disk
     end = start
     if take_ts:
         end = max(end, max(take_ts))
-    for candidate in (
-        run_dir / "evidence" / f"{dim_id}_evidence.jsonl",
-        *(run_dir / "evidence").glob(f"{dim_id}_agent-*.stream"),
-    ):
-        try:
-            end = max(end, candidate.stat().st_mtime)
-        except OSError:
-            continue
+    activity = latest_dim_activity_mtime(run_dir / "evidence", dim_id)
+    if activity is not None:
+        end = max(end, activity)
     return max(0.0, end - start)
 
 
@@ -237,7 +232,7 @@ def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
     will show.
     """
     evidence_dir = run_dir / "evidence"
-    queue = _read_json(evidence_dir / "consolidated_queue.json") or {}
+    queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
     taken = 0
     for entry in queue.get("taken") or []:
         fs = entry.get("files") if isinstance(entry, dict) else None
@@ -277,7 +272,7 @@ def build_scan_progress(
     """
     if not run_dir.is_dir():
         return None
-    status = _read_json(run_dir / "status.json") or {}
+    status = read_run_status_json(run_dir)
     if not status:
         return None
 
@@ -356,7 +351,7 @@ def build_scan_progress(
     for dim_id in dim_ids:
         queue_path = evidence_dir / f"{dim_id}_queue.json"
         eval_path = run_dir / "evaluation" / f"{dim_id}.json"
-        queue = _read_json(queue_path) if queue_path.is_file() else None
+        queue = read_queue_state(queue_path) if queue_path.is_file() else None
         d_state = _dim_state(
             dim_id, status, terminal=is_terminal,
             has_queue=queue is not None,
@@ -401,7 +396,7 @@ def build_scan_progress(
 
         matcher = build_matcher(dim_id, dismissed, deleted)
         tally = tally_unique_findings(
-            evidence_dir / f"{dim_id}_evidence.jsonl",
+            dimension_evidence_file(run_dir, dim_id),
             suppressed=matcher.is_suppressed if matcher.active else None,
             resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir,
                                               req_map_reader=read_req_to_principle_map),

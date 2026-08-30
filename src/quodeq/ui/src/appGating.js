@@ -29,12 +29,22 @@ export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selected
 }
 
 /**
+ * Whether a selected source has an Evaluate flow at all. Evaluation is
+ * local-only server-side, so a 'shared' selection has no route for it —
+ * everything else (including an unset/undefined source, which defaults to
+ * local) is evaluatable.
+ */
+export function isEvaluatableSource(selectedSource) {
+  return selectedSource !== 'shared';
+}
+
+/**
  * Whether the TopBar's Evaluate button should be wired up. Shared projects
  * have no Evaluate flow (evaluation is local-only), so the button is omitted
  * outright regardless of project count.
  */
 export function shouldShowEvaluateButton(projectsCount, selectedSource) {
-  return (projectsCount ?? 0) > 0 && selectedSource !== 'shared';
+  return (projectsCount ?? 0) > 0 && isEvaluatableSource(selectedSource);
 }
 
 /**

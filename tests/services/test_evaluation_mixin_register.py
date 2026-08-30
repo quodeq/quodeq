@@ -3,11 +3,38 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import pytest
-from quodeq.services.project_registration import register_project as _register_project
+from quodeq.services.project_registration import (
+    _zero_run_scan_fallback,
+    register_project as _register_project,
+)
 
 
 def _read_info(reports_root: Path, uuid: str) -> dict:
     return json.loads((reports_root / uuid / "repository_info.json").read_text())
+
+
+def test_zero_run_scan_fallback_returns_independent_nested_containers():
+    """Each call must return its own nested dict/lists.
+
+    Regression: the fallback used to be a module-level dict and callers did
+    ``dict(_ZERO_RUN_SCAN_FALLBACK)`` -- a shallow copy that left every
+    result's ``languages``/``branches``/``modules``/``file_tree`` pointing at
+    the SAME shared containers, so mutating one project's zero-run scan_data
+    (e.g. a caller appending to "modules") silently corrupted every other
+    project's fallback result, past and future.
+    """
+    a = _zero_run_scan_fallback()
+    b = _zero_run_scan_fallback()
+    assert a == b
+    assert a["languages"] is not b["languages"]
+    assert a["branches"] is not b["branches"]
+    assert a["modules"] is not b["modules"]
+    assert a["file_tree"] is not b["file_tree"]
+
+    a["languages"]["python"] = 1
+    a["modules"].append("mutated")
+    assert b["languages"] == {}
+    assert b["modules"] == []
 
 
 def test_register_local_path_scans_in_place(tmp_path):

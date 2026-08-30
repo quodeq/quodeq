@@ -8,26 +8,59 @@ import { scoreColorClass } from '../utils/formatters.js';
  *  - reference-line positions and chart margins reused across charts
  */
 
-const _cssVarCache = new Map();
+/**
+ * Build an independent CSS-variable cache: a memoised getComputedStyle
+ * reader plus a MutationObserver that clears the cache when the document's
+ * theme attribute changes. Store instances let tests exercise the observer
+ * in isolation; the app shares one default store process-wide.
+ */
+export function createCssVarStore({ doc = typeof document !== 'undefined' ? document : undefined } = {}) {
+  const cache = new Map();
+  let observer = null;
+
+  function cssVar(name, fallback = '') {
+    if (cache.has(name)) return cache.get(name);
+    if (!doc) return fallback;
+    const val = getComputedStyle(doc.documentElement).getPropertyValue(name).trim();
+    const result = val || fallback;
+    cache.set(name, result);
+    return result;
+  }
+
+  function clear() { cache.clear(); }
+
+  // Idempotent: a second observe() call is a no-op rather than attaching a
+  // duplicate observer (defensive — callers may call it more than once).
+  function observe() {
+    if (observer || !doc) return;
+    observer = new MutationObserver(clear);
+    observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  function disconnect() {
+    observer?.disconnect();
+    observer = null;
+  }
+
+  return { cssVar, clear, observe, disconnect };
+}
+
+/** The app-wide cache every production chart panel shares. */
+export const defaultCssVarStore = createCssVarStore();
+// Observer lives at MODULE SCOPE, not inside a React effect: it is the sole
+// mechanism that invalidates stale colors on a theme switch for RunHistoryPanel,
+// HistoryChartPanel and DimensionScoreHistoryPanel (recharts stroke/fill props
+// that never re-render on their own). Moving it into a component effect would
+// make 3 panels race each other on mount/unmount instead of sharing one
+// observer for the process's lifetime.
+defaultCssVarStore.observe();
 
 export function cssVar(name, fallback = '') {
-  if (_cssVarCache.has(name)) return _cssVarCache.get(name);
-  if (typeof document === 'undefined') return fallback;
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const result = val || fallback;
-  _cssVarCache.set(name, result);
-  return result;
+  return defaultCssVarStore.cssVar(name, fallback);
 }
 
 /** Clear the cache; called automatically on theme change, exported for tests. */
-export function clearCssVarCache() { _cssVarCache.clear(); }
-
-if (typeof document !== 'undefined') {
-  new MutationObserver(() => _cssVarCache.clear()).observe(
-    document.documentElement,
-    { attributes: true, attributeFilter: ['data-theme'] },
-  );
-}
+export function clearCssVarCache() { defaultCssVarStore.clear(); }
 
 const GRADE_CSS_VARS = {
   'grade-top':    '--color-grade-top-text',

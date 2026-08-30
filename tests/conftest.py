@@ -102,3 +102,36 @@ class DummyProcess:
 def dummy_process():
     """Return a DummyProcess instance."""
     return DummyProcess()
+
+
+class RecordingLog:
+    """A capturing ``quodeq.core.observability.LogSink`` for tests.
+
+    Inner-layer code no longer imports a logging framework -- it accepts an
+    injected ``log: LogSink``. Tests that used to assert on ``caplog`` or
+    patch a module-level ``log_info``/``log_warning`` instead pass this in
+    and assert against the recorded messages.
+    """
+
+    def __init__(self) -> None:
+        self.info_messages: list[str] = []
+        self.warning_messages: list[str] = []
+        self.debug_messages: list[str] = []
+        self.error_messages: list[str] = []
+
+    def info(self, message: str) -> None:
+        self.info_messages.append(message)
+
+    def warning(self, message: str) -> None:
+        self.warning_messages.append(message)
+
+    def debug(self, message: str) -> None:
+        self.debug_messages.append(message)
+
+    def error(self, message: str) -> None:
+        self.error_messages.append(message)
+
+
+@pytest.fixture
+def recording_log() -> RecordingLog:
+    return RecordingLog()

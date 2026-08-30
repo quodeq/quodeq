@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
 

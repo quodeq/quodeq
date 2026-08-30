@@ -53,14 +53,14 @@ class TestIterCompiledStandards:
 
 class TestRouteDelegation:
     def test_counts_uses_the_adapter(self, tmp_path):
-        from quodeq.api import standards_overrides_routes as routes
+        from quodeq.services.standards_overrides import override_counts_by_dimension
 
         _write(tmp_path, "sec", {
             "id": "sec",
             "principles": [{"requirements": [{"id": "S-1"}, {"id": "S-2"}]}],
         })
 
-        counts = routes._counts({"S-1": {}, "S-2": {}, "OTHER": {}}, tmp_path)
+        counts = override_counts_by_dimension({"S-1": {}, "S-2": {}, "OTHER": {}}, tmp_path)
 
         assert counts == {"sec": 2}
 

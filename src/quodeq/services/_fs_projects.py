@@ -8,11 +8,11 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry
-from quodeq.data.fs.children import find_children  # noqa: F401 — re-exported API
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_project_helpers import (
     _auto_detect_parents,
@@ -21,12 +21,14 @@ from quodeq.services._fs_project_helpers import (
     _max_projects_listed,
 )
 from quodeq.services.ports import (
+    find_children,
+    is_valid_repo_url,
+    list_runs,
     read_repository_info,
     repository_info_exists,
+    safe_read_dir,
     write_repository_info,
 )
-from quodeq.data.fs.report_parser.runs import list_runs, safe_read_dir
-from quodeq.data.fs.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
@@ -211,8 +213,18 @@ def delete_project(reports_dir: str, project: str) -> bool:
     return children_removed
 
 
-def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
-    """Return project metadata including discipline and available dimensions."""
+def get_project_info(
+    reports_dir: str, project: str,
+    *,
+    list_dimensions: Callable[..., tuple[str, ...]] = _list_available_dimensions_for_discipline,
+    has_fingerprints: Callable[[Path, str], bool] = _has_fingerprints,
+) -> dict[str, Any] | None:
+    """Return project metadata including discipline and available dimensions.
+
+    *list_dimensions* and *has_fingerprints* are injection seams for tests,
+    defaulting to the production collaborators of the same name
+    (``_list_available_dimensions_for_discipline``, ``_has_fingerprints``).
+    """
     project_dir = (Path(reports_dir) / project).resolve()
     if not project_dir.is_relative_to(Path(reports_dir).resolve()):
         return None
@@ -221,8 +233,10 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
         return None
 
     discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
-    available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
-    has_fingerprints = _has_fingerprints(Path(reports_dir), project)
+    available_dimensions = (
+        list_dimensions(log=SHARED_LOG) if discipline else []
+    )
+    fingerprints_found = has_fingerprints(Path(reports_dir), project)
     path_missing = (
         info.get("location") == "online"
         and not (info.get("path", "").startswith(("https://", "git@")))
@@ -235,6 +249,6 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
         **info,
         "discipline": discipline,
         "availableDimensions": available_dimensions,
-        "hasFingerprints": has_fingerprints,
+        "hasFingerprints": fingerprints_found,
         "pathMissing": path_missing,
     }

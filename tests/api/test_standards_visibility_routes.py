@@ -58,6 +58,14 @@ def test_get_returns_defaults_when_no_file(client, project_id):
     assert resp.get_json()["isDefault"] is True
 
 
+def test_get_reports_default_standard_ids(client, project_id):
+    """Additive `defaultStandardIds` lets the UI reconcile its boot-time
+    fallback against the server's own default set instead of duplicating
+    it as a second source of truth."""
+    body = client.get(f"/api/projects/{project_id}/standards-visibility").get_json()
+    assert body["defaultStandardIds"] == list(DEFAULT_VISIBLE_STANDARDS)
+
+
 def test_get_reports_known_standard_ids(client, project_id):
     body = client.get(f"/api/projects/{project_id}/standards-visibility").get_json()
     assert "security" in body["knownStandardIds"]

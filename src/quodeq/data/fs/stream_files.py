@@ -64,6 +64,29 @@ def count_active_agent_streams(
     return count
 
 
+def latest_dim_activity_mtime(evidence_dir: Path, dim_id: str) -> float | None:
+    """Latest mtime among a dim's evidence jsonl and any surviving agent streams.
+
+    None when neither exists (or neither is statable). Used as the "done" end-
+    of-activity signal when a dimension's transition timestamps are unavailable
+    (see ``services.scan_progress._dim_elapsed_s``): agent streams are deleted
+    at dimension completion, so they rarely survive, but the evidence file's
+    own mtime remains as the fallback signal.
+    """
+    best: float | None = None
+    for candidate in (
+        evidence_dir / f"{dim_id}_evidence.jsonl",
+        *evidence_dir.glob(f"{dim_id}_agent-*.stream"),
+    ):
+        try:
+            mtime = candidate.stat().st_mtime
+        except OSError:
+            continue
+        if best is None or mtime > best:
+            best = mtime
+    return best
+
+
 def append_jsonl_rows(path: Path, rows: Iterable[dict]) -> None:
     """Append *rows* to *path* as JSONL lines.
 

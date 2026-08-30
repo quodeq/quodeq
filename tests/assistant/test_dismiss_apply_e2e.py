@@ -8,10 +8,8 @@ finding on the suppression read path (silent no-op reporting dismissed: True).
 """
 import json
 
-from flask import Flask
-
 from quodeq.assistant.tools import ToolContext, build_registry
-from quodeq.assistant.tools._actions import ACTIONS
+from quodeq.assistant.tools._actions import ACTIONS, ActionContext
 from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.services.dismissed import dismissed_keys
@@ -43,15 +41,18 @@ def _ctx(tmp_path, violations):
     return eval_root, ctx
 
 
-def _app(eval_root):
-    app = Flask(__name__)
-    app.config["EVALUATIONS_DIR"] = str(eval_root)
-    return app
+def _action_ctx(eval_root):
+    return ActionContext(
+        evaluations_dir=eval_root,
+        evaluators_dir=eval_root,
+        compiled_dir=eval_root,
+        dimensions_file=eval_root / "dimensions.json",
+    )
 
 
 def _apply_latest(ctx, eval_root, action_id):
     payload = ctx.repository.get_action(action_id)["payload"]
-    return ACTIONS["dismiss_finding"].apply(payload, _app(eval_root))
+    return ACTIONS["dismiss_finding"].apply(payload, _action_ctx(eval_root))
 
 
 def test_dismiss_roundtrip_suppresses_the_finding(tmp_path):

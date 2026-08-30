@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared.logging import log_info, log_warning
 
@@ -48,7 +48,7 @@ class _DimensionContext:
     """Grouped parameters for dimension processing."""
     dim_id: str
     idx: int
-    ctx: Any
+    ctx: _AnalysisContext
     files: list[str]
     evidence_dir: Path
 
@@ -61,7 +61,7 @@ class _PoolExecutionParams:
 
 
 def process_consolidated_dimensions(
-    config: RunConfig, dimensions: list[str], ctx: Any,
+    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
     return _process_consolidated_impl(config, dimensions, ctx)
@@ -104,7 +104,7 @@ def _execute_pool_and_collect(
 
 
 def process_dimension_with_subagents(
-    config: RunConfig, dim_id: str, idx: int, ctx: Any,
+    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
     callbacks: DimensionCallbacks,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents.

@@ -30,10 +30,12 @@ from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
-from quodeq.services.base import ActionProvider, EvaluationOptions
+from quodeq.services.base import ActionProvider, CreateProjectResult, EvaluationOptions, NewProjectSpec
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
+from quodeq.services.project_registration import register_project_with_rollback
 from quodeq.services.tooling_mixin import FsToolingMixin
+from quodeq.shared.log_sink import SHARED_LOG
 
 
 class FilesystemActionProvider(ActionProvider):
@@ -63,6 +65,7 @@ class FilesystemActionProvider(ActionProvider):
             self._jobs = JobManager(
                 reports_root=reports_root,
                 on_job_complete=PostRunHook(reports_root=reports_root),
+                log=SHARED_LOG,
             )
 
         self._projects = ProjectsCache()
@@ -161,6 +164,9 @@ class FilesystemActionProvider(ActionProvider):
 
     def invalidate_projects_cache(self) -> None:
         self._projects.invalidate()
+
+    def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
+        return register_project_with_rollback(reports_dir, spec, log=SHARED_LOG)
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         return _fs_projects.update_project_path(reports_dir, project, new_path)

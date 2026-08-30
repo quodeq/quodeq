@@ -21,7 +21,6 @@ from quodeq.core.types import (
     TrendPoint,
     ViolationResponse,
     ViolationSummary,
-    to_camel_dict,
 )
 from quodeq.data.mappers import (
     parse_dimension_result,
@@ -33,6 +32,7 @@ from quodeq.data.mappers import (
     parse_violation_response,
 )
 from quodeq.core.types.violation import ProgressInfo, ViolationFileEntry
+from quodeq.shared.serialization import to_camel_dict
 
 
 # ---------------------------------------------------------------------------

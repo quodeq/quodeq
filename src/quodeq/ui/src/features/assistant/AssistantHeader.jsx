@@ -7,13 +7,8 @@ import {
   ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon,
 } from '../../components/CopyButton.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+import { providerSupportsWebTools } from '../../models/provider.js';
 import { t } from '../../strings/index.js';
-
-// Providers where the web toggle does something: claude flips its native
-// WebSearch/WebFetch; local providers get in-process search_web/fetch_url.
-// Mirrors the backend gate (LOCAL_PROVIDERS in llm_bridge/_providers.py plus
-// the claude argv path in adapters/_cli_command.py) — keep the two in sync.
-const WEB_PROVIDERS = new Set(['claude', 'ollama', 'omlx', 'llamacpp']);
 
 /**
  * The assistant panel's own header: panel switcher, animated compass
@@ -108,7 +103,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
             <PencilIcon />
           </button>
         )}
-        {WEB_PROVIDERS.has(provider) && (
+        {providerSupportsWebTools(provider) && (
           <button type="button" className="assistant-drawer-btn assistant-drawer-web"
             onClick={toggleWebEnabled}
             aria-pressed={webEnabled}

@@ -9,11 +9,13 @@
  * this module.
  */
 import {
+  ACTIVE_PROVIDER_KEY,
   DEFAULT_MAX_SUBAGENTS,
   DEFAULT_TIME_LIMIT_S,
   LOCAL_API_PROVIDERS,
   providerKey,
 } from '../constants.js';
+import { readString } from '../adapters/storage.js';
 
 /**
  * Effective defaults for a provider when no key was ever written.
@@ -34,10 +36,25 @@ export function effectiveProviderDefaults(providerId) {
 }
 
 function readInt(storage, providerId, key) {
-  const raw = storage.getItem(providerKey(providerId, key));
+  const raw = readString(providerKey(providerId, key), null, storage);
   if (raw === null || raw === undefined) return null;
   const parsed = parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * The provider id the sidebar/nav shows as "active" (last one the user
+ * picked in Settings). `|| null` collapses an empty-string read to null so
+ * callers can treat "unset" and "explicitly blank" the same way.
+ */
+export function readActiveProviderSelection(storage) {
+  return readString(ACTIVE_PROVIDER_KEY, null, storage) || null;
+}
+
+/** The model stored for `providerId`, or null when unset or no provider. */
+export function readActiveProviderModel(providerId, storage) {
+  if (!providerId) return null;
+  return readString(providerKey(providerId, 'model'), null, storage);
 }
 
 /**

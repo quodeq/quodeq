@@ -135,13 +135,10 @@ class TestCacheStatsMarker:
         with patch(
             "quodeq.analysis.cache.dimension_runner.emit_marker",
             new=fake_emit,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
         ):
             process_dimension_with_cache(
                 config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                cache=cache, dispatcher=fake_dispatch,
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -179,13 +176,10 @@ class TestCacheStatsMarker:
         with patch(
             "quodeq.analysis.cache.dimension_runner.emit_marker",
             new=fake_emit,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
         ):
             process_dimension_with_cache(
                 config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                cache=cache, dispatcher=fake_dispatch,
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]

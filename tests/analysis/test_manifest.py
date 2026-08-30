@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest, build_manifest
+from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 
 @pytest.fixture()
@@ -163,7 +164,7 @@ def test_to_dict(detection: dict) -> None:
         language_stats={".ts": 10},
     )
     manifest = SourceManifest(targets=[target], total_files=10, language_stats={".ts": 10})
-    d = manifest.to_dict()
+    d = manifest_to_dict(manifest)
     assert d["language"] == "typescript"
     assert d["total_files"] == 10
     assert d["source_files_count"] == 2

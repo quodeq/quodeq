@@ -18,6 +18,7 @@ from pathlib import Path
 
 from quodeq.config.paths import default_paths
 from quodeq.analysis.subprocess import AnalysisError
+from quodeq.analysis.dispatch_policy import default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -32,12 +33,14 @@ from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.services.grade_formula import load_params
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
+from quodeq.analysis.manifest_serialization import manifest_to_dict
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
@@ -215,7 +218,9 @@ def _count_excluded_findings(
             source_file_count=0, files_read=0,
         ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
-            cwe_url_template=cwe_url_template())
+            cwe_url_template=cwe_url_template(),
+            on_quarantine=log_quarantined_findings,
+            on_malformed_line=log_malformed_jsonl_line)
     except (OSError, ValueError, KeyError):
         return 0
     if evidence is None:
@@ -364,7 +369,7 @@ def _save_manifest(manifest, evidence_dir: Path) -> None:
     """Save manifest for debugging (best-effort)."""
     if manifest and evidence_dir:
         try:
-            write_text(evidence_dir / "manifest.json", json.dumps(manifest.to_dict(), indent=2))
+            write_text(evidence_dir / "manifest.json", json.dumps(manifest_to_dict(manifest), indent=2))
         except OSError as exc:
             _logger.debug("Could not write manifest: %s", exc)
 
@@ -418,6 +423,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             diff_from=diff_from,
             skip_scoring=skip_scoring,
         ),
+        dispatch=default_dispatch_policy(env=_env),
     )
 
 

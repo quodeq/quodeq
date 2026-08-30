@@ -91,7 +91,7 @@ class TestDiscardSkipsScoring:
 
 class TestDiscardRunState:
     def test_wipes_cache_for_all_dims_including_done(
-        self, tmp_path: Path, monkeypatch,
+        self, tmp_path: Path,
     ):
         """Every dim with a dispatch-keys sidecar gets its cache entries wiped.
 
@@ -125,14 +125,10 @@ class TestDiscardRunState:
 
         cache_root = tmp_path / "cache"
         cache = _seed_cache_entries(cache_root, ["kkkkk1", "kkkkk2", "kkkkk3"])
-        monkeypatch.setattr(
-            "quodeq.services.evaluation_mixin._open_cache",
-            lambda: cache,
-        )
 
         _discard_run_state(str(reports), {
             "outputProject": "proj", "outputRunId": "run-1",
-        })
+        }, cache=cache)
 
         assert cache.get("kkkkk1") is None
         assert cache.get("kkkkk2") is None
@@ -147,7 +143,7 @@ class TestDiscardRunState:
         )
 
     def test_wipes_cache_even_without_dim_state(
-        self, tmp_path: Path, monkeypatch,
+        self, tmp_path: Path,
     ):
         """A dim whose INCOMPLETE marker never landed (hard kill) is wiped.
 
@@ -166,15 +162,11 @@ class TestDiscardRunState:
 
         cache_root = tmp_path / "cache"
         cache = _seed_cache_entries(cache_root, ["kkkkk9"])
-        monkeypatch.setattr(
-            "quodeq.services.evaluation_mixin._open_cache",
-            lambda: cache,
-        )
 
         # No dimensions.json at all. Must not crash, must still wipe.
         _discard_run_state(str(reports), {
             "outputProject": "proj", "outputRunId": "run-1",
-        })
+        }, cache=cache)
 
         assert cache.get("kkkkk9") is None
         assert not (run / "evidence" / "d1_queue.json").exists()
@@ -265,9 +257,8 @@ class TestProviderDiscardPurgesRun:
         # the liveness check report the pid dead once "killed" — but leave
         # status.json untouched, exactly like a wedged process would.
         import quodeq.services._external_jobs as _ext_mod
-        import quodeq.data.sqlite._index_sync as _sync_mod
         original_kill_tree = _ext_mod._kill_tree
-        original_alive = _sync_mod._is_pid_alive
+        original_alive = _ext_mod.is_pid_alive
         pid_killed = False
 
         def fake_kill_tree(target_pid: int, sig: int = _signal.SIGTERM) -> None:
@@ -281,14 +272,14 @@ class TestProviderDiscardPurgesRun:
             return original_alive(query_pid)
 
         _ext_mod._kill_tree = fake_kill_tree
-        _sync_mod._is_pid_alive = fake_alive
+        _ext_mod.is_pid_alive = fake_alive
         try:
             ok = provider.cancel_evaluation(
                 "ext-wedged-run", reports_dir=str(reports), discard_partial=True,
             )
         finally:
             _ext_mod._kill_tree = original_kill_tree
-            _sync_mod._is_pid_alive = original_alive
+            _ext_mod.is_pid_alive = original_alive
 
         assert ok is True
         assert not run.exists(), (
@@ -401,7 +392,7 @@ def test_discard_removes_the_replayed_keys_sidecar(tmp_path: Path):
     assert not sidecar.exists()
 
 
-def test_discard_does_not_delete_replayed_cache_entries(tmp_path: Path, monkeypatch):
+def test_discard_does_not_delete_replayed_cache_entries(tmp_path: Path):
     """The replayed entries were written by an EARLIER run. Discard wipes only
     what this run created; deleting these would destroy a prior kept run's
     cached work."""
@@ -421,10 +412,8 @@ def test_discard_does_not_delete_replayed_cache_entries(tmp_path: Path, monkeypa
         def delete(self, key: str) -> None:
             deleted.append(key)
 
-    monkeypatch.setattr(
-        "quodeq.services.evaluation_mixin._open_cache", lambda: _FakeCache(),
+    _discard_run_state(
+        str(reports), {"outputProject": "proj", "outputRunId": "run1"}, cache=_FakeCache(),
     )
-
-    _discard_run_state(str(reports), {"outputProject": "proj", "outputRunId": "run1"})
 
     assert deleted == ["key-mine"]

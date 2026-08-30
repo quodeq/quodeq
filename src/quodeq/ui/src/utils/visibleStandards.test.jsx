@@ -49,6 +49,23 @@ it('migrates an existing local selection up to the server once', async () => {
   expect(ids).toEqual(['security']);
 });
 
+it('uses the server-provided defaultStandardIds for the migration comparison, not the JS constant', async () => {
+  // The cache matches the SERVER's default set (a different, hypothetical
+  // set than the local DEFAULT_VISIBLE_STANDARDS constant) -- nothing to
+  // migrate, even though it differs from the JS literal. Proves the
+  // comparison prefers the hydrated `defaultStandardIds` over the
+  // boot-fallback constant when the response carries one.
+  const serverDefaults = ['security', 'reliability'];
+  getStandardsVisibility.mockResolvedValue({
+    visibleStandardIds: [...serverDefaults], isDefault: true, defaultStandardIds: serverDefaults,
+  });
+  const storage = fakeStorage({
+    [VISIBLE_STANDARDS_STORAGE_KEY]: JSON.stringify(serverDefaults),
+  });
+  await hydrateVisibleStandardIds('p1', { storage });
+  expect(putStandardsVisibility).not.toHaveBeenCalled();
+});
+
 it('does not migrate when the server already has a saved selection', async () => {
   getStandardsVisibility.mockResolvedValue({
     visibleStandardIds: ['reliability'], isDefault: false,

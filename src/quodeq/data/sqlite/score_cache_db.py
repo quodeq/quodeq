@@ -13,7 +13,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Iterator
 
-from quodeq.services._score_cache_epoch import CACHE_WRITER_EPOCH
+from quodeq.data.sqlite._score_cache_epoch import CACHE_WRITER_EPOCH
 from quodeq.shared._env import get_score_cache_path
 
 _logger = logging.getLogger(__name__)

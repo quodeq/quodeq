@@ -14,8 +14,8 @@ import tempfile as _tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.config.clone_env import git_clone_timeout_s
 from quodeq.config.paths import default_paths
-from quodeq.shared._env import env_int
 from quodeq.shared.utils import is_repo_url, project_name_from_repo, read_json
 from quodeq.shared.validation import validate_path_segment
 from quodeq.analysis.manifest import SourceManifest, build_manifest, detect_language
@@ -24,6 +24,7 @@ from quodeq.analysis.manifest_models import AnalysisTarget
 # keep their historical `from quodeq._cli_resolution import ...` path.
 from quodeq.analysis.manifest_scope import _filter_manifest_by_scope  # noqa: F401
 from quodeq.analysis.runner import load_universal_dimensions
+from quodeq.shared.log_sink import SHARED_LOG
 
 import logging
 
@@ -32,7 +33,7 @@ _logger = logging.getLogger(__name__)
 _WORKTREE_TIMEOUT_S = 30
 # Branch fetches go over the network; give them the clone budget, not the
 # local worktree one.
-_FETCH_TIMEOUT_S = env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1)
+_FETCH_TIMEOUT_S = git_clone_timeout_s()
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +285,7 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     manifest = _build_manifest(args, src, paths, scope_path=scope_path)
 
     if scope_path and manifest:
-        manifest = _filter_manifest_by_scope(manifest, scope_path)
+        manifest = _filter_manifest_by_scope(manifest, scope_path, log=SHARED_LOG)
         if manifest is None:
             return None
 

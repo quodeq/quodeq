@@ -1,4 +1,4 @@
-"""Tests for the central dim_resolution module.
+"""Tests for the central scoring_view package.
 
 This module is the single source of truth for which run/dim data should
 appear in which view. The tests pin down its three guarantees:
@@ -23,7 +23,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.data.fs.report_parser import RunInfo
-from quodeq.services.dim_resolution import (
+from quodeq.services.scoring_view import (
     DimResolution,
     is_eligible_for_chart_bar,
     is_eligible_for_default_view,

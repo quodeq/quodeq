@@ -9,64 +9,13 @@
  * compare.css.
  */
 import { t, LOCALE } from '../../../strings/index.js';
+import { trendDomain, monotonePath } from '../compareTrendModel.js';
 
 const W = 640;
 const H = 240;
 const PAD = { top: 12, right: 14, bottom: 8, left: 14 };
 
-function domain(series) {
-  const times = series.flat().map((e) => new Date(e.dateISO).getTime());
-  const values = series.flat().map((e) => e.value);
-  // Pad the score range instead of pinning 0–10: real fleets live in a
-  // narrow band and a full-scale axis would flatten both lines.
-  const lo = Math.max(0, Math.floor(Math.min(...values) - 0.5));
-  const hi = Math.min(10, Math.ceil(Math.max(...values) + 0.5));
-  return {
-    t0: Math.min(...times),
-    t1: Math.max(...times),
-    v0: lo,
-    v1: hi > lo ? hi : lo + 1,
-  };
-}
-
 const shortDate = (ms) => new Date(ms).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
-
-/**
- * Monotone cubic (Fritsch-Carlson) path through the points: soft curves
- * that still pass through every value and never overshoot a peak or put a
- * wobble on a plateau — the same interpolation the Overview's line uses.
- */
-function monotonePath(pts) {
-  const n = pts.length;
-  if (n < 2) return '';
-  const seg = (p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
-  if (n === 2) return `M${seg(pts[0])} L${seg(pts[1])}`;
-  const dx = [];
-  const slope = [];
-  for (let i = 0; i < n - 1; i += 1) {
-    dx.push(pts[i + 1][0] - pts[i][0]);
-    slope.push((pts[i + 1][1] - pts[i][1]) / (dx[i] || 1));
-  }
-  const tangent = [slope[0]];
-  for (let i = 1; i < n - 1; i += 1) {
-    if (slope[i - 1] * slope[i] <= 0) {
-      tangent.push(0);
-    } else {
-      const w1 = 2 * dx[i] + dx[i - 1];
-      const w2 = dx[i] + 2 * dx[i - 1];
-      tangent.push((w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]));
-    }
-  }
-  tangent.push(slope[n - 2]);
-  let d = `M${seg(pts[0])}`;
-  for (let i = 0; i < n - 1; i += 1) {
-    const h = dx[i] / 3;
-    d += ` C${(pts[i][0] + h).toFixed(1)},${(pts[i][1] + h * tangent[i]).toFixed(1)}`
-      + ` ${(pts[i + 1][0] - h).toFixed(1)},${(pts[i + 1][1] - h * tangent[i + 1]).toFixed(1)}`
-      + ` ${seg(pts[i + 1])}`;
-  }
-  return d;
-}
 
 /**
  * @param {object} props
@@ -74,7 +23,7 @@ function monotonePath(pts) {
  * @param {{dateISO: string, value: number}[]} props.b - Oldest-first series.
  */
 export default function CompareDuelTrend({ a, b }) {
-  const { t0, t1, v0, v1 } = domain([a, b]);
+  const { t0, t1, v0, v1 } = trendDomain([a, b]);
   const span = t1 - t0;
   const x = (iso) => (span
     ? PAD.left + ((new Date(iso).getTime() - t0) / span) * (W - PAD.left - PAD.right)

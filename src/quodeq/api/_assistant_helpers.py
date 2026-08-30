@@ -5,12 +5,14 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Callable
 
 from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository, AssistantStore
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.assistant.tools import ToolContext, default_findings_repo_factory
+from quodeq.assistant.tools._actions import ActionContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
 from quodeq.services._fs_projects import get_project_info
@@ -169,7 +171,25 @@ def get_repository(app: Flask) -> AssistantStore:
     return app._assistant_repository
 
 
-def build_tool_context(app: Flask, session: dict) -> ToolContext:
+def build_action_context(app: Flask) -> ActionContext:
+    """Build an ActionContext from app.config, resolved fresh per request.
+
+    ``EVALUATIONS_DIR`` must be read at apply time, not baked in at
+    ``create_app`` — tests monkeypatch ``app.config`` before POSTing to
+    ``/api/assistant/actions/<id>/apply`` and expect that to take effect
+    (see tests/api/test_assistant_routes.py's apply-action tests).
+    """
+    return ActionContext(
+        evaluations_dir=Path(app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()),
+        evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
+        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+    )
+
+
+def build_tool_context(
+    app: Flask, session: dict, *, repo_root_resolver: Callable[[str], str | None] = resolve_repo_root,
+) -> ToolContext:
     """Build a ToolContext from a session row.
 
     Plan 1 naming note: the session row's ``run_id`` column holds the UI's
@@ -209,7 +229,7 @@ def build_tool_context(app: Flask, session: dict) -> ToolContext:
     # identical repo_attach_info check rather than a looser one, so it is a
     # self-healing retry rather than a widening of trust.
     if repo_root is None and source != "shared" and session.get("project_id"):
-        resolved = resolve_repo_root(session["project_id"])
+        resolved = repo_root_resolver(session["project_id"])
         repo_root = Path(resolved) if resolved else None
     return ToolContext(
         repository=get_repository(app),

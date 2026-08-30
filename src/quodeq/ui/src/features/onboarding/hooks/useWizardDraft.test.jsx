@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { saveDraft, loadDraft, clearDraft, DRAFT_KEY } from './useWizardDraft.js';
+import {
+  saveDraft, loadDraft, clearDraft, DRAFT_KEY,
+  markWelcomeSkipped, wasWelcomeSkipped, SKIPPED_KEY,
+} from './useWizardDraft.js';
 
 describe('useWizardDraft', () => {
   beforeEach(() => {
@@ -45,5 +48,17 @@ describe('useWizardDraft', () => {
     } finally {
       Storage.prototype.setItem = originalSetItem;
     }
+  });
+
+  it('markWelcomeSkipped writes the literal "true" under SKIPPED_KEY', () => {
+    markWelcomeSkipped();
+    expect(localStorage.getItem(SKIPPED_KEY)).toBe('true');
+    expect(SKIPPED_KEY).toBe('quodeq_onboarding_skipped');
+  });
+
+  it('wasWelcomeSkipped reflects the stored flag', () => {
+    expect(wasWelcomeSkipped()).toBe(false);
+    markWelcomeSkipped();
+    expect(wasWelcomeSkipped()).toBe(true);
   });
 });

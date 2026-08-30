@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from ._serialization import to_camel_dict
 from .dashboard import AccumulatedSummary, DashboardSummary, TrendPoint
 from .dimension import DimensionResult, DimensionSummary, GradeBreakdown
 from .evidence import EvidenceFileMeta
@@ -44,5 +43,4 @@ __all__ = [
     "ViolationFileEntry",
     "ViolationResponse",
     "ViolationSummary",
-    "to_camel_dict",
 ]

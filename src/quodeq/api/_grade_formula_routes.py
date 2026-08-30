@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from pathlib import Path
+from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
@@ -56,7 +57,10 @@ def _state_payload(result: "grade_formula.ApplyResult | None" = None) -> dict:
     return payload
 
 
-def register_grade_formula_routes(app: Flask) -> None:
+def register_grade_formula_routes(
+    app: Flask,
+    apply_to_all_runs: Callable[[Path], grade_formula.ApplyResult] = grade_formula.apply_to_all_runs,
+) -> None:
     """Register grade formula endpoints."""
 
     @app.get("/api/grade-formula")
@@ -69,13 +73,13 @@ def register_grade_formula_routes(app: Flask) -> None:
         if err:
             return err
         grade_formula.save_params(params)
-        result = grade_formula.apply_to_all_runs(Path(reports_dir()))
+        result = apply_to_all_runs(Path(reports_dir()))
         return jsonify(_state_payload(result=result))
 
     @app.delete("/api/grade-formula")
     def delete_grade_formula() -> Response:
         grade_formula.reset_params()
-        result = grade_formula.apply_to_all_runs(Path(reports_dir()))
+        result = apply_to_all_runs(Path(reports_dir()))
         return jsonify(_state_payload(result=result))
 
     @app.post("/api/grade-formula/preview")

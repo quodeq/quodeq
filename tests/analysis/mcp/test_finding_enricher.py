@@ -323,15 +323,18 @@ def test_keeps_declared_dimension_when_requirement_unresolvable() -> None:
     assert result["d"] == "maintainability"
 
 
-def test_reroute_is_logged(caplog) -> None:
-    import logging
+def test_reroute_is_logged() -> None:
+    captured: list[str] = []
+
+    class _CapturingLog:
+        def info(self, message: str) -> None: pass
+        def warning(self, message: str) -> None: captured.append(message)
+        def debug(self, message: str) -> None: pass
+        def error(self, message: str) -> None: pass
+
     req_to_dim = {"S-CON-1": "security"}
-    with caplog.at_level(logging.WARNING):
-        _enricher(req_to_dim=req_to_dim).enrich(
-            {"t": "violation", "req": "S-CON-1", "d": "maintainability",
-             "severity": "critical", "file": "a.py", "line": 1}
-        )
-    assert any(
-        "security" in r.getMessage() and "maintainability" in r.getMessage()
-        for r in caplog.records
+    FindingEnricher(CompiledContext(req_to_dim=req_to_dim), log=_CapturingLog()).enrich(
+        {"t": "violation", "req": "S-CON-1", "d": "maintainability",
+         "severity": "critical", "file": "a.py", "line": 1}
     )
+    assert any("security" in m and "maintainability" in m for m in captured)

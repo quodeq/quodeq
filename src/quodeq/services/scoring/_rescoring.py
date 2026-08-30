@@ -16,11 +16,11 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.ports import load_suppression_rules
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.services.scoring._summary import recompute_summary
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 _logger = logging.getLogger(__name__)
 

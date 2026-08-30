@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
@@ -20,11 +20,16 @@ from quodeq.core.types.dimension import DimensionResult, DimensionSummary, Grade
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import GradeTablesReader, read_active_findings, row_to_finding
+from quodeq.services.ports import (
+    GradeTablesReader,
+    SQLiteStateStore,
+    load_suppression_rules,
+    read_active_findings,
+    row_to_finding,
+)
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 
 def _severity_bucket(severity: str) -> str:
@@ -154,10 +159,9 @@ def _default_grade_tables_reader(run_dir: Path) -> GradeTablesReader:
     """Composition fallback: the concrete SQLite state store.
 
     The public caller (``scoring.get_scores_raw``) passes ``store_factory``
-    explicitly; this lazy default keeps direct callers of the facade helper
-    working without a module-level SQLite import in the services layer.
+    explicitly; this default keeps direct callers of the facade helper
+    working without repeating the concrete store at every call site.
     """
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
     return SQLiteStateStore(run_dir)
 
 

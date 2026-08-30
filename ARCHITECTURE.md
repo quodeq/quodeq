@@ -44,8 +44,8 @@ modules (`cli.py`, `_cli_*.py`) are outside the checker. `core/` and `shared/`
 are strict: the cross-cutting allowance does not apply to them.
 
 These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
-Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list: fix
-imports rather than add entries). Regenerate the baseline only with justification:
+Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list, currently
+13 entries: fix imports rather than add entries). Regenerate the baseline only with justification:
 `python tools/check_imports.py --update-baseline`.
 
 ## File Size Guidelines (soft limits)
@@ -63,8 +63,14 @@ imports rather than add entries). Regenerate the baseline only with justificatio
 - Public APIs live in the parent `__init__.py` with re-exports for backward compatibility.
 - Frozen dataclasses for data transfer objects.
 - `services/ports.py` is the single boundary between services and data layers: it re-exports the data functions services use and hosts the Protocols services accept as injected seams (`StandardsStore`, `GradeTablesReader`). `tools/check_imports.py` allows any services→data import — this is a convention, not an enforcement point — but new or edited services code imports through ports.py.
-- Ports for concrete adapters live in `data/ports/` (`FindingsRepository`, `AssistantStore`); consumers annotate against the Protocol, composition roots construct the SQLite classes.
-- Entities in `core/` are plain frozen dataclasses (stdlib only). Serialization lives in adapters: the event-log JSON codec is `data/events/codec.py`, dict→dataclass mappers are `data/mappers/`, and env-derived settings are resolved in `config/` (e.g. `config/evidence_env.py`) and passed inward as parameters.
+- Ports for concrete adapters live in `data/ports/` (`FindingsRepository`, `AssistantStore`, `ActionLog` — mirrors `data/actions_log.py::ActionLogWriter`, `DismissedSnippetsReader` — a `Callable` alias mirroring `data/sqlite/findings_queries.py::read_dismissed_snippets`); consumers annotate against the Protocol, composition roots construct the SQLite classes.
+- Entities in `core/` are plain frozen dataclasses (stdlib only). Serialization lives in adapters: the event-log JSON codec is `data/events/codec.py`, dict→dataclass mappers are `data/mappers/`, the API wire serializer (`to_camel_dict`) is `shared/serialization.py`, and env-derived settings are resolved in `config/` (e.g. `config/evidence_env.py`, `config/clone_env.py`, `config/analysis_env.py`, `config/standards_env.py`) and passed inward as parameters. `tests/tools/test_serialization_boundary.py` ratchets `to_camel_dict` use to `api/` plus a declared list of other wire boundaries.
+- Inner layers (`core/`, `analysis/`, `services/`, `config/`) accept an injected `core/observability.py::LogSink` instead of importing a logging framework directly; the default is the silent `NULL_LOG`, and composition roots (CLI, api, dashboard) pass a real sink, e.g. `shared/log_sink.py::SHARED_LOG`. `tests/tools/test_logging_boundary.py` ratchets new `logging`/`shared.logging` imports in those four directories against a declared, burn-down-only list.
+- Fire-and-forget background work (a route handler kicking off salvage-scoring, a mutation flow's projection fallback) goes through `services/background.py`'s `BackgroundRunner` protocol (default `ThreadBackgroundRunner`, one daemon thread per submission) instead of each call site spawning its own thread.
+- Score-cache persistence lives in `data/sqlite/` (`score_cache_store.py`, `score_cache_db.py`, `_score_cache_epoch.py` — moved from `services/`, keeping SQL access behind the data layer).
+- `dashboard/_probes.py` bundles the API-startup path's collaborators (`ApiProbes`, `DashboardHooks`) as frozen dataclasses defaulting to the production implementation, so tests inject fakes instead of patching module attributes.
+- `data/fs/` gained a few narrowly-scoped adapters for facts that used to be computed ad hoc: `evidence_tally.py` (unique finding counts from a dim's raw evidence JSONL, shared by the subagent-pool heartbeat and the dashboard's live scan-progress reader), `git_stats.py` (read-only `git log` commit counts, fails open to `None` on any git trouble), and `project_index.py` (the public facade over the project-identity index's internal `_index_io`/`_models`/`_resolution` split).
+- Route business logic keeps moving into `services/` use cases with the route left as request parsing and response shaping, e.g. `services/shared_connect.py` (connect/validate/clone a shared-results repo, extracted from `PUT /api/shared/config`) and `services/standards_overrides.py` (per-project override count/diff analysis, extracted from `api/standards_overrides_routes.py`).
 
 ## Runtime State Model
 

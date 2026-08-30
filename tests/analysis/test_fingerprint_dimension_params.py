@@ -42,10 +42,10 @@ def _write_overrides(project_root: Path, overrides: dict) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _clear_caches():
-    fingerprint._hash_standards.cache_clear()
-    yield
-    fingerprint._hash_standards.cache_clear()
+def _clear_caches(monkeypatch):
+    # Fresh HashCache per test: isolation via injection (swapping the
+    # module-default instance), not a cache_clear() attribute hook.
+    monkeypatch.setattr(fingerprint, "_hash_cache", fingerprint.HashCache())
 
 
 @pytest.fixture()
@@ -86,7 +86,7 @@ def test_revert_restores_empty_hash(standards_dir, project_root):
     _write_overrides(project_root, {"M-ANA-2": {"max_lines": 60}})
     assert dimension_params_state(standards_dir, DIM, project_root)[0] != ""
     (project_root / OVERRIDES_RELPATH).unlink()
-    dimension_params_state.cache_clear()
+    fingerprint.reset_hash_caches()
     assert dimension_params_state(standards_dir, DIM, project_root)[0] == ""
 
 

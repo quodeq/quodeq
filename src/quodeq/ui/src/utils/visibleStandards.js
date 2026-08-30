@@ -104,7 +104,7 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
   const generationAtStart = writeGeneration;
   const supersededByNewerWrite = () => isStale?.() || writeGeneration !== generationAtStart;
   try {
-    const { visibleStandardIds, isDefault } = await getStandardsVisibility(projectId);
+    const { visibleStandardIds, isDefault, defaultStandardIds } = await getStandardsVisibility(projectId);
     if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
     if (isDefault && !storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY)) {
       const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
@@ -115,7 +115,11 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
       // of its own either) is nothing but the trailing residue of an
       // earlier hydrate and must not spawn a file with nothing but the
       // defaults in it.
-      if (Array.isArray(cached) && !sameIdSet(cached, DEFAULT_VISIBLE_STANDARDS)) {
+      // Prefer the server's own default set when the response carries one
+      // (additive `defaultStandardIds`); the JS constant is only the
+      // pre-hydration boot fallback for when the server hasn't answered yet.
+      const isoDefaults = Array.isArray(defaultStandardIds) ? defaultStandardIds : DEFAULT_VISIBLE_STANDARDS;
+      if (Array.isArray(cached) && !sameIdSet(cached, isoDefaults)) {
         const saved = await putStandardsVisibility(projectId, cached);
         if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
         const ids = saved?.visibleStandardIds ?? cached;

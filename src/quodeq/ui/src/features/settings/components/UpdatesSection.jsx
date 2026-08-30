@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
-import { checkForUpdates, setUpdateAutoCheck } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
 
 export default function UpdatesSection() {
+  const { checkForUpdates, setUpdateAutoCheck } = useApi();
   const { status, setStatus } = useUpdateStatus();
   const [checking, setChecking] = useState(false);
 

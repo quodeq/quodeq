@@ -34,7 +34,7 @@ from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._fs_projects import find_children
+from quodeq.services.ports import find_children
 from quodeq.services.score_cache import (
     accumulated_cache_version,
     cached_accumulated,
@@ -59,7 +59,11 @@ from quodeq.services.scoring._response_builders import (  # noqa: F401
     _build_totals_from_findings,
     _severity_bucket,
 )
-from quodeq.data.fs.suppression_rules import load_suppression_rules
+from quodeq.services.ports import (
+    SQLiteStateStore,
+    SqliteFindingsRepository,
+    load_suppression_rules,
+)
 from quodeq.services.scoring._rescoring import (  # noqa: F401
     _dims_expecting_rescore,
     _merge_rescored_dims,
@@ -99,9 +103,6 @@ def get_scores_raw(
 
     params = load_params()
 
-    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-
     # The SQL grade tables are frozen per run and, on a stale projection,
     # reflect only the dismissals already projected into THIS run's own findings
     # table -- NOT project-wide dismissals/deletions that accrued later. So when
@@ -130,12 +131,13 @@ def get_scores_raw(
     if not prefer_eval_rescore and (run_dir / "events.jsonl").is_file():
         import sqlite3  # noqa: PLC0415
         try:
-            repo = SqliteFindingsRepository(run_dir)
+            repo = (d.findings_repo_factory or SqliteFindingsRepository)(run_dir)
             repo.ensure_projected()
-            store = SQLiteStateStore(run_dir)
+            store_factory = d.grade_tables_factory or SQLiteStateStore
+            store = store_factory(run_dir)
             if store.read_dimension_scores():
                 return _build_response_from_grade_tables(
-                    run_dir, params=params, store_factory=SQLiteStateStore,
+                    run_dir, params=params, store_factory=store_factory,
                 )
         except sqlite3.DatabaseError:
             # evaluation.db is unreadable by this binary: it was written by a
@@ -317,7 +319,7 @@ def get_project_scores(
     # unchanged -- so the Overview has to be able to say so next to the grade.
     # Computed outside the accumulated cache: it is a file-existence check, and
     # keeping it out of the cached payload avoids another version input.
-    scoring_meta = {"customFormula": is_custom()}
+    scoring_meta = {"customFormula": (d.is_custom_formula or is_custom)()}
 
     all_runs = list_runs(reports_root, project)
     if not all_runs:

@@ -96,7 +96,7 @@ class FsToolingMixin:
         """Resolve and validate a browse path. Returns (target, error_or_None)."""
         target = Path(path) if path else Path.home()
         target = target.resolve()
-        if not target.is_relative_to(Path.home()):
+        if not target.is_relative_to(Path.home().resolve()):
             return target, {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
         if not target.exists():
             return target, {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}

@@ -45,6 +45,13 @@ class _FakeProvider:
     def invalidate_projects_cache(self) -> None:
         self.cache_invalidated = True
 
+    def create_project(self, reports_dir: str, spec):
+        # Delegates to the real use case (same as FilesystemActionProvider):
+        # there is no filesystem-specific behavior to fake here, only the
+        # clone/scan primitives the tests monkeypatch directly.
+        from quodeq.services.project_registration import register_project_with_rollback
+        return register_project_with_rollback(reports_dir, spec)
+
 
 @pytest.fixture()
 def provider():

@@ -5,6 +5,7 @@ import {
 } from '../../api/index.js';
 import { projectKeys } from '../../api/queryKeys.js';
 import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
+import { clampFloors } from './gradeFormulaRules.js';
 import { t } from '../../strings/index.js';
 
 const PREVIEW_DEBOUNCE_MS = 250;
@@ -75,7 +76,7 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
 
   const update = useCallback((patch) => {
     setDraft((prev) => {
-      const next = { ...prev, ...patch };
+      const next = { ...prev, ...clampFloors(prev, patch) };
       requestPreview(next);
       return next;
     });

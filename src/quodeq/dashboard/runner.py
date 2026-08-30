@@ -11,10 +11,9 @@ import logging
 import os
 
 from quodeq.dashboard._api_health import ApiConfig
-from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.dashboard._networking import _choose_ui_port, _is_port_open
-from quodeq.dashboard._process import _kill_stale_action_api
+from quodeq.dashboard._probes import ApiProbes, DashboardHooks
 from quodeq.dashboard import _server as _server_mod
 from quodeq.dashboard._server import (
     _ensure_action_api,
@@ -23,7 +22,6 @@ from quodeq.dashboard._server import (
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.paths import resolve_path
-from quodeq.shared.prereqs import check_dashboard_dev_prereqs
 
 __all__ = [
     "BuildConfig",
@@ -48,8 +46,11 @@ def validate_paths(config: DashboardConfig) -> None:
         raise FileNotFoundError("Static dist missing index.html. Run without --no-build to build.")
 
 
-def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
+def _resolve_paths_and_build(
+    config: DashboardConfig, *, hooks: DashboardHooks | None = None,
+) -> DashboardConfig:
     """Resolve paths, check prerequisites, build UI if needed, choose a free port."""
+    hooks = hooks or DashboardHooks()
     reports_dir = resolve_path(str(config.reports_dir))
     repo_root = resolve_path(str(config.repo_root))
 
@@ -58,16 +59,16 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
     if config.build.dev:
-        check_dashboard_dev_prereqs()
-        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall, dev=True)
+        hooks.check_prereqs()
+        static_dist = hooks.build_ui(config.build.no_build, config.build.reinstall, dev=True)
     elif not config.static_dist_defaulted:
         user_provided_dist = resolve_path(str(config.static_dist))
         if (user_provided_dist / "index.html").exists():
             static_dist = user_provided_dist
         else:
-            static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
+            static_dist = hooks.build_ui(config.build.no_build, config.build.reinstall)
     else:
-        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
+        static_dist = hooks.build_ui(config.build.no_build, config.build.reinstall)
 
     return DashboardConfig(
         server=ServerConfig(
@@ -89,20 +90,24 @@ def _start_action_api(
     action_api_host: str,
     action_api_port: int,
     api_config: ApiConfig,
+    *,
+    probes: ApiProbes | None = None,
+    hooks: DashboardHooks | None = None,
 ) -> tuple[str, "subprocess.Popen | None"]:
     """Resolve and start the action API, returning (url, process).
 
     Handles both forced-port and auto-scan modes, including killing stale
     processes when not in forced mode.
     """
+    hooks = hooks or DashboardHooks()
     if config.server.api_forced:
         return _ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=api_config.static_dist,
-            evaluations_dir=api_config.evaluations_dir,
+            evaluations_dir=api_config.evaluations_dir, probes=probes,
         )
-    _kill_stale_action_api(action_api_host, action_api_port)
+    hooks.kill_stale(action_api_host, action_api_port)
     return _ensure_action_api(
-        action_api_host, action_api_port, api_config=api_config,
+        action_api_host, action_api_port, api_config=api_config, probes=probes,
     )
 
 
@@ -144,12 +149,21 @@ def _kick_update_check() -> None:
         pass
 
 
-def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) -> int:
+def run_dashboard(
+    config: DashboardConfig,
+    env: dict[str, str] | None = None,
+    *,
+    probes: ApiProbes | None = None,
+    hooks: DashboardHooks | None = None,
+) -> int:
     """Start the dashboard: resolve paths, launch the action API, and serve until exit.
 
     *env* overrides ``os.environ`` when provided (useful for testing).
+    *probes* and *hooks* are injection seams for tests: each defaults to the
+    production collaborators of the same name (see ``dashboard/_probes.py``).
     """
-    config = _resolve_paths_and_build(config)
+    hooks = hooks or DashboardHooks()
+    config = _resolve_paths_and_build(config, hooks=hooks)
     validate_paths(config)
 
     if env is not None:
@@ -170,7 +184,10 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     action_api_host = config.server.api_host or _get_default_host()
     action_api_port = config.server.api_port or config.server.port
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
-    action_api_url, action_api_process = _start_action_api(config, action_api_host, action_api_port, api_config)
+    ensure_api = hooks.ensure_api or _start_action_api
+    action_api_url, action_api_process = ensure_api(
+        config, action_api_host, action_api_port, api_config, probes=probes, hooks=hooks,
+    )
 
     _kick_update_check()
 

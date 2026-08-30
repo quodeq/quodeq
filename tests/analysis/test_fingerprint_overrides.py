@@ -43,10 +43,10 @@ def _write_overrides(project_root: Path, text: str) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _clear_fingerprint_caches():
-    fingerprint._hash_standards.cache_clear()
-    yield
-    fingerprint._hash_standards.cache_clear()
+def _clear_fingerprint_caches(monkeypatch):
+    # Fresh HashCache per test: isolation via injection (swapping the
+    # module-default instance), not a cache_clear() attribute hook.
+    monkeypatch.setattr(fingerprint, "_hash_cache", fingerprint.HashCache())
 
 
 @pytest.fixture

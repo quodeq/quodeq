@@ -7,6 +7,7 @@ import { useScanData } from '../hooks/useScanData.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import CleanScanToggle from './CleanScanToggle.jsx';
 import { t } from '../../../strings/index.js';
+import { isLocalRepo as isLocalRepoValue } from '../../../models/repo.js';
 
 const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
@@ -128,9 +129,7 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
     cleanScan, setCleanScan,
   } = useEvaluationForm(onStart, showToast);
 
-  // Anchored: a schemeless paste like "github.com/org/repo" is remote, but a
-  // local folder whose path merely contains "github.com" is not.
-  const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !/^(www\.)?github\.com\//i.test(repo);
+  const isLocalRepo = isLocalRepoValue(repo);
   const { scanData } = useScanData(null, isLocalRepo ? repo : null);
 
   // Submit stays clickable when no standards are selected so the snackbar

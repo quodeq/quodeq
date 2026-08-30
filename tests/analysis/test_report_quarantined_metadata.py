@@ -115,7 +115,7 @@ def test_count_survives_the_run_read_into_the_dashboard_payload(tmp_path):
     vanishes before the UI ever sees it and the feature is inert. Pin the whole
     path: report JSON -> DimensionResult -> camelCase payload.
     """
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
     from quodeq.data.fs.report_parser.runs import read_run_data
 
     _write_report(tmp_path / "proj" / "run1", "demo", {"quarantinedCount": 3})

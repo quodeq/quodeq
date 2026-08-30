@@ -61,14 +61,35 @@ def _parse_hunks(patch: str | None) -> set[int]:
     return lines
 
 
+def _github_call(req: Request) -> list | dict:
+    """Perform *req* against the GitHub API, returning parsed JSON.
+
+    Shared by ``_github_get`` (read) and ``_github_request`` (write) so both
+    fail the same way: a non-2xx response or a connection-level failure
+    becomes a ``RuntimeError`` carrying the response/reason, instead of a
+    raw ``urllib.error`` leaking to callers.
+    """
+    try:
+        with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        _logger.error("GitHub API request failed: HTTP %s %s – %s", exc.code, exc.reason, body)
+        raise RuntimeError(
+            f"GitHub API returned HTTP {exc.code} ({exc.reason}): {body}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        _logger.error("GitHub API request failed: %s", exc.reason)
+        raise RuntimeError(f"GitHub API request failed: {exc.reason}") from exc
+
+
 def _github_get(url: str, token: str) -> list | dict:
     """Authenticated GET to the GitHub API. Returns parsed JSON."""
     req = Request(url, method="GET")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
-        return json.loads(resp.read())
+    return _github_call(req)
 
 
 def fetch_pr_changed_lines(
@@ -245,13 +266,4 @@ def _github_request(url: str, payload: dict, token: str) -> dict:
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("Content-Type", "application/json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-
-    try:
-        with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode(errors="replace")
-        _logger.error("GitHub API request failed: HTTP %s %s – %s", exc.code, exc.reason, body)
-        raise RuntimeError(
-            f"GitHub API returned HTTP {exc.code} ({exc.reason}): {body}"
-        ) from exc
+    return _github_call(req)

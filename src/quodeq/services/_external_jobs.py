@@ -25,6 +25,7 @@ from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-ex
     resolve_external_pid,
 )
 from quodeq.shared._env import env_float
+from quodeq.shared.process import is_pid_alive
 
 _logger = logging.getLogger(__name__)
 
@@ -54,8 +55,6 @@ def cancel_external_run(
     killed). Returns False only when there was nothing to cancel or signal
     delivery failed at the OS level.
     """
-    from quodeq.data.sqlite._index_sync import _is_pid_alive
-
     grace = grace_period_s if grace_period_s is not None else _DEFAULT_GRACE_PERIOD_S
     project_dir = resolve_child_dir(reports_root, project_uuid)
     if project_dir is None:
@@ -67,7 +66,7 @@ def cancel_external_run(
     _kill_tree(pid, signal.SIGTERM)
     deadline = time.monotonic() + grace
     while time.monotonic() < deadline:
-        if not _is_pid_alive(pid):
+        if not is_pid_alive(pid):
             return True
         time.sleep(_POLL_INTERVAL_S)
 
@@ -79,7 +78,7 @@ def cancel_external_run(
     # Brief wait so callers that immediately read status.json see a settled state.
     final_deadline = time.monotonic() + 1.0
     while time.monotonic() < final_deadline:
-        if not _is_pid_alive(pid):
+        if not is_pid_alive(pid):
             return True
         time.sleep(_POLL_INTERVAL_S)
-    return not _is_pid_alive(pid)
+    return not is_pid_alive(pid)

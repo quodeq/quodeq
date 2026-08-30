@@ -9,11 +9,11 @@ be fanned out one request per project without shipping multi-MB bodies.
 """
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from quodeq.services._fs_metadata import _local_repo_root
+from quodeq.services.ports import count_commits_since
 from quodeq.services.scoring import get_project_scores
 
 _GIT_TIMEOUT_S = 5
@@ -49,20 +49,12 @@ def _commits_since(repo_root: Path | None, since_iso: str | None) -> int | None:
     moved is provisional no matter how recent the run is. Runs don't record
     a commit hash (the cache key deliberately excludes it), so the count is
     time-based against the last scored run's date. Fails open to None on
-    any git trouble -- a missing repo, no git, a timeout.
+    any git trouble -- a missing repo, no git, a timeout (the adapter owns
+    the subprocess call).
     """
     if repo_root is None or not since_iso:
         return None
-    try:
-        proc = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-list", "--count", f"--since={since_iso}", "HEAD"],
-            capture_output=True, encoding="utf-8", timeout=_GIT_TIMEOUT_S, check=False,
-        )
-        if proc.returncode != 0:
-            return None
-        return int(proc.stdout.strip())
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None
+    return count_commits_since(repo_root, since_iso, timeout_s=_GIT_TIMEOUT_S)
 
 
 def build_compare_summary(reports_root: Path, project: str) -> dict[str, Any] | None:

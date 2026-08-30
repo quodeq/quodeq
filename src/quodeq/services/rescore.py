@@ -5,7 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import DimensionResult, to_camel_dict
+from quodeq.core.types import DimensionResult
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.scoring.engine import compute_tallies

@@ -12,7 +12,7 @@ import pytest
 from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.data.fs.standards_loader import load_compiled_refs
 
-from tests._evidence_helpers import _make_request, _run_server
+from tests._analysis_helpers import _make_request, _run_server
 
 _JSONRPC_METHOD_NOT_FOUND = -32601
 

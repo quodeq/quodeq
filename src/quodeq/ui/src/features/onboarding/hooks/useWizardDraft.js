@@ -1,16 +1,15 @@
+import { readJSON, readString, removeKey, writeJSON, writeString } from '../../../adapters/storage.js';
+
 export const DRAFT_KEY = 'quodeq_onboarding_draft';
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+export const SKIPPED_KEY = 'quodeq_onboarding_skipped';
 
 /**
  * Save wizard state snapshot to localStorage with a savedAt timestamp.
  * Silently no-ops when localStorage is unavailable (private browsing / quota).
  */
 export function saveDraft(snapshot) {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...snapshot, savedAt: Date.now() }));
-  } catch {
-    /* private browsing or quota — wizard still works without persistence */
-  }
+  writeJSON(DRAFT_KEY, { ...snapshot, savedAt: Date.now() });
 }
 
 /**
@@ -18,19 +17,7 @@ export function saveDraft(snapshot) {
  * is unparseable, or the draft is older than 24h.
  */
 export function loadDraft() {
-  let raw = null;
-  try {
-    raw = localStorage.getItem(DRAFT_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  const parsed = readJSON(DRAFT_KEY);
   if (!parsed || typeof parsed !== 'object') return null;
   if (typeof parsed.savedAt !== 'number') return null;
   if (Date.now() - parsed.savedAt > DRAFT_TTL_MS) return null;
@@ -38,9 +25,15 @@ export function loadDraft() {
 }
 
 export function clearDraft() {
-  try {
-    localStorage.removeItem(DRAFT_KEY);
-  } catch {
-    /* see above */
-  }
+  removeKey(DRAFT_KEY);
+}
+
+/** Mark that the user dismissed the welcome step ("Maybe later"). */
+export function markWelcomeSkipped(storage) {
+  writeString(SKIPPED_KEY, 'true', storage);
+}
+
+/** Whether the user previously dismissed the welcome step. */
+export function wasWelcomeSkipped(storage) {
+  return readString(SKIPPED_KEY, null, storage) === 'true';
 }

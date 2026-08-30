@@ -30,14 +30,15 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
+from quodeq.config.analysis_env import failure_streak_override
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache._failure_streak import (
     CircuitBreakerError,
@@ -72,18 +73,16 @@ _logger = logging.getLogger(__name__)
 _PERSIST_INTERVAL_S = 30.0
 
 
-def _resolve_failure_streak_threshold(opts: AnalysisOptions) -> int:
+def _resolve_failure_streak_threshold(
+    opts: AnalysisOptions, *, override: int | None = None,
+) -> int:
     """Return the effective breaker threshold.
 
-    Priority: ``QUODEQ_FAILURE_STREAK`` env var > options field. Negative or
-    non-integer env values fall back to the options field. 0 disables.
+    Priority: *override* (when given) > options field. 0 disables; negative
+    values clamp to 0.
     """
-    raw = os.environ.get("QUODEQ_FAILURE_STREAK")
-    if raw is not None:
-        try:
-            return max(0, int(raw))
-        except ValueError:
-            pass
+    if override is not None:
+        return max(0, override)
     return max(0, opts.failure_streak_threshold)
 
 
@@ -297,12 +296,16 @@ def _write_findings(
 def process_dimension_with_cache(
     config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
     callbacks: DimensionCallbacks,
-    *, cache: CacheBackend | None = None,
+    *,
+    cache: CacheBackend | None = None,
+    dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents,
+    persist_interval_s: float = _PERSIST_INTERVAL_S,
 ) -> Evidence | None:
     """V2 entry point — content-addressed cache replaces V1 change detection.
 
-    Falls through to ``process_dimension_with_subagents`` when there's
-    no source-file list to classify (matches V1's no-files fallback).
+    Falls through to *dispatcher* (defaults to
+    ``process_dimension_with_subagents``) when there's no source-file list
+    to classify (matches V1's no-files fallback).
     """
     if cache is None:
         cache = LocalFileBackend()
@@ -323,7 +326,7 @@ def process_dimension_with_cache(
     if not files:
         # Nothing to classify — defer to existing path so the no-files
         # warning + single-agent fallback runs unchanged.
-        return process_dimension_with_subagents(config, dim_id, idx, ctx, callbacks)
+        return dispatcher(config, dim_id, idx, ctx, callbacks)
 
     # Clean-scan (incremental=False) means "I want fresh analysis." The user's
     # mental model: cancelled clean-scan + retry should NOT short-circuit on
@@ -450,7 +453,7 @@ def process_dimension_with_cache(
     stop_event = threading.Event()
     watcher = threading.Thread(
         target=_periodic_persist,
-        args=(stop_event, _persist_now, _PERSIST_INTERVAL_S),
+        args=(stop_event, _persist_now, persist_interval_s),
         daemon=True,
         name=f"v2-cache-persist-{dim_id}",
     )
@@ -471,12 +474,15 @@ def process_dimension_with_cache(
         jsonl.touch()
 
     breaker = FailureStreakWatcher(
-        jsonl, threshold=_resolve_failure_streak_threshold(config.options),
+        jsonl,
+        threshold=_resolve_failure_streak_threshold(
+            config.options, override=failure_streak_override(),
+        ),
     )
     breaker.start()
 
     try:
-        miss_evidence = process_dimension_with_subagents(
+        miss_evidence = dispatcher(
             miss_config, dim_id, idx, ctx, callbacks,
         )
     finally:

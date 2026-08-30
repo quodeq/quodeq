@@ -2,40 +2,36 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.plugin_discovery import discover_plugins
 
-# Error keyword returned by browse_repo when the path exists but is not a directory.
-_BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
+# Provider browse error codes -> (HTTP status, API error code, safe message).
+# Keyed by error_code (not message substring) so the frozen response bodies
+# stay exact regardless of the provider's internal wording. .get() defaults
+# to the same 404 triple browse_repo returns for an unrecognized code.
+_BROWSE_ERROR_MAP = {
+    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, "FORBIDDEN", "Path must be within the user's home directory"),
+    "PATH_NOT_DIRECTORY": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT", "Path is not a directory"),
+    "PATH_NOT_FOUND": (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible"),
+}
+_BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible")
 
 
 def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle GET /api/browse."""
     path = request.args.get("path")
-    if path:
-        resolved = Path(path).resolve()
-        home = Path.home().resolve()
-        if not resolved.is_relative_to(home):
-            body, status = error_response(
-                "Path must be within the user's home directory",
-                HTTPStatus.FORBIDDEN,
-                "FORBIDDEN",
-            )
-            return jsonify(body), status
     include_files = request.args.get("files", "").lower() in ("1", "true")
     payload = provider.browse_repo(path, include_files=include_files)
     if "error" in payload:
-        raw_error = payload["error"]
-        is_not_dir = _BROWSE_NOT_A_DIR_KEYWORD in raw_error.lower()
-        browse_status = HTTPStatus.BAD_REQUEST if is_not_dir else HTTPStatus.NOT_FOUND
-        safe_msg = "Path is not a directory" if is_not_dir else "Path not found or not accessible"
-        body, status = error_response(safe_msg, browse_status, "INVALID_INPUT")
+        http_status, code, safe_msg = _BROWSE_ERROR_MAP.get(
+            payload.get("error_code"), _BROWSE_ERROR_DEFAULT,
+        )
+        body, status = error_response(safe_msg, http_status, code)
         return jsonify(body), status
     return jsonify(payload)
 

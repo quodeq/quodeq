@@ -106,16 +106,10 @@ class TestWatcherStartsAndStops:
                 principles={},
             )
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=slow_dispatcher,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner._PERSIST_INTERVAL_S", 0.05,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(),
+            cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05,
+        )
 
         # Final state: cache entry exists (final persist after dispatch).
         key = build_cache_key_for_file(config, "a.py", "security")
@@ -142,17 +136,11 @@ class TestWatcherSurvivesDispatchException:
             )
             raise RuntimeError("simulated cancel")
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=crashing_dispatcher,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner._PERSIST_INTERVAL_S", 60.0,
-        ):
-            with pytest.raises(RuntimeError, match="simulated cancel"):
-                process_dimension_with_cache(
-                    config, "security", 1, _make_ctx(), _make_callbacks(),
-                    cache=cache,
-                )
+        with pytest.raises(RuntimeError, match="simulated cancel"):
+            process_dimension_with_cache(
+                config, "security", 1, _make_ctx(), _make_callbacks(),
+                cache=cache, dispatcher=crashing_dispatcher, persist_interval_s=60.0,
+            )
 
         # No ok marker emitted → orphaned findings must NOT be cached.
         key = build_cache_key_for_file(config, "a.py", "security")

@@ -5,24 +5,6 @@ const MAX_LINES = 5000;
 const READYSTATE_CLOSED = 2;
 const INACTIVITY_MS = 60000;
 
-const TERMINAL_STATE_LINE = {
-  cancelled: t('evaluate.logCancelled'),
-  failed: t('evaluate.logFailed'),
-  lost: t('evaluate.logLost'),
-  done: t('evaluate.logComplete'),
-  complete: t('evaluate.logComplete'),
-  completed: t('evaluate.logComplete'),
-};
-
-/** The stream's `done` payload is arbitrary text, so look up own keys only:
- *  TERMINAL_STATE_LINE['constructor'] is a function, and appending that to
- *  the log would put a non-renderable value into the list. */
-function terminalLine(state) {
-  return Object.hasOwn(TERMINAL_STATE_LINE, state)
-    ? TERMINAL_STATE_LINE[state]
-    : t('evaluate.logComplete');
-}
-
 export function useJobLogStream(jobId) {
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState('idle');
@@ -105,22 +87,33 @@ export function useJobLogStream(jobId) {
 
     resetInactivity();
 
+    // Set once the stream reaches ANY terminal outcome ('done' fired, or
+    // unmount/jobId-switch tore this effect down). Guards es.onerror: closing
+    // an EventSource can itself dispatch a trailing error event in some
+    // browsers, which must not overwrite a clean 'done' with status='error'
+    // (or, post-teardown, update state on an effect that already cleaned up).
+    let finished = false;
+
     es.onmessage = (e) => {
       resetInactivity();
       append(e.data);
     };
     es.addEventListener('done', (e) => {
+      finished = true;
       if (inactivityRef.current != null) {
         clearTimeout(inactivityRef.current);
         inactivityRef.current = null;
       }
       const state = (e?.data || '').trim().toLowerCase();
-      append(terminalLine(state));
+      // The rendered terminal line is EvalLogProvider's job now (it reads
+      // terminalState + logPresentation.terminalLine); this hook only
+      // records which state was reached.
       setTerminalState(state || 'done');
       setStatus('done');
       es.close();
     });
     es.onerror = () => {
+      if (finished) return;
       if (es.readyState === READYSTATE_CLOSED) {
         append(t('evaluate.logDisconnected'));
         setStatus('error');
@@ -128,6 +121,7 @@ export function useJobLogStream(jobId) {
     };
 
     return () => {
+      finished = true;
       es.close();
       if (inactivityRef.current != null) {
         clearTimeout(inactivityRef.current);

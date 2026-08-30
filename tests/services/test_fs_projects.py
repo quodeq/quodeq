@@ -9,13 +9,13 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from quodeq.services._fs_projects import (
-    find_children,
     _build_parent_child_sets,
     build_project_list,
     update_project_path,
     delete_project,
     get_project_info,
 )
+from quodeq.services.ports import find_children
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ class TestUpdateProjectPath:
         assert info["path"] == str(new_dir.resolve())
         assert info["location"] == "local"
 
-    @patch("quodeq.data.fs.repo_handler.is_valid_repo_url", return_value=True)
+    @patch("quodeq.services._fs_projects.is_valid_repo_url", return_value=True)
     def test_update_url_path(self, mock_valid, tmp_path: Path):
         reports_dir, project = self._setup_project(tmp_path)
         result = update_project_path(reports_dir, project, "https://github.com/org/repo.git")
@@ -154,7 +154,7 @@ class TestUpdateProjectPath:
         info = json.loads((Path(reports_dir) / project / "repository_info.json").read_text())
         assert info["location"] == "online"
 
-    @patch("quodeq.data.fs.repo_handler.is_valid_repo_url", return_value=False)
+    @patch("quodeq.services._fs_projects.is_valid_repo_url", return_value=False)
     def test_rejects_invalid_url(self, mock_valid, tmp_path: Path):
         reports_dir, project = self._setup_project(tmp_path)
         assert update_project_path(reports_dir, project, "https://bad") is False
@@ -232,9 +232,11 @@ class TestGetProjectInfo:
             "location": "local",
             "path": str(tmp_path),
         }))
-        with patch("quodeq.services._fs_projects._list_available_dimensions_for_discipline", return_value=["sec"]):
-            with patch("quodeq.services._fs_projects._has_fingerprints", return_value=False):
-                result = get_project_info(str(tmp_path), "proj-uuid")
+        result = get_project_info(
+            str(tmp_path), "proj-uuid",
+            list_dimensions=lambda **_kw: ["sec"],
+            has_fingerprints=lambda *_a: False,
+        )
         assert result is not None
         assert result["name"] == "test"
         assert result["discipline"] == "software"
@@ -258,10 +260,12 @@ class TestGetProjectInfo:
             "location": "online",
             "path": "/local/path",  # Not a URL
         }))
-        with patch("quodeq.services._fs_projects._list_available_dimensions_for_discipline", return_value=[]):
-            with patch("quodeq.services._fs_projects._has_fingerprints", return_value=False):
-                with patch("quodeq.services._fs_projects._infer_discipline", return_value=None):
-                    result = get_project_info(str(tmp_path), "proj-uuid")
+        with patch("quodeq.services._fs_projects._infer_discipline", return_value=None):
+            result = get_project_info(
+                str(tmp_path), "proj-uuid",
+                list_dimensions=lambda **_kw: [],
+                has_fingerprints=lambda *_a: False,
+            )
         assert result is not None
         assert result["pathMissing"] is True
 
@@ -276,7 +280,7 @@ class TestGetProjectInfo:
 
 
 def test_project_entry_carries_origin_url(tmp_path):
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
 
     proj = tmp_path / "p1"
     run = proj / "run-1"
@@ -324,7 +328,7 @@ def test_latest_done_run_id_is_newest_done_run_not_newest_run(tmp_path: Path):
 
 
 def test_latest_done_run_id_absent_when_no_done_runs(tmp_path: Path):
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
 
     proj = tmp_path / "p2"
     proj.mkdir()

@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from quodeq.analysis.manifest_render import render_target_prompt_context
-
-_MAX_EXTENSION_DISPLAY = 8
+from quodeq.analysis.manifest_render import (
+    describe_target,
+    render_manifest_prompt_context,
+    render_target_prompt_context,
+)
 
 
 @dataclass
@@ -35,13 +37,11 @@ class AnalysisTarget:
 
     @property
     def project_description(self) -> str:
-        """E.g. 'Kotlin mobile using Flutter'."""
-        parts = [self.language.title()]
-        if self.category:
-            parts = [f"{self.language.title()} {self.category}"]
-        if self.frameworks:
-            parts.append(f"using {', '.join(self.frameworks)}")
-        return " ".join(parts)
+        """E.g. 'Kotlin mobile using Flutter'.
+
+        Delegates to :func:`describe_target`.
+        """
+        return describe_target(self)
 
     def to_prompt_context(self, repo_total_files: int = 0, other_targets: list[AnalysisTarget] | None = None) -> str:
         """Render target as context for inclusion in analysis prompts.
@@ -49,20 +49,6 @@ class AnalysisTarget:
         Delegates to :func:`render_target_prompt_context`.
         """
         return render_target_prompt_context(self, repo_total_files, other_targets)
-
-    def to_dict(self) -> dict:
-        """Serialize for JSON debugging output."""
-        return {
-            "name": self.name,
-            "language": self.language,
-            "category": self.category,
-            "frameworks": self.frameworks,
-            "project_description": self.project_description,
-            "total_files": self.total_files,
-            "source_files_count": len(self.source_files),
-            "language_stats": self.language_stats,
-            "scope_path": self.scope_path,
-        }
 
 
 @dataclass
@@ -121,47 +107,8 @@ class SourceManifest:
         return p.project_description if p else "Unknown"
 
     def to_prompt_context(self) -> str:
-        """Render manifest as context for inclusion in analysis prompts."""
-        if not self.targets:
-            lines = [
-                "**Project type:** Unknown",
-                f"**Source files:** {self.total_files}",
-            ]
-            if self.language_stats:
-                breakdown = ", ".join(
-                    f"{ext}: {count}" for ext, count in
-                    sorted(self.language_stats.items(), key=lambda x: -x[1])[:_MAX_EXTENSION_DISPLAY]
-                )
-                lines.append(f"**Extension breakdown:** {breakdown}")
-            return "\n".join(lines)
+        """Render manifest as context for inclusion in analysis prompts.
 
-        if len(self.targets) == 1:
-            return self.targets[0].to_prompt_context(repo_total_files=self.total_files)
-
-        # Multi-language: describe all detected modules
-        lines = [f"**Source files:** {self.total_files}"]
-        lines.append("**Detected modules:**")
-        for t in self.targets:
-            lines.append(f"- {t.project_description} ({t.total_files} files)")
-        lines.append("")
-        lines.append("Analyze each file according to its language and project type.")
-        if self.language_stats:
-            breakdown = ", ".join(
-                f"{ext}: {count}" for ext, count in
-                sorted(self.language_stats.items(), key=lambda x: -x[1])[:_MAX_EXTENSION_DISPLAY]
-            )
-            lines.append(f"**Extension breakdown:** {breakdown}")
-        return "\n".join(lines)
-
-    def to_dict(self) -> dict:
-        """Serialize for JSON debugging output."""
-        return {
-            "language": self.language,
-            "category": self.category,
-            "frameworks": self.frameworks,
-            "project_description": self.project_description,
-            "total_files": self.total_files,
-            "source_files_count": len(self.source_files),
-            "language_stats": self.language_stats,
-            "targets": [t.to_dict() for t in self.targets],
-        }
+        Delegates to :func:`render_manifest_prompt_context`.
+        """
+        return render_manifest_prompt_context(self)

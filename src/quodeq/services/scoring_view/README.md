@@ -132,10 +132,6 @@ Everything else is private (leading underscore on filenames). Reach
 
 ## Migration status
 
-This package is being introduced as a series of small PRs. Track
-progress in the relevant PRs and in the call-sites file: every place
-that used to compute its own filter now imports from here.
-
-When the migration is done, `services/dim_resolution.py` (a thin
-re-export shim from the previous iteration) gets deleted in a final
-cleanup PR.
+Done. `services/dim_resolution.py` (the re-export shim from the
+previous iteration) has been deleted; every call site imports from
+this package directly.

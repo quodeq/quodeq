@@ -1,6 +1,7 @@
 """Repository protocol for findings persistence."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any, Protocol, runtime_checkable
 
 from quodeq.core.types.finding import Finding
@@ -30,7 +31,7 @@ class FindingsRepository(Protocol):
         ...
 
     def search(self, query: str, limit: int = 100, *,
-               exclude_dimensions: list[str] | None = None) -> list[Finding]:
+               exclude_dimensions: Iterable[str] | None = None) -> list[Finding]:
         """FTS5 search across reason and snippet.
 
         ``exclude_dimensions`` drops whole dimensions from the result BEFORE

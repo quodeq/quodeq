@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { listTerminalSessions, createTerminalSession, killTerminalSession } from '../../api/terminal.js';
+import { useApi } from '../../api/ApiContext.jsx';
 import { readString, writeString } from '../../adapters/storage.js';
 
 // Closing the drawer unmounts the pane (and this hook), so the selected tab
@@ -25,6 +25,7 @@ function readStoredActive() {
  *    without polling.
  */
 export function useTerminalSessions({ enabled }) {
+  const { listTerminalSessions, createTerminalSession, killTerminalSession } = useApi();
   const [sessions, setSessions] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [max, setMax] = useState(6);
@@ -59,7 +60,7 @@ export function useTerminalSessions({ enabled }) {
       })();
     }
     return reconcilingRef.current;
-  }, []);
+  }, [listTerminalSessions, createTerminalSession]);
 
   useEffect(() => {
     if (enabled) reconcile();
@@ -81,7 +82,7 @@ export function useTerminalSessions({ enabled }) {
       // 409 at the cap (or a race): the server is the source of truth.
       await reconcile();
     }
-  }, [reconcile]);
+  }, [reconcile, createTerminalSession]);
 
   const closeSession = useCallback(async (id) => {
     // Drop it locally FIRST: unmounting the view closes its socket and
@@ -96,7 +97,7 @@ export function useTerminalSessions({ enabled }) {
     await killTerminalSession(id).catch(() => {});
     // Recreates a fresh session when the last tab was closed.
     await reconcile();
-  }, [reconcile]);
+  }, [reconcile, killTerminalSession]);
 
   const selectSession = useCallback((id) => {
     setActiveId(id);

@@ -87,6 +87,56 @@ def queue_file_exists(run_dir: Path, dim_id: str) -> bool:
     return dimension_queue_file(run_dir, dim_id).exists()
 
 
+def dimension_evidence_file(run_dir: Path, dim_id: str) -> Path:
+    """The dim's raw evidence path (``evidence/<dim>_evidence.jsonl``)."""
+    return run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
+
+
+def evidence_file_size(path: Path) -> int:
+    """Size in bytes of *path*, or 0 when it is absent or unreadable."""
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def file_mtime(path: Path) -> float | None:
+    """Modification time of *path* (epoch seconds), or None if unreadable."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def dimension_report_exists(evaluation_dir: Path, dim_id: str) -> bool:
+    """True when the dim's scored report file exists.
+
+    Deliberately ``.is_file()`` rather than ``.exists()``: a directory or a
+    symlink to nothing at that path must not count as a scored report.
+    """
+    return (evaluation_dir / f"{dim_id}.json").is_file()
+
+
+def read_run_status_json(run_dir: Path) -> dict:
+    """Parse ``status.json`` in *run_dir*, or ``{}`` on any read/parse error."""
+    try:
+        return json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
+def read_queue_state(queue_path: Path) -> dict | None:
+    """Parse a dim (or consolidated) ``*_queue.json`` file into a dict.
+
+    None on any read/parse problem: missing and corrupt are equivalent "no
+    signal" here, mirroring ``read_run_state``'s no-schema-check contract.
+    """
+    try:
+        return json.loads(queue_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
 def read_queue_files_count(queue_path: Path) -> int:
     """Sum of files across all ``taken`` batches in a dim's queue.json.
 

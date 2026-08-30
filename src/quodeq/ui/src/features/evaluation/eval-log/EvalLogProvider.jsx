@@ -3,13 +3,18 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../components/ConsoleLogViewer.jsx';
 import { EvalLogContext, EvalLogLogsContext, useEvalLogLogs } from './EvalLogContext.js';
 import { useJobLogStream } from './useJobLogStream.js';
+import { JOB_STATUS_WORD, terminalLine } from './logPresentation.js';
 import { t } from '../../../strings/index.js';
 
 // Read logs from the dedicated logs context so the side-pane's spec stays
-// stable across log appends — only this leaf re-renders on each batch.
-function EvalLogPaneBody() {
+// stable across log appends — only this leaf re-renders on each batch. The
+// terminal line (once the run reaches a terminal state) is rendered here
+// rather than appended into the logs array itself, so it never becomes part
+// of the actual transcript useJobLogStream hands out.
+function EvalLogPaneBody({ terminalState }) {
   const { logs } = useEvalLogLogs();
-  return <ConsoleLogViewer logs={logs} />;
+  const displayLogs = terminalState ? logs.concat(terminalLine(terminalState)) : logs;
+  return <ConsoleLogViewer logs={displayLogs} />;
 }
 
 const STREAM_STATUS_WORD = {
@@ -17,14 +22,6 @@ const STREAM_STATUS_WORD = {
   streaming: 'running',
   done: 'completed',
   error: 'error',
-};
-
-const JOB_STATUS_WORD = {
-  running: 'running',
-  done: 'completed',
-  failed: 'failed',
-  cancelled: 'cancelled',
-  lost: 'lost',
 };
 
 function statusWord(jobStatus, streamStatus, terminalState) {
@@ -58,7 +55,7 @@ function buildSpec({ jobId, jobStatus, status, terminalState }) {
     id: WINDOW_ID,
     type: 'eval-log',
     title: parts.join(' · '),
-    render: () => <EvalLogPaneBody />,
+    render: () => <EvalLogPaneBody terminalState={terminalState} />,
   };
 }
 

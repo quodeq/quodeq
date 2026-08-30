@@ -15,6 +15,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis._runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
 def _build_dimension_prompt(
@@ -122,4 +123,6 @@ def _parse_dimension_evidence(
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
         cwe_url_template=cwe_url_template(),
+        on_quarantine=log_quarantined_findings,
+        on_malformed_line=log_malformed_jsonl_line,
     )

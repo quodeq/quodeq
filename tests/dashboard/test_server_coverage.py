@@ -10,91 +10,105 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from quodeq.dashboard._probes import ApiProbes
+
 
 class TestEnsureActionApi:
-    @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1", "localhost"})
-    @patch("quodeq.dashboard._server.action_api_healthy", return_value=True)
-    @patch("quodeq.dashboard._server._is_port_open", return_value=True)
-    def test_reuses_existing_healthy_api(self, mock_port, mock_healthy, mock_hosts):
+    def test_reuses_existing_healthy_api(self):
         from quodeq.dashboard._server import _ensure_action_api
-        url, proc = _ensure_action_api("127.0.0.1", 8000)
+        probes = ApiProbes(
+            local_hosts=lambda *a, **k: {"127.0.0.1", "localhost"},
+            api_healthy=lambda *_a: True,
+            is_port_open=lambda *_a: True,
+        )
+        url, proc = _ensure_action_api("127.0.0.1", 8000, probes=probes)
         assert url == "http://127.0.0.1:8000"
         assert proc is None
 
-    @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1", "localhost"})
-    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://127.0.0.1:8000", MagicMock()))
-    @patch("quodeq.dashboard._server._is_port_open", return_value=False)
-    def test_spawns_new_api(self, mock_port, mock_spawn, mock_hosts):
+    def test_spawns_new_api(self):
         from quodeq.dashboard._server import _ensure_action_api
-        url, proc = _ensure_action_api("127.0.0.1", 8000)
+        spawn = MagicMock(return_value=("http://127.0.0.1:8000", MagicMock()))
+        probes = ApiProbes(
+            local_hosts=lambda *a, **k: {"127.0.0.1", "localhost"},
+            is_port_open=lambda *_a: False,
+            spawn=spawn,
+        )
+        url, proc = _ensure_action_api("127.0.0.1", 8000, probes=probes)
         assert url == "http://127.0.0.1:8000"
-        mock_spawn.assert_called_once()
+        spawn.assert_called_once()
 
-    @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1", "localhost"})
-    @patch("quodeq.dashboard._server.action_api_healthy", return_value=False)
-    @patch("quodeq.dashboard._server._is_port_open", return_value=True)
-    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://127.0.0.1:7863", MagicMock()))
-    def test_skips_unhealthy_port_tries_next(self, mock_spawn, mock_port, mock_healthy, mock_hosts):
+    def test_skips_unhealthy_port_tries_next(self):
         from quodeq.dashboard._server import _ensure_action_api
         # Port 8000 is open but unhealthy, port 7863 is closed so it spawns
-        mock_port.side_effect = [True, False]
-        url, proc = _ensure_action_api("127.0.0.1", 8000, max_tries=2)
+        probes = ApiProbes(
+            local_hosts=lambda *a, **k: {"127.0.0.1", "localhost"},
+            api_healthy=lambda *_a: False,
+            is_port_open=MagicMock(side_effect=[True, False]),
+            spawn=lambda *_a, **_k: ("http://127.0.0.1:7863", MagicMock()),
+        )
+        url, proc = _ensure_action_api("127.0.0.1", 8000, max_tries=2, probes=probes)
         assert "7863" in url
 
-    @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1", "localhost"})
-    @patch("quodeq.dashboard._server.action_api_healthy", return_value=False)
-    @patch("quodeq.dashboard._server._is_port_open", return_value=True)
-    def test_raises_when_no_free_port(self, mock_port, mock_healthy, mock_hosts):
+    def test_raises_when_no_free_port(self):
         from quodeq.dashboard._server import _ensure_action_api
+        probes = ApiProbes(
+            local_hosts=lambda *a, **k: {"127.0.0.1", "localhost"},
+            api_healthy=lambda *_a: False,
+            is_port_open=lambda *_a: True,
+        )
         with pytest.raises(RuntimeError, match="Unable to find a free port"):
-            _ensure_action_api("127.0.0.1", 8000, max_tries=2)
+            _ensure_action_api("127.0.0.1", 8000, max_tries=2, probes=probes)
 
-    @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1"})
-    @patch("quodeq.dashboard._server._allow_plaintext_http", return_value=False)
-    def test_rejects_non_localhost_without_tls(self, mock_allow, mock_hosts):
+    def test_rejects_non_localhost_without_tls(self):
         from quodeq.dashboard._server import _ensure_action_api
-        with pytest.raises(RuntimeError, match="Plaintext HTTP"):
-            _ensure_action_api("192.168.1.100", 8000)
+        probes = ApiProbes(local_hosts=lambda *a, **k: {"127.0.0.1"})
+        with patch("quodeq.dashboard._server._allow_plaintext_http", return_value=False):
+            with pytest.raises(RuntimeError, match="Plaintext HTTP"):
+                _ensure_action_api("192.168.1.100", 8000, probes=probes)
 
-    @patch("quodeq.dashboard._server._local_hosts", return_value={"127.0.0.1"})
-    @patch("quodeq.dashboard._server._allow_plaintext_http", return_value=True)
-    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://192.168.1.100:8000", MagicMock()))
-    @patch("quodeq.dashboard._server._is_port_open", return_value=False)
-    def test_allows_non_localhost_with_opt_in(self, mock_port, mock_spawn, mock_allow, mock_hosts):
+    def test_allows_non_localhost_with_opt_in(self):
         from quodeq.dashboard._server import _ensure_action_api
-        url, proc = _ensure_action_api("192.168.1.100", 8000)
+        probes = ApiProbes(
+            local_hosts=lambda *a, **k: {"127.0.0.1"},
+            is_port_open=lambda *_a: False,
+            spawn=lambda *_a, **_k: ("http://192.168.1.100:8000", MagicMock()),
+        )
+        with patch("quodeq.dashboard._server._allow_plaintext_http", return_value=True):
+            url, proc = _ensure_action_api("192.168.1.100", 8000, probes=probes)
         assert "192.168.1.100" in url
 
 
 class TestEnsureActionApiForced:
-    @patch("quodeq.dashboard._server.action_api_healthy", return_value=True)
-    @patch("quodeq.dashboard._server._is_port_open", return_value=True)
-    def test_reuses_healthy(self, mock_port, mock_healthy):
+    def test_reuses_healthy(self):
         from quodeq.dashboard._server import _ensure_action_api_forced
-        url, proc = _ensure_action_api_forced("127.0.0.1", 5000)
+        probes = ApiProbes(api_healthy=lambda *_a: True, is_port_open=lambda *_a: True)
+        url, proc = _ensure_action_api_forced("127.0.0.1", 5000, probes=probes)
         assert url == "http://127.0.0.1:5000"
         assert proc is None
 
-    @patch("quodeq.dashboard._server.action_api_healthy", return_value=False)
-    @patch("quodeq.dashboard._server._is_port_open", return_value=True)
-    def test_raises_when_port_in_use_not_healthy(self, mock_port, mock_healthy):
+    def test_raises_when_port_in_use_not_healthy(self):
         from quodeq.dashboard._server import _ensure_action_api_forced
+        probes = ApiProbes(api_healthy=lambda *_a: False, is_port_open=lambda *_a: True)
         with pytest.raises(RuntimeError, match="Port 5000"):
-            _ensure_action_api_forced("127.0.0.1", 5000)
+            _ensure_action_api_forced("127.0.0.1", 5000, probes=probes)
 
-    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://127.0.0.1:5000", MagicMock()))
-    @patch("quodeq.dashboard._server._is_port_open", return_value=False)
-    def test_spawns_when_port_free(self, mock_port, mock_spawn):
+    def test_spawns_when_port_free(self):
         from quodeq.dashboard._server import _ensure_action_api_forced
-        url, proc = _ensure_action_api_forced("127.0.0.1", 5000)
+        probes = ApiProbes(
+            is_port_open=lambda *_a: False,
+            spawn=lambda *_a, **_k: ("http://127.0.0.1:5000", MagicMock()),
+        )
+        url, proc = _ensure_action_api_forced("127.0.0.1", 5000, probes=probes)
         assert url == "http://127.0.0.1:5000"
 
-    @patch("quodeq.dashboard._server._spawn_and_wait_local", return_value=("http://127.0.0.1:5000", MagicMock()))
-    @patch("quodeq.dashboard._server._is_port_open", return_value=False)
-    def test_passes_static_and_eval_dirs(self, mock_port, mock_spawn):
+    def test_passes_static_and_eval_dirs(self):
         from quodeq.dashboard._server import _ensure_action_api_forced
-        _ensure_action_api_forced("127.0.0.1", 5000, static_dist=Path("/static"), evaluations_dir="/evals")
-        args = mock_spawn.call_args
+        spawn = MagicMock(return_value=("http://127.0.0.1:5000", MagicMock()))
+        probes = ApiProbes(is_port_open=lambda *_a: False, spawn=spawn)
+        _ensure_action_api_forced(
+            "127.0.0.1", 5000, static_dist=Path("/static"), evaluations_dir="/evals", probes=probes,
+        )
+        args = spawn.call_args
         assert args[0][1] == "http://127.0.0.1:5000"
 
 

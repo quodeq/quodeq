@@ -95,6 +95,13 @@ def create_app(
     from quodeq.api.assistant_routes import AssistantTurnState
     app.extensions["assistant_turns"] = AssistantTurnState()
 
+    from quodeq.services.background import ThreadBackgroundRunner
+    from quodeq.shared.log_sink import SHARED_LOG
+    app.extensions["background"] = ThreadBackgroundRunner(log=SHARED_LOG)
+
+    from quodeq.api.standards_read_routes import CweCache
+    app.extensions["cwe_cache"] = CweCache()
+
     from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir

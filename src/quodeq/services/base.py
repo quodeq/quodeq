@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -10,6 +11,38 @@ from quodeq.shared.constants import (  # noqa: F401 — re-export for backward c
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
 )
+
+_logger = logging.getLogger(__name__)
+
+
+def resolve_clean_scan(payload: dict) -> bool:
+    """Resolve the user's clean_scan intent from new and legacy fields.
+
+    New: ``cleanScan: bool`` -- explicit opt-out, default False.
+    Legacy: ``incremental: bool`` -- deprecated, with inverted semantics
+    (old ``True`` meant "use cache" -> ``clean_scan=False``; old ``False``
+    meant "ignore cache" -> ``clean_scan=True``). One-release back-compat.
+
+    Sending both is rejected: we won't guess intent if a client transitions
+    mid-deployment and ends up posting conflicting flags.
+    """
+    has_new = "cleanScan" in payload
+    has_legacy = "incremental" in payload
+    if has_new and has_legacy:
+        raise ValueError(
+            "`cleanScan` and `incremental` cannot be combined in a single payload. "
+            "Use `cleanScan` only -- `incremental` is deprecated. "
+            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
+            "(force full re-analysis)."
+        )
+    if has_legacy:
+        _logger.warning(
+            "Evaluation payload uses deprecated `incremental` field. "
+            "Migrate to `cleanScan` (inverted semantics). "
+            "Legacy field will be removed in the next release.",
+        )
+        return not bool(payload.get("incremental"))
+    return bool(payload.get("cleanScan", False))
 
 
 @dataclass
@@ -33,11 +66,51 @@ class EvaluationOptions:
     provider_api_base: str = ""
 
 
+@dataclass(frozen=True)
+class NewProjectSpec:
+    """Request-boundary-validated inputs for registering a new project.
+
+    The route builds this after its own request-boundary checks (repo-URL
+    shape, cloneDest containment under home, local-path allowlist); the
+    provider's ``create_project`` owns everything from here on (duplicate
+    detection, clone + scan, rollback on failure).
+    """
+    repo: str
+    discipline: str | None
+    scope_path: str | None
+    clone_dest: str | None
+    ephemeral: bool
+
+
+@dataclass(frozen=True)
+class CreateProjectResult:
+    """Outcome of ``ProjectActions.create_project``.
+
+    ``status`` drives the route's HTTP translation:
+    created | duplicate | invalid_repo | clone_failed | internal_error.
+    """
+    status: str
+    project_id: str | None = None
+    scan_data: dict | None = None
+    existing_project_id: str | None = None
+    message: str = ""
+    clone_error_kind: str | None = None
+
+
 class ProjectActions(Protocol):
     """Methods for project listing and metadata."""
 
     def list_projects(self, reports_dir: str) -> dict:
         """Return a dict with a 'projects' list for the given reports directory."""
+        ...
+
+    def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
+        """Register (clone if needed + scan) a new project.
+
+        Owns duplicate detection, the clone/scan attempt, rollback of any
+        partial project directory on failure, and the scan.json readback
+        (with a zero-run fallback). See NewProjectSpec/CreateProjectResult.
+        """
         ...
 
     def get_project_info(self, reports_dir: str, project: str) -> dict:

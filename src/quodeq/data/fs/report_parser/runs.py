@@ -1,13 +1,16 @@
 """Run discovery, date parsing, and report aggregation for filesystem reports.
 
-The module-level functions (``read_run_data``, ``list_runs``) provide the
-default filesystem implementation.  The ``RunStorage`` protocol is defined
-in ``quodeq.data.fs.report_parser.runs`` — alternative backends should
-implement that protocol and be injected at the call site.
+The module-level functions (``read_run_data``, ``list_runs``, etc.) are the
+filesystem implementation — there is no ``RunStorage`` protocol here. A
+caller that needs a substitute injects a reader callable instead: see
+``ScoringDeps.read_run_data`` (``services/scoring/_deps.py``),
+``_trend_fetcher._default_read_run_scalars``, and
+``_run_lookup._make_caching_fetcher``.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.core.utils.io import resolve_child_dir
@@ -78,18 +81,35 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
     return overlay_sql_grades(run_dir, dimensions)
 
 
-def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[DimensionResult]:
+def _default_fallback_reader(reports_root: Path, project: str, run_id: str) -> list[DimensionResult]:
+    """Default ``read_run_scalars`` fallback: a thin wrapper around
+    ``read_run_data``, resolved by name at call time (not captured directly
+    as the default value) so a caller two layers up that still patches this
+    module's ``read_run_data`` attribute (rather than injecting
+    ``fallback_reader``) keeps intercepting the fallback path.
+    """
+    return read_run_data(reports_root, project, run_id)
+
+
+def read_run_scalars(
+    reports_root: Path,
+    project: str,
+    run_id: str,
+    *,
+    fallback_reader: Callable[[Path, str, str], list[DimensionResult]] = _default_fallback_reader,
+) -> list[DimensionResult]:
     """Load a run's per-dimension SCALARS (score/grade/principles) only.
 
     Fast path for the dashboard trend and accumulated carry-forward, which need
     only ``overall_score`` / ``overall_grade`` per dimension — not the full
     findings.  Reads the authoritative SQL grade tables directly instead of
-    parsing the evaluation JSON, then falls back to :func:`read_run_data`
-    whenever the SQL tables can't faithfully reproduce the overlaid result:
-    legacy run (no ``events.jsonl``) or no ``evaluation.db``; SQLite disabled or
-    db unreadable; empty grade tables; a NULL SQL score (overlay would keep the
-    eval-time score); or the SQL dim count != the on-disk ``evaluation/*.json``
-    count (partial projection).  Returned dimensions carry empty findings.
+    parsing the evaluation JSON, then falls back to *fallback_reader*
+    (defaults to :func:`read_run_data`) whenever the SQL tables can't
+    faithfully reproduce the overlaid result: legacy run (no ``events.jsonl``)
+    or no ``evaluation.db``; SQLite disabled or db unreadable; empty grade
+    tables; a NULL SQL score (overlay would keep the eval-time score); or the
+    SQL dim count != the on-disk ``evaluation/*.json`` count (partial
+    projection).  Returned dimensions carry empty findings.
     """
     validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
@@ -102,7 +122,7 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
         or not has_evaluation_db(run_dir)
         or not (run_dir / "events.jsonl").is_file()
     ):
-        return read_run_data(reports_root, project, run_id)
+        return fallback_reader(reports_root, project, run_id)
 
     import sqlite3  # noqa: PLC0415
 
@@ -116,13 +136,13 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
         dim_rows = store.read_dimension_scores()
         principle_rows = store.read_principle_grades()
     except sqlite3.DatabaseError:
-        return read_run_data(reports_root, project, run_id)
+        return fallback_reader(reports_root, project, run_id)
 
     if not dim_rows:
-        return read_run_data(reports_root, project, run_id)
+        return fallback_reader(reports_root, project, run_id)
 
     if any(r.get("score") is None for r in dim_rows):
-        return read_run_data(reports_root, project, run_id)
+        return fallback_reader(reports_root, project, run_id)
 
     eval_dir = run_dir / "evaluation"
     on_disk = (
@@ -130,7 +150,7 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
         if eval_dir.is_dir() else 0
     )
     if on_disk and len(dim_rows) != on_disk:
-        return read_run_data(reports_root, project, run_id)
+        return fallback_reader(reports_root, project, run_id)
 
     # No eval-time grade fallback here (unlike overlay_sql_grades): the fast
     # path doesn't read the JSON, and a projected dim past the NULL-score

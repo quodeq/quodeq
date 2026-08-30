@@ -9,7 +9,14 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from quodeq.services.ports import read_finding_details_from_json_eval
+from quodeq.services.ports import (
+    ActionLogWriter,
+    load_suppression_rules,
+    migrate_if_needed,
+    read_action_events,
+    read_finding_details,
+    read_finding_details_from_json_eval,
+)
 from quodeq.services.suppression_keys import is_dismissed
 from quodeq.core.events.models import (
     EventType,
@@ -19,10 +26,6 @@ from quodeq.core.events.models import (
     FindingUndismissedEvent,
 )
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
-from quodeq.data.actions_log import ActionLogWriter, read_action_events
-from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed
-from quodeq.data.sqlite.findings_queries import read_finding_details
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 
 def dismiss_finding(project_dir: Path, finding: dict) -> None:

@@ -21,9 +21,24 @@ from quodeq.services._dashboard_cache import DashboardCacheConfig, _make_run_dim
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_trend_fetcher
+from quodeq.services.ports import read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
+
+
+def _read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str | None:
+    """Return the run's ``status.json`` ``exit_reason``, or ``None`` if absent.
+
+    Used by the dashboard to surface deadline-truncated runs to the UI:
+    the "Partial" badge on each DimensionGaugeCard fires when the run
+    didn't complete naturally (e.g. ``exit_reason="deadline"`` from a
+    timeout, or ``"failure_streak"`` from repeated failures).
+    """
+    data = read_run_status_json(reports_root / project / run_id)
+    reason = data.get("exit_reason")
+    return reason if isinstance(reason, str) else None
+
 
 # Maximum number of historical runs scanned for trend, previous scores, and
 # stale dimensions. The full run list is still returned in availableRuns (metadata

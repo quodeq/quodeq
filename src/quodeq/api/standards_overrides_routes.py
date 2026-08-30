@@ -14,61 +14,16 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api._assistant_helpers import resolve_repo_root
 from quodeq.api.helpers import error_response
 from quodeq.shared.validation import validate_path_segment
-from quodeq.core.standards.overrides import (
-    OVERRIDES_RELPATH,
-    dimension_params,
-    validate_overrides,
-)
+from quodeq.core.standards.overrides import validate_overrides
+from quodeq.services.standards_overrides import changed_dimensions, override_counts_by_dimension
 from quodeq.services.standards_prefs import (
     clear_project_overrides,
     collect_declared_params,
-    iter_compiled_standards,
     load_project_overrides,
     save_project_overrides,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _counts(overrides: dict, compiled_dir: Path) -> dict[str, int]:
-    """Per-dimension count of overridden requirements, keyed by compiled id."""
-    dim_by_req: dict[str, str] = {}
-    for stem, data in iter_compiled_standards(compiled_dir):
-        for principle in data.get("principles", []):
-            for req in principle.get("requirements", []):
-                if req.get("id"):
-                    dim_by_req[req["id"]] = data.get("id", stem)
-    counts: dict[str, int] = {}
-    for req_id in overrides:
-        dim = dim_by_req.get(req_id)
-        if dim:
-            counts[dim] = counts.get(dim, 0) + 1
-    return counts
-
-
-def _changed_dimensions(compiled_dir: Path, current: dict, proposed: dict) -> list[str]:
-    """Dimensions whose non-default effective params differ between the
-    current overrides file and the proposed mapping. A changed dimension is
-    exactly one whose cache keys will shift, so this is the invalidation
-    impact surfaced to the user before saving.
-
-    Scans only the compiled dir, mirroring dimension_params_state (which reads
-    only compiled/<dimension>.json), so custom evaluator-dir standards—whose
-    cache keys never shift on override change—are symmetrically never reported."""
-    changed: list[str] = []
-    for stem, data in iter_compiled_standards(compiled_dir):
-        try:
-            _, before = dimension_params(data, current)
-            _, after = dimension_params(data, proposed)
-        except (AttributeError, TypeError):
-            # A shape-invalid params block (spec not a dict, "params" not a
-            # mapping, etc.) raises AttributeError/TypeError out of
-            # dimension_params -- same degrade-and-skip as an unreadable or
-            # unparseable compiled file, so a bad file never 500s the PUT.
-            continue
-        if before != after:
-            changed.append(data.get("id", stem))
-    return changed
 
 
 def register_overrides_routes(app: Flask) -> None:
@@ -89,7 +44,7 @@ def register_overrides_routes(app: Flask) -> None:
             return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, "not_found")
         compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
         overrides = load_project_overrides(root)
-        return jsonify({"overrides": overrides, "counts": _counts(overrides, compiled_dir)})
+        return jsonify({"overrides": overrides, "counts": override_counts_by_dimension(overrides, compiled_dir)})
 
     @app.put("/api/projects/<project_id>/standards-overrides")
     def put_standards_overrides(project_id: str) -> Response:
@@ -119,7 +74,7 @@ def register_overrides_routes(app: Flask) -> None:
             resp.status_code = HTTPStatus.BAD_REQUEST
             return resp
         current = load_project_overrides(root)
-        changed = _changed_dimensions(compiled_dir, current, clean)
+        changed = changed_dimensions(compiled_dir, current, clean)
         dry_run = request.args.get("dryRun", "").lower() in ("1", "true")
         if dry_run:
             return jsonify({"overrides": clean, "changedDimensions": changed})

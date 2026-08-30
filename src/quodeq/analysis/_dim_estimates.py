@@ -32,12 +32,12 @@ from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
 from quodeq.analysis.dispatch_policy import api_file_size_cap
 from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.dim_estimates_io import (
     DIM_ESTIMATES_FILENAME,
     read_dim_estimates,
     write_dim_estimates,
 )
-from quodeq.shared.logging import log_info
 
 __all__ = [
     "DIM_ESTIMATES_FILENAME",
@@ -48,7 +48,7 @@ __all__ = [
 
 
 def compute_dim_estimates(
-    config: RunConfig, dimensions: list[str],
+    config: RunConfig, dimensions: list[str], *, log: LogSink = NULL_LOG,
 ) -> dict[str, dict[str, Any]]:
     """Estimate per-dim file count + reason, before any dim runs.
 
@@ -67,7 +67,7 @@ def compute_dim_estimates(
         if n_excluded and not excluded_logged:
             # The excluded set is dim-agnostic (size cap only), so log it
             # once per run, not once per dimension.
-            log_info(
+            log.info(
                 f"  {n_excluded} file(s) excluded from analysis: over the API "
                 f"file-size cap ({api_file_size_cap()} bytes). Raise "
                 f"QUODEQ_MAX_API_FILE_SIZE to include them."

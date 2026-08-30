@@ -8,34 +8,13 @@ nothing here reads history or resolves runs. Declared in
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import DimensionResult, to_camel_dict
+from quodeq.core.types import DimensionResult
+from quodeq.shared.serialization import to_camel_dict
 
 from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services._dashboard_history import _DashboardPayload
-
-
-def _read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str | None:
-    """Return the run's ``status.json`` ``exit_reason``, or ``None`` if absent.
-
-    Used by the dashboard to surface deadline-truncated runs to the UI:
-    the "Partial" badge on each DimensionGaugeCard fires when the run
-    didn't complete naturally (e.g. ``exit_reason="deadline"`` from a
-    timeout, or ``"failure_streak"`` from repeated failures).
-    """
-    import json as _json  # noqa: PLC0415
-    status_path = reports_root / project / run_id / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        with status_path.open("r", encoding="utf-8") as fp:
-            data = _json.load(fp)
-    except (OSError, ValueError):
-        return None
-    reason = data.get("exit_reason")
-    return reason if isinstance(reason, str) else None
 
 
 def _attach_exit_reason_to_dim(

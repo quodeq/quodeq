@@ -20,18 +20,17 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.api.import_project import import_zip_stream
 from quodeq.api.zip import _build_project_zip
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit
 from quodeq.services.dismissed import load_dismissed
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.scoring import get_project_scores, get_scores_slim
+from quodeq.services.shared_connect import connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status, start_publish
 from quodeq.services.shared_repo import (
-    check_repo_format,
     clone_lock,
-    ensure_shared_clone,
     last_synced_at,
     published_meta,
     read_state,
@@ -42,7 +41,6 @@ from quodeq.services.shared_repo import (
     shared_index_db_path,
     shared_score_cache_path,
     sync_shared_index,
-    validate_remote_url,
 )
 from quodeq.services.shared_settings import (
     SharedSettings,
@@ -174,49 +172,29 @@ def register_shared_routes(app: Flask) -> None:
         url = str(body.get("url") or "").strip()
         if not url:
             return jsonify({"error": "url is required"}), 400
-        try:
-            validate_remote_url(url)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
-        # Audit finding A4: reconnecting to a URL whose cache dir is already
-        # on disk (a prior connect, possibly stale) must not silently keep
-        # serving whatever was last fetched -- ensure_shared_clone below
-        # early-returns an existing clone without fetching, so the freshness
-        # check has to happen here, before it. refresh_shared_clone acquires
-        # clone_lock itself (RLock, so nesting would be safe too, but there
-        # is nothing else in this route that needs the lock held around it).
-        pre_existing = read_state(url) != "missing"
-        repo = ensure_shared_clone(url)
-        if repo is None:
+        outcome = connect_shared_repo(url)
+        if outcome.status == "invalid_url":
+            return jsonify({"error": outcome.detail}), 400
+        if outcome.status == "clone_failed":
             return (
                 jsonify(
-                    {"error": f"could not clone the repository, check that git can access {url}"}
+                    {"error": f"could not clone the repository, check that git can access {outcome.url}"}
                 ),
                 502,
             )
-        if pre_existing:
-            ok, _ = refresh_shared_clone(url)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
-        # Format validation only makes sense once the clone actually exists,
-        # so it runs AFTER ensure_shared_clone, not before -- a foreign or
-        # too-new repo must never reach write_settings (that would connect
-        # the UI to a repo every subsequent /api/shared/* route then 409s
-        # on). "empty" (never published into) is a legitimate first-connect
-        # state and is accepted here same as "ok".
-        fmt = check_repo_format(repo)
-        if fmt == "foreign":
+        if outcome.status == "foreign":
             return (
                 jsonify(
                     {"error": "the repository exists but does not look like a quodeq results repository"}
                 ),
                 400,
             )
-        if fmt == "unsupported_version":
+        if outcome.status == "unsupported_version":
             return (
                 jsonify({"error": "this shared repository requires a newer version of quodeq"}),
                 400,
             )
-        write_settings(SharedSettings(url=url))
-        return jsonify({"configured": True, "url": url})
+        return jsonify({"configured": True, "url": outcome.url})
 
     @app.delete("/api/shared/config")
     def shared_config_delete() -> Response:

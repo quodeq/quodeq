@@ -22,10 +22,12 @@ from quodeq.core.types import DimensionResult
 
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data
+from quodeq.services.deleted import deleted_keys
 from quodeq.services.scoring_view import is_eligible_for_default_view
-from quodeq.services.dismissed import filter_dismissed_from_dimensions
+from quodeq.services.dismissed import dismissed_keys, filter_dismissed_from_dimensions
+from quodeq.services.ports import load_suppression_rules
+from quodeq.services.rescore import _rescore_dimension
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
     DashboardCacheConfig,
@@ -46,12 +48,12 @@ from quodeq.services._dashboard_history import (  # noqa: F401
     _compute_dashboard_payload,
     _enrich_dimensions_with_trend,
     _max_history_runs,
+    _read_run_exit_reason,
 )
 from quodeq.services._dashboard_response import (  # noqa: F401
     _attach_dismissed_count_to_dim,
     _attach_exit_reason_to_dim,
     _build_dashboard_result,
-    _read_run_exit_reason,
     _slim_history_dim,
 )
 
@@ -74,10 +76,6 @@ def _rescore_run_dimensions(
     were read from: its directory is passed as the evidence basis so a touched
     dimension is re-scored from that run's own evidence, not the legacy formula.
     """
-    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
-
     validate_path_segment(project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
@@ -144,7 +142,7 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     in_progress and cancelled runs are skipped: the overview waits for a
     run to terminate cleanly before promoting it to the default
     landing-page view. The eligibility predicate is the shared
-    ``dim_resolution.is_eligible_for_default_view`` rule, used by both
+    ``scoring_view.is_eligible_for_default_view`` rule, used by both
     this call site and ``accumulated._compute_result``. Keeping them on
     the same predicate is what prevents the "headline says one thing,
     cards say another" inconsistency users hit when the two filters

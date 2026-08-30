@@ -357,12 +357,12 @@ def _wait_for_terminal_status(
 
 
 def _open_cache():
-    """Indirection so tests can swap in a fake backend."""
+    """Lazily construct the default cache backend (import kept local)."""
     from quodeq.analysis.cache import LocalFileBackend
     return LocalFileBackend()
 
 
-def _discard_run_state(reports_dir: str, job: dict) -> None:
+def _discard_run_state(reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None) -> None:
     """Wipe every trace a discarded run left behind.
 
     Invoked when the user cancels with "Discard findings": the run must end
@@ -391,7 +391,7 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
 
     keys = read_dispatched_cache_keys(evidence_dir)
     if keys:
-        cache = _open_cache()
+        cache = cache or _open_cache()
         for key in keys:
             try:
                 cache.delete(key)
@@ -406,3 +406,19 @@ def _discard_run_state(reports_dir: str, job: dict) -> None:
         "*_replayed_unconsolidated_keys.json",
     )
     remove_matching_files(evidence_dir, scratch_patterns)
+
+
+class _CacheEraser(Protocol):
+    """The one cache-backend method ``_discard_run_state`` needs.
+
+    A local structural type instead of importing
+    ``analysis.cache.backend.CacheBackend``: services/ must not import
+    analysis/ (see ARCHITECTURE.md layering). ``LocalFileBackend`` (returned
+    by ``_open_cache``, and every other real cache backend) satisfies this
+    shape without any inheritance. Defined after ``_discard_run_state``
+    (referenced there only as a deferred string annotation, per
+    ``from __future__ import annotations``) so it doesn't shift the
+    baseline-pinned lazy import inside ``_open_cache`` above.
+    """
+
+    def delete(self, key: str) -> None: ...

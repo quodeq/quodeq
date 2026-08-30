@@ -30,6 +30,7 @@ from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_ver
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.fingerprint import _hash_file, _hash_standards, dimension_params_state
+from quodeq.config.paths import default_paths
 
 _logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def build_cache_writer(
         (_hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
         or ""
     )
-    prompts_hash = _hash_prompts_combined()
+    prompts_hash = _hash_prompts_combined(default_paths().prompts_dir)
     version = quodeq_version()
     # Computed once at construction: the params_hash keys threshold-override
     # changes into the cache key below; effective_params is recorded on each
