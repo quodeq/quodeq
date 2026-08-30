@@ -82,18 +82,28 @@ export function invalidateThemeColors() { _themeColors = null; }
 // score is 0-10 scale (matching the app's grading system)
 const GRADE_COLOR_KEYS = ['gradeTop', 'gradeHigh', 'gradeMid', 'gradeLow'];
 
-export function scoreRGB(score) {
-  const tc = getThemeColors();
-  const thresholds = getGradeThresholds();
+/**
+ * @param {number} score
+ * @param {{colors?: object, thresholds?: Array<[number, string]>}} [opts]
+ *   Lazy defaults: an explicit `colors`/`thresholds` skips the DOM entirely
+ *   (tests inject both); omitting them reads the live theme/thresholds
+ *   exactly as before. Scene builders call this with no options — the
+ *   default parameters preserve their existing (singleton-cache) behavior.
+ */
+export function scoreRGB(score, { colors = getThemeColors(), thresholds = getGradeThresholds() } = {}) {
   for (let i = 0; i < thresholds.length; i += 1) {
-    if (score >= thresholds[i][0]) return tc[GRADE_COLOR_KEYS[i]] ?? tc.gradeLow;
+    if (score >= thresholds[i][0]) return colors[GRADE_COLOR_KEYS[i]] ?? colors.gradeLow;
   }
-  return tc.gradeBottom;
+  return colors.gradeBottom;
 }
 
-export function sevRGB(sev) {
-  const tc = getThemeColors();
-  return tc[sev] || tc.minor;
+/**
+ * @param {string} sev
+ * @param {{colors?: object}} [opts] Lazy default: an explicit `colors` skips
+ *   the DOM entirely (tests inject it); omitting it reads the live theme.
+ */
+export function sevRGB(sev, { colors = getThemeColors() } = {}) {
+  return colors[sev] || colors.minor;
 }
 
 export function rgb(c) { return `rgb(${c.r},${c.g},${c.b})`; }

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useStandardDetail } from '../hooks/useStandardDetail.js';
 import { useStandardsOverrides } from '../hooks/useStandardsOverrides.js';
+import { applyParamOverride, countCustomizedRequirements } from '../overridesModel.js';
 import { useAppState } from '../../../hooks/useAppState.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
@@ -148,22 +149,13 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved, onR
   useEffect(() => { savedOverridesRef.current = savedOverrides; }, [savedOverrides]);
 
   const handleChangeParam = useCallback((reqId, paramName, value) => {
-    setDraftOverrides((prev) => {
-      const base = structuredClone(prev ?? savedOverridesRef.current);
-      const reqOverrides = { ...(base[reqId] || {}) };
-      if (value === null) delete reqOverrides[paramName];
-      else reqOverrides[paramName] = value;
-      if (Object.keys(reqOverrides).length === 0) delete base[reqId];
-      else base[reqId] = reqOverrides;
-      return base;
-    });
+    setDraftOverrides((prev) => applyParamOverride(prev ?? savedOverridesRef.current, reqId, paramName, value));
   }, []);
 
-  const customizedCount = useMemo(() => {
-    const reqIds = new Set(
-      (standard?.principles || []).flatMap((p) => (p.requirements || []).map((r) => r.id)));
-    return Object.keys(overrides).filter((id) => reqIds.has(id)).length;
-  }, [standard, overrides]);
+  const customizedCount = useMemo(
+    () => countCustomizedRequirements(standard, overrides),
+    [standard, overrides],
+  );
 
   const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
 

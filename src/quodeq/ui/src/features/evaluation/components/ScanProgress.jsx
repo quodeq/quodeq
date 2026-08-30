@@ -69,7 +69,12 @@ function DimRow({ dim }) {
   if (isPending) {
     meta = <span className="scan-progress__dim-meta-projected">{t('evaluate.queued')}{reasonBadge}</span>;
   } else if (isDone) {
-    const coveragePct = total > 0 ? Math.round((taken / total) * 100) : null;
+    // Clamp adoption (sanctioned intended change): pct() caps at 100 where
+    // the inline Math.round() above did not, so a done dim with taken>total
+    // (count drift) no longer prints e.g. "105%". The null sentinel for a
+    // zero total is preserved — it's load-bearing (chip renders only when
+    // !== null).
+    const coveragePct = total > 0 ? pct(taken, total) : null;
     const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== 'done';
     const hint = exitReasonHint(dim.exitReason);
     const partialTooltip = isPartial

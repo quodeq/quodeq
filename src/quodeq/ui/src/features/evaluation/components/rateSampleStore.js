@@ -14,27 +14,52 @@
 
 import { RATE_WINDOW_MS } from './buildJobStatCells.js';
 
-const byJob = new Map();
-
 /**
- * Append a sample for a job and trim anything older than RATE_WINDOW_MS.
- * Always keeps at least the newest sample (so a long stall still has a point).
- * @returns {Array<{t:number, taken:number}>} the job's (trimmed) buffer
+ * Build an independent throughput-sample store: append/read/reset closing
+ * over its own per-job buffer map. `windowMs` decouples the trim rule from
+ * RATE_WINDOW_MS for tests; production code shares one default instance.
  */
-export function recordRateSample(jobId, t, taken) {
-  let buf = byJob.get(jobId);
-  if (!buf) { buf = []; byJob.set(jobId, buf); }
-  buf.push({ t, taken });
-  while (buf.length > 1 && t - buf[0].t > RATE_WINDOW_MS) buf.shift();
-  return buf;
+export function createRateSampleStore({ windowMs = RATE_WINDOW_MS } = {}) {
+  const byJob = new Map();
+
+  /**
+   * Append a sample for a job and trim anything older than windowMs.
+   * Always keeps at least the newest sample (so a long stall still has a point).
+   * @returns {Array<{t:number, taken:number}>} the job's (trimmed) buffer
+   */
+  function recordRateSample(jobId, t, taken) {
+    let buf = byJob.get(jobId);
+    if (!buf) { buf = []; byJob.set(jobId, buf); }
+    buf.push({ t, taken });
+    while (buf.length > 1 && t - buf[0].t > windowMs) buf.shift();
+    return buf;
+  }
+
+  /** The job's current sample buffer (empty array if none recorded yet). */
+  function getRateSamples(jobId) {
+    return byJob.get(jobId) || [];
+  }
+
+  /** Test hygiene: the store is otherwise long-lived and would leak across tests. */
+  function reset() {
+    byJob.clear();
+  }
+
+  return { recordRateSample, getRateSamples, reset };
 }
 
-/** The job's current sample buffer (empty array if none recorded yet). */
+/** The app-wide throughput store every production import shares. */
+export const defaultRateSampleStore = createRateSampleStore();
+
+export function recordRateSample(jobId, t, taken) {
+  return defaultRateSampleStore.recordRateSample(jobId, t, taken);
+}
+
 export function getRateSamples(jobId) {
-  return byJob.get(jobId) || [];
+  return defaultRateSampleStore.getRateSamples(jobId);
 }
 
 /** Test hygiene: the store is module-level and would otherwise leak across tests. */
 export function _resetRateSamples() {
-  byJob.clear();
+  defaultRateSampleStore.reset();
 }

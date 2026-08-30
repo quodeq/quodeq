@@ -14,16 +14,9 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations } from './dimensionCardModel.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
-
-const SEVERITY_OPTIONS = ['critical', 'major', 'minor', 'unknown'];
-
-function toggleInList(list, value) {
-  return list.includes(value)
-    ? list.filter((item) => item !== value)
-    : [...list, value];
-}
 
 function PrincipleFilter({ principles }) {
   const { options: principleOptions, selected: selectedPrinciples, setSelected: setSelectedPrinciples } = principles;
@@ -130,25 +123,6 @@ function DimViolationsList({ filteredViolations, activeFilterCount, totalCount, 
       </div>
     </div>
   );
-}
-
-function computePrincipleOptions(dimension) {
-  if (!dimension) return [];
-  const names = new Set();
-  (dimension.principles || []).forEach((p) => names.add(p.name));
-  (dimension.violations || []).forEach((v) => { if (v.principle) names.add(v.principle); });
-  return Array.from(names).filter(Boolean).sort((a, b) => a.localeCompare(b));
-}
-
-function filterViolations(dimension, selectedSeverities, selectedPrinciples, fileFilter) {
-  if (!dimension) return [];
-  return (dimension.violations || []).filter((v) => {
-    if (selectedSeverities.length > 0 && !selectedSeverities.includes(v.severity || 'unknown')) return false;
-    if (selectedPrinciples.length > 0 && !selectedPrinciples.includes(v.principle || '')) return false;
-    const normalizedFilter = fileFilter.trim().toLowerCase();
-    if (normalizedFilter && !String(v.file || '').toLowerCase().includes(normalizedFilter)) return false;
-    return true;
-  });
 }
 
 function DimCardHeader({ title, dimension, delta }) {

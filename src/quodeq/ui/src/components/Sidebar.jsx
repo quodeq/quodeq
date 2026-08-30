@@ -3,6 +3,7 @@ import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, 
 import { cloneElement } from 'react';
 import { BRAND_NAME } from '../strings/brand.js';
 import { t, LOCALE } from '../strings/index.js';
+import { isEvaluatableSource } from '../appGating.js';
 
 // Folder glyph for the REPOSITORY row — same outline used in the file/folder
 // table on FileDetailPage, just sized up for the sidebar rail.
@@ -171,7 +172,7 @@ export default function Sidebar({
           </nav>
         )}
 
-        {selectedSource !== 'shared' && (
+        {isEvaluatableSource(selectedSource) && (
           <nav className="sidebar-nav sidebar-block">
             <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
           </nav>

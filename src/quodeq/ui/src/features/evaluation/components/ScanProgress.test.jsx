@@ -108,6 +108,22 @@ describe('ScanProgress partial coverage signal', () => {
     await screen.findByText('maintainability');
     expect(container.querySelector('.scan-progress__coverage--partial')).toBeNull();
   });
+
+  it('clamps coverage % to 100 in a done dim when taken exceeds total (count drift)', async () => {
+    // Regression for the clamp-adoption change: the old inline
+    // Math.round((taken/total)*100) had no cap and would have printed 105%.
+    getEvaluationProgress.mockResolvedValueOnce(payload({
+      id: 'maintainability', state: 'done',
+      files: { taken: 105, total: 100 },
+      violations: 0, compliance: 5,
+      elapsedS: 60, exitReason: 'done',
+    }));
+    const { container } = withEvalLog(<ScanProgress job={baseJob} />, ctx);
+    fireEvent.click(await screen.findByTitle('Show per-dimension detail'));
+    await screen.findByText('maintainability');
+    const pctEl = container.querySelector('.scan-progress__coverage');
+    expect(pctEl.textContent).toMatch(/^100\s*%$/);
+  });
 });
 
 describe('ScanProgress total coverage (incremental runs)', () => {

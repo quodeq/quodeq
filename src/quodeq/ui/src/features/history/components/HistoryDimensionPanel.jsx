@@ -12,25 +12,8 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
+import { cssVar } from '../../../components/scoreChartHelpers.js';
 import { t } from '../../../strings/index.js';
-
-// Module-level CSS variable cache. Use clearCssVarCache() for test resets.
-const _cssVarCache = new Map();
-const cssVar = (name, fallback) => {
-  if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
-  if (typeof document === 'undefined') return fallback;
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  _cssVarCache.set(name, val);
-  return val || fallback;
-};
-if (typeof document !== 'undefined') {
-  new MutationObserver(() => _cssVarCache.clear()).observe(
-    document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
-  );
-}
-
-/** Clear the CSS variable cache; exported for test resets. */
-export function clearCssVarCache() { _cssVarCache.clear(); }
 
 // Domain constants that match backend scoring tiers (see grading.py).
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };

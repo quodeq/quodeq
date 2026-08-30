@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { recordRateSample, getRateSamples, _resetRateSamples } from './rateSampleStore.js';
+import { recordRateSample, getRateSamples, _resetRateSamples, createRateSampleStore } from './rateSampleStore.js';
 import { RATE_WINDOW_MS } from './buildJobStatCells.js';
 
 test('rateSampleStore: records and returns samples for a job', () => {
@@ -45,4 +45,21 @@ test('rateSampleStore: isolates samples per job', () => {
 test('rateSampleStore: returns an empty array for an unknown job', () => {
   _resetRateSamples();
   assert.deepEqual(getRateSamples('nope'), []);
+});
+
+test('createRateSampleStore: two instances never share samples', () => {
+  const a = createRateSampleStore();
+  const b = createRateSampleStore();
+  a.recordRateSample('j1', 1000, 10);
+  assert.deepEqual(a.getRateSamples('j1'), [{ t: 1000, taken: 10 }]);
+  assert.deepEqual(b.getRateSamples('j1'), []);
+});
+
+test('createRateSampleStore: windowMs is injectable independent of RATE_WINDOW_MS', () => {
+  const store = createRateSampleStore({ windowMs: 10 });
+  store.recordRateSample('j1', 0, 1);
+  store.recordRateSample('j1', 11, 2); // past the injected 10ms window
+  const buf = store.getRateSamples('j1');
+  assert.equal(buf.length, 1);
+  assert.equal(buf[0].taken, 2);
 });
