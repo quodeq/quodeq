@@ -5,37 +5,39 @@ params, so any change auto-invalidates. Disposable/best-effort: a corrupt or
 older-schema db is rebuilt, and any cache error falls through to recompute.
 
 This module owns the version hashes (the cache's invalidation contract) and is
-the facade every caller imports. The mechanics live in three submodules:
-``_score_cache_db`` (connection/schema), ``_score_cache_store`` (per-table
-reads/writes) and ``_score_cache_fetch`` (read-through wrappers).
+the facade every caller imports. The connection/schema and per-table
+reads/writes live in ``quodeq.data.sqlite`` (``score_cache_db`` /
+``score_cache_store``), reached through ``services/ports.py`` like every
+other services -> data edge; the read-through wrappers stay in this package's
+``_score_cache_fetch``.
 """
 from __future__ import annotations
 
 import hashlib
 import json
-import sqlite3
 from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._score_cache_epoch import CACHE_WRITER_EPOCH as _CACHE_WRITER_EPOCH
 from quodeq.services.ports import load_suppression_rules
 
 # ---------------------------------------------------------------------------
-# Decomposed submodules. Every moved name is re-exported here so external
-# callers and test patch targets keep working against this module.
+# Every moved/data-layer name is re-exported here so external callers and
+# test patch targets keep working against this module.
 # ---------------------------------------------------------------------------
-from quodeq.services._score_cache_db import (  # noqa: F401 — facade re-export
-    open_score_cache,
-    score_cache_path_override,
-)
-from quodeq.services._score_cache_store import (  # noqa: F401 — facade re-export
+from quodeq.services.ports import (  # noqa: F401 — facade re-export
+    CACHE_WRITER_EPOCH as _CACHE_WRITER_EPOCH,
     load_run_keys,
+    load_run_keys_or_empty,
+    open_score_cache,
     read_cached_accumulated,
     read_cached_project_summary,
     read_cached_rows,
+    read_project_summary_cached,
+    score_cache_path_override,
     store_run_keys,
+    store_run_keys_best_effort,
     write_cached_accumulated,
     write_cached_project_summary,
     write_cached_rows,
@@ -174,11 +176,8 @@ def per_run_versions(
     from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
     from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
     dismissed, deleted = dismissed_keys(project_dir), deleted_keys(project_dir)
-    try:
-        with open_score_cache() as conn:
-            cached = load_run_keys(conn, project)
-    except sqlite3.Error:
-        cached = {}
+    with open_score_cache() as conn:
+        cached = load_run_keys_or_empty(conn, project)
     out: list[tuple[str, str, str]] = []
     for rid, status in runs:
         terminal = status == "complete"
@@ -186,11 +185,8 @@ def per_run_versions(
         if keys is None:
             keys = read_run_key_sets(project_dir / rid)
             if terminal:
-                try:
-                    with open_score_cache() as conn:
-                        store_run_keys(conn, project, rid, keys[0], keys[1])
-                except sqlite3.Error:
-                    pass
+                with open_score_cache() as conn:
+                    store_run_keys_best_effort(conn, project, rid, keys[0], keys[1])
         out.append(
             (rid, status, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
     return out

@@ -21,6 +21,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
+from quodeq.services.ports import evidence_file_size
 from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 
@@ -74,7 +75,7 @@ def score_dimension_from_evidence(
         _logger.debug("Evidence path escapes run dir for %s/%s", run_dir.name, dim_id)
         return None
     jsonl = Path(candidate)
-    if not jsonl.is_file() or jsonl.stat().st_size == 0:
+    if evidence_file_size(jsonl) == 0:
         return None
     compiled_dir, evaluators_dir = (standard_dirs_fn or standard_dirs)()
     try:

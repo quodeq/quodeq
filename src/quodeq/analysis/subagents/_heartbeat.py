@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.analysis.subagents.file_queue import FileQueue
-from quodeq.analysis.subagents.jsonl_utils import FindingTally, tally_unique_findings
 from quodeq.core.evidence._req_mapping import PrincipleResolver
+from quodeq.data.fs.evidence_tally import FindingTally, tally_unique_findings
 from quodeq.shared.logging import log_info, log_warning
 
 _HEARTBEAT_INTERVAL = 10

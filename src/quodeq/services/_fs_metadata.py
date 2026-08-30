@@ -215,7 +215,7 @@ def _read_accumulated_summary(
         params = grade_formula.load_params()
 
     from quodeq.services.score_cache import (  # noqa: PLC0415
-        cached_project_summary, open_score_cache, read_cached_project_summary,
+        cached_project_summary, read_project_summary_cached,
     )
     from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
     version, visible_set = _summary_version(reports_root, entry_name, runs, params)
@@ -235,12 +235,7 @@ def _read_accumulated_summary(
     # consulted below rather than assumed empty forever.
     if not runs:
         return None, None, None, False
-    import sqlite3  # noqa: PLC0415
-    try:
-        with open_score_cache() as conn:
-            hit = read_cached_project_summary(conn, entry_name, version)
-    except sqlite3.Error:
-        hit = None
+    hit = read_project_summary_cached(entry_name, version)
     if hit is not None:
         return hit["grade"], hit["score"], hit["files"], False
     return None, None, None, True

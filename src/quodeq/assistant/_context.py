@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import Callable
 
 from quodeq.assistant.skills import Skill
-from quodeq.config.assistant_env import assistant_context_path
+from quodeq.config.assistant_env import read_assistant_context
 
 
 # Fallback-mode local providers (llamacpp/omlx, non-tool ollama models) learn
@@ -55,8 +55,8 @@ problem and what context is missing."""
 
 def build_system_prompt(skill: Skill | None = None, web_enabled: bool = False,
                         write_enabled: bool = False,
-                        context_path: Path | None = None) -> str:
-    prompt = (context_path or assistant_context_path()).read_text(encoding="utf-8")
+                        read_context: Callable[[], str] | None = None) -> str:
+    prompt = (read_context or read_assistant_context)()
     prompt += _QUODEQ_TOOL_CONTEXT_SECTION
     if web_enabled:
         prompt += _WEB_ACCESS_SECTION

@@ -17,6 +17,8 @@ from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
 from quodeq.services.ports import (
     dimension_queue_file,
+    dimension_report_exists,
+    ensure_dir,
     list_dimension_evidence,
     queue_file_exists,
     read_dimensions,
@@ -69,7 +71,7 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     if evidence_entries is None:
         return
 
-    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(evaluation_dir)
     source_file_count = _read_project_source_file_count(reports_dir, project)
     params = load_params()
     # Same standard dirs as a completed run's scoring, so off-standard
@@ -80,8 +82,7 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     dim_states = read_dimensions(run_dir).get("dimensions", {})
 
     for dim_id, jsonl_path, evidence_size in evidence_entries:
-        eval_file = evaluation_dir / f"{dim_id}.json"
-        if eval_file.exists():
+        if dimension_report_exists(evaluation_dir, dim_id):
             continue  # already scored
         if dim_states.get(dim_id, {}).get("state") == "incomplete":
             _logger.info("Skipping scoring for incomplete dim %s", dim_id)

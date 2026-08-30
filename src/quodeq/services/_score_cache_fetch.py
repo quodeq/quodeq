@@ -12,8 +12,8 @@ from contextlib import contextmanager
 from typing import Callable, Iterator
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._score_cache_db import open_score_cache
-from quodeq.services._score_cache_store import (
+from quodeq.services.ports import (
+    open_score_cache,
     read_cached_accumulated,
     read_cached_project_summary,
     write_cached_accumulated,

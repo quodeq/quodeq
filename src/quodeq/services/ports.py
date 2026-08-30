@@ -37,11 +37,16 @@ from quodeq.data.fs.deleted_store import (  # noqa: F401
 
 # Run-directory readers and discard-time cleanup mechanics.
 from quodeq.data.fs.run_files import (  # noqa: F401
+    dimension_evidence_file,
     dimension_queue_file,
+    dimension_report_exists,
+    evidence_file_size,
     list_dimension_evidence,
     queue_file_exists,
     read_dispatched_cache_keys,
     read_queue_files_count,
+    read_queue_state,
+    read_run_status_json,
     remove_matching_files,
 )
 
@@ -54,7 +59,10 @@ from quodeq.data.fs.run_artifacts import (  # noqa: F401
 )
 
 # Agent stream files.
-from quodeq.data.fs.stream_files import count_active_agent_streams  # noqa: F401
+from quodeq.data.fs.stream_files import (  # noqa: F401
+    count_active_agent_streams,
+    latest_dim_activity_mtime,
+)
 
 # Legacy per-run evaluation/*.json finding details (SQL twin:
 # quodeq.data.sqlite.findings_queries.read_finding_details).
@@ -136,6 +144,32 @@ from quodeq.data.fs.dimensions_state_store import (  # noqa: F401
 # SQL grade tables + findings projection.
 from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: F401
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: F401
+
+# Score-cache store (connection + row-level reads/writes).
+from quodeq.data.sqlite.score_cache_db import (  # noqa: F401
+    CACHE_WRITER_EPOCH,
+    open_score_cache,
+    score_cache_path_override,
+)
+from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
+    load_run_keys,
+    load_run_keys_or_empty,
+    read_cached_accumulated,
+    read_cached_project_summary,
+    read_cached_rows,
+    read_project_summary_cached,
+    store_run_keys,
+    store_run_keys_best_effort,
+    write_cached_accumulated,
+    write_cached_project_summary,
+    write_cached_rows,
+)
+
+# Live evidence tally (heartbeat + scan-progress counters).
+from quodeq.data.fs.evidence_tally import FindingTally, tally_unique_findings  # noqa: F401
+
+# Local git repo statistics.
+from quodeq.data.fs.git_stats import count_commits_since  # noqa: F401
 
 
 class GradeTablesReader(Protocol):

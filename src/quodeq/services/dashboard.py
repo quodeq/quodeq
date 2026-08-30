@@ -48,12 +48,12 @@ from quodeq.services._dashboard_history import (  # noqa: F401
     _compute_dashboard_payload,
     _enrich_dimensions_with_trend,
     _max_history_runs,
+    _read_run_exit_reason,
 )
 from quodeq.services._dashboard_response import (  # noqa: F401
     _attach_dismissed_count_to_dim,
     _attach_exit_reason_to_dim,
     _build_dashboard_result,
-    _read_run_exit_reason,
     _slim_history_dim,
 )
 

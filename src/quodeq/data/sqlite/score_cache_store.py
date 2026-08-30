@@ -12,6 +12,7 @@ import logging
 import sqlite3
 
 from quodeq.core.types import DimensionResult
+from quodeq.data.sqlite.score_cache_db import open_score_cache
 
 _logger = logging.getLogger(__name__)
 
@@ -178,3 +179,33 @@ def load_run_keys(
         except (ValueError, TypeError):
             continue
     return out
+
+
+def load_run_keys_or_empty(
+    conn: sqlite3.Connection, project: str,
+) -> dict[str, tuple[set[tuple], set[tuple]]]:
+    """Same as :func:`load_run_keys` (already empty-on-error); named for the
+    best-effort call sites in ``services.score_cache.per_run_versions``."""
+    return load_run_keys(conn, project)
+
+
+def store_run_keys_best_effort(
+    conn: sqlite3.Connection, project: str, run_id: str,
+    dismiss_keys: set[tuple], class_keys: set[tuple],
+) -> None:
+    """Same as :func:`store_run_keys` (already best-effort); named for the
+    call sites in ``services.score_cache.per_run_versions``."""
+    store_run_keys(conn, project, run_id, dismiss_keys, class_keys)
+
+
+def read_project_summary_cached(project: str, version: str) -> dict | None:
+    """Leak-free wrapper: open the cache, read one project-summary row, close.
+
+    Returns None on any sqlite3 error (corrupt/locked db) as well as a clean
+    miss, matching every other read in this module's None-on-miss contract.
+    """
+    try:
+        with open_score_cache() as conn:
+            return read_cached_project_summary(conn, project, version)
+    except sqlite3.Error:
+        return None
