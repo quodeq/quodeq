@@ -13,7 +13,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
 
-from tests._evidence_helpers import _fake_run_analysis  # noqa: F401 — shared helper
+from tests._analysis_helpers import _fake_run_analysis  # noqa: F401 — shared helper
 
 # See test_adaptive_scaling_integration.py for the Windows skip rationale.
 pytestmark = pytest.mark.skipif(

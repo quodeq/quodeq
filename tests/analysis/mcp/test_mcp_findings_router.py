@@ -13,7 +13,7 @@ from quodeq.analysis.mcp.args import parse_args
 from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.analysis.mcp.findings_server import CompiledContext
 
-from tests._evidence_helpers import _make_request, _run_server
+from tests._analysis_helpers import _make_request, _run_server
 
 
 def _run_server_with_queue(

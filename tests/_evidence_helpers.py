@@ -1,17 +1,15 @@
-"""Shared evidence/MCP test helpers (formerly tests/engine/conftest.py)."""
+"""Shared evidence test helpers (formerly tests/engine/conftest.py).
+
+Pure module: only json + quodeq.core.evidence.model. Analysis-layer helpers
+(_fake_run_analysis, _run_server) live in tests/_analysis_helpers.py so that
+tests/core consumers of _evidence_line/make_evidence_with_confidence stay
+decoupled from the analysis layer and its framework dependencies.
+"""
 from __future__ import annotations
 
 import json
-import sys
-from io import StringIO
-from unittest.mock import patch
 
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
-
-# The analysis-layer imports (findings_server, FileQueue) are deferred into
-# the two helpers that need them so that tests/core consumers of
-# _evidence_line/make_evidence_with_confidence stay decoupled from the
-# analysis layer and its framework dependencies.
 
 _TEST_PRINCIPLE = "ts-001"
 _TEST_DIMENSION = "security"
@@ -20,45 +18,12 @@ _TEST_SNIPPET = "eval(x)"
 _TEST_REASON = "injection"
 
 
-def _fake_run_analysis(work_dir, prompt, stream_file, config):
-    """Mock run_analysis that writes some findings and drains the queue."""
-    from quodeq.analysis.subagents.file_queue import FileQueue  # noqa: PLC0415
-
-    stream_file.parent.mkdir(parents=True, exist_ok=True)
-    stream_file.write_text("")
-    if config.queue_path:
-        queue = FileQueue(config.queue_path)
-        queue.take(queue.remaining(), agent_id=config.agent_id)
-    if config.jsonl_file:
-        agent_id = config.agent_id or "unknown"
-        with open(config.jsonl_file, "a") as f:
-            f.write(json.dumps({
-                "schema_version": 1,
-                "p": "Modularity", "t": "violation", "d": "maintainability",
-                "w": f"Found by {agent_id}", "file": f"{agent_id}.py", "line": 1,
-            }) + "\n")
-
-
 def _make_request(method: str, req_id: int = 1, params: dict | None = None) -> str:
     """Build a JSON-RPC request string."""
     msg: dict = {"jsonrpc": "2.0", "method": method, "id": req_id}
     if params is not None:
         msg["params"] = params
     return json.dumps(msg)
-
-
-def _run_server(input_lines: list[str], findings_file: str) -> list[dict]:
-    """Feed *input_lines* to the MCP server and return parsed response dicts."""
-    from quodeq.analysis.mcp import findings_server as mcp_findings  # noqa: PLC0415
-
-    stdin_text = "\n".join(input_lines) + "\n"
-    stdout_buf = StringIO()
-    with patch.object(sys, "stdin", StringIO(stdin_text)), \
-         patch.object(sys, "stdout", stdout_buf), \
-         patch.object(sys, "argv", ["mcp_findings.py", findings_file]):
-        mcp_findings.main()
-    output = stdout_buf.getvalue().strip()
-    return [json.loads(line) for line in output.splitlines() if line.strip()]
 
 
 def _evidence_line(**overrides) -> str:
