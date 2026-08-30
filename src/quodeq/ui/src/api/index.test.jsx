@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { registerProject, getOmlxModels } from './index.js';
+import { registerProject, getOmlxModels, getLlamacppLogAvailable } from './index.js';
 
 beforeEach(() => {
   global.fetch = vi.fn();
@@ -91,6 +91,20 @@ describe('registerProject', () => {
     timeoutErr.name = 'TimeoutError';
     global.fetch.mockRejectedValue(timeoutErr);
     await expect(registerProject({ repo: '/tmp/repo' })).rejects.toThrow(/timed out/i);
+  });
+});
+
+describe('getLlamacppLogAvailable', () => {
+  // Finding #588: the llama.cpp log-availability probe must go through
+  // request() (30s timeout via AbortSignal), never a raw, unguarded fetch()
+  // — a component-level test can't tell the difference once the call is
+  // hidden behind useApi(), so this pins it at the wrapper itself.
+  it('goes through request() — hits the right path and carries an abort signal', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ available: true }) });
+    await getLlamacppLogAvailable();
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toContain('/llamacpp/logs/available');
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
   });
 });
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S, notifyProviderSettingsChanged } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
+import { useMigrateLegacySettings } from '../hooks/useMigrateLegacySettings.js';
 import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import LlamaCppTab from './LlamaCppTab.jsx';
@@ -12,7 +13,7 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
-import { readString, removeKey, writeString } from '../../../adapters/storage.js';
+import { readString, writeString } from '../../../adapters/storage.js';
 
 const PROVIDER_HINT = (
   <>
@@ -55,17 +56,6 @@ export function defaultsForProvider(classification, providerId) {
   return { ...CLOUD_FALLBACK_DEFAULTS, ...(CLOUD_DEFAULTS_BY_ID[providerId] || {}) };
 }
 
-const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
-const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
-const LEGACY_SETTING_MIGRATIONS = {
-  'cc-max-subagents': 'subagents',
-  // Legacy global key — migrate to provider-scoped 'time-limit' suffix.
-  'cc-pool-budget': 'time-limit',
-  'cc-time-limit': 'time-limit',
-  'cc-per-dimension': 'per-dimension',
-  'cc-ai-model': 'model',
-};
-
 function TabContent({ provider, providerConfig }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
   const defaults = defaultsForProvider(classification, provider.id);
@@ -84,22 +74,6 @@ function TabContent({ provider, providerConfig }) {
     return <CliProviderTab providerId={provider.id} state={state} update={update} />;
   }
   return <CloudProviderTab providerId={provider.id} providerConfig={providerConfig} state={state} update={update} />;
-}
-
-function useMigrateLegacySettings(clients) {
-  useEffect(() => {
-    if (clients.length === 0) return;
-    if (readString(MIGRATION_DONE_KEY)) return;
-    const targetId = readString(LEGACY_AI_CMD_KEY) || clients[0].id;
-    for (const [oldKey, newSuffix] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
-      const oldVal = readString(oldKey);
-      if (oldVal !== null) {
-        writeString(`cc-${targetId}-${newSuffix}`, oldVal);
-        removeKey(oldKey);
-      }
-    }
-    writeString(MIGRATION_DONE_KEY, '1');
-  }, [clients]);
 }
 
 export default function ProviderTabs({ providerConfigs }) {

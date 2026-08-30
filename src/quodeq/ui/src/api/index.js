@@ -28,6 +28,7 @@ export {
   sharedListDismissedFindings, sharedListVerifiedFindings,
   publishProject, pullSharedProject,
 } from './shared.js';
+export { listTerminalSessions, createTerminalSession, killTerminalSession } from './terminal.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 
@@ -321,6 +322,11 @@ export function testOllamaConcurrency(model) {
 /** @returns {Promise<Object>} llama.cpp connection status */
 export function getLlamacppStatus() {
   return request('/llamacpp/status');
+}
+
+/** @returns {Promise<Object>} Whether a llama.cpp log file is configured on the server */
+export function getLlamacppLogAvailable() {
+  return request('/llamacpp/logs/available');
 }
 
 /** @returns {Promise<Object[]>} Loaded llama.cpp model (0 or 1 entries) */

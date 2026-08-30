@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { registerProject, listStandards, getProjectInfo, getProjectScan } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
-import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
+import { saveDraft, clearDraft, markWelcomeSkipped } from '../hooks/useWizardDraft.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import WelcomeStep from './steps/WelcomeStep.jsx';
 import RepoScanStep from './steps/RepoScanStep.jsx';
@@ -11,7 +11,6 @@ import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
 
 const STEP_ORDER = ['welcome', 'repo-scan', 'provider', 'standard-launch'];
-const SKIPPED_STEPS_KEY = 'quodeq_onboarding_skipped';
 
 function visibleSteps(_currentStep, _isFirstProject, providerConfigured) {
   // Welcome is excluded from numeric counter.
@@ -68,7 +67,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   const currentIndex = visible.indexOf(wizard.state.step) + 1;
 
   function handleSkipWelcome() {
-    try { localStorage.setItem(SKIPPED_STEPS_KEY, 'true'); } catch { /* ignore */ }
+    markWelcomeSkipped();
     clearDraft();
     onClose({ saved: false });
   }

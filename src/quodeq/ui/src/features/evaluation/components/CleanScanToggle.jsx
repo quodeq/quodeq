@@ -4,21 +4,13 @@ import { readString, removeKey, writeString } from '../../../adapters/storage.js
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
-function readPermanent() {
-  try {
-    return readString(STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
+function readPermanent(storage) {
+  return readString(STORAGE_KEY, null, storage) === '1';
 }
 
-function writePermanent(on) {
-  try {
-    if (on) localStorage.setItem(STORAGE_KEY, '1');
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore quota / disabled storage */
-  }
+function writePermanent(on, storage) {
+  if (on) writeString(STORAGE_KEY, '1', storage);
+  else removeKey(STORAGE_KEY, storage);
 }
 
 /**

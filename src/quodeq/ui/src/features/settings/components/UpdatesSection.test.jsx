@@ -1,12 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-
-vi.mock('../../../api/index.js', () => ({
-  getUpdateStatus: vi.fn(),
-  checkForUpdates: vi.fn(),
-  setUpdateAutoCheck: vi.fn(() => Promise.resolve({ ok: true })),
-}));
-import { getUpdateStatus, checkForUpdates, setUpdateAutoCheck } from '../../../api/index.js';
+import { ApiProvider } from '../../../api/ApiContext.jsx';
 import UpdatesSection from './UpdatesSection.jsx';
 
 const UP_TO_DATE = {
@@ -17,30 +11,45 @@ const UP_TO_DATE = {
 const AVAILABLE = { ...UP_TO_DATE, latest: '1.5.0', update_available: true,
   latest_url: 'https://github.com/quodeq/quodeq/releases/tag/v1.5.0' };
 
+const fakeApi = {
+  getUpdateStatus: vi.fn(),
+  checkForUpdates: vi.fn(),
+  setUpdateAutoCheck: vi.fn(() => Promise.resolve({ ok: true })),
+};
+
+function renderWithApi() {
+  return render(
+    <ApiProvider value={fakeApi}>
+      <UpdatesSection />
+    </ApiProvider>,
+  );
+}
+
 beforeEach(() => {
-  getUpdateStatus.mockResolvedValue(UP_TO_DATE);
-  checkForUpdates.mockResolvedValue(AVAILABLE);
+  fakeApi.getUpdateStatus.mockReset().mockResolvedValue(UP_TO_DATE);
+  fakeApi.checkForUpdates.mockReset().mockResolvedValue(AVAILABLE);
+  fakeApi.setUpdateAutoCheck.mockReset().mockResolvedValue({ ok: true });
 });
 afterEach(() => { vi.clearAllMocks(); delete window.pywebview; });
 
 describe('UpdatesSection', () => {
   it('shows the current version and up-to-date state', async () => {
-    render(<UpdatesSection />);
+    renderWithApi();
     await waitFor(() => expect(screen.getByText(/1\.4\.0/)).toBeInTheDocument());
   });
 
   it('"Check now" calls the API and surfaces the new version', async () => {
-    render(<UpdatesSection />);
-    await waitFor(() => expect(getUpdateStatus).toHaveBeenCalled());
+    renderWithApi();
+    await waitFor(() => expect(fakeApi.getUpdateStatus).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: /check/i }));
-    await waitFor(() => expect(checkForUpdates).toHaveBeenCalled());
+    await waitFor(() => expect(fakeApi.checkForUpdates).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText(/1\.5\.0/)).toBeInTheDocument());
   });
 
   it('toggling auto-check calls setUpdateAutoCheck', async () => {
-    render(<UpdatesSection />);
-    await waitFor(() => expect(getUpdateStatus).toHaveBeenCalled());
+    renderWithApi();
+    await waitFor(() => expect(fakeApi.getUpdateStatus).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: /off/i }));
-    await waitFor(() => expect(setUpdateAutoCheck).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(fakeApi.setUpdateAutoCheck).toHaveBeenCalledWith(false));
   });
 });

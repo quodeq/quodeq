@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveProviderSettings, effectiveProviderDefaults } from './effectiveProviderSettings.js';
+import {
+  resolveProviderSettings, effectiveProviderDefaults,
+  readActiveProviderSelection, readActiveProviderModel,
+} from './effectiveProviderSettings.js';
 
 const storage = (entries) => ({ getItem: (key) => (key in entries ? entries[key] : null) });
 
@@ -54,4 +57,32 @@ test('corrupt numeric values fall back to defaults instead of NaN', () => {
 test('legacy pool-budget key is honored when time-limit is unset', () => {
   const s = storage({ 'cc-claude-pool-budget': '1200' });
   assert.equal(resolveProviderSettings('claude', s).timeLimitS, 1200);
+});
+
+test('readActiveProviderSelection returns null when unset', () => {
+  assert.equal(readActiveProviderSelection(storage({})), null);
+});
+
+test('readActiveProviderSelection returns the stored provider id', () => {
+  const s = storage({ 'cc-active-provider': 'claude' });
+  assert.equal(readActiveProviderSelection(s), 'claude');
+});
+
+test('readActiveProviderSelection collapses an explicit empty string to null', () => {
+  const s = storage({ 'cc-active-provider': '' });
+  assert.equal(readActiveProviderSelection(s), null);
+});
+
+test('readActiveProviderModel returns null with no provider id', () => {
+  assert.equal(readActiveProviderModel(null, storage({})), null);
+  assert.equal(readActiveProviderModel('', storage({})), null);
+});
+
+test('readActiveProviderModel returns the stored model for the provider', () => {
+  const s = storage({ 'cc-claude-model': 'sonnet' });
+  assert.equal(readActiveProviderModel('claude', s), 'sonnet');
+});
+
+test('readActiveProviderModel returns null when unset', () => {
+  assert.equal(readActiveProviderModel('claude', storage({})), null);
 });

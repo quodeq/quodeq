@@ -27,30 +27,10 @@ import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
   buildDimensionView, buildDuelView, sortRows, consequenceOf, consequenceLevel,
 } from '../compareModel.js';
+import { readStoredScope, storeScope } from '../compareScopeStorage.js';
 import CompareFleetView from './CompareFleetView.jsx';
 import CompareDimensionView from './CompareDimensionView.jsx';
 import CompareDuelView from './CompareDuelView.jsx';
-
-const SCOPE_STORAGE_KEY = 'quodeq.compare.scope';
-
-function readStoredScope() {
-  try {
-    const raw = localStorage.getItem(SCOPE_STORAGE_KEY);
-    const ids = raw ? JSON.parse(raw) : null;
-    return Array.isArray(ids) ? ids : null;
-  } catch {
-    return null;
-  }
-}
-
-function storeScope(ids) {
-  try {
-    if (ids == null) localStorage.removeItem(SCOPE_STORAGE_KEY);
-    else localStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify(ids));
-  } catch {
-    /* storage unavailable — scope just won't persist */
-  }
-}
 
 export default function ComparePage({
   projects, projectsLoaded, onOpenProject,

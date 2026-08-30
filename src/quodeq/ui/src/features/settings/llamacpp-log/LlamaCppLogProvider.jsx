@@ -3,7 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
 import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 import { useLlamaCppLogStream } from './useLlamaCppLogStream.js';
-import { request } from '../../../api/request.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 
 const WINDOW_ID = 'llamacpp-log';
@@ -25,6 +25,7 @@ function buildSpec(logs, status) {
 }
 
 export function LlamaCppLogProvider({ children }) {
+  const { getLlamacppLogAvailable } = useApi();
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState(false);
   const { logs, status } = useLlamaCppLogStream(open);
@@ -35,7 +36,7 @@ export function LlamaCppLogProvider({ children }) {
   // session since the env var is set at server-launch time.
   useEffect(() => {
     let cancelled = false;
-    request('/llamacpp/logs/available')
+    getLlamacppLogAvailable()
       .then((data) => {
         if (!cancelled) setAvailable(Boolean(data?.available));
       })
@@ -43,7 +44,7 @@ export function LlamaCppLogProvider({ children }) {
         if (!cancelled) setAvailable(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [getLlamacppLogAvailable]);
 
   const spec = useMemo(() => (open ? buildSpec(logs, status) : null), [open, logs, status]);
 
