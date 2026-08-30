@@ -35,6 +35,7 @@ from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
 from quodeq.services.project_registration import register_project_with_rollback
 from quodeq.services.tooling_mixin import FsToolingMixin
+from quodeq.shared.log_sink import SHARED_LOG
 
 
 class FilesystemActionProvider(ActionProvider):
@@ -64,6 +65,7 @@ class FilesystemActionProvider(ActionProvider):
             self._jobs = JobManager(
                 reports_root=reports_root,
                 on_job_complete=PostRunHook(reports_root=reports_root),
+                log=SHARED_LOG,
             )
 
         self._projects = ProjectsCache()

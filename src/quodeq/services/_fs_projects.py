@@ -12,6 +12,7 @@ from typing import Any
 
 from quodeq.core.types import ProjectEntry
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_project_helpers import (
     _auto_detect_parents,
@@ -222,7 +223,9 @@ def get_project_info(reports_dir: str, project: str) -> dict[str, Any] | None:
         return None
 
     discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
-    available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
+    available_dimensions = (
+        _list_available_dimensions_for_discipline(log=SHARED_LOG) if discipline else []
+    )
     has_fingerprints = _has_fingerprints(Path(reports_dir), project)
     path_missing = (
         info.get("location") == "online"

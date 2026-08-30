@@ -24,6 +24,7 @@ from quodeq.core.types import ScoringResult
 from quodeq.services.ports import evidence_file_size
 from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 _logger = logging.getLogger(__name__)
 
@@ -84,7 +85,9 @@ def score_dimension_from_evidence(
             source_file_count=source_file_count, files_read=files_read,
         ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
-            cwe_url_template=cwe_url_template())
+            cwe_url_template=cwe_url_template(),
+            on_quarantine=log_quarantined_findings,
+            on_malformed_line=log_malformed_jsonl_line)
     except (OSError, ValueError, KeyError) as exc:
         _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None

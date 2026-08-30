@@ -18,6 +18,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.analysis.subagents.pool import SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
 from quodeq.analysis._runner_markers import cleanup_stream
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
 @dataclass
@@ -55,5 +56,7 @@ def _collect_evidence(
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
         cwe_url_template=cwe_url_template(),
+        on_quarantine=log_quarantined_findings,
+        on_malformed_line=log_malformed_jsonl_line,
     )
     return ev

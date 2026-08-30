@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -12,7 +11,9 @@ from quodeq.core.events.models import Judgment
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
 
-_logger = logging.getLogger(__name__)
+# A malformed-line message is handed to this sink instead of logged directly,
+# so core never imports a logging framework -- see quodeq.core.observability.
+MalformedLineSink = Callable[[str], None]
 
 
 def _jsonl_confidence(value: object, default: int = 100) -> int:
@@ -37,7 +38,9 @@ def _coerce_scope_downgrade(raw: object) -> dict[str, str] | None:
     return raw
 
 
-def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
+def parse_jsonl_line(
+    line: str, *, on_malformed_line: MalformedLineSink | None = None,
+) -> tuple[Judgment, list[str] | None] | None:
     """Parse a single JSONL evidence line into a Judgment and optional LLM ref selection."""
     line = line.strip()
     if not line:
@@ -45,10 +48,12 @@ def parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
     try:
         obj = json.loads(line)
     except json.JSONDecodeError as exc:
-        _logger.warning("Skipping malformed JSONL line: %s", exc)
+        if on_malformed_line is not None:
+            on_malformed_line(f"Skipping malformed JSONL line: {exc}")
         return None
     if not isinstance(obj, dict):
-        _logger.warning("Skipping non-object JSONL line")
+        if on_malformed_line is not None:
+            on_malformed_line("Skipping non-object JSONL line")
         return None
 
     practice_id = obj.get("p") or obj.get("req")
@@ -125,12 +130,13 @@ def judgment_to_dict(j: Judgment) -> dict:
 def parse_judgments(
     lines: Iterable[str], compiled_dir: Path | None,
     cwe_url_template: str | None = None,
+    *, on_malformed_line: MalformedLineSink | None = None,
 ) -> list[Judgment]:
     """Parse JSONL lines and return enriched Judgment objects."""
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
     for line in lines:
-        result = parse_jsonl_line(line)
+        result = parse_jsonl_line(line, on_malformed_line=on_malformed_line)
         if result is not None:
             j, llm_refs = result
             j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache,
@@ -143,10 +149,12 @@ def read_judgments(
     jsonl_file: Path, compiled_dir: Path | None,
     open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
     cwe_url_template: str | None = None,
+    *, on_malformed_line: MalformedLineSink | None = None,
 ) -> list[Judgment]:
     """Read JSONL lines from a file and return enriched Judgment objects."""
     if not jsonl_file.exists():
         return []
     opener = open_fn or open_text
     with opener(jsonl_file) as _jf:
-        return parse_judgments(_jf, compiled_dir, cwe_url_template=cwe_url_template)
+        return parse_judgments(_jf, compiled_dir, cwe_url_template=cwe_url_template,
+                                on_malformed_line=on_malformed_line)

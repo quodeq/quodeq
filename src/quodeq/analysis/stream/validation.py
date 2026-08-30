@@ -4,14 +4,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-# NOTE: logging in inner layer — tracked for middleware extraction
-from quodeq.shared.logging import log_debug
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.utils import open_text
 
 _MCP_SERVER_NAME = "findings"
 
 
-def get_mcp_status(stream_file: Path) -> str | None:
+def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
     """Return MCP server status from the stream init event, or None if unavailable."""
     if not stream_file.exists() or stream_file.stat().st_size == 0:
         return None
@@ -29,16 +28,18 @@ def get_mcp_status(stream_file: Path) -> str | None:
                 if srv.get("name") == _MCP_SERVER_NAME:
                     return srv.get("status")
     except (json.JSONDecodeError, OSError) as exc:
-        log_debug(f"Failed to read MCP status from {stream_file}: {exc}")
+        log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None
 
 
-def _is_error_event(line: str, stream_file: Path) -> bool | None:
+def _is_error_event(
+    line: str, stream_file: Path, *, log: LogSink = NULL_LOG,
+) -> bool | None:
     """Check if a stream line is an error event. Returns True/False or None to skip."""
     try:
         d = json.loads(line.strip())
     except json.JSONDecodeError as exc:
-        log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
+        log.debug(f"Skipping malformed stream line in {stream_file}: {exc}")
         return None
     if not isinstance(d, dict):
         return False  # a valid-JSON non-object line is not an error event
@@ -47,16 +48,16 @@ def _is_error_event(line: str, stream_file: Path) -> bool | None:
     return False
 
 
-def is_stream_valid(stream_file: Path) -> bool:
+def is_stream_valid(stream_file: Path, *, log: LogSink = NULL_LOG) -> bool:
     """Return True if stream exists, is non-empty, and has no error events."""
     if not stream_file.exists() or stream_file.stat().st_size == 0:
         return False
     try:
         with open_text(stream_file) as f:
             for line in f:
-                if _is_error_event(line, stream_file) is True:
+                if _is_error_event(line, stream_file, log=log) is True:
                     return False
     except OSError as exc:
-        log_debug(f"Cannot read stream file {stream_file}: {exc}")
+        log.debug(f"Cannot read stream file {stream_file}: {exc}")
         return False
     return True

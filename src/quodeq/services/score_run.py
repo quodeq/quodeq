@@ -15,6 +15,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 from quodeq.services.ports import (
     dimension_queue_file,
     dimension_report_exists,
@@ -100,7 +101,9 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
                 source_file_count=source_file_count, files_read=files_read,
             ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
                 req_map_reader=read_req_to_principle_map,
-                cwe_url_template=cwe_url_template())
+                cwe_url_template=cwe_url_template(),
+                on_quarantine=log_quarantined_findings,
+                on_malformed_line=log_malformed_jsonl_line)
             if evidence is None:
                 continue
             scores = score_evidence(evidence, mode="numerical", params=params)

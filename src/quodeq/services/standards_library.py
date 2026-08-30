@@ -2,7 +2,6 @@
 from __future__ import annotations
 import hashlib
 import json
-import logging
 import ssl
 import urllib.request
 from pathlib import Path
@@ -11,9 +10,6 @@ from typing import Any, Protocol
 from quodeq.data.fs.standards_store import (
     read_standard_payload, resolve_jailed_standard_path, write_standard_payload,
 )
-
-# NOTE: logging in inner layer — tracked for middleware extraction
-logger = logging.getLogger(__name__)
 
 _HTTP_TIMEOUT_S = 30
 _HASH_PREFIX_LEN = 16

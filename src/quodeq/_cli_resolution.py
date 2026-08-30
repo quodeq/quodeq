@@ -24,6 +24,7 @@ from quodeq.analysis.manifest_models import AnalysisTarget
 # keep their historical `from quodeq._cli_resolution import ...` path.
 from quodeq.analysis.manifest_scope import _filter_manifest_by_scope  # noqa: F401
 from quodeq.analysis.runner import load_universal_dimensions
+from quodeq.shared.log_sink import SHARED_LOG
 
 import logging
 
@@ -284,7 +285,7 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     manifest = _build_manifest(args, src, paths, scope_path=scope_path)
 
     if scope_path and manifest:
-        manifest = _filter_manifest_by_scope(manifest, scope_path)
+        manifest = _filter_manifest_by_scope(manifest, scope_path, log=SHARED_LOG)
         if manifest is None:
             return None
 

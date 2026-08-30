@@ -12,9 +12,9 @@ import time
 import uuid
 from typing import Any, Callable, Iterable
 
-import logging
 import subprocess
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import JobSnapshot
 
 from quodeq.analysis._process import _kill_tree, _terminate_process
@@ -44,8 +44,6 @@ __all__ = [
     "JobManager",
 ]
 
-# NOTE: logging in inner layer — tracked for middleware extraction
-_logger = logging.getLogger(__name__)
 _REPORT_PATH_MARKER = "Report path:"
 _EXIT_CODE_SPAWN_FAILURE = -1
 _EXIT_CODE_TIMEOUT = -9
@@ -93,6 +91,7 @@ class JobManager:
         on_job_complete: Callable[[str, Job], None] | None = None,
         reports_root: Path | None = None,
         job_timeout_cap_s: float | None = None,
+        *, log: LogSink = NULL_LOG,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
@@ -100,6 +99,7 @@ class JobManager:
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
+        self._log = log
         # Injection seam for the hard job-duration cap; None means "fall back
         # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
         self._job_timeout_cap_s_override = job_timeout_cap_s
@@ -144,7 +144,7 @@ class JobManager:
                 start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            _logger.error("Failed to start job subprocess: %s", exc)
+            self._log.error(f"Failed to start job subprocess: {exc}")
             job.status = STATUS_FAILED
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.exit_code = _EXIT_CODE_SPAWN_FAILURE
@@ -351,7 +351,7 @@ class JobManager:
                     if not stripped.startswith(_CC_MARKER_PREFIX):
                         self._tee_run_log(job_id, stripped)
             except (IOError, BrokenPipeError) as exc:
-                _logger.warning("Stream read error for job %s: %s", job_id, exc)
+                self._log.warning(f"Stream read error for job {job_id}: {exc}")
             if batch:
                 self._flush_batch(job_id, batch)
             # Final drain: if the report_path marker arrived in the last batch,
@@ -491,7 +491,7 @@ class JobManager:
             except subprocess.TimeoutExpired:
                 if self._watchdog_should_kill(job_id, started_at):
                     elapsed = int(time.time() - started_at)
-                    _logger.warning("Job %s watchdog killing after %ds", job_id, elapsed)
+                    self._log.warning(f"Job {job_id} watchdog killing after {elapsed}s")
                     # Kill the whole process GROUP (TERM -> grace -> KILL), not
                     # just the parent PID. The subprocess is spawned
                     # start_new_session=True, so a bare process.kill() would
@@ -532,4 +532,4 @@ class JobManager:
             try:
                 self._on_job_complete(job_id, job)
             except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
-                _logger.error("on_job_complete callback failed for %s: %s", job_id, exc)
+                self._log.error(f"on_job_complete callback failed for {job_id}: {exc}")

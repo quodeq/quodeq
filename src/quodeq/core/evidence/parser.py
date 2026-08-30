@@ -6,12 +6,13 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
+from quodeq.core.evidence._jsonl import (
+    MalformedLineSink, judgment_to_dict, parse_jsonl_line, read_judgments)
 from quodeq.core.evidence._refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import Judgment
 from quodeq.core.evidence._req_mapping import (
-    ReqMapReader, _GroupedJudgments, _group_judgments)
+    QuarantineSink, ReqMapReader, _GroupedJudgments, _group_judgments)
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 # Re-export for backward compatibility (external code imports these from parser)
@@ -72,6 +73,8 @@ def parse_jsonl_to_evidence_by_dimension(
     *, req_map_reader: ReqMapReader | None = None,
     cwe_url_template: str | None = None,
     open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
+    on_quarantine: QuarantineSink | None = None,
+    on_malformed_line: MalformedLineSink | None = None,
 ) -> dict[str, Evidence]:
     """Parse a multi-dimension JSONL file into per-dimension Evidence objects.
 
@@ -85,7 +88,7 @@ def parse_jsonl_to_evidence_by_dimension(
     with opener(jsonl_file) as jf:
         req_refs_cache: dict[str, dict[str, list[dict]]] = {}
         for line in jf:
-            result = parse_jsonl_line(line)
+            result = parse_jsonl_line(line, on_malformed_line=on_malformed_line)
             if result is not None:
                 j, llm_refs = result
                 j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache,
@@ -94,14 +97,18 @@ def parse_jsonl_to_evidence_by_dimension(
     if not by_dim:
         return {}
     result: dict[str, Evidence] = {}
+    all_quarantined = []
     for dim, dj in by_dim.items():
         grouped = _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir,
                                    compiled_dir=compiled_dir,
                                    req_map_reader=req_map_reader)
+        all_quarantined.extend(grouped.quarantined_findings)
         result[dim] = _build_evidence(
             context, _build_principles(grouped, dim, context.source_file_count),
             grouped.quarantined,
         )
+    if on_quarantine is not None and all_quarantined:
+        on_quarantine(all_quarantined)
     return result
 
 
@@ -110,6 +117,8 @@ def parse_jsonl_to_evidence(
     compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
     *, req_map_reader: ReqMapReader | None = None,
     cwe_url_template: str | None = None,
+    on_quarantine: QuarantineSink | None = None,
+    on_malformed_line: MalformedLineSink | None = None,
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     # NOTE: read_judgments materializes all judgments into a list.  This is
@@ -117,11 +126,14 @@ def parse_jsonl_to_evidence(
     # indexes judgments[0] for the dimension name.  For streaming scenarios use
     # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, compiled_dir,
-                               cwe_url_template=cwe_url_template)
+                               cwe_url_template=cwe_url_template,
+                               on_malformed_line=on_malformed_line)
     dim = judgments[0].dimension if judgments else ""
     grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir,
                                compiled_dir=compiled_dir,
                                req_map_reader=req_map_reader)
+    if on_quarantine is not None and grouped.quarantined_findings:
+        on_quarantine(grouped.quarantined_findings)
     return _build_evidence(
         context, _build_principles(grouped, dim, context.source_file_count),
         grouped.quarantined,

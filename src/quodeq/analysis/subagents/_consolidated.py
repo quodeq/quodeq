@@ -20,6 +20,7 @@ from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _c
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis._runner_markers import cleanup_stream
 from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,8 @@ def _collect_consolidated_results(
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
         cwe_url_template=cwe_url_template(),
+        on_quarantine=log_quarantined_findings,
+        on_malformed_line=log_malformed_jsonl_line,
     )
 
 

@@ -32,6 +32,7 @@ from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.services.grade_formula import load_params
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.logging import log_error, log_info, log_warning
+from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo
 from quodeq.analysis._runner_markers import emit_marker
@@ -215,7 +216,9 @@ def _count_excluded_findings(
             source_file_count=0, files_read=0,
         ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
-            cwe_url_template=cwe_url_template())
+            cwe_url_template=cwe_url_template(),
+            on_quarantine=log_quarantined_findings,
+            on_malformed_line=log_malformed_jsonl_line)
     except (OSError, ValueError, KeyError):
         return 0
     if evidence is None:

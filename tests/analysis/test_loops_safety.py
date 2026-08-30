@@ -160,14 +160,14 @@ class TestPerDimLoopSafety:
         assert "security" not in result
         assert "reliability" in result
 
-    def test_diagnostic_log_lines_are_emitted(self):
+    def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()
-        with patch("quodeq.analysis._loops.log_info") as mock_log:
-            run_per_dimension_loop(
-                cfg, ["a", "b"], _ctx(2),
-                runner=_runner_from(lambda *a: _FakeEvidence()),
-            )
-        messages = [c.args[0] for c in mock_log.call_args_list]
+        run_per_dimension_loop(
+            cfg, ["a", "b"], _ctx(2),
+            runner=_runner_from(lambda *a: _FakeEvidence()),
+            log=recording_log,
+        )
+        messages = recording_log.info_messages
         # Loop start banner
         assert any("per-dimension: 2 dim(s) to process: a, b" in m for m in messages)
         # Per-iteration entry + completion
@@ -237,15 +237,15 @@ class TestIncrementalLoopSafety:
         assert seen == ["security", "reliability", "maintainability"]
         assert set(result) == {"security", "maintainability"}
 
-    def test_diagnostic_log_lines_are_emitted(self):
+    def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()
-        with patch("quodeq.analysis._loops._log_dimension_result"), \
-             patch("quodeq.analysis._loops.log_info") as mock_log:
+        with patch("quodeq.analysis._loops._log_dimension_result"):
             run_incremental_loop(
                 cfg, ["security", "flexibility"], _ctx(2),
                 runner=_runner_from(lambda *a: _FakeEvidence()),
+                log=recording_log,
             )
-        messages = [c.args[0] for c in mock_log.call_args_list]
+        messages = recording_log.info_messages
         assert any("incremental: 2 dim(s) to process: security, flexibility" in m for m in messages)
         assert any("entering iteration 1/2 for security" in m for m in messages)
         assert any("completed iteration 1/2 for security" in m for m in messages)
@@ -293,19 +293,19 @@ class TestCallbackRetryPersistsSideEffects:
         # Both files written — the bug was that security's write was lost.
         assert written == ["security", "reliability"]
 
-    def test_per_dim_retry_failure_logs_not_persisted_warning(self):
+    def test_per_dim_retry_failure_logs_not_persisted_warning(self, recording_log):
         cfg = _config()
 
         def always_raises(_dim, _ev):
             raise BrokenPipeError("permanently broken")
 
-        with patch("quodeq.analysis._loops.log_warning") as mock_warn:
-            run_per_dimension_loop(
-                cfg, ["security"], _ctx(1),
-                runner=_runner_from(lambda *a: _FakeEvidence()),
-                on_dimension_done=always_raises,
-            )
-        warn_messages = [c.args[0] for c in mock_warn.call_args_list]
+        run_per_dimension_loop(
+            cfg, ["security"], _ctx(1),
+            runner=_runner_from(lambda *a: _FakeEvidence()),
+            on_dimension_done=always_raises,
+            log=recording_log,
+        )
+        warn_messages = recording_log.warning_messages
         assert any("retry after broken pipe raised" in m for m in warn_messages), warn_messages
         assert any("NOT persisted" in m for m in warn_messages), warn_messages
 

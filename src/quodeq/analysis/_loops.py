@@ -16,8 +16,7 @@ from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_res
 from quodeq.analysis.errors import EvaluationError, FatalProviderError
 from quodeq.core.evidence.model import Evidence
 from quodeq.analysis._runner_markers import emit_marker
-# NOTE: logging in inner layer - tracked for middleware extraction
-from quodeq.shared.logging import log_info, log_warning
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
 
@@ -25,6 +24,7 @@ from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, Ill
 def _safe_write_dim_state(
     run_dir: Path | None, dim: str, state: DimState, *,
     reason: str | None = None, exit_reason: str | None = None,
+    log: LogSink = NULL_LOG,
 ) -> None:
     """Best-effort dim-state write. Never raises into the loop.
 
@@ -43,9 +43,9 @@ def _safe_write_dim_state(
     try:
         write_dim_state(run_dir, dim, state, reason=reason, exit_reason=exit_reason)
     except IllegalDimTransitionError as exc:
-        log_warning(f"[loop] dim-state transition rejected: {exc}")
+        log.warning(f"[loop] dim-state transition rejected: {exc}")
     except (OSError, AttributeError, TypeError) as exc:
-        log_warning(f"[loop] dim-state write failed for {dim}: {exc}")
+        log.warning(f"[loop] dim-state write failed for {dim}: {exc}")
 
 
 def _run_dir_for(config: RunConfig) -> Path | None:
@@ -119,7 +119,7 @@ def _count_ok_files(run_dir: Path | None) -> int:
     return total
 
 
-def _raise_on_fatal_cancel(run_dir: Path | None) -> None:
+def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> None:
     """Fail the run loudly when a dead provider stopped it before ANY analysis.
 
     Two outcomes, keyed on whether this run already analysed files
@@ -141,7 +141,7 @@ def _raise_on_fatal_cancel(run_dir: Path | None) -> None:
         return
     ok_files = _count_ok_files(run_dir)
     if ok_files > 0:
-        log_warning(
+        log.warning(
             f"[loop] provider failed mid-run after {ok_files} file(s) were "
             f"analysed -- keeping partial results, run finalizes as done "
             f"with a stopped-early warning"
@@ -293,6 +293,7 @@ def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
     *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
+    log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
 
@@ -308,20 +309,20 @@ def run_incremental_loop(
             ``emit_log=True`` so the runner emits its own analyzing marker.
     """
     result: dict[str, Evidence] = {}
-    log_info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
+    log.info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
-        log_info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
+        log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
         deadline = getattr(config.options, "deadline_at", None)
         if deadline is not None and time.monotonic() >= deadline:
-            log_info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
+            log.info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
             break
         if cancellation.is_cancelled():
-            log_info(f"[loop] cancellation requested -- skipping {dimension} and remaining dims")
+            log.info(f"[loop] cancellation requested -- skipping {dimension} and remaining dims")
             break
         run_dir = _run_dir_for(config)
-        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
+        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=log)
         emit_marker("analyzing", dimension=dimension)
-        log_info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
+        log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
         ev: Evidence | None = None
         last_exc: BaseException | None = None
         try:
@@ -336,13 +337,13 @@ def run_incremental_loop(
                 # The run is being torn down (signal, breaker, fatal provider
                 # error): a full-scan fallback would only spawn agents that
                 # die immediately against the same dead provider.
-                log_warning(
+                log.warning(
                     f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}; "
                     f"run cancelled, skipping full-scan fallback",
                 )
                 ev = None
             else:
-                log_warning(f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}, falling back to full")
+                log.warning(f"[{idx}/{ctx.total}] {dimension} - incremental failed: {exc}, falling back to full")
                 fallback_options = copy(config.options)
                 fallback_options.incremental_file_filter = None
                 fallback_config = replace(config, options=fallback_options)
@@ -361,7 +362,7 @@ def run_incremental_loop(
             # it as failed without saying which dim. Log + swallow + continue
             # so subsequent dims still run; the surfaced log line gives us
             # the trail we need next time this happens.
-            log_warning(
+            log.warning(
                 f"[loop] {dimension} - unexpected exception "
                 f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
             )
@@ -373,7 +374,7 @@ def run_incremental_loop(
         if ev:
             _safe_write_dim_state(
                 run_dir, dimension, DimState.DONE,
-                exit_reason=ev.exit_reason,
+                exit_reason=ev.exit_reason, log=log,
             )
             try:
                 _log_dimension_result(ev, dimension, idx, ctx.total)
@@ -392,34 +393,34 @@ def run_incremental_loop(
                 if on_dimension_done:
                     try:
                         on_dimension_done(dimension, ev)
-                        log_warning(
+                        log.warning(
                             f"[loop] {dimension} - callback broken pipe, "
                             f"retried after silencing stdout, result persisted",
                         )
                     except Exception as exc:  # noqa: BLE001
-                        log_warning(
+                        log.warning(
                             f"[loop] {dimension} - callback retry after broken pipe raised "
                             f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
                         )
                 else:
-                    log_warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
+                    log.warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
             except Exception as exc:  # noqa: BLE001
-                log_warning(
+                log.warning(
                     f"[loop] {dimension} - callback raised "
                     f"{type(exc).__name__}: {exc} - result kept, continuing loop",
                 )
                 result.setdefault(dimension, ev)
         else:
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(last_exc))
-        log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
-    log_info(
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(last_exc), log=log)
+        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
+    log.info(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'})",
     )
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
     report_run_drop_stats()
-    _raise_on_fatal_cancel(_run_dir_for(config))
+    _raise_on_fatal_cancel(_run_dir_for(config), log=log)
     check_zero_findings(
         result, config.source_file_count,
         incremental_filter_active=config.options.incremental_file_filter is not None
@@ -433,6 +434,7 @@ def run_per_dimension_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
     *, runner: DimensionRunner,
     on_dimension_done: Callable[[str, Evidence], None] | None = None,
+    log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension).
 
@@ -446,55 +448,55 @@ def run_per_dimension_loop(
     """
     result: dict[str, Evidence] = {}
     skipped_count = 0
-    log_info(f"[loop] per-dimension: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
+    log.info(f"[loop] per-dimension: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
-        log_info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
+        log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
         deadline = getattr(config.options, "deadline_at", None)
         if deadline is not None and time.monotonic() >= deadline:
-            log_info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
+            log.info(f"[loop] deadline reached -- skipping {dimension} and remaining dims")
             # Remaining dims stay in PENDING (they were never RUNNING). No write needed.
             break
         if cancellation.is_cancelled():
-            log_info(f"[loop] cancellation requested -- skipping {dimension} and remaining dims")
+            log.info(f"[loop] cancellation requested -- skipping {dimension} and remaining dims")
             # Remaining dims stay in PENDING. No write needed.
             break
         run_dir = _run_dir_for(config)
-        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
+        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=log)
         ev: Evidence | None = None
         try:
             ev = runner.run(config, dimension, idx, ctx, emit_log=True)
         except BrokenPipeError as exc:
             _silence_broken_stdout()
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc))
-            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: broken pipe)")
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc), log=log)
+            log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: broken pipe)")
             continue
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} - failed: {exc}")
+            log.warning(f"[{idx}/{ctx.total}] {dimension} - failed: {exc}")
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc))
-            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {type(exc).__name__})")
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc), log=log)
+            log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {type(exc).__name__})")
             continue
         except Exception as exc:  # noqa: BLE001
             # Don't let an exotic exception class drop the rest of the loop
             # silently. Log + count as skipped + continue so we get the trail.
-            log_warning(
+            log.warning(
                 f"[loop] {dimension} - unexpected exception "
                 f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
             )
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc))
-            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: unexpected)")
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(exc), log=log)
+            log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: unexpected)")
             continue
         if ev is None:
             skipped_count += 1
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason())
-            log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
+            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(), log=log)
+            log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
             continue
         # ev is set - dim succeeded analytically.
         _safe_write_dim_state(
             run_dir, dimension, DimState.DONE,
-            exit_reason=ev.exit_reason,
+            exit_reason=ev.exit_reason, log=log,
         )
         try:
             result[dimension] = ev
@@ -509,31 +511,31 @@ def run_per_dimension_loop(
             if on_dimension_done:
                 try:
                     on_dimension_done(dimension, ev)
-                    log_warning(
+                    log.warning(
                         f"[loop] {dimension} - callback broken pipe, "
                         f"retried after silencing stdout, result persisted",
                     )
                 except Exception as exc:  # noqa: BLE001
-                    log_warning(
+                    log.warning(
                         f"[loop] {dimension} - callback retry after broken pipe raised "
                         f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
                     )
             else:
-                log_warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
+                log.warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
         except Exception as exc:  # noqa: BLE001
-            log_warning(
+            log.warning(
                 f"[loop] {dimension} - callback raised "
                 f"{type(exc).__name__}: {exc} - result kept, continuing loop",
             )
-        log_info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev=set)")
-    log_info(
+        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev=set)")
+    log.info(
         f"[loop] per-dimension finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'}, {skipped_count} skipped)",
     )
     # Before the guards: the drop-ratio summary must land even when a
     # guard raises (a high drop ratio and a worthless run often co-occur).
     report_run_drop_stats()
-    _raise_on_fatal_cancel(_run_dir_for(config))
+    _raise_on_fatal_cancel(_run_dir_for(config), log=log)
     check_zero_findings(
         result, config.source_file_count, skipped_count,
         incremental_filter_active=config.options.incremental_file_filter is not None

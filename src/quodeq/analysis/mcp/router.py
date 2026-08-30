@@ -18,6 +18,7 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
+from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
@@ -101,7 +102,7 @@ class FindingsRouter:
         on_file_done: "Callable[[str, list[dict]], None] | None" = None,
     ):
         self._fh = output_fh
-        self._enricher = FindingEnricher(context or CompiledContext(), file_reader)
+        self._enricher = FindingEnricher(context or CompiledContext(), file_reader, log=SHARED_LOG)
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self._event_log: EventLogWriter | None = event_log
         self._on_file_done: "Callable[[str, list[dict]], None] | None" = on_file_done

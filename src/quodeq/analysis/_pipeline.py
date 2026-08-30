@@ -24,6 +24,7 @@ from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.utils import get_ai_cmd
 
 _LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
@@ -77,7 +78,7 @@ def _run_dry_run(
         # Dim states must move to DONE here just like the real loops: the
         # lifecycle flips anything still pending at exit to INCOMPLETE and
         # stamps the run exit_reason=incomplete_dimensions.
-        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING)
+        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=SHARED_LOG)
         log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
         emit_marker("analyzing", dimension=dimension)
         ev = Evidence(
@@ -96,7 +97,7 @@ def _run_dry_run(
             jsonl_path.touch()
         emit_marker("scoring", dimension=dimension)
         result[dimension] = ev
-        _safe_write_dim_state(run_dir, dimension, DimState.DONE)
+        _safe_write_dim_state(run_dir, dimension, DimState.DONE, log=SHARED_LOG)
         if on_dimension_done:
             on_dimension_done(dimension, ev)
     return result
@@ -110,7 +111,7 @@ def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> None:
     if not config.work_dir:
         return  # dev mode (no run_dir) — nothing for the dashboard to read
     try:
-        estimates = compute_dim_estimates(config, dimensions)
+        estimates = compute_dim_estimates(config, dimensions, log=SHARED_LOG)
     except (OSError, ValueError, KeyError, RuntimeError):
         return
     write_dim_estimates(config.work_dir.parent, estimates)
@@ -164,6 +165,7 @@ def _run_dimensions(
             config, dimensions, ctx,
             runner=runner,
             on_dimension_done=on_dimension_done,
+            log=SHARED_LOG,
         )
 
     if config.options.incremental:
@@ -176,6 +178,7 @@ def _run_dimensions(
             config, dimensions, ctx,
             runner=runner,
             on_dimension_done=on_dimension_done,
+            log=SHARED_LOG,
         )
 
     # Clean-scan path: full re-analysis, no carry-forward. Reached only
@@ -207,6 +210,7 @@ def _run_dimensions(
         config, dimensions, ctx,
         runner=runner,
         on_dimension_done=on_dimension_done,
+        log=SHARED_LOG,
     )
 
 

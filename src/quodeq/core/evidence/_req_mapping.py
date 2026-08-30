@@ -1,14 +1,11 @@
 """Requirement-to-principle mapping helpers for evidence grouping."""
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.events.models import Judgment
-
-_logger = logging.getLogger(__name__)
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -22,6 +19,22 @@ def _sev_rank(sev: str) -> int:
     return _SEV_RANKS.get(sev, 1)
 
 
+@dataclass(frozen=True)
+class QuarantinedFinding:
+    """One finding dropped for naming a principle the standard does not
+    define -- the per-finding detail behind the ``quarantined`` counter,
+    handed to an ``on_quarantine`` sink instead of logged in core."""
+    dimension: str
+    practice_id: str | None
+    principle: str | None
+    req: str | None
+    file: str
+    severity: str
+
+
+QuarantineSink = Callable[[list[QuarantinedFinding]], None]
+
+
 @dataclass
 class _GroupedJudgments:
     violations: dict[str, list[Judgment]]
@@ -31,6 +44,10 @@ class _GroupedJudgments:
     # Reported as run metadata so a run that discarded most of its evidence is
     # distinguishable from a clean one; never re-joined to the findings lists.
     quarantined: int = 0
+    # Per-finding detail behind `quarantined`. Appended once per dropped
+    # judgment, in the same loop, with no dedup/set/filter -- so
+    # len(quarantined_findings) == quarantined always (see invariant test).
+    quarantined_findings: list[QuarantinedFinding] = field(default_factory=list)
 
 
 def _resolve_req_to_principle_map(
@@ -189,23 +206,27 @@ def _group_judgments(
     sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}
     quarantined = 0
+    quarantined_findings: list[QuarantinedFinding] = []
 
     for j in judgments:
         # When the dimension has a standard, a finding whose principle is not
         # one the standard defines is unmappable: quarantine it (keep it out of
-        # principle scoring) and log, so a misfiled finding -- a critical, in the
-        # worst case -- is never silently turned into a phantom principle (e.g.
-        # an "N/A" card on the dashboard). The live scan counters resolve through
-        # the same PrincipleResolver, so they exclude exactly these findings too.
+        # principle scoring) and record it, so a misfiled finding -- a critical,
+        # in the worst case -- is never silently turned into a phantom principle
+        # (e.g. an "N/A" card on the dashboard). Logging happens in the outer
+        # layer via the caller's `on_quarantine` sink; core only collects the
+        # data. The live scan counters resolve through the same
+        # PrincipleResolver, so they exclude exactly these findings too.
         principle = resolver.resolve(j.practice_id)
         if principle is None:
-            _logger.warning(
-                "Quarantining unmapped %s finding in dimension %r: principle %r "
-                "not in standard (practice_id=%r, req=%r, file=%s)",
-                j.severity or "?", dimension,
-                resolver.req_to_principle.get(j.practice_id, j.practice_id),
-                j.practice_id, j.req, j.file,
-            )
+            quarantined_findings.append(QuarantinedFinding(
+                dimension=dimension,
+                practice_id=j.practice_id,
+                principle=resolver.req_to_principle.get(j.practice_id, j.practice_id),
+                req=j.req,
+                file=j.file,
+                severity=j.severity or "?",
+            ))
             quarantined += 1
             continue
         if j.verdict == "violation":
@@ -216,4 +237,5 @@ def _group_judgments(
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
-    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined)
+    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined,
+                              quarantined_findings)
