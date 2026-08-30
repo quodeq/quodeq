@@ -2,10 +2,7 @@ import PrincipleForm from './PrincipleForm.jsx';
 import RequirementForm from './RequirementForm.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
-
-function slugify(text) {
-  return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
+import { applyNameChange } from '../../../models/standard.js';
 
 function EmptyState() {
   return (
@@ -18,9 +15,10 @@ function EmptyState() {
 function NameField({ standard, editable, isNew, onUpdateField }) {
   const handleNameChange = (e) => {
     const name = e.target.value;
-    onUpdateField(['name'], name);
-    if (isNew || !standard.id || standard.id === slugify(standard.name || '')) {
-      onUpdateField(['id'], slugify(name));
+    const updates = applyNameChange(standard, name, isNew);
+    onUpdateField(['name'], updates.name);
+    if ('id' in updates) {
+      onUpdateField(['id'], updates.id);
     }
   };
   return (

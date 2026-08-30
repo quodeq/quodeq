@@ -33,16 +33,18 @@ class MockEventSource {
   get onerror() { return this._onerror; }
   emit(name, event) {
     if (name === 'message' && this._onmessage) this._onmessage(event);
+    if (name === 'error' && this._onerror) this._onerror(event);
     (this.listeners[name] || []).forEach((fn) => fn(event));
   }
   close() { this.closed = true; }
 }
 
 function Probe({ jobId }) {
-  const { logs, status } = useJobLogStream(jobId);
+  const { logs, status, terminalState } = useJobLogStream(jobId);
   return (
     <div>
       <div data-testid="status">{status}</div>
+      <div data-testid="terminal-state">{terminalState ?? ''}</div>
       <div data-testid="logs">{logs.join('|')}</div>
     </div>
   );
@@ -83,6 +85,33 @@ describe('useJobLogStream', () => {
     act(() => { es.emit('done', {}); });
     expect(screen.getByTestId('status')).toHaveTextContent('done');
     expect(es.closed).toBe(true);
+  });
+
+  it('records the terminal state but does NOT append a rendered terminal line to logs[] -- that is EvalLogProvider.EvalLogPaneBody\'s job now', () => {
+    render(<Probe jobId="j1" />);
+    const es = MockEventSource.instances[0];
+    act(() => { es.emit('message', { data: 'building evidence' }); });
+    flushBatched();
+    act(() => { es.emit('done', { data: 'cancelled' }); });
+    expect(screen.getByTestId('terminal-state')).toHaveTextContent('cancelled');
+    // Only the real log line is in logs[] -- no "evaluation cancelled" banner
+    // text baked in by the hook.
+    expect(screen.getByTestId('logs')).toHaveTextContent('building evidence');
+    expect(screen.getByTestId('logs').textContent).not.toContain('cancelled');
+  });
+
+  it('a stray error event after done does not override status back to error (es.onerror guard)', () => {
+    render(<Probe jobId="j1" />);
+    const es = MockEventSource.instances[0];
+    act(() => { es.emit('done', {}); });
+    expect(screen.getByTestId('status')).toHaveTextContent('done');
+    // Some browsers dispatch a trailing error event when an EventSource is
+    // close()d mid-flight; readyState reads CLOSED at that point same as a
+    // real disconnect would, so the hook must distinguish "done, then
+    // closed" from "disconnected".
+    es.readyState = 2; // READYSTATE_CLOSED
+    act(() => { es.emit('error', {}); });
+    expect(screen.getByTestId('status')).toHaveTextContent('done');
   });
 
   it('caps the buffer at 5000 lines, dropping from the front', () => {

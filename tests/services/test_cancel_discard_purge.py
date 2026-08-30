@@ -257,9 +257,8 @@ class TestProviderDiscardPurgesRun:
         # the liveness check report the pid dead once "killed" — but leave
         # status.json untouched, exactly like a wedged process would.
         import quodeq.services._external_jobs as _ext_mod
-        import quodeq.data.sqlite._index_sync as _sync_mod
         original_kill_tree = _ext_mod._kill_tree
-        original_alive = _sync_mod._is_pid_alive
+        original_alive = _ext_mod.is_pid_alive
         pid_killed = False
 
         def fake_kill_tree(target_pid: int, sig: int = _signal.SIGTERM) -> None:
@@ -273,14 +272,14 @@ class TestProviderDiscardPurgesRun:
             return original_alive(query_pid)
 
         _ext_mod._kill_tree = fake_kill_tree
-        _sync_mod._is_pid_alive = fake_alive
+        _ext_mod.is_pid_alive = fake_alive
         try:
             ok = provider.cancel_evaluation(
                 "ext-wedged-run", reports_dir=str(reports), discard_partial=True,
             )
         finally:
             _ext_mod._kill_tree = original_kill_tree
-            _sync_mod._is_pid_alive = original_alive
+            _ext_mod.is_pid_alive = original_alive
 
         assert ok is True
         assert not run.exists(), (

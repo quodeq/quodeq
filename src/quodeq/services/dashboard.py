@@ -142,7 +142,7 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     in_progress and cancelled runs are skipped: the overview waits for a
     run to terminate cleanly before promoting it to the default
     landing-page view. The eligibility predicate is the shared
-    ``dim_resolution.is_eligible_for_default_view`` rule, used by both
+    ``scoring_view.is_eligible_for_default_view`` rule, used by both
     this call site and ``accumulated._compute_result``. Keeping them on
     the same predicate is what prevents the "headline says one thing,
     cards say another" inconsistency users hit when the two filters

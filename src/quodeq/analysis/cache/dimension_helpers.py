@@ -40,6 +40,7 @@ from quodeq.analysis.fingerprint import (
     _hash_standards,
     dimension_params_state,
 )
+from quodeq.config.paths import default_paths
 
 _logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ def _current_provenance(config: RunConfig, dimension: str) -> dict:
     return {
         "model_id": _model_id_from(config),
         "standards_hash": standards_hash,
-        "prompts_hash": _hash_prompts_combined(),
+        "prompts_hash": _hash_prompts_combined(default_paths().prompts_dir),
         "quodeq_version": quodeq_version(),
     }
 
@@ -144,14 +145,17 @@ def format_provenance_drift(drift: dict, *, reused: int) -> str:
     return ", ".join(parts)
 
 
-def _hash_prompts_combined() -> str:
+def _hash_prompts_combined(prompts_dir: Path | None) -> str:
     """Hash all rules-bearing prompts into a single SHA-256.
 
     The fingerprint module stores a per-file map for selective
     invalidation; here we collapse it to one string so the cache key
     stays simple. Any prompt change still invalidates correctly.
+
+    *prompts_dir* is required: callers resolve ``default_paths().prompts_dir``
+    (composition-root concern, not this module's).
     """
-    pmap = _hash_prompts_map() or {}
+    pmap = _hash_prompts_map(prompts_dir) or {}
     if not pmap:
         return ""
     h = hashlib.sha256()
@@ -316,7 +320,7 @@ def persist_dispatch_results(
     _, effective_params = dimension_params_state(
         config.standards_dir, dimension, config.src,
     )
-    prompts_hash = _hash_prompts_combined()
+    prompts_hash = _hash_prompts_combined(default_paths().prompts_dir)
     version = quodeq_version()
     for f in miss_files:
         if f not in ok_files:

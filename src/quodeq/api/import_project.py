@@ -29,9 +29,13 @@ from quodeq.api.zip import (
     _MANIFEST_SCHEMA,
     _max_zip_size_bytes,
 )
-from quodeq.data.fs._index_io import _load_index, _save_index
-from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
-from quodeq.data.fs._resolution import _index_key
+from quodeq.services.ports import (
+    ProjectIdentity,
+    ProjectRepository,
+    index_key,
+    load_index,
+    save_index,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -322,11 +326,11 @@ def _update_index(
     are used instead of the default filesystem helpers, keeping the storage
     layer injectable for testing or alternative backends.
     """
-    load_fn = repository.load_index if repository is not None else _load_index
-    save_fn = repository.save_index if repository is not None else _save_index
+    load_fn = repository.load_index if repository is not None else load_index
+    save_fn = repository.save_index if repository is not None else save_index
     try:
         index = load_fn(reports_root)
-        index[_index_key(identity)] = project_uuid
+        index[index_key(identity)] = project_uuid
         save_fn(reports_root, index)
     except OSError as exc:
         _logger.warning("import: could not update project_index.json: %s", exc)

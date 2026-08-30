@@ -3,9 +3,6 @@
 # Regenerate intentionally: python tools/check_imports.py --update-baseline
 src/quodeq/analysis/subprocess.py:283:llm_bridge
 src/quodeq/api/_evaluation_routes.py:21:analysis
-src/quodeq/api/import_project.py:32:data
-src/quodeq/api/import_project.py:33:data
-src/quodeq/api/import_project.py:34:data
 src/quodeq/api/llm_bridge_routes.py:6:llm_bridge
 src/quodeq/api/routes_project_list.py:238:analysis
 src/quodeq/ci/review.py:129:cli_parser

@@ -2,6 +2,14 @@
  * Encapsulates project-level actions (delete, export, relocate, import) that
  * were previously inlined inside App, keeping the root component focused
  * on composition rather than API plumbing.
+ *
+ * Failure handlers return `{ ok: false, messageKey, vars }` (the raw i18n
+ * key + interpolation vars, not a rendered string) so a caller can inspect
+ * or relocalize the failure; success returns `{ ok: true }`. Separately,
+ * *onError* (optional second-arg option) is invoked with the RENDERED
+ * message (`t(messageKey, vars)`) so a caller that just wants the old
+ * "tell the user" behavior doesn't have to render it itself -- defaults to
+ * `alert()`, preserving pre-refactor behavior when no seam is wired.
  */
 import { useApi } from '../api/ApiContext.jsx';
 import { chooseDialog } from '../utils/chooseDialog.js';
@@ -16,17 +24,30 @@ function sanitizeFilename(name) {
     .slice(0, 100) || 'project';
 }
 
-export function useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects }) {
+function defaultOnError(messageKey, vars) {
+  alert(t(messageKey, vars));
+}
+
+export function useProjectActions(
+  { projects, selectedProject, handleProjectChange, loadProjects },
+  { onError = defaultOnError } = {},
+) {
   const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
+
+  function fail(messageKey, vars) {
+    onError(messageKey, vars);
+    return { ok: false, messageKey, vars };
+  }
+
   async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);
     } catch (err) {
-      alert(t('projects.deleteProjectFailed', { error: err.message }));
-      return;
+      return fail('projects.deleteProjectFailed', { error: err.message });
     }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();
+    return { ok: true };
   }
 
   function handleExportProject(projectId) {
@@ -52,10 +73,10 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
       await relocateProject(projectId, newPath);
     } catch (err) {
       console.error('Relocate failed:', err);
-      alert(t('projects.relocateFailed', { error: err.message || t('common.unknownError') }));
-      return;
+      return fail('projects.relocateFailed', { error: err.message || t('common.unknownError') });
     }
     loadProjects();
+    return { ok: true };
   }
 
   async function _attemptImport(file, action) {
@@ -95,7 +116,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
   }
 
   async function handleImportProject() {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined') return { ok: false, cancelled: true };
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.zip,application/zip,application/x-zip-compressed';
@@ -107,18 +128,18 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
       input.click();
     });
     document.body.removeChild(input);
-    if (!file) return;
+    if (!file) return { ok: false, cancelled: true };
 
     let attempt = await _attemptImport(file);
     if (!attempt.ok && attempt.err.status === 409 && attempt.err.kind) {
       attempt = await _resolveImportConflict(file, attempt.err);
-      if (attempt === null) return; // user cancelled
+      if (attempt === null) return { ok: false, cancelled: true }; // user cancelled
     }
     if (!attempt.ok) {
-      alert(t('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') }));
-      return;
+      return fail('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') });
     }
     loadProjects();
+    return { ok: true };
   }
 
   return { handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject };

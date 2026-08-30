@@ -25,6 +25,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services.ports import (
     count_active_agent_streams,
     dimension_evidence_file,
+    file_mtime,
     latest_dim_activity_mtime,
     read_queue_state,
     read_run_status_json,
@@ -206,10 +207,10 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str, record: dict | None =
         if take_ts:
             start = min(take_ts)
         else:
-            try:
-                start = queue.stat().st_mtime
-            except OSError:
+            mtime = file_mtime(queue)
+            if mtime is None:
                 return None
+            start = mtime
     if state == "running":
         return max(0.0, time.time() - start)
     # done: latest activity signal still on disk

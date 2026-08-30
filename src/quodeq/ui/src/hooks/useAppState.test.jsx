@@ -6,6 +6,7 @@ import { useAppState, useOverviewReturnReconcile, TAB_OVERVIEW, KNOWN_TABS } fro
 import { useNavStack } from './useNavStack.js';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { ApiProvider } from '../api/ApiContext.jsx';
+import { SidePaneProvider } from '../features/side-pane/SidePaneProvider.jsx';
 import { projectKeys } from '../api/queryKeys.js';
 
 // useAppState composes useEvaluationLifecycle (-> useEvaluation) and
@@ -314,7 +315,9 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     const { result, rerender } = renderHook(() => useAppState(), {
       wrapper: ({ children }) => (
         <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          <ApiProvider value={fakeApi}>
+            <SidePaneProvider>{children}</SidePaneProvider>
+          </ApiProvider>
         </QueryClientProvider>
       ),
     });
@@ -344,7 +347,9 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     const { result, rerender } = renderHook(() => useAppState(), {
       wrapper: ({ children }) => (
         <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          <ApiProvider value={fakeApi}>
+            <SidePaneProvider>{children}</SidePaneProvider>
+          </ApiProvider>
         </QueryClientProvider>
       ),
     });
@@ -395,7 +400,9 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     const { result, rerender } = renderHook(() => useAppState(), {
       wrapper: ({ children }) => (
         <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          <ApiProvider value={fakeApi}>
+            <SidePaneProvider>{children}</SidePaneProvider>
+          </ApiProvider>
         </QueryClientProvider>
       ),
     });
@@ -443,7 +450,9 @@ describe('useAppState projects-load re-arm on server reconnect', () => {
     const { result, rerender } = renderHook(() => useAppState(), {
       wrapper: ({ children }) => (
         <QueryClientProvider client={client}>
-          <ApiProvider value={fakeApi}>{children}</ApiProvider>
+          <ApiProvider value={fakeApi}>
+            <SidePaneProvider>{children}</SidePaneProvider>
+          </ApiProvider>
         </QueryClientProvider>
       ),
     });

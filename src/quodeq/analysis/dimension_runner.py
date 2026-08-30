@@ -10,6 +10,7 @@ emit_log behaviour) without calling real AI infrastructure.
 from __future__ import annotations
 
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 from quodeq.analysis.checks.runner import apply_checks_for_run
 from quodeq.analysis.subagents.runner import DimensionCallbacks
@@ -36,10 +37,19 @@ class DimensionRunner:
 
     Construct once per run (or per test) and call ``run()`` per dimension.
     Inject ``callbacks`` to replace the AI dispatch steps in tests.
+
+    ``cache`` is the composition root's shared cache backend for the whole
+    run; left ``None``, ``process_dimension_with_cache`` defaults to its own
+    ``LocalFileBackend()`` (and runs the once-per-process legacy-entry GC) --
+    see ``_pipeline.py`` for the production wiring.
     """
 
-    def __init__(self, callbacks: DimensionCallbacks | None = None) -> None:
+    def __init__(
+        self, callbacks: DimensionCallbacks | None = None,
+        cache: CacheBackend | None = None,
+    ) -> None:
         self._callbacks = callbacks or _default_callbacks()
+        self._cache = cache
 
     def run(
         self,
@@ -55,7 +65,9 @@ class DimensionRunner:
             emit_marker("analyzing", dimension=dim_id)
             log_info(f"→ [{idx}/{ctx.total}] Analyzing {dim_id}")
 
-        ev = process_dimension_with_cache(config, dim_id, idx, ctx, self._callbacks)
+        ev = process_dimension_with_cache(
+            config, dim_id, idx, ctx, self._callbacks, cache=self._cache,
+        )
 
         if ev is None:
             log_warning(f"[{idx}/{ctx.total}] {dim_id} — no valid evidence, skipping")

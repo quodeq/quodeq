@@ -11,6 +11,12 @@ from quodeq.core.types.req_ref import ReqRef
 
 T = TypeVar("T")
 
+# Judgment.verdict vocabulary. "dismissed" is NOT a valid Judgment verdict --
+# that's a derived view-only state on Finding (see Judgment's docstring).
+VERDICT_VIOLATION = "violation"
+VERDICT_COMPLIANCE = "compliance"
+VALID_VERDICTS = frozenset({VERDICT_VIOLATION, VERDICT_COMPLIANCE})
+
 
 class EventType(str, Enum):
     RUN_STARTED = "RUN_STARTED"
@@ -81,10 +87,21 @@ class Judgment:
     carried_forward: bool = False
 
     def is_violation(self) -> bool:
-        return self.verdict == "violation"
+        return self.verdict == VERDICT_VIOLATION
 
     def is_compliance(self) -> bool:
-        return self.verdict == "compliance"
+        return self.verdict == VERDICT_COMPLIANCE
+
+    def has_valid_verdict(self) -> bool:
+        """True when verdict is one of the known values.
+
+        Deliberately non-raising: ``wire_dict_to_judgment``
+        (``finding_mappings.py``) has a documented never-raises contract
+        (an empty/garbage verdict is normal for a malformed wire dict), and
+        a raising validator here would make historical ``events.jsonl``
+        entries with an unexpected verdict permanently unreplayable.
+        """
+        return self.verdict in VALID_VERDICTS
 
 
 # Deprecation alias -- remove in a follow-up PR once all callers migrate.

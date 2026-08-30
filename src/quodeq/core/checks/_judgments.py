@@ -6,7 +6,7 @@ all. Those are exactly the fields that decide how a finding scores.
 """
 from __future__ import annotations
 
-from quodeq.core.events.models import Judgment
+from quodeq.core.events.models import Judgment, VERDICT_COMPLIANCE, VERDICT_VIOLATION
 
 SEVERITY = "major"
 _CONFIDENCE = 100  # a static fact is not a guess
@@ -15,7 +15,7 @@ _CONFIDENCE = 100  # a static fact is not a guess
 def violation(*, req: str, dimension: str, file: str, line: int,
               title: str, reason: str) -> Judgment:
     return Judgment(
-        practice_id=req, req=req, verdict="violation", dimension=dimension,
+        practice_id=req, req=req, verdict=VERDICT_VIOLATION, dimension=dimension,
         file=file, line=line, title=title, reason=reason,
         severity=SEVERITY, confidence=_CONFIDENCE,
     )
@@ -32,7 +32,7 @@ def compliance(*, req: str, dimension: str, anchor: str,
     earned more than one.
     """
     return Judgment(
-        practice_id=req, req=req, verdict="compliance", dimension=dimension,
+        practice_id=req, req=req, verdict=VERDICT_COMPLIANCE, dimension=dimension,
         file=anchor, line=1, title=title, reason=reason,
         severity=SEVERITY, confidence=_CONFIDENCE,
     )

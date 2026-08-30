@@ -7,7 +7,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 
 from quodeq.core.evidence._refs import enrich_judgment
-from quodeq.core.events.models import Judgment
+from quodeq.core.events.models import Judgment, VALID_VERDICTS
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
 
@@ -58,7 +58,7 @@ def parse_jsonl_line(
 
     practice_id = obj.get("p") or obj.get("req")
     verdict = obj.get("t")
-    if not practice_id or verdict not in ("violation", "compliance"):
+    if not practice_id or verdict not in VALID_VERDICTS:
         return None
 
     pre_resolved = obj.get("req_refs")

@@ -183,7 +183,7 @@ def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     none is complete. This mirrors ``dashboard._resolve_selected_run("latest")``
     so ``isLatest`` matches what the Overview actually shows.
     """
-    from quodeq.services.dim_resolution import is_eligible_for_default_view  # noqa: PLC0415
+    from quodeq.services.scoring_view import is_eligible_for_default_view  # noqa: PLC0415
     from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
 
     reports_root = Path(evaluations_dir).resolve()

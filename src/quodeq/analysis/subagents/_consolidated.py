@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
@@ -34,7 +34,7 @@ class _ConsolidatedPaths:
 class _ConsolidatedRunContext:
     """Grouped context for consolidated result collection."""
     dimensions: list[str]
-    ctx: Any
+    ctx: _AnalysisContext
     results: list[Any]
     files: list[str]
     exit_reason: str | None = None
@@ -106,7 +106,7 @@ def _collect_consolidated_results(
     )
 
 
-def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
+def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext) -> str:
     """Build the consolidated prompt for multi-dimension analysis."""
     return build_consolidated_prompt(
         dimensions=dimensions,
@@ -128,7 +128,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
 
 
 def process_consolidated_dimensions(
-    config: "RunConfig", dimensions: list[str], ctx: Any,
+    config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None

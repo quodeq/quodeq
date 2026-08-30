@@ -41,6 +41,7 @@ from quodeq.data.fs.run_files import (  # noqa: F401
     dimension_queue_file,
     dimension_report_exists,
     evidence_file_size,
+    file_mtime,
     list_dimension_evidence,
     queue_file_exists,
     read_dispatched_cache_keys,
@@ -170,6 +171,18 @@ from quodeq.data.fs.evidence_tally import FindingTally, tally_unique_findings  #
 
 # Local git repo statistics.
 from quodeq.data.fs.git_stats import count_commits_since  # noqa: F401
+
+# Project-identity index (project_index.json): load/save + the identity key
+# a project resolves to. Re-exported here (rather than api/ reaching into
+# data.fs.project_index directly) so the api -> services -> data edge stays
+# visible in one place, matching this module's own convention above.
+from quodeq.data.fs.project_index import (  # noqa: F401
+    ProjectIdentity,
+    ProjectRepository,
+    index_key,
+    load_index,
+    save_index,
+)
 
 
 class GradeTablesReader(Protocol):

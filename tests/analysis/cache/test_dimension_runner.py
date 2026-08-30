@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -743,6 +744,105 @@ class TestWatcherJoinHasNoTimeoutCeiling:
             "breaker.stop_and_join's 5s timeout is independent of the "
             "watcher fix and must stay in place"
         )
+
+
+class _SlowPutCache:
+    """Wraps a real cache backend; ``put`` blocks on a release Event.
+
+    Lets a test hold the FINAL persist tick in flight while it asserts
+    that the watcher thread hasn't been abandoned yet, then release it
+    and confirm the entry lands anyway.
+    """
+
+    def __init__(self, inner: LocalFileBackend, started: threading.Event,
+                 release: threading.Event) -> None:
+        self._inner = inner
+        self._started = started
+        self._release = release
+
+    def get(self, key):
+        return self._inner.get(key)
+
+    def put(self, key, entry) -> None:
+        self._started.set()
+        # Safety net timeout so a broken test fails fast instead of hanging
+        # the suite; the test itself sets `release` well before this.
+        self._release.wait(timeout=5.0)
+        self._inner.put(key, entry)
+
+    def has(self, key) -> bool:
+        return self._inner.has(key)
+
+    def delete(self, key) -> None:
+        self._inner.delete(key)
+
+    def stats(self):
+        return self._inner.stats()
+
+
+class TestSlowFinalPersistIsNotAbandoned:
+    """Behavioural companion to TestWatcherJoinHasNoTimeoutCeiling's source
+    inspection: prove that ``watcher.join()``'s lack of a timeout actually
+    lets a slow final persist tick complete rather than merely asserting
+    the source text says so.
+
+    Dispatch here is fast (FakeDispatcher writes its ok marker immediately),
+    so ``stop_event`` is set well within the 60s periodic interval — the
+    watcher's periodic loop never ticks, and the only ``persist_fn()`` call
+    is the FINAL one after ``stop_event.set()``. Making that one call block
+    on an Event, released only after the main thread has confirmed it's in
+    flight, pins that ``process_dimension_with_cache`` doesn't return (and
+    doesn't drop the entry) until that final tick actually finishes.
+    """
+
+    def test_slow_final_persist_is_not_abandoned(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        config, src = _setup(tmp_path, {"a.py": "x"})
+        dispatcher = FakeDispatcher(src)
+
+        started = threading.Event()
+        release = threading.Event()
+        slow_cache = _SlowPutCache(cache, started, release)
+
+        result: dict = {}
+
+        def run() -> None:
+            result["evidence"] = process_dimension_with_cache(
+                config, "security", 1, _make_ctx(), _make_callbacks(),
+                cache=slow_cache, dispatcher=dispatcher, persist_interval_s=60.0,
+            )
+
+        runner_thread = threading.Thread(target=run)
+        runner_thread.start()
+        try:
+            assert started.wait(timeout=5.0), (
+                "the final persist tick never started -- watcher wiring broke"
+            )
+            # Bounded wait (not a bare sleep -- returns the instant the
+            # thread finishes) that gives process_dimension_with_cache every
+            # chance to return early if watcher.join() has any short-ish
+            # timeout ceiling. It must not: the persist is still blocked on
+            # `release`, so a correct join() call blocks right along with it.
+            runner_thread.join(timeout=1.0)
+            assert runner_thread.is_alive(), (
+                "process_dimension_with_cache returned before the slow "
+                "final persist completed -- watcher.join() must have no "
+                "timeout ceiling (the c88be50e regression)"
+            )
+        finally:
+            release.set()
+        runner_thread.join(timeout=5.0)
+        assert not runner_thread.is_alive(), "process_dimension_with_cache never returned"
+        assert result.get("evidence") is not None
+
+        key = build_cache_key_for_file(config, "a.py", "security")
+        entry = cache.get(key)
+        assert entry is not None, (
+            "the slow final persist tick must not be abandoned -- its "
+            "entry must land in the cache once released"
+        )
+        assert any(f.get("w") == "v-a.py" for f in entry.findings)
 
 
 class TestCachedFindingsReachEventLog:

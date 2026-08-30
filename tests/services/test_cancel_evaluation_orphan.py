@@ -152,9 +152,8 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
     # on POSIX, taskkill on Windows). Also simulate SIGTERM being honored so
     # the grace-period poll doesn't burn 30s.
     import quodeq.services._external_jobs as _ext_mod
-    import quodeq.data.sqlite._index_sync as _sync_mod
     original_kill_tree = _ext_mod._kill_tree
-    original_alive = _sync_mod._is_pid_alive
+    original_alive = _ext_mod.is_pid_alive
     sent_signals: list[tuple[int, int]] = []
     pid_killed = False
 
@@ -170,12 +169,12 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
         return original_alive(query_pid)
 
     _ext_mod._kill_tree = fake_kill_tree  # type: ignore[attr-defined]
-    _sync_mod._is_pid_alive = fake_alive  # type: ignore[attr-defined]
+    _ext_mod.is_pid_alive = fake_alive  # type: ignore[attr-defined]
     try:
         ok = provider.cancel_evaluation("ext-live-run", reports_dir=str(reports))
     finally:
         _ext_mod._kill_tree = original_kill_tree  # type: ignore[attr-defined]
-        _sync_mod._is_pid_alive = original_alive  # type: ignore[attr-defined]
+        _ext_mod.is_pid_alive = original_alive  # type: ignore[attr-defined]
 
     assert ok is True
     assert sent_signals, "tree-kill path must be taken when PID is alive"

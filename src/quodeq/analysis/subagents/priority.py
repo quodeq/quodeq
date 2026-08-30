@@ -71,7 +71,7 @@ def prioritize_files(
     max_prev_violations = priority_config.get("previous_violations_max", _DEFAULT_PREV_VIOLATIONS_MAX)
 
     # Batch computations (one pass each)
-    fan_in = compute_fan_in(files, src, language or "") if language else {}
+    fan_in = compute_fan_in(files, src, language or "", config=priority_config) if language else {}
     git_scores = compute_git_scores(files, src, config=priority_config)
     prev_violations = compute_previous_violations(config, evidence_dir, dimension) if evidence_dir and config else {}
 

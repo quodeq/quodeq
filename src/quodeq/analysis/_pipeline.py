@@ -14,6 +14,8 @@ from quodeq.analysis._loops import (
     run_per_dimension_loop,
 )
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
+from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
@@ -142,7 +144,17 @@ def _run_dimensions(
     # One runner per run. Per-run construction (vs. a module-level
     # singleton) makes test substitution and concurrency-safety obvious:
     # each evaluation owns its own DimensionCallbacks instance.
-    runner = DimensionRunner()
+    #
+    # Cache is constructed here (composition root) rather than left for
+    # process_dimension_with_cache to default lazily, so every dimension
+    # in this run shares one LocalFileBackend. The legacy-entry GC that
+    # used to ride along with the lazy default is called explicitly here
+    # instead -- it's still once-per-(root, schema)-per-process (see
+    # maybe_collect_legacy_entries's own memo), just triggered at runner
+    # construction instead of on the first cache-is-None dimension call.
+    cache = LocalFileBackend()
+    maybe_collect_legacy_entries(cache.root)
+    runner = DimensionRunner(cache=cache)
 
     # Set the run-level deadline once, just before the dim loop starts.
     # Skipped for dry runs (already returned above), unlimited budget, or

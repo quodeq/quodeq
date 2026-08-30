@@ -100,6 +100,14 @@ def evidence_file_size(path: Path) -> int:
         return 0
 
 
+def file_mtime(path: Path) -> float | None:
+    """Modification time of *path* (epoch seconds), or None if unreadable."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
 def dimension_report_exists(evaluation_dir: Path, dim_id: str) -> bool:
     """True when the dim's scored report file exists.
 

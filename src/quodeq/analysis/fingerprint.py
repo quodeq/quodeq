@@ -16,7 +16,6 @@ import json
 import threading
 from pathlib import Path
 
-from quodeq.config.paths import default_paths
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
     dimension_params,
@@ -246,7 +245,7 @@ _RULES_BEARING_PROMPTS: frozenset[str] = frozenset({"evaluation_rules.md"})
 
 
 def _hash_prompts_map(
-    prompts_dir: Path | None = None, *, cache: HashCache | None = None,
+    prompts_dir: Path | None, *, cache: HashCache | None = None,
 ) -> dict[str, str]:
     """Per-file SHA-256 of every *.md prompt under *prompts_dir*.
 
@@ -256,10 +255,11 @@ def _hash_prompts_map(
     module-wide instance production shares), so repeat calls inside one
     process re-walk the prompts directory (cheap) but don't re-read file
     bytes.
+
+    *prompts_dir* is required: callers resolve ``default_paths().prompts_dir``
+    themselves (composition-root concern, not this module's).
     """
     cache = cache or _hash_cache
-    if prompts_dir is None:
-        prompts_dir = default_paths().prompts_dir
     if prompts_dir is None or not prompts_dir.is_dir():
         return {}
     out: dict[str, str] = {}

@@ -97,6 +97,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     )
     from quodeq.analysis.cache.local import LocalFileBackend
     from quodeq.analysis.fingerprint import _hash_file
+    from quodeq.config.paths import default_paths
 
     src_root = tmp_path / "src"
     src_root.mkdir()
@@ -121,7 +122,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     prov = entry.provenance
     assert prov["model_id"] == "sonnet"
     assert prov["standards_hash"] == ""  # standards_dir=None
-    assert prov["prompts_hash"] == _hash_prompts_combined()
+    assert prov["prompts_hash"] == _hash_prompts_combined(default_paths().prompts_dir)
     assert prov["quodeq_version"] == (quodeq.__version__ or "")
 
 

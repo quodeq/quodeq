@@ -1,7 +1,7 @@
 """Accumulated-trend builder for the dashboard module."""
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable, TypedDict
 
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import ScoringParams
@@ -11,12 +11,45 @@ from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services.accumulated import numeric_average
 
 
+class DimensionDetail(TypedDict):
+    """One dimension's score/grade/delta within a single run's trend entry.
+
+    Shape only -- this IS the frozen HTTP body (``trend[].dimensionDetails``);
+    the TypedDict documents it without changing what gets built or returned.
+    """
+    dimension: str
+    score: float | None
+    grade: str | None
+    delta: float | None
+
+
+class TrendEntry(TypedDict):
+    """One run's accumulated-trend row, in the shape the dashboard HTTP
+    response and the UI's history chart consume.
+
+    Shape only -- this IS the frozen HTTP body (``trend``); the TypedDict
+    documents it without changing what gets built or returned.
+    """
+    runId: str
+    dateISO: str | None
+    dateLabel: str
+    status: str
+    dimensionsCount: int
+    dimensions: list[str]
+    dimensionDetails: list[DimensionDetail]
+    accumulatedDimensionsCount: int
+    runNumericAverage: float | None
+    runOverallGrade: str | None
+    numericAverage: float | None
+    overallGrade: str | None
+
+
 def _build_dimension_details(
     run_dims: list[DimensionResult],
     prev_by_dim: dict[str, DimensionResult],
-) -> list[dict[str, Any]]:
+) -> list[DimensionDetail]:
     """Build per-dimension detail dicts with score deltas for a single run."""
-    details = []
+    details: list[DimensionDetail] = []
     for dim in sorted(run_dims, key=lambda d: d.dimension or ""):
         if not dim.dimension:
             continue
@@ -37,7 +70,7 @@ def build_accumulated_trend(
     runs: list[RunInfo],
     get_run_dimensions: Callable[[str], list[DimensionResult]],
     params: ScoringParams | None = None,
-) -> list[dict[str, Any]]:
+) -> list[TrendEntry]:
     """Build trend using accumulated scores across all runs (oldest to newest).
 
     When *params* is None, the saved grade-formula params are loaded so the
@@ -46,7 +79,7 @@ def build_accumulated_trend(
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
-    trend: list[dict[str, Any]] = []
+    trend: list[TrendEntry] = []
     acc_by_dim: dict[str, DimensionResult] = {}
     prev_by_dim: dict[str, DimensionResult] = {}
     for item in reversed(runs):  # oldest -> newest
