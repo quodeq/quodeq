@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from quodeq.core.types import to_camel_dict
 from quodeq.data.mappers import (
     parse_dimension_result,
     parse_dimension_summary,
@@ -15,6 +14,7 @@ from quodeq.data.mappers import (
     parse_violation_response,
     parse_violation_summary,
 )
+from quodeq.shared.serialization import to_camel_dict
 
 from tests.data.test_types import (
     DIMENSION_RESULT,

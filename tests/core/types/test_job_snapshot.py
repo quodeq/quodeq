@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from quodeq.core.types.job import JobSnapshot
-from quodeq.core.types._serialization import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 
 
 def test_job_snapshot_serialises_provider_and_model():

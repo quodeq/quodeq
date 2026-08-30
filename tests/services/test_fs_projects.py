@@ -276,7 +276,7 @@ class TestGetProjectInfo:
 
 
 def test_project_entry_carries_origin_url(tmp_path):
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
 
     proj = tmp_path / "p1"
     run = proj / "run-1"
@@ -324,7 +324,7 @@ def test_latest_done_run_id_is_newest_done_run_not_newest_run(tmp_path: Path):
 
 
 def test_latest_done_run_id_absent_when_no_done_runs(tmp_path: Path):
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
 
     proj = tmp_path / "p2"
     proj.mkdir()

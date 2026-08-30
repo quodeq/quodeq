@@ -10,7 +10,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from quodeq.core.types import DimensionResult, to_camel_dict
+from quodeq.core.types import DimensionResult
+from quodeq.shared.serialization import to_camel_dict
 
 from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services._dashboard_history import _DashboardPayload

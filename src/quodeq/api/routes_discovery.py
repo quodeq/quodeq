@@ -6,7 +6,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.plugin_discovery import discover_plugins
 

@@ -20,7 +20,7 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.api.import_project import import_zip_stream
 from quodeq.api.zip import _build_project_zip
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit

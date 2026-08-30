@@ -50,20 +50,6 @@ class AnalysisTarget:
         """
         return render_target_prompt_context(self, repo_total_files, other_targets)
 
-    def to_dict(self) -> dict:
-        """Serialize for JSON debugging output."""
-        return {
-            "name": self.name,
-            "language": self.language,
-            "category": self.category,
-            "frameworks": self.frameworks,
-            "project_description": self.project_description,
-            "total_files": self.total_files,
-            "source_files_count": len(self.source_files),
-            "language_stats": self.language_stats,
-            "scope_path": self.scope_path,
-        }
-
 
 @dataclass
 class SourceManifest:
@@ -152,16 +138,3 @@ class SourceManifest:
             )
             lines.append(f"**Extension breakdown:** {breakdown}")
         return "\n".join(lines)
-
-    def to_dict(self) -> dict:
-        """Serialize for JSON debugging output."""
-        return {
-            "language": self.language,
-            "category": self.category,
-            "frameworks": self.frameworks,
-            "project_description": self.project_description,
-            "total_files": self.total_files,
-            "source_files_count": len(self.source_files),
-            "language_stats": self.language_stats,
-            "targets": [t.to_dict() for t in self.targets],
-        }

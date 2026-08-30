@@ -148,6 +148,6 @@ def test_settled_summaries_stamp_the_cache_again(tmp_path):
 
 
 def test_summary_pending_serializes_camelcase():
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
     entry = ProjectEntry(id="p", name="p", summary_pending=True)
     assert to_camel_dict(entry)["summaryPending"] is True

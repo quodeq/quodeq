@@ -15,8 +15,7 @@ SRC_ROOT = Path(__file__).resolve().parent.parent.parent / "src" / "quodeq"
 # Relative to src/quodeq. Every entry is a wire boundary that is NOT an HTTP
 # route, with the reason it serializes. Burn-down candidates are marked.
 DECLARED_WIRE_BOUNDARIES: dict[str, str] = {
-    "core/types/_serialization.py": "defines the serializer",
-    "core/types/__init__.py": "re-exports the serializer",
+    "shared/serialization.py": "defines the serializer",
     "assistant/tools/_read_tools.py": "assistant tool output is its own wire (LLM-facing)",
     "analysis/_report_scoring.py": "dimension report files on disk are camelCase (stored contract)",
     "data/fs/report_parser/_eval_parsing.py": "parses stored camelCase findings back out (stored contract)",

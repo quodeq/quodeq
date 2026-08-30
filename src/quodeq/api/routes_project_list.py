@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip

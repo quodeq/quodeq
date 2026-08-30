@@ -17,7 +17,7 @@ from quodeq.api._evaluation_helpers import (
     _validate_ai_cmd,
 )
 from quodeq.api.helpers import error_response, scan_target_error, validate_evaluation_payload
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation

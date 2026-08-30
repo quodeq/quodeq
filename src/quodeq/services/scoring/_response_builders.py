@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average

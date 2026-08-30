@@ -14,7 +14,7 @@ from quodeq.core.standards.visibility import (
     partition_entries_visible,
     partition_visible,
 )
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.data.ports.findings import FindingsRepository
 from quodeq.services import _fs_reports
 from quodeq.services.deleted import deleted_keys

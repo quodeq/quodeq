@@ -39,6 +39,7 @@ from quodeq.analysis._runner_markers import emit_marker
 from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
+from quodeq.analysis.manifest_serialization import manifest_to_dict
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
@@ -367,7 +368,7 @@ def _save_manifest(manifest, evidence_dir: Path) -> None:
     """Save manifest for debugging (best-effort)."""
     if manifest and evidence_dir:
         try:
-            write_text(evidence_dir / "manifest.json", json.dumps(manifest.to_dict(), indent=2))
+            write_text(evidence_dir / "manifest.json", json.dumps(manifest_to_dict(manifest), indent=2))
         except OSError as exc:
             _logger.debug("Could not write manifest: %s", exc)
 

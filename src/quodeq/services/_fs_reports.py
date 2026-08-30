@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.config.paths import default_paths
-from quodeq.core.types import ViolationResponse, ViolationSummary, to_camel_dict
+from quodeq.core.types import ViolationResponse, ViolationSummary
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
 from quodeq.services.violations import _ResolveOptions, aggregate_violations, resolve_dimension_eval

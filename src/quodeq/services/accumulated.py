@@ -9,7 +9,8 @@ from typing import Any
 
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
-from quodeq.core.types import DimensionResult, to_camel_dict
+from quodeq.core.types import DimensionResult
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs

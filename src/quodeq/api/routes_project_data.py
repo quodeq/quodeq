@@ -7,7 +7,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_path_segment
 

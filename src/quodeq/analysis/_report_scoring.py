@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import re
 
-from quodeq.core.types import ScoringResult, to_camel_dict
+from quodeq.core.types import ScoringResult
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.scoring.internals import score_to_grade_label
 
 
