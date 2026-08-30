@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types import ProjectEntry
-from quodeq.data.fs.children import find_children  # noqa: F401 — re-exported API
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_project_helpers import (
@@ -21,12 +20,14 @@ from quodeq.services._fs_project_helpers import (
     _max_projects_listed,
 )
 from quodeq.services.ports import (
+    find_children,
+    is_valid_repo_url,
+    list_runs,
     read_repository_info,
     repository_info_exists,
+    safe_read_dir,
     write_repository_info,
 )
-from quodeq.data.fs.report_parser.runs import list_runs, safe_read_dir
-from quodeq.data.fs.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)

@@ -20,7 +20,7 @@ from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._score_cache_epoch import CACHE_WRITER_EPOCH as _CACHE_WRITER_EPOCH
-from quodeq.data.fs.suppression_rules import load_suppression_rules
+from quodeq.services.ports import load_suppression_rules
 
 # ---------------------------------------------------------------------------
 # Decomposed submodules. Every moved name is re-exported here so external

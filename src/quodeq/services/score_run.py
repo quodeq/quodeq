@@ -19,6 +19,7 @@ from quodeq.services.ports import (
     dimension_queue_file,
     list_dimension_evidence,
     queue_file_exists,
+    read_dimensions,
     read_queue_files_count,
     read_scan_total_files,
 )
@@ -76,7 +77,6 @@ def score_completed_evidence(reports_dir: str, job: dict) -> None:
     from quodeq.services.evidence_rescore import standard_dirs  # noqa: PLC0415
     compiled_dir, evaluators_dir = standard_dirs()
 
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
     dim_states = read_dimensions(run_dir).get("dimensions", {})
 
     for dim_id, jsonl_path, evidence_size in evidence_entries:

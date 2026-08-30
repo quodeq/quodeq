@@ -103,10 +103,12 @@ class TestRescoreRunDimensionsValidatesPathSegments:
 
     def test_rejects_traversal_run_id(self, tmp_path, monkeypatch):
         # Force past the "no active suppressions" early return so the
-        # run_id join at :196 is actually reached.
+        # run_id join at :196 is actually reached. dashboard.py imports
+        # these two at module level (not deferred), so the patch target is
+        # dashboard's own name binding, not the origin modules.
         monkeypatch.setattr(
-            "quodeq.services.dismissed.dismissed_keys", lambda _pd: {("R1", "a.py", 1)})
-        monkeypatch.setattr("quodeq.services.deleted.deleted_keys", lambda _pd: set())
+            "quodeq.services.dashboard.dismissed_keys", lambda _pd: {("R1", "a.py", 1)})
+        monkeypatch.setattr("quodeq.services.dashboard.deleted_keys", lambda _pd: set())
         with pytest.raises(ValueError):
             _rescore_run_dimensions([], tmp_path, "proj", "../../etc/passwd", params=None)
 

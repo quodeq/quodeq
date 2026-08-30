@@ -22,7 +22,7 @@ _FAILURE_BACKOFF_S = 60.0
 
 def _enumerate_projects(reports_dir: str) -> list[tuple[str, str]]:
     """Return [(project_id, latest_date_iso)] for every project directory."""
-    from quodeq.data.fs.report_parser.runs import list_runs, safe_read_dir  # noqa: PLC0415
+    from quodeq.services.ports import list_runs, safe_read_dir  # noqa: PLC0415
 
     reports_root = Path(reports_dir)
     out: list[tuple[str, str]] = []
@@ -47,7 +47,7 @@ def _warm_project(reports_dir: str, project_id: str) -> None:
     Both go through the single-flight read-through helpers, so this is a
     version-check no-op on a warm cache and dedupes with on-demand requests.
     """
-    from quodeq.data.fs.children import find_children  # noqa: PLC0415
+    from quodeq.services.ports import find_children  # noqa: PLC0415
     from quodeq.services._fs_metadata import warm_project_summary  # noqa: PLC0415
     from quodeq.services.scoring import get_project_scores  # noqa: PLC0415
 

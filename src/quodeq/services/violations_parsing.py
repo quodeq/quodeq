@@ -140,7 +140,15 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
 
 
 # ---------------------------------------------------------------------------
-# Re-exports for backward compatibility (must stay at bottom to avoid circular imports)
+# Re-exports for backward compatibility (must stay at bottom to avoid circular
+# imports). ``_violations_jsonl`` and ``_violations_stream`` both import
+# helpers from THIS module's top half (``_build_violation_response`` etc.), so
+# importing them at the top of the file would run into a partially-initialized
+# ``violations_parsing`` module. Placing the import here, after those helpers
+# already exist in this module's namespace, breaks the cycle. Removable only
+# if ``_violations_jsonl``/``_violations_stream`` stop depending on this
+# module's helpers, or those helpers move to a leaf module both can import
+# from directly.
 # ---------------------------------------------------------------------------
 
 from quodeq.services._violations_jsonl import parse_violations_from_jsonl  # noqa: E402

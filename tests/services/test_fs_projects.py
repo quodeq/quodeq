@@ -9,13 +9,13 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from quodeq.services._fs_projects import (
-    find_children,
     _build_parent_child_sets,
     build_project_list,
     update_project_path,
     delete_project,
     get_project_info,
 )
+from quodeq.services.ports import find_children
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ class TestUpdateProjectPath:
         assert info["path"] == str(new_dir.resolve())
         assert info["location"] == "local"
 
-    @patch("quodeq.data.fs.repo_handler.is_valid_repo_url", return_value=True)
+    @patch("quodeq.services._fs_projects.is_valid_repo_url", return_value=True)
     def test_update_url_path(self, mock_valid, tmp_path: Path):
         reports_dir, project = self._setup_project(tmp_path)
         result = update_project_path(reports_dir, project, "https://github.com/org/repo.git")
@@ -154,7 +154,7 @@ class TestUpdateProjectPath:
         info = json.loads((Path(reports_dir) / project / "repository_info.json").read_text())
         assert info["location"] == "online"
 
-    @patch("quodeq.data.fs.repo_handler.is_valid_repo_url", return_value=False)
+    @patch("quodeq.services._fs_projects.is_valid_repo_url", return_value=False)
     def test_rejects_invalid_url(self, mock_valid, tmp_path: Path):
         reports_dir, project = self._setup_project(tmp_path)
         assert update_project_path(reports_dir, project, "https://bad") is False

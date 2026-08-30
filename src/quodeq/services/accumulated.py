@@ -14,7 +14,7 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
-from quodeq.services._fs_projects import find_children as _find_children
+from quodeq.services.ports import find_children as _find_children
 from quodeq.data.fs.report_parser.grades import calculate_trend, most_frequent_grade, parse_numeric_score
 from quodeq.data.fs.report_parser.runs import RunInfo, list_runs
 from quodeq.shared.utils import _env_int

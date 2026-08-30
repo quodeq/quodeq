@@ -17,8 +17,11 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services.dismissed import load_dismissed
 from quodeq.services.ports import (
+    ActionLogWriter,
+    find_dismissed_matching,
     locked_deleted_store,
     read_deleted_entries,
     write_deleted_entries,
@@ -29,7 +32,6 @@ from quodeq.core.events.models import (
     FindingUndismissedEvent,
 )
 from quodeq.core.types.finding import Finding
-from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.dismissed import recount_totals
 
 
@@ -63,7 +65,7 @@ def _entry_from_finding(finding: dict) -> dict:
     }
 
 
-def delete_finding(project_dir: Path, finding: dict) -> int:
+def delete_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> int:
     """Permanently suppress a finding by (dimension, principle, file).
 
     Also undismisses any dismissed findings that share the same suppression
@@ -79,11 +81,11 @@ def delete_finding(project_dir: Path, finding: dict) -> int:
         if new_key not in {_key(e) for e in existing}:
             existing.append(_entry_from_finding(finding))
             write_deleted_entries(project_dir, existing)
-        swept = _sweep_dismissed_matching(project_dir, new_key)
+        swept = _sweep_dismissed_matching(project_dir, new_key, writer=writer)
     return swept
 
 
-def delete_all_dismissed(project_dir: Path) -> int:
+def delete_all_dismissed(project_dir: Path, *, writer: ActionLog | None = None) -> int:
     """Convert every currently-dismissed entry into a permanent suppression.
 
     Reads dismissed findings from each run's evaluation.db, adds a deleted
@@ -106,26 +108,26 @@ def delete_all_dismissed(project_dir: Path) -> int:
         write_deleted_entries(project_dir, existing)
         # Undismiss all via the action log.
         count = len(dismissed_entries)
-        writer = ActionLogWriter(project_dir)
+        log = writer or ActionLogWriter(project_dir)
         for entry in dismissed_entries:
             payload = FindingUndismissed(
                 req=entry.get("req", ""),
                 file=entry.get("file", ""),
                 line=int(entry.get("line", 0)),
             )
-            writer.emit(FindingUndismissedEvent(payload=payload))
+            log.emit(FindingUndismissedEvent(payload=payload))
         return count
 
 
-def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
+def _sweep_dismissed_matching(
+    project_dir: Path, key: tuple, *, writer: ActionLog | None = None,
+) -> int:
     """Undismiss every dismissed finding whose ``(dimension, principle, file)`` matches *key*.
 
     Reads from each run's evaluation.db (via the data layer's
     ``find_dismissed_matching``) to find dismissed findings that match the
     deletion key, then appends FindingUndismissedEvent to actions.jsonl for each.
     """
-    from quodeq.data.sqlite.findings_queries import find_dismissed_matching  # noqa: PLC0415
-
     dimension, principle, file = key
     if not project_dir.is_dir():
         return 0
@@ -143,10 +145,10 @@ def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
     if not matching:
         return 0
 
-    writer = ActionLogWriter(project_dir)
+    log = writer or ActionLogWriter(project_dir)
     for req, f, line in matching:
         payload = FindingUndismissed(req=req, file=f, line=line)
-        writer.emit(FindingUndismissedEvent(payload=payload))
+        log.emit(FindingUndismissedEvent(payload=payload))
     return len(matching)
 
 

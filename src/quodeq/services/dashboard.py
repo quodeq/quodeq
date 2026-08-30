@@ -22,10 +22,12 @@ from quodeq.core.types import DimensionResult
 
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data
+from quodeq.services.deleted import deleted_keys
 from quodeq.services.scoring_view import is_eligible_for_default_view
-from quodeq.services.dismissed import filter_dismissed_from_dimensions
+from quodeq.services.dismissed import dismissed_keys, filter_dismissed_from_dimensions
+from quodeq.services.ports import load_suppression_rules
+from quodeq.services.rescore import _rescore_dimension
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
     DashboardCacheConfig,
@@ -74,10 +76,6 @@ def _rescore_run_dimensions(
     were read from: its directory is passed as the evidence basis so a touched
     dimension is re-scored from that run's own evidence, not the legacy formula.
     """
-    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
-
     validate_path_segment(project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)

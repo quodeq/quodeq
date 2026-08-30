@@ -5,9 +5,13 @@ functions from this module instead of reaching into ``quodeq.data.*``
 directly, so every services -> data edge is visible in one place. The
 layer checker allows any services -> data import — this is a convention,
 not an enforcement point — but new or edited services code goes through
-here. Contents are dependency-light on purpose: plain re-exports grouped
-by concern, plus the Protocols services accept as injected seams. The
-adapters themselves live in ``quodeq.data``.
+here. Contents are plain re-exports grouped by concern, plus the Protocols
+services accept as injected seams. Most re-exported adapters are
+dependency-light, but a few (the filesystem report parser, the
+shared-results repo git plumbing) pull in a fair amount of the data layer
+themselves; re-exporting them here anyway is a deliberate choice — keeping
+every services -> data edge visible in one place outweighs staying thin —
+not an oversight. The adapters themselves live in ``quodeq.data``.
 """
 from __future__ import annotations
 
@@ -63,7 +67,11 @@ from quodeq.data.fs.repo_clone import clone_repo  # noqa: F401
 
 # Per-run findings-table reads (SQL stays in the adapter) and the row-dict →
 # Finding mapper that decodes what those reads return.
-from quodeq.data.sqlite.findings_queries import read_active_findings  # noqa: F401
+from quodeq.data.sqlite.findings_queries import (  # noqa: F401
+    find_dismissed_matching,
+    read_active_findings,
+    read_finding_details,
+)
 from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: F401
 
 # Custom-standard file mechanics (see StandardsStore below).
@@ -74,6 +82,60 @@ from quodeq.data.fs.standards_store import (  # noqa: F401
     standard_exists,
     standard_path,
 )
+
+# Project action log (dismiss/verify events) + legacy dismissed.json fold-in.
+from quodeq.data.actions_log import (  # noqa: F401
+    ACTIONS_LOG_FILENAME,
+    ActionLogWriter,
+    read_action_events,
+)
+from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed  # noqa: F401
+
+# Per-project suppression_rules.json pattern store.
+from quodeq.data.fs.suppression_rules import load_suppression_rules  # noqa: F401
+
+# Run discovery + report aggregation (filesystem report parser).
+from quodeq.data.fs.report_parser.runs import (  # noqa: F401
+    RunInfo,
+    list_runs,
+    read_run_data,
+    read_run_scalars,
+    safe_read_dir,
+)
+
+# Repo-URL validation + child-project discovery.
+from quodeq.data.fs.repo_handler import is_valid_repo_url  # noqa: F401
+from quodeq.data.fs.children import find_children  # noqa: F401
+
+# Shared-results repo: clone lifecycle, git invocation, layout + format checks.
+from quodeq.data.fs.shared_repo import (  # noqa: F401
+    FORMAT_NAME,
+    FORMAT_VERSION,
+    MARKER_FILENAME,
+    PUBLISHED_META_FILENAME,
+    bootstrap_repo_layout,
+    check_repo_format,
+    clone_lock,
+    ensure_shared_clone,
+    refresh_shared_clone,
+    remove_clone_dir,
+    run_git,
+)
+
+# Run status + dim-state file names and readers.
+from quodeq.data.fs.run_status_store import (  # noqa: F401
+    STATUS_FILENAME,
+    UnsupportedSchemaError,
+    read_status,
+)
+from quodeq.data.fs.dimensions_state_store import (  # noqa: F401
+    FILENAME as DIMENSIONS_FILENAME,
+    read_dimensions,
+)
+
+# SQL grade tables + findings projection.
+from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: F401
+from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: F401
 
 
 class GradeTablesReader(Protocol):
