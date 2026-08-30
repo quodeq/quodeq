@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from flask import Flask
-
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.services.import_validator import validate_import
@@ -21,12 +19,26 @@ class ActionConflict(Exception):
 
 
 @dataclass(frozen=True)
+class ActionContext:
+    """Everything an action's ``apply`` needs from server configuration.
+
+    Built per-request by ``api._assistant_helpers.build_action_context`` so
+    tests that monkeypatch ``app.config`` before POSTing still take effect —
+    this must never be cached at app-construction time.
+    """
+    evaluations_dir: Path
+    evaluators_dir: Path
+    compiled_dir: Path
+    dimensions_file: Path
+
+
+@dataclass(frozen=True)
 class ActionSpec:
     action_type: str
     description: str
-    validate: Callable[[dict, ToolContext], dict]  # raises ToolError / returns canonical payload
-    summarize: Callable[[dict], dict]              # server-canonical card summary fields
-    apply: Callable[[dict, Flask], dict]           # executes on user approval
+    validate: Callable[[dict, ToolContext], dict]      # raises ToolError / returns canonical payload
+    summarize: Callable[[dict], dict]                  # server-canonical card summary fields
+    apply: Callable[[dict, ActionContext], dict]       # executes on user approval
 
 
 def _validate_create_standard(payload: dict, ctx: ToolContext) -> dict:
@@ -43,14 +55,10 @@ def _summarize_create_standard(canonical: dict) -> dict:
     }
 
 
-def _apply_create_standard(payload: dict, app: Flask) -> dict:
+def _apply_create_standard(payload: dict, ctx: ActionContext) -> dict:
     from quodeq.services.standards import StandardsService  # noqa: PLC0415
 
-    service = StandardsService(
-        Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-        Path(app.config["STANDARDS_COMPILED_DIR"]),
-        Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
-    )
+    service = StandardsService(ctx.evaluators_dir, ctx.compiled_dir, ctx.dimensions_file)
     result = service.import_from_file(payload, force=False)
     if result.get("status") == "conflict":
         raise ActionConflict("standard id already exists")
@@ -117,13 +125,12 @@ def _summarize_dismiss_finding(canonical: dict) -> dict:
             "line": canonical["line"], "reason": canonical["reason"]}
 
 
-def _apply_dismiss_finding(payload: dict, app: Flask) -> dict:
+def _apply_dismiss_finding(payload: dict, ctx: ActionContext) -> dict:
     from quodeq.services.mutation_rescore import dismiss_delta, rescore_with_fallback  # noqa: PLC0415
     from quodeq.services.dismissed import dismiss_finding  # noqa: PLC0415
-    from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
 
     validate_path_segment(payload["project"])
-    evaluations_dir = app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
+    evaluations_dir = str(ctx.evaluations_dir)
     project_dir = Path(evaluations_dir) / payload["project"]
     dismiss_finding(project_dir, {
         "req": payload["req"], "file": payload["file"], "line": payload["line"],
@@ -156,13 +163,11 @@ def _summarize_verify_finding(canonical: dict) -> dict:
             "line": canonical["line"], "note": canonical["note"]}
 
 
-def _apply_verify_finding(payload: dict, app: Flask) -> dict:
+def _apply_verify_finding(payload: dict, ctx: ActionContext) -> dict:
     from quodeq.services.verified import verify_finding  # noqa: PLC0415
-    from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
 
     validate_path_segment(payload["project"])
-    evaluations_dir = app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
-    verify_finding(Path(evaluations_dir) / payload["project"], payload)
+    verify_finding(ctx.evaluations_dir / payload["project"], payload)
     return {"verified": True}
 
 

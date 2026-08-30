@@ -1,0 +1,15 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d1117; color: #c9d1d9;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px; line-height: 1.7;
+  padding: 16px;
+}
+h1 {
+  font-size: 14px; font-weight: 500;
+  color: #8b949e; margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #21262d;
+}
+#logs { white-space: pre-wrap; word-break: break-word; }
+.ts { color: #484f58; }

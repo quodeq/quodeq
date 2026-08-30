@@ -1,7 +1,6 @@
 """Validation and helper functions for evaluation routes."""
 from __future__ import annotations
 
-import logging
 import re
 import time as _time
 from http import HTTPStatus
@@ -10,14 +9,13 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
-from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
+from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT, resolve_clean_scan
 from quodeq.shared.validation import validate_relative_scope
 
 # Userinfo cannot contain an unencoded "/", so excluding it keeps matches
 # identical while a failing scan stays linear (no polynomial backtracking
 # on inputs like repeated "http://" runs).
 _CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
-_logger = logging.getLogger(__name__)
 
 # Bounds for user-supplied evaluation parameters
 _MIN_SUBAGENTS = 1
@@ -40,36 +38,6 @@ def _coerce_int(value: object, default: int) -> int:
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
-
-
-def _resolve_clean_scan(payload: dict) -> bool:
-    """Resolve the user's clean_scan intent from new and legacy fields.
-
-    New: ``cleanScan: bool`` -- explicit opt-out, default False.
-    Legacy: ``incremental: bool`` -- deprecated, with inverted semantics
-    (old ``True`` meant "use cache" -> ``clean_scan=False``; old ``False``
-    meant "ignore cache" -> ``clean_scan=True``). One-release back-compat.
-
-    Sending both is rejected: we won't guess intent if a client transitions
-    mid-deployment and ends up posting conflicting flags.
-    """
-    has_new = "cleanScan" in payload
-    has_legacy = "incremental" in payload
-    if has_new and has_legacy:
-        raise ValueError(
-            "`cleanScan` and `incremental` cannot be combined in a single payload. "
-            "Use `cleanScan` only -- `incremental` is deprecated. "
-            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
-            "(force full re-analysis)."
-        )
-    if has_legacy:
-        _logger.warning(
-            "Evaluation payload uses deprecated `incremental` field. "
-            "Migrate to `cleanScan` (inverted semantics). "
-            "Legacy field will be removed in the next release.",
-        )
-        return not bool(payload.get("incremental"))
-    return bool(payload.get("cleanScan", False))
 
 
 def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
@@ -100,7 +68,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None
     subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
-    clean_scan = _resolve_clean_scan(payload)
+    clean_scan = resolve_clean_scan(payload)
     scope_path = payload.get("scopePath") or None
     if scope_path is not None:
         # ValueError propagates to the route's 400 INVALID_INPUT handler.

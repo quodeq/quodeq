@@ -6,20 +6,13 @@ import time as _time
 
 import pytest
 
-import quodeq.api.standards_read_routes as _mod
+from quodeq.api.standards_read_routes import CweCache
 from tests._timeouts import budget
 
 
-@pytest.fixture(autouse=True)
-def _reset_cache():
-    _mod.reset_cwe_cache()
-    yield
-    _mod.reset_cwe_cache()
-
-
-def test_reload_cwe_if_needed_exists():
-    """_reload_cwe_if_needed must exist as the synchronized reload helper."""
-    assert callable(_mod._reload_cwe_if_needed)
+def test_cwe_cache_get_exists():
+    """CweCache.get must exist as the synchronized reload method."""
+    assert callable(CweCache().get)
 
 
 def test_concurrent_expiry_reloads_exactly_once():
@@ -27,7 +20,7 @@ def test_concurrent_expiry_reloads_exactly_once():
 
     Strategy: force cache expiry, then release both threads simultaneously
     using an event so both see the stale cache and race to reload.
-    The lock inside _reload_cwe_if_needed must ensure only one reload happens.
+    The lock inside CweCache.get must ensure only one reload happens.
     """
     call_count = 0
     # Slow down the loader so the second thread genuinely races.
@@ -42,8 +35,9 @@ def test_concurrent_expiry_reloads_exactly_once():
         return [{"id": "CWE-79", "name": "XSS"}]
 
     # Force expiry.
-    _mod._cwe_cache = None
-    _mod._cwe_cache_time = 0.0
+    cache = CweCache(ttl_s=3600)
+    cache._cache = None
+    cache._cache_time = 0.0
 
     results = []
     errors = []
@@ -53,7 +47,7 @@ def test_concurrent_expiry_reloads_exactly_once():
     def _thread():
         try:
             start_gate.wait(timeout=budget(5))  # all three release together
-            result = _mod._reload_cwe_if_needed(_loader)
+            result = cache.get(_loader)
             results.append(result)
         except Exception as exc:
             errors.append(exc)
@@ -76,3 +70,48 @@ def test_concurrent_expiry_reloads_exactly_once():
     assert len(results) == 2
     # Both threads must see the same cached result.
     assert results[0] == results[1] == [{"id": "CWE-79", "name": "XSS"}]
+
+
+def test_ttl_defaults_from_env_per_instance(monkeypatch):
+    """TTL is read from QUODEQ_CWE_CACHE_TTL at construction time, per instance."""
+    monkeypatch.setenv("QUODEQ_CWE_CACHE_TTL", "42")
+    assert CweCache()._ttl_s == 42
+
+
+def test_explicit_ttl_overrides_env(monkeypatch):
+    monkeypatch.setenv("QUODEQ_CWE_CACHE_TTL", "42")
+    assert CweCache(ttl_s=7)._ttl_s == 7
+
+
+def test_clear_forces_a_reload():
+    calls = []
+
+    def _loader():
+        calls.append(1)
+        return ["x"]
+
+    cache = CweCache()
+    cache.get(_loader)
+    cache.get(_loader)
+    assert len(calls) == 1
+    cache.clear()
+    cache.get(_loader)
+    assert len(calls) == 2
+
+
+def test_injectable_clock_controls_expiry():
+    now = [0.0]
+    cache = CweCache(ttl_s=10, clock=lambda: now[0])
+    calls = []
+
+    def _loader():
+        calls.append(1)
+        return ["x"]
+
+    cache.get(_loader)
+    now[0] = 5.0  # still within TTL
+    cache.get(_loader)
+    assert len(calls) == 1
+    now[0] = 11.0  # expired
+    cache.get(_loader)
+    assert len(calls) == 2

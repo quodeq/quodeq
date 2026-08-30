@@ -4,11 +4,28 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
+from flask import Flask
 
+from quodeq.api._grade_formula_routes import register_grade_formula_routes
 from quodeq.api.app import create_app
 from quodeq.core.scoring.params import DEFAULT_PARAMS, params_to_dict
 from quodeq.services import grade_formula
 from tests.api.test_action_api import StubProvider
+
+
+def _client_with_apply_to_all_runs(apply_to_all_runs):
+    """A bare Flask app with a fake ``apply_to_all_runs`` injected directly.
+
+    The production call site (routes_registry.py) never overrides this
+    parameter, so the route captures ``grade_formula.apply_to_all_runs`` as
+    a default argument at import time -- monkeypatching the module attribute
+    afterward has no effect on an already-registered route. Tests that need
+    a fake outcome must inject it at registration time instead.
+    """
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    register_grade_formula_routes(app, apply_to_all_runs=apply_to_all_runs)
+    return app.test_client()
 
 # State-changing requests require a matching Origin header (CSRF guard in
 # api/security.py). The test client's default host is "localhost".
@@ -43,9 +60,8 @@ def test_get_returns_defaults_and_is_custom_false(client, formula_path):
     assert body["defaults"] == params_to_dict(DEFAULT_PARAMS)
 
 
-def test_put_saves_and_applies(client, formula_path, monkeypatch):
-    monkeypatch.setattr(
-        grade_formula, "apply_to_all_runs",
+def test_put_saves_and_applies(formula_path):
+    client = _client_with_apply_to_all_runs(
         lambda root: grade_formula.ApplyResult(rescored=7, failed=[]),
     )
     payload = params_to_dict(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
@@ -58,11 +74,10 @@ def test_put_saves_and_applies(client, formula_path, monkeypatch):
     assert grade_formula.load_params().base_k == 0.3
 
 
-def test_put_reports_partial_apply(client, formula_path, monkeypatch):
+def test_put_reports_partial_apply(formula_path):
     # A run that couldn't be rescored is surfaced so the client can warn the
     # user rather than the endpoint claiming a clean success.
-    monkeypatch.setattr(
-        grade_formula, "apply_to_all_runs",
+    client = _client_with_apply_to_all_runs(
         lambda root: grade_formula.ApplyResult(rescored=5, failed=["run-x", "run-y"]),
     )
     payload = params_to_dict(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
@@ -80,9 +95,8 @@ def test_put_rejects_invalid_params_with_400(client, formula_path):
     assert not formula_path.exists()
 
 
-def test_delete_resets_to_defaults(client, formula_path, monkeypatch):
-    monkeypatch.setattr(
-        grade_formula, "apply_to_all_runs",
+def test_delete_resets_to_defaults(formula_path):
+    client = _client_with_apply_to_all_runs(
         lambda root: grade_formula.ApplyResult(rescored=0, failed=[]),
     )
     grade_formula.save_params(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))

@@ -6,7 +6,9 @@ point instead of importing private helpers.
 from __future__ import annotations
 
 import json
+import logging
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,12 +16,21 @@ from quodeq.data.fs.project_files import read_repository_info, write_repository_
 from quodeq.data.git_cli import remote_origin_url_raw
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.data.fs.repo_validation import validate_remote_url
-from quodeq.services._fs_clone import run_git_clone
+from quodeq.services._fs_clone import CloneError, run_git_clone
+from quodeq.services._fs_project_helpers import find_existing_project
 from quodeq.services._fs_scan import scan_project
+from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
+_logger = logging.getLogger(__name__)
+
 _LOCATION_LOCAL = "local"
+
+_ZERO_RUN_SCAN_FALLBACK = {
+    "total_files": 0, "code_files": 0, "languages": {},
+    "branches": [], "modules": [], "file_tree": [],
+}
 
 # Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
 # there: services must not depend on the api layer (no other services module
@@ -166,6 +177,76 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
         return
     data["onboardingCompletedAt"] = None
     write_repository_info(project_dir, data)
+
+
+def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
+    """Delete any project directories created since *before* was captured."""
+    reports_path = Path(reports_root)
+    if not reports_path.is_dir():
+        return
+    after = {p.name for p in reports_path.iterdir() if p.is_dir()}
+    for new in after - before:
+        try:
+            shutil.rmtree(reports_path / new, ignore_errors=True)
+        except OSError:
+            pass
+
+
+def register_project_with_rollback(
+    reports_dir: str, spec: NewProjectSpec, *, clones_dir: Path | None = None,
+) -> CreateProjectResult:
+    """Register a new project end to end: duplicate check, clone + scan,
+    rollback of any partial project directory on failure, scan.json readback.
+
+    The API route keeps its own request-boundary checks (repo-URL shape,
+    cloneDest containment, local-path allowlist) and only builds *spec* once
+    those pass; this function owns everything downstream of that.
+    """
+    existing = find_existing_project(reports_dir, spec.repo, spec.scope_path)
+    if existing is not None:
+        return CreateProjectResult(status="duplicate", existing_project_id=existing)
+
+    # Capture the set of project directories present before registration so a
+    # failed scan/clone can be rolled back to exactly what existed before.
+    reports_root_path = Path(reports_dir)
+    before = (
+        {p.name for p in reports_root_path.iterdir() if p.is_dir()}
+        if reports_root_path.is_dir()
+        else set()
+    )
+
+    try:
+        project_uuid = register_project(
+            spec.repo,
+            spec.discipline,
+            reports_dir,
+            scope_path=spec.scope_path,
+            clone_dest=spec.clone_dest,
+            ephemeral=spec.ephemeral,
+            clones_dir=clones_dir,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        _rollback_new_dirs(reports_dir, before)
+        return CreateProjectResult(status="invalid_repo", message=str(exc))
+    except CloneError as exc:
+        _rollback_new_dirs(reports_dir, before)
+        return CreateProjectResult(status="clone_failed", message=str(exc), clone_error_kind=exc.kind)
+    except Exception:
+        # error_response (route layer) swallows the traceback Flask's own 500
+        # handler would have logged; record it before converting to a
+        # generic, no-detail result (the exception text can carry filesystem
+        # paths or backend internals that must not reach the remote caller).
+        _logger.exception("Registration failed for repo=%r", spec.repo)
+        _rollback_new_dirs(reports_dir, before)
+        return CreateProjectResult(status="internal_error")
+
+    # scan.json is now always present after register_project succeeds.
+    scan_path = reports_root_path / project_uuid / "scan.json"
+    try:
+        scan_data = json.loads(scan_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, FileNotFoundError):
+        scan_data = dict(_ZERO_RUN_SCAN_FALLBACK)
+    return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
 
 
 def mark_onboarding_complete(project_dir: Path) -> None:

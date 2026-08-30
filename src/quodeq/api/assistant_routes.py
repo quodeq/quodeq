@@ -12,6 +12,7 @@ from quodeq.api import _assistant_helpers
 from quodeq.api._assistant_helpers import (
     _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS,
     SharedSourceUnavailable,
+    build_action_context,
     build_tool_context,
     event_frames,
     get_repository,
@@ -437,7 +438,7 @@ def register_assistant_routes(app: Flask) -> None:
             state = fresh["status"] if fresh else "gone"
             return jsonify({"error": f"action already {state}"}), 409
         try:
-            result = spec.apply(action["payload"], current_app)
+            result = spec.apply(action["payload"], build_action_context(current_app))
         except ValueError as exc:
             repo.set_action_status(action_id, "drafted")
             return jsonify({"error": str(exc)}), 400

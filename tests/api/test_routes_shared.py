@@ -127,8 +127,8 @@ def test_put_config_rejects_non_string_url(client, monkeypatch, tmp_path):
 
 
 def test_put_config_clone_failure_returns_502(client, monkeypatch):
-    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
-    monkeypatch.setattr("quodeq.api.routes_shared.ensure_shared_clone", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url: None)
     resp = client.put(
         "/api/shared/config",
         json={"url": "https://github.com/example/repo.git"},
@@ -159,7 +159,7 @@ def test_put_config_rejects_foreign_repo_after_clone(client, monkeypatch, tmp_pa
     # validate_remote_url legitimately rejects file:// (SSRF guard scopes
     # accepted schemes to https/ssh); bypass just that check so the local
     # bare origin below can exercise the real clone + format-check path.
-    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
     origin = tmp_path / "foreign-origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     _push_seed_file(origin, "README.md", "some other project")
@@ -180,7 +180,7 @@ def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch,
     """Audit A1: same AFTER-clone validation for a repo whose quodeq.json
     marker declares a format version newer than this build understands."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
     origin = tmp_path / "future-origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     _push_seed_file(
@@ -201,7 +201,7 @@ def test_put_config_accepts_empty_repo(client, monkeypatch, tmp_path):
     """Audit A1: a real clone of a bare origin with zero commits ("empty",
     never published into) must be accepted, not rejected as foreign."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
     origin = tmp_path / "empty-origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     url = f"file://{origin}"
@@ -218,8 +218,8 @@ def test_put_config_accepts_empty_repo(client, monkeypatch, tmp_path):
 def test_put_config_happy_path(client, monkeypatch, tmp_path):
     fake_repo = tmp_path / "fake-clone"
     fake_repo.mkdir()
-    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
-    monkeypatch.setattr("quodeq.api.routes_shared.ensure_shared_clone", lambda url: fake_repo)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url: fake_repo)
     resp = client.put(
         "/api/shared/config",
         json={"url": "https://github.com/example/repo.git"},
@@ -243,7 +243,7 @@ def test_put_config_reconnect_refreshes_pre_existing_clone(client, monkeypatch, 
     reconnected (second PUT) -- the listing must already show it, with no
     separate POST /api/shared/refresh in between."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
-    monkeypatch.setattr("quodeq.api.routes_shared.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
     origin = tmp_path / "origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
     url = f"file://{origin}"

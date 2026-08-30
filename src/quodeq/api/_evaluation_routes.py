@@ -21,6 +21,7 @@ from quodeq.core.types import to_camel_dict
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation
+from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.services.base import ActionProvider
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.services.scan_progress import build_scan_progress
@@ -71,6 +72,13 @@ def _release_scoring(job_id: str) -> None:
     """
     with _scored_jobs_lock:
         _scored_jobs.pop(job_id, None)
+
+
+def _background(app: Flask) -> BackgroundRunner:
+    """The app's background-task runner. ``create_app`` instantiates it;
+    setdefault keeps bare test apps (register_evaluation_item_routes on a
+    plain Flask) working."""
+    return app.extensions.setdefault("background", ThreadBackgroundRunner())
 
 
 def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
@@ -199,20 +207,16 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
                 "outputRunId": job.output_run_id,
             }
 
-            def _score_in_bg(reports_dir: str, score_args: dict) -> None:
+            def _score_in_bg() -> None:
                 try:
-                    score_completed_evidence(reports_dir, score_args)
+                    score_completed_evidence(_reports, _score_args)
                 except Exception as exc:
                     _logger.debug(
                         "Could not score cancelled dimension for %s: %s",
-                        score_args.get("outputRunId"), exc,
+                        _score_args.get("outputRunId"), exc,
                     )
 
-            threading.Thread(
-                target=_score_in_bg,
-                args=(_reports, _score_args),
-                daemon=True,
-            ).start()
+            _background(app).submit(_score_in_bg, name=f"score-{job_id}")
         payload = to_camel_dict(job)
         payload["dimStates"] = _read_dim_states(job)
         return jsonify(payload)

@@ -94,14 +94,12 @@ def test_api_helper_resolves_repo_root_via_project_id_fallback(tmp_path, monkeyp
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     save_visible_standard_ids(repo_root, ["performance"])
-    monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.resolve_repo_root",
-        lambda project_id: str(repo_root) if project_id == "proj-x" else None,
-    )
+    resolver = lambda project_id: str(repo_root) if project_id == "proj-x" else None
     app = _app(tmp_path)
     with app.app_context():
         ctx = build_tool_context(
-            app, _session(project_uuid=None, project_id="proj-x"))
+            app, _session(project_uuid=None, project_id="proj-x"),
+            repo_root_resolver=resolver)
     assert ctx.repo_root == repo_root
     assert ctx.visible_standard_ids == ("performance",)
 
@@ -114,10 +112,7 @@ def test_api_helper_shared_session_never_falls_back_to_a_local_repo_root(
     # for the overview case above must not quietly undo that guarantee just
     # because a same-named local project happens to exist on this machine.
     called = []
-    monkeypatch.setattr(
-        "quodeq.api._assistant_helpers.resolve_repo_root",
-        lambda project_id: called.append(project_id) or str(tmp_path),
-    )
+    resolver = lambda project_id: called.append(project_id) or str(tmp_path)
     monkeypatch.setattr(
         "quodeq.api._assistant_helpers.read_settings",
         lambda: SharedSettings(url="file:///fake-origin.git"),
@@ -134,7 +129,8 @@ def test_api_helper_shared_session_never_falls_back_to_a_local_repo_root(
     app = _app(tmp_path)
     with app.app_context():
         ctx = build_tool_context(
-            app, _session(source="shared", project_uuid=None, project_id="proj-x"))
+            app, _session(source="shared", project_uuid=None, project_id="proj-x"),
+            repo_root_resolver=resolver)
     assert ctx.repo_root is None
     # A shared session still resolves a concrete selection (the ISO
     # defaults), not None -- it gets no filtering-off exemption just because

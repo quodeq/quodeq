@@ -15,13 +15,11 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._assistant_helpers import resolve_repo_root
 from quodeq.api.helpers import error_response
-from quodeq.core.standards.visibility import (
-    VISIBILITY_RELPATH,
-    validate_visible_ids,
-)
+from quodeq.core.standards.visibility import validate_visible_ids
 from quodeq.services.standards_prefs import (
     load_visible_standard_ids,
     save_visible_standard_ids,
+    visibility_is_default,
 )
 from quodeq.services.standards import StandardsService
 from quodeq.shared.validation import validate_path_segment
@@ -48,7 +46,7 @@ def register_visibility_routes(app: Flask) -> None:
         ids = load_visible_standard_ids(root)
         return {
             "visibleStandardIds": list(ids),
-            "isDefault": not (root / VISIBILITY_RELPATH).is_file(),
+            "isDefault": visibility_is_default(root),
             "knownStandardIds": sorted(_known_ids()),
         }
 

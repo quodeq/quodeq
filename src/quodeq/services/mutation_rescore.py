@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -310,11 +311,15 @@ def delete_all_delta(
 
 def rescore_with_fallback(
     evaluations_dir: str, project: str, run_id: str | None,
+    *, runner: BackgroundRunner | None = None,
 ) -> dict[str, Any] | None:
     """Rescore the requested run, falling back to a project-wide projection.
 
     Shared by the findings mutation routes and the assistant's
     dismiss_finding action apply. See _rescore_run for the slim payload.
+    *runner* lets callers/tests inject a synchronous or fake BackgroundRunner;
+    production defaults to a fresh ThreadBackgroundRunner per call (it holds
+    no state, so there is nothing to share between calls).
     """
     scores = _rescore_run(evaluations_dir, project, run_id)
     if scores is None:
@@ -331,5 +336,7 @@ def rescore_with_fallback(
             finally:
                 lock.release()
 
-        threading.Thread(target=_bg_project, daemon=True).start()
+        (runner or ThreadBackgroundRunner()).submit(
+            _bg_project, name=f"rescore-project-{project}",
+        )
     return scores

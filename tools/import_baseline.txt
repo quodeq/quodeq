@@ -6,8 +6,8 @@ src/quodeq/api/_evaluation_routes.py:21:analysis
 src/quodeq/api/import_project.py:32:data
 src/quodeq/api/import_project.py:33:data
 src/quodeq/api/import_project.py:34:data
-src/quodeq/api/llm_bridge_routes.py:8:llm_bridge
-src/quodeq/api/routes_project_list.py:255:analysis
+src/quodeq/api/llm_bridge_routes.py:6:llm_bridge
+src/quodeq/api/routes_project_list.py:238:analysis
 src/quodeq/ci/review.py:129:cli_parser
 src/quodeq/ci/review.py:147:_cli_evaluation
 src/quodeq/data/fs/repo_clone.py:19:context

@@ -1,8 +1,6 @@
 """API routes for LLM bridge — provider status, models, testing."""
 from __future__ import annotations
 
-import os
-
 from flask import Flask, Response, jsonify, request
 
 from quodeq.llm_bridge import (
@@ -19,6 +17,7 @@ from quodeq.llm_bridge import (
     get_known_models,
     get_provider_configs,
     check_cloud_connection,
+    resolve_api_key,
 )
 from quodeq.shared.url_validation import validate_url_safe
 
@@ -162,17 +161,11 @@ def register_llm_bridge_routes(app: Flask) -> None:
 
         api_base = data.get("api_base") or provider_cfg.get("api_base", "")
         api_key = data.get("api_key", "")
-        api_key_env = provider_cfg.get("api_key_env", "")
+        api_key_env = ""
         if not api_key:
             # Resolve env var via provider id when given, else by api_base
             # match so old clients (without `provider`) still work.
-            if not api_key_env and api_base:
-                for cfg in configs.values():
-                    if cfg.get("api_base") == api_base and cfg.get("api_key_env"):
-                        api_key_env = cfg["api_key_env"]
-                        break
-            if api_key_env:
-                api_key = os.environ.get(api_key_env, "")
+            api_key, api_key_env = resolve_api_key(provider_id, api_base)
 
         if api_base:
             try:
@@ -198,10 +191,10 @@ def register_llm_bridge_routes(app: Flask) -> None:
         """Report which provider api-key env vars are visible to this process."""
         configs = get_provider_configs()
         seen: dict[str, bool] = {}
-        for pid, cfg in configs.items():
-            env_name = cfg.get("api_key_env", "")
+        for pid in configs:
+            key, env_name = resolve_api_key(pid)
             if env_name:
-                seen[pid] = bool(os.environ.get(env_name, "").strip())
+                seen[pid] = bool(key.strip())
         return jsonify(seen)
 
     @app.get("/api/known-models")

@@ -63,3 +63,36 @@ def classify_provider(provider_id: str, *, markers: frozenset[str] | None = None
     if _is_local_api(provider_id, markers=markers):
         return "local-api"
     return "cloud-api"
+
+
+def resolve_api_key_env(provider_id: str = "", api_base: str = "") -> str:
+    """Return the api_key_env name for *provider_id*, falling back to a
+    match on *api_base* for older clients that never sent a provider id.
+
+    Empty string when neither resolves to a configured provider with an
+    ``api_key_env`` entry.
+    """
+    configs = get_provider_configs()
+    provider_cfg = configs.get(provider_id, {}) if provider_id else {}
+    env_name = provider_cfg.get("api_key_env", "")
+    if not env_name and api_base:
+        for cfg in configs.values():
+            if cfg.get("api_base") == api_base and cfg.get("api_key_env"):
+                env_name = cfg["api_key_env"]
+                break
+    return env_name
+
+
+def resolve_api_key(
+    provider_id: str = "", api_base: str = "", env: dict[str, str] | None = None,
+) -> tuple[str, str]:
+    """Resolve an API key for *provider_id* (or *api_base*) from the environment.
+
+    Returns ``(key, env_name)``. *key* is ``""`` when the resolved env var is
+    unset or there is nothing to resolve; *env_name* is returned regardless,
+    so a caller can report which variable is missing.
+    """
+    environ = env if env is not None else os.environ
+    env_name = resolve_api_key_env(provider_id, api_base)
+    key = environ.get(env_name, "") if env_name else ""
+    return key, env_name
