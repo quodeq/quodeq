@@ -185,8 +185,7 @@ def per_run_versions(
         dismissed = dismissed_keys(project_dir)
     if deleted is None:
         deleted = deleted_keys(project_dir)
-    with open_score_cache() as conn:
-        cached = load_run_keys_or_empty(conn, project)
+    cached = load_run_keys_or_empty(project)
     out: list[tuple[str, str, str]] = []
     for rid, status in runs:
         terminal = status == "complete"
@@ -194,8 +193,7 @@ def per_run_versions(
         if keys is None:
             keys = read_run_key_sets(project_dir / rid)
             if terminal:
-                with open_score_cache() as conn:
-                    store_run_keys_best_effort(conn, project, rid, keys[0], keys[1])
+                store_run_keys_best_effort(project, rid, keys[0], keys[1])
         out.append(
             (rid, status, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
     return out

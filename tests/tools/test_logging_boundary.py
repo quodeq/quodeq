@@ -30,8 +30,9 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_analysis_context.py': 'Analysis context - dimension loading and resolution - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_api_runner.py': 'API runner for direct LLM evaluation - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_command.py': 'AI CLI command-line construction and environment setup - out of scope for this sweep (not a flagged per-site conversion)',
-    'analysis/_dimension_steps.py': 'Dimension step functions: prompt building, AI execution, evidence parsing - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/_dimension_steps.py': 'Dimension step functions: prompt building, AI execution, evidence parsing - imports quodeq.shared.logging directly (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
     'analysis/_drop_stats.py': 'Per-run aggregate of API-runner parse drops (issue #606) - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/_evidence_parser.py': 'Evidence-parsing composition wiring: imports quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring, not a logging-boundary violation',
     'analysis/_pipeline.py': 'Pipeline coordination - dimension orchestration, merging, and public API - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_process.py': 'Subprocess spawning, heartbeat monitoring, and error handling - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
@@ -55,7 +56,8 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/run_lifecycle.py': "RunLifecycleContext - the run's lifecycle context manager - out of scope for this sweep (not a flagged per-site conversion)",
     'analysis/stream/parser.py': 'Stream-JSON event parser - extracts JSONL evidence lines from AI CLI output - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/stream/progress_reader.py': 'Incremental progress reader for AI analysis stream and JSONL files - out of scope for this sweep (not a flagged per-site conversion)',
-    'analysis/subagents/_consolidated.py': 'Consolidated multi-dimension analysis - extracted from subagents/runner.py - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/subagents/_consolidated.py': 'Consolidated multi-dimension analysis - extracted from subagents/runner.py - imports quodeq.shared.logging directly (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
+    'analysis/subagents/_evidence_collector.py': 'Stream-level evidence collection for the subagent pool - imports quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring, not a logging-boundary violation',
     'analysis/subagents/_heartbeat.py': 'Heartbeat and progress reporting for the subagent pool - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/_pool_launcher.py': 'Pool creation, launching, and stream-level evidence collection - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/_pool_scaling.py': 'Scaling logic: respawn decisions, scale-up computation, future collection - out of scope for this sweep (not a flagged per-site conversion)',
@@ -94,16 +96,15 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/_violations_jsonl.py': 'JSONL-specific parsing for extracting violations from MCP findings files - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_violations_stream.py': 'Stream-specific parsing for extracting violations from live event log files - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_warmup.py': 'Background warm-up of per-project score caches at server boot - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/background.py': 'Fire-and-forget background task submission - out of scope for this sweep (not a flagged per-site conversion)',
     'services/base.py': 'Protocol definitions for the action provider abstraction layer - out of scope for this sweep (not a flagged per-site conversion)',
     'services/deleted.py': 'Persistent storage for permanently-deleted findings - per-project JSON file - out of scope for this sweep (not a flagged per-site conversion)',
     'services/evaluation_mixin.py': 'Mixin providing evaluation lifecycle methods for the filesystem provider - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/evidence_rescore.py': 'Rescore a dimension from its raw evidence, minus dismissed/deleted findings - out of scope for this sweep (not a flagged per-site conversion)',
+    'services/evidence_rescore.py': 'Rescore a dimension from its raw evidence, minus dismissed/deleted findings - imports the raw stdlib logger (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
+    'services/filesystem.py': 'FilesystemActionProvider - thin coordinator composing the provider collaborators - imports quodeq.shared.log_sink for SHARED_LOG, passed into composition-root wiring for register_project_with_rollback - plan-sanctioned composition wiring, not a logging-boundary violation',
     'services/grade_formula.py': 'User-tuned grade formula: apply/preview orchestration - out of scope for this sweep (not a flagged per-site conversion)',
     'services/mutation_rescore.py': 'Rescore-after-mutation helpers, shared by API routes and assistant actions - out of scope for this sweep (not a flagged per-site conversion)',
     'services/plugin_discovery.py': 'Discover available languages and return plugin metadata - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/project_registration.py': 'Use case: register a project (resolve identity, clone if needed, scan) - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/score_run.py': 'Use case: score completed evidence after cancellation - out of scope for this sweep (not a flagged per-site conversion)',
+    'services/score_run.py': 'Use case: score completed evidence after cancellation - imports the raw stdlib logger (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
     'services/scoring/__init__.py': 'Scoring reader - single read-side entry point for all score data - out of scope for this sweep (not a flagged per-site conversion)',
     'services/scoring/_rescoring.py': 'Accumulated-rescore machinery for the scoring reader - out of scope for this sweep (not a flagged per-site conversion)',
     'services/shared_publish.py': 'Staging logic for publishing a project into the shared results repo - out of scope for this sweep (not a flagged per-site conversion)',
@@ -114,7 +115,15 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
 
 
 def _imports_logging(text: str) -> bool:
-    return "import logging" in text or "from quodeq.shared.logging import" in text
+    return (
+        "import logging" in text
+        or "from quodeq.shared.logging import" in text
+        # quodeq.shared.log_sink transitively reaches shared.logging (its
+        # SharedLog delegates to log_info/log_warning/log_debug/log_error),
+        # so a file importing it is doing the same thing a raw logging
+        # import would -- the needle must see it too.
+        or "from quodeq.shared.log_sink import" in text
+    )
 
 
 def _files_importing_logging() -> set[str]:

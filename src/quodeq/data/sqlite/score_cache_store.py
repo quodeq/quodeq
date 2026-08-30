@@ -182,20 +182,44 @@ def load_run_keys(
 
 
 def load_run_keys_or_empty(
-    conn: sqlite3.Connection, project: str,
+    project: str,
 ) -> dict[str, tuple[set[tuple], set[tuple]]]:
-    """Same as :func:`load_run_keys` (already empty-on-error); named for the
-    best-effort call sites in ``services.score_cache.per_run_versions``."""
-    return load_run_keys(conn, project)
+    """Leak-free wrapper: open the cache, load a project's run keys, close.
+
+    Returns {} on any sqlite3 error, including one from ``open_score_cache``
+    itself (an unopenable/twice-corrupt db raises past its one rebuild
+    attempt), not just from the query — matching every other read in this
+    module's empty-on-error contract. Named for the call site in
+    ``services.score_cache.per_run_versions``, which used to open the
+    connection itself and only wrap the query, letting an open/rebuild
+    failure propagate to callers (``scoring.get_project_scores``,
+    ``services._fs_metadata`` summaries) that expect this disposable cache
+    to degrade to recompute, never raise.
+    """
+    try:
+        with open_score_cache() as conn:
+            return load_run_keys(conn, project)
+    except sqlite3.Error:
+        return {}
 
 
 def store_run_keys_best_effort(
-    conn: sqlite3.Connection, project: str, run_id: str,
+    project: str, run_id: str,
     dismiss_keys: set[tuple], class_keys: set[tuple],
 ) -> None:
-    """Same as :func:`store_run_keys` (already best-effort); named for the
-    call sites in ``services.score_cache.per_run_versions``."""
-    store_run_keys(conn, project, run_id, dismiss_keys, class_keys)
+    """Leak-free wrapper: open the cache, store a run's key sets, close.
+
+    Best-effort: swallows any sqlite3 error, including one from
+    ``open_score_cache`` itself, not just from the write (``store_run_keys``
+    already logs+returns on a query/serialization error; this also covers
+    an open/rebuild failure the same way). Named for the call site in
+    ``services.score_cache.per_run_versions`` (see :func:`load_run_keys_or_empty`).
+    """
+    try:
+        with open_score_cache() as conn:
+            store_run_keys(conn, project, run_id, dismiss_keys, class_keys)
+    except sqlite3.Error:
+        _logger.warning("run_keys open failed for %s/%s", project, run_id, exc_info=True)
 
 
 def read_project_summary_cached(project: str, version: str) -> dict | None:

@@ -6,12 +6,12 @@ point instead of importing private helpers.
 from __future__ import annotations
 
 import json
-import logging
 import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.project_files import read_repository_info, write_repository_info
 from quodeq.data.git_cli import remote_origin_url_raw
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
@@ -23,14 +23,22 @@ from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
-_logger = logging.getLogger(__name__)
-
 _LOCATION_LOCAL = "local"
 
-_ZERO_RUN_SCAN_FALLBACK = {
-    "total_files": 0, "code_files": 0, "languages": {},
-    "branches": [], "modules": [], "file_tree": [],
-}
+
+def _zero_run_scan_fallback() -> dict:
+    """Fresh zero-run scan_data for a project whose scan.json is missing/corrupt.
+
+    A factory, not a module-level constant: dict(_ZERO_RUN_SCAN_FALLBACK) used
+    to only shallow-copy, so every registration that hit this fallback shared
+    the same nested ``languages``/``branches``/``modules``/``file_tree``
+    containers -- a caller mutating one result's list/dict silently corrupted
+    every other fallback result (past and future).
+    """
+    return {
+        "total_files": 0, "code_files": 0, "languages": {},
+        "branches": [], "modules": [], "file_tree": [],
+    }
 
 # Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
 # there: services must not depend on the api layer (no other services module
@@ -193,7 +201,8 @@ def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
 
 
 def register_project_with_rollback(
-    reports_dir: str, spec: NewProjectSpec, *, clones_dir: Path | None = None,
+    reports_dir: str, spec: NewProjectSpec, *,
+    clones_dir: Path | None = None, log: LogSink = NULL_LOG,
 ) -> CreateProjectResult:
     """Register a new project end to end: duplicate check, clone + scan,
     rollback of any partial project directory on failure, scan.json readback.
@@ -231,12 +240,12 @@ def register_project_with_rollback(
     except CloneError as exc:
         _rollback_new_dirs(reports_dir, before)
         return CreateProjectResult(status="clone_failed", message=str(exc), clone_error_kind=exc.kind)
-    except Exception:
+    except Exception as exc:
         # error_response (route layer) swallows the traceback Flask's own 500
         # handler would have logged; record it before converting to a
         # generic, no-detail result (the exception text can carry filesystem
         # paths or backend internals that must not reach the remote caller).
-        _logger.exception("Registration failed for repo=%r", spec.repo)
+        log.error(f"Registration failed for repo={spec.repo!r}: {exc}")
         _rollback_new_dirs(reports_dir, before)
         return CreateProjectResult(status="internal_error")
 
@@ -245,7 +254,7 @@ def register_project_with_rollback(
     try:
         scan_data = json.loads(scan_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, FileNotFoundError):
-        scan_data = dict(_ZERO_RUN_SCAN_FALLBACK)
+        scan_data = _zero_run_scan_fallback()
     return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
 
 

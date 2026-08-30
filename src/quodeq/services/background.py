@@ -10,11 +10,10 @@ work items that must not block the caller.
 """
 from __future__ import annotations
 
-import logging
 import threading
 from typing import Callable, Protocol
 
-_logger = logging.getLogger(__name__)
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 class BackgroundRunner(Protocol):
@@ -34,11 +33,14 @@ class ThreadBackgroundRunner:
     is no request left to report the failure to.
     """
 
+    def __init__(self, *, log: LogSink = NULL_LOG) -> None:
+        self._log = log
+
     def submit(self, fn: Callable[[], None], *, name: str = "") -> None:
         def _run() -> None:
             try:
                 fn()
             except Exception as exc:  # noqa: BLE001 — background work must never crash the thread silently
-                _logger.debug("Background task %s failed: %s", name or fn, exc)
+                self._log.debug(f"Background task {name or fn} failed: {exc}")
 
         threading.Thread(target=_run, name=name or None, daemon=True).start()

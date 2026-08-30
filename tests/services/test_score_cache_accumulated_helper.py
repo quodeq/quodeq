@@ -1,4 +1,7 @@
+import os
 from pathlib import Path
+
+import pytest
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.score_cache import (
@@ -102,6 +105,28 @@ def test_per_run_versions_does_not_persist_in_progress_keys(tmp_path, monkeypatc
         pd, "proj", DEFAULT_PARAMS, [("r2", "complete")], dismissed=set(), deleted=set())
     with open_score_cache() as conn:
         assert "r2" in load_run_keys(conn, "proj")  # terminal run persisted
+
+
+@pytest.mark.skipif(
+    os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+    reason="chmod-based permission denial is ineffective as root or on Windows",
+)
+def test_per_run_versions_degrades_on_unopenable_cache(tmp_path, monkeypatch):
+    """An unopenable score-cache dir must not turn this hot read path (called
+    from scoring.get_project_scores / services._fs_metadata summaries) into a
+    raise -- it must degrade to a fresh read_run_key_sets, same as any other
+    disposable-cache failure.
+    """
+    pd = tmp_path / "proj"; pd.mkdir()
+    ro_dir = tmp_path / "ro"; ro_dir.mkdir()
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(ro_dir / "sc.db"))
+    os.chmod(ro_dir, 0o500)  # read+execute only: the db file can never be created
+    try:
+        out = per_run_versions(
+            pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], dismissed=set(), deleted=set())
+    finally:
+        os.chmod(ro_dir, 0o700)
+    assert [(rid, status) for rid, status, _ in out] == [("r1", "complete")]
 
 
 def test_cached_accumulated_not_cacheable_serves_without_persisting(tmp_path, monkeypatch):

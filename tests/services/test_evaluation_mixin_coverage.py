@@ -40,18 +40,24 @@ class TestScoreCompletedEvidence:
 
         mock_evidence = MagicMock()
         mock_scores = {"security": 75}
+        fake_params = object()  # sentinel: prove the value threaded through is
+        # what load_params() returned, not a self-referential readback of the
+        # mock's own recorded call (fake_scorer.call_args.kwargs["params"]
+        # always equals itself regardless of what score_completed_evidence
+        # actually passed).
         fake_parser = MagicMock(return_value=mock_evidence)
         fake_scorer = MagicMock(return_value=mock_scores)
         fake_reporter = MagicMock()
 
-        _score_completed_evidence(
-            str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
-            parser=fake_parser, scorer=fake_scorer, reporter=fake_reporter,
-        )
+        with patch("quodeq.services.score_run.load_params", return_value=fake_params):
+            _score_completed_evidence(
+                str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+                parser=fake_parser, scorer=fake_scorer, reporter=fake_reporter,
+            )
 
         fake_parser.assert_called_once()
         assert fake_parser.call_args.args[0] == jsonl
-        fake_scorer.assert_called_once_with(mock_evidence, mode="numerical", params=fake_scorer.call_args.kwargs["params"])
+        fake_scorer.assert_called_once_with(mock_evidence, mode="numerical", params=fake_params)
         fake_reporter.assert_called_once_with(mock_evidence, mock_scores, "security", eval_dir)
 
     def test_skips_already_scored(self, tmp_path):

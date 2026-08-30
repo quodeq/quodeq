@@ -166,7 +166,7 @@ class FilesystemActionProvider(ActionProvider):
         self._projects.invalidate()
 
     def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
-        return register_project_with_rollback(reports_dir, spec)
+        return register_project_with_rollback(reports_dir, spec, log=SHARED_LOG)
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         return _fs_projects.update_project_path(reports_dir, project, new_path)

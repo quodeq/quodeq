@@ -6,7 +6,7 @@ logger it used to import directly -- without importing it.
 """
 from __future__ import annotations
 
-from quodeq.core.evidence._req_mapping import QuarantinedFinding
+from quodeq.core.evidence import QuarantinedFinding
 from quodeq.core.observability import LogSink
 from quodeq.shared.logging import log_debug, log_error, log_info, log_warning
 
