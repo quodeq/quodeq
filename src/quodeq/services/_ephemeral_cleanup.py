@@ -6,7 +6,7 @@ import json
 import logging
 from pathlib import Path
 
-from quodeq.data.fs.shared_repo import remove_clone_dir
+from quodeq.services._wiring import remove_clone_dir
 
 _logger = logging.getLogger(__name__)
 

@@ -16,7 +16,7 @@ from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     dimension_queue_file,
     dimension_report_exists,
     ensure_dir,

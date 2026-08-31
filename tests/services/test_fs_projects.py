@@ -15,7 +15,7 @@ from quodeq.services._fs_projects import (
     delete_project,
     get_project_info,
 )
-from quodeq.services.ports import find_children
+from quodeq.services._wiring import find_children
 
 
 # ---------------------------------------------------------------------------

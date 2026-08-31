@@ -3,9 +3,8 @@
 The module-level functions (``read_run_data``, ``list_runs``, etc.) are the
 filesystem implementation — there is no ``RunStorage`` protocol here. A
 caller that needs a substitute injects a reader callable instead: see
-``ScoringDeps.read_run_data`` (``services/scoring/_deps.py``),
-``_trend_fetcher._default_read_run_scalars``, and
-``_run_lookup._make_caching_fetcher``.
+``ScoringDeps.read_run_data`` (``services/scoring/_deps.py``) and
+``_trend_fetcher._default_read_run_scalars``.
 """
 
 from __future__ import annotations
@@ -28,11 +27,6 @@ from quodeq.data.fs.report_parser._run_info import (
     safe_read_dir as safe_read_dir,
 )
 from quodeq.data.fs.report_parser.run_dates import project_run_dates
-from quodeq.data.fs.report_parser._run_lookup import (
-    RunLookupCache as RunLookupCache,
-    _get_previous_run_for_dimension as _get_previous_run_for_dimension,
-    _make_caching_fetcher as _make_caching_fetcher,
-)
 from quodeq.shared.validation import validate_path_segment
 
 _DEFAULT_RUN_LIMIT = 100

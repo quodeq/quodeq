@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from typing import Callable, Iterator
 
 from quodeq.core.types import DimensionResult
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     open_score_cache,
     read_cached_accumulated,
     read_cached_project_summary,

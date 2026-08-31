@@ -12,10 +12,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.data.fs.project_files import read_repository_info, write_repository_info
-from quodeq.data.git_cli import remote_origin_url_raw
-from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.data.fs.repo_validation import validate_remote_url
+from quodeq.services._wiring import (
+    ProjectIdentity,
+    read_repository_info,
+    remote_origin_url_raw,
+    resolve_project_uuid,
+    validate_remote_url,
+    write_repository_info,
+)
 from quodeq.services._fs_clone import CloneError, run_git_clone
 from quodeq.services._fs_project_helpers import find_existing_project
 from quodeq.services._fs_scan import scan_project

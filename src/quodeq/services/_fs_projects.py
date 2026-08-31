@@ -20,7 +20,7 @@ from quodeq.services._fs_project_helpers import (
     _build_project_entry,
     _max_projects_listed,
 )
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     find_children,
     is_valid_repo_url,
     list_runs,

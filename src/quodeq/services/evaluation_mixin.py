@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.services.ports import read_dispatched_cache_keys, remove_matching_files
+from quodeq.services._wiring import read_dispatched_cache_keys, remove_matching_files
 from quodeq.services.project_registration import mark_onboarding_complete, register_project
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.shared.provider_env import provider_env_exports

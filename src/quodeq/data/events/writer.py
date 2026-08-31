@@ -12,11 +12,12 @@ _logger = logging.getLogger(__name__)
 
 
 class EventLogWriter:
-    """
-    Thread-safe, append-only writer for the Quodeq Event Log (JSONL).
-    
-    This class is the sole authority for writing events to the immutable 
-    source of truth in the Core layer.
+    """Thread-safe, append-only writer for the Quodeq Event Log (JSONL).
+
+    Data-layer adapter: the sole writer of ``events.jsonl``, the immutable
+    source of truth. The event TYPES it serializes are core
+    (``core/events/models.py``); the file mechanics (locking, append, flush)
+    live here in ``data/events/``.
     """
 
     def __init__(self, log_path: Path):

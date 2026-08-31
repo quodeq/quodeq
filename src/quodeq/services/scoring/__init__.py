@@ -34,13 +34,18 @@ from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import find_children
 from quodeq.services.score_cache import (
     accumulated_cache_version,
     cached_accumulated,
     per_run_versions,
 )
-from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data, read_run_scalars
+from quodeq.services._wiring import (
+    RunInfo,
+    find_children,
+    list_runs,
+    read_run_data,
+    read_run_scalars,
+)
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.shared._env import env_int
 from quodeq.shared.validation import validate_path_segment
@@ -59,7 +64,7 @@ from quodeq.services.scoring._response_builders import (  # noqa: F401
     _build_totals_from_findings,
     _severity_bucket,
 )
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     SQLiteStateStore,
     SqliteFindingsRepository,
     load_suppression_rules,

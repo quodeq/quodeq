@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Protocol
 
-from quodeq.data.fs.standards_store import (
+from quodeq.services._wiring import (
     read_standard_payload, resolve_jailed_standard_path, write_standard_payload,
 )
 

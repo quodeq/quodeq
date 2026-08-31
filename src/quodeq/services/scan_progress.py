@@ -22,7 +22,7 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
     file_mtime,

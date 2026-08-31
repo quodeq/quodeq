@@ -5,9 +5,8 @@ import pytest
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
-from quodeq.services.dashboard import (
-    build_dashboard, clear_shared_dimension_cache, _SHARED_RUN_DIM_CACHE,
-)
+from quodeq.services._dashboard_cache import _shared_dimension_cache
+from quodeq.services.dashboard import build_dashboard, clear_shared_dimension_cache
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
 from quodeq.services.evidence_rescore import score_dimension_from_evidence
 from quodeq.services.score_cache import score_cache_version
@@ -25,7 +24,7 @@ def _isolate(tmp_path, monkeypatch):
 
 def _versions_in_shared_cache() -> set:
     """Return the suppression-version component of every 4-tuple shared-cache key."""
-    return {k[3] for k in _SHARED_RUN_DIM_CACHE if len(k) == 4}
+    return {k[3] for k in _shared_dimension_cache.keys() if len(k) == 4}
 
 
 def test_dismiss_produces_a_new_shared_cache_version(tmp_path):
@@ -33,7 +32,7 @@ def test_dismiss_produces_a_new_shared_cache_version(tmp_path):
     suppression version, so no read path can serve a pre-dismiss entry.
 
     A dismiss activates the trend fetcher's *heavy* (rescoring) path, which is
-    the one that populates ``_SHARED_RUN_DIM_CACHE``. Before the fix its keys
+    the one that populates the shared dimension cache. Before the fix its keys
     were 3-tuples with no version component, so ``_versions_in_shared_cache()``
     was empty and this assertion failed. After the fix the key carries the
     suppression hash from ``score_cache_version``.

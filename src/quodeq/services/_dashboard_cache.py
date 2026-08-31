@@ -66,12 +66,13 @@ class DimensionCache:
         with self.lock:
             self.data.clear()
 
+    def keys(self) -> list[tuple]:
+        """Return a snapshot list of the cache's current keys, under lock."""
+        with self.lock:
+            return list(self.data.keys())
+
 
 _shared_dimension_cache = DimensionCache()
-# Back-compat module-level names: some tests reach into the shared cache's
-# storage directly (iteration, ``.clear()``) rather than through the class.
-_SHARED_RUN_DIM_CACHE = _shared_dimension_cache.data
-_SHARED_RUN_DIM_LOCK = _shared_dimension_cache.lock
 
 
 def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:

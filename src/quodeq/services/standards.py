@@ -13,7 +13,7 @@ from quodeq.services._standards_io import default_read_json, default_write_json
 from quodeq.services._standards_queries import (
     check_builtin_id, get_standard, list_builtin, list_custom, load_cwe_list,
 )
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     compiled_exists as _compiled_exists,
     ensure_evaluators_dir as _ensure_evaluators_dir,
     remove_standard as _remove_standard,

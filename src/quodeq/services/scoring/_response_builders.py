@@ -20,8 +20,8 @@ from quodeq.core.types.dimension import DimensionResult, DimensionSummary, Grade
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import (
-    GradeTablesReader,
+from quodeq.services.ports import GradeTablesReader
+from quodeq.services._wiring import (
     SQLiteStateStore,
     load_suppression_rules,
     read_active_findings,
