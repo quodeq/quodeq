@@ -1,7 +1,9 @@
 """Validation and helper functions for evaluation routes."""
 from __future__ import annotations
 
+import os.path
 import re
+import shutil
 import time as _time
 from http import HTTPStatus
 
@@ -10,6 +12,7 @@ from flask import Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT, resolve_clean_scan
+from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 from quodeq.shared.validation import validate_relative_scope
 
 # Userinfo cannot contain an unencoded "/", so excluding it keeps matches
@@ -56,6 +59,50 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
+# Binary override charset: letters, digits, '.', '_', '-', ':' and path
+# separators. No whitespace or shell metacharacters, matching the posture of
+# shared.prereqs._SAFE_CMD_TOKEN_RE.
+_SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
+
+
+def _validate_ai_cmd_path(
+    ai_cmd: str | None, ai_cmd_path: str | None,
+) -> tuple[Response, int] | None:
+    """Return an error response if *ai_cmd_path* is not an acceptable binary
+    override for provider *ai_cmd*, or None if valid (or absent).
+
+    The aiCmd allow-list exists so the local HTTP API can never spawn an
+    arbitrary binary. A free-text override would reopen that, so it must
+    (a) contain no shell metacharacters, (b) resolve to an existing
+    executable, and (c) have a basename that starts with the provider id
+    (e.g. 'claude-api' or '/opt/bin/claude-max' for 'claude'), which keeps
+    the override an alternate install of the allowed CLI rather than a
+    redirect to any program.
+    """
+    if not ai_cmd_path:
+        return None
+
+    def _invalid(reason: str) -> tuple[Response, int]:
+        body, status = error_response(
+            f"Invalid AI command override: {reason}",
+            HTTPStatus.BAD_REQUEST,
+            "INVALID_INPUT",
+        )
+        return jsonify(body), status
+
+    if not _SAFE_CMD_PATH_RE.fullmatch(ai_cmd_path):
+        return _invalid(
+            "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
+        )
+    provider = ai_cmd or _get_ai_cmd()
+    basename = os.path.basename(ai_cmd_path.replace("\\", "/"))
+    if not basename.startswith(provider):
+        return _invalid(f"binary name must start with '{provider}'")
+    if shutil.which(ai_cmd_path) is None:
+        return _invalid(f"'{ai_cmd_path}' was not found or is not executable")
+    return None
+
+
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
@@ -78,6 +125,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         dimensions=payload.get("dimensions") or "",
         numerical=bool(payload.get("numerical")),
         ai_cmd=payload.get("aiCmd") or None,
+        ai_cmd_path=payload.get("aiCmdPath") or None,
         ai_model=ai_model,
         subagent_model=subagent_model,
         verify_findings=bool(payload.get("verifyFindings", True)),

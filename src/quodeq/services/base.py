@@ -52,6 +52,7 @@ class EvaluationOptions:
     dimensions: str = ""
     numerical: bool = False
     ai_cmd: str | None = None
+    ai_cmd_path: str | None = None
     ai_model: str | None = None
     subagent_model: str | None = None
     verify_findings: bool = True

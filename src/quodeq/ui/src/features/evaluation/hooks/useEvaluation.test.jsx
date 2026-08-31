@@ -413,4 +413,29 @@ describe("preparePayload honors caller-provided values", () => {
       expect.objectContaining({ aiCmd: "claude", aiModel: "sonnet", timeLimit: 1200 }),
     );
   });
+
+  it("includes the provider's command override when set", async () => {
+    localStorage.setItem("cc-claude-model", "sonnet");
+    localStorage.setItem("cc-claude-cmd-path", "/opt/bin/claude-api");
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j-w3", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [], aiCmd: "claude" });
+    });
+    expect(fakeApi.startEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({ aiCmdPath: "/opt/bin/claude-api" }),
+    );
+  });
+
+  it("omits the command when it still equals the provider default", async () => {
+    localStorage.setItem("cc-claude-model", "sonnet");
+    localStorage.setItem("cc-claude-cmd-path", "claude");
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j-w4", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: [], aiCmd: "claude" });
+    });
+    const payload = fakeApi.startEvaluation.mock.calls.at(-1)[0];
+    expect(payload).not.toHaveProperty("aiCmdPath");
+  });
 });

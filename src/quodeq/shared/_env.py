@@ -34,6 +34,17 @@ def get_ai_model(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("AI_MODEL") or None
 
 
+def get_ai_cmd_path(env: dict[str, str] | None = None) -> str | None:
+    """Return the binary override for the AI CLI (AI_CMD_PATH), or None.
+
+    When set, spawn sites use this as argv[0] instead of the provider id,
+    while the provider id (get_ai_cmd) keeps selecting the ai_providers.json
+    entry. Lets an alternate install or wrapper (e.g. a `claude-api` script
+    that switches CLAUDE_CONFIG_DIR) run with unchanged provider behavior.
+    """
+    return (env or os.environ).get("AI_CMD_PATH") or None
+
+
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
     """Read an environment variable as an int, warn and return *default* on failure."""
     return env_int(var, default, env=env)

@@ -143,6 +143,11 @@ class FsEvaluationMixin:
         base = env if env is not None else os.environ
         built_env = {**base, "PYTHONUNBUFFERED": "1"}
         built_env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
+        # Validated at the API boundary (_validate_ai_cmd_path); the scan
+        # subprocess spawns it as argv[0] while AI_CMD keeps keying the
+        # provider config (analysis._command._cmd_binary).
+        if options.ai_cmd_path:
+            built_env["AI_CMD_PATH"] = options.ai_cmd_path
         ai_model = options.ai_model or get_ai_model()
         subagent_model = options.subagent_model or ai_model
         # Ensure both env vars are set consistently — prevents model swapping

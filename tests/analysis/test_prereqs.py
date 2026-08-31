@@ -69,6 +69,22 @@ class TestCheckCliProvider:
         with patch("subprocess.run", return_value=result):
             _check_cli_provider("claude")
 
+    def test_override_resolving_binary_passes(self, monkeypatch):
+        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/claude-api")
+        with patch("quodeq.analysis.prereqs.shutil.which", return_value="/opt/bin/claude-api"):
+            _check_cli_provider("claude")
+
+    def test_override_missing_binary_raises(self, monkeypatch):
+        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/claude-api")
+        with patch("quodeq.analysis.prereqs.shutil.which", return_value=None):
+            with pytest.raises(RuntimeError, match="command override"):
+                _check_cli_provider("claude")
+
+    def test_override_with_shell_metachars_raises(self, monkeypatch):
+        monkeypatch.setenv("AI_CMD_PATH", "claude;rm")
+        with pytest.raises(RuntimeError, match="not a valid AI command override"):
+            _check_cli_provider("claude")
+
 
 class TestCheckApiProvider:
     def test_ollama_not_running_raises(self):

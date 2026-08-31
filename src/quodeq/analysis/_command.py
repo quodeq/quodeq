@@ -19,7 +19,7 @@ from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_confi
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.shared._models import normalize_model_id
-from quodeq.shared.utils import get_ai_cmd, get_ai_model
+from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path, get_ai_model
 
 _log = logging.getLogger(__name__)
 
@@ -42,9 +42,19 @@ def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
     return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
 
+def _cmd_binary(cmd: str) -> str:
+    """Return the binary to spawn for provider *cmd*.
+
+    AI_CMD_PATH (validated at the API boundary, see
+    api._evaluation_helpers._validate_ai_cmd_path) redirects the spawn to an
+    alternate install or wrapper while *cmd* keeps keying the provider config.
+    """
+    return get_ai_cmd_path() or cmd
+
+
 def _build_base_args(cmd: str, provider_cfg: dict) -> list[str]:
     """Build the initial args list: binary, subcommand, base args, and tools."""
-    args: list[str] = [cmd]
+    args: list[str] = [_cmd_binary(cmd)]
     subcommand = provider_cfg.get("cmd_subcommand", "")
     if subcommand:
         args.append(subcommand)
@@ -314,7 +324,7 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
         provider_cfg = _get_provider_configs().get(cmd, {})
         # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
         use_separator = provider_cfg.get("mcp_add_separator", True)
-        register_cmd = [cmd, "mcp", "add", name]
+        register_cmd = [_cmd_binary(cmd), "mcp", "add", name]
         if use_separator:
             register_cmd.append("--")
         register_cmd.extend(mcp_args)
@@ -334,7 +344,7 @@ def _unregister_cli_mcp(cmd: str, name: str) -> None:
         return
     try:
         subprocess.run(
-            [cmd, "mcp", "remove", name],
+            [_cmd_binary(cmd), "mcp", "remove", name],
             check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):

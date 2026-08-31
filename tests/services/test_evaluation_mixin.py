@@ -127,6 +127,17 @@ class TestBuildEvalEnv:
         assert env["AI_MODEL"] == "gpt-4"
         assert env["SUBAGENT_MODEL"] == "gpt-3.5"
 
+    def test_ai_cmd_path_exported(self):
+        m = self._mixin()
+        opts = EvaluationOptions(ai_cmd="claude", ai_cmd_path="/opt/bin/claude-api")
+        env = m._build_eval_env("/repo", opts, env={})
+        assert env["AI_CMD_PATH"] == "/opt/bin/claude-api"
+
+    def test_no_ai_cmd_path_not_exported(self):
+        m = self._mixin()
+        env = m._build_eval_env("/repo", EvaluationOptions(ai_cmd="claude"), env={})
+        assert "AI_CMD_PATH" not in env
+
     def test_no_verify(self):
         m = self._mixin()
         opts = EvaluationOptions(verify_findings=False)

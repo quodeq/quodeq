@@ -101,6 +101,10 @@ function preparePayload(payload, storage = localStorage) {
   if (apiKey) result.apiKey = apiKey;
   const apiBase = get("api-base");
   if (apiBase) result.apiBase = apiBase;
+  // The Settings field pre-fills the provider id as its default; only a
+  // real change is an override worth sending.
+  const cmdPath = get("cmd-path");
+  if (cmdPath && cmdPath !== provider) result.aiCmdPath = cmdPath;
   return result;
 }
 

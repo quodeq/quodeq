@@ -59,7 +59,7 @@ from quodeq.shared._repo import is_repo_url, project_name_from_repo  # noqa: F40
 # ---------------------------------------------------------------------------
 
 from quodeq.shared._env import (  # noqa: F401
-    get_ai_provider, get_ai_cmd, get_ai_model, _env_int,
+    get_ai_provider, get_ai_cmd, get_ai_model, get_ai_cmd_path, _env_int,
     get_action_api_port, get_action_api_host,
     get_dashboard_port, get_static_dist, get_evaluations_dir,
     get_anthropic_api_key, get_asvs_url,
@@ -91,7 +91,7 @@ __all__ = [
     # Repo URL helpers
     "is_repo_url", "project_name_from_repo",
     # Environment accessors
-    "get_ai_provider", "get_ai_cmd", "get_ai_model", "_env_int",
+    "get_ai_provider", "get_ai_cmd", "get_ai_model", "get_ai_cmd_path", "_env_int",
     "get_action_api_port", "get_action_api_host",
     "get_dashboard_port", "get_static_dist", "get_evaluations_dir",
     "get_anthropic_api_key", "get_asvs_url",

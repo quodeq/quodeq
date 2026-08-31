@@ -47,7 +47,9 @@ const DEFAULT_PROVIDER_ORDER = 50;
  * with. Exported so tests can pin display == payload.
  */
 export function defaultsForProvider(classification, providerId) {
-  if (classification === 'cli') return CLI_DEFAULTS;
+  // The launch command defaults to the provider id itself; the Advanced
+  // field shows it pre-filled so changing it is an edit, not a discovery.
+  if (classification === 'cli') return { ...CLI_DEFAULTS, 'cmd-path': providerId };
   if (classification === 'local-api') {
     if (providerId === 'llamacpp') return LLAMACPP_DEFAULTS;
     if (providerId === 'omlx') return OMLX_DEFAULTS;

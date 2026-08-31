@@ -15,6 +15,7 @@ from quodeq.api._evaluation_helpers import (
     _check_eval_rate_limit,
     _sanitize_url,
     _validate_ai_cmd,
+    _validate_ai_cmd_path,
 )
 from quodeq.api.helpers import error_response, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
@@ -138,6 +139,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         ai_cmd_error = _validate_ai_cmd(ai_cmd)
         if ai_cmd_error is not None:
             return ai_cmd_error
+        ai_cmd_path_error = _validate_ai_cmd_path(ai_cmd, payload.get("aiCmdPath") or None)
+        if ai_cmd_path_error is not None:
+            return ai_cmd_path_error
         # Require an explicit model for API-type providers (e.g. Ollama)
         if ai_cmd:
             ptype = get_provider_configs().get(ai_cmd, {}).get("type")
