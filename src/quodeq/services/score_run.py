@@ -13,7 +13,6 @@ from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
-from quodeq.analysis.report import write_dimension_report
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 from quodeq.services._wiring import (
@@ -25,6 +24,7 @@ from quodeq.services._wiring import (
     read_dimensions,
     read_queue_files_count,
     read_scan_total_files,
+    write_dimension_report,
 )
 
 _logger = logging.getLogger(__name__)

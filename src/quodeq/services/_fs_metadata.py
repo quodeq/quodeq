@@ -12,6 +12,7 @@ from quodeq.services._wiring import (
     RunInfo,
     read_repository_info,
     read_run_data,
+    read_scan_json,
     safe_read_dir,
     summarize_dimensions,
 )
@@ -25,17 +26,10 @@ if TYPE_CHECKING:
 
 def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
     """Read scan.json and return coverage fields, or empty dict if not available."""
-    scan_path = reports_root / entry_name / "scan.json"
-    if not scan_path.exists():
+    data = read_scan_json(reports_root / entry_name)
+    if data is None:
         return {}
-    try:
-        data = json.loads(scan_path.read_text(encoding="utf-8"))
-        return {
-            "scanDate": data.get("scanned_at"),
-            "totalFiles": data.get("total_files"),
-        }
-    except (json.JSONDecodeError, OSError):
-        return {}
+    return {"scanDate": data.get("scanned_at"), "totalFiles": data.get("total_files")}
 
 
 def _check_path_exists(path: str | None, location: str | None) -> bool | None:

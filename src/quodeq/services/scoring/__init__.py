@@ -31,6 +31,7 @@ from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fe
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.grade_formula import is_custom, load_params
+from quodeq.services.ports import StoreUnreadableError
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -134,7 +135,6 @@ def get_scores_raw(
     # without one, skip straight to the JSON-file fallback so we don't have
     # to wait on a no-op projection that will leave the grade tables empty.
     if not prefer_eval_rescore and (run_dir / "events.jsonl").is_file():
-        import sqlite3  # noqa: PLC0415
         try:
             repo = (d.findings_repo_factory or SqliteFindingsRepository)(run_dir)
             repo.ensure_projected()
@@ -144,7 +144,7 @@ def get_scores_raw(
                 return _build_response_from_grade_tables(
                     run_dir, params=params, store_factory=store_factory,
                 )
-        except sqlite3.DatabaseError:
+        except StoreUnreadableError:
             # evaluation.db is unreadable by this binary: it was written by a
             # newer Quodeq (SchemaVersionError, a DatabaseError subclass) or is
             # otherwise corrupt/half-written. Don't crash the score read; fall

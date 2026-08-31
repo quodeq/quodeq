@@ -17,7 +17,6 @@ applies when it builds the scored report.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
@@ -31,9 +30,8 @@ from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
     is_dismissed,
 )
 from quodeq.shared.validation import validate_path_segment
-from quodeq.services._wiring import (  # noqa: F401 — re-exported API
-    load_suppression_rules,
-)
+from quodeq.services._wiring import load_suppression_rules  # noqa: F401 — re-exported API
+from quodeq.services._wiring import read_req_to_principle_map
 
 _TYPE_VIOLATION = "violation"
 
@@ -90,23 +88,7 @@ def load_req_to_principle(
     if not evaluators_dir.is_dir():
         return {}
     validate_path_segment(dimension)
-    path = evaluators_dir / f"{dimension}.json"
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return {}  # valid JSON but not an object: degrade, don't crash
-        mapping: dict[str, str] = {}
-        for p in data.get("principles", []):
-            pname = p.get("name", "")
-            for req in p.get("requirements", []):
-                rid = req.get("id", "")
-                if rid and pname:
-                    mapping[rid] = pname
-        return mapping
-    except (OSError, ValueError):
-        return {}
+    return read_req_to_principle_map(evaluators_dir, dimension) or {}
 
 
 def project_suppressions(project_dir: Path) -> tuple[frozenset, frozenset]:

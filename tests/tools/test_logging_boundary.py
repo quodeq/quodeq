@@ -43,7 +43,6 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/cache/dimension_helpers.py': 'Dimension-level cache helpers bridging RunConfig and the filesystem - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/dimension_runner.py': 'V2 cache-aware dimension processor composing the B4 cache helpers - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/gc.py': 'One-time garbage collection of cache entries from an older schema - out of scope for this sweep (not a flagged per-site conversion)',
-    'analysis/cache/local.py': 'Local filesystem cache backend - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/tiered.py': 'Tiered cache - local-first with optional remote fallback - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/checks/runner.py': "Run a dimension's deterministic checkers and fold the results into its evidence - out of scope for this sweep (not a flagged per-site conversion)",
     'analysis/dimension_runner.py': 'DimensionRunner: named seam for single-dimension analysis - out of scope for this sweep (not a flagged per-site conversion)',

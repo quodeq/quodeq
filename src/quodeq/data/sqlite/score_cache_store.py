@@ -222,6 +222,30 @@ def store_run_keys_best_effort(
         _logger.warning("run_keys open failed for %s/%s", project, run_id, exc_info=True)
 
 
+def read_all_cached_rows(
+    conn: sqlite3.Connection, project: str,
+) -> dict[tuple[str, str], list[DimensionResult]]:
+    """Every cached scalar row for *project*, grouped by (run_id, version).
+
+    Empty dict on any sqlite3.Error (missing table included) -- the caller
+    (the bulk-load path in ``services._score_cache_fetch``) treats an empty
+    result as "nothing cached yet", not an error.
+    """
+    by_run_version: dict[tuple[str, str], list[DimensionResult]] = {}
+    try:
+        rows = conn.execute(
+            "SELECT run_id, version, dimension, overall_score, overall_grade "
+            "FROM run_scalars WHERE project=? ORDER BY run_id, dimension",
+            (project,),
+        )
+        for rid, ver, dim, score, grade in rows:
+            by_run_version.setdefault((rid, ver), []).append(
+                DimensionResult(dimension=dim, overall_score=score, overall_grade=grade))
+    except sqlite3.Error:
+        return {}
+    return by_run_version
+
+
 def read_project_summary_cached(project: str, version: str) -> dict | None:
     """Leak-free wrapper: open the cache, read one project-summary row, close.
 

@@ -362,8 +362,16 @@ def _wait_for_terminal_status(
 
 
 def _open_cache():
-    """Lazily construct the default cache backend (import kept local)."""
-    from quodeq.analysis.cache import LocalFileBackend
+    """Lazily construct the default cache backend (import kept local).
+
+    Deferred rather than routed through ``services._wiring``: ``_wiring`` is
+    imported by nearly every services module (including ``services.scoring``,
+    itself reachable from ``tests/core``), and ``LocalFileBackend``'s module
+    reaches the top-level ``quodeq`` package (via ``CacheEntry.quodeq_version``),
+    which deferred-imports ``quodeq.cli`` -> httpx/pydantic. Keeping this
+    import local keeps that framework chain out of ``_wiring``'s reach.
+    """
+    from quodeq.data.cache_store.local import LocalFileBackend
     return LocalFileBackend()
 
 
@@ -417,13 +425,13 @@ class _CacheEraser(Protocol):
     """The one cache-backend method ``_discard_run_state`` needs.
 
     A local structural type instead of importing
-    ``analysis.cache.backend.CacheBackend``: services/ must not import
-    analysis/ (see ARCHITECTURE.md layering). ``LocalFileBackend`` (returned
-    by ``_open_cache``, and every other real cache backend) satisfies this
-    shape without any inheritance. Defined after ``_discard_run_state``
-    (referenced there only as a deferred string annotation, per
-    ``from __future__ import annotations``) so it doesn't shift the
-    baseline-pinned lazy import inside ``_open_cache`` above.
+    ``data.cache_store.backend.CacheBackend`` directly: this Protocol is the
+    injection seam ``_discard_run_state`` tests against, independent of
+    which concrete backend ``_open_cache`` returns. ``LocalFileBackend``
+    (returned by ``_open_cache``, and every other real cache backend)
+    satisfies this shape without any inheritance. Defined after
+    ``_discard_run_state`` (referenced there only as a deferred string
+    annotation, per ``from __future__ import annotations``).
     """
 
     def delete(self, key: str) -> None: ...

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextvars
 import logging
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +24,7 @@ from quodeq.services._wiring import (
     is_valid_repo_url,
     list_runs,
     read_repository_info,
+    remove_project_dir,
     repository_info_exists,
     safe_read_dir,
     write_repository_info,
@@ -200,15 +200,11 @@ def delete_project(reports_dir: str, project: str) -> bool:
     children_removed = True
     for child_id in find_children(reports_root, project):
         child_path = reports_root / child_id
-        try:
-            shutil.rmtree(child_path)
-        except OSError:
+        if not remove_project_dir(child_path):
             _logger.warning("Could not remove child project directory %s", child_path)
             children_removed = False
 
-    try:
-        shutil.rmtree(project_path)
-    except OSError:
+    if not remove_project_dir(project_path):
         return False
     return children_removed
 

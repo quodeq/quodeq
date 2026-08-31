@@ -7,5 +7,6 @@ swap touches ``_wiring`` + ``data/``, never the consumers of this module.
 """
 from __future__ import annotations
 
+from quodeq.data.ports.errors import StoreUnreadableError  # noqa: F401
 from quodeq.data.ports.grade_tables import GradeTablesReader  # noqa: F401
 from quodeq.data.ports.standards_store import StandardsStore  # noqa: F401

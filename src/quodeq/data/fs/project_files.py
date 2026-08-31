@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import shutil
 from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
@@ -69,3 +70,25 @@ def write_scan_json(scan: ScanData, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(dataclasses.asdict(scan), indent=2)
     (output_dir / SCAN_FILENAME).write_text(payload, encoding="utf-8")
+
+
+def read_scan_json(project_dir: Path) -> dict | None:
+    """Parsed ``scan.json``, or None when absent, corrupt, or not a JSON
+    object. Mirrors :func:`read_repository_info`'s contract."""
+    path = project_dir / SCAN_FILENAME
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def remove_project_dir(project_dir: Path) -> bool:
+    """Remove *project_dir* and everything under it. False on failure."""
+    try:
+        shutil.rmtree(project_dir)
+    except OSError:
+        return False
+    return True

@@ -20,7 +20,9 @@ from __future__ import annotations
 # Per-project JSON artifacts: repository_info.json, scan.json.
 from quodeq.data.fs.project_files import (  # noqa: F401
     read_repository_info,
+    read_scan_json,
     read_scan_total_files,
+    remove_project_dir,
     repository_info_exists,
     write_repository_info,
 )
@@ -31,6 +33,19 @@ from quodeq.data.fs.deleted_store import (  # noqa: F401
     read_deleted_entries,
     write_deleted_entries,
 )
+
+# Per-dimension report file builder + writer.
+from quodeq.data.fs.dimension_report._report_io import write_dimension_report  # noqa: F401
+
+# NOTE: LocalFileBackend (data.cache_store.local) is deliberately NOT
+# re-exported here. Its module (via CacheEntry.quodeq_version) reaches the
+# top-level ``quodeq`` package, whose ``main()`` deferred-imports
+# ``quodeq.cli`` -- which pulls httpx/pydantic. This module is imported by
+# nearly every services module (including services/scoring, itself reached
+# from tests/core), so adding the edge here would make httpx/pydantic
+# transitively reachable from inner-layer test files
+# (tests/tools/test_no_framework_transitivity.py). evaluation_mixin.py keeps
+# a narrowly-scoped deferred import instead (see its ``_open_cache``).
 
 # Run-directory readers and discard-time cleanup mechanics.
 from quodeq.data.fs.run_files import (  # noqa: F401
@@ -103,6 +118,13 @@ from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_need
 # Per-project suppression_rules.json pattern store.
 from quodeq.data.fs.suppression_rules import load_suppression_rules  # noqa: F401
 
+# Evaluator req-id -> principle-name mapping.
+from quodeq.data.fs.standards_loader import read_req_to_principle_map  # noqa: F401
+
+# AI client discovery: CLI ``/models`` subprocess + Anthropic HTTP API.
+from quodeq.data.cli_models import run_cli_models_command  # noqa: F401
+from quodeq.data.anthropic_models import fetch_anthropic_models  # noqa: F401
+
 # Run discovery + report aggregation (filesystem report parser).
 from quodeq.data.fs.report_parser.runs import (  # noqa: F401
     RunInfo,
@@ -161,6 +183,7 @@ from quodeq.data.sqlite.score_cache_db import (  # noqa: F401
 from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
     load_run_keys,
     load_run_keys_or_empty,
+    read_all_cached_rows,
     read_cached_accumulated,
     read_cached_project_summary,
     read_cached_rows,
