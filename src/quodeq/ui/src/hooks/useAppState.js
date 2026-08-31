@@ -157,6 +157,26 @@ export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedS
   }, [rootTab, selectedProject, selectedSource, queryClient]);
 }
 
+/**
+ * The sidebar's active-tab fallback rule: a known top-level page passes
+ * through, a drill-down page tagged with `sourceTab` falls back to that tab
+ * when it is itself a known tab, `history-run` buckets under `history`, and
+ * everything else defaults to Overview.
+ *
+ * Caveat: a drill-down page pushed WITHOUT a `sourceTab` (e.g. ExplorerPage's
+ * onPrincipleClick -> 'evalprinciple', handleCardNavigate -> 'file') hits the
+ * Overview fallback here even while the user is still mid-triage inside
+ * Violations/Map. That is WHY useOverviewReturnReconcile above gates its
+ * refetch on `rootTab` (navStack[0].page) instead of this derived value —
+ * see its comment.
+ */
+export function resolveActiveTab(activePage) {
+  if (KNOWN_TABS.includes(activePage.page)) return activePage.page;
+  if (activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab)) return activePage.sourceTab;
+  if (activePage.page === TAB_HISTORY_RUN) return 'history';
+  return TAB_OVERVIEW;
+}
+
 export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
@@ -197,10 +217,7 @@ export function useAppState() {
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, selectedSource, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
 
-  const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
-    : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
-    : activePage.page === TAB_HISTORY_RUN ? 'history'
-    : TAB_OVERVIEW;
+  const activeTab = resolveActiveTab(activePage);
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useStandardDetail } from '../hooks/useStandardDetail.js';
 import { useStandardsOverrides } from '../hooks/useStandardsOverrides.js';
-import { applyParamOverride, countCustomizedRequirements } from '../overridesModel.js';
+import { applyParamOverride, countCustomizedRequirements, decideSave } from '../overridesModel.js';
 import { useAppState } from '../../../hooks/useAppState.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
@@ -181,9 +181,9 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved, onR
     if (!overridesDirty) { await commitSave(); return; }
     try {
       const impact = await previewOverrides(overrides);
-      const changed = impact?.changedDimensions || [];
-      if (changed.length === 0) { await commitSave(); return; }
-      setPendingImpact(changed);
+      const decision = decideSave({ overridesDirty, impact });
+      if (decision === 'commit') { await commitSave(); return; }
+      setPendingImpact(decision.confirm);
     } catch (err) {
       setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
     }

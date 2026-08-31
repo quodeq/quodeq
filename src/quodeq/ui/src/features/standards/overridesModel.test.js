@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyParamOverride, countCustomizedRequirements } from './overridesModel.js';
+import { applyParamOverride, countCustomizedRequirements, decideSave } from './overridesModel.js';
 
 // ---------------------------------------------------------------------------
 // applyParamOverride
@@ -64,4 +64,29 @@ test('countCustomizedRequirements: zero when there are no overrides', () => {
 test('countCustomizedRequirements: handles a standard with no principles', () => {
   assert.equal(countCustomizedRequirements({}, { 'REQ-1': {} }), 0);
   assert.equal(countCustomizedRequirements(null, { 'REQ-1': {} }), 0);
+});
+
+// ---------------------------------------------------------------------------
+// decideSave
+// ---------------------------------------------------------------------------
+
+test('decideSave: commits outright when there is no drafted overrides change', () => {
+  assert.equal(decideSave({ overridesDirty: false, impact: { changedDimensions: ['security'] } }), 'commit');
+  assert.equal(decideSave({ overridesDirty: false, impact: null }), 'commit');
+});
+
+test('decideSave: commits when the preview reports no changed dimensions', () => {
+  assert.equal(decideSave({ overridesDirty: true, impact: { changedDimensions: [] } }), 'commit');
+});
+
+test('decideSave: commits when the preview omits changedDimensions entirely', () => {
+  assert.equal(decideSave({ overridesDirty: true, impact: {} }), 'commit');
+  assert.equal(decideSave({ overridesDirty: true, impact: null }), 'commit');
+});
+
+test('decideSave: asks for confirmation when the preview reports changed dimensions', () => {
+  assert.deepEqual(
+    decideSave({ overridesDirty: true, impact: { changedDimensions: ['security', 'maintainability'] } }),
+    { confirm: ['security', 'maintainability'] },
+  );
 });

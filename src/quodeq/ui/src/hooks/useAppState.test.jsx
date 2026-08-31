@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAppState, useOverviewReturnReconcile, TAB_OVERVIEW, KNOWN_TABS } from './useAppState.js';
+import { useAppState, useOverviewReturnReconcile, resolveActiveTab, TAB_OVERVIEW, KNOWN_TABS } from './useAppState.js';
 import { useNavStack } from './useNavStack.js';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { ApiProvider } from '../api/ApiContext.jsx';
@@ -175,17 +175,32 @@ describe('useOverviewReturnReconcile regression: untagged drill-down pages do no
     expect(spy).not.toHaveBeenCalled();
   });
 
-  // Documents WHY rootTab (not activeTab) is required: useAppState.js's
-  // activeTab fallback formula, replayed here verbatim against the exact
-  // untagged 'evalprinciple' page ExplorerPage.onPrincipleClick pushes,
-  // resolves to TAB_OVERVIEW -- the misclassification the reviewer flagged.
-  it('the legacy activeTab-fallback formula misclassifies the same untagged page as overview', () => {
+  // Documents WHY rootTab (not activeTab) is required: resolveActiveTab,
+  // called directly against the exact untagged 'evalprinciple' page
+  // ExplorerPage.onPrincipleClick pushes, resolves to TAB_OVERVIEW -- the
+  // misclassification the reviewer flagged. Intentional: see the doc
+  // comment on resolveActiveTab.
+  it('resolveActiveTab misclassifies the same untagged page as overview', () => {
     const activePage = { page: 'evalprinciple', evalPrincipal: { principle: 'P' } };
-    const legacyActiveTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
-      : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
-      : activePage.page === 'history-run' ? 'history'
-      : TAB_OVERVIEW;
-    expect(legacyActiveTab).toBe(TAB_OVERVIEW);
+    expect(resolveActiveTab(activePage)).toBe(TAB_OVERVIEW);
+  });
+
+  // Direct coverage of resolveActiveTab's other branches.
+  it('resolveActiveTab: a known top-level page passes through', () => {
+    expect(resolveActiveTab({ page: 'violations' })).toBe('violations');
+  });
+
+  it('resolveActiveTab: falls back to sourceTab when that is itself a known tab', () => {
+    expect(resolveActiveTab({ page: 'explorer', sourceTab: 'violations' })).toBe('violations');
+  });
+
+  it('resolveActiveTab: an unknown page with no usable sourceTab falls back to history for history-run', () => {
+    expect(resolveActiveTab({ page: 'history-run' })).toBe('history');
+  });
+
+  it('resolveActiveTab: an unknown page with an unknown/empty sourceTab defaults to overview', () => {
+    expect(resolveActiveTab({ page: 'evalprinciple', sourceTab: '' })).toBe(TAB_OVERVIEW);
+    expect(resolveActiveTab({ page: 'evalprinciple', sourceTab: 'not-a-tab' })).toBe(TAB_OVERVIEW);
   });
 
   it('still refetches on a genuine return to Overview after the same drill-down', () => {

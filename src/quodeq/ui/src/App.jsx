@@ -41,6 +41,7 @@ import {
 import {
   shouldBounceToEvaluate, shouldShowEvaluateButton, resolveProjectDisplayName,
   shouldShowProjectTabs, selectSidebarCounts, shouldRedirectToRemoteRepositories,
+  shouldShowCompareTab,
 } from './appGating.js';
 import {
   buildAssistantSessionPayload, buildAssistantActionAppliedHandler,
@@ -433,14 +434,10 @@ export default function App() {
                 hasCurrentProjectRuns,
                 sharedProjectInfo: state.sharedProjectInfo,
               })}
-              // Compare needs two analyzed projects to rank anything; below
-              // that the tab is redundant and stays hidden. Remote projects
-              // from the shared repository count toward the pair: one local
-              // project plus published teammates is a comparable fleet.
-              showCompareTab={(() => {
-                const localWithRuns = state.projects.filter((p) => (p.runsCount ?? 0) > 0).length;
-                return localWithRuns >= 2 || (localWithRuns >= 1 && sharedSignal.hasContent);
-              })()}
+              showCompareTab={shouldShowCompareTab({
+                projects: state.projects,
+                sharedHasContent: sharedSignal.hasContent,
+              })}
               selectedSource={state.selectedSource}
               projectInfo={{
                 displayName: resolvedDisplayName,

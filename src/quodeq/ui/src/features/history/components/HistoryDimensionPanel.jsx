@@ -13,6 +13,7 @@ import {
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import { cssVar } from '../../../components/scoreChartHelpers.js';
+import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { t } from '../../../strings/index.js';
 
 // Domain constants that match backend scoring tiers (see grading.py).
@@ -101,8 +102,7 @@ function prepareDimensionData(dimensions) {
     .sort((a, b) => a.dimension.localeCompare(b.dimension))
     .map((d) => {
       const curr = parseFloat(d.overallScore);
-      const prev = parseFloat(d.previousScore);
-      const delta = !isNaN(curr) && !isNaN(prev) ? curr - prev : null;
+      const delta = fallbackDelta(d);
       return { ...d, numericScore: isNaN(curr) ? 0 : curr, delta };
     });
 }
