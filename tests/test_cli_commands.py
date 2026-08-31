@@ -197,9 +197,11 @@ class TestBuildRunConfig:
         args = argparse.Namespace(
             dimensions=None, no_consolidated=False, no_verify=False,
             max_turns=None, max_duration=None, n_subagents=5,
-            pool_budget=None, clean_scan=True, legacy_incremental=False, _single_file=True,
+            pool_budget=None, clean_scan=True, legacy_incremental=False,
         )
-        inputs = ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data={})
+        inputs = ResolvedInputs(
+            src=tmp_path, language="python", manifest=None, dims_data={}, single_file=True,
+        )
         config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={})
         assert config.options.consolidated is False
 

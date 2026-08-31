@@ -21,10 +21,11 @@ from quodeq.api._assistant_helpers import (
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
 from quodeq.assistant import get_provider_configs
+from quodeq.assistant.apply_action import apply_drafted_action
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest, run_turn, write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
-from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES, ACTIONS, ActionConflict
+from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import read_state
 from quodeq.services.shared_settings import read_settings
@@ -413,39 +414,20 @@ def register_assistant_routes(app: Flask) -> None:
     @app.post("/api/assistant/actions/<action_id>/apply")
     def apply_assistant_action(action_id: str):
         repo = get_repository(app)
-        action = repo.get_action(action_id)
-        if action is None:
+        outcome = apply_drafted_action(repo, action_id, build_action_context(current_app))
+        if outcome.kind == "unknown_action":
             return jsonify({"error": "unknown action"}), 404
-        owner = repo.get_session(action["session_id"])
-        if owner is not None and (owner.get("source") or "local") == "shared":
-            # Defense in depth: read-only sessions never draft actions
-            # (draft_action is not registered), so nothing legitimate reaches
-            # here. Refuse rather than mutate the local store under a shared
-            # project id.
+        if outcome.kind == "read_only":
             return jsonify({"error": "read-only session"}), 403
-        if action["status"] != "drafted":
-            return jsonify({"error": f"action already {action['status']}"}), 409
-        spec = ACTIONS.get(action["action_type"])
-        if spec is None:
+        if outcome.kind == "already":
+            return jsonify({"error": f"action already {outcome.detail}"}), 409
+        if outcome.kind == "unsupported":
             return jsonify({"error": "unsupported action type"}), 400
-        # Atomically claim the drafted->applied transition BEFORE running the
-        # side effect, so a double-click / two-tab race can't run spec.apply
-        # twice (which double-ran the dismiss rescore). The loser sees a
-        # non-drafted row and 409s. On failure we release back to drafted so
-        # the user can retry.
-        if not repo.set_action_status(action_id, "applied", expected="drafted"):
-            fresh = repo.get_action(action_id)
-            state = fresh["status"] if fresh else "gone"
-            return jsonify({"error": f"action already {state}"}), 409
-        try:
-            result = spec.apply(action["payload"], build_action_context(current_app))
-        except ValueError as exc:
-            repo.set_action_status(action_id, "drafted")
-            return jsonify({"error": str(exc)}), 400
-        except ActionConflict as exc:
-            repo.set_action_status(action_id, "drafted")
-            return jsonify({"error": str(exc)}), 409
-        return jsonify({"applied": True, "result": result}), 200
+        if outcome.kind == "invalid":
+            return jsonify({"error": outcome.detail}), 400
+        if outcome.kind == "conflict":
+            return jsonify({"error": outcome.detail}), 409
+        return jsonify({"applied": True, "result": outcome.result}), 200
 
     @app.post("/api/assistant/actions/<action_id>/reject")
     def reject_assistant_action(action_id: str):

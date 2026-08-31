@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 if sys.platform != "win32":
@@ -175,3 +176,19 @@ class FindingsRouter:
                         "FindingsRouter: on_file_done callback raised for %s", file,
                         exc_info=True,
                     )
+
+
+def write_skip_markers(jsonl_file: Path, skipped: list[str], reason: str) -> None:
+    """Append ``file_done: skipped`` markers for taken-but-undispatched files.
+
+    Invariant: every file taken from a queue must end with a marker. A
+    silent drop leaves the file uncached, so every incremental run re-queues
+    and re-drops it — the dim never converges (the perpetual-97% bug).
+    ``skipped`` (unlike ``error``) does not feed the failure-streak breaker
+    or the post-run reachability guard.
+    """
+    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(jsonl_file, "a", encoding="utf-8") as fh:
+        router = FindingsRouter(fh)
+        for f in skipped:
+            router.mark_file_done(file=f, status="skipped", reason=reason)

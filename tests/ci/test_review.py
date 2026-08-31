@@ -107,8 +107,8 @@ def test_review_subcommand_defaults():
 
 
 def test_handle_review_default_does_not_pass_dimensions(tmp_path):
-    """When no --dimensions flag is given, handle_review must NOT pass --dimensions
-    to the evaluate sub-parser, so the evaluate command defaults to all dimensions."""
+    """When no --dimensions flag is given, handle_review must pass
+    dimensions=None so the evaluate entry defaults to all dimensions."""
     from unittest.mock import MagicMock, patch
     import json
     import argparse
@@ -126,43 +126,12 @@ def test_handle_review_default_does_not_pass_dimensions(tmp_path):
     repo_result = MagicMock()
     repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
 
-    captured_argv = []
-
-    def fake_parse_args(argv):
-        captured_argv.extend(argv)
-        # Return a minimal Namespace so handle_review can continue
-        ns = argparse.Namespace(
-            dimensions=None,
-            repo=".",
-            incremental=True,
-            output=str(tmp_path),
-            pool_budget=300,
-            mode=None,
-            max_turns=None,
-            max_duration=None,
-            n_subagents=1,
-            no_verify=False,
-            no_consolidated=False,
-            dry_run=True,
-            evidence_only=False,
-            no_prescan=False,
-            language=None,
-            branch=None,
-            scope=None,
-        )
-        return ns
-
     with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq.cli_parser.build_parser") as mock_build_parser, \
-         patch("quodeq._cli_evaluation.run_evaluate", return_value=0):
-        mock_parser = MagicMock()
-        mock_parser.parse_args.side_effect = fake_parse_args
-        mock_build_parser.return_value = mock_parser
-
+         patch("quodeq._cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
         from quodeq.ci.review import handle_review
         handle_review(args)
 
-    assert "--dimensions" not in captured_argv
+    assert mock_run.call_args.kwargs["dimensions"] is None
 
 
 def test_handle_review_expands_dimension_alias(tmp_path):
@@ -184,43 +153,12 @@ def test_handle_review_expands_dimension_alias(tmp_path):
     repo_result = MagicMock()
     repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
 
-    captured_argv = []
-
-    def fake_parse_args(argv):
-        captured_argv.extend(argv)
-        ns = argparse.Namespace(
-            dimensions="security",
-            repo=".",
-            incremental=True,
-            output=str(tmp_path),
-            pool_budget=300,
-            mode=None,
-            max_turns=None,
-            max_duration=None,
-            n_subagents=1,
-            no_verify=False,
-            no_consolidated=False,
-            dry_run=True,
-            evidence_only=False,
-            no_prescan=False,
-            language=None,
-            branch=None,
-            scope=None,
-        )
-        return ns
-
     with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq.cli_parser.build_parser") as mock_build_parser, \
-         patch("quodeq._cli_evaluation.run_evaluate", return_value=0):
-        mock_parser = MagicMock()
-        mock_parser.parse_args.side_effect = fake_parse_args
-        mock_build_parser.return_value = mock_parser
-
+         patch("quodeq._cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
         from quodeq.ci.review import handle_review
         handle_review(args)
 
-    idx = captured_argv.index("--dimensions")
-    assert captured_argv[idx + 1] == "security"
+    assert mock_run.call_args.kwargs["dimensions"] == "security"
 
 
 def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkeypatch):
@@ -228,25 +166,19 @@ def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkey
     import argparse
     from quodeq.ci.review import handle_review
 
-    captured_argv: list[list[str]] = []
+    captured_calls: list[dict] = []
 
-    def fake_parse_args(argv):
-        captured_argv.append(list(argv))
-        # Return a minimal namespace; run_evaluate is mocked separately.
-        return argparse.Namespace()
+    def fake_run_diff_evaluation(src, **kwargs):
+        captured_calls.append({"src": src, **kwargs})
+        return 0
 
     monkeypatch.setattr("quodeq.ci.review.detect_pr", lambda pr_override=None: (42, "develop"))
     monkeypatch.setattr("quodeq.ci.review.get_repo_info", lambda: ("owner", "repo"))
     monkeypatch.setattr("quodeq.ci.review.get_github_token", lambda: "t")
     monkeypatch.setattr("quodeq.ci.review.snapshot_run_dirs", lambda d: set())
-    # run_evaluate and build_parser are imported INSIDE handle_review; patch
-    # them at their source modules so the in-function imports pick up the
-    # patches.
-    monkeypatch.setattr("quodeq._cli_evaluation.run_evaluate", lambda args: 0)
-    monkeypatch.setattr(
-        "quodeq.cli_parser.build_parser",
-        lambda: type("P", (), {"parse_args": staticmethod(fake_parse_args)})(),
-    )
+    # run_diff_evaluation is imported INSIDE handle_review; patch it at its
+    # source module so the in-function import picks up the patch.
+    monkeypatch.setattr("quodeq._cli_evaluation.run_diff_evaluation", fake_run_diff_evaluation)
     # short-circuit the post/report stage for this test. load_violations_from_evidence
     # is imported inside handle_review, so patch at its source.
     monkeypatch.setattr(
@@ -262,13 +194,11 @@ def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkey
     rc = handle_review(args)
     # handle_review may exit 1 if no new runs are found (expected — we mock
     # snapshot_run_dirs to return empty both before and after). We don't care
-    # about the exit code for this test; we care about the argv built for
-    # evaluate.
-    assert captured_argv, "review did not build an evaluate argv"
-    argv = captured_argv[0]
-    assert "--diff-from" in argv
-    assert "origin/develop" in argv
-    assert "--incremental" not in argv
+    # about the exit code for this test; we care about the evaluation call.
+    assert captured_calls, "review did not run a diff evaluation"
+    call = captured_calls[0]
+    assert call["base_ref"] == "origin/develop"
+    assert "incremental" not in call
 
 
 def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys):
@@ -298,10 +228,9 @@ def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys)
 
     monkeypatch.setattr("quodeq.ci.review.detect_pr", lambda pr_override=None: (42, "develop"))
     monkeypatch.setattr("quodeq.ci.review.get_repo_info", lambda: ("owner", "repo"))
-    monkeypatch.setattr("quodeq._cli_evaluation.run_evaluate", lambda args: 0)
     monkeypatch.setattr(
-        "quodeq.cli_parser.build_parser",
-        lambda: type("P", (), {"parse_args": staticmethod(lambda argv: argparse.Namespace())})(),
+        "quodeq._cli_evaluation.run_diff_evaluation",
+        lambda src, **kwargs: 0,
     )
 
     args = argparse.Namespace(
@@ -337,39 +266,54 @@ def test_handle_review_time_limit_zero_means_unlimited(tmp_path):
     repo_result = MagicMock()
     repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
 
-    captured_argv = []
-
-    def fake_parse_args(argv):
-        captured_argv.extend(argv)
-        return argparse.Namespace(
-            dimensions=None,
-            repo=".",
-            incremental=True,
-            output=str(tmp_path),
-            pool_budget=0,
-            mode=None,
-            max_turns=None,
-            max_duration=None,
-            n_subagents=1,
-            no_verify=False,
-            no_consolidated=False,
-            dry_run=True,
-            evidence_only=False,
-            no_prescan=False,
-            language=None,
-            branch=None,
-            scope=None,
-        )
-
     with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq.cli_parser.build_parser") as mock_build_parser, \
-         patch("quodeq._cli_evaluation.run_evaluate", return_value=0):
-        mock_parser = MagicMock()
-        mock_parser.parse_args.side_effect = fake_parse_args
-        mock_build_parser.return_value = mock_parser
-
+         patch("quodeq._cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
         from quodeq.ci.review import handle_review
         handle_review(args)
 
-    idx = captured_argv.index("--time-limit")
-    assert captured_argv[idx + 1] == "0"
+    assert mock_run.call_args.kwargs["time_limit"] == 0
+
+
+def test_run_diff_evaluation_builds_evaluate_namespace(tmp_path):
+    """The typed entry hands the REAL parser an evaluate argv; assert the
+    resulting namespace fields (argv round-trip stays inside the CLI pkg)."""
+    from unittest.mock import patch
+    from quodeq._cli_evaluation import run_diff_evaluation
+
+    captured = {}
+
+    def fake_run_evaluate(ns):
+        captured["ns"] = ns
+        return 0
+
+    with patch("quodeq._cli_evaluation.run_evaluate", fake_run_evaluate):
+        rc = run_diff_evaluation(
+            ".", base_ref="origin/main", output_dir=tmp_path,
+            dimensions="security", time_limit=120,
+        )
+
+    assert rc == 0
+    ns = captured["ns"]
+    assert ns.repo == "."
+    assert ns.diff_from == "origin/main"
+    assert ns.output == str(tmp_path)
+    assert ns.dimensions == "security"
+    assert ns.pool_budget == 120  # --time-limit shares the pool_budget dest
+
+
+def test_run_diff_evaluation_defaults(tmp_path):
+    from unittest.mock import patch
+    from quodeq._cli_evaluation import run_diff_evaluation
+
+    captured = {}
+
+    def fake_run_evaluate(ns):
+        captured["ns"] = ns
+        return 0
+
+    with patch("quodeq._cli_evaluation.run_evaluate", fake_run_evaluate):
+        run_diff_evaluation(".", base_ref="origin/develop", output_dir=tmp_path)
+
+    ns = captured["ns"]
+    assert ns.dimensions is None
+    assert ns.pool_budget == 300

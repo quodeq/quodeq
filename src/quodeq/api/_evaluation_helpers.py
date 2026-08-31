@@ -6,6 +6,7 @@ import os.path
 import re
 import shutil
 import time as _time
+from collections.abc import Mapping
 from http import HTTPStatus
 
 from flask import Response, jsonify, request
@@ -87,6 +88,19 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
             f"Invalid AI command. Allowed: {allowed_list}",
             HTTPStatus.BAD_REQUEST,
             "INVALID_INPUT",
+        )
+        return jsonify(body), status
+    return None
+
+
+def _validate_ai_model(
+    ai_cmd: str | None, ai_model: str | None, provider_configs: Mapping[str, dict],
+) -> tuple[Response, int] | None:
+    """API-type providers require an explicit model."""
+    if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == "api" and not ai_model:
+        body, status = error_response(
+            "No model selected. Go to Settings and select one.",
+            HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
         )
         return jsonify(body), status
     return None

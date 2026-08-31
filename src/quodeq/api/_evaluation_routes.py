@@ -16,10 +16,11 @@ from quodeq.api._evaluation_helpers import (
     _sanitize_url,
     _validate_ai_cmd,
     _validate_ai_cmd_path,
+    _validate_ai_model,
 )
 from quodeq.api.helpers import error_response, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.assistant import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
@@ -142,15 +143,11 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         ai_cmd_path_error = _validate_ai_cmd_path(ai_cmd, payload.get("aiCmdPath") or None)
         if ai_cmd_path_error is not None:
             return ai_cmd_path_error
-        # Require an explicit model for API-type providers (e.g. Ollama)
-        if ai_cmd:
-            ptype = get_provider_configs().get(ai_cmd, {}).get("type")
-            if ptype == "api" and not payload.get("aiModel"):
-                body, status = error_response(
-                    "No model selected. Go to Settings and select one.",
-                    HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
-                )
-                return jsonify(body), status
+        model_error = _validate_ai_model(
+            ai_cmd, payload.get("aiModel") or None, get_provider_configs(),
+        )
+        if model_error is not None:
+            return model_error
         repo = payload.get("repo")
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:

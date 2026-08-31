@@ -8,7 +8,7 @@
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
 | `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ |
 | `assistant/` | Embedded LLM assistant: sessions, tool registry, provider turn adapters, guard | core/, data/, services/, llm_bridge/ |
-| `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/ |
+| `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/, update/, assistant/, llm_bridge/ |
 | `analysis/` | Evaluation pipeline: AI orchestration, subagents, prompts, MCP, markers, scoring pipeline | core/, data/, services/, context/ |
 | `dashboard/` | Server/process management: build UI, start API, health checks | services/, api/, update/ |
 | `llm_bridge/` | LLM provider bridge: Ollama, OpenRouter, CLI-tool providers | (nothing — leaf; one grandfathered analysis import) |
@@ -27,7 +27,7 @@ core/          -> core/
 data/          -> core/
 services/      -> core/, data/
 assistant/     -> core/, data/, services/, llm_bridge/
-api/           -> core/, services/, update/, assistant/, terminal/
+api/           -> core/, services/, update/, assistant/, terminal/, llm_bridge/
 analysis/      -> core/, data/, services/, context/
 dashboard/     -> services/, api/, update/
 terminal/      -> core/
@@ -45,7 +45,7 @@ are strict: the cross-cutting allowance does not apply to them.
 
 These rules are enforced in CI by `tools/check_imports.py` via `tests/tools/test_import_layers.py`.
 Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn-down list, currently
-13 entries: fix imports rather than add entries). Regenerate the baseline only with justification:
+6 entries: fix imports rather than add entries). Regenerate the baseline only with justification:
 `python tools/check_imports.py --update-baseline`.
 
 ## File Size Guidelines (soft limits)

@@ -169,3 +169,34 @@ def test_router_skips_accumulation_when_no_callback():
 
     assert "Foo.kt" not in router._findings_by_file
     assert '"file": "Foo.kt"' in fh.getvalue()
+
+
+class TestWriteSkipMarkers:
+    """write_skip_markers: router-owned skipped markers for undispatched files."""
+
+    def test_writes_skipped_marker_with_reason(self, tmp_path):
+        from quodeq.analysis.mcp.router import write_skip_markers
+
+        jsonl_file = tmp_path / "nested" / "adaptability_evidence.jsonl"
+        write_skip_markers(jsonl_file, ["src/big.py", "src/gone.py"], "skipped: over cap")
+
+        lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
+        assert len(lines) == 2
+        assert all(ln["_marker"] == "file_done" for ln in lines)
+        assert all(ln["status"] == "skipped" for ln in lines)
+        assert all(ln["reason"] == "skipped: over cap" for ln in lines)
+        assert [ln["file"] for ln in lines] == ["src/big.py", "src/gone.py"]
+
+    def test_appends_to_existing_file(self, tmp_path):
+        from quodeq.analysis.mcp.router import write_skip_markers
+
+        jsonl_file = tmp_path / "evidence.jsonl"
+        jsonl_file.write_text('{"existing": true}\n')
+        write_skip_markers(jsonl_file, ["src/foo.py"], "skipped: missing")
+
+        lines = jsonl_file.read_text().splitlines()
+        assert len(lines) == 2
+        assert json.loads(lines[1]) == {
+            "_marker": "file_done", "file": "src/foo.py",
+            "status": "skipped", "reason": "skipped: missing",
+        }

@@ -26,6 +26,26 @@ def validate_relative_scope(scope: str) -> None:
         raise ValueError(f"Invalid scope path: {scope!r}. Parent-directory segments are not allowed.")
 
 
+def validate_canonical_absolute(raw: str) -> Path:
+    """Return the resolved canonical form of *raw*, raising ValueError unless it
+    is an absolute, traversal-free path (literal '..' segments rejected
+    pre-resolution).
+    """
+    # Reject literal '..' segments in user input — even if they resolve
+    # to a fine canonical path, accepting them silently transforms what
+    # the user typed into something different. Then resolve and verify
+    # the canonical form is still absolute and traversal-free.
+    if ".." in Path(raw).parts:
+        raise ValueError("path contains parent-directory segment")
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        raise ValueError("path must be absolute")
+    resolved = candidate.resolve(strict=False)
+    if not resolved.is_absolute() or ".." in resolved.parts:
+        raise ValueError("path resolves to a non-canonical location")
+    return resolved
+
+
 def validate_resolved_within(path: Path, root: Path) -> Path:
     """Return *path* contained within *root*, raising ValueError if it escapes.
 

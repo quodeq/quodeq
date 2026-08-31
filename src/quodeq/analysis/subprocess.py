@@ -337,23 +337,6 @@ def _resolve_provider_config(
     return model, api_base, api_key
 
 
-def _write_skip_markers(jsonl_file: Path, skipped: list[str], reason: str) -> None:
-    """Append ``file_done: skipped`` markers for taken-but-undispatched files.
-
-    Invariant: every file taken from a queue must end with a marker. A
-    silent drop leaves the file uncached, so every incremental run re-queues
-    and re-drops it — the dim never converges (the perpetual-97% bug).
-    ``skipped`` (unlike ``error``) does not feed the failure-streak breaker
-    or the post-run reachability guard.
-    """
-    from quodeq.analysis.mcp.router import FindingsRouter  # noqa: PLC0415
-    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(jsonl_file, "a", encoding="utf-8") as fh:
-        router = FindingsRouter(fh)
-        for f in skipped:
-            router.mark_file_done(file=f, status="skipped", reason=reason)
-
-
 def _gather_api_source_files(
     work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
 ) -> list[Path] | None:
@@ -368,7 +351,10 @@ def _gather_api_source_files(
         # the file changed (or vanished) between queue build and dispatch.
         dispatchable, dropped = dispatch_policy.split_api_dispatchable(work_dir, taken)
         if dropped:
-            _write_skip_markers(
+            # Lazy import keeps the baseline-pinned llm_bridge line above
+            # from shifting; the marker helper is router-owned wire format.
+            from quodeq.analysis.mcp.router import write_skip_markers  # noqa: PLC0415
+            write_skip_markers(
                 jsonl_file, dropped,
                 reason=(
                     f"skipped: missing or over the API file-size cap "

@@ -22,7 +22,7 @@ from quodeq.services._fs_project_helpers import (
 from quodeq.services._fs_scan import scan_project
 from quodeq.services._warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider, NewProjectSpec
-from quodeq.shared.validation import contained_path, validate_path_segment, validate_relative_scope
+from quodeq.shared.validation import contained_path, validate_canonical_absolute, validate_path_segment, validate_relative_scope
 
 _logger = logging.getLogger(__name__)
 
@@ -50,18 +50,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
         body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
     try:
-        # Reject literal '..' segments in user input — even if they resolve
-        # to a fine canonical path, accepting them silently transforms what
-        # the user typed into something different. Then resolve and verify
-        # the canonical form is still absolute and traversal-free.
-        if ".." in Path(new_path).parts:
-            raise ValueError("path contains parent-directory segment")
-        candidate = Path(new_path)
-        if not candidate.is_absolute():
-            raise ValueError("path must be absolute")
-        resolved = candidate.resolve(strict=False)
-        if not resolved.is_absolute() or ".." in resolved.parts:
-            raise ValueError("path resolves to a non-canonical location")
+        resolved = validate_canonical_absolute(new_path)
     except (OSError, ValueError):
         body, status = error_response("Invalid path", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status

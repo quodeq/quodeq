@@ -86,7 +86,7 @@ class TestResolveRepo:
         repo_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch=None)
         result = _resolve_repo(args)
-        assert result == repo_dir.resolve()
+        assert result == (repo_dir.resolve(), None, None)
 
     def test_local_path_not_exists(self, tmp_path, capsys):
         from quodeq.cli import _resolve_repo
@@ -122,7 +122,7 @@ class TestResolveRepo:
         mock_prep.return_value = str(repo_dir)
         args = argparse.Namespace(repo="https://github.com/x/y", branch=None)
         result = _resolve_repo(args)
-        assert result == repo_dir.resolve()
+        assert result == (repo_dir.resolve(), None, None)
 
     def test_branch_creates_worktree(self, tmp_path):
         from quodeq.cli import _resolve_repo
@@ -134,8 +134,7 @@ class TestResolveRepo:
         with patch("quodeq._cli_resolution.is_repo_url", return_value=False), \
              patch("quodeq._cli_resolution._create_worktree", return_value=worktree_dir) as mock_wt:
             result = _resolve_repo(args)
-            assert result == worktree_dir
-            assert args._worktree_origin == repo_dir.resolve()
+            assert result == (worktree_dir, repo_dir.resolve(), worktree_dir)
             mock_wt.assert_called_once()
 
     def test_branch_worktree_failure(self, tmp_path, capsys):

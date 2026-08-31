@@ -382,7 +382,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
     log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
 
-    is_single_file = getattr(args, '_single_file', False)
+    is_single_file = inputs.single_file
 
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
     if is_single_file:
@@ -558,10 +558,8 @@ def _run_pipeline_with_cleanup(
                         pass
                     if is_repo_url(args.repo):
                         cleanup_cloned_repo(str(inputs.src))
-                    worktree_dir = getattr(args, "_worktree_dir", None)
-                    worktree_origin = getattr(args, "_worktree_origin", None)
-                    if worktree_dir and worktree_origin:
-                        _cleanup_worktree(worktree_origin, worktree_dir)
+                    if inputs.worktree_dir and inputs.worktree_origin:
+                        _cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
         except (AnalysisError, EvaluationError) as exc:
             # RunLifecycleContext.__exit__ has already written state=failed.
             # Map the domain error to exit code 1.
@@ -621,10 +619,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
     try:
         paths = _setup_run_dirs(args, inputs.src)
     except Exception:
-        worktree_dir = getattr(args, "_worktree_dir", None)
-        worktree_origin = getattr(args, "_worktree_origin", None)
-        if worktree_dir and worktree_origin:
-            _cleanup_worktree(worktree_origin, worktree_dir)
+        if inputs.worktree_dir and inputs.worktree_origin:
+            _cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
         raise
     result = _run_pipeline_with_cleanup(args, inputs, paths)
     _, _evidence_dir, evaluation_dir = paths
@@ -649,3 +645,21 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         _write_sarif_if_requested(args, evaluation_dir)
     return result
+
+
+def run_diff_evaluation(
+    src: str, *, base_ref: str, output_dir: Path,
+    dimensions: str | None = None, time_limit: int = 300,
+) -> int:
+    """Typed entry for CI review: evaluate *src* diffed against *base_ref*.
+
+    The argv round-trip through the real parser stays inside the CLI
+    package, so parser defaults remain single-sourced and callers (ci/)
+    never fabricate presentation-layer input.
+    """
+    argv = ["evaluate", src, "--diff-from", base_ref, "--output", str(output_dir),
+            "--time-limit", str(time_limit)]
+    if dimensions:
+        argv += ["--dimensions", dimensions]
+    from quodeq.cli_parser import build_parser  # noqa: PLC0415
+    return run_evaluate(build_parser().parse_args(argv))

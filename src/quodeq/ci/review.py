@@ -126,26 +126,19 @@ def handle_review(args) -> int:
 
     baseline_runs = snapshot_run_dirs(output_dir)
 
-    from quodeq.cli_parser import build_parser
-    eval_parser_argv = [
-        "evaluate", ".",
-        "--diff-from", f"origin/{base_branch}",
-        "--output", str(output_dir),
-    ]
     dims = getattr(args, "dimensions", None)
-    if dims:
-        eval_parser_argv.extend(["--dimensions", expand_dimension_aliases(dims)])
     pool_budget = getattr(args, "pool_budget", None)
-    time_limit = pool_budget if pool_budget is not None else 300
-    eval_parser_argv.extend(["--time-limit", str(time_limit)])
-
-    parser = build_parser()
-    eval_args = parser.parse_args(eval_parser_argv)
 
     print(f"Running PR diff evaluation (base: origin/{base_branch})...")
     start = time.time()
-    from quodeq._cli_evaluation import run_evaluate
-    exit_code = run_evaluate(eval_args)
+    from quodeq._cli_evaluation import run_diff_evaluation
+    exit_code = run_diff_evaluation(
+        ".",
+        base_ref=f"origin/{base_branch}",
+        output_dir=output_dir,
+        dimensions=expand_dimension_aliases(dims) if dims else None,
+        time_limit=pool_budget if pool_budget is not None else 300,
+    )
     duration = int(time.time() - start)
 
     if exit_code != 0:
