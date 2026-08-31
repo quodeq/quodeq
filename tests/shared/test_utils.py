@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os.path
 from pathlib import Path
 
 import pytest
@@ -100,8 +101,18 @@ class TestGetters:
         assert utils.get_evaluations_dir("evaluations") == "evaluations"
 
     def test_get_evaluations_dir_from_env(self, monkeypatch):
+        # abspath also qualifies the drive on Windows; compare normalized.
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir")
-        assert utils.get_evaluations_dir() == "/custom/dir"
+        assert utils.get_evaluations_dir() == os.path.abspath("/custom/dir")
+
+    def test_env_paths_are_normalized(self, monkeypatch):
+        # Operator-supplied paths get expanduser + abspath: '~' expands and
+        # '..' segments collapse instead of resolving at use time.
+        monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir/../other")
+        assert utils.get_evaluations_dir() == os.path.abspath("/custom/other")
+        monkeypatch.setenv("QUODEQ_DIR", "~/quodeq-state")
+        from quodeq.shared._env import get_quodeq_dir
+        assert get_quodeq_dir() == Path.home() / "quodeq-state"
 
     def test_get_anthropic_api_key_none_by_default(self, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

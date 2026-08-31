@@ -122,6 +122,29 @@ export default function CliProviderTab({ providerId, state, update }) {
             </div>
             <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
           </div>
+          <div className="settings-row">
+            <div className="settings-row-label">
+              <span className="settings-label-row">
+                <span className="settings-label">{t('settings.cmdOverride')}</span>
+                <HelpHint label={t('settings.cmdOverrideHelpAria')}>
+                  {t('settings.cmdOverrideHint', { provider: providerId })}
+                </HelpHint>
+              </span>
+              <span className="settings-description">{t('settings.cmdOverrideDesc', { provider: providerId })}</span>
+            </div>
+            <input
+              type="text"
+              className="settings-model-input"
+              value={state['cmd-path'] || ''}
+              placeholder={providerId}
+              onChange={(e) => update('cmd-path', e.target.value.trim())}
+              aria-label={t('settings.cmdOverride')}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
           <AdvancedAnalysisSettings state={state} update={update} />
         </div>
       </details>

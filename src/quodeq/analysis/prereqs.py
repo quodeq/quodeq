@@ -6,13 +6,20 @@ module owns everything that needs the provider registry.
 from __future__ import annotations
 
 import os
+import re
+import shutil
 import subprocess
 import urllib.error
 import urllib.request
 
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.shared.prereqs import _SAFE_CMD_TOKEN_RE, _run_version_cmd
-from quodeq.shared.utils import get_ai_cmd
+from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
+
+# Like _SAFE_CMD_TOKEN_RE but for a binary override (AI_CMD_PATH): also
+# allows path separators and the Windows drive colon. Still no whitespace
+# or shell metacharacters.
+_SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
 
 _CLI_INSTALL_HINTS: dict[str, str] = {
     "claude": (
@@ -45,6 +52,34 @@ def _is_provider_explicitly_configured() -> bool:
     return "AI_PROVIDER" in os.environ or "AI_CMD" in os.environ
 
 
+def _check_cli_binary_override(provider: str, override: str) -> None:
+    """Check that an AI_CMD_PATH override resolves to an executable.
+
+    The `--version` probe is skipped here: _run_version_cmd's token charset
+    forbids path separators (its Windows shell=True hardening), and for an
+    explicit override the failure mode being guarded against is simply
+    "binary not found".
+
+    This is an availability check, not a security boundary: AI_CMD_PATH
+    reaches this process either from the operator's own environment or via
+    the dashboard API, where api._evaluation_helpers._validate_ai_cmd_path
+    enforces the spawn restrictions (provider-prefixed name, on-PATH dir).
+    """
+    if not _SAFE_CMD_PATH_RE.fullmatch(override):
+        raise RuntimeError(
+            f"'{override}' is not a valid AI command override (AI_CMD_PATH).\n\n"
+            f"Overrides may only contain letters, digits, '.', '_', '-', ':' "
+            f"and path separators."
+        )
+    if shutil.which(override) is None:
+        raise RuntimeError(
+            f"'{override}' is set as the command override for '{provider}' "
+            f"(AI_CMD_PATH) but was not found or is not executable.\n\n"
+            f"Fix the override in the dashboard Settings (Advanced), or unset "
+            f"AI_CMD_PATH to use '{provider}' from PATH."
+        )
+
+
 def _check_cli_provider(provider: str) -> None:
     """Check that a CLI provider binary is available on PATH."""
     if not _SAFE_CMD_TOKEN_RE.fullmatch(provider):
@@ -54,6 +89,10 @@ def _check_cli_provider(provider: str) -> None:
             f"Choose a provider in the dashboard Settings:\n"
             f"  quodeq"
         )
+    override = get_ai_cmd_path()
+    if override:
+        _check_cli_binary_override(provider, override)
+        return
     try:
         _run_version_cmd([provider, "--version"])
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:

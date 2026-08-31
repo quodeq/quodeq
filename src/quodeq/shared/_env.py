@@ -10,6 +10,17 @@ from quodeq.shared._config import _get_config
 _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
 
 
+def _sanitized_env_path(raw: str) -> str:
+    """Normalize an operator-supplied filesystem path from an env var.
+
+    Env vars are the operator's own trust domain, but expanduser + abspath
+    (which collapses '.' and '..' segments) keeps a stray relative or '~'
+    value from resolving somewhere surprising at use time, and gives every
+    consumer one canonical absolute form.
+    """
+    return os.path.abspath(os.path.expanduser(raw))
+
+
 def get_ai_provider(env: dict[str, str] | None = None) -> str:
     """Return the AI provider from environment or default."""
     return (env or os.environ).get("AI_PROVIDER", _get_config()["ai_provider_default"])
@@ -32,6 +43,17 @@ def get_ai_cmd(env: dict[str, str] | None = None) -> str:
 def get_ai_model(env: dict[str, str] | None = None) -> str | None:
     """Return the AI model from environment, or None."""
     return (env or os.environ).get("AI_MODEL") or None
+
+
+def get_ai_cmd_path(env: dict[str, str] | None = None) -> str | None:
+    """Return the binary override for the AI CLI (AI_CMD_PATH), or None.
+
+    When set, spawn sites use this as argv[0] instead of the provider id,
+    while the provider id (get_ai_cmd) keeps selecting the ai_providers.json
+    entry. Lets an alternate install or wrapper (e.g. a `claude-api` script
+    that switches CLAUDE_CONFIG_DIR) run with unchanged provider behavior.
+    """
+    return (env or os.environ).get("AI_CMD_PATH") or None
 
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
@@ -133,7 +155,7 @@ def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None =
     """
     from_env = (env or os.environ).get("QUODEQ_EVALUATIONS_DIR")
     if from_env:
-        return from_env
+        return _sanitized_env_path(from_env)
     if default is not None:
         return default
     return str(_DEFAULT_EVALUATIONS_DIR)
@@ -175,7 +197,7 @@ def get_index_db_path(default: str | None = None, env: dict[str, str] | None = N
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_INDEX_DB_PATH" in environ:
-        return environ["QUODEQ_INDEX_DB_PATH"]
+        return _sanitized_env_path(environ["QUODEQ_INDEX_DB_PATH"])
     return default or str(_DEFAULT_INDEX_DB_PATH)
 
 
@@ -192,7 +214,7 @@ def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_GRADE_FORMULA_PATH" in environ:
-        return environ["QUODEQ_GRADE_FORMULA_PATH"]
+        return _sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
     return str(_DEFAULT_GRADE_FORMULA_PATH)
 
 
@@ -208,7 +230,7 @@ def get_score_cache_path(env: dict[str, str] | None = None) -> str:
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_SCORE_CACHE_PATH" in environ:
-        return environ["QUODEQ_SCORE_CACHE_PATH"]
+        return _sanitized_env_path(environ["QUODEQ_SCORE_CACHE_PATH"])
     index_parent = Path(get_index_db_path(env=environ)).parent
     if str(index_parent) not in ("", "."):
         return str(index_parent / "score_cache.db")
@@ -229,7 +251,7 @@ def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
     """
     from_env = (env or os.environ).get("QUODEQ_DIR")
     if from_env:
-        return Path(from_env)
+        return Path(_sanitized_env_path(from_env))
     return Path.home() / ".quodeq"
 
 
@@ -245,7 +267,7 @@ def get_clones_dir(env: dict[str, str] | None = None) -> Path:
     """
     from_env = (env or os.environ).get("QUODEQ_CLONES_DIR")
     if from_env:
-        return Path(from_env)
+        return Path(_sanitized_env_path(from_env))
     return Path.home() / ".quodeq" / "clones"
 
 

@@ -1,7 +1,9 @@
 """Validation and helper functions for evaluation routes."""
 from __future__ import annotations
 
+import os.path
 import re
+import shutil
 import time as _time
 from http import HTTPStatus
 
@@ -10,6 +12,7 @@ from flask import Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT, resolve_clean_scan
+from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 from quodeq.shared.validation import validate_relative_scope
 
 # Userinfo cannot contain an unencoded "/", so excluding it keeps matches
@@ -56,6 +59,70 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
+# Binary override charset: letters, digits, '.', '_', '-', ':' and path
+# separators. No whitespace or shell metacharacters, matching the posture of
+# shared.prereqs._SAFE_CMD_TOKEN_RE.
+_SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
+
+
+def _path_dirs(env: dict[str, str] | None = None) -> list[str]:
+    """Real (symlink-resolved, case-normalized) directories on the server's PATH."""
+    raw = (env or os.environ).get("PATH", "")
+    return [os.path.normcase(os.path.realpath(d)) for d in raw.split(os.pathsep) if d]
+
+
+def _validate_ai_cmd_path(
+    ai_cmd: str | None, ai_cmd_path: str | None,
+) -> tuple[Response, int] | None:
+    """Return an error response if *ai_cmd_path* is not an acceptable binary
+    override for provider *ai_cmd*, or None if valid (or absent).
+
+    The aiCmd allow-list exists so the local HTTP API can never spawn an
+    arbitrary binary. A free-text override would reopen that, so it must
+    (a) contain no shell metacharacters or '..' segments, (b) be absolute
+    when it names a path at all, (c) have a basename that starts with the
+    provider id (e.g. 'claude-api' or '/opt/bin/claude-max' for 'claude'),
+    (d) resolve to an existing executable, and (e) live in a directory on
+    the server's PATH. (c) keeps the override an alternate install of the
+    allowed CLI, (e) keeps it out of attacker-writable locations like /tmp
+    or a downloads folder.
+    """
+    if not ai_cmd_path:
+        return None
+
+    def _invalid(reason: str) -> tuple[Response, int]:
+        body, status = error_response(
+            f"Invalid AI command override: {reason}",
+            HTTPStatus.BAD_REQUEST,
+            "INVALID_INPUT",
+        )
+        return jsonify(body), status
+
+    if not _SAFE_CMD_PATH_RE.fullmatch(ai_cmd_path):
+        return _invalid(
+            "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
+        )
+    normalized = ai_cmd_path.replace("\\", "/")
+    if ".." in normalized.split("/"):
+        return _invalid("'..' path segments are not allowed")
+    if "/" in normalized and not os.path.isabs(ai_cmd_path):
+        return _invalid("a path must be absolute; otherwise use a bare command name")
+    provider = ai_cmd or _get_ai_cmd()
+    basename = os.path.basename(normalized)
+    if not basename.startswith(provider):
+        return _invalid(f"binary name must start with '{provider}'")
+    resolved = shutil.which(ai_cmd_path)
+    if resolved is None:
+        return _invalid(f"'{ai_cmd_path}' was not found or is not executable")
+    resolved_dir = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(resolved))))
+    if resolved_dir not in _path_dirs():
+        return _invalid(
+            f"'{ai_cmd_path}' is not in a directory on PATH; move it to one "
+            f"(e.g. ~/.local/bin) or add its directory to PATH"
+        )
+    return None
+
+
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
@@ -78,6 +145,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         dimensions=payload.get("dimensions") or "",
         numerical=bool(payload.get("numerical")),
         ai_cmd=payload.get("aiCmd") or None,
+        ai_cmd_path=payload.get("aiCmdPath") or None,
         ai_model=ai_model,
         subagent_model=subagent_model,
         verify_findings=bool(payload.get("verifyFindings", True)),
