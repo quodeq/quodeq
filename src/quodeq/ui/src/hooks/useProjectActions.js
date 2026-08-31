@@ -9,7 +9,9 @@
  * *onError* (optional second-arg option) is invoked with the RENDERED
  * message (`t(messageKey, vars)`) so a caller that just wants the old
  * "tell the user" behavior doesn't have to render it itself -- defaults to
- * `alert()`, preserving pre-refactor behavior when no seam is wired.
+ * a no-op, since failures already surface structurally via the returned
+ * `{ ok: false, messageKey, vars }` and a caller owns how (or whether) to
+ * present them.
  */
 import { useApi } from '../api/ApiContext.jsx';
 import { chooseDialog } from '../utils/chooseDialog.js';
@@ -24,13 +26,9 @@ function sanitizeFilename(name) {
     .slice(0, 100) || 'project';
 }
 
-function defaultOnError(messageKey, vars) {
-  alert(t(messageKey, vars));
-}
-
 export function useProjectActions(
   { projects, selectedProject, handleProjectChange, loadProjects },
-  { onError = defaultOnError } = {},
+  { onError = () => {} } = {},
 ) {
   const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
 

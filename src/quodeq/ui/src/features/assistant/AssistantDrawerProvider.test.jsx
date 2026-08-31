@@ -6,6 +6,9 @@ vi.mock('../../api/assistant.js', () => ({
   createAssistantSession: vi.fn(async (payload) => ({ sessionId: 's1', readOnly: payload?.source === 'shared' })),
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
   stopAssistantTurn: vi.fn(async () => ({ stopping: true })),
+  fetchAssistantWorkspace: vi.fn(async () => ({ worktree: null })),
+  applyAssistantAction: vi.fn(async () => ({ applied: true })),
+  rejectAssistantAction: vi.fn(async () => ({ rejected: true })),
   assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
   fetchAssistantCatalog: vi.fn(async () => ({ commands: [], skills: [], actions: [] })),
 }));

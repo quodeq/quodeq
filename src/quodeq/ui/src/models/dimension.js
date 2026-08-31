@@ -67,6 +67,31 @@ export function createDimension(raw) {
 }
 
 /**
+ * Create a Dimension from a slim scores payload (getRunScores/getCompareSummary
+ * and their shared-repo mirrors), preserving the presence/absence of
+ * violations/compliance/principles instead of coercing an absent key to `[]`.
+ *
+ * mergeRescoreIntoEval (explorerDataHooks.js) treats `violations != null` as a
+ * tri-state: when the slim payload OMITS violations, prior violations are kept
+ * as-is; when present (even `[]`), they're used to filter. createDimension's
+ * unconditional `[]` coercion would collapse that distinction and silently
+ * wipe every violation whenever a slim payload omits the key -- so this
+ * factory only maps a field when it's actually an array.
+ *
+ * @param {Object} raw
+ * @returns {Dimension}
+ */
+export function createSlimDimension(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  return {
+    ...raw,
+    violations: Array.isArray(raw.violations) ? createViolations(raw.violations) : raw.violations,
+    compliance: Array.isArray(raw.compliance) ? createViolations(raw.compliance) : raw.compliance,
+    principles: Array.isArray(raw.principles) ? raw.principles.map(createPrinciple) : raw.principles,
+  };
+}
+
+/**
  * Create a canonical DimensionEval from the dimension-eval API response.
  *
  * @param {Object} raw

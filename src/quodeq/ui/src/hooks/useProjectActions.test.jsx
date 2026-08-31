@@ -92,15 +92,18 @@ describe('useProjectActions', () => {
     beforeEach(() => { alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {}); });
     afterEach(() => { alertSpy.mockRestore(); });
 
-    it('falls back to alert() with the rendered message when no onError is supplied', async () => {
+    it('is a no-op when no onError is supplied: no alert(), failure still surfaces structurally', async () => {
       const err = new Error('disk full');
       const fakeApi = { deleteProject: vi.fn().mockRejectedValue(err) };
       const { result } = renderActions(fakeApi); // no options -> default onError
 
-      await act(async () => { await result.current.handleDeleteProject('a'); });
+      let outcome;
+      await act(async () => { outcome = await result.current.handleDeleteProject('a'); });
 
-      expect(alertSpy).toHaveBeenCalledTimes(1);
-      expect(alertSpy.mock.calls[0][0]).toContain('disk full');
+      expect(outcome).toEqual({
+        ok: false, messageKey: 'projects.deleteProjectFailed', vars: { error: 'disk full' },
+      });
+      expect(alertSpy).not.toHaveBeenCalled();
     });
   });
 });
