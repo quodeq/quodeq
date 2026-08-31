@@ -1,5 +1,6 @@
 """PrecedentCorpus: matching, budgets, circuit breaker, loader degrade paths."""
 import math
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from quodeq.context.precedent import (
     MARKER_NAME,
     PrecedentCorpus,
+    VectorStoreFns,
     load_precedent_corpus,
     precedent_text,
 )
@@ -147,6 +149,62 @@ def test_loader_excludes_scope_level_and_empty_snippet_dismissals(
     # Exactly one text was ever handed to the embedder: the scope-level /
     # empty-snippet dismissal never made it into the backfill batch.
     assert calls == [1]
+
+
+def test_loader_uses_injected_vector_store_without_sqlite(tmp_path: Path, monkeypatch) -> None:
+    """A fake ``VectorStoreFns`` fully replaces the sqlite-backed store.
+
+    The production resolver is patched to fail on call, so a passing test
+    proves the loader touched no sqlite module: every store interaction went
+    through the injected callables (in-memory dict), including backfill
+    insert, claim release, and the final vector read.
+    """
+    monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
+    monkeypatch.setattr(
+        "quodeq.context.precedent._resolve_vector_store",
+        lambda: pytest.fail("production sqlite store resolved despite injected store"),
+    )
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    run_dir = seed_dismissed(
+        project_dir, "r1",
+        req="S-CON-1", snippet="password = 'secret'", file="auth.py", line=42,
+    )
+
+    conn_sentinel = object()
+    stored: dict[str, list[float]] = {}
+    released: list[bool] = []
+
+    @contextmanager
+    def fake_open(pd, model):
+        assert pd == project_dir
+        yield conn_sentinel
+
+    def fake_insert(conn, model, items):
+        assert conn is conn_sentinel
+        stored.update(dict(items))
+        return True
+
+    store = VectorStoreFns(
+        open_vector_store=fake_open,
+        load_vectors=lambda conn: list(stored.items()),
+        insert_vectors=fake_insert,
+        stored_fingerprints=lambda conn: set(stored),
+        try_claim_backfill=lambda conn: True,
+        release_backfill_claim=lambda conn: released.append(True),
+    )
+
+    corpus = load_precedent_corpus(
+        project_dir, run_dir,
+        embed_fn=lambda texts, **kw: [[1.0, 0.0] for _ in texts],
+        availability_fn=lambda m, b: True,
+        store=store,
+    )
+
+    assert corpus is not None
+    assert corpus.match(precedent_text("S-CON-1", "password = 'secret'")) == pytest.approx(1.0)
+    assert len(stored) == 1  # the dismissal was backfilled through the fake
+    assert released == [True]  # backfill claim released exactly once
 
 
 def test_loader_model_unavailable_returns_none(tmp_path: Path, monkeypatch) -> None:

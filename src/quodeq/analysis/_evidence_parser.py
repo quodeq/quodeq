@@ -12,7 +12,7 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
@@ -35,6 +35,7 @@ def parse_evidence_from_jsonl(
         compiled_dir=compiled_dir,
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
+        refs_reader=load_compiled_refs,
         cwe_url_template=cwe_url_template(),
         on_quarantine=log_quarantined_findings,
         on_malformed_line=log_malformed_jsonl_line,

@@ -22,7 +22,7 @@ from quodeq.analysis.dispatch_policy import default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
 from quodeq.analysis.scoring_pipeline import run_full
@@ -218,6 +218,7 @@ def _count_excluded_findings(
             source_file_count=0, files_read=0,
         ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
+            refs_reader=load_compiled_refs,
             cwe_url_template=cwe_url_template(),
             on_quarantine=log_quarantined_findings,
             on_malformed_line=log_malformed_jsonl_line)

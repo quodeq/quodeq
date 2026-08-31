@@ -1,15 +1,22 @@
 """Reference resolution helpers for evidence judgments."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.core.standards.refs import load_compiled_refs
 from quodeq.core.types.req_ref import ReqRef
 
 if TYPE_CHECKING:
     from quodeq.core.events.models import Judgment
+
+# Reads ``{req_id: [{label, url, ...}, ...]}`` for (compiled_dir, dimension).
+# Mirrors the ``ReqMapReader`` seam in ``_req_mapping``: *compiled_dir* is
+# only ever handed to the injected reader -- core performs no file I/O
+# itself. Production injects
+# ``quodeq.data.fs.standards_loader.load_compiled_refs``.
+RefsReader = Callable[[str, str], dict[str, list[dict]]]
 
 # Outer layers resolve the QUODEQ_CWE_URL_TEMPLATE override (see
 # quodeq.config.evidence_env.cwe_url_template) and pass it in; core only
@@ -60,19 +67,27 @@ def enrich_judgment(
     compiled_dir: Path | None,
     req_refs_cache: dict[str, dict[str, list[dict]]],
     cwe_url_template: str | None = None,
+    *,
+    refs_reader: RefsReader | None = None,
 ) -> "Judgment":
     """Resolve req_refs for a Judgment, returning the (possibly new) Judgment.
 
     Judgment is a frozen dataclass, so we return a replaced copy when we have
     something new to attach. When the judgment already carries refs, or no
     refs were resolved, the original instance is returned unchanged.
+
+    *refs_reader* loads compiled refs for (compiled_dir, dimension); without
+    a reader the lookup map is empty -- same "permissive without a reader"
+    contract as ``_resolve_req_to_principle_map``.
     """
     if j.req_refs:
         return j  # MCP server already enriched
     all_req_refs = None
     if compiled_dir and j.req and j.dimension:
         if j.dimension not in req_refs_cache:
-            req_refs_cache[j.dimension] = load_compiled_refs(str(compiled_dir), j.dimension)
+            req_refs_cache[j.dimension] = (
+                refs_reader(str(compiled_dir), j.dimension) if refs_reader else {}
+            )
         all_req_refs = req_refs_cache[j.dimension].get(j.req)
     resolved = resolve_llm_refs(llm_refs, all_req_refs, cwe_url_template)
     if not resolved:

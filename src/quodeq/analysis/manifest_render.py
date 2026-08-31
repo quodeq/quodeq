@@ -92,5 +92,5 @@ def render_manifest_prompt_context(manifest: SourceManifest) -> str:
     if not manifest.targets:
         return _render_no_targets(manifest)
     if len(manifest.targets) == 1:
-        return manifest.targets[0].to_prompt_context(repo_total_files=manifest.total_files)
+        return render_target_prompt_context(manifest.targets[0], manifest.total_files, None)
     return _render_multi_target(manifest)

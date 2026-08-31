@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from quodeq.analysis.manifest_render import (
+    render_manifest_prompt_context,
+    render_target_prompt_context,
+)
+
 if TYPE_CHECKING:
     from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 
@@ -57,10 +62,11 @@ def render_manifest_context(context: PromptContext) -> str:
     """
     if context.target is not None and context.manifest is not None:
         other_targets = [t for t in context.manifest.targets if t.name != context.target.name]
-        return context.target.to_prompt_context(
-            repo_total_files=context.manifest.total_files,
-            other_targets=other_targets or None,
+        return render_target_prompt_context(
+            context.target,
+            context.manifest.total_files,
+            other_targets or None,
         )
     if context.manifest is not None:
-        return context.manifest.to_prompt_context()
+        return render_manifest_prompt_context(context.manifest)
     return NO_GUIDANCE

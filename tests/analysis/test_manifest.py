@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest, build_manifest
+from quodeq.analysis.manifest_render import render_manifest_prompt_context
 from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 
@@ -148,7 +149,7 @@ def test_to_prompt_context(detection: dict) -> None:
         language_stats={".py": 42},
     )
     manifest = SourceManifest(targets=[target], total_files=42, language_stats={".py": 42})
-    text = manifest.to_prompt_context()
+    text = render_manifest_prompt_context(manifest)
     assert "Python" in text
     assert "42" in text
     assert "backend" in text
@@ -205,7 +206,7 @@ def test_multi_target_prompt_context() -> None:
         language_stats={".dart": 235},
     )
     manifest = SourceManifest(targets=[dart, rust], total_files=320, language_stats={".rs": 85, ".dart": 235})
-    text = manifest.to_prompt_context()
+    text = render_manifest_prompt_context(manifest)
     assert "320" in text
     assert "Detected modules" in text
     assert "Dart mobile" in text

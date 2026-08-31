@@ -75,7 +75,6 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'config/ai_provider.py': 'AI provider selection and configuration persistence - out of scope for this sweep (not a flagged per-site conversion)',
     'config/prompt_templates.py': 'Simple mustache-style template rendering for prompt files - out of scope for this sweep (not a flagged per-site conversion)',
     'core/standards/overrides.py': 'Per-project overrides for declared numeric requirement parameters - out of scope for this sweep (not a flagged per-site conversion)',
-    'core/standards/refs.py': 'Shared reference-label and compiled-refs utilities - out of scope for this sweep (not a flagged per-site conversion)',
     'core/utils/io.py': 'Low-level text/JSON read helpers with centralized encoding - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_cache.py': 'Shared LRU cache factory for dimension fetchers - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_ephemeral_cleanup.py': 'Lifecycle management for ephemeral clones under ~/.quodeq/clones/ - out of scope for this sweep (not a flagged per-site conversion)',

@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-from quodeq.core.evidence._refs import enrich_judgment
+from quodeq.core.evidence._refs import RefsReader, enrich_judgment
 from quodeq.core.events.models import Judgment, VALID_VERDICTS
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
@@ -130,7 +130,8 @@ def judgment_to_dict(j: Judgment) -> dict:
 def parse_judgments(
     lines: Iterable[str], compiled_dir: Path | None,
     cwe_url_template: str | None = None,
-    *, on_malformed_line: MalformedLineSink | None = None,
+    *, refs_reader: RefsReader | None = None,
+    on_malformed_line: MalformedLineSink | None = None,
 ) -> list[Judgment]:
     """Parse JSONL lines and return enriched Judgment objects."""
     judgments: list[Judgment] = []
@@ -140,7 +141,8 @@ def parse_judgments(
         if result is not None:
             j, llm_refs = result
             j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache,
-                                cwe_url_template=cwe_url_template)
+                                cwe_url_template=cwe_url_template,
+                                refs_reader=refs_reader)
             judgments.append(j)
     return judgments
 
@@ -149,7 +151,8 @@ def read_judgments(
     jsonl_file: Path, compiled_dir: Path | None,
     open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
     cwe_url_template: str | None = None,
-    *, on_malformed_line: MalformedLineSink | None = None,
+    *, refs_reader: RefsReader | None = None,
+    on_malformed_line: MalformedLineSink | None = None,
 ) -> list[Judgment]:
     """Read JSONL lines from a file and return enriched Judgment objects."""
     if not jsonl_file.exists():
@@ -157,4 +160,5 @@ def read_judgments(
     opener = open_fn or open_text
     with opener(jsonl_file) as _jf:
         return parse_judgments(_jf, compiled_dir, cwe_url_template=cwe_url_template,
+                                refs_reader=refs_reader,
                                 on_malformed_line=on_malformed_line)
