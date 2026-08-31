@@ -127,7 +127,7 @@ class FakeDispatcher:
         self.calls: list[RunConfig] = []
 
     def __call__(
-        self, config: RunConfig, dim_id: str, idx: int, ctx, callbacks,
+        self, config: RunConfig, dim_id: str, idx: int, ctx, callbacks, **_,
     ) -> Evidence | None:
         self.calls.append(config)
         # Mirror what the real dispatcher does: write findings to JSONL
@@ -477,7 +477,7 @@ class TestWiring:
         config, src = _setup(tmp_path, {"a.py": "x"})
 
         called = {"hit": False}
-        def fake_cache(config, dim_id, idx, ctx, callbacks, cache=None):
+        def fake_cache(config, dim_id, idx, ctx, callbacks, cache=None, **_):
             called["hit"] = True
             return _make_dummy_evidence(files_read=1)
 
@@ -554,7 +554,7 @@ class TestCircuitBreakerWiring:
 
         evidence_dir = config.work_dir or config.src
 
-        def err_dispatcher(config, dim_id, idx, ctx, callbacks):
+        def err_dispatcher(config, dim_id, idx, ctx, callbacks, **_):
             jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -595,7 +595,7 @@ class TestCircuitBreakerWiring:
 
         evidence_dir = config.work_dir or config.src
 
-        def err_dispatcher(config, dim_id, idx, ctx, callbacks):
+        def err_dispatcher(config, dim_id, idx, ctx, callbacks, **_):
             jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -659,7 +659,7 @@ class TestCarryOrder:
         ))
 
         # b.py is a miss -- fake dispatcher writes a fresh finding for it.
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -906,7 +906,7 @@ class TestCachedFindingsReachEventLog:
 
         events_log = (config.work_dir or config.src).parent / "events.jsonl"
 
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             # The dispatcher in production routes through FindingsRouter,
             # which emits events. This fake only writes JSONL — we're
             # specifically testing the cache-replay side.
@@ -987,7 +987,7 @@ class TestEvidenceFileCreatedBeforeBreaker:
 
         # Dispatcher that writes NOTHING to the JSONL and returns None,
         # mirroring the fresh-dimension window before any finding is emitted.
-        def silent_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def silent_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             return None
 
         # Capture WARNING+ only, so the assertion isn't coupled to the exact
@@ -1349,7 +1349,7 @@ class TestFilesReadReflectsAnalyzedCount:
             model_id="test-model",
         ))
 
-        def mixed_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def mixed_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             # Misses are restricted by the file filter to {b.py, c.py}.
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -1445,7 +1445,7 @@ class _SalvageDispatcher:
     def __init__(self, n_errors: int) -> None:
         self.n_errors = n_errors
 
-    def __call__(self, config, dim_id, idx, ctx, callbacks):
+    def __call__(self, config, dim_id, idx, ctx, callbacks, **_):
         jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:
@@ -1466,7 +1466,7 @@ class _AllErrorsDispatcher:
     def __init__(self, n_errors: int) -> None:
         self.n_errors = n_errors
 
-    def __call__(self, config, dim_id, idx, ctx, callbacks):
+    def __call__(self, config, dim_id, idx, ctx, callbacks, **_):
         jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:

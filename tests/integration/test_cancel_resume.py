@@ -135,7 +135,7 @@ class _ScriptedDispatcher:
         self.calls: list[set[str]] = []
 
     def __call__(
-        self, config: RunConfig, dim_id: str, idx: int, ctx, callbacks,
+        self, config: RunConfig, dim_id: str, idx: int, ctx, callbacks, **_,
     ) -> Evidence | None:
         files = sorted(config.options.incremental_file_filter or set())
         self.calls.append(set(files))
@@ -360,7 +360,7 @@ class TestCrashPathPreservesLikeCancel:
             def __init__(self):
                 self.calls = []
 
-            def __call__(self, config, dim_id, idx, ctx, callbacks):
+            def __call__(self, config, dim_id, idx, ctx, callbacks, **_):
                 self.calls.append(sorted(config.options.incremental_file_filter or set()))
                 jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
                 with jsonl.open("a") as out:

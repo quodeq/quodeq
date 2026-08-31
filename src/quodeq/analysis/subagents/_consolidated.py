@@ -19,7 +19,7 @@ from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis._runner_markers import cleanup_stream
-from quodeq.shared.logging import log_info, log_warning
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
@@ -129,6 +129,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: _AnalysisCont
 
 def process_consolidated_dimensions(
     config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext,
+    *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
@@ -137,7 +138,7 @@ def process_consolidated_dimensions(
     # 1. List source files
     files, extensions, _excluded = _list_source_files(config, dimensions[0])
     if not files:
-        log_warning("No source files for consolidated analysis")
+        log.warning("No source files for consolidated analysis")
         return {}
 
     # 2. Build consolidated prompt and create file queue
@@ -145,7 +146,7 @@ def process_consolidated_dimensions(
     files_per_agent = _compute_files_per_agent(len(files))
     queue_path = evidence_dir / "consolidated_queue.json"
     FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
-    log_info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
+    log.info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
 
     # 3. Build config and launch pool
     base_ac = _build_consolidated_config(config, dimensions, files_per_agent, compiled_dir=compiled_dir)

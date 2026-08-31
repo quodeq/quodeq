@@ -132,6 +132,7 @@ class RecordingLog:
         self.warning_messages: list[str] = []
         self.debug_messages: list[str] = []
         self.error_messages: list[str] = []
+        self.success_messages: list[str] = []
 
     def info(self, message: str) -> None:
         self.info_messages.append(message)
@@ -144,6 +145,9 @@ class RecordingLog:
 
     def error(self, message: str) -> None:
         self.error_messages.append(message)
+
+    def success(self, message: str) -> None:
+        self.success_messages.append(message)
 
 
 @pytest.fixture

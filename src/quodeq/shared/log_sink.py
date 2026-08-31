@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from quodeq.core.evidence import QuarantinedFinding
 from quodeq.core.observability import LogSink
-from quodeq.shared.logging import log_debug, log_error, log_info, log_warning
+from quodeq.shared.logging import log_debug, log_error, log_info, log_success, log_warning
 
 
 class SharedLog:
@@ -25,6 +25,9 @@ class SharedLog:
 
     def error(self, message: str) -> None:
         log_error(message)
+
+    def success(self, message: str) -> None:
+        log_success(message)
 
 
 SHARED_LOG: LogSink = SharedLog()

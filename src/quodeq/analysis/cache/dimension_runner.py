@@ -62,6 +62,8 @@ from quodeq.analysis.subagents.runner import (
 )
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.evidence.model import Evidence
+from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.data.ports.events import EventEmitter
 from quodeq.analysis._runner_markers import emit_marker
 
 _logger = logging.getLogger(__name__)
@@ -179,7 +181,10 @@ def _events_log_path(jsonl: Path) -> Path:
     return jsonl.parent.parent / "events.jsonl"
 
 
-def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
+def _emit_cached_findings(
+    events_log: Path, findings: list[dict], *,
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
+) -> None:
     """Emit cached findings as JUDGMENT_CREATED events to the run's event log.
 
     Cached findings replayed by the V2 cache in incremental runs were
@@ -197,10 +202,14 @@ def _emit_cached_findings(events_log: Path, findings: list[dict]) -> None:
     if not findings:
         return
     from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
-    from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
 
-    writer = EventLogWriter(events_log)
+    if writer_factory is None:
+        # Lazy default resolution: the concrete data-layer writer is only
+        # imported when no factory was injected.
+        from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
+        writer_factory = EventLogWriter
+    writer = writer_factory(events_log)
     for finding in findings:
         try:
             payload = wire_dict_to_judgment(finding)
@@ -218,6 +227,7 @@ def _write_findings(
     emit_events: bool = True,
     unconsolidated: list[dict] | None = None,
     trust_model: TrustModel | None = None,
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
     """Replay cached findings into this run's evidence JSONL.
 
@@ -290,7 +300,9 @@ def _write_findings(
         for finding in stamped:
             out.write(json.dumps(finding) + "\n")
     if emit_events:
-        _emit_cached_findings(_events_log_path(jsonl), stamped)
+        _emit_cached_findings(
+            _events_log_path(jsonl), stamped, writer_factory=writer_factory,
+        )
 
 
 def process_dimension_with_cache(
@@ -300,6 +312,8 @@ def process_dimension_with_cache(
     cache: CacheBackend | None = None,
     dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents,
     persist_interval_s: float = _PERSIST_INTERVAL_S,
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
+    log: LogSink = NULL_LOG,
 ) -> Evidence | None:
     """V2 entry point — content-addressed cache replaces V1 change detection.
 
@@ -326,7 +340,7 @@ def process_dimension_with_cache(
     if not files:
         # Nothing to classify — defer to existing path so the no-files
         # warning + single-agent fallback runs unchanged.
-        return dispatcher(config, dim_id, idx, ctx, callbacks)
+        return dispatcher(config, dim_id, idx, ctx, callbacks, log=log)
 
     # Clean-scan (incremental=False) means "I want fresh analysis." The user's
     # mental model: cancelled clean-scan + retry should NOT short-circuit on
@@ -394,6 +408,7 @@ def process_dimension_with_cache(
             jsonl, classify.cached_findings, append=True,
             unconsolidated=classify.unconsolidated_findings,
             trust_model=trust_model,
+            writer_factory=writer_factory,
         )
         if jsonl.exists():
             deduplicate_jsonl(jsonl)
@@ -425,6 +440,7 @@ def process_dimension_with_cache(
             jsonl, classify.cached_findings, append=True,
             unconsolidated=classify.unconsolidated_findings,
             trust_model=trust_model,
+            writer_factory=writer_factory,
         )
 
     # Persist the per-file cache keys to a sidecar so the discard path can
@@ -483,7 +499,7 @@ def process_dimension_with_cache(
 
     try:
         miss_evidence = dispatcher(
-            miss_config, dim_id, idx, ctx, callbacks,
+            miss_config, dim_id, idx, ctx, callbacks, log=log,
         )
     finally:
         # Signal the watcher to do a final persist and exit. Whatever

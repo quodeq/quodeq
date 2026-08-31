@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
-from quodeq.shared.logging import log_info, log_warning
+from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-exports from split modules -- keep the public API stable
 from quodeq.analysis.subagents._source_files import _list_source_files  # noqa: F401
@@ -62,20 +62,21 @@ class _PoolExecutionParams:
 
 def process_consolidated_dimensions(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
+    *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
-    return _process_consolidated_impl(config, dimensions, ctx)
+    return _process_consolidated_impl(config, dimensions, ctx, log=log)
 
 
 def _prepare_findings_and_queue(
-    config: RunConfig, dc: _DimensionContext,
+    config: RunConfig, dc: _DimensionContext, log: LogSink,
 ) -> _PoolExecutionParams:
     """Build the file queue for the pool. No prior-findings logic — V2's
     cache hit/miss already determined which files need dispatch."""
     queue_path = dc.evidence_dir / f"{dc.dim_id}_queue.json"
     files_per_agent = _compute_files_per_agent(len(dc.files))
     FileQueue(queue_path, dc.files, max_files_per_agent=files_per_agent)
-    log_info(
+    log.info(
         f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued",
     )
     return _PoolExecutionParams(
@@ -106,6 +107,7 @@ def _execute_pool_and_collect(
 def process_dimension_with_subagents(
     config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
     callbacks: DimensionCallbacks,
+    *, log: LogSink = NULL_LOG,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents.
 
@@ -116,7 +118,7 @@ def process_dimension_with_subagents(
 
     files, extensions, _excluded = _list_source_files(config, dim_id)
     if not files:
-        log_warning(
+        log.warning(
             f"[{idx}/{ctx.total}] {dim_id} -- no source files for subagent queue"
             f" (src={config.src}, language={config.language}, extensions={extensions})"
         )
@@ -125,6 +127,6 @@ def process_dimension_with_subagents(
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
     dc = _DimensionContext(dim_id=dim_id, idx=idx, ctx=ctx, files=files, evidence_dir=evidence_dir)
-    pool_params = _prepare_findings_and_queue(config, dc)
+    pool_params = _prepare_findings_and_queue(config, dc, log)
 
     return _execute_pool_and_collect(config, dc, pool_params)
