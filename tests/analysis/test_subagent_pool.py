@@ -11,6 +11,7 @@ import pytest
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_config
 
 
 from tests._analysis_helpers import _fake_run_analysis  # noqa: F401 — shared helper
@@ -52,18 +53,16 @@ class TestSubagentPool:
         assert all(r.success for r in results)
 
     def test_agent_configs_have_queue_and_agent_id(self, tmp_path: Path) -> None:
-        # NOTE: Directly tests private method _build_agent_config for coverage of
-        # per-agent configuration wiring.  Known coupling to internal implementation.
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py"])
 
-        pool = SubagentPool(
-            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=2, prompt="test", dimension="security"),
-            config=AnalysisConfig(compiled_dir=tmp_path / "compiled"),
+        wctx = WorkerContext(
+            dimension="security", dimension_key="security",
+            evidence_dir=tmp_path, queue_path=queue_path,
         )
-
-        ac, jsonl, stream = pool._build_agent_config(0)
+        ac, jsonl, stream = build_agent_config(
+            0, AnalysisConfig(compiled_dir=tmp_path / "compiled"), wctx,
+        )
         assert ac.queue_path == queue_path
         assert ac.agent_id == "agent-0"
         assert ac.dimension == "security"

@@ -1,4 +1,4 @@
-"""tests/core must not pull framework packages in transitively.
+"""Guard (from tests/tools) that tests/core pulls no framework packages transitively.
 
 The clean-architecture self-evaluation flagged tests/core files for reaching
 httpx (via tests._evidence_helpers -> analysis.mcp.findings_server ->
