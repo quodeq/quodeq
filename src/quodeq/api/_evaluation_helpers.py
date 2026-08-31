@@ -65,6 +65,12 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 _SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
 
 
+def _path_dirs(env: dict[str, str] | None = None) -> list[str]:
+    """Real (symlink-resolved) directories on the server's PATH."""
+    raw = (env or os.environ).get("PATH", "")
+    return [os.path.realpath(d) for d in raw.split(os.pathsep) if d]
+
+
 def _validate_ai_cmd_path(
     ai_cmd: str | None, ai_cmd_path: str | None,
 ) -> tuple[Response, int] | None:
@@ -73,11 +79,13 @@ def _validate_ai_cmd_path(
 
     The aiCmd allow-list exists so the local HTTP API can never spawn an
     arbitrary binary. A free-text override would reopen that, so it must
-    (a) contain no shell metacharacters, (b) resolve to an existing
-    executable, and (c) have a basename that starts with the provider id
-    (e.g. 'claude-api' or '/opt/bin/claude-max' for 'claude'), which keeps
-    the override an alternate install of the allowed CLI rather than a
-    redirect to any program.
+    (a) contain no shell metacharacters or '..' segments, (b) be absolute
+    when it names a path at all, (c) have a basename that starts with the
+    provider id (e.g. 'claude-api' or '/opt/bin/claude-max' for 'claude'),
+    (d) resolve to an existing executable, and (e) live in a directory on
+    the server's PATH. (c) keeps the override an alternate install of the
+    allowed CLI, (e) keeps it out of attacker-writable locations like /tmp
+    or a downloads folder.
     """
     if not ai_cmd_path:
         return None
@@ -94,12 +102,24 @@ def _validate_ai_cmd_path(
         return _invalid(
             "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
         )
+    normalized = ai_cmd_path.replace("\\", "/")
+    if ".." in normalized.split("/"):
+        return _invalid("'..' path segments are not allowed")
+    if "/" in normalized and not os.path.isabs(ai_cmd_path):
+        return _invalid("a path must be absolute; otherwise use a bare command name")
     provider = ai_cmd or _get_ai_cmd()
-    basename = os.path.basename(ai_cmd_path.replace("\\", "/"))
+    basename = os.path.basename(normalized)
     if not basename.startswith(provider):
         return _invalid(f"binary name must start with '{provider}'")
-    if shutil.which(ai_cmd_path) is None:
+    resolved = shutil.which(ai_cmd_path)
+    if resolved is None:
         return _invalid(f"'{ai_cmd_path}' was not found or is not executable")
+    resolved_dir = os.path.realpath(os.path.dirname(os.path.abspath(resolved)))
+    if resolved_dir not in _path_dirs():
+        return _invalid(
+            f"'{ai_cmd_path}' is not in a directory on PATH; move it to one "
+            f"(e.g. ~/.local/bin) or add its directory to PATH"
+        )
     return None
 
 

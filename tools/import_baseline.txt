@@ -2,7 +2,7 @@
 # justification -- the goal is to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_imports.py --update-baseline
 src/quodeq/analysis/subprocess.py:283:llm_bridge
-src/quodeq/api/_evaluation_routes.py:21:analysis
+src/quodeq/api/_evaluation_routes.py:22:analysis
 src/quodeq/api/llm_bridge_routes.py:6:llm_bridge
 src/quodeq/api/routes_project_list.py:238:analysis
 src/quodeq/ci/review.py:129:cli_parser
@@ -10,7 +10,7 @@ src/quodeq/ci/review.py:147:_cli_evaluation
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/llm_bridge/_providers.py:6:analysis
 src/quodeq/services/_external_jobs.py:21:analysis
-src/quodeq/services/evaluation_mixin.py:361:analysis
+src/quodeq/services/evaluation_mixin.py:366:analysis
 src/quodeq/services/jobs.py:20:analysis
 src/quodeq/services/score_run.py:16:analysis
 src/quodeq/services/tooling_mixin.py:18:analysis

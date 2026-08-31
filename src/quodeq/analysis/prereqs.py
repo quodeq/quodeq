@@ -59,6 +59,11 @@ def _check_cli_binary_override(provider: str, override: str) -> None:
     forbids path separators (its Windows shell=True hardening), and for an
     explicit override the failure mode being guarded against is simply
     "binary not found".
+
+    This is an availability check, not a security boundary: AI_CMD_PATH
+    reaches this process either from the operator's own environment or via
+    the dashboard API, where api._evaluation_helpers._validate_ai_cmd_path
+    enforces the spawn restrictions (provider-prefixed name, on-PATH dir).
     """
     if not _SAFE_CMD_PATH_RE.fullmatch(override):
         raise RuntimeError(
