@@ -30,7 +30,6 @@ from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_ver
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.fingerprint import _hash_file, _hash_standards, dimension_params_state
-from quodeq.config.paths import default_paths
 
 _logger = logging.getLogger(__name__)
 
@@ -43,6 +42,7 @@ def build_cache_writer(
     dimension: str,
     model_id: str,
     language: str,
+    prompts_dir: Path | None,
 ) -> Callable[[str, list[dict]], None]:
     """Return a closure that writes a per-file cache entry on each ok marker.
 
@@ -62,6 +62,11 @@ def build_cache_writer(
             ``config.options.subagent_model or config.options.ai_model``
             in the parent's resolution.
         language: Language identifier from the project's manifest.
+        prompts_dir: Prompts directory folded into the entry's provenance
+            (``prompts_hash``). Callers resolve it at the composition root
+            (``RunConfig.prompts_dir`` / ``default_paths().prompts_dir``);
+            it MUST match what classify-time ``_current_provenance`` hashes,
+            or reused entries report phantom prompts drift.
 
     Failures (disk full, permission denied, etc.) propagate as exceptions
     out of the closure. The router catches them and logs; the JSONL marker
@@ -77,7 +82,7 @@ def build_cache_writer(
         (_hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
         or ""
     )
-    prompts_hash = _hash_prompts_combined(default_paths().prompts_dir)
+    prompts_hash = _hash_prompts_combined(prompts_dir)
     version = quodeq_version()
     # Computed once at construction: the params_hash keys threshold-override
     # changes into the cache key below; effective_params is recorded on each

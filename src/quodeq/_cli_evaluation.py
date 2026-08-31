@@ -407,6 +407,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         manifest=inputs.manifest,
         dimensions_data=inputs.dims_data,
         evaluators_dir=default_paths().evaluators_dir,
+        prompts_dir=default_paths().prompts_dir,
         options=AnalysisOptions(
             ai_model=effective_ai_model,
             dimensions=dimensions_filter,

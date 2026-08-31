@@ -18,7 +18,6 @@ from __future__ import annotations
 import functools
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass
 from enum import Enum as _Enum
@@ -32,6 +31,11 @@ from pydantic import BaseModel, Field
 from quodeq.analysis._drop_stats import record as _record_drop_stats
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+from quodeq.config.analysis_env import (
+    api_read_timeout_override,
+    context_size_override,
+    max_output_tokens_override,
+)
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
@@ -179,9 +183,9 @@ def _resolve_max_tokens(config: ApiRunnerConfig, *, is_openai: bool) -> int | No
         return config.max_tokens
     if is_openai:
         return None
-    env_val = os.environ.get("QUODEQ_MAX_OUTPUT_TOKENS", "").strip()
-    if env_val.isdigit():
-        return int(env_val) or None
+    override = max_output_tokens_override()
+    if override is not None:
+        return override or None
     return _DEFAULT_LOCAL_MAX_TOKENS
 
 
@@ -196,10 +200,10 @@ def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeo
     QUODEQ_API_READ_TIMEOUT (whole seconds) overrides the read budget outright.
     """
     base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
-    env_val = os.environ.get("QUODEQ_API_READ_TIMEOUT", "").strip()
-    if env_val.isdigit() and int(env_val) > 0:
+    override = api_read_timeout_override()
+    if override is not None and override > 0:
         return httpx.Timeout(
-            connect=base.connect, read=float(env_val),
+            connect=base.connect, read=float(override),
             write=base.write, pool=base.pool,
         )
     scale = max(1, config.n_subagents)
@@ -361,9 +365,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
     if ctx_size <= 0:
-        env_val = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
-        if env_val.isdigit():
-            ctx_size = int(env_val)
+        ctx_size = context_size_override() or 0
     if ctx_size > 0:
         # Kept for proxies (LiteLLM-style) that forward it to Ollama's native
         # API; direct Ollama ignores it on /v1, hence the warning.
@@ -602,6 +604,7 @@ def _build_cache_writer(
         dimension=dim_id,
         model_id=model_id,
         language=run_config.language or "",
+        prompts_dir=run_config.prompts_dir,
     )
 
 

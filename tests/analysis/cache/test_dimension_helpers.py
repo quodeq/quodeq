@@ -680,3 +680,89 @@ def test_classify_treats_a_legacy_entry_as_consolidated(tmp_path):
 
     assert [f["file"] for f in result.cached_findings] == ["a.py"]
     assert result.unconsolidated_findings == []
+
+
+# ============================================================
+# prompts_dir injection ([35]/[36]): provenance hashes flow from
+# RunConfig.prompts_dir, and all three stamping sites agree.
+# ============================================================
+
+class TestPromptsDirProvenance:
+    def _prompts_dir(self, tmp_path: Path) -> Path:
+        prompts = tmp_path / "prompts"
+        prompts.mkdir()
+        (prompts / "rules.md").write_text("# rule one")
+        return prompts
+
+    def test_current_provenance_hashes_injected_prompts_dir(self, tmp_path: Path):
+        from quodeq.analysis.cache.dimension_helpers import (
+            _current_provenance,
+            _hash_prompts_combined,
+        )
+
+        prompts = self._prompts_dir(tmp_path)
+        _write_files(tmp_path / "src", {"a.py": "x"})
+        config = replace(_make_config(tmp_path / "src"), prompts_dir=prompts)
+
+        prov = _current_provenance(config, "security")
+        expected = _hash_prompts_combined(prompts)
+        assert expected  # the temp dir has a rules-bearing prompt
+        assert prov["prompts_hash"] == expected
+
+    def test_persist_stamps_the_injected_prompts_dir(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        from quodeq.analysis.cache.dimension_helpers import _hash_prompts_combined
+
+        prompts = self._prompts_dir(tmp_path)
+        files = _write_files(tmp_path / "src", {"a.py": "x"})
+        config = replace(
+            _make_config(tmp_path / "src", work_dir=tmp_path / "work"),
+            prompts_dir=prompts,
+        )
+        miss_keys = {f: build_cache_key_for_file(config, f, "security") for f in files}
+        jsonl = tmp_path / "work" / "security_evidence.jsonl"
+        jsonl.parent.mkdir(parents=True, exist_ok=True)
+        jsonl.write_text(
+            json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+        )
+
+        persist_dispatch_results(
+            config, "security", miss_files=files,
+            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+        )
+
+        entry = cache.get(miss_keys["a.py"])
+        assert entry is not None
+        assert entry.provenance["prompts_hash"] == _hash_prompts_combined(prompts)
+
+    def test_cache_writer_agrees_with_classify_time_provenance(self, tmp_path: Path):
+        """The synchronous cache writer and classify's _current_provenance
+        must stamp the SAME prompts_hash for the same prompts_dir, or reused
+        entries report phantom prompts drift."""
+        from quodeq.analysis.cache.cache_writer import build_cache_writer
+        from quodeq.analysis.cache.dimension_helpers import _current_provenance
+        from quodeq.analysis.cache.local import LocalFileBackend
+
+        prompts = self._prompts_dir(tmp_path)
+        _write_files(tmp_path / "src", {"a.py": "x"})
+        config = replace(_make_config(tmp_path / "src"), prompts_dir=prompts)
+
+        cache_root = tmp_path / "cache"
+        write = build_cache_writer(
+            cache_root=cache_root,
+            src_root=tmp_path / "src",
+            standards_dir=None,
+            dimension="security",
+            model_id="test-model",
+            language="python",
+            prompts_dir=config.prompts_dir,
+        )
+        write("a.py", [])
+
+        key = build_cache_key_for_file(config, "a.py", "security")
+        entry = LocalFileBackend(root=cache_root).get(key)
+        assert entry is not None
+        current = _current_provenance(config, "security")
+        assert entry.provenance["prompts_hash"] == current["prompts_hash"]
+        assert current["prompts_hash"]  # non-empty: the hash is real, not two blanks

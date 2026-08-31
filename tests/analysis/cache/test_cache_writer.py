@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.config.paths import default_paths
 
 
 def _make_config(
@@ -48,6 +49,7 @@ def test_cache_writer_writes_entry_via_local_backend(tmp_path):
         dimension="flexibility",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
 
     findings = [{"file": "Foo.kt", "line": 10, "p": "Adaptability", "t": "violation", "req": "F-ADP-1"}]
@@ -77,6 +79,7 @@ def test_cache_writer_writes_empty_findings_entry(tmp_path):
         dimension="flexibility",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
 
     write("Empty.kt", [])
@@ -111,6 +114,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
         dimension="flexibility",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
     write("Foo.kt", [])
 
@@ -154,6 +158,7 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
         dimension="flexibility",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
     write("Foo.kt", [])
 
@@ -188,6 +193,7 @@ def test_entry_is_self_describing_for_future_key_migration(tmp_path):
     write = build_cache_writer(
         cache_root=cache_root, src_root=src_root, standards_dir=None,
         dimension="flexibility", model_id="sonnet", language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
     write("Foo.kt", [])
 
@@ -237,6 +243,7 @@ def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
         dimension="flexibility",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
     write("Foo.kt", [{"file": "Foo.kt", "line": 1, "p": "X", "t": "violation", "req": "R-1"}])
 
@@ -275,6 +282,7 @@ def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
         dimension="flexibility",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
 
     # Craft a traversal path that resolves to the sentinel outside src_root.
@@ -328,6 +336,7 @@ def test_written_entry_records_effective_params(tmp_path):
         dimension="maintainability",
         model_id="m",
         language="python",
+        prompts_dir=default_paths().prompts_dir,
     )
     write("auth.py", [])
 
@@ -357,6 +366,7 @@ def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):
         dimension="security",
         model_id="sonnet",
         language="kotlin",
+        prompts_dir=default_paths().prompts_dir,
     )
     write("Foo.kt", [{"file": "Foo.kt", "line": 1, "t": "violation"}])
 
