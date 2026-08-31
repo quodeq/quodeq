@@ -66,9 +66,9 @@ _SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
 
 
 def _path_dirs(env: dict[str, str] | None = None) -> list[str]:
-    """Real (symlink-resolved) directories on the server's PATH."""
+    """Real (symlink-resolved, case-normalized) directories on the server's PATH."""
     raw = (env or os.environ).get("PATH", "")
-    return [os.path.realpath(d) for d in raw.split(os.pathsep) if d]
+    return [os.path.normcase(os.path.realpath(d)) for d in raw.split(os.pathsep) if d]
 
 
 def _validate_ai_cmd_path(
@@ -114,7 +114,7 @@ def _validate_ai_cmd_path(
     resolved = shutil.which(ai_cmd_path)
     if resolved is None:
         return _invalid(f"'{ai_cmd_path}' was not found or is not executable")
-    resolved_dir = os.path.realpath(os.path.dirname(os.path.abspath(resolved)))
+    resolved_dir = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(resolved))))
     if resolved_dir not in _path_dirs():
         return _invalid(
             f"'{ai_cmd_path}' is not in a directory on PATH; move it to one "

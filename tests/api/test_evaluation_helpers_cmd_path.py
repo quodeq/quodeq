@@ -30,6 +30,11 @@ def bin_dir(tmp_path, monkeypatch):
 
 
 def _make_executable(directory, name: str) -> str:
+    if os.name == "nt":
+        # shutil.which on Windows only finds PATHEXT extensions.
+        path = directory / f"{name}.bat"
+        path.write_text("@exit /b 0\n")
+        return str(path)
     path = directory / name
     path.write_text("#!/bin/sh\nexit 0\n")
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

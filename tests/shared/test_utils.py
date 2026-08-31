@@ -103,6 +103,15 @@ class TestGetters:
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir")
         assert utils.get_evaluations_dir() == "/custom/dir"
 
+    def test_env_paths_are_normalized(self, monkeypatch):
+        # Operator-supplied paths get expanduser + abspath: '~' expands and
+        # '..' segments collapse instead of resolving at use time.
+        monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir/../other")
+        assert utils.get_evaluations_dir() == "/custom/other"
+        monkeypatch.setenv("QUODEQ_DIR", "~/quodeq-state")
+        from quodeq.shared._env import get_quodeq_dir
+        assert get_quodeq_dir() == Path.home() / "quodeq-state"
+
     def test_get_anthropic_api_key_none_by_default(self, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         assert utils.get_anthropic_api_key() is None
