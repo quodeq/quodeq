@@ -38,12 +38,13 @@ class TestEnrichJudgmentRefsReader:
             return {"S-CON-1": [{"label": "CISQ-1", "url": "https://example.com/1"}]}
 
         cache: dict[str, dict[str, list[dict]]] = {}
+        compiled_dir = Path("/compiled")
         enriched = enrich_judgment(
-            _judgment(), ["CISQ-1"], Path("/compiled"), cache,
+            _judgment(), ["CISQ-1"], compiled_dir, cache,
             refs_reader=fake_reader,
         )
 
-        assert calls == [("/compiled", "security")]
+        assert calls == [(str(compiled_dir), "security")]
         assert [(r.label, r.url) for r in enriched.req_refs] == [
             ("CISQ-1", "https://example.com/1"),
         ]
