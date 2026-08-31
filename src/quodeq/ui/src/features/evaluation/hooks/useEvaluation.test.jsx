@@ -280,6 +280,48 @@ describe("useEvaluation", () => {
     await waitFor(() => expect(result.current.jobError).toMatch(/provider/i));
   });
 
+  it("startEvaluation surfaces the backend's specific message on a 400", async () => {
+    // Regression: a server-side 400 (e.g. an invalid aiCmdPath override)
+    // used to collapse into the generic "Failed to start evaluation.",
+    // hiding the actionable reason the backend already wrote.
+    const err = new Error(
+      "Invalid AI command override: 'claude-v' was not found or is not executable",
+    );
+    err.status = 400;
+    err.code = "INVALID_INPUT";
+    fakeApi.startEvaluation.mockRejectedValue(err);
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await expect(
+      result.current.startEvaluation({ repo: "x", dimensions: [] }),
+    ).rejects.toThrow();
+    await waitFor(() => expect(result.current.jobError).toMatch(/claude-v/));
+  });
+
+  it("startEvaluation shows translated copy for a mapped error code", async () => {
+    const err = new Error("Too many evaluation requests");
+    err.status = 429;
+    err.code = "RATE_LIMITED";
+    fakeApi.startEvaluation.mockRejectedValue(err);
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await expect(
+      result.current.startEvaluation({ repo: "x", dimensions: [] }),
+    ).rejects.toThrow();
+    await waitFor(() =>
+      expect(result.current.jobError).toBe("Too many requests. Wait a moment and try again."),
+    );
+  });
+
+  it("startEvaluation falls back to the generic message when the failure carries no text", async () => {
+    fakeApi.startEvaluation.mockRejectedValue(new Error(""));
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await expect(
+      result.current.startEvaluation({ repo: "x", dimensions: [] }),
+    ).rejects.toThrow();
+    await waitFor(() =>
+      expect(result.current.jobError).toBe("Failed to start evaluation."),
+    );
+  });
+
   it("adopts a running CLI-started external run on mount", async () => {
     const running = {
       jobId: "ext-abc",
