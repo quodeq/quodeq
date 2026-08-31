@@ -1,69 +1,34 @@
 """Centralized configuration loading for the Quodeq package.
 
 Provides the :class:`Config` dataclass (via ``_config_class``) and
-lazy-loaded default constants read from ``defaults.json``.
+lazy-loaded default constants read from ``defaults.json``. Delegates to the
+canonical process-wide singleton in :mod:`quodeq.shared._config` rather than
+keeping a second one here.
 """
 from __future__ import annotations
 
-import threading
-from pathlib import Path
-
+from quodeq.shared._config import _DEFAULTS_PATH, _get_config as _canonical_get_config
 from quodeq.shared._config_class import Config  # noqa: F401
-
-_DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
-
-_config_lock = threading.Lock()
-# Singleton instance — access via _get_config(override) for DI; reset via _reset_config_for_testing().
-_config_instance: Config | None = None
 
 
 def _get_config(override: Config | None = None) -> Config:
-    """Return the lazily-loaded singleton Config instance (thread-safe).
+    """Return the canonical singleton Config instance.
 
     Pass *override* to use a specific Config without touching the singleton
     (useful for testing and dependency injection).
     """
-    if override is not None:
-        return override
-    global _config_instance
-    if _config_instance is None:
-        with _config_lock:
-            if _config_instance is None:
-                _config_instance = Config.from_file(_DEFAULTS_PATH)
-    return _config_instance
-
-
-def _reset_config_for_testing() -> None:
-    """Clear the singleton so the next ``_get_config()`` call reloads from disk.
-
-    Intended **only** for test teardown — never call in production code.
-    """
-    global _config_instance
-    with _config_lock:
-        _config_instance = None
-        _lazy_cache.clear()
-
-
-# ---------------------------------------------------------------------------
-# Lazy accessors for constants derived from defaults.json
-# ---------------------------------------------------------------------------
-_lazy_cache: dict[str, str] = {}
-_lazy_lock = threading.Lock()
+    return override if override is not None else _canonical_get_config()
 
 
 def _lazy_constant(key: str) -> str:
-    """Return a config value, reading defaults.json on first access."""
-    if key not in _lazy_cache:
-        with _lazy_lock:
-            if key not in _lazy_cache:
-                try:
-                    _lazy_cache[key] = _get_config()[key]
-                except KeyError:
-                    raise KeyError(
-                        f"Config key {key!r} not found in defaults.json "
-                        f"({_DEFAULTS_PATH}); the file may be missing or corrupt"
-                    ) from None
-    return _lazy_cache[key]
+    """Return a config value from the canonical singleton."""
+    try:
+        return _get_config()[key]
+    except KeyError:
+        raise KeyError(
+            f"Config key {key!r} not found in defaults.json "
+            f"({_DEFAULTS_PATH}); the file may be missing or corrupt"
+        ) from None
 
 
 def get_anthropic_api_url() -> str:

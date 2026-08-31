@@ -95,9 +95,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/_violations_jsonl.py': 'JSONL-specific parsing for extracting violations from MCP findings files - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_violations_stream.py': 'Stream-specific parsing for extracting violations from live event log files - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_warmup.py': 'Background warm-up of per-project score caches at server boot - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/base.py': 'Protocol definitions for the action provider abstraction layer - out of scope for this sweep (not a flagged per-site conversion)',
     'services/deleted.py': 'Persistent storage for permanently-deleted findings - per-project JSON file - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/evaluation_mixin.py': 'Mixin providing evaluation lifecycle methods for the filesystem provider - out of scope for this sweep (not a flagged per-site conversion)',
     'services/evidence_rescore.py': 'Rescore a dimension from its raw evidence, minus dismissed/deleted findings - imports the raw stdlib logger (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
     'services/filesystem.py': 'FilesystemActionProvider - thin coordinator composing the provider collaborators - imports quodeq.shared.log_sink for SHARED_LOG, passed into composition-root wiring for register_project_with_rollback - plan-sanctioned composition wiring, not a logging-boundary violation',
     'services/grade_formula.py': 'User-tuned grade formula: apply/preview orchestration - out of scope for this sweep (not a flagged per-site conversion)',
@@ -108,7 +106,6 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/scoring/_rescoring.py': 'Accumulated-rescore machinery for the scoring reader - out of scope for this sweep (not a flagged per-site conversion)',
     'services/shared_publish.py': 'Staging logic for publishing a project into the shared results repo - out of scope for this sweep (not a flagged per-site conversion)',
     'services/tooling_mixin.py': 'Mixin providing repo browsing and AI client discovery for the filesystem provider - out of scope for this sweep (not a flagged per-site conversion)',
-    'services/violations_parsing.py': 'Shared helpers and evidence parsing for violation extraction - out of scope for this sweep (not a flagged per-site conversion)',
     'services/violations.py': 'Violation resolution and aggregation for the filesystem action provider - out of scope for this sweep (not a flagged per-site conversion)',
 }
 

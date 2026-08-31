@@ -3,9 +3,9 @@ import logging
 from unittest.mock import patch
 import pytest
 
+from quodeq.api import _evaluation_helpers as _eval_helpers_mod
 from quodeq.api._evaluation_helpers import _build_evaluation_options
 from quodeq.api.app import create_app
-import quodeq.services.base as _base_mod
 from quodeq.services.base import ActionProvider, EvaluationOptions
 
 
@@ -56,11 +56,11 @@ def test_legacy_incremental_false_maps_to_clean_scan_true():
 
     Inverted semantics: the old flag was opt-in; the new flag is opt-out.
     """
-    with patch.object(_base_mod._logger, "warning") as mock_warn:
+    with patch.object(_eval_helpers_mod._logger, "warning") as mock_warn:
         opts = _build_evaluation_options({"incremental": False})
     assert opts.clean_scan is True
     # Deprecation warning should fire on resolve_clean_scan's logger
-    # (services/base.py -- the resolution rule moved out of the api layer).
+    # (api/_evaluation_helpers.py -- wire-key parsing is adapter work).
     assert mock_warn.called, "Expected a deprecation warning for legacy `incremental` field"
     warn_msg = mock_warn.call_args[0][0]
     assert "deprecated" in warn_msg.lower()
@@ -69,7 +69,7 @@ def test_legacy_incremental_false_maps_to_clean_scan_true():
 
 def test_legacy_incremental_true_maps_to_clean_scan_false():
     """Legacy `incremental: true` (old "use cache") maps to `clean_scan: false`."""
-    with patch.object(_base_mod._logger, "warning") as mock_warn:
+    with patch.object(_eval_helpers_mod._logger, "warning") as mock_warn:
         opts = _build_evaluation_options({"incremental": True})
     assert opts.clean_scan is False
     assert mock_warn.called, "Expected a deprecation warning for legacy `incremental` field"

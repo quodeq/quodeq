@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import re
 import subprocess
@@ -13,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Protocol
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
@@ -24,8 +24,6 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_n
 
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
-
-_logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
@@ -375,7 +373,10 @@ def _open_cache():
     return LocalFileBackend()
 
 
-def _discard_run_state(reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None) -> None:
+def _discard_run_state(
+    reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None,
+    log: LogSink = NULL_LOG,
+) -> None:
     """Wipe every trace a discarded run left behind.
 
     Invoked when the user cancels with "Discard findings": the run must end
@@ -409,7 +410,7 @@ def _discard_run_state(reports_dir: str, job: dict, *, cache: "_CacheEraser | No
             try:
                 cache.delete(key)
             except Exception as exc:  # noqa: BLE001
-                _logger.warning("Could not delete cache entry %s: %s", key, exc)
+                log.warning(f"Could not delete cache entry {key}: {exc}")
 
     scratch_patterns = (
         "*_queue.json", "*_fingerprint.json",
