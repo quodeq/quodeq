@@ -65,7 +65,7 @@ class TestTerminateProcess:
         proc = MagicMock()
         proc.pid = 123
         proc.wait.return_value = 0
-        with patch("quodeq.analysis._process._kill_tree"):
+        with patch("quodeq.shared._process_kill.kill_tree"):
             _terminate_process(proc)
             proc.wait.assert_called_once()
 
@@ -74,7 +74,7 @@ class TestTerminateProcess:
         proc = MagicMock()
         proc.pid = 123
         proc.wait.side_effect = [subprocess.TimeoutExpired("cmd", 10), None]
-        with patch("quodeq.analysis._process._kill_tree") as mock_kill:
+        with patch("quodeq.shared._process_kill.kill_tree") as mock_kill:
             _terminate_process(proc)
             assert mock_kill.call_count == 2  # SIGTERM + SIGKILL
 
@@ -83,7 +83,7 @@ class TestTerminateProcess:
         proc = MagicMock()
         proc.pid = 123
         proc.wait.side_effect = subprocess.TimeoutExpired("cmd", 10)
-        with patch("quodeq.analysis._process._kill_tree"):
+        with patch("quodeq.shared._process_kill.kill_tree"):
             _terminate_process(proc)
             proc.kill.assert_called_once()
 

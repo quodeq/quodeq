@@ -10,14 +10,14 @@ from pathlib import Path
 import threading
 import time
 import uuid
-from typing import Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 import subprocess
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import JobSnapshot
 
-from quodeq.analysis._process import _kill_tree, _terminate_process
+from quodeq.shared._process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
 from quodeq.shared._env import env_float
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
@@ -32,6 +32,9 @@ from quodeq.services._job_model import (
     _CC_MARKER_PREFIX,
     _CONSUME_BATCH_SIZE,
 )
+
+if TYPE_CHECKING:
+    from quodeq.services._external_jobs import ProcessControl
 
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
@@ -92,6 +95,7 @@ class JobManager:
         reports_root: Path | None = None,
         job_timeout_cap_s: float | None = None,
         *, log: LogSink = NULL_LOG,
+        process_control: "ProcessControl | None" = None,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
@@ -100,6 +104,7 @@ class JobManager:
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
         self._log = log
+        self._process_control = process_control
         # Injection seam for the hard job-duration cap; None means "fall back
         # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
         self._job_timeout_cap_s_override = job_timeout_cap_s
@@ -205,7 +210,9 @@ class JobManager:
             if not project_dir.is_dir():
                 continue
             if (project_dir / run_id).is_dir():
-                return cancel_external_run(project_dir.name, run_id, reports_root)
+                return cancel_external_run(
+                    project_dir.name, run_id, reports_root, control=self._process_control,
+                )
         return False
 
     def shutdown(self) -> None:

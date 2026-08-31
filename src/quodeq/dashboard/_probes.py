@@ -14,6 +14,8 @@ module attributes.
 """
 from __future__ import annotations
 
+import subprocess
+import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,13 +23,12 @@ from typing import TYPE_CHECKING
 
 from quodeq.dashboard._api_health_check import action_api_healthy
 from quodeq.dashboard._build import maybe_build_ui
+from quodeq.dashboard._instance import InstanceController
 from quodeq.dashboard._networking import _is_port_open, _local_hosts
 from quodeq.dashboard._process import _kill_stale_action_api, _spawn_and_wait_local
 from quodeq.shared.prereqs import check_dashboard_dev_prereqs
 
 if TYPE_CHECKING:
-    import subprocess
-
     from quodeq.dashboard._api_health import ApiConfig
 
 
@@ -55,3 +56,40 @@ class DashboardHooks:
     ensure_api: Callable[..., tuple[str, "subprocess.Popen | None"]] | None = None
     build_ui: Callable[..., Path] = maybe_build_ui
     check_prereqs: Callable[[], None] = check_dashboard_dev_prereqs
+
+
+def _webview_importable() -> bool:
+    try:
+        import webview  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _linux_webview_backend_available() -> bool:
+    """Return True if pywebview's GTK backend can actually load on Linux.
+
+    pywebview-on-Linux needs PyGObject + WebKit2GTK; neither is a pip
+    dependency of the `pywebview` wheel. Importing the GTK backend is the
+    only reliable probe — a successful `import webview` only proves the
+    Python package installed, not that its Linux backend is usable.
+    """
+    try:
+        import gi  # type: ignore[import-untyped]
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import WebKit2  # noqa: F401
+        return True
+    except (ImportError, ValueError):
+        # ValueError: "Namespace WebKit2 not available"
+        return False
+
+
+@dataclass(frozen=True)
+class NativeShell:
+    """Injectable seam for ``_serve_native``'s native-window collaborators."""
+
+    webview_importable: Callable[[], bool] = _webview_importable
+    linux_backend_available: Callable[[], bool] = _linux_webview_backend_available
+    make_instance: Callable[[], InstanceController] = InstanceController
+    spawn_window: Callable[..., "subprocess.Popen"] = subprocess.Popen
+    open_browser: Callable[[str], object] = webbrowser.open

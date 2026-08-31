@@ -9,6 +9,4 @@ src/quodeq/ci/review.py:129:cli_parser
 src/quodeq/ci/review.py:147:_cli_evaluation
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/llm_bridge/_providers.py:6:analysis
-src/quodeq/services/_external_jobs.py:21:analysis
-src/quodeq/services/jobs.py:20:analysis
 src/quodeq/services/tooling_mixin.py:15:analysis
