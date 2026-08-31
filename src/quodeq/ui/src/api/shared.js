@@ -15,7 +15,7 @@
 import { request, BASE } from './request.js';
 import { createProject } from '../models/project.js';
 import { createDashboard } from '../models/dashboard.js';
-import { createDimension, createDimensionEval } from '../models/dimension.js';
+import { createDimension, createDimensionEval, createSlimDimension } from '../models/dimension.js';
 
 /**
  * Convert a UNIX epoch-seconds timestamp (as sent by the backend) to
@@ -163,8 +163,10 @@ export async function sharedGetDashboard(projectId, run = 'latest') {
  * @param {string} projectId
  * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
  */
-export function sharedGetCompareSummary(projectId) {
-  return request(`/shared/projects/${encodeURIComponent(projectId)}/compare-summary`);
+export async function sharedGetCompareSummary(projectId) {
+  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/compare-summary`);
+  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
+  return data;
 }
 
 /**
@@ -203,10 +205,12 @@ export async function sharedGetProjectScores(projectId, asOfRun = null) {
  * @param {string} runId
  * @returns {Promise<{dimensions: Array, summary: Object}>}
  */
-export function sharedGetRunScores(projectId, runId) {
-  return request(
+export async function sharedGetRunScores(projectId, runId) {
+  const data = await request(
     `/shared/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`
   );
+  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
+  return data;
 }
 
 // ── Dimension Eval & Violations ─────────────────────────────────────────────

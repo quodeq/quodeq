@@ -7,7 +7,7 @@ from the running scan.
 import json
 from pathlib import Path
 
-from quodeq.analysis.cache.dimension_runner import _write_findings
+from quodeq.analysis.cache.dimension_runner import _emit_cached_findings, _write_findings
 
 
 def _finding(title: str) -> dict:
@@ -23,6 +23,37 @@ def test_write_findings_stamps_carried_forward(tmp_path: Path):
     _write_findings(jsonl, [_finding("carry-a")], append=False, emit_events=False)
     written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
     assert written[0]["carried_forward"] is True
+
+
+def test_emit_cached_findings_uses_injected_writer_factory(tmp_path: Path):
+    """[8]: the event-log writer is an injectable seam. A fake factory
+    receives the events.jsonl path and its emit() sees one JUDGMENT_CREATED
+    event per replayed finding — no concrete EventLogWriter constructed."""
+    class _RecordingWriter:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            self.events = []
+
+        def emit(self, event) -> None:
+            self.events.append(event)
+
+    writers: list[_RecordingWriter] = []
+
+    def factory(path: Path) -> _RecordingWriter:
+        writer = _RecordingWriter(path)
+        writers.append(writer)
+        return writer
+
+    events_log = tmp_path / "events.jsonl"
+    _emit_cached_findings(
+        events_log, [_finding("carry-a"), _finding("carry-b")],
+        writer_factory=factory,
+    )
+
+    assert len(writers) == 1
+    assert writers[0].path == events_log
+    assert len(writers[0].events) == 2
+    assert all(e.payload.title in {"carry-a", "carry-b"} for e in writers[0].events)
 
 
 def test_write_findings_does_not_mutate_the_source_dicts(tmp_path: Path):
@@ -56,7 +87,7 @@ def test_only_cache_replays_are_flagged(tmp_path: Path, cache):
         model_id="test-model",
     ))
 
-    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
         jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:
@@ -140,7 +171,7 @@ def test_all_unconsolidated_hits_are_still_written(tmp_path: Path, cache):
         model_id="test-model", consolidated=False,
     ))
 
-    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
         jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:
@@ -183,7 +214,7 @@ def test_salvage_path_keeps_unconsolidated_hits_when_dispatch_returns_none(
     # b.py has no cache entry, so it lands in classify.misses and dispatch is
     # actually attempted (and not the all-hits short-circuit above).
 
-    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
         return None
 
     evidence = process_dimension_with_cache(
@@ -220,7 +251,7 @@ def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
             model_id="test-model", consolidated=consolidated,
         ))
 
-    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
         jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:
@@ -318,7 +349,7 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
             src, work_dir=run_dir / "evidence", file_names=["a.py"],
         ), run_dir
 
-    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+    def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
         jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:

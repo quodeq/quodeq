@@ -31,7 +31,7 @@ def test_pipeline_writes_running_then_done(tmp_path: Path) -> None:
          patch.object(cli, "emit_marker"):
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
@@ -59,7 +59,7 @@ def test_pipeline_writes_failed_on_exception(tmp_path: Path) -> None:
          patch.object(cli, "emit_marker"):
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         with pytest.raises(RuntimeError):
             cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
@@ -89,7 +89,7 @@ def test_pipeline_writes_failed_on_domain_error(tmp_path: Path) -> None:
          patch.object(cli, "emit_marker"):
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         # The wrapper should catch AnalysisError/EvaluationError, log, return 1.
         result = cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
         assert result == 1
@@ -200,7 +200,7 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
         args = argparse.Namespace(
             repo="local", max_duration=None, pool_budget=None,
         )
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
@@ -335,7 +335,7 @@ def test_pipeline_records_provider_and_model_from_env(tmp_path: Path, monkeypatc
          patch.object(cli, "emit_marker"):
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
@@ -370,7 +370,7 @@ def test_pipeline_records_ai_cmd_as_provider(tmp_path: Path, monkeypatch) -> Non
          patch.object(cli, "emit_marker"):
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
@@ -410,7 +410,7 @@ def test_pool_deadline_extension_reaches_status_json(tmp_path: Path) -> None:
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
         args = argparse.Namespace(repo="local", pool_budget=60)
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
         cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     status = read_status(evaluation_dir.parent)

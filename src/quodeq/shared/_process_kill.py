@@ -12,6 +12,40 @@ import subprocess
 import sys
 from typing import Any
 
+_TERMINATE_TIMEOUT_S = 10
+_KILL_WAIT_TIMEOUT_S = 5
+
+
+def kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
+    """Kill a process and all its children, cross-platform."""
+    if sys.platform == "win32":
+        # taskkill /T kills the entire process tree
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(pid)],
+            capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
+        )
+    else:
+        try:
+            os.killpg(os.getpgid(pid), sig)
+        except (ProcessLookupError, OSError):
+            try:
+                os.kill(pid, sig)
+            except (ProcessLookupError, OSError):
+                pass
+
+
+def terminate_process(process: subprocess.Popen) -> None:
+    """Kill the process and its entire process tree to prevent orphans."""
+    kill_tree(process.pid, signal.SIGTERM)
+    try:
+        process.wait(timeout=_TERMINATE_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        kill_tree(process.pid, getattr(signal, "SIGKILL", signal.SIGTERM))
+        try:
+            process.wait(timeout=_KILL_WAIT_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
 
 def kill_proc_tree(proc: Any) -> None:
     """Kill *proc* and its children. proc is a subprocess.Popen (or a test double

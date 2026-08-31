@@ -6,7 +6,6 @@ modules are re-exported here for backward compatibility.
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -14,9 +13,6 @@ from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.core.evidence.parser import resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 from quodeq.shared.utils import read_json
-
-# NOTE: logging in inner layer — tracked for middleware extraction
-_logger = logging.getLogger(__name__)
 
 _TYPE_VIOLATION = "violation"
 _TYPE_COMPLIANCE = "compliance"

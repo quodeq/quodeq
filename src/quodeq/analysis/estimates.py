@@ -71,6 +71,7 @@ def project_estimates_payload(
         manifest=manifest,
         dimensions_data=dims_data,
         evaluators_dir=paths.evaluators_dir,
+        prompts_dir=paths.prompts_dir,
         options=AnalysisOptions(dimensions=requested, incremental=not clean_scan),
         dispatch=default_dispatch_policy(),
     )

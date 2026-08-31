@@ -1,13 +1,12 @@
-"""Data models for the source manifest."""
+"""Data models for the source manifest.
+
+Prompt-text rendering lives in ``manifest_render`` (``describe_target``,
+``render_target_prompt_context``, ``render_manifest_prompt_context``); the
+entities here carry only data.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-
-from quodeq.analysis.manifest_render import (
-    describe_target,
-    render_manifest_prompt_context,
-    render_target_prompt_context,
-)
 
 
 @dataclass
@@ -34,21 +33,6 @@ class AnalysisTarget:
             raise ValueError("AnalysisTarget requires a name")
         if not self.language:
             raise ValueError("AnalysisTarget requires a language")
-
-    @property
-    def project_description(self) -> str:
-        """E.g. 'Kotlin mobile using Flutter'.
-
-        Delegates to :func:`describe_target`.
-        """
-        return describe_target(self)
-
-    def to_prompt_context(self, repo_total_files: int = 0, other_targets: list[AnalysisTarget] | None = None) -> str:
-        """Render target as context for inclusion in analysis prompts.
-
-        Delegates to :func:`render_target_prompt_context`.
-        """
-        return render_target_prompt_context(self, repo_total_files, other_targets)
 
 
 @dataclass
@@ -100,15 +84,3 @@ class SourceManifest:
             merged.extend(t.source_files)
         merged.sort()
         return merged
-
-    @property
-    def project_description(self) -> str:
-        p = self._primary
-        return p.project_description if p else "Unknown"
-
-    def to_prompt_context(self) -> str:
-        """Render manifest as context for inclusion in analysis prompts.
-
-        Delegates to :func:`render_manifest_prompt_context`.
-        """
-        return render_manifest_prompt_context(self)

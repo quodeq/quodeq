@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     read_repository_info,
     repository_info_exists,
     write_repository_info,

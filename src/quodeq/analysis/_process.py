@@ -1,56 +1,20 @@
 """Subprocess spawning, heartbeat monitoring, and error handling."""
 from __future__ import annotations
 
-import os
-import signal
 import subprocess
-import sys
 from pathlib import Path
 
 from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
 from quodeq.analysis.errors import FatalProviderError, ProviderError, classify_fatal_provider_message
 from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
 from quodeq.shared import cancellation
+from quodeq.shared._process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
-
-_TERMINATE_TIMEOUT_S = 10
-_KILL_WAIT_TIMEOUT_S = 5
 
 
 class AnalysisError(ProviderError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
-
-
-def _kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
-    """Kill a process and all its children, cross-platform."""
-    if sys.platform == "win32":
-        # taskkill /T kills the entire process tree
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
-        )
-    else:
-        try:
-            os.killpg(os.getpgid(pid), sig)
-        except (ProcessLookupError, OSError):
-            try:
-                os.kill(pid, sig)
-            except (ProcessLookupError, OSError):
-                pass
-
-
-def _terminate_process(process: subprocess.Popen) -> None:
-    """Kill the process and its entire process tree to prevent orphans."""
-    _kill_tree(process.pid, signal.SIGTERM)
-    try:
-        process.wait(timeout=_TERMINATE_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
-        _kill_tree(process.pid, getattr(signal, "SIGKILL", signal.SIGTERM))
-        try:
-            process.wait(timeout=_KILL_WAIT_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            process.kill()
 
 
 def _run_with_heartbeat(

@@ -16,6 +16,7 @@ from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis._config import HeartbeatCallback
+from quodeq.config.paths import default_paths
 
 if TYPE_CHECKING:
     from quodeq.analysis.cache.dimension_helpers import ClassifyResult
@@ -77,6 +78,11 @@ class RunConfig:
     dimensions_data: DimensionsConfig | None = None
     target: AnalysisTarget | None = None
     evaluators_dir: Path | None = None
+    # Prompts directory whose rules-bearing *.md files fold into cache
+    # provenance (``prompts_hash``). Composition roots pass it explicitly;
+    # the default keeps direct constructors (tests, one-shot callers) on the
+    # same value they resolved implicitly before.
+    prompts_dir: Path | None = field(default_factory=lambda: default_paths().prompts_dir)
     # Per-run stash for ``classify_files_via_cache``. The pipeline classifies
     # files twice per dim (once upfront in ``_persist_dim_estimates`` for the
     # dashboard's totals, once inside the dim runner for actual dispatch).

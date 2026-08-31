@@ -1,6 +1,6 @@
 """Path-traversal guard tests for compiled-standards dimension lookup.
 
-``_load_compiled_data`` (``core/standards/refs.py``) interpolates a
+``_load_compiled_data`` (``data/fs/standards_loader.py``) interpolates a
 request-supplied ``dimension`` string directly into a filesystem path
 (``Path(compiled_dir) / f"{dimension}.json"`` and the ``evaluators_dir``
 equivalent). These tests prove a traversal segment, an absolute path, and a
@@ -13,7 +13,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.core.standards.refs import is_known_dimension, known_dimension_ids, load_compiled_refs
+from quodeq.data.fs.standards_loader import (
+    is_known_dimension,
+    known_dimension_ids,
+    load_compiled_refs,
+)
 
 
 def _write_compiled(directory: Path, dim: str, req_id: str = "S-1") -> None:

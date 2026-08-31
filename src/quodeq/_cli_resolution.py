@@ -47,6 +47,9 @@ class ResolvedInputs:
     language: str
     manifest: object  # SourceManifest | None
     dims_data: dict
+    worktree_origin: Path | None = None
+    worktree_dir: Path | None = None
+    single_file: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -117,8 +120,13 @@ def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
 # Repo / language / manifest resolution
 # ---------------------------------------------------------------------------
 
-def _resolve_repo(args: argparse.Namespace) -> Path | None:
-    """Resolve the repo argument to a local path (cloning if needed)."""
+def _resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | None] | None:
+    """Resolve the repo argument to a local path (cloning if needed).
+
+    Returns ``(src, worktree_origin, worktree_dir)`` where the worktree
+    fields are non-None only when a temporary branch worktree was created,
+    or ``None`` (with error printed to stderr) on failure.
+    """
     from quodeq.data.fs.repo_handler import cleanup_cloned_repo, prepare_repository
 
     repo_path = args.repo
@@ -143,11 +151,9 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
         worktree = _create_worktree(src, branch)
         if worktree is None:
             return None
-        args._worktree_origin = src
-        args._worktree_dir = worktree
-        src = worktree
+        return worktree, src, worktree
 
-    return src
+    return src, None, None
 
 
 def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
@@ -233,17 +239,14 @@ def _resolve_single_file(src: Path) -> tuple[Path, str | None]:
 
 
 
-def _override_manifest_single_file(
-    language: str, single_file: str, args: argparse.Namespace,
-) -> SourceManifest:
-    """Create a single-file manifest and flag args for single-file mode."""
+def _override_manifest_single_file(language: str, single_file: str) -> SourceManifest:
+    """Create a manifest covering exactly one source file."""
     ext = os.path.splitext(single_file)[1]
     target = AnalysisTarget(
         name=single_file, language=language,
         source_files=[single_file], total_files=1,
         language_stats={ext: 1} if ext else {},
     )
-    args._single_file = True
     return SourceManifest(targets=[target], total_files=1, language_stats={ext: 1} if ext else {})
 
 
@@ -252,9 +255,10 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
 
     Returns ``None`` (with error printed to stderr) if any step fails.
     """
-    src = _resolve_repo(args)
-    if src is None:
+    resolved = _resolve_repo(args)
+    if resolved is None:
         return None
+    src, worktree_origin, worktree_dir = resolved
 
     scope_path, ok = _resolve_scope(src, args)
     if not ok:
@@ -290,6 +294,10 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
             return None
 
     if single_file:
-        manifest = _override_manifest_single_file(language, single_file, args)
+        manifest = _override_manifest_single_file(language, single_file)
 
-    return ResolvedInputs(src=src, language=language, manifest=manifest, dims_data=dims_data)
+    return ResolvedInputs(
+        src=src, language=language, manifest=manifest, dims_data=dims_data,
+        worktree_origin=worktree_origin, worktree_dir=worktree_dir,
+        single_file=bool(single_file),
+    )

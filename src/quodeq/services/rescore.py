@@ -17,11 +17,14 @@ from quodeq.core.scoring.internals import (
     severity_grade_floor,
     score_to_grade_label,
 )
+from quodeq.core.evidence.model import classify_confidence_level
 from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.scoring import PrincipleScore
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
+from quodeq.services import grade_formula
 from quodeq.services.dismissed import recount_totals
+from quodeq.services.evidence_rescore import score_dimension_from_evidence
 from quodeq.services.suppression import is_deleted, is_dismissed
 
 
@@ -56,8 +59,6 @@ def _score_principle(
 
     Returns (final_score, grade).
     """
-    from quodeq.core.evidence.model import classify_confidence_level  # noqa: PLC0415
-
     v_dicts = [_finding_to_dict(v) for v in violations]
     c_dicts = [_finding_to_dict(c) for c in compliance]
     vt_counts, ct_counts, _using_taxonomy = compute_tallies(v_dicts, c_dicts)
@@ -158,7 +159,6 @@ def _rescore_dimension(
     compliance_count = dim.totals.compliance_count if dim.totals else len(dim.compliance)
 
     if run_dir is not None:
-        from quodeq.services.evidence_rescore import score_dimension_from_evidence  # noqa: PLC0415
         scores = score_dimension_from_evidence(
             run_dir, dim_id, dismissed=dismissed, deleted=deleted,
             source_file_count=dim.source_file_count or 0,
@@ -226,7 +226,6 @@ def rescore_dimensions(
     evidence when available (see `_rescore_dimension`).
     """
     if params is None:
-        from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
     rescored = [
         _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params,

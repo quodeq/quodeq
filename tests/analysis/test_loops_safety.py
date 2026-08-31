@@ -196,7 +196,7 @@ class TestIncrementalLoopSafety:
             seen.append(dim)
             return _FakeEvidence()
 
-        def log_result(_ev, dim, _i, _t):
+        def log_result(_ev, dim, _i, _t, **_):
             if dim == "usability":
                 raise BrokenPipeError("dashboard pipe closed")
 
@@ -320,7 +320,7 @@ class TestCallbackRetryPersistsSideEffects:
         # _log_dimension_result raises BrokenPipeError before
         # on_dimension_done is reached on the original try; the retry path
         # then invokes on_dimension_done with stdout silenced.
-        def log_result(_ev, dim, _i, _t):
+        def log_result(_ev, dim, _i, _t, **_):
             if dim == "security":
                 raise BrokenPipeError("dashboard pipe closed")
 

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services.dismissed import load_dismissed
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     ActionLogWriter,
     find_dismissed_matching,
     locked_deleted_store,

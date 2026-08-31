@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
-from quodeq.core.standards.refs import is_known_dimension
+from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export

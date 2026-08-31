@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S, notifyProviderSettingsChanged } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, notifyProviderSettingsChanged } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { useMigrateLegacySettings } from '../hooks/useMigrateLegacySettings.js';
-import { classifyProvider } from './providerUtils.js';
+import { classifyProvider, defaultsForProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import LlamaCppTab from './LlamaCppTab.jsx';
 import OmlxTab from './OmlxTab.jsx';
@@ -29,34 +29,7 @@ const INSTALL_INSTRUCTIONS = {
   gemini: tRich('settings.installHintGemini'),
 };
 
-const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
-const OLLAMA_DEFAULTS = { 'time-limit': '0' };
-const LLAMACPP_DEFAULTS = { 'time-limit': '0' };
-const OMLX_DEFAULTS = { 'time-limit': '0' };
-// Every cloud provider runs with the CLI-style effective defaults
-// (5 subagents / 600s — see resolveProviderSettings); the tab must display
-// them for unset keys or Settings claims values the run won't use.
-const CLOUD_FALLBACK_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
-const CLOUD_DEFAULTS_BY_ID = {
-  openrouter: { 'model': 'baidu/cobuddy:free' },
-};
 const DEFAULT_PROVIDER_ORDER = 50;
-
-/**
- * Display defaults for a provider tab: what an unset key effectively runs
- * with. Exported so tests can pin display == payload.
- */
-export function defaultsForProvider(classification, providerId) {
-  // The launch command defaults to the provider id itself; the Advanced
-  // field shows it pre-filled so changing it is an edit, not a discovery.
-  if (classification === 'cli') return { ...CLI_DEFAULTS, 'cmd-path': providerId };
-  if (classification === 'local-api') {
-    if (providerId === 'llamacpp') return LLAMACPP_DEFAULTS;
-    if (providerId === 'omlx') return OMLX_DEFAULTS;
-    return OLLAMA_DEFAULTS;
-  }
-  return { ...CLOUD_FALLBACK_DEFAULTS, ...(CLOUD_DEFAULTS_BY_ID[providerId] || {}) };
-}
 
 function TabContent({ provider, providerConfig }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);

@@ -6,9 +6,7 @@
  * mergeMessages (kept in AssistantDrawerProvider.jsx, not moved here).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  createAssistantSession, fetchAssistantWorkspace, postAssistantMessage, stopAssistantTurn,
-} from '../../api/assistant.js';
+import { useApi } from '../../api/ApiContext.jsx';
 import { useAssistantStream } from './useAssistantStream.js';
 import { t } from '../../strings/index.js';
 
@@ -24,6 +22,7 @@ export function sessionKey(ctx) {
 }
 
 export function useAssistantSession() {
+  const { createAssistantSession, fetchAssistantWorkspace, postAssistantMessage, stopAssistantTurn } = useApi();
   const [sessionId, setSessionId] = useState(null);
   const [sessionCtxKey, setSessionCtxKey] = useState(null);
   // Provider/model of the active session, surfaced so the drawer header can
@@ -77,7 +76,7 @@ export function useAssistantSession() {
       if (sessionIdRef.current !== sid) return;   // context switched mid-flight
       setWorkspace(ws.worktree);
     } catch { /* advisory only */ }
-  }, []);
+  }, [fetchAssistantWorkspace]);
   const stream = useAssistantStream(sessionId, { onDone: () => {
     setTurnActive(false);
     if (writeEnabledRef.current) refreshWorkspace();
@@ -121,7 +120,7 @@ export function useAssistantSession() {
     setSessionId(created.sessionId);
     setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
     lastCtxRef.current = ctx;
-  }, []);
+  }, [createAssistantSession]);
 
   const startSession = useCallback(async (ctx) => {
     const key = sessionKey(ctx);
@@ -162,7 +161,7 @@ export function useAssistantSession() {
       setLocalError(t('assistant.sendFailed', { error: err?.message || err }));
       setTurnActive(false);
     }
-  }, [sessionId, stream.messages.length, webEnabled, writeEnabled]);
+  }, [sessionId, stream.messages.length, webEnabled, writeEnabled, postAssistantMessage]);
 
   // Ask the server to cancel the in-flight turn. turnActive stays true until
   // the stream's terminal `stopped` frame arrives (server truth, same as
@@ -174,7 +173,7 @@ export function useAssistantSession() {
     } catch (err) {
       setLocalError(t('assistant.stopTurnFailed', { error: err?.message || err }));
     }
-  }, [sessionId, turnActive]);
+  }, [sessionId, turnActive, stopAssistantTurn]);
 
   // Client-answered meta-commands (/help, /skills, /actions): show the user
   // turn and the local response in the transcript without any server call.

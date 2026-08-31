@@ -7,7 +7,7 @@ older-schema db is rebuilt, and any cache error falls through to recompute.
 This module owns the version hashes (the cache's invalidation contract) and is
 the facade every caller imports. The connection/schema and per-table
 reads/writes live in ``quodeq.data.sqlite`` (``score_cache_db`` /
-``score_cache_store``), reached through ``services/ports.py`` like every
+``score_cache_store``), reached through ``services/_wiring.py`` like every
 other services -> data edge; the read-through wrappers stay in this package's
 ``_score_cache_fetch``.
 """
@@ -20,13 +20,13 @@ from pathlib import Path
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import load_suppression_rules
+from quodeq.services._wiring import load_suppression_rules
 
 # ---------------------------------------------------------------------------
 # Every moved/data-layer name is re-exported here so external callers and
 # test patch targets keep working against this module.
 # ---------------------------------------------------------------------------
-from quodeq.services.ports import (  # noqa: F401 — facade re-export
+from quodeq.services._wiring import (  # noqa: F401 — facade re-export
     CACHE_WRITER_EPOCH as _CACHE_WRITER_EPOCH,
     load_run_keys,
     load_run_keys_or_empty,

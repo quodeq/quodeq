@@ -1,19 +1,23 @@
 """Validation and helper functions for evaluation routes."""
 from __future__ import annotations
 
+import logging
 import os.path
 import re
 import shutil
 import time as _time
+from collections.abc import Mapping
 from http import HTTPStatus
 
 from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
-from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT, resolve_clean_scan
+from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 from quodeq.shared.validation import validate_relative_scope
+
+_logger = logging.getLogger(__name__)
 
 # Userinfo cannot contain an unencoded "/", so excluding it keeps matches
 # identical while a failing scan stays linear (no polynomial backtracking
@@ -26,6 +30,36 @@ _MAX_SUBAGENTS = 10
 _MIN_TIME_LIMIT = 60
 _MAX_TIME_LIMIT = 3600
 _MAX_CONTEXT_SIZE = 2_000_000
+
+
+def resolve_clean_scan(payload: dict) -> bool:
+    """Resolve the user's clean_scan intent from new and legacy fields.
+
+    New: ``cleanScan: bool`` -- explicit opt-out, default False.
+    Legacy: ``incremental: bool`` -- deprecated, with inverted semantics
+    (old ``True`` meant "use cache" -> ``clean_scan=False``; old ``False``
+    meant "ignore cache" -> ``clean_scan=True``). One-release back-compat.
+
+    Sending both is rejected: we won't guess intent if a client transitions
+    mid-deployment and ends up posting conflicting flags.
+    """
+    has_new = "cleanScan" in payload
+    has_legacy = "incremental" in payload
+    if has_new and has_legacy:
+        raise ValueError(
+            "`cleanScan` and `incremental` cannot be combined in a single payload. "
+            "Use `cleanScan` only -- `incremental` is deprecated. "
+            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
+            "(force full re-analysis)."
+        )
+    if has_legacy:
+        _logger.warning(
+            "Evaluation payload uses deprecated `incremental` field. "
+            "Migrate to `cleanScan` (inverted semantics). "
+            "Legacy field will be removed in the next release.",
+        )
+        return not bool(payload.get("incremental"))
+    return bool(payload.get("cleanScan", False))
 
 
 def _coerce_int(value: object, default: int) -> int:
@@ -54,6 +88,19 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
             f"Invalid AI command. Allowed: {allowed_list}",
             HTTPStatus.BAD_REQUEST,
             "INVALID_INPUT",
+        )
+        return jsonify(body), status
+    return None
+
+
+def _validate_ai_model(
+    ai_cmd: str | None, ai_model: str | None, provider_configs: Mapping[str, dict],
+) -> tuple[Response, int] | None:
+    """API-type providers require an explicit model."""
+    if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == "api" and not ai_model:
+        body, status = error_response(
+            "No model selected. Go to Settings and select one.",
+            HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
         )
         return jsonify(body), status
     return None

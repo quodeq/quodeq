@@ -22,9 +22,11 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
+    dimension_queue_file,
+    dimension_report_exists,
     file_mtime,
     latest_dim_activity_mtime,
     read_queue_state,
@@ -349,13 +351,11 @@ def build_scan_progress(
 
     dim_results: list[_DimProgress] = []
     for dim_id in dim_ids:
-        queue_path = evidence_dir / f"{dim_id}_queue.json"
-        eval_path = run_dir / "evaluation" / f"{dim_id}.json"
-        queue = read_queue_state(queue_path) if queue_path.is_file() else None
+        queue = read_queue_state(dimension_queue_file(run_dir, dim_id))
         d_state = _dim_state(
             dim_id, status, terminal=is_terminal,
             has_queue=queue is not None,
-            has_evaluation=eval_path.is_file(),
+            has_evaluation=dimension_report_exists(run_dir / "evaluation", dim_id),
         )
         record = dim_records.get(dim_id) if isinstance(dim_records, dict) else None
         # DONE dims carry `exit_reason`; INCOMPLETE dims carry `reason`

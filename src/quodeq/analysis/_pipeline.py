@@ -154,7 +154,7 @@ def _run_dimensions(
     # construction instead of on the first cache-is-None dimension call.
     cache = LocalFileBackend()
     maybe_collect_legacy_entries(cache.root)
-    runner = DimensionRunner(cache=cache)
+    runner = DimensionRunner(cache=cache, log=SHARED_LOG)
 
     # Set the run-level deadline once, just before the dim loop starts.
     # Skipped for dry runs (already returned above), unlimited budget, or
@@ -207,12 +207,14 @@ def _run_dimensions(
             and config.options.max_subagents > 1
             and _provider_type != "api"):
         try:
-            result = process_consolidated_dimensions(config, dimensions, ctx)
+            result = process_consolidated_dimensions(
+                config, dimensions, ctx, log=SHARED_LOG,
+            )
             if result:
                 dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
                 for dim, ev in result.items():
                     idx = dim_index.get(dim, 0)
-                    _log_dimension_result(ev, dim, idx, len(dimensions))
+                    _log_dimension_result(ev, dim, idx, len(dimensions), log=SHARED_LOG)
                 return result
             log_warning("Consolidated mode produced no results, falling back to per-dimension")
         except (OSError, KeyError, ValueError, RuntimeError) as exc:

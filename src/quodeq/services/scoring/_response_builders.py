@@ -20,8 +20,8 @@ from quodeq.core.types.dimension import DimensionResult, DimensionSummary, Grade
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.ports import (
-    GradeTablesReader,
+from quodeq.services.ports import GradeTablesReader
+from quodeq.services._wiring import (
     SQLiteStateStore,
     load_suppression_rules,
     read_active_findings,
@@ -113,21 +113,17 @@ def _build_dimension_dict(
 
 def _build_summary_from_dim_dicts(
     dim_dicts: list[dict], params: ScoringParams = DEFAULT_PARAMS,
+    *, score_pairs: list[tuple[str | None, float]],
 ) -> dict:
     """Build a camelCase summary dict from a list of dimension camelCase dicts.
 
     Mirrors ``summarize_dimensions`` logic but works directly on the already-
-    serialised dicts produced by ``_build_dimension_dict``.
+    serialised dicts produced by ``_build_dimension_dict``. *score_pairs* are
+    the raw (dimension, score) floats -- the caller already has them before
+    they get formatted into the ``overallScore`` display strings, so no
+    parsing back out of ``"7.5/10"`` is needed here.
     """
     overall_grades = [d["overallGrade"] for d in dim_dicts if d.get("overallGrade")]
-    score_pairs: list[tuple[str | None, float]] = []
-    for d in dim_dicts:
-        s = d.get("overallScore")
-        if s and isinstance(s, str) and "/" in s:
-            try:
-                score_pairs.append((d.get("dimension"), float(s.split("/")[0])))
-            except ValueError:
-                pass
 
     numeric_average = dimension_weighted_average(score_pairs, params)
 
@@ -198,6 +194,7 @@ def _build_response_from_grade_tables(
             compliance_by_dim.setdefault(dim, []).append(f)
 
     dim_dicts = []
+    score_pairs: list[tuple[str | None, float]] = []
     for dim_row in dim_rows:
         dim_name = dim_row["dimension"]
         dim_dicts.append(_build_dimension_dict(
@@ -206,8 +203,10 @@ def _build_response_from_grade_tables(
             violations_by_dim.get(dim_name, []),
             compliance_by_dim.get(dim_name, []),
         ))
+        if dim_row.get("score") is not None:
+            score_pairs.append((dim_row["dimension"], float(dim_row["score"])))
 
-    summary = _build_summary_from_dim_dicts(dim_dicts, params=params)
+    summary = _build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
     return {"dimensions": dim_dicts, "summary": summary}
 
 

@@ -3,6 +3,7 @@ import os
 import pytest
 
 from quodeq.core.types import DimensionResult
+from quodeq.data.sqlite.score_cache_store import read_all_cached_rows
 from quodeq.services.score_cache import (
     load_run_keys_or_empty,
     open_score_cache,
@@ -46,6 +47,25 @@ def test_corrupt_db_is_rebuilt(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(p))
     with open_score_cache() as conn:  # must not raise; rebuilds
         assert read_cached_rows(conn, "proj", "r1", "v1") is None
+
+
+def test_read_all_cached_rows_groups_by_run_and_version(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    d1 = [DimensionResult(dimension="security", overall_score="8/10", overall_grade="Good")]
+    d2 = [DimensionResult(dimension="reliability", overall_score="6/10", overall_grade="Fair")]
+    with open_score_cache() as conn:
+        write_cached_rows(conn, "proj", "r1", "v1", d1)
+        write_cached_rows(conn, "proj", "r2", "v1", d2)
+        rows = read_all_cached_rows(conn, "proj")
+    assert set(rows) == {("r1", "v1"), ("r2", "v1")}
+    assert [d.dimension for d in rows[("r1", "v1")]] == ["security"]
+    assert [d.dimension for d in rows[("r2", "v1")]] == ["reliability"]
+
+
+def test_read_all_cached_rows_empty_when_nothing_cached(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    with open_score_cache() as conn:
+        assert read_all_cached_rows(conn, "proj") == {}
 
 
 @pytest.mark.skipif(

@@ -109,6 +109,49 @@ class TestWriteScanJson:
         assert data["file_tree"] == ["a.py"]
 
 
+class TestReadScanJson:
+    def test_missing_returns_none(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        assert read_scan_json(tmp_path) is None
+
+    def test_corrupt_returns_none(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        (tmp_path / "scan.json").write_text("{nope")
+        assert read_scan_json(tmp_path) is None
+
+    def test_non_dict_json_returns_none(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        (tmp_path / "scan.json").write_text("[1, 2]")
+        assert read_scan_json(tmp_path) is None
+
+    def test_valid_returns_dict(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        (tmp_path / "scan.json").write_text(json.dumps({"total_files": 3, "scanned_at": "x"}))
+        assert read_scan_json(tmp_path) == {"total_files": 3, "scanned_at": "x"}
+
+
+class TestRemoveProjectDir:
+    def test_removes_directory_tree(self, tmp_path):
+        from quodeq.data.fs.project_files import remove_project_dir
+
+        project = tmp_path / "proj"
+        (project / "sub").mkdir(parents=True)
+        (project / "sub" / "f.txt").write_text("x")
+
+        assert remove_project_dir(project) is True
+        assert not project.exists()
+
+    def test_oserror_returns_false(self, tmp_path):
+        from quodeq.data.fs.project_files import remove_project_dir
+
+        with patch("shutil.rmtree", side_effect=OSError("boom")):
+            assert remove_project_dir(tmp_path / "missing") is False
+
+
 class TestServiceDelegation:
     def test_mark_onboarding_complete_writes_through_adapter(self, tmp_path):
         from quodeq.services.project_registration import mark_onboarding_complete

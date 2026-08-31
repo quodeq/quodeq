@@ -131,6 +131,7 @@ def _build_router(
                 % (server_args.cache_root, server_args.model_id),
             )
         from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+        from quodeq.config.paths import default_paths  # noqa: PLC0415
         src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
         # NOTE: standards_dir must be the standards ROOT (parent of
         # "compiled/"), not server_args.compiled_dir. build_cache_writer /
@@ -147,6 +148,10 @@ def _build_router(
             dimension=server_args.dimension,
             model_id=server_args.model_id,
             language=server_args.language or "",
+            # This subprocess is its own composition root: no RunConfig
+            # crosses the process boundary, so resolve the same default the
+            # parent's RunConfig.prompts_dir carries.
+            prompts_dir=default_paths().prompts_dir,
         )
 
     return FindingsRouter(

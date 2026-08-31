@@ -92,7 +92,7 @@ class TestWatcherStartsAndStops:
 
         # The fake dispatcher writes a finding to JSONL, then sleeps long enough
         # that the watcher (with a tiny interval) ticks at least once.
-        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text(
@@ -127,7 +127,7 @@ class TestWatcherSurvivesDispatchException:
         the findings are complete. The next run will re-dispatch."""
         config = _setup(tmp_path, {"a.py": "x"})
 
-        def crashing_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def crashing_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             # Write partial findings with no ok marker (worker died mid-file).

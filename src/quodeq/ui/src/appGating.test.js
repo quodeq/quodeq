@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   isEvaluatableSource, shouldShowEvaluateButton, shouldBounceToEvaluate,
   resolveProjectDisplayName, shouldShowProjectTabs, selectSidebarCounts,
-  shouldRedirectToRemoteRepositories,
+  shouldRedirectToRemoteRepositories, shouldShowCompareTab,
 } from './appGating.js';
 
 // ---------------------------------------------------------------------------
@@ -117,6 +117,40 @@ test('selectSidebarCounts: nulls out immediately when nothing has landed yet', (
     selectSidebarCounts({ filteredAccumulated: null, accumulated: null, filteredTrend: null, dashboard: null }),
     { violationsCount: null, historyCount: null },
   );
+});
+
+// ---------------------------------------------------------------------------
+// shouldShowCompareTab
+// ---------------------------------------------------------------------------
+
+test('shouldShowCompareTab: hidden with zero or one local project with runs and no shared content', () => {
+  assert.equal(shouldShowCompareTab({ projects: [], sharedHasContent: false }), false);
+  assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 3 }], sharedHasContent: false }), false);
+});
+
+test('shouldShowCompareTab: shown once two local projects have runs', () => {
+  assert.equal(
+    shouldShowCompareTab({ projects: [{ runsCount: 1 }, { runsCount: 2 }], sharedHasContent: false }),
+    true,
+  );
+});
+
+test('shouldShowCompareTab: one local project with runs plus shared content is enough', () => {
+  assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 1 }], sharedHasContent: true }), true);
+});
+
+test('shouldShowCompareTab: shared content alone (zero local projects with runs) is not enough', () => {
+  assert.equal(shouldShowCompareTab({ projects: [], sharedHasContent: true }), false);
+  assert.equal(shouldShowCompareTab({ projects: [{ runsCount: 0 }], sharedHasContent: true }), false);
+});
+
+test('shouldShowCompareTab: projects without a runsCount field count as zero runs', () => {
+  assert.equal(shouldShowCompareTab({ projects: [{}, {}], sharedHasContent: false }), false);
+  assert.equal(shouldShowCompareTab({ projects: [{}, { runsCount: 1 }], sharedHasContent: true }), true);
+});
+
+test('shouldShowCompareTab: a missing/undefined projects list is treated as empty', () => {
+  assert.equal(shouldShowCompareTab({ sharedHasContent: false }), false);
 });
 
 // ---------------------------------------------------------------------------

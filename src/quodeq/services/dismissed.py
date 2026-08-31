@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     ActionLogWriter,
     load_suppression_rules,
     migrate_if_needed,

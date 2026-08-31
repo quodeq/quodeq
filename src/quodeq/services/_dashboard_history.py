@@ -15,13 +15,11 @@ from typing import Any, Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult, DimensionSummary
 
-from quodeq.data.fs.report_parser.grades import calculate_trend
-from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services._dashboard_cache import DashboardCacheConfig, _make_run_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._trend_fetcher import make_trend_fetcher
-from quodeq.services.ports import read_run_status_json
+from quodeq.services._wiring import RunInfo, calculate_trend, read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}

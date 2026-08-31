@@ -7,16 +7,14 @@ import logging
 import os
 import platform as _platform_module
 import shutil
-import subprocess
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 from typing import Any, Callable
 
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.data.fs.report_parser import safe_read_dir
+from quodeq.services._wiring import fetch_anthropic_models, run_cli_models_command
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.utils import get_anthropic_api_key, read_json
 
@@ -41,20 +39,12 @@ def _load_fallback_claude_models() -> list[str]:
 
 def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     """Fetch model list from the Anthropic API. Returns None on failure."""
-    try:
-        req = urllib.request.Request(
-            get_anthropic_api_url(),
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": get_anthropic_api_version(),
-            },
-        )
-        with urllib.request.urlopen(req, timeout=_ANTHROPIC_API_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-        models = [m["id"] for m in data.get("data", []) if m.get("id")]
-        return models if models else None
-    except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, ValueError):
-        return None
+    return fetch_anthropic_models(
+        api_key,
+        url=get_anthropic_api_url(),
+        version=get_anthropic_api_version(),
+        timeout_s=_ANTHROPIC_API_TIMEOUT_S,
+    )
 
 
 _DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini"})
@@ -276,18 +266,7 @@ class FsToolingMixin:
             return {"models": []}
         if not client_id.isalnum():
             return {"models": []}
-        if not shutil.which(client_id):
-            return {"models": []}
-        try:
-            result = subprocess.run(
-                [client_id, "/models"],
-                capture_output=True,
-                text=True, encoding="utf-8",
-                timeout=_CLI_MODEL_TIMEOUT_S,
-            )
-            output = result.stdout if result.returncode == 0 else ""
-        except (subprocess.TimeoutExpired, OSError):
-            return {"models": []}
+        output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S)
         models = []
         for line in output.splitlines():
             token = line.strip().split()[0] if line.strip() else ""

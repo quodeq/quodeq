@@ -12,8 +12,9 @@ from contextlib import contextmanager
 from typing import Callable, Iterator
 
 from quodeq.core.types import DimensionResult
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     open_score_cache,
+    read_all_cached_rows,
     read_cached_accumulated,
     read_cached_project_summary,
     write_cached_accumulated,
@@ -148,16 +149,9 @@ def make_cache_backed_fetcher(
     if score_cache_disabled():
         return base_fetcher
 
-    by_run_version: dict[tuple[str, str], list[DimensionResult]] = {}
     try:
         with open_score_cache() as conn:
-            for rid, ver, dim, score, grade in conn.execute(
-                "SELECT run_id, version, dimension, overall_score, overall_grade "
-                "FROM run_scalars WHERE project=? ORDER BY run_id, dimension",
-                (project,),
-            ):
-                by_run_version.setdefault((rid, ver), []).append(
-                    DimensionResult(dimension=dim, overall_score=score, overall_grade=grade))
+            by_run_version = read_all_cached_rows(conn, project)
     except sqlite3.Error:
         by_run_version = {}
 

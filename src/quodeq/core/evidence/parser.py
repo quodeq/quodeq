@@ -8,7 +8,7 @@ from pathlib import Path
 
 from quodeq.core.evidence._jsonl import (
     MalformedLineSink, judgment_to_dict, parse_jsonl_line, read_judgments)
-from quodeq.core.evidence._refs import enrich_judgment, resolve_llm_refs
+from quodeq.core.evidence._refs import RefsReader, enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import Judgment
 from quodeq.core.evidence._req_mapping import (
@@ -71,6 +71,7 @@ def parse_jsonl_to_evidence_by_dimension(
     jsonl_file: Path, context: EvidenceContext,
     compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
     *, req_map_reader: ReqMapReader | None = None,
+    refs_reader: RefsReader | None = None,
     cwe_url_template: str | None = None,
     open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
     on_quarantine: QuarantineSink | None = None,
@@ -92,7 +93,8 @@ def parse_jsonl_to_evidence_by_dimension(
             if result is not None:
                 j, llm_refs = result
                 j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache,
-                                    cwe_url_template=cwe_url_template)
+                                    cwe_url_template=cwe_url_template,
+                                    refs_reader=refs_reader)
                 by_dim.setdefault(j.dimension or "unknown", []).append(j)
     if not by_dim:
         return {}
@@ -116,6 +118,7 @@ def parse_jsonl_to_evidence(
     jsonl_file: Path, context: EvidenceContext,
     compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
     *, req_map_reader: ReqMapReader | None = None,
+    refs_reader: RefsReader | None = None,
     cwe_url_template: str | None = None,
     on_quarantine: QuarantineSink | None = None,
     on_malformed_line: MalformedLineSink | None = None,
@@ -127,6 +130,7 @@ def parse_jsonl_to_evidence(
     # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, compiled_dir,
                                cwe_url_template=cwe_url_template,
+                               refs_reader=refs_reader,
                                on_malformed_line=on_malformed_line)
     dim = judgments[0].dimension if judgments else ""
     grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir,

@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-from quodeq.services.ports import (
+from quodeq.services._wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
     MARKER_FILENAME,

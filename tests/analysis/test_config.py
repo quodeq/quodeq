@@ -21,7 +21,7 @@ def test_invalid_max_duration_env_falls_back_to_default(monkeypatch):
 
 
 def test_injected_env_is_honoured():
-    from quodeq.analysis._config import _default_max_duration, _default_max_turns
+    from quodeq.config.analysis_env import default_max_duration, default_max_turns
 
-    assert _default_max_turns({"QUODEQ_DEFAULT_MAX_TURNS": "11"}) == 11
-    assert _default_max_duration({"QUODEQ_DEFAULT_MAX_DURATION": "22"}) == 22
+    assert default_max_turns({"QUODEQ_DEFAULT_MAX_TURNS": "11"}) == 11
+    assert default_max_duration({"QUODEQ_DEFAULT_MAX_DURATION": "22"}) == 22

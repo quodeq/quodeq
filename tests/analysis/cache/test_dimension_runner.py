@@ -127,7 +127,7 @@ class FakeDispatcher:
         self.calls: list[RunConfig] = []
 
     def __call__(
-        self, config: RunConfig, dim_id: str, idx: int, ctx, callbacks,
+        self, config: RunConfig, dim_id: str, idx: int, ctx, callbacks, **_,
     ) -> Evidence | None:
         self.calls.append(config)
         # Mirror what the real dispatcher does: write findings to JSONL
@@ -477,7 +477,7 @@ class TestWiring:
         config, src = _setup(tmp_path, {"a.py": "x"})
 
         called = {"hit": False}
-        def fake_cache(config, dim_id, idx, ctx, callbacks, cache=None):
+        def fake_cache(config, dim_id, idx, ctx, callbacks, cache=None, **_):
             called["hit"] = True
             return _make_dummy_evidence(files_read=1)
 
@@ -554,7 +554,7 @@ class TestCircuitBreakerWiring:
 
         evidence_dir = config.work_dir or config.src
 
-        def err_dispatcher(config, dim_id, idx, ctx, callbacks):
+        def err_dispatcher(config, dim_id, idx, ctx, callbacks, **_):
             jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -595,7 +595,7 @@ class TestCircuitBreakerWiring:
 
         evidence_dir = config.work_dir or config.src
 
-        def err_dispatcher(config, dim_id, idx, ctx, callbacks):
+        def err_dispatcher(config, dim_id, idx, ctx, callbacks, **_):
             jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -659,7 +659,7 @@ class TestCarryOrder:
         ))
 
         # b.py is a miss -- fake dispatcher writes a fresh finding for it.
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -699,51 +699,20 @@ class TestCarryOrder:
         )
 
 
-class TestWatcherJoinHasNoTimeoutCeiling:
-    """Regression for the c88be50e "16% loss" bug.
+def test_breaker_join_keeps_its_timeout():
+    """The breaker is a separate thread with its own lifecycle —
+    its 5s join cap is unrelated to the c88be50e cache-loss bug and
+    should remain intact. (The watcher.join() no-timeout behavior is
+    pinned behaviorally by TestSlowFinalPersistIsNotAbandoned below.)"""
+    import inspect
 
-    The watcher's final persist tick can take longer than 5s when the
-    JSONL has a few hundred file_done="ok" markers (each tick re-scans
-    the full file and writes per-file cache entries). A 5s join ceiling
-    silently abandoned the final tick mid-flight, so every `ok` marker
-    that hadn't been persisted by the previous tick was lost.
+    from quodeq.analysis.cache import dimension_runner
 
-    The user reported a flexibility run where 790 file_done="ok" markers
-    landed in the JSONL but only 662 cache entries persisted (~16% loss).
-
-    Pin via source inspection so a future refactor can't re-introduce the
-    timeout. The watcher.join() call MUST stay un-timeout-bounded; the
-    breaker is a separate thread and keeps its own timeout.
-    """
-
-    def test_final_cache_flush_has_no_join_timeout_ceiling(self):
-        import inspect
-
-        from quodeq.analysis.cache import dimension_runner
-
-        src = inspect.getsource(dimension_runner.process_dimension_with_cache)
-        assert "watcher.join(timeout=5.0)" not in src, (
-            "watcher.join must not have a timeout ceiling — the 5s cap "
-            "was the c88be50e regression that dropped the final persist tick"
-        )
-        assert "watcher.join()" in src, (
-            "watcher.join() (no timeout) must still run in the finally "
-            "block so the final persist tick completes"
-        )
-
-    def test_breaker_join_keeps_its_timeout(self):
-        """The breaker is a separate thread with its own lifecycle —
-        its 5s join cap is unrelated to the cache-loss bug and should
-        remain intact."""
-        import inspect
-
-        from quodeq.analysis.cache import dimension_runner
-
-        src = inspect.getsource(dimension_runner.process_dimension_with_cache)
-        assert "breaker.stop_and_join(timeout=5.0)" in src, (
-            "breaker.stop_and_join's 5s timeout is independent of the "
-            "watcher fix and must stay in place"
-        )
+    src = inspect.getsource(dimension_runner.process_dimension_with_cache)
+    assert "breaker.stop_and_join(timeout=5.0)" in src, (
+        "breaker.stop_and_join's 5s timeout is independent of the "
+        "watcher fix and must stay in place"
+    )
 
 
 class _SlowPutCache:
@@ -781,10 +750,11 @@ class _SlowPutCache:
 
 
 class TestSlowFinalPersistIsNotAbandoned:
-    """Behavioural companion to TestWatcherJoinHasNoTimeoutCeiling's source
-    inspection: prove that ``watcher.join()``'s lack of a timeout actually
-    lets a slow final persist tick complete rather than merely asserting
-    the source text says so.
+    """Regression for the c88be50e "16% loss" bug (a flexibility run where
+    790 file_done="ok" markers landed in the JSONL but only 662 cache
+    entries persisted): prove that ``watcher.join()``'s lack of a timeout
+    ceiling actually lets a slow final persist tick complete instead of
+    being abandoned mid-flight.
 
     Dispatch here is fast (FakeDispatcher writes its ok marker immediately),
     so ``stop_event`` is set well within the 60s periodic interval — the
@@ -936,7 +906,7 @@ class TestCachedFindingsReachEventLog:
 
         events_log = (config.work_dir or config.src).parent / "events.jsonl"
 
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             # The dispatcher in production routes through FindingsRouter,
             # which emits events. This fake only writes JSONL — we're
             # specifically testing the cache-replay side.
@@ -1017,7 +987,7 @@ class TestEvidenceFileCreatedBeforeBreaker:
 
         # Dispatcher that writes NOTHING to the JSONL and returns None,
         # mirroring the fresh-dimension window before any finding is emitted.
-        def silent_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def silent_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             return None
 
         # Capture WARNING+ only, so the assertion isn't coupled to the exact
@@ -1379,7 +1349,7 @@ class TestFilesReadReflectsAnalyzedCount:
             model_id="test-model",
         ))
 
-        def mixed_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def mixed_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             # Misses are restricted by the file filter to {b.py, c.py}.
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -1475,7 +1445,7 @@ class _SalvageDispatcher:
     def __init__(self, n_errors: int) -> None:
         self.n_errors = n_errors
 
-    def __call__(self, config, dim_id, idx, ctx, callbacks):
+    def __call__(self, config, dim_id, idx, ctx, callbacks, **_):
         jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:
@@ -1496,7 +1466,7 @@ class _AllErrorsDispatcher:
     def __init__(self, n_errors: int) -> None:
         self.n_errors = n_errors
 
-    def __call__(self, config, dim_id, idx, ctx, callbacks):
+    def __call__(self, config, dim_id, idx, ctx, callbacks, **_):
         jsonl = (config.work_dir or config.src) / f"{dim_id}_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         with jsonl.open("a") as out:

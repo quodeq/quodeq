@@ -14,6 +14,7 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations } from './dimensionCardModel.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
@@ -191,9 +192,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
     return <section className="panel dim-card"><h3>{title}</h3><p className="dimension-meta">{t('dimension.selectDimension')}</p></section>;
   }
 
-  const currScore = parseFloat(dimension.overallScore);
-  const prevScore = parseFloat(dimension.previousScore);
-  const delta = !isNaN(currScore) && !isNaN(prevScore) ? (currScore - prevScore) : null;
+  const delta = fallbackDelta(dimension);
 
   return (
     <section className={`panel dim-card ${isSingleFocus ? 'full-width' : ''}`}>

@@ -20,12 +20,16 @@ from typing import Any, Callable
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import DimensionResult
 
-from quodeq.data.fs.report_parser.grades import summarize_dimensions
-from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.scoring_view import is_eligible_for_default_view
 from quodeq.services.dismissed import dismissed_keys, filter_dismissed_from_dimensions
-from quodeq.services.ports import load_suppression_rules
+from quodeq.services._wiring import (
+    RunInfo,
+    list_runs,
+    load_suppression_rules,
+    read_run_data,
+    summarize_dimensions,
+)
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.shared.validation import validate_path_segment
 
@@ -34,8 +38,6 @@ from quodeq.services._dashboard_cache import (  # noqa: F401
     _DEFAULT_RUN_DIM_CACHE_MAX,
     _make_run_dimension_fetcher,
     _run_dim_cache_max,
-    _SHARED_RUN_DIM_CACHE,
-    _SHARED_RUN_DIM_LOCK,
     clear_shared_dimension_cache,
     create_dimension_cache,
 )

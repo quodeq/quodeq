@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 
 from quodeq.services.filesystem import FilesystemActionProvider
+from quodeq.services.jobs import JobManager
+from quodeq.services._external_jobs import ProcessControl
 from quodeq.data.sqlite.run_index import open_index
 from quodeq.data.fs.run_status_store import RunState, write_status
 
@@ -144,16 +146,12 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
     (run / ".pid").write_text(str(os.getpid()))
 
     db_path = tmp_path / "idx.db"
-    provider = FilesystemActionProvider(index_db_path=db_path)
-    provider.list_evaluations(limit=0, reports_dir=str(reports))
 
     # We don't want to actually kill ourselves; intercept the tree-kill helper
     # (which is what cancel_external_run uses, and is cross-platform: killpg
-    # on POSIX, taskkill on Windows). Also simulate SIGTERM being honored so
-    # the grace-period poll doesn't burn 30s.
-    import quodeq.services._external_jobs as _ext_mod
-    original_kill_tree = _ext_mod._kill_tree
-    original_alive = _ext_mod.is_pid_alive
+    # on POSIX, taskkill on Windows) via constructor injection instead of
+    # patching module attributes. Also simulate SIGTERM being honored so the
+    # grace-period poll doesn't burn 30s.
     sent_signals: list[tuple[int, int]] = []
     pid_killed = False
 
@@ -164,17 +162,15 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
             pid_killed = True
 
     def fake_alive(query_pid: int) -> bool:
-        if pid_killed:
-            return False
-        return original_alive(query_pid)
+        return not pid_killed
 
-    _ext_mod._kill_tree = fake_kill_tree  # type: ignore[attr-defined]
-    _ext_mod.is_pid_alive = fake_alive  # type: ignore[attr-defined]
-    try:
-        ok = provider.cancel_evaluation("ext-live-run", reports_dir=str(reports))
-    finally:
-        _ext_mod._kill_tree = original_kill_tree  # type: ignore[attr-defined]
-        _ext_mod.is_pid_alive = original_alive  # type: ignore[attr-defined]
+    jm = JobManager(
+        process_control=ProcessControl(kill_tree=fake_kill_tree, pid_alive=fake_alive),
+    )
+    provider = FilesystemActionProvider(job_manager=jm, index_db_path=db_path)
+    provider.list_evaluations(limit=0, reports_dir=str(reports))
+
+    ok = provider.cancel_evaluation("ext-live-run", reports_dir=str(reports))
 
     assert ok is True
     assert sent_signals, "tree-kill path must be taken when PID is alive"

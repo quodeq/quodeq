@@ -71,7 +71,6 @@ class TestCliWiring:
             no_verify=False,
             no_consolidated=False,
             dry_run=True,
-            _single_file=False,
         )
 
         dims_data = _make_dims_data("security")
@@ -105,7 +104,6 @@ class TestCliWiring:
             no_verify=False,
             no_consolidated=False,
             dry_run=False,
-            _single_file=False,
         )
 
         dims_data = _make_dims_data("security")
@@ -140,7 +138,6 @@ class TestCliWiring:
             no_verify=False,
             no_consolidated=False,
             # no dry_run attribute at all
-            _single_file=False,
         )
 
         dims_data = _make_dims_data("security")

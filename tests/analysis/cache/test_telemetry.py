@@ -120,7 +120,7 @@ class TestCacheStatsMarker:
             markers.append((phase, kwargs))
 
         from quodeq.core.evidence.model import Evidence
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text(
@@ -163,7 +163,7 @@ class TestCacheStatsMarker:
             markers.append((phase, kwargs))
 
         from quodeq.core.evidence.model import Evidence
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text('{"file": "a.py", "line": 1}\n')

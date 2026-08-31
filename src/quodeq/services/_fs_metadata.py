@@ -8,8 +8,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
-from quodeq.data.fs.report_parser.grades import summarize_dimensions
-from quodeq.data.fs.report_parser.runs import RunInfo, read_run_data, safe_read_dir
+from quodeq.services._wiring import (
+    RunInfo,
+    read_repository_info,
+    read_run_data,
+    read_scan_json,
+    safe_read_dir,
+    summarize_dimensions,
+)
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -20,17 +26,10 @@ if TYPE_CHECKING:
 
 def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
     """Read scan.json and return coverage fields, or empty dict if not available."""
-    scan_path = reports_root / entry_name / "scan.json"
-    if not scan_path.exists():
+    data = read_scan_json(reports_root / entry_name)
+    if data is None:
         return {}
-    try:
-        data = json.loads(scan_path.read_text(encoding="utf-8"))
-        return {
-            "scanDate": data.get("scanned_at"),
-            "totalFiles": data.get("total_files"),
-        }
-    except (json.JSONDecodeError, OSError):
-        return {}
+    return {"scanDate": data.get("scanned_at"), "totalFiles": data.get("total_files")}
 
 
 def _check_path_exists(path: str | None, location: str | None) -> bool | None:
@@ -55,13 +54,7 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
 
 def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
     """Read repository_info.json for a project, returning an empty dict on failure."""
-    info_path = reports_root / entry_name / "repository_info.json"
-    if not info_path.exists():
-        return {}
-    try:
-        return json.loads(info_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
+    return read_repository_info(reports_root / entry_name) or {}
 
 
 def _local_repo_root(reports_root: Path, entry_name: str) -> Path | None:

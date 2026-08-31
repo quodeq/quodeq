@@ -26,3 +26,16 @@ export function countCustomizedRequirements(standard, overrides) {
     (standard?.principles || []).flatMap((p) => (p.requirements || []).map((r) => r.id)));
   return Object.keys(overrides).filter((id) => reqIds.has(id)).length;
 }
+
+/**
+ * Save-vs-impact-dialog decision for StandardEditor's handleSave. An
+ * undrafted overrides state (`!overridesDirty`) has nothing to preview and
+ * commits outright. Otherwise the preview's `changedDimensions` decides: a
+ * non-empty set means the save would move scores enough to interrupt with a
+ * confirmation dialog, an empty (or missing) set commits straight through.
+ */
+export function decideSave({ overridesDirty, impact }) {
+  if (!overridesDirty) return 'commit';
+  const changed = impact?.changedDimensions || [];
+  return changed.length === 0 ? 'commit' : { confirm: changed };
+}

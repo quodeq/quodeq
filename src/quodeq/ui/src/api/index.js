@@ -9,7 +9,7 @@
  */
 
 import { createDashboard } from '../models/dashboard.js';
-import { createDimension, createDimensionEval } from '../models/dimension.js';
+import { createDimension, createDimensionEval, createSlimDimension } from '../models/dimension.js';
 import { createJob } from '../models/job.js';
 import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
@@ -17,7 +17,7 @@ import { request, BASE } from './request.js';
 export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore, deleteFinding, deleteAllFindings, listVerifiedFindings, unverifyFinding } from './findings.js';
 export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard, getStandardsOverrides, putStandardsOverrides } from './standards.js';
 export {
-  createAssistantSession, postAssistantMessage,
+  createAssistantSession, fetchAssistantWorkspace, postAssistantMessage, stopAssistantTurn,
   applyAssistantAction, rejectAssistantAction, assistantEventsUrl,
 } from './assistant.js';
 export {
@@ -119,7 +119,9 @@ export async function getProjectScores(projectId, asOfRun = null) {
 
 /** @returns {Promise<{dimensions: Array, summary: Object}>} */
 export async function getRunScores(projectId, runId) {
-  return request(`/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`);
+  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
+  return data;
 }
 
 /**
@@ -128,8 +130,10 @@ export async function getRunScores(projectId, runId) {
  *
  * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
  */
-export function getCompareSummary(projectId) {
-  return request(`/projects/${encodeURIComponent(projectId)}/compare-summary`);
+export async function getCompareSummary(projectId) {
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/compare-summary`);
+  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
+  return data;
 }
 
 // ── Grade formula ───────────────────────────────────────────────────────

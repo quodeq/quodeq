@@ -26,6 +26,8 @@ from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.core.types import JobSnapshot
 from quodeq.services.evaluation_mixin import FsEvaluationMixin, _discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
+from quodeq.services.jobs import JobManager
+from quodeq.services._external_jobs import ProcessControl
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 from quodeq.data.fs.run_status_store import RunState, write_status
 
@@ -250,15 +252,11 @@ class TestProviderDiscardPurgesRun:
         (run / ".pid").write_text(str(os.getpid()))
 
         db_path = tmp_path / "idx.db"
-        provider = FilesystemActionProvider(index_db_path=db_path)
-        provider.list_evaluations(limit=0, reports_dir=str(reports))
 
         # Intercept the tree-kill (we must not SIGTERM ourselves) and make
         # the liveness check report the pid dead once "killed" — but leave
-        # status.json untouched, exactly like a wedged process would.
-        import quodeq.services._external_jobs as _ext_mod
-        original_kill_tree = _ext_mod._kill_tree
-        original_alive = _ext_mod.is_pid_alive
+        # status.json untouched, exactly like a wedged process would. Inject
+        # via ProcessControl instead of patching module attributes.
         pid_killed = False
 
         def fake_kill_tree(target_pid: int, sig: int = _signal.SIGTERM) -> None:
@@ -267,19 +265,17 @@ class TestProviderDiscardPurgesRun:
                 pid_killed = True
 
         def fake_alive(query_pid: int) -> bool:
-            if pid_killed:
-                return False
-            return original_alive(query_pid)
+            return not pid_killed
 
-        _ext_mod._kill_tree = fake_kill_tree
-        _ext_mod.is_pid_alive = fake_alive
-        try:
-            ok = provider.cancel_evaluation(
-                "ext-wedged-run", reports_dir=str(reports), discard_partial=True,
-            )
-        finally:
-            _ext_mod._kill_tree = original_kill_tree
-            _ext_mod.is_pid_alive = original_alive
+        jm = JobManager(
+            process_control=ProcessControl(kill_tree=fake_kill_tree, pid_alive=fake_alive),
+        )
+        provider = FilesystemActionProvider(job_manager=jm, index_db_path=db_path)
+        provider.list_evaluations(limit=0, reports_dir=str(reports))
+
+        ok = provider.cancel_evaluation(
+            "ext-wedged-run", reports_dir=str(reports), discard_partial=True,
+        )
 
         assert ok is True
         assert not run.exists(), (

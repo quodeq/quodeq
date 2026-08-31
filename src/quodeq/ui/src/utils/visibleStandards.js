@@ -1,6 +1,8 @@
 import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
 import { countBySeverity } from './severity.js';
+import { readJSON, writeString } from '../adapters/storage.js';
+import { decideHydration } from './visibleStandardsModel.js';
 
 // Marks that the (per-browser, not per-project) cache has been reconciled
 // with SOME project's own real file -- either because that project already
@@ -12,18 +14,6 @@ import { countBySeverity } from './severity.js';
 // whichever cache it governs, including in tests that inject their own
 // fake storage per test.
 const VISIBLE_STANDARDS_MIGRATED_KEY = 'quodeq-visible-standards-migrated';
-
-function sameIdSet(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length === 0 && b.length === 0) return true;
-  const setA = new Set(a);
-  const setB = new Set(b);
-  if (setA.size !== setB.size) return false;
-  for (const id of setA) {
-    if (!setB.has(id)) return false;
-  }
-  return true;
-}
 
 /**
  * Read the visible standard IDs from localStorage.
@@ -106,37 +96,34 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
   try {
     const { visibleStandardIds, isDefault, defaultStandardIds } = await getStandardsVisibility(projectId);
     if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
-    if (isDefault && !storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY)) {
-      const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
-      const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
-      // Only a cache that actually differs from the ISO defaults carries
-      // real user intent worth migrating -- a cache that already equals the
-      // defaults (the common case: every project opened so far had no file
-      // of its own either) is nothing but the trailing residue of an
-      // earlier hydrate and must not spawn a file with nothing but the
-      // defaults in it.
-      // Prefer the server's own default set when the response carries one
-      // (additive `defaultStandardIds`); the JS constant is only the
-      // pre-hydration boot fallback for when the server hasn't answered yet.
-      const isoDefaults = Array.isArray(defaultStandardIds) ? defaultStandardIds : DEFAULT_VISIBLE_STANDARDS;
-      if (Array.isArray(cached) && !sameIdSet(cached, isoDefaults)) {
-        const saved = await putStandardsVisibility(projectId, cached);
-        if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
-        const ids = saved?.visibleStandardIds ?? cached;
-        storage.setItem(VISIBLE_STANDARDS_MIGRATED_KEY, '1');
-        writeVisibleStandardIds(ids, storage);
-        return ids;
-      }
+    // Migration/adoption policy lives in decideHydration (visibleStandardsModel.js);
+    // this orchestrator only fetches, guards the two races below, and executes
+    // the storage writes the decision calls for.
+    const decision = decideHydration({
+      serverIds: visibleStandardIds,
+      isDefault,
+      serverDefaults: defaultStandardIds,
+      cachedIds: readJSON(VISIBLE_STANDARDS_STORAGE_KEY, null, storage),
+      alreadyMigrated: !!storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY),
+      fallbackDefaults: DEFAULT_VISIBLE_STANDARDS,
+    });
+    if (decision.kind === 'migrate') {
+      const saved = await putStandardsVisibility(projectId, decision.ids);
+      if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
+      const ids = saved?.visibleStandardIds ?? decision.ids;
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
+      writeVisibleStandardIds(ids, storage);
+      return ids;
     }
-    if (!isDefault) {
+    if (decision.markMigrated) {
       // This project already has its own real file: the cache is now known
       // to belong to a specific project's synced selection, so it must
       // never again be read as an unclaimed legacy value up for grabs by
       // the next project that happens to have no file yet.
-      storage.setItem(VISIBLE_STANDARDS_MIGRATED_KEY, '1');
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
     }
-    writeVisibleStandardIds(visibleStandardIds, storage);
-    return visibleStandardIds;
+    writeVisibleStandardIds(decision.ids, storage);
+    return decision.ids;
   } catch (err) {
     // Covers both an offline/failed fetch (expected, cache stays put) and a
     // genuine bug such as a response-shape change throwing a TypeError. The

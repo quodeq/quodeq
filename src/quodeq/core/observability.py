@@ -12,7 +12,12 @@ from typing import Protocol
 
 
 class LogSink(Protocol):
-    """Minimal four-level logging surface injectable into inner layers."""
+    """Minimal logging surface injectable into inner layers.
+
+    ``success`` exists alongside the four stdlib-style levels because the
+    shared colored-console logger renders success lines distinctly (green);
+    collapsing it into ``info`` would lose that on the CLI.
+    """
 
     def info(self, message: str) -> None: ...
 
@@ -21,6 +26,8 @@ class LogSink(Protocol):
     def debug(self, message: str) -> None: ...
 
     def error(self, message: str) -> None: ...
+
+    def success(self, message: str) -> None: ...
 
 
 class NullLog:
@@ -36,6 +43,9 @@ class NullLog:
         pass
 
     def error(self, message: str) -> None:
+        pass
+
+    def success(self, message: str) -> None:
         pass
 
 

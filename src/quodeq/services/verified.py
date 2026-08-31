@@ -16,10 +16,11 @@ from quodeq.core.events.models import (
     FindingVerified,
     FindingVerifiedEvent,
 )
-from quodeq.services.ports import ActionLogWriter, read_action_events
+from quodeq.data.ports.actions_log import ActionLog
+from quodeq.services._wiring import ActionLogWriter, read_action_events
 
 
-def verify_finding(project_dir: Path, finding: dict) -> None:
+def verify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingVerified event to project_dir/actions.jsonl."""
     payload = FindingVerified(
         req=str(finding.get("req", "")),
@@ -27,17 +28,19 @@ def verify_finding(project_dir: Path, finding: dict) -> None:
         line=int(finding.get("line", 0)),
         note=finding.get("note"),
     )
-    ActionLogWriter(project_dir).emit(FindingVerifiedEvent(payload=payload))
+    log = writer or ActionLogWriter(project_dir)
+    log.emit(FindingVerifiedEvent(payload=payload))
 
 
-def unverify_finding(project_dir: Path, finding: dict) -> None:
+def unverify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingUnverified event to project_dir/actions.jsonl."""
     payload = FindingUnverified(
         req=str(finding.get("req", "")),
         file=str(finding.get("file", "")),
         line=int(finding.get("line", 0)),
     )
-    ActionLogWriter(project_dir).emit(FindingUnverifiedEvent(payload=payload))
+    log = writer or ActionLogWriter(project_dir)
+    log.emit(FindingUnverifiedEvent(payload=payload))
 
 
 def verified_entries(project_dir: Path) -> list[dict]:

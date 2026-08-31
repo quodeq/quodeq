@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.services._fs_metadata import _local_repo_root
-from quodeq.services.ports import count_commits_since
+from quodeq.services._wiring import count_commits_since
 from quodeq.services.scoring import get_project_scores
 
 _GIT_TIMEOUT_S = 5

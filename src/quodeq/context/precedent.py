@@ -23,6 +23,8 @@ import logging
 import math
 import re
 import time
+from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -102,6 +104,51 @@ _BACKFILL_CHUNK = 32
 
 EmbedFn = Callable[..., list[list[float]]]
 AvailabilityFn = Callable[[str, str], bool]
+
+
+@dataclass(frozen=True)
+class VectorStoreFns:
+    """The six vector-store callables ``load_precedent_corpus`` needs.
+
+    Mirrors the ``embed_fn``/``availability_fn`` seam: tests inject fakes,
+    production resolves the sqlite-backed implementations from
+    ``data/sqlite/precedent_vectors.py`` via :func:`_resolve_vector_store`.
+    The connection handle is opaque to this layer -- it is only ever passed
+    back into the other five callables.
+    """
+
+    open_vector_store: Callable[[Path, str], AbstractContextManager[object | None]]
+    load_vectors: Callable[[object], list[tuple[str, list[float]]]]
+    insert_vectors: Callable[[object, str, list[tuple[str, list[float]]]], bool]
+    stored_fingerprints: Callable[[object], set[str]]
+    try_claim_backfill: Callable[[object], bool]
+    release_backfill_claim: Callable[[object], None]
+
+
+def _resolve_vector_store() -> VectorStoreFns:
+    """Build the production vector-store callables from ``data.sqlite``.
+
+    Local import for the same reason as ``load_precedent_fingerprints``'s
+    lazy default: a top-level ``data.sqlite`` import would close the
+    ``data.fs.repo_clone`` -> ``context`` -> ``data.sqlite`` loop.
+    """
+    from quodeq.data.sqlite.precedent_vectors import (  # noqa: PLC0415
+        insert_vectors,
+        load_vectors,
+        open_vector_store,
+        release_backfill_claim,
+        stored_fingerprints,
+        try_claim_backfill,
+    )
+
+    return VectorStoreFns(
+        open_vector_store=open_vector_store,
+        load_vectors=load_vectors,
+        insert_vectors=insert_vectors,
+        stored_fingerprints=stored_fingerprints,
+        try_claim_backfill=try_claim_backfill,
+        release_backfill_claim=release_backfill_claim,
+    )
 
 
 def precedent_text(req: str | None, snippet: str | None) -> str | None:
@@ -238,13 +285,15 @@ def load_precedent_corpus(
     *,
     embed_fn: EmbedFn | None = None,
     availability_fn: AvailabilityFn | None = None,
+    store: VectorStoreFns | None = None,
 ) -> "PrecedentCorpus | None":
     """Build the semantic corpus, or None. NEVER raises (never breaks a scan).
 
-    *embed_fn* / *availability_fn* are test seams; production resolves them
-    from llm_bridge. The run-dir marker file is the cross-process circuit
-    breaker: one process's failure disables the tier for sibling agents,
-    respawns, and per-call API context rebuilds.
+    *embed_fn* / *availability_fn* / *store* are test seams; production
+    resolves the first two from llm_bridge and *store* from
+    ``data.sqlite.precedent_vectors``. The run-dir marker file is the
+    cross-process circuit breaker: one process's failure disables the tier
+    for sibling agents, respawns, and per-call API context rebuilds.
     """
     from quodeq.shared._env import (  # noqa: PLC0415 -- cross-cutting layer
         get_embedding_base_url,
@@ -287,21 +336,15 @@ def load_precedent_corpus(
             _logger.debug("Semantic precedents: no dismissed findings")
             return None
 
-        from quodeq.data.sqlite.precedent_vectors import (  # noqa: PLC0415
-            insert_vectors,
-            load_vectors,
-            open_vector_store,
-            release_backfill_claim,
-            stored_fingerprints,
-            try_claim_backfill,
-        )
+        if store is None:
+            store = _resolve_vector_store()
 
         start = time.monotonic()
         embedded_new = 0
-        with open_vector_store(project_dir, model) as conn:
+        with store.open_vector_store(project_dir, model) as conn:
             if conn is None:
                 return None
-            if try_claim_backfill(conn):
+            if store.try_claim_backfill(conn):
                 try:
                     deadline = time.monotonic() + _BACKFILL_BUDGET_S
                     # We hold the exclusive backfill claim, so no other writer
@@ -309,7 +352,7 @@ def load_precedent_corpus(
                     # track inserts locally instead of re-querying the whole
                     # (growing) table on every chunk -- that was an N+1 scan whose
                     # cost climbed with the corpus size.
-                    stored = stored_fingerprints(conn)
+                    stored = store.stored_fingerprints(conn)
                     while time.monotonic() < deadline:
                         missing = [fp for fp in texts if fp not in stored]
                         if not missing:
@@ -322,13 +365,13 @@ def load_precedent_corpus(
                         except Exception as exc:  # noqa: BLE001 -- partial corpus is fine
                             _logger.warning("Precedent backfill stopped: %s", exc)
                             break
-                        if not insert_vectors(conn, model, list(zip(chunk, vecs))):
+                        if not store.insert_vectors(conn, model, list(zip(chunk, vecs))):
                             break
                         stored.update(chunk)
                         embedded_new += len(chunk)
                 finally:
-                    release_backfill_claim(conn)
-            pairs = load_vectors(conn)
+                    store.release_backfill_claim(conn)
+            pairs = store.load_vectors(conn)
 
         vectors = [vec for fp, vec in pairs if fp in texts]
         if not vectors:

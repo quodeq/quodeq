@@ -16,9 +16,11 @@ from __future__ import annotations
 import logging
 import signal
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
-from quodeq.analysis._process import _kill_tree
+from quodeq.shared._process_kill import kill_tree as _kill_tree
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-exported API
     is_safe_run_segment,
@@ -40,6 +42,14 @@ _POLL_INTERVAL_S = 0.05
 _FORCE_KILL_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
 
 
+@dataclass(frozen=True)
+class ProcessControl:
+    """Injectable seam for the process-control calls ``cancel_external_run`` makes."""
+
+    kill_tree: Callable[[int, int], None] = _kill_tree
+    pid_alive: Callable[[int], bool] = is_pid_alive
+
+
 
 
 def cancel_external_run(
@@ -48,6 +58,7 @@ def cancel_external_run(
     reports_root: Path,
     *,
     grace_period_s: float | None = None,
+    control: ProcessControl | None = None,
 ) -> bool:
     """Stop an external run's process tree; escalate SIGTERM to SIGKILL after grace.
 
@@ -56,6 +67,7 @@ def cancel_external_run(
     delivery failed at the OS level.
     """
     grace = grace_period_s if grace_period_s is not None else _DEFAULT_GRACE_PERIOD_S
+    control = control or ProcessControl()
     project_dir = resolve_child_dir(reports_root, project_uuid)
     if project_dir is None:
         return False
@@ -63,10 +75,10 @@ def cancel_external_run(
     if pid is None:
         return False
 
-    _kill_tree(pid, signal.SIGTERM)
+    control.kill_tree(pid, signal.SIGTERM)
     deadline = time.monotonic() + grace
     while time.monotonic() < deadline:
-        if not is_pid_alive(pid):
+        if not control.pid_alive(pid):
             return True
         time.sleep(_POLL_INTERVAL_S)
 
@@ -74,11 +86,11 @@ def cancel_external_run(
         "SIGTERM grace window (%ss) expired for pid %s; escalating to SIGKILL",
         grace, pid,
     )
-    _kill_tree(pid, _FORCE_KILL_SIGNAL)
+    control.kill_tree(pid, _FORCE_KILL_SIGNAL)
     # Brief wait so callers that immediately read status.json see a settled state.
     final_deadline = time.monotonic() + 1.0
     while time.monotonic() < final_deadline:
-        if not is_pid_alive(pid):
+        if not control.pid_alive(pid):
             return True
         time.sleep(_POLL_INTERVAL_S)
-    return not is_pid_alive(pid)
+    return not control.pid_alive(pid)

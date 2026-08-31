@@ -154,3 +154,64 @@ class TestEmitLog:
             )
 
         mock_marker.assert_any_call("analyzing", dimension="security")
+
+
+# ---------------------------------------------------------------------------
+# Injected LogSink ([28]: no direct shared.logging import)
+# ---------------------------------------------------------------------------
+
+class TestInjectedLogSink:
+    def test_injected_log_receives_analyzing_line(self, recording_log):
+        ev = _make_evidence()
+        with patch(
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
+            return_value=ev,
+        ), patch(
+            "quodeq.analysis.dimension_runner.emit_marker",
+        ):
+            DimensionRunner(log=recording_log).run(
+                MagicMock(), "security", 1, _make_ctx(), emit_log=True,
+            )
+
+        assert any(
+            "Analyzing security" in m for m in recording_log.info_messages
+        )
+        assert any(
+            "security" in m for m in recording_log.success_messages
+        )
+
+    def test_injected_log_receives_skip_warning(self, recording_log):
+        with patch(
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
+            return_value=None,
+        ), patch(
+            "quodeq.analysis.dimension_runner.emit_marker",
+        ):
+            result = DimensionRunner(log=recording_log).run(
+                MagicMock(), "security", 1, _make_ctx(),
+            )
+
+        assert result is None
+        assert any(
+            "no valid evidence, skipping" in m
+            for m in recording_log.warning_messages
+        )
+
+    def test_log_is_threaded_into_cache_runner(self, recording_log):
+        captured = {}
+
+        def fake_cache(config, dim_id, idx, ctx, cbs, **kw):
+            captured["log"] = kw.get("log")
+            return _make_evidence()
+
+        with patch(
+            "quodeq.analysis.dimension_runner.process_dimension_with_cache",
+            side_effect=fake_cache,
+        ), patch(
+            "quodeq.analysis.dimension_runner.emit_marker",
+        ):
+            DimensionRunner(log=recording_log).run(
+                MagicMock(), "security", 1, _make_ctx(), emit_log=False,
+            )
+
+        assert captured["log"] is recording_log

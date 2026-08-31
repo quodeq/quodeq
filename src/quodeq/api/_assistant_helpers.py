@@ -252,11 +252,10 @@ def local_provider_busy(provider_id: str) -> bool:
     """True when a local single-slot model is likely serving an evaluation."""
     if provider_id not in _LOCAL_PROVIDERS:
         return False
-    action_provider = current_app.config.get("_provider")
-    jobs = getattr(action_provider, "_jobs", None)
-    if jobs is None:
+    provider = current_app.config.get("_provider")
+    if provider is None:
         return False
-    return any(j.status == "running" for j in jobs.list_jobs(limit=20))
+    return bool(provider.list_evaluations(limit=20, states={"running"}))
 
 
 def event_frames(repository: AssistantStore, session_id: str, after_seq: int):

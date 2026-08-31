@@ -40,7 +40,6 @@ from quodeq.analysis.fingerprint import (
     _hash_standards,
     dimension_params_state,
 )
-from quodeq.config.paths import default_paths
 
 _logger = logging.getLogger(__name__)
 
@@ -105,7 +104,7 @@ def _current_provenance(config: RunConfig, dimension: str) -> dict:
     return {
         "model_id": _model_id_from(config),
         "standards_hash": standards_hash,
-        "prompts_hash": _hash_prompts_combined(default_paths().prompts_dir),
+        "prompts_hash": _hash_prompts_combined(config.prompts_dir),
         "quodeq_version": quodeq_version(),
     }
 
@@ -320,7 +319,7 @@ def persist_dispatch_results(
     _, effective_params = dimension_params_state(
         config.standards_dir, dimension, config.src,
     )
-    prompts_hash = _hash_prompts_combined(default_paths().prompts_dir)
+    prompts_hash = _hash_prompts_combined(config.prompts_dir)
     version = quodeq_version()
     for f in miss_files:
         if f not in ok_files:

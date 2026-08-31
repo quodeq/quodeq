@@ -22,7 +22,7 @@ from quodeq.analysis.dispatch_policy import default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
 from quodeq.analysis.scoring_pipeline import run_full
@@ -218,6 +218,7 @@ def _count_excluded_findings(
             source_file_count=0, files_read=0,
         ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
+            refs_reader=load_compiled_refs,
             cwe_url_template=cwe_url_template(),
             on_quarantine=log_quarantined_findings,
             on_malformed_line=log_malformed_jsonl_line)
@@ -382,7 +383,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
     log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
 
-    is_single_file = getattr(args, '_single_file', False)
+    is_single_file = inputs.single_file
 
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
     if is_single_file:
@@ -407,6 +408,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         manifest=inputs.manifest,
         dimensions_data=inputs.dims_data,
         evaluators_dir=default_paths().evaluators_dir,
+        prompts_dir=default_paths().prompts_dir,
         options=AnalysisOptions(
             ai_model=effective_ai_model,
             dimensions=dimensions_filter,
@@ -557,10 +559,8 @@ def _run_pipeline_with_cleanup(
                         pass
                     if is_repo_url(args.repo):
                         cleanup_cloned_repo(str(inputs.src))
-                    worktree_dir = getattr(args, "_worktree_dir", None)
-                    worktree_origin = getattr(args, "_worktree_origin", None)
-                    if worktree_dir and worktree_origin:
-                        _cleanup_worktree(worktree_origin, worktree_dir)
+                    if inputs.worktree_dir and inputs.worktree_origin:
+                        _cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
         except (AnalysisError, EvaluationError) as exc:
             # RunLifecycleContext.__exit__ has already written state=failed.
             # Map the domain error to exit code 1.
@@ -620,10 +620,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
     try:
         paths = _setup_run_dirs(args, inputs.src)
     except Exception:
-        worktree_dir = getattr(args, "_worktree_dir", None)
-        worktree_origin = getattr(args, "_worktree_origin", None)
-        if worktree_dir and worktree_origin:
-            _cleanup_worktree(worktree_origin, worktree_dir)
+        if inputs.worktree_dir and inputs.worktree_origin:
+            _cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
         raise
     result = _run_pipeline_with_cleanup(args, inputs, paths)
     _, _evidence_dir, evaluation_dir = paths
@@ -648,3 +646,21 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         _write_sarif_if_requested(args, evaluation_dir)
     return result
+
+
+def run_diff_evaluation(
+    src: str, *, base_ref: str, output_dir: Path,
+    dimensions: str | None = None, time_limit: int = 300,
+) -> int:
+    """Typed entry for CI review: evaluate *src* diffed against *base_ref*.
+
+    The argv round-trip through the real parser stays inside the CLI
+    package, so parser defaults remain single-sourced and callers (ci/)
+    never fabricate presentation-layer input.
+    """
+    argv = ["evaluate", src, "--diff-from", base_ref, "--output", str(output_dir),
+            "--time-limit", str(time_limit)]
+    if dimensions:
+        argv += ["--dimensions", dimensions]
+    from quodeq.cli_parser import build_parser  # noqa: PLC0415
+    return run_evaluate(build_parser().parse_args(argv))

@@ -378,7 +378,7 @@ def run_incremental_loop(
                 exit_reason=ev.exit_reason, log=log,
             )
             try:
-                _log_dimension_result(ev, dimension, idx, ctx.total)
+                _log_dimension_result(ev, dimension, idx, ctx.total, log=log)
                 result[dimension] = ev
                 if on_dimension_done:
                     on_dimension_done(dimension, ev)

@@ -15,7 +15,7 @@ from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import DashboardConfig
 from quodeq.dashboard._networking import _MAX_PORT_SCAN_TRIES, _allow_plaintext_http
 from quodeq.dashboard._frozen import subprocess_cmd
-from quodeq.dashboard._probes import ApiProbes
+from quodeq.dashboard._probes import ApiProbes, NativeShell
 from quodeq.dashboard._process import _PROCESS_WAIT_TIMEOUT_S, _wait_for_process
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
@@ -85,6 +85,7 @@ def _serve_and_wait(
     action_api_url: str,
     action_api_process: subprocess.Popen | None,
     config: DashboardConfig,
+    *, shell: NativeShell | None = None,
 ) -> None:
     """Open window or browser, register signal handlers, and block until exit."""
     log_success(f"Dashboard running at {action_api_url}")
@@ -126,7 +127,7 @@ def _serve_and_wait(
     signal.signal(signal.SIGTERM, _handle_term)
 
     if config.build.use_native and config.build.open_browser:
-        _serve_native(action_api_url, action_api_process, _stop_children)
+        _serve_native(action_api_url, action_api_process, _stop_children, shell=shell)
     elif config.build.open_browser:
         webbrowser.open(action_api_url)
         _serve_blocking(action_api_process, _stop_children)
@@ -138,6 +139,8 @@ def _serve_native(
     action_api_url: str,
     action_api_process: subprocess.Popen | None,
     stop_children: typing.Callable,
+    *, shell: NativeShell | None = None,
+    serve_blocking: typing.Callable[..., None] | None = None,
 ) -> None:
     """Open a PyWebView native window with single-instance support.
 
@@ -147,28 +150,27 @@ def _serve_native(
     of silently dying after spawning a webview subprocess that immediately
     crashes on import.
     """
-    try:
-        import webview  # noqa: F401
-    except ImportError:
+    shell = shell or NativeShell()
+    serve_blocking = serve_blocking or _serve_blocking
+
+    if not shell.webview_importable():
         raise RuntimeError(
             "pywebview is not installed. "
             "Try reinstalling with 'pip install --upgrade quodeq' or use --browser."
         )
 
-    if sys.platform.startswith("linux") and not _linux_webview_backend_available():
+    if sys.platform.startswith("linux") and not shell.linux_backend_available():
         logging.getLogger(__name__).warning(
             "pywebview's Linux GTK+/WebKit backend is missing — "
             "falling back to opening the dashboard in your browser. "
             "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
             "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
         )
-        webbrowser.open(action_api_url)
-        _serve_blocking(action_api_process, stop_children)
+        shell.open_browser(action_api_url)
+        serve_blocking(action_api_process, stop_children)
         return
 
-    from quodeq.dashboard._instance import InstanceController
-
-    instance = InstanceController()
+    instance = shell.make_instance()
 
     # Probe rather than acquire: the *window* process owns the reload socket,
     # because it is the only one that can act on a reload. Binding it here
@@ -203,7 +205,7 @@ def _serve_native(
     except OSError:
         webview_stderr = subprocess.DEVNULL
 
-    subprocess.Popen(
+    shell.spawn_window(
         subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
         start_new_session=True,
         stdout=subprocess.DEVNULL,
@@ -215,25 +217,7 @@ def _serve_native(
     # and the user can still reach the dashboard in their browser. Without
     # this block the whole `quodeq dashboard` command returned immediately
     # after spawning the detached webview child and the API was torn down.
-    _serve_blocking(action_api_process, stop_children)
-
-
-def _linux_webview_backend_available() -> bool:
-    """Return True if pywebview's GTK backend can actually load on Linux.
-
-    pywebview-on-Linux needs PyGObject + WebKit2GTK; neither is a pip
-    dependency of the `pywebview` wheel. Importing the GTK backend is the
-    only reliable probe — a successful `import webview` only proves the
-    Python package installed, not that its Linux backend is usable.
-    """
-    try:
-        import gi  # type: ignore[import-untyped]
-        gi.require_version("WebKit2", "4.1")
-        from gi.repository import WebKit2  # noqa: F401
-        return True
-    except (ImportError, ValueError):
-        # ValueError: "Namespace WebKit2 not available"
-        return False
+    serve_blocking(action_api_process, stop_children)
 
 
 # Public alias for cross-module use within the dashboard package

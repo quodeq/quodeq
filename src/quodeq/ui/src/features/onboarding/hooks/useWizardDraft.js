@@ -7,25 +7,29 @@ export const SKIPPED_KEY = 'quodeq_onboarding_skipped';
 /**
  * Save wizard state snapshot to localStorage with a savedAt timestamp.
  * Silently no-ops when localStorage is unavailable (private browsing / quota).
+ * @param {Object} snapshot
+ * @param {Storage} [storage] - injectable storage backend; defaults to localStorage
  */
-export function saveDraft(snapshot) {
-  writeJSON(DRAFT_KEY, { ...snapshot, savedAt: Date.now() });
+export function saveDraft(snapshot, storage) {
+  writeJSON(DRAFT_KEY, { ...snapshot, savedAt: Date.now() }, storage);
 }
 
 /**
  * Load wizard state snapshot. Returns null if no draft exists, the draft
  * is unparseable, or the draft is older than 24h.
+ * @param {Storage} [storage] - injectable storage backend; defaults to localStorage
  */
-export function loadDraft() {
-  const parsed = readJSON(DRAFT_KEY);
+export function loadDraft(storage) {
+  const parsed = readJSON(DRAFT_KEY, null, storage);
   if (!parsed || typeof parsed !== 'object') return null;
   if (typeof parsed.savedAt !== 'number') return null;
   if (Date.now() - parsed.savedAt > DRAFT_TTL_MS) return null;
   return parsed;
 }
 
-export function clearDraft() {
-  removeKey(DRAFT_KEY);
+/** @param {Storage} [storage] - injectable storage backend; defaults to localStorage */
+export function clearDraft(storage) {
+  removeKey(DRAFT_KEY, storage);
 }
 
 /** Mark that the user dismissed the welcome step ("Maybe later"). */

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
+from quodeq.services._wiring import list_runs
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -184,7 +185,6 @@ def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     so ``isLatest`` matches what the Overview actually shows.
     """
     from quodeq.services.scoring_view import is_eligible_for_default_view  # noqa: PLC0415
-    from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
 
     reports_root = Path(evaluations_dir).resolve()
     try:

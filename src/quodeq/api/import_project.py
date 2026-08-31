@@ -29,7 +29,7 @@ from quodeq.api.zip import (
     _MANIFEST_SCHEMA,
     _max_zip_size_bytes,
 )
-from quodeq.services.ports import (
+from quodeq.services.project_index import (
     ProjectIdentity,
     ProjectRepository,
     index_key,

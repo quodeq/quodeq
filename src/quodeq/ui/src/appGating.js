@@ -104,6 +104,18 @@ export function selectSidebarCounts({ filteredAccumulated, accumulated, filtered
 }
 
 /**
+ * Compare needs two analyzed projects to rank anything; below that the tab
+ * is redundant and stays hidden. Remote projects from the shared repository
+ * count toward the pair: one local project plus published teammates is a
+ * comparable fleet. Exported so this contract is unit-testable without
+ * mounting the whole App.
+ */
+export function shouldShowCompareTab({ projects, sharedHasContent }) {
+  const localWithRuns = (projects || []).filter((p) => (p.runsCount ?? 0) > 0).length;
+  return localWithRuns >= 2 || (localWithRuns >= 1 && !!sharedHasContent);
+}
+
+/**
  * One-shot initial-landing decision. With zero local projects the default
  * 'overview' landing is a dead-end empty state; when a configured shared
  * repo has published content, land on the repositories tab instead so the

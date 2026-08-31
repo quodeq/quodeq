@@ -335,8 +335,8 @@ class TestBuildDashboard:
             selected_full_reads.append(run_id)
             return dims
 
-        from quodeq.services.dashboard import _SHARED_RUN_DIM_CACHE
-        _SHARED_RUN_DIM_CACHE.clear()
+        from quodeq.services.dashboard import clear_shared_dimension_cache
+        clear_shared_dimension_cache()
 
         with (
             patch("quodeq.services.dashboard.list_runs", return_value=runs),
@@ -652,8 +652,8 @@ class TestInProgressFreshnessThroughDashboard:
                 return [_dim("security", "B", "7.0"), _dim("performance", "A", "9.0")]
             return [_dim("usability", "A", "9.5")]
 
-        from quodeq.services.dashboard import _SHARED_RUN_DIM_CACHE
-        _SHARED_RUN_DIM_CACHE.clear()
+        from quodeq.services.dashboard import clear_shared_dimension_cache
+        clear_shared_dimension_cache()
 
         with (
             patch("quodeq.services.dashboard.list_runs", return_value=runs),
@@ -963,8 +963,8 @@ class TestHistoryContextSlimming:
         def read_by_run(_root, _project, run_id):
             return selected_dims if run_id == "r-new" else old_dims
 
-        from quodeq.services.dashboard import _SHARED_RUN_DIM_CACHE
-        _SHARED_RUN_DIM_CACHE.clear()
+        from quodeq.services.dashboard import clear_shared_dimension_cache
+        clear_shared_dimension_cache()
         with (
             patch("quodeq.services.dashboard.list_runs", return_value=runs),
             # Selected-run path reads via dashboard.read_run_data; the history

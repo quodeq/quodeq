@@ -5,6 +5,8 @@ import json
 
 import pytest
 
+from quodeq.data.fs._index_cache import clear_index_cache
+
 # Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
 # main-thread stack. ~160KB of text -- trivially producible by hand or by a
 # buggy generator, which is what makes this a real degradation path and not a
@@ -82,6 +84,18 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     monkeypatch.setenv("QUODEQ_GRADE_FORMULA_PATH", str(home / "grade_formula.json"))
 
 
+@pytest.fixture(autouse=True)
+def _fresh_index_cache() -> None:
+    """Clear the shared project-resolver index cache before every test.
+
+    The cache is a module-level singleton (``data/fs/_index_cache.py``); a
+    test that leaves stale mtime-keyed entries in it can leak state into the
+    next test that resolves the same path. Suite-wide isolation by default.
+    """
+    clear_index_cache()
+    yield
+
+
 class DummyProcess:
     """Minimal process stub for tests that need a mock subprocess."""
 
@@ -118,6 +132,7 @@ class RecordingLog:
         self.warning_messages: list[str] = []
         self.debug_messages: list[str] = []
         self.error_messages: list[str] = []
+        self.success_messages: list[str] = []
 
     def info(self, message: str) -> None:
         self.info_messages.append(message)
@@ -130,6 +145,9 @@ class RecordingLog:
 
     def error(self, message: str) -> None:
         self.error_messages.append(message)
+
+    def success(self, message: str) -> None:
+        self.success_messages.append(message)
 
 
 @pytest.fixture

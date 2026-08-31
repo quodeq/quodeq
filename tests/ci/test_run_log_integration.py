@@ -52,7 +52,7 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
         evaluation_dir.mkdir(parents=True)
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
 
         # During pipeline, a RunLogHandler must be attached to the quodeq logger.
         attached: list[bool] = []

@@ -11,7 +11,7 @@ from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis._runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
@@ -122,6 +122,7 @@ def _parse_dimension_evidence(
         compiled_dir=compiled_dir,
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
+        refs_reader=load_compiled_refs,
         cwe_url_template=cwe_url_template(),
         on_quarantine=log_quarantined_findings,
         on_malformed_line=log_malformed_jsonl_line,

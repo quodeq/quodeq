@@ -144,7 +144,7 @@ class TestDispatchBypassesCacheOnCleanScan:
         from quodeq.core.evidence.model import Evidence
 
         dispatched_files: list[str] = []
-        def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             files = sorted(cfg.options.incremental_file_filter or set())
             dispatched_files.extend(files)
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
@@ -198,7 +198,7 @@ class TestDispatchBypassesCacheOnCleanScan:
         from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
         from quodeq.core.evidence.model import Evidence
 
-        def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             with jsonl.open("a") as out:
@@ -270,7 +270,7 @@ class TestCleanScanInvalidates:
             assert cache.get(build_cache_key_for_file(config, f, "security")) is not None
 
         from quodeq.core.evidence.model import Evidence
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             # Worker emits a marker for a.py only -- b.py is "abandoned"
@@ -329,7 +329,7 @@ class TestCleanScanInvalidates:
         assert entry_before is not None
 
         from quodeq.core.evidence.model import Evidence
-        def noop_dispatch(cfg, dim_id, idx, ctx, callbacks):
+        def noop_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             return Evidence(
                 repository="", language="python", date="2026-01-01",
                 source_file_count=1, files_read=1, coverage_pct=100.0, principles={},
