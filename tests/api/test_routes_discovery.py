@@ -64,3 +64,62 @@ def test_browse_valid_path_returns_200(client, tmp_path):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["current"] == str(tmp_path)
+
+
+# ── GET /api/ai-clients/<id>/cmd-path-check ─────────────────────────────
+#
+# Eager validation for the Settings "command override" field: same rules
+# as the aiCmdPath check on POST /api/evaluations, but returned as data
+# ({ok, error}) so the UI can flag a bad value at save time instead of
+# the user discovering it when a start fails.
+
+def _make_executable(directory, name):
+    import os
+    import stat
+    if os.name == "nt":
+        path = directory / f"{name}.bat"
+        path.write_text("@exit /b 0\n")
+        return str(path)
+    path = directory / name
+    path.write_text("#!/bin/sh\nexit 0\n")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return str(path)
+
+
+@pytest.fixture()
+def bin_dir(tmp_path, monkeypatch):
+    import os
+    d = tmp_path / "bin"
+    d.mkdir()
+    monkeypatch.setenv("PATH", f"{d}{os.pathsep}{os.environ.get('PATH', '')}")
+    return d
+
+
+def test_cmd_path_check_valid_bare_name(client, bin_dir):
+    _make_executable(bin_dir, "claude-api")
+    resp = client.get("/api/ai-clients/claude/cmd-path-check?path=claude-api")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"ok": True, "error": None}
+
+
+def test_cmd_path_check_missing_binary(client, bin_dir):
+    resp = client.get("/api/ai-clients/claude/cmd-path-check?path=claude-nowhere")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "not found" in body["error"]
+
+
+def test_cmd_path_check_wrong_prefix(client, bin_dir):
+    _make_executable(bin_dir, "my-claude")
+    resp = client.get("/api/ai-clients/claude/cmd-path-check?path=my-claude")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "must start with 'claude'" in body["error"]
+
+
+def test_cmd_path_check_empty_path_is_valid(client):
+    resp = client.get("/api/ai-clients/claude/cmd-path-check")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"ok": True, "error": None}

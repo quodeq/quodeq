@@ -118,11 +118,9 @@ def _path_dirs(env: dict[str, str] | None = None) -> list[str]:
     return [os.path.normcase(os.path.realpath(d)) for d in raw.split(os.pathsep) if d]
 
 
-def _validate_ai_cmd_path(
-    ai_cmd: str | None, ai_cmd_path: str | None,
-) -> tuple[Response, int] | None:
-    """Return an error response if *ai_cmd_path* is not an acceptable binary
-    override for provider *ai_cmd*, or None if valid (or absent).
+def ai_cmd_path_error(ai_cmd: str | None, ai_cmd_path: str | None) -> str | None:
+    """Reason *ai_cmd_path* is not an acceptable binary override for
+    provider *ai_cmd*, or None if valid (or absent).
 
     The aiCmd allow-list exists so the local HTTP API can never spawn an
     arbitrary binary. A free-text override would reopen that, so it must
@@ -133,41 +131,51 @@ def _validate_ai_cmd_path(
     the server's PATH. (c) keeps the override an alternate install of the
     allowed CLI, (e) keeps it out of attacker-writable locations like /tmp
     or a downloads folder.
+
+    Pure rules-to-reason form so both the start-evaluation 400 and the
+    Settings eager check (GET /api/ai-clients/<id>/cmd-path-check) apply
+    the same rules from one place.
     """
     if not ai_cmd_path:
         return None
-
-    def _invalid(reason: str) -> tuple[Response, int]:
-        body, status = error_response(
-            f"Invalid AI command override: {reason}",
-            HTTPStatus.BAD_REQUEST,
-            "INVALID_INPUT",
-        )
-        return jsonify(body), status
-
     if not _SAFE_CMD_PATH_RE.fullmatch(ai_cmd_path):
-        return _invalid(
-            "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
-        )
+        return "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
     normalized = ai_cmd_path.replace("\\", "/")
     if ".." in normalized.split("/"):
-        return _invalid("'..' path segments are not allowed")
+        return "'..' path segments are not allowed"
     if "/" in normalized and not os.path.isabs(ai_cmd_path):
-        return _invalid("a path must be absolute; otherwise use a bare command name")
+        return "a path must be absolute; otherwise use a bare command name"
     provider = ai_cmd or _get_ai_cmd()
     basename = os.path.basename(normalized)
     if not basename.startswith(provider):
-        return _invalid(f"binary name must start with '{provider}'")
+        return f"binary name must start with '{provider}'"
     resolved = shutil.which(ai_cmd_path)
     if resolved is None:
-        return _invalid(f"'{ai_cmd_path}' was not found or is not executable")
+        return f"'{ai_cmd_path}' was not found or is not executable"
     resolved_dir = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(resolved))))
     if resolved_dir not in _path_dirs():
-        return _invalid(
+        return (
             f"'{ai_cmd_path}' is not in a directory on PATH; move it to one "
             f"(e.g. ~/.local/bin) or add its directory to PATH"
         )
     return None
+
+
+def _validate_ai_cmd_path(
+    ai_cmd: str | None, ai_cmd_path: str | None,
+) -> tuple[Response, int] | None:
+    """Return a 400 error response if *ai_cmd_path* is not an acceptable
+    binary override for provider *ai_cmd*, or None if valid (or absent).
+    Rules live in ai_cmd_path_error."""
+    reason = ai_cmd_path_error(ai_cmd, ai_cmd_path)
+    if reason is None:
+        return None
+    body, status = error_response(
+        f"Invalid AI command override: {reason}",
+        HTTPStatus.BAD_REQUEST,
+        "INVALID_INPUT",
+    )
+    return jsonify(body), status
 
 
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":

@@ -302,6 +302,20 @@ export function getClientModels(clientId) {
   return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
 }
 
+/**
+ * Eager validation for the Settings command override field. Same rules
+ * the server applies to aiCmdPath when an evaluation starts.
+ *
+ * @param {string} clientId
+ * @param {string} path
+ * @returns {Promise<{ok: boolean, error: string | null}>}
+ */
+export function checkCmdPath(clientId, path) {
+  return request(
+    `/ai-clients/${encodeURIComponent(clientId)}/cmd-path-check?path=${encodeURIComponent(path)}`,
+  );
+}
+
 // ── LLM Bridge ─────────────────────────────────────────────────────────
 
 /** @returns {Promise<Object>} Ollama connection status */

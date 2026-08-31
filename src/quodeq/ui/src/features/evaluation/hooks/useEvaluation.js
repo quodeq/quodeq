@@ -34,6 +34,7 @@ import {
 } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
+import { apiErrorMessage } from "../../../strings/apiErrors.js";
 
 const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const JOB_POLL_MS = 1500;
@@ -240,9 +241,14 @@ export function useEvaluation() {
       queryClient.invalidateQueries({ queryKey: projectKeys.all() });
     },
     onError: (err) => {
-      // Only our own prereq errors carry copy worth showing; anything else
-      // is a transport/server failure whose raw text would be noise.
-      setJobError(err?.userFacing ? err.message : t("evaluate.startFailed"));
+      // Our own prereq errors carry copy written for the user. Server
+      // rejections go through apiErrorMessage: a mapped code wins
+      // (translated), otherwise the backend's specific sentence (e.g. an
+      // invalid aiCmdPath override names the binary it could not find),
+      // and the generic string is only for failures with no text at all.
+      setJobError(
+        err?.userFacing ? err.message : apiErrorMessage(err, "evaluate.startFailed"),
+      );
     },
   });
 

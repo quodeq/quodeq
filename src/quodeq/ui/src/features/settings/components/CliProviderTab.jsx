@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS, DEFAULT_SUBAGENTS } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
@@ -45,9 +46,28 @@ function ModelTextInput({ label, value, placeholder, onChange, required }) {
 }
 
 export default function CliProviderTab({ providerId, state, update }) {
+  const api = useApi();
   const [power, setPower] = useState(() => {
     return Number(readString(POWER_KEY)) || DEFAULT_POWER_LEVEL;
   });
+  const [cmdPathError, setCmdPathError] = useState(null);
+
+  // Eager check on blur: the same rules the server applies to aiCmdPath at
+  // start time, so a bad override (a shell function, a typo, a binary off
+  // PATH) is flagged here instead of failing the next evaluation. A check
+  // that cannot be reached stays silent — the start-time validation still
+  // guards, and a transport hiccup must not brand a good value invalid.
+  function validateCmdPath() {
+    const value = state['cmd-path'];
+    if (!value || value === providerId) {
+      setCmdPathError(null);
+      return;
+    }
+    api
+      .checkCmdPath(providerId, value)
+      .then((result) => setCmdPathError(result.ok ? null : result.error))
+      .catch(() => setCmdPathError(null));
+  }
 
   function persistPower(level) {
     setPower(level);
@@ -132,18 +152,26 @@ export default function CliProviderTab({ providerId, state, update }) {
               </span>
               <span className="settings-description">{t('settings.cmdOverrideDesc', { provider: providerId })}</span>
             </div>
-            <input
-              type="text"
-              className="settings-model-input"
-              value={state['cmd-path'] || ''}
-              placeholder={providerId}
-              onChange={(e) => update('cmd-path', e.target.value.trim())}
-              aria-label={t('settings.cmdOverride')}
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-              spellCheck={false}
-            />
+            <div className="settings-model-field">
+              <input
+                type="text"
+                className="settings-model-input"
+                value={state['cmd-path'] || ''}
+                placeholder={providerId}
+                onChange={(e) => update('cmd-path', e.target.value.trim())}
+                onBlur={validateCmdPath}
+                aria-label={t('settings.cmdOverride')}
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {cmdPathError && (
+                <span className="settings-model-hint settings-error" role="alert">
+                  {cmdPathError}
+                </span>
+              )}
+            </div>
           </div>
           <AdvancedAnalysisSettings state={state} update={update} />
         </div>

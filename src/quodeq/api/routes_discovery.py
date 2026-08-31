@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._evaluation_helpers import ai_cmd_path_error
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
@@ -79,6 +80,17 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/ai-clients/<client_id>/models")
     def client_models(client_id: str) -> Response:
         return jsonify(provider.get_client_models(client_id))
+
+    @app.get("/api/ai-clients/<client_id>/cmd-path-check")
+    def client_cmd_path_check(client_id: str) -> Response:
+        """Eager check for the Settings command override field.
+
+        Same rules as the aiCmdPath validation on POST /api/evaluations,
+        returned as data so the UI can flag a bad value when it is typed
+        instead of when a start fails.
+        """
+        reason = ai_cmd_path_error(client_id, request.args.get("path"))
+        return jsonify({"ok": reason is None, "error": reason})
 
     @app.get("/api/plugins")
     def plugins() -> Response:
