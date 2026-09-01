@@ -1,107 +1,37 @@
-"""Mixin providing evaluation lifecycle methods for the filesystem provider."""
+"""Mixin providing evaluation lifecycle methods for the filesystem provider.
+
+Split (Task 14): dispatch abstraction + CLI command building moved to
+``_evaluation_dispatch.py``, env-var building to ``_evaluation_env.py``, and
+the cancel-wait/discard machinery to ``_run_discard.py``. All are re-exported
+here — tests import ``SubprocessDispatcher``/``_build_evaluate_cmd`` and patch
+``_wait_for_terminal_status``/``_discard_run_state`` at this module's path.
+"""
 
 from __future__ import annotations
 
-import json
-import os
-import re
-import subprocess
-import sys
-import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Protocol
+from typing import TYPE_CHECKING, Callable
 
-from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
-from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.services._wiring import read_dispatched_cache_keys, remove_matching_files
+from quodeq.services.base import EvaluationOptions
 from quodeq.services.project_registration import mark_onboarding_complete, register_project
 from quodeq.services.score_run import score_completed_evidence
-from quodeq.shared.provider_env import provider_env_exports
-from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
+from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url
+
+from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, _build_evaluate_cmd  # noqa: F401 — re-export
+from quodeq.services._evaluation_env import build_eval_env
+from quodeq.services._run_discard import (  # noqa: F401 — re-export
+    _CacheEraser,
+    _discard_run_state,
+    _open_cache,
+    _wait_for_terminal_status,
+)
 
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
-
-class EvaluationDispatcher(Protocol):
-    """Abstraction for dispatching evaluation work.
-
-    The default implementation spawns a local subprocess via ``JobManager``.
-    Replace with a task-queue or remote-worker implementation for horizontal
-    scaling (e.g. Celery, cloud functions).
-    """
-
-    def dispatch(
-        self,
-        cmd: list[str],
-        *,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        ai_provider: str | None = None,
-        ai_model: str | None = None,
-        time_limit_s: int | None = None,
-    ) -> JobSnapshot:
-        """Submit an evaluation command and return the initial job state."""
-        ...
-
-
-class SubprocessDispatcher:
-    """Default dispatcher that delegates to the in-process ``JobManager``."""
-
-    def __init__(self, job_manager: JobManager) -> None:
-        self._jobs = job_manager
-
-    def dispatch(
-        self,
-        cmd: list[str],
-        *,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        ai_provider: str | None = None,
-        ai_model: str | None = None,
-        time_limit_s: int | None = None,
-    ) -> JobSnapshot:
-        return self._jobs.start_job(
-            cmd, cwd=cwd, env=env,
-            ai_provider=ai_provider, ai_model=ai_model,
-            time_limit_s=time_limit_s,
-        )
-
-
-def _build_evaluate_cmd(
-    repo: str, options: EvaluationOptions, reports_dir: str,
-) -> list[str]:
-    """Build the CLI command list for a V2 evaluation subprocess."""
-    reports_abs = str(Path(reports_dir).resolve())
-    repo_path = Path(repo)
-    repo_arg = repo if is_repo_url(repo) else str(repo_path.resolve())
-
-    if getattr(sys, "frozen", False):
-        cmd = [sys.executable, "--_evaluate", "evaluate", repo_arg]
-    else:
-        cmd = [sys.executable, "-m", "quodeq.cli", "evaluate", repo_arg]
-    cmd += ["-o", reports_abs]
-    if options.dimensions:
-        if isinstance(options.dimensions, list):
-            cmd += ["-d", ",".join(options.dimensions)]
-        else:
-            cmd += ["-d", str(options.dimensions)]
-    if options.numerical:
-        cmd += ["-m", "numerical"]
-    if options.max_subagents != DEFAULT_MAX_SUBAGENTS:
-        cmd += ["--n-subagents", str(options.max_subagents)]
-    if options.clean_scan:
-        cmd += ["--clean-scan"]
-    if options.branch:
-        cmd += ["--branch", options.branch]
-    if options.scope_path:
-        cmd += ["--scope", options.scope_path]
-    return cmd
 
 
 class FsEvaluationMixin:
@@ -114,12 +44,12 @@ class FsEvaluationMixin:
     inside ``cancel_evaluation`` without re-introducing MRO coupling.
     """
 
-    _jobs: JobManager
+    _jobs: "JobManager"
     _dispatcher: EvaluationDispatcher | None
 
     def __init__(
         self,
-        jobs: JobManager | None = None,
+        jobs: "JobManager | None" = None,
         get_status_fn: Callable | None = None,
     ) -> None:
         if jobs is not None:
@@ -138,49 +68,11 @@ class FsEvaluationMixin:
     @staticmethod
     def _build_eval_env(repo: str, options: EvaluationOptions, env: dict[str, str] | None = None) -> dict[str, str]:
         """Build the subprocess environment for an evaluation run."""
-        base = env if env is not None else os.environ
-        built_env = {**base, "PYTHONUNBUFFERED": "1"}
-        built_env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
-        # Validated at the API boundary (_validate_ai_cmd_path); the scan
-        # subprocess spawns it as argv[0] while AI_CMD keeps keying the
-        # provider config (analysis._command._cmd_binary).
-        if options.ai_cmd_path:
-            built_env["AI_CMD_PATH"] = options.ai_cmd_path
-        ai_model = options.ai_model or get_ai_model()
-        subagent_model = options.subagent_model or ai_model
-        # Ensure both env vars are set consistently — prevents model swapping
-        # between verification (reads AI_MODEL) and analysis (reads SUBAGENT_MODEL)
-        if ai_model:
-            built_env["AI_MODEL"] = ai_model
-        if subagent_model:
-            built_env["SUBAGENT_MODEL"] = subagent_model
-        if not options.verify_findings:
-            built_env["QUODEQ_NO_VERIFY"] = "1"
-        # Always propagate the limit, including 0 (unlimited). The CLI
-        # subprocess uses positive values to set the run-level deadline
-        # (lifecycle.set_deadline + analyzing_start marker) that the
-        # dashboard's countdown depends on. An absent env var resolves to
-        # None in the CLI and the pool substitutes its 600s default, so
-        # skipping 0 turned "unlimited" into a 10-minute run.
-        if options.time_limit is not None and options.time_limit >= 0:
-            built_env["QUODEQ_TIME_LIMIT"] = str(options.time_limit)
-        if options.per_dimension:
-            built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
-        if options.context_size > 0:
-            built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
-        # Export user-entered API credentials under the env names the scan
-        # subprocess resolves them from (provider's api_key_env). Without
-        # this, a key typed in Settings for e.g. OpenRouter never reached
-        # the run and it failed with a missing-key error.
-        built_env.update(provider_env_exports(
-            options.ai_cmd, options.provider_api_key, options.provider_api_base,
-        ))
-        if options.ai_cmd == "omlx":
-            if options.provider_api_key:
-                built_env["OMLX_API_KEY"] = options.provider_api_key
-            if options.provider_api_base:
-                built_env["OMLX_BASE_URL"] = options.provider_api_base
-        return built_env
+        return build_eval_env(
+            repo, options, env,
+            ai_cmd=options.ai_cmd or get_ai_cmd(),
+            ai_model=options.ai_model or get_ai_model(),
+        )
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
@@ -317,122 +209,3 @@ class FsEvaluationMixin:
         if states:
             jobs = [j for j in jobs if j.status in states]
         return jobs[:limit] if limit > 0 else jobs
-
-
-_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
-_CANCEL_WAIT_TIMEOUT_S = 2.0
-_CANCEL_WAIT_POLL_S = 0.05
-
-
-def _wait_for_terminal_status(
-    run_dir: Path,
-    *,
-    timeout_s: float = _CANCEL_WAIT_TIMEOUT_S,
-    poll_interval_s: float = _CANCEL_WAIT_POLL_S,
-) -> bool:
-    """Block until ``run_dir/status.json`` reports a terminal state, or timeout.
-
-    Returns True when a terminal state ({done, failed, cancelled}) is
-    observed on disk; returns False on timeout. Best-effort: a False
-    return does not abort the calling cancel flow — downstream polling
-    or SSE will eventually catch up.
-
-    Bridges the async gap between ``JobManager.cancel_job`` returning
-    (in-memory state flipped, signal sent to subprocess) and the run
-    lifecycle handler in the subprocess flushing ``status.json`` to
-    terminal. Without this wait, observers reading from disk
-    immediately after the API returns can still see the run as
-    ``in_progress`` for ~100ms-1s, producing a window where a
-    follow-up "Start" surfaces two ``running`` rows in the UI.
-    """
-    deadline = time.monotonic() + timeout_s
-    status_path = run_dir / "status.json"
-    while True:
-        try:
-            data = json.loads(status_path.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data.get("state") in _TERMINAL_RUN_STATES:
-                return True
-        except (OSError, ValueError):
-            pass
-        if time.monotonic() >= deadline:
-            return False
-        time.sleep(poll_interval_s)
-
-
-def _open_cache():
-    """Lazily construct the default cache backend (import kept local).
-
-    Deferred rather than routed through ``services._wiring``: ``_wiring`` is
-    imported by nearly every services module (including ``services.scoring``,
-    itself reachable from ``tests/core``), and ``LocalFileBackend``'s module
-    reaches the top-level ``quodeq`` package (via ``CacheEntry.quodeq_version``),
-    which deferred-imports ``quodeq.cli`` -> httpx/pydantic. Keeping this
-    import local keeps that framework chain out of ``_wiring``'s reach.
-    """
-    from quodeq.data.cache_store.local import LocalFileBackend
-    return LocalFileBackend()
-
-
-def _discard_run_state(
-    reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None,
-    log: LogSink = NULL_LOG,
-) -> None:
-    """Wipe every trace a discarded run left behind.
-
-    Invoked when the user cancels with "Discard findings": the run must end
-    up as if it never happened. For EVERY dim that dispatched work (has a
-    ``<dim>_dispatch_keys.json`` sidecar) the V2 content-addressed cache
-    entries it wrote are deleted, including dims that finished cleanly.
-    Without that, the next incremental run counts the discarded run's files
-    as "analyzed in previous runs" in the coverage header. The sidecar holds
-    only this run's dispatched (cache-miss) keys, so entries written by
-    earlier kept runs are not touched.
-
-    All per-dim scratch (queue, fingerprint, evidence JSONL, dispatch-keys
-    and replayed-keys sidecars) is removed so the status-GET scoring path
-    cannot resurrect a report from leftover evidence. The caller removes the
-    run directory itself.
-    """
-    project = job.get("outputProject")
-    run_id = job.get("outputRunId")
-    if not project or not run_id:
-        return
-
-    run_dir = Path(reports_dir) / project / run_id
-    evidence_dir = run_dir / "evidence"
-    if not evidence_dir.is_dir():
-        return
-
-    keys = read_dispatched_cache_keys(evidence_dir)
-    if keys:
-        cache = cache or _open_cache()
-        for key in keys:
-            try:
-                cache.delete(key)
-            except Exception as exc:  # noqa: BLE001
-                log.warning(f"Could not delete cache entry {key}: {exc}")
-
-    scratch_patterns = (
-        "*_queue.json", "*_fingerprint.json",
-        "*_evidence.jsonl", "*_dispatch_keys.json",
-        # Entries listed here belong to EARLIER runs, so they are cleaned up
-        # as scratch but deliberately not fed to the cache-deletion loop above.
-        "*_replayed_unconsolidated_keys.json",
-    )
-    remove_matching_files(evidence_dir, scratch_patterns)
-
-
-class _CacheEraser(Protocol):
-    """The one cache-backend method ``_discard_run_state`` needs.
-
-    A local structural type instead of importing
-    ``data.cache_store.backend.CacheBackend`` directly: this Protocol is the
-    injection seam ``_discard_run_state`` tests against, independent of
-    which concrete backend ``_open_cache`` returns. ``LocalFileBackend``
-    (returned by ``_open_cache``, and every other real cache backend)
-    satisfies this shape without any inheritance. Defined after
-    ``_discard_run_state`` (referenced there only as a deferred string
-    annotation, per ``from __future__ import annotations``).
-    """
-
-    def delete(self, key: str) -> None: ...

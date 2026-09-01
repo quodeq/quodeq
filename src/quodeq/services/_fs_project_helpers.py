@@ -71,33 +71,43 @@ def _derive_latest_done_run_id(runs: list[RunInfo]) -> str | None:
     return next((run.run_id for run in runs if run.status == "complete"), None)
 
 
+def _backfill_and_read_meta(
+    reports_root: Path, entry_name: str, runs: list[RunInfo], *, backfill: bool,
+) -> tuple[dict, dict]:
+    """Lazy-backfill the project record, then extract its display metadata.
+
+    Ensures legacy project records have an ``onboardingCompletedAt`` field so
+    the wizard never auto-opens for already-onboarded projects. Returns the
+    (possibly updated) info dict so callers can pass the field through to the
+    entry without re-reading. Projects with runs also heal a null field to
+    the first run's date: an evaluation happened, so setup is complete
+    (records that predate the start_evaluation stamp would otherwise show
+    'Resume setup' forever).
+
+    *backfill* mirrors ``build_project_list``'s parameter of the same name:
+    when False, the record is read read-only and never rewritten (used by
+    the shared-repo route so listing a clone never dirties its worktree).
+    """
+    project_dir = reports_root / entry_name
+    heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
+    backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
+    info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
+    return info, _extract_project_metadata(info, entry_name)
+
+
 def _build_project_entry(
     reports_root: Path, entry_name: str, runs: list[RunInfo], *,
     backfill: bool = True, inline_summaries: bool = False,
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
-    *backfill* mirrors ``build_project_list``'s parameter of the same name:
-    when False, the record is read read-only and never rewritten (used by
-    the shared-repo route so listing a clone never dirties its worktree).
-
     *inline_summaries* mirrors ``build_project_list``'s parameter of the same
     name, forwarded to ``_read_accumulated_summary`` as ``compute_on_miss``:
     the shared-repo route has no warm-up engine, so it keeps computing a
-    missing summary inline instead of reporting it pending.
+    missing summary inline instead of reporting it pending. See
+    ``_backfill_and_read_meta`` for the *backfill* rationale.
     """
-    # Lazy backfill: ensure legacy project records have an
-    # ``onboardingCompletedAt`` field so the wizard never auto-opens for
-    # already-onboarded projects. Returns the (possibly updated) info dict
-    # so we can pass the field through to the entry without re-reading.
-    # Projects with runs also heal a null field to the first run's date:
-    # an evaluation happened, so setup is complete (records that predate the
-    # start_evaluation stamp would otherwise show 'Resume setup' forever).
-    project_dir = reports_root / entry_name
-    heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
-    backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
-    info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
-    meta = _extract_project_metadata(info, entry_name)
+    info, meta = _backfill_and_read_meta(reports_root, entry_name, runs, backfill=backfill)
     latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=inline_summaries,
     )

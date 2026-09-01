@@ -6,6 +6,11 @@ Owns the read-side query path for evaluations: ``list``, ``get_status``,
 
 The ``ActionProvider`` methods on ``FilesystemActionProvider`` are 1-line
 delegates to an instance of this class.
+
+Split (Task 14): the status.json readers and the ``RunRow`` -> ``JobSnapshot``
+assembly live in ``_run_status_readers.py``, re-exported here for backward
+compatibility (``_read_dimensions_from_status`` / ``_read_time_limit_from_status``
+are imported directly by tests).
 """
 from __future__ import annotations
 
@@ -18,6 +23,14 @@ from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import is_safe_run_segment
 from quodeq.services.jobs import JobManager
+from quodeq.services._run_status_readers import build_job_snapshot
+from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
+    _read_deadline_from_status,
+    _read_dimensions_from_status,
+    _read_provider_model_from_status,
+    _read_time_limit_from_status,
+    _tail_run_log,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -35,6 +48,43 @@ def _status_json_terminal(run_dir: Path) -> bool:
         return False
     state = data.get("state")
     return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
+
+
+def _merge_internal_jobs(
+    snapshots: list[JobSnapshot], internal_jobs: list[JobSnapshot],
+) -> list[JobSnapshot]:
+    """Merge SQLite-index snapshots with in-memory internal jobs.
+
+    Internal dashboard-spawned jobs always take priority over index rows
+    that project the same on-disk run. The dedup key is (project, run_id)
+    rather than job_id because internal jobs carry bare UUIDs while
+    indexed rows carry "ext-<run_id>" — keying on job_id never matches
+    the two views of the same run and both end up in the merged list.
+
+    'lost' internal jobs are restart placeholders whose subprocess may
+    still be alive: they must not shadow the truthful ext- row derived
+    from the run's own status.json, and when such a row exists the
+    placeholder itself is dropped in its favor.
+    """
+    covered = {
+        (j.output_project, j.output_run_id) for j in internal_jobs
+        if j.output_project and j.output_run_id and j.status != "lost"
+    }
+    row_keys = {
+        (s.output_project, s.output_run_id) for s in snapshots
+        if s.output_project and s.output_run_id
+    }
+    visible_internal = [
+        j for j in internal_jobs
+        if not (
+            j.status == "lost"
+            and (j.output_project, j.output_run_id) in row_keys
+        )
+    ]
+    return [
+        s for s in snapshots
+        if (s.output_project, s.output_run_id) not in covered
+    ] + visible_internal
 
 
 class EvaluationsIndex:
@@ -71,38 +121,11 @@ class EvaluationsIndex:
         finally:
             db.close()
         snapshots = [self._run_row_to_snapshot(r) for r in rows]
-        # Internal dashboard-spawned jobs always take priority over index rows
-        # that project the same on-disk run. The dedup key is (project, run_id)
-        # rather than job_id because internal jobs carry bare UUIDs while
-        # indexed rows carry "ext-<run_id>" — keying on job_id never matches
-        # the two views of the same run and both end up in the merged list.
         try:
             internal_jobs = self._jobs.list_jobs(reports_root=None)
         except (AttributeError, TypeError):
             internal_jobs = []
-        # 'lost' internal jobs are restart placeholders whose subprocess may
-        # still be alive: they must not shadow the truthful ext- row derived
-        # from the run's own status.json, and when such a row exists the
-        # placeholder itself is dropped in its favor.
-        covered = {
-            (j.output_project, j.output_run_id) for j in internal_jobs
-            if j.output_project and j.output_run_id and j.status != "lost"
-        }
-        row_keys = {
-            (s.output_project, s.output_run_id) for s in snapshots
-            if s.output_project and s.output_run_id
-        }
-        visible_internal = [
-            j for j in internal_jobs
-            if not (
-                j.status == "lost"
-                and (j.output_project, j.output_run_id) in row_keys
-            )
-        ]
-        merged = [
-            s for s in snapshots
-            if (s.output_project, s.output_run_id) not in covered
-        ] + visible_internal
+        merged = _merge_internal_jobs(snapshots, internal_jobs)
         if states:
             merged = [s for s in merged if s.status in states]
         merged.sort(key=lambda s: s.started_at or "", reverse=True)
@@ -347,154 +370,4 @@ class EvaluationsIndex:
         return _run_index.open_index(self._index_db_path)
 
     def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
-        logs: list[str] = []
-        dimensions: list[str] | None = None
-        deadline_at: str | None = None
-        ai_provider: str | None = None
-        ai_model: str | None = None
-        time_limit_s: int | None = None
-        if row.run_dir:
-            run_dir_path = Path(row.run_dir)
-            try:
-                logs = _tail_run_log(run_dir_path)
-            except (OSError, ValueError):
-                logs = []
-            try:
-                dimensions = _read_dimensions_from_status(run_dir_path)
-            except (OSError, ValueError):
-                dimensions = None
-            try:
-                deadline_at = _read_deadline_from_status(run_dir_path)
-            except (OSError, ValueError):
-                deadline_at = None
-            try:
-                ai_provider, ai_model = _read_provider_model_from_status(run_dir_path)
-            except (OSError, ValueError):
-                ai_provider, ai_model = None, None
-            try:
-                time_limit_s = _read_time_limit_from_status(run_dir_path)
-            except (OSError, ValueError):
-                time_limit_s = None
-        return JobSnapshot(
-            job_id=row.job_id,
-            status=row.state,
-            command="",
-            started_at=row.started_at,
-            ended_at=row.finalized_at,
-            exit_code=None,
-            logs=logs,
-            output_project=row.project_uuid,
-            output_run_id=row.run_id,
-            phase=row.phase,
-            deadline_at=deadline_at,
-            current_dimension=row.current_dimension,
-            dimensions=dimensions,
-            error=row.exit_reason,
-            source="external" if row.job_id.startswith("ext-") else "internal",
-            exit_reason=row.exit_reason,
-            ai_provider=ai_provider,
-            ai_model=ai_model,
-            time_limit_s=time_limit_s,
-        )
-
-
-def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
-    """Return the last *max_lines* lines from run.log."""
-    log_path = run_dir / "run.log"
-    if not log_path.is_file():
-        return []
-    try:
-        with log_path.open("r", encoding="utf-8", errors="replace") as fp:
-            lines = fp.readlines()
-    except OSError:
-        return []
-    tail = lines[-max_lines:] if len(lines) > max_lines else lines
-    return [line.rstrip("\n") for line in tail]
-
-
-def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
-    """Read the `dimensions` list from status.json, or None if unavailable.
-
-    "All dimensions" runs record an empty list (the raw, unresolved CLI
-    filter is None). The UI fetches per-dim evals from this list, so an
-    empty one blanks the live findings feed for every full scan served via
-    the index. Recover the resolved list from the per-dim sidecars, the
-    same fallback scan_progress uses.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    dims = data.get("dimensions")
-    if not isinstance(dims, list):
-        return None
-    if dims:
-        return dims
-    from quodeq.shared.dim_estimates_io import read_dim_estimates
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
-    recovered: dict[str, None] = {}
-    dim_records = read_dimensions(run_dir).get("dimensions")
-    record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()
-    for key in (*record_keys, *read_dim_estimates(run_dir).keys()):
-        recovered.setdefault(key, None)
-    return list(recovered) if recovered else dims
-
-
-def _read_time_limit_from_status(run_dir: Path) -> int | None:
-    """Read the run budget (`time_limit_s`) from status.json, or None."""
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    raw = data.get("time_limit_s")
-    return raw if isinstance(raw, int) else None
-
-
-def _read_deadline_from_status(run_dir: Path) -> str | None:
-    """Read the `deadline_at` ISO string from status.json, or None.
-
-    External (CLI) runs are not tracked by JobManager so they don't go
-    through the marker-parsing path that sets ``Job.deadline_at``. Reading
-    directly from status.json keeps the dashboard's countdown ticking.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    val = data.get("deadline_at")
-    return val if isinstance(val, str) else None
-
-
-def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
-    """Read (ai_provider, ai_model) from status.json, or (None, None).
-
-    External (CLI) runs aren't tracked by JobManager, so they don't carry
-    provider/model on an in-memory Job. Reading directly from status.json
-    keeps the dashboard's in-progress card self-describing for ext- runs.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return (None, None)
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return (None, None)
-    if not isinstance(data, dict):
-        return (None, None)
-    provider = data.get("ai_provider")
-    model = data.get("ai_model")
-    return (
-        provider if isinstance(provider, str) else None,
-        model if isinstance(model, str) else None,
-    )
+        return build_job_snapshot(row)

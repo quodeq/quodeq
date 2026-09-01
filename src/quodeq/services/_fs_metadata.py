@@ -157,6 +157,53 @@ def _summary_version(
     return version, visible_set
 
 
+def _compute_on_miss_summary(
+    reports_root: Path, entry_name: str, runs: list[RunInfo],
+    params: "ScoringParams", visible_set: set[str], version: str,
+) -> tuple[str | None, float | None, int | None, bool]:
+    """Compute-and-cache branch of ``_read_accumulated_summary``.
+
+    Reached when *compute_on_miss* controls what happens on a cache miss.
+    False (the default, used by the local projects-list path) never computes
+    inline here -- callers only reach this branch via True (the shared-repo
+    route, which has no warm-up engine, keeping the pre-warm-up behavior of
+    computing inline on a miss) or the kill switch
+    (``QUODEQ_DISABLE_SCORE_CACHE``), which always computes inline too since
+    a disabled cache can never be filled by the warm-up engine.
+    """
+    from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
+
+    payload = cached_project_summary(
+        entry_name, version,
+        lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+    )
+    return payload["grade"], payload["score"], payload["files"], False
+
+
+def _read_settled_or_pending_summary(
+    entry_name: str, runs: list[RunInfo], version: str,
+) -> tuple[str | None, float | None, int | None, bool]:
+    """Read-only branch of ``_read_accumulated_summary``.
+
+    Only a project with NO runs at all will never be picked up by the
+    warm-up engine (``warm_project_summary`` has the same empty-runs gate),
+    so a cache miss here would report pending forever -- report it settled
+    instead. A project whose runs are all cancelled/in-progress (no
+    "complete" run) is NOT special-cased here: ``warm_project_summary``
+    computes a fallback grade for it too (cancelled fallback via
+    ``select_default_view_runs``), so its cache must still be consulted
+    below rather than assumed empty forever.
+    """
+    from quodeq.services.score_cache import read_project_summary_cached  # noqa: PLC0415
+
+    if not runs:
+        return None, None, None, False
+    hit = read_project_summary_cached(entry_name, version)
+    if hit is not None:
+        return hit["grade"], hit["score"], hit["files"], False
+    return None, None, None, True
+
+
 def _read_accumulated_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
     params: "ScoringParams | None" = None, *, compute_on_miss: bool = False,
@@ -177,53 +224,18 @@ def _read_accumulated_summary(
     selection is folded into the cache version so toggling a standard
     invalidates the cached card.
 
-    *compute_on_miss* controls what happens on a cache miss. False (the
-    default, used by the local projects-list path) never computes inline: a
-    miss reports ``pending=True`` and leaves the warm-up engine to fill the
-    cache, so first paint after an upgrade never blocks on a full recompute.
-    True (used by the shared-repo route, which has no warm-up engine) keeps
-    the pre-warm-up behavior of computing inline on a miss. The kill switch
-    (``QUODEQ_DISABLE_SCORE_CACHE``) always computes inline too, since a
-    disabled cache can never be filled by the warm-up engine.
-
-    On the read-only path, only a project with NO runs at all is settled
-    (``pending=False`` without a cache lookup) -- ``warm_project_summary``
-    requires at least one run too, so such a project can never be warmed and
-    reporting it pending would be a lie. A project whose runs exist but
-    include no ``complete`` run (cancelled-only, in-progress-only) still gets
-    a cache lookup: ``warm_project_summary`` computes a fallback grade for it
-    via ``select_default_view_runs``' cancelled fallback, so a miss there is
-    genuinely pending, not settled.
+    See ``_compute_on_miss_summary`` and ``_read_settled_or_pending_summary``
+    for the two branches' cache-hit/miss rationale.
     """
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.services.score_cache import (  # noqa: PLC0415
-        cached_project_summary, read_project_summary_cached,
-    )
     from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
     version, visible_set = _summary_version(reports_root, entry_name, runs, params)
     if compute_on_miss or score_cache_disabled():
-        payload = cached_project_summary(
-            entry_name, version,
-            lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
-        )
-        return payload["grade"], payload["score"], payload["files"], False
-    # Read-only branch only: a project with NO runs at all will never be
-    # picked up by the warm-up engine (warm_project_summary has the same
-    # empty-runs gate below), so a cache miss here would report pending
-    # forever -- report it settled instead. A project whose runs are all
-    # cancelled/in-progress (no "complete" run) is NOT special-cased here:
-    # warm_project_summary computes a fallback grade for it too (cancelled
-    # fallback via select_default_view_runs), so its cache must still be
-    # consulted below rather than assumed empty forever.
-    if not runs:
-        return None, None, None, False
-    hit = read_project_summary_cached(entry_name, version)
-    if hit is not None:
-        return hit["grade"], hit["score"], hit["files"], False
-    return None, None, None, True
+        return _compute_on_miss_summary(reports_root, entry_name, runs, params, visible_set, version)
+    return _read_settled_or_pending_summary(entry_name, runs, version)
 
 
 def warm_project_summary(reports_root: Path, entry_name: str) -> None:
