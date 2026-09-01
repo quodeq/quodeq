@@ -2,12 +2,9 @@
 # lines). Do NOT add entries without justification -- the goal is
 # to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_sizes.py --update-baseline
-src/quodeq/_cli_evaluation.py:1:file
-src/quodeq/_cli_evaluation.py:378:function
-src/quodeq/_cli_evaluation.py:467:function
-src/quodeq/_cli_evaluation.py:574:function
-src/quodeq/_cli_resolution.py:1:file
-src/quodeq/_cli_resolution.py:253:function
+src/quodeq/_cli_evaluation.py:161:function
+src/quodeq/_cli_evaluation.py:215:function
+src/quodeq/_cli_resolution.py:203:function
 src/quodeq/api/_import_validation.py:88:function
 src/quodeq/api/_log_stream_routes.py:110:function
 src/quodeq/api/_log_stream_routes.py:135:function

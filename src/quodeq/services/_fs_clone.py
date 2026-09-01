@@ -106,7 +106,7 @@ def run_git_clone(
     ``--shallow-since``): the working copy is evaluated at HEAD and the only
     history consumer is git churn scoring, whose lookback the default window
     covers (see ``config.clone_env.clone_shallow_months``). Branch evaluations
-    against such a clone rely on ``_cli_resolution._fetch_branch`` fetching
+    against such a clone rely on ``_cli_worktree._fetch_branch`` fetching
     the missing branch on demand. Shallow requests the remote cannot satisfy
     (e.g. no commits inside the window) fall back to one full clone. A
     shallow working copy can be completed manually with ``git fetch

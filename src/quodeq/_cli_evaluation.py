@@ -1,8 +1,13 @@
 """Evaluation pipeline execution — config building and running.
 
-Input resolution helpers live in ``_cli_resolution.py``.
-All public names are re-exported by ``quodeq.cli`` so that existing imports
-(including tests) continue to work unchanged.
+Input resolution lives in ``_cli_resolution.py``; run lifecycle (directory
+setup, RunLifecycleContext wiring, cleanup, SARIF export) lives in
+``_cli_lifecycle.py``; suppression-aware score printing lives in
+``_cli_scoring.py``. All public names stay re-exported here (and, in turn,
+by ``quodeq.cli``) — ~15 test files patch ``quodeq._cli_evaluation.<name>``.
+A few re-exports below have no direct caller left here (their callers moved
+out and reach them via a deferred facade lookup on this module) but must
+stay importable as patch targets.
 """
 
 from __future__ import annotations
@@ -11,59 +16,43 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
-import time
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
-from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.dispatch_policy import default_dispatch_policy
-from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
-from quodeq.config.evidence_env import cwe_url_template
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
-from quodeq.core.scoring.params import ScoringParams
-from quodeq.core.types import ScoringResult
+from quodeq.analysis.runner import AnalysisOptions, RunConfig, run
 from quodeq.analysis.scoring_pipeline import run_full
-from quodeq.services.deleted import deleted_keys
-from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
-from quodeq.services.suppression import is_deleted, is_dismissed
+from quodeq.services.evidence_rescore import score_dimension_from_evidence  # noqa: F401 — facade patch target
 from quodeq.services.grade_formula import load_params
-from quodeq.data.fs.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.data.fs.project_resolver import resolve_project_uuid  # noqa: F401 — facade patch target
 from quodeq.shared.logging import log_error, log_info, log_warning
-from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
-from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo, write_text
-from quodeq.data.fs.repo_handler import cleanup_cloned_repo
-from quodeq.analysis._runner_markers import emit_marker
+from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text  # noqa: F401 — is_repo_url/project_name_from_repo/get_ai_model are facade patch targets
+from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # noqa: F401 — facade patch target
+from quodeq.analysis._runner_markers import emit_marker  # noqa: F401 — facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
 from quodeq.analysis.manifest_serialization import manifest_to_dict
-from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
-# Re-export resolution helpers — keep the public API stable
+# Re-export resolution / lifecycle / scoring helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401
-    ResolvedInputs,
-    _build_manifest,
-    _cleanup_worktree,
-    _create_worktree,
-    _filter_manifest_by_scope,
-    _override_manifest_single_file,
-    _resolve_evaluation_inputs,
-    _resolve_language,
-    _resolve_repo,
-    _resolve_scope,
-    _resolve_single_file,
+    ResolvedInputs, _build_manifest, _cleanup_worktree, _create_worktree,
+    _filter_manifest_by_scope, _override_manifest_single_file,
+    _resolve_evaluation_inputs, _resolve_language, _resolve_repo,
+    _resolve_scope, _resolve_single_file,
+)
+from quodeq._cli_lifecycle import (  # noqa: F401
+    _record_deadline_if_hit, _record_provider_fatal_if_cancelled,
+    _run_pipeline_with_cleanup, _setup_run_dirs, _write_sarif_if_requested,
+)
+from quodeq._cli_scoring import (  # noqa: F401
+    _count_excluded_findings, _dim_evidence_counts, _format_adjusted_score, _print_scores,
 )
 
 _logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
 # Environment helpers
-# ---------------------------------------------------------------------------
-
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 _ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
@@ -117,219 +106,14 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
-# ---------------------------------------------------------------------------
-# SARIF export helper
-# ---------------------------------------------------------------------------
-
-def _write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> None:
-    """Write a SARIF file if --sarif was passed. Fail-soft: never raises.
-
-    Called from run_evaluate AFTER the run lifecycle has fully closed, so a
-    failure here can never flip a successful run to failed. The scored reports
-    are already on disk in evaluation_dir.
-    """
-    sarif_path = getattr(args, "sarif", None)
-    if not sarif_path:
-        return
-    try:
-        from quodeq import __version__
-        from quodeq.ci.reporter import load_evaluation_reports
-        from quodeq.ci.sarif import build_sarif
-
-        reports = load_evaluation_reports(evaluation_dir)
-        doc = build_sarif(
-            reports,
-            tool_version=__version__ or "0.0.0+dev",
-            min_severity=getattr(args, "min_severity", None),
-            include_snippets=getattr(args, "with_snippets", False),
-        )
-        out = Path(sarif_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(doc, indent=2), encoding="utf-8")
-        count = sum(len(r["results"]) for r in doc["runs"])
-        log_info(f"Wrote {count} finding(s) to SARIF: {out}")
-    except Exception as exc:  # noqa: BLE001 — fail-soft: SARIF must never sink a scan
-        log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
-
-
-# ---------------------------------------------------------------------------
-# Run directory setup
-# ---------------------------------------------------------------------------
-
-def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Path]:
-    """Resolve project UUID and create evidence/evaluation directories."""
-    import uuid
-
-    reports_root = Path(args.output)
-    reports_root.mkdir(parents=True, exist_ok=True)
-
-    project_name = project_name_from_repo(args.repo)
-    location = "online" if is_repo_url(args.repo) else "local"
-    scope = getattr(args, "scope", None)
-
-    # Detect the git 'origin' remote so two clones of the same repo in
-    # different local paths share a single project identity.
-    remote_url = None
-    if location == "local":
-        from quodeq.data.git_cli import git_remote_url
-        remote_url = git_remote_url(str(src))
-
-    project_uuid = resolve_project_uuid(
-        reports_root,
-        ProjectIdentity(project_name, str(src), None, location, scope_path=scope, remote_url=remote_url),
-    )
-
-    run_id = str(uuid.uuid4())
-    evidence_dir = reports_root / project_uuid / run_id / "evidence"
-    evaluation_dir = reports_root / project_uuid / run_id / "evaluation"
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evaluation_dir.mkdir(parents=True, exist_ok=True)
-    return reports_root, evidence_dir, evaluation_dir
-
-
-# ---------------------------------------------------------------------------
-# Post-scan score printing (suppression-aware)
-# ---------------------------------------------------------------------------
-
-_NUMERIC_SCORE_RE = re.compile(r"^-?\d+(?:\.\d+)?/\d+$")
-
-
-def _count_excluded_findings(
-    run_dir: Path, dim_id: str, dismissed: set[tuple], deleted: set[tuple],
-) -> int:
-    """Count this run's evidence violations for *dim_id* that a dismissal or
-    deletion suppresses.
-
-    Mirrors the exclusion predicates in
-    ``services.evidence_rescore.score_dimension_from_evidence`` so the count
-    matches what the rescore actually drops. Returns 0 when the evidence
-    jsonl is missing, empty, or unparseable — the caller then falls back to
-    the original score line (no evidence to rescore from).
-    """
-    jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
-    if not jsonl.is_file() or jsonl.stat().st_size == 0:
-        return 0
-    # Same standard dirs as the rescore: a quarantined finding never entered
-    # the grade, so a dismissal targeting it must not count as an exclusion.
-    compiled_dir, evaluators_dir = standard_dirs()
-    try:
-        evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
-            language="", repository="", date_str="",
-            source_file_count=0, files_read=0,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
-            req_map_reader=read_req_to_principle_map,
-            refs_reader=load_compiled_refs,
-            cwe_url_template=cwe_url_template(),
-            on_quarantine=log_quarantined_findings,
-            on_malformed_line=log_malformed_jsonl_line)
-    except (OSError, ValueError, KeyError):
-        return 0
-    if evidence is None:
-        return 0
-
-    count = 0
-    for pe in evidence.principles.values():
-        for v in pe.violations:
-            if is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
-                            file=v.get("file"), line=v.get("line")) \
-                    or is_deleted(deleted, dimension=dim_id,
-                                  principle=pe.practice_id, file=v.get("file")):
-                count += 1
-    return count
-
-
-def _dim_evidence_counts(evaluation_dir: Path, dim_id: str) -> tuple[int, int]:
-    """Read (sourceFileCount, filesRead) from a dimension's just-written report JSON.
-
-    Falls back to (0, 0) when the report is missing or unparseable.
-    """
-    try:
-        data = json.loads((evaluation_dir / f"{dim_id}.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return 0, 0
-    return int(data.get("sourceFileCount") or 0), int(data.get("filesRead") or 0)
-
-
-def _format_adjusted_score(original: str, result: ScoringResult) -> str | None:
-    """Format *result*'s overall value to match *original*'s numeric-vs-grade shape.
-
-    Returns None when no adjusted value is available, so the caller falls
-    back to the original line.
-    """
-    overall = result.overall
-    if overall is None:
-        return None
-    if _NUMERIC_SCORE_RE.match(original):
-        if overall.weighted_score is None:
-            return None
-        denom = original.rsplit("/", 1)[1]
-        return f"{overall.weighted_score}/{denom}"
-    return overall.grade or overall.weighted_grade
-
-
-def _print_scores(
-    scores: dict[str, str], run_dir: Path, project_dir: Path, params: ScoringParams,
-) -> None:
-    """Print each dimension's score, noting any dismissed/deleted findings excluded.
-
-    With no active dismissals or deletions for the project, this is
-    byte-identical to the historical ``  {dim}: {score}`` line — the common
-    case. When a dimension's just-scanned evidence has one or more matching
-    suppressions, prints the evidence-based rescore instead (the same basis
-    the dashboard rescore uses — see ``services/evidence_rescore.py``), with
-    a suffix noting how many findings were excluded. Dimensions with no
-    matching suppression, or with evidence too old/missing to rescore from,
-    fall back to the original line unchanged.
-    """
-    if not scores:
-        return
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-    if not dismissed and not deleted:
-        for dim, score in scores.items():
-            print(f"  {dim}: {score}")
-        return
-
-    evaluation_dir = run_dir / "evaluation"
-    for dim, score in scores.items():
-        excluded = _count_excluded_findings(run_dir, dim, dismissed, deleted)
-        if excluded <= 0:
-            print(f"  {dim}: {score}")
-            continue
-        source_file_count, files_read = _dim_evidence_counts(evaluation_dir, dim)
-        try:
-            result = score_dimension_from_evidence(
-                run_dir, dim,
-                dismissed=dismissed, deleted=deleted,
-                source_file_count=source_file_count, files_read=files_read,
-                params=params,
-            )
-            adjusted = _format_adjusted_score(score, result) if result is not None else None
-        except Exception as exc:  # noqa: BLE001 — this is a console embellishment
-            # on top of reports already written to disk; a scoring-engine edge
-            # case here must never crash an otherwise-successful scan's exit
-            # path (nothing upstream catches a generic exception -- see
-            # _run_pipeline_with_cleanup, which only catches AnalysisError/
-            # EvaluationError). Fall back to the original line instead.
-            _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
-            adjusted = None
-        if adjusted is None:
-            print(f"  {dim}: {score}")
-            continue
-        print(f"  {dim}: {adjusted} ({excluded} dismissed findings excluded)")
-
-
-# ---------------------------------------------------------------------------
 # Pipeline execution
-# ---------------------------------------------------------------------------
-
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
     """Execute the evidence/scoring pipeline and print results.
 
-    Three modes:
-    - scoring (default): run_full → scored evaluation/<dim>.json reports
-    - --evidence-only: run() → merged <language>_evidence.json, no scoring
-    - PR diff (skip_scoring): run() → per-dimension JSONL only, no merged json, no scoring
+    Three modes: scoring (default, run_full → scored evaluation/<dim>.json
+    reports), --evidence-only (run() → merged <language>_evidence.json, no
+    scoring), PR diff / skip_scoring (run() → per-dimension JSONL only, no
+    merged json, no scoring).
 
     Domain errors (AnalysisError, EvaluationError) are intentionally *not*
     caught here — they propagate to _run_pipeline_with_cleanup so that
@@ -341,9 +125,8 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
         log_info(f"Starting {label} (this may take several minutes per dimension)...")
         evidence = run(config)
         if config.options.skip_scoring:
-            # PR diff mode: per-dimension JSONL is already written by the
-            # pipeline. No merged whole-repo artifact — PR reviews consume
-            # the JSONL directly via `ci report --from-evidence`.
+            # PR diff mode: per-dimension JSONL is already written by the pipeline.
+            # No merged whole-repo artifact — PR reviews consume the JSONL directly.
             log_info(f"PR diff evaluation complete — evidence written to {evidence_dir}/")
         else:
             # --evidence-only: write the merged whole-repo Evidence JSON.
@@ -429,153 +212,9 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     )
 
 
-def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
-    """Tag the lifecycle with exit_reason='deadline' if the run's
-    --max-duration was reached before natural completion.
-
-    The loops at ``analysis/_loops.py:156, 273`` break out of dim iteration
-    silently when ``time.monotonic() >= deadline_at`` — they don't raise.
-    Without this hook, a deadline-truncated run finalizes with
-    ``exit_reason=null``, indistinguishable from a clean completion. The
-    dashboard then can't render the "Partial" badge.
-    """
-    deadline_at = getattr(getattr(config, "options", None), "deadline_at", None)
-    if not isinstance(deadline_at, (int, float)):
-        return
-    if time.monotonic() >= deadline_at:
-        lifecycle.set_exit_reason("deadline")
-
-
-def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
-    """Tag a completed run that a dead provider cut short.
-
-    ``_raise_on_fatal_cancel`` lets the pipeline finish when files were
-    already analysed before the provider died (partial data is worth
-    keeping). Without this hook such a run finalizes with
-    ``exit_reason=null``, indistinguishable from a clean completion, and
-    the UI can't warn that the results are partial. Runs after the
-    deadline hook so the provider failure, being the actual cause, wins.
-    """
-    from quodeq.shared import cancellation
-    reason = cancellation.cancel_reason() or ""
-    if reason.startswith("provider_fatal"):
-        lifecycle.set_exit_reason("provider_fatal")
-    elif reason == "agent_failure_streak":
-        lifecycle.set_exit_reason("failure_streak")
-
-
-def _run_pipeline_with_cleanup(
-    args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
-) -> int:
-    """Set up directories, build config, run the pipeline, and clean up cloned repos."""
-    _reports_root, evidence_dir, evaluation_dir = paths
-    log_info(f"Report path: {evaluation_dir}")
-    run_dir = evaluation_dir.parent
-    run_id = run_dir.name
-    project_uuid = run_dir.parent.name
-    emit_marker("report_path", project=project_uuid, runId=run_id)
-    _save_manifest(inputs.manifest, evidence_dir)
-
-    # Write a .pid file so the dashboard can detect and cancel this external run
-    pid_file = run_dir / ".pid"
-    try:
-        pid_file.write_text(str(os.getpid()), encoding="utf-8")
-    except OSError:
-        pass  # non-fatal; cancel-by-filesystem just won't work for this run
-
-    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir, run_dir=run_dir)
-
-    # Install a per-run log handler so every log_info lands in run.log.
-    from quodeq.shared.run_log import RunLogHandler, RunLogWriter
-    writer = RunLogWriter(run_dir)
-    handler = RunLogHandler(writer)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    _logger_root = logging.getLogger("quodeq")
-    _logger_root.addHandler(handler)
-
-    # Resolve dimensions list for status.json metadata.
-    # Defensively coerce to a real list — config may be a Mock in tests.
-    _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
-    dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
-
-    try:
-        # Lifecycle context: pending → running on enter, done on clean exit,
-        # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
-        try:
-            ai_provider = get_ai_cmd()
-            ai_model = get_ai_model()
-            with RunLifecycleContext(
-                run_dir=run_dir,
-                job_id=f"ext-{run_id}",
-                dimensions=dimensions_list,
-                ai_provider=ai_provider,
-                ai_model=ai_model,
-            ) as lifecycle:
-                try:
-                    # Mark the pipeline as actively analyzing so dashboard
-                    # clients begin polling per-dimension partial results
-                    # (the UI gates dim-polling on phase in
-                    # {analyzing, scoring}).
-                    lifecycle.set_phase("analyzing")
-                    # Record the run-level deadline so the dashboard countdown
-                    # has it (visible immediately in status.json and SSE).
-                    # Resolve from CLI args OR env vars — dashboard runs pass
-                    # QUODEQ_TIME_LIMIT via env, not the CLI flag.
-                    budget_s = _resolve_time_limit(args)
-                    if budget_s is not None:
-                        # Persist the budget itself (0 = unlimited) so
-                        # index-served snapshots can surface it.
-                        lifecycle.set_time_limit(budget_s)
-                    if budget_s is not None and budget_s > 0:
-                        from datetime import datetime, timedelta, timezone
-                        deadline_iso = (
-                            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
-                        ).isoformat()
-                        lifecycle.set_deadline(deadline_iso)
-                        # Let the pool auto-scale push the deadline outward
-                        # in status.json too, so the dashboard countdown and
-                        # exit-reason labeling track the granted budget.
-                        config.options.on_deadline_extended = lifecycle.set_deadline
-                    result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-                    # If the loops broke out on --max-duration, the pipeline
-                    # returns cleanly with no exception. Tag the lifecycle so
-                    # the dashboard can distinguish a deadline-truncated run
-                    # from a clean completion (exit_reason=null vs "deadline").
-                    _record_deadline_if_hit(lifecycle, config)
-                    _record_provider_fatal_if_cancelled(lifecycle)
-                    # run_full writes per-dimension reports as each dimension
-                    # completes, so by the time it returns scoring is already
-                    # done. Record the last pre-finalize phase as "scoring"
-                    # so the UI shows a sensible state even if the process
-                    # lingers briefly before transition_to_finalizing.
-                    lifecycle.set_phase("scoring")
-                    lifecycle.transition_to_finalizing()
-                    return result
-                finally:
-                    # Clean up .pid file on exit so we don't leave stale PIDs
-                    try:
-                        pid_file.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-                    if is_repo_url(args.repo):
-                        cleanup_cloned_repo(str(inputs.src))
-                    if inputs.worktree_dir and inputs.worktree_origin:
-                        _cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
-        except (AnalysisError, EvaluationError) as exc:
-            # RunLifecycleContext.__exit__ has already written state=failed.
-            # Map the domain error to exit code 1.
-            log_error(f"{exc}")
-            return 1
-    finally:
-        _logger_root.removeHandler(handler)
-        writer.close()
-
-
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
-    # --incremental is a deprecated no-op alias; emit a warning so external
-    # scripts have notice to migrate. The default behaviour already does
-    # what --incremental used to mean.
+    # --incremental is a deprecated no-op alias; incremental is already the default.
     if getattr(args, "legacy_incremental", False):
         log_warning(
             "--incremental is deprecated and will be removed in the next release. "
@@ -602,10 +241,9 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if inputs is None:
         return 1
 
-    # Resolve --diff-from here (not inside _build_run_config) so a
-    # DiffResolveError fails fast before any run directory is created.
-    # This keeps the lifecycle contract: once a run dir exists, its state
-    # is always written by RunLifecycleContext.
+    # Resolve --diff-from here (not inside _build_run_config) so a DiffResolveError
+    # fails fast before any run directory is created — once a run dir exists, its
+    # state is always written by RunLifecycleContext.
     diff_from = getattr(args, "diff_from", None)
     if diff_from:
         try:
@@ -625,24 +263,20 @@ def run_evaluate(args: argparse.Namespace) -> int:
         raise
     result = _run_pipeline_with_cleanup(args, inputs, paths)
     _, _evidence_dir, evaluation_dir = paths
-    # --diff-from / --evidence-only produce no scored reports: nothing to
-    # export and nothing consolidated into the Overview.
+    # --diff-from / --evidence-only produce no scored reports: nothing to export.
     no_scored_reports = bool(
         getattr(args, "diff_from", None) or getattr(args, "evidence_only", False)
     )
-    # Fail-soft consolidation pass, OUTSIDE the run lifecycle (it has fully
-    # closed by now), so a failure here can never flip the run state. Marks
-    # this run's cache entries consolidated so the NEXT run replays their
-    # findings as carried forward. Gated internally on status.json reading
-    # "done", which is why a run cancelled with "keep findings", a failed
-    # run, and a killed process all leave their entries unconsolidated and
-    # their findings still read as new in the live feed.
+    # Fail-soft consolidation pass, OUTSIDE the run lifecycle (already closed), so a
+    # failure here can never flip the run state. Marks this run's cache entries
+    # consolidated so the NEXT run replays their findings as carried forward; gated
+    # internally on status.json reading "done" (a cancelled/failed/killed run leaves
+    # entries unconsolidated, so their findings still read as new in the live feed).
     if not no_scored_reports:
         from quodeq.analysis.cache.consolidation import mark_run_consolidated
         mark_run_consolidated(evaluation_dir.parent)
-    # Fail-soft SARIF export, OUTSIDE the run lifecycle (it has fully closed by
-    # now), only on success and only when scored reports exist. A SARIF error
-    # here can never flip the run state.
+    # Fail-soft SARIF export, OUTSIDE the run lifecycle, only on success and only
+    # when scored reports exist. A SARIF error here can never flip the run state.
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         _write_sarif_if_requested(args, evaluation_dir)
     return result
@@ -654,9 +288,9 @@ def run_diff_evaluation(
 ) -> int:
     """Typed entry for CI review: evaluate *src* diffed against *base_ref*.
 
-    The argv round-trip through the real parser stays inside the CLI
-    package, so parser defaults remain single-sourced and callers (ci/)
-    never fabricate presentation-layer input.
+    The argv round-trip through the real parser stays inside the CLI package,
+    so parser defaults remain single-sourced and callers (ci/) never
+    fabricate presentation-layer input.
     """
     argv = ["evaluate", src, "--diff-from", base_ref, "--output", str(output_dir),
             "--time-limit", str(time_limit)]
