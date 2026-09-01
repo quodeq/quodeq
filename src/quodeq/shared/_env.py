@@ -5,6 +5,10 @@ filesystem-path, sqlite-DB, and embedding accessors live in the four
 siblings below and are re-exported so every existing import path
 (``from quodeq.shared._env import <name>``, including this project-wide
 fan-in's many call sites) keeps working unchanged.
+
+``_sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
+defined here) so ``_env_paths.py``/``_env_db.py`` can import it without a
+cycle back through this module -- see that module's docstring.
 """
 from __future__ import annotations
 
@@ -12,17 +16,7 @@ import logging
 import os
 
 from quodeq.shared._config import _get_config
-
-
-def _sanitized_env_path(raw: str) -> str:
-    """Normalize an operator-supplied filesystem path from an env var.
-
-    Env vars are the operator's own trust domain, but expanduser + abspath
-    (which collapses '.' and '..' segments) keeps a stray relative or '~'
-    value from resolving somewhere surprising at use time, and gives every
-    consumer one canonical absolute form.
-    """
-    return os.path.abspath(os.path.expanduser(raw))
+from quodeq.shared._env_sanitize import _sanitized_env_path  # noqa: F401 — re-export
 
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:

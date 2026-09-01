@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from quodeq.shared._env import _sanitized_env_path
+from quodeq.shared._env_sanitize import _sanitized_env_path
 
 _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
 
