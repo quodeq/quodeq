@@ -25,36 +25,43 @@ EMPTY_ESTIMATES_PAYLOAD = {
 }
 
 
-def project_estimates_payload(
-    project_dir: Path, requested: list[str] | None, clean_scan: bool,
-) -> dict:
-    """Compute read-only pre-run estimates for a project.
+def _resolve_repo_source(project_dir: Path) -> tuple[Path, str | None] | None:
+    """Resolve the project's source path and scope from repository_info.json.
 
-    Mirrors run-start input resolution (language detection, manifest build,
-    dimension resolution via ``load_analysis_context``) without creating a
-    run or writing anything to disk. Any resolution failure degrades to the
-    zeros payload instead of an error: a project that was never scanned
-    simply has nothing to estimate.
+    Returns None when the info file is missing/unreadable or the recorded
+    path no longer exists, signalling the caller to degrade to zeros.
     """
     info_path = project_dir / "repository_info.json"
     try:
         info = json.loads(info_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return dict(EMPTY_ESTIMATES_PAYLOAD)
+        return None
     src = Path(info.get("path") or "")
     if not info.get("path") or not src.is_dir():
-        return dict(EMPTY_ESTIMATES_PAYLOAD)
+        return None
+    return src, info.get("scopePath") or None
 
+
+def _build_estimate_config(
+    src: Path,
+    scope_path: str | None,
+    requested: list[str] | None,
+    clean_scan: bool,
+) -> RunConfig | None:
+    """Build the RunConfig used to compute estimates, mirroring run start.
+
+    Returns None when detection/dimensions data isn't available yet or
+    language detection fails, signalling the caller to degrade to zeros.
+    """
     paths = default_paths()
     if not paths.detection_file.exists() or not paths.dimensions_file.exists():
-        return dict(EMPTY_ESTIMATES_PAYLOAD)
+        return None
     try:
         language = detect_language(src, paths.detection_file)
         dims_data = load_universal_dimensions(paths.dimensions_file)
     except ValueError:
-        return dict(EMPTY_ESTIMATES_PAYLOAD)
+        return None
 
-    scope_path = info.get("scopePath") or None
     detection = read_json(paths.detection_file)
     disciplines_conf = paths.disciplines_conf if paths.disciplines_conf.exists() else None
     manifest = build_manifest(src, detection, disciplines_conf, scope_path=scope_path)
@@ -64,7 +71,7 @@ def project_estimates_payload(
         manifest = _filter_manifest_by_scope(manifest, scope_path)
 
     standards_dir = paths.standards_dir
-    config = RunConfig(
+    return RunConfig(
         src=src,
         language=language,
         standards_dir=standards_dir if standards_dir.exists() else None,
@@ -76,21 +83,18 @@ def project_estimates_payload(
         dispatch=default_dispatch_policy(),
     )
 
-    try:
-        # load_analysis_context filters unknown requested dimensions the
-        # same way run start does; ValueError means none were valid.
-        dimensions, _ctx = load_analysis_context(config)
-        estimates = compute_dim_estimates(config, dimensions)
-    except (OSError, ValueError, KeyError, RuntimeError):
-        return dict(EMPTY_ESTIMATES_PAYLOAD)
 
-    # Only per-dim counts exist here (no per-file identity), so the
-    # project-wide numbers are per-dim-consistent aggregates: every dim
-    # enumerates the same dispatchable file set, so ``total`` agrees
-    # across dims and ``count`` differs only by per-dim cache state.
-    # projectFiles/changedFiles are the per-dim maxima and cachedFiles
-    # the complement, matching how scan_progress reports per-dim totals
-    # rather than a deduped cross-dim file set.
+def _aggregate_project_totals(estimates: dict) -> dict:
+    """Aggregate per-dim estimate counts into the project-wide totals payload.
+
+    Only per-dim counts exist here (no per-file identity), so the
+    project-wide numbers are per-dim-consistent aggregates: every dim
+    enumerates the same dispatchable file set, so ``total`` agrees across
+    dims and ``count`` differs only by per-dim cache state.
+    projectFiles/changedFiles are the per-dim maxima and cachedFiles the
+    complement, matching how scan_progress reports per-dim totals rather
+    than a deduped cross-dim file set.
+    """
     project_files = max((e["total"] for e in estimates.values()), default=0)
     changed_files = max((e["count"] for e in estimates.values()), default=0)
     cached_files = max(0, project_files - changed_files)
@@ -100,3 +104,34 @@ def project_estimates_payload(
         "cachedFiles": cached_files,
         "changedFiles": changed_files,
     }
+
+
+def project_estimates_payload(
+    project_dir: Path, requested: list[str] | None, clean_scan: bool,
+) -> dict:
+    """Compute read-only pre-run estimates for a project.
+
+    Mirrors run-start input resolution (language detection, manifest build,
+    dimension resolution via ``load_analysis_context``) without creating a
+    run or writing anything to disk. Any resolution failure degrades to the
+    zeros payload instead of an error: a project that was never scanned
+    simply has nothing to estimate.
+    """
+    resolved = _resolve_repo_source(project_dir)
+    if resolved is None:
+        return dict(EMPTY_ESTIMATES_PAYLOAD)
+    src, scope_path = resolved
+
+    config = _build_estimate_config(src, scope_path, requested, clean_scan)
+    if config is None:
+        return dict(EMPTY_ESTIMATES_PAYLOAD)
+
+    try:
+        # load_analysis_context filters unknown requested dimensions the
+        # same way run start does; ValueError means none were valid.
+        dimensions, _ctx = load_analysis_context(config)
+        estimates = compute_dim_estimates(config, dimensions)
+    except (OSError, ValueError, KeyError, RuntimeError):
+        return dict(EMPTY_ESTIMATES_PAYLOAD)
+
+    return _aggregate_project_totals(estimates)

@@ -113,13 +113,20 @@ class LaunchPoolParams:
     all_files: list[str] | None = None
 
 
-def _launch_pool(
+def _resolve_pool_budget(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
-    *, env: dict[str, str] | None = None,
-) -> tuple[Any, list[Any]]:
-    """Create and run a SubagentPool, returning its results."""
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model(env) or config.options.ai_model
+    env: dict[str, str] | None,
+) -> int:
+    """Resolve this pool's effective time limit and ratchet the run deadline.
+
+    Must run BEFORE `_build_pool_config`: the pool snapshots deadline_at,
+    and every deadline consumer (watchdog, drain checks, dashboard
+    countdown) must agree on the granted budget, not the pre-scale one.
+    Only the AUTO-SCALED budget may ratchet the deadline. An explicit
+    time_limit is a run-wide HARD CAP: extending it here handed every
+    dim's pool a fresh full budget, so a 1h run kept running for
+    "1h after the LAST dim launch" (observed: run 838d807e).
+    """
     queue_size = len(params.all_files) if params.all_files is not None else 0
     time_limit = _resolve_time_limit(config.options.time_limit, queue_size)
     base_user_budget = config.options.time_limit if config.options.time_limit is not None else DEFAULT_TIME_LIMIT
@@ -128,16 +135,19 @@ def _launch_pool(
             f"  [{dim_id}] Time limit auto-scaled: {base_user_budget}s → {time_limit}s"
             f" for {queue_size} files"
         )
-    # Must happen BEFORE base_ac is built: the pool snapshots deadline_at,
-    # and every deadline consumer (watchdog, drain checks, dashboard
-    # countdown) must agree on the granted budget, not the pre-scale one.
-    # Only the AUTO-SCALED budget may ratchet the deadline. An explicit
-    # time_limit is a run-wide HARD CAP: extending it here handed every
-    # dim's pool a fresh full budget, so a 1h run kept running for
-    # "1h after the LAST dim launch" (observed: run 838d807e).
     if config.options.time_limit is None:
         _extend_run_deadline(config.options, time_limit)
-    base_ac = AnalysisConfig(
+    return time_limit
+
+
+def _build_pool_config(
+    config: RunConfig, dim_id: str, params: LaunchPoolParams,
+    time_limit: int, env: dict[str, str] | None,
+) -> AnalysisConfig:
+    """Build the per-launch AnalysisConfig for this pool."""
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    subagent_model = config.options.subagent_model or _default_subagent_model(env) or config.options.ai_model
+    return AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
         max_turns=config.options.max_turns,
@@ -151,6 +161,15 @@ def _launch_pool(
         run_config=config,
         dimension=dim_id,
     )
+
+
+def _launch_pool(
+    config: RunConfig, dim_id: str, params: LaunchPoolParams,
+    *, env: dict[str, str] | None = None,
+) -> tuple[Any, list[Any]]:
+    """Create and run a SubagentPool, returning its results."""
+    time_limit = _resolve_pool_budget(config, dim_id, params, env)
+    base_ac = _build_pool_config(config, dim_id, params, time_limit, env)
     n_agents = config.options.max_subagents
 
     # Skip scout mode for providers without per-token billing (e.g. Codex with

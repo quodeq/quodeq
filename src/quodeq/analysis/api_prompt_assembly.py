@@ -73,19 +73,10 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
     return "\n\n".join(parts)
 
 
-def _format_shape_block(
-    shape: ProjectShape, trust_model: TrustModel | None = None,
-) -> str:
-    """Render a project briefing for the LLM, or empty when nothing is known.
-
-    A declared trust model is briefed even when shape detection returned
-    UNKNOWN: detection is a guess, the declaration is the team telling us the
-    answer, and suppressing it would waste the only reliable signal we have.
-    """
-    relaxing = trust_model is not None and (
-        trust_model.relaxes_remote() or not trust_model.multi_tenant)
-    if shape.deployment is Deployment.UNKNOWN and not relaxing:
-        return ""
+def _build_shape_summary_parts(
+    shape: ProjectShape, trust_model: TrustModel | None,
+) -> list[str]:
+    """Build the `key=value` summary fragments for a project-shape briefing."""
     parts: list[str] = []
     if shape.deployment is not Deployment.UNKNOWN:
         parts.append(f"deployment={shape.deployment.value}")
@@ -99,31 +90,41 @@ def _format_shape_block(
         parts.append(f"web_frameworks={'+'.join(shape.web_frameworks)}")
     if shape.ui_lang:
         parts.append(f"ui={shape.ui_lang}")
-    summary = ", ".join(parts)
+    return parts
 
-    note = ""
+
+def _deployment_note(shape: ProjectShape) -> str:
+    """Return a deployment-specific caveat for the LLM, or "" when none applies."""
     if shape.deployment is Deployment.DESKTOP and shape.is_single_user:
-        note = (
+        return (
             " This is a single-user desktop tool, not a hosted multi-tenant"
             " service. Treat findings about thread blocking, distributed"
             " state, concurrent callers, and rate limiting with skepticism."
         )
-    elif shape.deployment is Deployment.LIBRARY:
-        note = (
+    if shape.deployment is Deployment.LIBRARY:
+        return (
             " This is a library, not an end-user application. API stability"
             " and backwards compatibility matter more than user-facing UX."
         )
-    elif shape.deployment is Deployment.CLI and shape.is_single_user:
-        note = (
+    if shape.deployment is Deployment.CLI and shape.is_single_user:
+        return (
             " This is a single-user CLI, not a hosted service. Concurrent"
             " caller and multi-tenant findings rarely apply."
         )
-    # Both notes below mirror scope_gate.py's own two rules, deliberately at
-    # the same preconditions, so the prompt never advises something the
-    # deterministic gate would not also do. Neither ever tells the model a
-    # category "does not apply" -- that invites the model to omit the
-    # finding, which is unrecoverable, unlike a severity cap. Always report;
-    # only the severity guidance changes.
+    return ""
+
+
+def _trust_relaxation_notes(trust_model: TrustModel | None) -> str:
+    """Return trust-relaxation caveats for the LLM, or "" when none apply.
+
+    Both notes below mirror scope_gate.py's own two rules, deliberately at
+    the same preconditions, so the prompt never advises something the
+    deterministic gate would not also do. Neither ever tells the model a
+    category "does not apply" -- that invites the model to omit the
+    finding, which is unrecoverable, unlike a severity cap. Always report;
+    only the severity guidance changes.
+    """
+    note = ""
     if trust_model is not None and trust_model.relaxes_remote():
         note += (
             " No untrusted party can open a socket to this process. For a"
@@ -141,6 +142,24 @@ def _format_shape_block(
             " finding whose only issue is reaching another user's data, still"
             " report it, at `minor` instead of `major`. Do not omit it."
         )
+    return note
+
+
+def _format_shape_block(
+    shape: ProjectShape, trust_model: TrustModel | None = None,
+) -> str:
+    """Render a project briefing for the LLM, or empty when nothing is known.
+
+    A declared trust model is briefed even when shape detection returned
+    UNKNOWN: detection is a guess, the declaration is the team telling us the
+    answer, and suppressing it would waste the only reliable signal we have.
+    """
+    relaxing = trust_model is not None and (
+        trust_model.relaxes_remote() or not trust_model.multi_tenant)
+    if shape.deployment is Deployment.UNKNOWN and not relaxing:
+        return ""
+    summary = ", ".join(_build_shape_summary_parts(shape, trust_model))
+    note = _deployment_note(shape) + _trust_relaxation_notes(trust_model)
     return f"## Project Shape\n\n**{summary}**.{note}"
 
 

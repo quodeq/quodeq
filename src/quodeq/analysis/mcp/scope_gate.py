@@ -110,60 +110,72 @@ def _prose(finding: dict) -> str:
     return " ".join(str(finding.get(k) or "") for k in ("reason", "w"))
 
 
+def _cross_principal_rule_applies(model: TrustModel, req: str | None, prose: str) -> bool:
+    """True when rule 2 (cross-principal) relaxes a finding under *model*.
+
+    Both axes are required, not just ``multi_tenant``. ``multi_tenant=False``
+    only says there is no SECOND user whose data could be reached -- it says
+    nothing about whether a stranger can reach the process at all. S-AUT-10
+    also covers "Authorization checks MUST be enforced on every request", so
+    a public-facing single-user service with a missing authz check is still
+    genuinely vulnerable: the attacker is an unauthenticated stranger, not a
+    second tenant. Without ``relaxes_remote()`` here, this waiver would
+    silently evaporate the moment the app becomes network-exposed, the same
+    failure shape that got the old remote-ingress rule deleted (see the
+    comment below ``_CROSS_PRINCIPAL_REQS``).
+
+    The tenancy check alone is not enough either, which is why a provenance
+    check joins it. "Another user's session" is ambiguous: it can describe a
+    genuine second-tenant read (impossible once ``multi_tenant`` is False)
+    OR it can describe an unauthenticated stranger reaching the SAME single
+    user's own session -- still live on a loopback bind via browser CSRF or
+    DNS rebinding -- when the finding also names how that stranger gets in
+    (e.g. "query parameter"). The cross-principal phrasing cannot tell those
+    two readings apart; ``names_external_source`` can, because it reads the
+    ingress term instead of the relationship term. So both a tenancy check
+    (rules out reading #1) and a provenance check (rules out reading #2) are
+    required before this rule may relax anything.
+
+    ``names_operator_source`` is deliberately NOT added alongside it: argv
+    and the environment are the operator's own inputs, set by whoever
+    launches the process, and carry no attacker reading here even when the
+    finding's premise is cross-principal.
+    """
+    return bool(
+        not model.multi_tenant and model.relaxes_remote()
+        and req in _CROSS_PRINCIPAL_REQS
+        and _CROSS_PATTERN.search(prose)
+        and not names_external_source(prose)
+    )
+
+
+def _sourceless_path_rule_applies(model: TrustModel, req: str | None, prose: str) -> bool:
+    """True when rule 1 (sourceless path/key) relaxes a finding under *model*."""
+    if not model.relaxes_remote():
+        return False
+    return (req in _PATH_REQS
+            and not names_external_source(prose)
+            and not names_operator_source(prose))
+
+
 def _matched_rule(finding: dict, model: TrustModel) -> str | None:
     """Return the rule name that would relax *finding* under *model*, or
     ``None``. Pure evidence check -- independent of the finding's CURRENT
     severity, so :func:`apply_scope_gate` can reuse it both to decide whether
     to downgrade a major finding and to decide whether a marker on an
     already-minor finding is still earned.
+
+    Rule 2 (cross-principal) is checked first: a named cross-principal
+    concept is more specific evidence than the absence of a source, and
+    would otherwise be masked by rule 1 (sourceless path/key).
     """
     req = finding.get("req")
     prose = _prose(finding)
 
-    # Rule 2 first: a named cross-principal concept is more specific evidence
-    # than the absence of a source, and would otherwise be masked by rule 1.
-    #
-    # Both axes are required, not just ``multi_tenant``. ``multi_tenant=False``
-    # only says there is no SECOND user whose data could be reached -- it says
-    # nothing about whether a stranger can reach the process at all. S-AUT-10
-    # also covers "Authorization checks MUST be enforced on every request", so
-    # a public-facing single-user service with a missing authz check is still
-    # genuinely vulnerable: the attacker is an unauthenticated stranger, not a
-    # second tenant. Without ``relaxes_remote()`` here, this waiver would
-    # silently evaporate the moment the app becomes network-exposed, the same
-    # failure shape that got the old remote-ingress rule deleted (see the
-    # comment below ``_CROSS_PRINCIPAL_REQS``).
-    #
-    # The tenancy check alone is not enough either, which is why a provenance
-    # check joins it. "Another user's session" is ambiguous: it can describe a
-    # genuine second-tenant read (impossible once ``multi_tenant`` is False)
-    # OR it can describe an unauthenticated stranger reaching the SAME single
-    # user's own session -- still live on a loopback bind via browser CSRF or
-    # DNS rebinding -- when the finding also names how that stranger gets in
-    # (e.g. "query parameter"). The cross-principal phrasing cannot tell those
-    # two readings apart; ``names_external_source`` can, because it reads the
-    # ingress term instead of the relationship term. So both a tenancy check
-    # (rules out reading #1) and a provenance check (rules out reading #2) are
-    # required before this rule may relax anything.
-    #
-    # ``names_operator_source`` is deliberately NOT added alongside it: argv
-    # and the environment are the operator's own inputs, set by whoever
-    # launches the process, and carry no attacker reading here even when the
-    # finding's premise is cross-principal.
-    if (not model.multi_tenant and model.relaxes_remote()
-            and req in _CROSS_PRINCIPAL_REQS
-            and _CROSS_PATTERN.search(prose)
-            and not names_external_source(prose)):
+    if _cross_principal_rule_applies(model, req, prose):
         return "cross_principal"
-
-    if not model.relaxes_remote():
-        return None
-
-    if (req in _PATH_REQS
-            and not names_external_source(prose)
-            and not names_operator_source(prose)):
+    if _sourceless_path_rule_applies(model, req, prose):
         return "sourceless_path"
-
     return None
 
 
@@ -216,6 +228,44 @@ def _restore(finding: dict, marker: object) -> bool:
     return True
 
 
+def _restore_or_clear_stale_marker(
+    finding: dict, model: TrustModel | None, marker: object, severity: object,
+) -> bool | None:
+    """Handle a finding already carrying a ``scope_downgrade`` marker.
+
+    Returns True/False when it fully decides ``apply_scope_gate``'s return
+    value (a marker on a currently-minor finding, checked against *model*);
+    returns None when the forward direction still needs evaluating (no
+    marker, or the finding isn't minor) -- though as a side effect it may
+    have cleared a marker that has gone stale on a non-minor finding.
+
+    A finding already carrying the marker is checked against *model* first
+    (see the module docstring's SYMMETRIC section): if the marker's rule no
+    longer fires, its pre-gate severity is restored and the marker removed.
+    When ``model is None`` (no resolved trust model -- e.g. an unwired call
+    site) the marker is left exactly as it is: absence of information must
+    never move a score in either direction, the same no-regression guarantee
+    :data:`quodeq.context.trust_model.CONSERVATIVE` gives the forward
+    direction.
+
+    A marker surviving on a finding that is not (or is no longer) minor is
+    stale: it documents a cap this gate is not currently enforcing, and left
+    in place it would render in the UI as "capped to minor" on a finding
+    that plainly isn't. Clear it once the model says the rule that would
+    justify it does not fire. This does not count as changing the finding's
+    severity, so it never causes this function to return True on its own.
+    """
+    if marker is not None and severity == "minor":
+        if model is not None and _matched_rule(finding, model) is None:
+            return _restore(finding, marker)
+        return False
+
+    if (marker is not None and model is not None
+            and _matched_rule(finding, model) is None):
+        del finding[SCOPE_DOWNGRADE_MARKER]
+    return None
+
+
 def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
     """Cap a ``major`` finding the declared trust model puts out of scope, or
     restore one a PRIOR call capped that no longer qualifies under *model*.
@@ -225,15 +275,6 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
     req: ``critical`` belongs to ``provenance_gate``, and letting both gates
     write the same field at the same severity would make the outcome depend
     on call order.
-
-    A finding already carrying a ``scope_downgrade`` marker is checked
-    against *model* first (see the module docstring's SYMMETRIC section): if
-    the marker's rule no longer fires, its pre-gate severity is restored and
-    the marker removed. When ``model is None`` (no resolved trust model --
-    e.g. an unwired call site) the marker is left exactly as it is: absence
-    of information must never move a score in either direction, the same
-    no-regression guarantee :data:`quodeq.context.trust_model.CONSERVATIVE`
-    gives the forward direction.
     """
     if finding.get("t") != "violation":
         return False
@@ -241,22 +282,9 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
     marker = finding.get(SCOPE_DOWNGRADE_MARKER)
     severity = finding.get("severity")
 
-    if marker is not None and severity == "minor":
-        if model is not None and _matched_rule(finding, model) is None:
-            return _restore(finding, marker)
-        return False
-
-    # A marker surviving on a finding that is not (or is no longer) minor is
-    # stale: it documents a cap this gate is not currently enforcing, and left
-    # in place it would render in the UI as "capped to minor" on a finding
-    # that plainly isn't. Clear it once the model says the rule that would
-    # justify it does not fire. Same no-regression rule as everywhere else in
-    # this module: model is None means no information, so nothing is cleared.
-    # This does not count as changing the finding's severity, so it never
-    # causes this function to return True on its own.
-    if (marker is not None and model is not None
-            and _matched_rule(finding, model) is None):
-        del finding[SCOPE_DOWNGRADE_MARKER]
+    decided = _restore_or_clear_stale_marker(finding, model, marker, severity)
+    if decided is not None:
+        return decided
 
     if model is None:
         return False

@@ -23,9 +23,8 @@ Signal handlers are restored on __exit__. atexit hook self-deregisters on clean 
 """
 from __future__ import annotations
 
-import atexit
 import logging
-import signal
+import signal  # noqa: F401 -- test_run_lifecycle.py patches `rl.signal.signal`
 from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
@@ -34,20 +33,24 @@ from typing import Any
 from quodeq.shared import cancellation
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
+from quodeq.analysis._run_lifecycle_support import (
+    _AtexitGuard,
+    _SignalGuard,
+    _finalize_run_on_atexit,
+    _is_circuit_breaker_error,
+    _is_named_error,
+    _mark_unfinished_dims_incomplete,
+    _run_signal_shutdown,
+    _seed_dimension_states,
+)
 from quodeq.data.fs.run_status_store import (
     RunState,
     TERMINAL_STATES,
-    read_status,
     validate_transition,
     write_status,
 )
 
 _logger = logging.getLogger(__name__)
-
-_SIGNALS_TO_HANDLE = (signal.SIGINT, signal.SIGTERM)
-# SIGHUP is POSIX-only. Included conditionally below.
-if hasattr(signal, "SIGHUP"):
-    _SIGNALS_TO_HANDLE = _SIGNALS_TO_HANDLE + (signal.SIGHUP,)
 
 
 def _now_iso() -> str:
@@ -62,6 +65,10 @@ class _StatusWriter:
     mutable attributes the context updates as the run progresses. ``write``
     is the single place that knows the full status row, so the normal-path,
     signal-path, and atexit-path writes cannot drift apart.
+
+    Kept in this module (not the sibling support module): it calls
+    ``write_status`` by bare name, patched by tests at
+    ``quodeq.analysis.run_lifecycle.write_status``.
     """
 
     def __init__(
@@ -99,52 +106,6 @@ class _StatusWriter:
             ai_model=self.ai_model,
             time_limit_s=self.time_limit_s,
         )
-
-
-class _SignalGuard:
-    """Install *handler* on the run's signals; restore the originals after."""
-
-    def __init__(self, handler: Any) -> None:
-        self._handler = handler
-        self._previous: dict[int, Any] = {}
-
-    def install(self) -> None:
-        for sig in _SIGNALS_TO_HANDLE:
-            try:
-                self._previous[sig] = signal.getsignal(sig)
-                signal.signal(sig, self._handler)
-            except (OSError, ValueError):
-                # Can fail in non-main threads; tests may run under such a case.
-                pass
-
-    def restore(self) -> None:
-        for sig, prev in self._previous.items():
-            try:
-                signal.signal(sig, prev)
-            except (OSError, ValueError):
-                pass
-        self._previous.clear()
-
-
-class _AtexitGuard:
-    """Register *callback* with atexit once, and deregister it once."""
-
-    def __init__(self, callback: Any) -> None:
-        self._callback = callback
-        self._registered = False
-
-    def register(self) -> None:
-        atexit.register(self._callback)
-        self._registered = True
-
-    def deregister(self) -> None:
-        if not self._registered:
-            return
-        try:
-            atexit.unregister(self._callback)
-        except Exception:
-            pass
-        self._registered = False
 
 
 class RunLifecycleContext:
@@ -185,11 +146,67 @@ class RunLifecycleContext:
         self._signals.install()
         self._atexit.register()
         self._write(RunState.PENDING)
-        self._seed_dimension_states()
+        _seed_dimension_states(self._run_dir, self._dimensions, log=_logger)
         self._transition(RunState.RUNNING)
         self._heartbeat.start()
         self._resources.start()
         return self
+
+    def _exit_clean(self) -> None:
+        """No exception — pipeline is expected to have transitioned to finalizing."""
+        if self._current_state in TERMINAL_STATES:
+            return
+        if self._current_state != RunState.FINALIZING:
+            # Caller didn't explicitly call transition_to_finalizing(); do it now.
+            self._transition(RunState.FINALIZING)
+        # The failure-streak breaker aborts the remaining dimensions from
+        # inside the pipeline, so a truncated run reaches this clean-exit
+        # path with dims still pending. Record that rather than reporting
+        # a done/None status that reads exactly like a full run — the
+        # skipped dims are dropped from the run average, and they tend to
+        # be the ones late in the order, not a random sample.
+        skipped = _mark_unfinished_dims_incomplete(self._run_dir, "not_reached", log=_logger)
+        self._transition(
+            RunState.DONE,
+            exit_reason=self._pending_exit_reason
+            or ("incomplete_dimensions" if skipped else None),
+        )
+
+    def _exit_system_exit(self) -> None:
+        """SystemExit raised by our signal handler; state already written there."""
+        if self._current_state not in TERMINAL_STATES:
+            self._transition(RunState.CANCELLED, exit_reason="systemexit")
+
+    def _exit_broken_pipe(self) -> None:
+        """The child's inherited stdout pipe closed under us (parent restarted
+        mid-scan). The analysis itself already ran and the evidence is on
+        disk, so this transitions to DONE rather than FAILED.
+        """
+        if self._current_state not in TERMINAL_STATES:
+            if self._current_state != RunState.FINALIZING:
+                self._transition(RunState.FINALIZING)
+            self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
+
+    def _exit_circuit_breaker(self) -> None:
+        """Circuit breaker tripped — auto-protection, not user cancel. Distinct
+        exit_reason makes the History entry distinguishable from regular failures.
+        """
+        if self._current_state not in TERMINAL_STATES:
+            self._transition(RunState.FAILED, exit_reason="failure_streak")
+
+    def _exit_fatal_provider(self) -> None:
+        """Provider reported an unrecoverable condition (quota, auth, credits).
+        Distinct exit_reason so the History entry says why instead of a
+        generic exception.
+        """
+        if self._current_state not in TERMINAL_STATES:
+            self._transition(RunState.FAILED, exit_reason="provider_fatal")
+
+    def _exit_other_exception(self, exc_type: type[BaseException] | None) -> None:
+        """Any other exception → failed."""
+        if self._current_state not in TERMINAL_STATES:
+            exc_name = exc_type.__name__ if exc_type else "UnknownError"
+            self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
 
     def __exit__(
         self,
@@ -200,55 +217,17 @@ class RunLifecycleContext:
         self._heartbeat.stop()
         self._resources.stop()
         if exc_type is None:
-            # No exception — pipeline is expected to have transitioned to finalizing.
-            if self._current_state not in TERMINAL_STATES:
-                if self._current_state != RunState.FINALIZING:
-                    # Caller didn't explicitly call transition_to_finalizing(); do it now.
-                    self._transition(RunState.FINALIZING)
-                # The failure-streak breaker aborts the remaining dimensions from
-                # inside the pipeline, so a truncated run reaches this clean-exit
-                # path with dims still pending. Record that rather than reporting
-                # a done/None status that reads exactly like a full run — the
-                # skipped dims are dropped from the run average, and they tend to
-                # be the ones late in the order, not a random sample.
-                skipped = self._mark_unfinished_dims_incomplete("not_reached")
-                self._transition(
-                    RunState.DONE,
-                    exit_reason=self._pending_exit_reason
-                    or ("incomplete_dimensions" if skipped else None),
-                )
+            self._exit_clean()
         elif issubclass(exc_type, SystemExit):
-            # SystemExit raised by our signal handler; state already written there.
-            if self._current_state not in TERMINAL_STATES:
-                self._transition(RunState.CANCELLED, exit_reason="systemexit")
+            self._exit_system_exit()
         elif issubclass(exc_type, BrokenPipeError):
-            # BrokenPipeError fires when the child's inherited stdout pipe
-            # closes — typically because our parent (the dashboard API) was
-            # restarted mid-scan and the pipe it was reading is gone. The
-            # analysis itself already ran (we got here because the pipeline
-            # tried to print a trailing status line after the work was done);
-            # the evidence is on disk. Transition to DONE rather than FAILED.
-            if self._current_state not in TERMINAL_STATES:
-                if self._current_state != RunState.FINALIZING:
-                    self._transition(RunState.FINALIZING)
-                self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
-        elif self._is_circuit_breaker_error(exc_type):
-            # Circuit breaker tripped — auto-protection, not user cancel.
-            # Distinct exit_reason makes the History entry distinguishable
-            # from regular failures so the UI can surface it differently.
-            if self._current_state not in TERMINAL_STATES:
-                self._transition(RunState.FAILED, exit_reason="failure_streak")
-        elif self._is_named_error(exc_type, "FatalProviderError"):
-            # Provider reported an unrecoverable condition (quota exhausted,
-            # auth failure, out of credits). Distinct exit_reason so the
-            # History entry says why instead of a generic exception.
-            if self._current_state not in TERMINAL_STATES:
-                self._transition(RunState.FAILED, exit_reason="provider_fatal")
+            self._exit_broken_pipe()
+        elif _is_circuit_breaker_error(exc_type):
+            self._exit_circuit_breaker()
+        elif _is_named_error(exc_type, "FatalProviderError"):
+            self._exit_fatal_provider()
         else:
-            # Any other exception → failed.
-            if self._current_state not in TERMINAL_STATES:
-                exc_name = exc_type.__name__ if exc_type else "UnknownError"
-                self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
+            self._exit_other_exception(exc_type)
         self._signals.restore()
         self._atexit.deregister()
         return False  # never swallow exceptions
@@ -298,108 +277,21 @@ class RunLifecycleContext:
     def _write(self, state: RunState, *, exit_reason: str | None = None) -> None:
         self._status.write(state, exit_reason=exit_reason)
 
-    def _seed_dimension_states(self) -> None:
-        """Initialise dimensions.json with one PENDING entry per dim."""
-        from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
-        for dim in self._dimensions:
-            try:
-                write_dim_state(self._run_dir, dim, DimState.PENDING)
-            except Exception as exc:  # noqa: BLE001
-                _logger.warning("failed to seed dim state for %s: %s", dim, exc)
-
     @staticmethod
     def _is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
-        """Detect an analysis-layer error class without a hard import dependency.
-
-        Lifecycle is a shared/low-level module; importing from analysis
-        would invert the dependency graph. Class-name match is enough since
-        we control both ends.
+        """Delegates to ``_run_lifecycle_support._is_named_error``; kept as a
+        staticmethod because a test calls ``RunLifecycleContext._is_named_error``.
         """
-        if exc_type is None:
-            return False
-        return any(cls.__name__ == name for cls in exc_type.__mro__)
-
-    @staticmethod
-    def _is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
-        return RunLifecycleContext._is_named_error(exc_type, "CircuitBreakerError")
-
-    def _deadline_has_passed(self) -> bool:
-        """True when the run's own deadline is set and already behind us."""
-        if not self._status.deadline_at:
-            return False
-        try:
-            deadline = datetime.fromisoformat(self._status.deadline_at)
-        except (TypeError, ValueError):
-            return False
-        if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
-        return datetime.now(timezone.utc) >= deadline
-
-    def _mark_unfinished_dims_incomplete(self, reason: str) -> int:
-        """Flip non-terminal dims to INCOMPLETE and return how many were flipped.
-
-        Covers ``pending`` as well as ``running``. A dimension the run never
-        got to is just as unfinished as one interrupted mid-flight, and the
-        state machine allows PENDING -> INCOMPLETE precisely for this. Leaving
-        them at ``pending`` made a truncated run indistinguishable from a
-        complete one: the scored dimensions were averaged into a run grade
-        with no record that the rest never ran.
-        """
-        from quodeq.data.fs.dimensions_state_store import (  # noqa: PLC0415 — signal path
-            DimState,
-            read_dimensions,
-            write_dim_state,
-        )
-        try:
-            entries = read_dimensions(self._run_dir).get("dimensions", {})
-        except Exception:  # noqa: BLE001 — a failing flip must not mask the exit
-            return 0
-        flipped = 0
-        for dim, entry in entries.items():
-            if isinstance(entry, dict) and entry.get("state") in {"running", "pending"}:
-                try:
-                    write_dim_state(self._run_dir, dim, DimState.INCOMPLETE, reason=reason)
-                    flipped += 1
-                except Exception as exc:  # noqa: BLE001
-                    _logger.warning("failed to mark dim %s incomplete: %s", dim, exc)
-        return flipped
+        return _is_named_error(exc_type, name)
 
     def _handle_signal(self, signum: int, frame: Any) -> None:
-        try:
-            name = signal.Signals(signum).name
-        except ValueError:
-            name = f"signal_{signum}"
-        # A signal landing AFTER the run's own deadline is the watchdog
-        # enforcing the time budget (SIGTERM at deadline+grace), not a
-        # user cancel. Label it "deadline" — the UI maps that to "time
-        # limit reached", not an error — and close out running dims. The
-        # state stays CANCELLED either way: salvage scoring triggers key
-        # off terminal failed/cancelled and must keep firing.
-        deadline_enforced = self._deadline_has_passed()
-        exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
-        # Signal worker threads (subagent pool, AI CLI subprocess monitors)
-        # to stop waiting on long-running operations and terminate promptly.
-        cancellation.request_cancel()
-        # Avoid using the transition-validating path — we may be mid-state.
-        self._heartbeat.stop()
-        self._resources.stop()
-        self._status.write(RunState.CANCELLED, exit_reason=exit_reason)
+        """Write CANCELLED status, close out unfinished dims, then re-raise as SystemExit."""
+        _run_signal_shutdown(
+            self._run_dir, self._heartbeat, self._resources, self._status,
+            self._status.deadline_at, signum, log=_logger,
+        )
         self._current_state = RunState.CANCELLED
-        # Close out every unfinished dim, not just on the deadline path: a
-        # plain cancel left the in-flight dimension stuck at 'running' and
-        # the untouched ones at 'pending' for the life of the run dir.
-        self._mark_unfinished_dims_incomplete(
-            "time_limit" if deadline_enforced else "cancelled")
         raise SystemExit(128 + signum)
 
     def _finalize_on_atexit(self) -> None:
-        current = read_status(self._run_dir)
-        if current is None:
-            return
-        state_str = current.get("state")
-        if state_str in {s.value for s in TERMINAL_STATES}:
-            return
-        # We exited without a terminal state — write cancelled.
-        self._heartbeat.stop()
-        self._resources.stop()
-        self._status.write(RunState.CANCELLED, exit_reason="atexit_unfinalized")
+        _finalize_run_on_atexit(self._run_dir, self._heartbeat, self._resources, self._status)

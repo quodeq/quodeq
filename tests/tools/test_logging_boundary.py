@@ -28,7 +28,10 @@ _CHECKED_DIRS = ("core", "analysis", "services", "config")
 # param and deleting the import.
 DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_analysis_context.py': 'Analysis context - dimension loading and resolution - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/_api_call.py': 'Direct LLM API call: request construction, the raw chat-completion round-trip, and error classification - split out of _api_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_runner.py': 'API runner for direct LLM evaluation - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/_api_source_gathering.py': 'Credential loading and file-batching helpers for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
+    'analysis/_api_standards_text.py': 'Source-file gathering and compiled-standards text for the API prompt - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_command.py': 'AI CLI command-line construction and environment setup - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_dimension_steps.py': 'Dimension step functions: prompt building, AI execution, evidence parsing - imports quodeq.shared.logging directly (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
     'analysis/_drop_stats.py': 'Per-run aggregate of API-runner parse drops (issue #606) - out of scope for this sweep (not a flagged per-site conversion)',
@@ -38,6 +41,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/api_prompt_assembly.py': 'Prompt assembly for the direct API runner - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/_failure_streak.py': 'Consecutive-failure circuit breaker for the dim runner - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/cache/_replay.py': "Cache-replay path: writing cached findings and their events.jsonl mirror back into a run's evidence - split out of dimension_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)",
     'analysis/cache/cache_writer.py': 'Factory for the per-file cache-write callback passed to FindingsRouter - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/consolidation.py': "Consolidation state - flip a completed run's cache entries - out of scope for this sweep (not a flagged per-site conversion)",
     'analysis/cache/dimension_helpers.py': 'Dimension-level cache helpers bridging RunConfig and the filesystem - out of scope for this sweep (not a flagged per-site conversion)',
