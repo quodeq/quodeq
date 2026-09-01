@@ -30,14 +30,11 @@ src/quodeq/api/terminal_routes.py:206:function
 src/quodeq/api/terminal_routes.py:90:function
 src/quodeq/api/zip.py:72:function
 src/quodeq/assistant/adapters/_api.py:157:function
-src/quodeq/assistant/adapters/_cli.py:206:function
-src/quodeq/assistant/adapters/_cli.py:68:function
 src/quodeq/assistant/orchestrator.py:95:function
 src/quodeq/assistant/tools/_overview.py:22:function
-src/quodeq/assistant/tools/_read_tools.py:1:file
-src/quodeq/assistant/tools/_read_tools.py:220:function
-src/quodeq/assistant/tools/_read_tools.py:341:function
-src/quodeq/assistant/tools/_read_tools.py:487:function
+src/quodeq/assistant/tools/_read_tools.py:131:function
+src/quodeq/assistant/tools/_read_tools.py:209:function
+src/quodeq/assistant/tools/_read_tools_scope.py:98:function
 src/quodeq/assistant/tools/_web_tools.py:136:function
 src/quodeq/assistant/worktree.py:1:file
 src/quodeq/ci/cli.py:18:function

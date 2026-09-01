@@ -16,7 +16,7 @@ SRC_ROOT = Path(__file__).resolve().parent.parent.parent / "src" / "quodeq"
 # route, with the reason it serializes. Burn-down candidates are marked.
 DECLARED_WIRE_BOUNDARIES: dict[str, str] = {
     "shared/serialization.py": "defines the serializer",
-    "assistant/tools/_read_tools.py": "assistant tool output is its own wire (LLM-facing)",
+    "assistant/tools/_read_tools_scope.py": "assistant tool output is its own wire (LLM-facing)",
     "data/fs/dimension_report/_report_scoring.py": "dimension report files on disk are camelCase (stored contract)",
     "data/fs/report_parser/_eval_parsing.py": "parses stored camelCase findings back out (stored contract)",
     "services/_accumulated_aggregate.py": "payload feeds both routes and the persisted score cache — burn-down: WS5/scoring reader",
