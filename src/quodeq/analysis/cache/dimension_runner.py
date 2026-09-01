@@ -1,30 +1,27 @@
 """V2 cache-aware dimension processor — composes B4 helpers with the
 existing dispatcher boundary.
 
-The flow:
-
-  1. List source files (respecting any incremental_file_filter set by
-     the caller)
-  2. Classify each file via the cache: hits return findings directly,
-     misses go to the dispatcher
-  3. All-hits short-circuit: write cached findings to JSONL and parse
-     to Evidence without calling the dispatcher
-  4. Otherwise: dispatch misses via process_dimension_with_subagents
-     with incremental_file_filter restricted to the miss set
-  5. Persist new findings to cache (per-file) from the dispatch JSONL
-  6. If there were also hits, append cached findings to the JSONL and
-     re-parse for the final Evidence
+Flow: list source files -> classify via cache (hits return findings
+directly, misses go to the dispatcher) -> all-hits short-circuits
+straight to JSONL + Evidence -> otherwise dispatch misses via
+process_dimension_with_subagents (file filter restricted to misses) ->
+persist new findings per-file -> if there were also hits, append cached
+findings to the JSONL and re-parse for the final Evidence.
 
 This sits *above* the existing dispatcher — V1's machinery (carry-
-forward, fingerprint, queue salvage) still runs for the dispatched
-files. That's intentional: the cache supersedes V1's incrementality
-decisions but keeps the proven dispatch path intact.
+forward, fingerprint, queue salvage) still runs for dispatched files.
+The cache supersedes V1's incrementality decisions but keeps the proven
+dispatch path intact.
 
-Known limitation: when migrating from a long-lived V1 install to V2,
-V1's carry-forward might surface findings for files V2 has cached,
-producing duplicates in the dispatch JSONL. The fix is to suppress
-V1's carry-forward when V2 is active; B6 cleanup will handle that
-once the V1 path is being deleted.
+Known limitation: V1 carry-forward can duplicate findings V2 has
+already cached, when migrating a long-lived V1 install to V2; B6
+cleanup removes V1's carry-forward once the V1 path is deleted.
+
+Cache-replay lives in ``_replay.py``; the persist-watcher body lives in
+``_persist_watcher.py``. ``emit_marker`` and the
+``threading.Thread``/``threading.Event()`` constructions stay in helpers
+defined here, since a ``mock.patch`` target resolves where a name is
+used, not where it is implemented.
 """
 from __future__ import annotations
 
@@ -34,19 +31,30 @@ import threading
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
-from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
-from quodeq.config.analysis_env import failure_streak_override
-from quodeq.analysis.cache.backend import CacheBackend
+from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache._failure_streak import (
     CircuitBreakerError,
     FailureStreakWatcher,
 )
+from quodeq.analysis.cache._persist_watcher import (
+    _PERSIST_INTERVAL_S,
+    _periodic_persist,
+    _resolve_failure_streak_threshold,
+)
+from quodeq.analysis.cache._replay import (
+    _compute_files_read,
+    _emit_cached_findings,  # noqa: F401 -- re-export
+    _evidence_dir,
+    _jsonl_path,
+    _write_findings,
+    _write_replayed_keys_sidecar,
+)
+from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
-    _group_findings_by_file,
     build_cache_key_for_file,
     classify_files_via_cache,
     format_provenance_drift,
@@ -54,302 +62,26 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
     DimensionCallbacks,
     process_dimension_with_subagents,
 )
+from quodeq.config.analysis_env import failure_streak_override
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.ports.events import EventEmitter
-from quodeq.analysis._runner_markers import emit_marker
 
 _logger = logging.getLogger(__name__)
 
-# How often the watcher thread persists in-flight cache entries during
-# dispatch. Smaller = less work lost on cancel; larger = less I/O during
-# normal runs. 30s is a pragmatic default — at typical model dispatch
-# speeds (~10-30s per file), each tick covers a handful of completed files.
-_PERSIST_INTERVAL_S = 30.0
 
-
-def _resolve_failure_streak_threshold(
-    opts: AnalysisOptions, *, override: int | None = None,
-) -> int:
-    """Return the effective breaker threshold.
-
-    Priority: *override* (when given) > options field. 0 disables; negative
-    values clamp to 0.
-    """
-    if override is not None:
-        return max(0, override)
-    return max(0, opts.failure_streak_threshold)
-
-
-def _periodic_persist(
-    stop_event: threading.Event, persist_fn: Any,
-    interval: float,
-) -> None:
-    """Background thread: call persist_fn() until stop_event is set.
-
-    Each tick is best-effort — exceptions never propagate to the caller
-    and never kill the watcher. Final persist happens on stop signal so
-    the watcher's last-known state is also written to cache.
-    """
-    while not stop_event.wait(timeout=interval):
-        try:
-            persist_fn()
-        except Exception as exc:  # noqa: BLE001 — never kill the dispatch
-            _logger.warning("incremental cache persist failed: %s", exc)
-    # Final persist after stop signaled (e.g. dispatch finished or raised).
-    try:
-        persist_fn()
-    except Exception as exc:  # noqa: BLE001
-        _logger.warning("final cache persist failed: %s", exc)
-
-
-def _evidence_dir(config: RunConfig) -> Path:
-    return config.work_dir or config.src
-
-
-def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
-    return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
-
-
-def _write_replayed_keys_sidecar(
-    config: RunConfig, dim_id: str, keys: dict[str, str],
-) -> None:
-    """Record which unconsolidated cache entries this dim replayed.
-
-    A run that reaches ``done`` consolidates not only the entries it wrote
-    but the unconsolidated ones it replayed: those findings are now in a
-    completed run's report. ``consolidation.mark_run_consolidated`` reads
-    this sidecar alongside ``<dim>_dispatch_keys.json``.
-
-    Skipped when there is nothing to record, so a run that replays only
-    consolidated entries leaves no file behind.
-    """
-    if not keys:
-        return
-    sidecar = _evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
-
-
-def _compute_files_read(
-    classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
-) -> int:
-    """Return the count of source files reproducible from the cache after
-    this run ends.
-
-    A source file is "reproducible" if either:
-      - it was a cache hit (the file was replayed from a cache entry,
-        consolidated or not — its cache entry already exists), or
-      - it was dispatched and the worker emitted ``file_done="ok"``
-        (which triggers a synchronous cache write via
-        ``build_cache_writer``, or the watcher's next persist tick).
-
-    Files with ``file_done="error"`` or no marker at all are NOT counted:
-    their analysis was incomplete and the cache contains no entry for
-    them, so the next run must re-dispatch.
-
-    Pre-fix, ``files_read`` was set to ``len(input_files)`` at every
-    callsite, making coverage % (computed downstream as
-    ``files_read / source_file_count``) meaningless: it always read 100%
-    even on deadline-truncated runs. The user reported a flexibility
-    score of "6.6/Adequate" on a run that actually analyzed ~850/3037
-    files — the dashboard couldn't tell it was partial.
-    """
-    n_hits = len(all_files) - len(classify.misses)
-    if not jsonl_path.is_file():
-        return n_hits
-    _grouped, ok_files = _group_findings_by_file(jsonl_path)
-    miss_set = set(classify.misses)
-    n_dispatch_ok = len(ok_files & miss_set)
-    return n_hits + n_dispatch_ok
-
-
-def _events_log_path(jsonl: Path) -> Path:
-    """Return the run's events.jsonl path given a per-dim evidence JSONL.
-
-    Evidence files live at ``<run_dir>/evidence/<dim>_evidence.jsonl``; the
-    event log lives at ``<run_dir>/events.jsonl``. Centralising the join so
-    the two callers below can't drift apart.
-    """
-    return jsonl.parent.parent / "events.jsonl"
-
-
-def _emit_cached_findings(
-    events_log: Path, findings: list[dict], *,
-    writer_factory: Callable[[Path], EventEmitter] | None = None,
-) -> None:
-    """Emit cached findings as JUDGMENT_CREATED events to the run's event log.
-
-    Cached findings replayed by the V2 cache in incremental runs were
-    landing only in the per-dim JSONL and never reaching ``events.jsonl``.
-    The SQL projection runs off ``events.jsonl``, so the dashboard's grade
-    tables saw only the freshly-dispatched findings and produced scores
-    that disagreed with the CLI's JSON file (e.g. flexibility scoring 9.0
-    in the UI vs 7.7 from the CLI on the same run). Mirroring each cached
-    finding into the event log closes that gap.
-
-    Exceptions are caught per finding and logged — the JSONL write
-    already succeeded above, so an event-emit failure should not propagate
-    and roll back the cache restore.
-    """
-    if not findings:
-        return
-    from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
-    from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
-
-    if writer_factory is None:
-        # Lazy default resolution: the concrete data-layer writer is only
-        # imported when no factory was injected.
-        from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
-        writer_factory = EventLogWriter
-    writer = writer_factory(events_log)
-    for finding in findings:
-        try:
-            payload = wire_dict_to_judgment(finding)
-            writer.emit(JudgmentCreatedEvent(payload=payload))
-        except Exception:  # noqa: BLE001 — event-log emit must never break a cache replay
-            _logger.warning(
-                "cache replay: event emit failed for finding p=%r file=%r line=%r",
-                finding.get("p"), finding.get("file"), finding.get("line"),
-                exc_info=True,
-            )
-
-
-def _write_findings(
-    jsonl: Path, findings: list[dict], *, append: bool,
-    emit_events: bool = True,
-    unconsolidated: list[dict] | None = None,
-    trust_model: TrustModel | None = None,
-    writer_factory: Callable[[Path], EventEmitter] | None = None,
-) -> None:
-    """Replay cached findings into this run's evidence JSONL.
-
-    *findings* come from consolidated cache entries: a completed run already
-    put them in its report and the user has seen them in an Overview. Those
-    are stamped ``carried_forward`` so the live feed can hide them.
-
-    *unconsolidated* come from entries no completed run has consolidated yet,
-    because the run that produced them was cancelled with "keep findings",
-    failed, or was killed. The user was never shown those in an Overview, so
-    they are written verbatim and read as this scan's own findings.
-
-    Both groups are re-gated and both are mirrored to events.jsonl. Skipping
-    the unconsolidated group in the event log would resurrect the UI-vs-CLI
-    score disagreement that _emit_cached_findings exists to prevent.
-    """
-    pending = list(unconsolidated or [])
-    # Re-gate cached findings on the replay path (issue #657). The live
-    # finding path gates in FindingEnricher.enrich(); cache replay bypasses
-    # enrich(), so a stale, un-gated critical R-FT-2/S-AUT-3 finding written
-    # by a pre-#639 quodeq version would otherwise replay at critical and
-    # inflate the grade. The gate only touches un-gated criticals, so
-    # re-gating an already-gated (or non-critical) finding is a no-op --
-    # safe to apply unconditionally to every cached finding.
-    #
-    # The scope gate is re-applied here for the identical reason: it too
-    # runs at the FindingEnricher sink (enrich(), after apply_provenance_gate),
-    # which cache replay bypasses just like the provenance gate. CacheKey
-    # deliberately does not fingerprint the declared trust model (that would
-    # defeat the point of gating at replay time instead of at the cache key),
-    # so a cached finding survives untouched across a
-    # ``.quodeq/project-profile.json`` edit unless something re-gates it on
-    # every replay -- this is that something. The practical effect: editing
-    # the profile to declare, say, ``networkExposure: loopback`` re-caps
-    # already-cached ``major`` findings on the very next run, without a cache
-    # miss or a CacheKey change.
-    #
-    # apply_scope_gate is symmetric (see its own module docstring): the same
-    # call also restores a finding this gate previously capped to ``minor``
-    # once the profile is TIGHTENED enough that the rule that capped it no
-    # longer fires. Without that other direction, a team that declares
-    # loopback, scans, then honestly ships hosted and widens the profile back
-    # to ``{"networkExposure": "public"}`` would see every already-cached
-    # finding stay stuck at ``minor`` forever -- the exact same staleness
-    # problem this whole re-gating pass exists to prevent, just in reverse.
-    #
-    # apply_severity_gates owns the sequence and the order it must run in
-    # (see severity_gates.py); this call site owns only the decision to
-    # re-gate on replay at all.
-    for finding in findings:
-        apply_severity_gates(finding, trust_model)
-    for finding in pending:
-        apply_severity_gates(finding, trust_model)
-    # Every caller of this function is a cache replay -- the dispatcher
-    # writes its own fresh findings and never comes through here. Stamp the
-    # origin so the live evaluation feed can show only what this scan is
-    # actually producing.
-    #
-    # Copy, do not mutate: these dicts are owned by the cache entries, and
-    # the periodic-persist watcher could otherwise write the flag back into
-    # the cache, making a later fresh scan of the same file look carried.
-    #
-    # Consolidated first, then unconsolidated, so the JSONL keeps reading
-    # foundation-then-new.
-    stamped = [{**finding, "carried_forward": True} for finding in findings]
-    stamped += [dict(finding) for finding in pending]
-    jsonl.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if append else "w"
-    with jsonl.open(mode, encoding="utf-8") as out:
-        for finding in stamped:
-            out.write(json.dumps(finding) + "\n")
-    if emit_events:
-        _emit_cached_findings(
-            _events_log_path(jsonl), stamped, writer_factory=writer_factory,
-        )
-
-
-def process_dimension_with_cache(
-    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
-    callbacks: DimensionCallbacks,
-    *,
-    cache: CacheBackend | None = None,
-    dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents,
-    persist_interval_s: float = _PERSIST_INTERVAL_S,
-    writer_factory: Callable[[Path], EventEmitter] | None = None,
-    log: LogSink = NULL_LOG,
-) -> Evidence | None:
-    """V2 entry point — content-addressed cache replaces V1 change detection.
-
-    Falls through to *dispatcher* (defaults to
-    ``process_dimension_with_subagents``) when there's no source-file list
-    to classify (matches V1's no-files fallback).
-    """
-    if cache is None:
-        cache = LocalFileBackend()
-        # First cache open of a real run (tests inject their own cache and
-        # skip this branch). Reclaim entries orphaned by the schema bump,
-        # once per process. Best-effort: never blocks the run.
-        maybe_collect_legacy_entries(cache.root)
-
-    # Resolved once per dimension and threaded through to every _write_findings
-    # call below, mirroring how the live path resolves it (_api_runner.py,
-    # findings_server.py): guard on ``config.src`` being set rather than
-    # assuming it, even though ``resolve_trust_model`` already degrades to
-    # CONSERVATIVE on ``None`` -- passing ``None`` through instead makes
-    # apply_scope_gate's no-op explicit rather than incidental.
-    trust_model = resolve_trust_model(config.src) if config.src is not None else None
-
-    files, _ext, _excluded = _list_source_files(config, dim_id)
-    if not files:
-        # Nothing to classify — defer to existing path so the no-files
-        # warning + single-agent fallback runs unchanged.
-        return dispatcher(config, dim_id, idx, ctx, callbacks, log=log)
-
-    # Clean-scan (incremental=False) means "I want fresh analysis." The user's
-    # mental model: cancelled clean-scan + retry should NOT short-circuit on
-    # stale entries that pre-date the clean-scan. So at clean-scan start, we
-    # delete the cache entries for this (dim, files) tuple BEFORE classify.
-    # If the run completes, the cache is naturally repopulated. If the run
-    # cancels mid-flight, the cache only contains what THIS run completed --
-    # never ghosts from before. Without this, "clean" only meant "bypass
-    # reads," and a cancelled clean run left the prior cache fully intact.
+def _invalidate_for_clean_scan(
+    config: RunConfig, files: list[str], dim_id: str, cache: CacheBackend,
+) -> bool:
+    """Delete this dim's cache entries before a clean-scan dispatch, so a
+    cancelled clean-scan + retry never short-circuits on stale entries
+    that pre-date the clean-scan."""
     bypass_reads = not config.options.incremental
     if bypass_reads:
         wiped = 0
@@ -364,13 +96,20 @@ def process_dimension_with_cache(
             "[%s] cache: invalidated %d entries before clean-scan dispatch",
             dim_id, wiped,
         )
+    return bypass_reads
+
+
+def _classify_and_log(
+    config: RunConfig, dim_id: str, files: list[str], cache: CacheBackend,
+    bypass_reads: bool,
+) -> ClassifyResult:
+    """Classify via cache, log the hit/miss split (surfacing provenance
+    drift so cross-model/standards reuse is never silent), and emit the
+    per-dim cache_stats marker for the dashboard / SSE stream."""
     classify = classify_files_via_cache(
         config, dim_id, files, cache, bypass_reads=bypass_reads,
     )
     n_hits = len(files) - len(classify.misses)
-    # Surface provenance drift on the classify log so reuse across a
-    # model/standards/prompts boundary is never silent (run.log -> side-pane
-    # log viewer + CLI). The user decides when to --clean-scan to refresh.
     drift_note = format_provenance_drift(classify.provenance_drift, reused=n_hits)
     _logger.info(
         "[%s] cache: %d hits / %d misses (%d total)%s%s",
@@ -378,88 +117,66 @@ def process_dimension_with_cache(
         " - clean-scan invalidated" if bypass_reads else "",
         f" - reused {drift_note}" if drift_note else "",
     )
-    # Structured marker for the dashboard / SSE stream - one event per
-    # dim summarising hit/miss split. Per-file events would be too noisy
-    # for a UI-level stream; per-dim is the right granularity.
     emit_marker(
-        "cache_stats",
-        dimension=dim_id,
-        hits=n_hits,
-        misses=len(classify.misses),
+        "cache_stats", dimension=dim_id, hits=n_hits, misses=len(classify.misses),
         total=len(files),
         mode="clean-scan-invalidated" if bypass_reads else "incremental",
     )
+    return classify
 
-    jsonl = _jsonl_path(config, dim_id)
 
-    # Written BEFORE the all-hits branch so one call site covers both replay
-    # paths. A fully cached dimension writes no dispatch_keys sidecar (it
-    # never dispatches), so without this it would never flip its entries.
-    _write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
+def _handle_all_hits(
+    config: RunConfig, dim_id: str, ctx: _AnalysisContext, jsonl: Path,
+    classify: ClassifyResult, files: list[str],
+    trust_model: TrustModel | None,
+    writer_factory: Callable[[Path], EventEmitter] | None,
+) -> Evidence | None:
+    """All-hits short-circuit: no dispatch needed. Appends (not overwrites)
+    since a dim may run multiple times in the same run (e.g. V1's backfill
+    phase); dedup after handles overlap from a same-run repeat."""
+    from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
+    _write_findings(
+        jsonl, classify.cached_findings, append=True,
+        unconsolidated=classify.unconsolidated_findings,
+        trust_model=trust_model, writer_factory=writer_factory,
+    )
+    if jsonl.exists():
+        deduplicate_jsonl(jsonl)
+    return parse_evidence_from_jsonl(
+        config, dim_id, ctx, jsonl,
+        files_read=_compute_files_read(classify, jsonl, files),
+    )
 
-    # All-hits short-circuit: no dispatch needed.
-    # We append (not overwrite) because callers may invoke us multiple times
-    # within the same dim (e.g. V1's backfill phase under stacked migration).
-    # Truncating here would destroy findings written by prior phases.
-    # Dedup runs after to handle any overlap from a same-run repeat.
-    if not classify.misses:
-        from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
-        _write_findings(
-            jsonl, classify.cached_findings, append=True,
-            unconsolidated=classify.unconsolidated_findings,
-            trust_model=trust_model,
-            writer_factory=writer_factory,
-        )
-        if jsonl.exists():
-            deduplicate_jsonl(jsonl)
-        return parse_evidence_from_jsonl(
-            config, dim_id, ctx, jsonl,
-            files_read=_compute_files_read(classify, jsonl, files),
-        )
 
-    # Dispatch misses via the existing path, with file filter restricted
-    # to the miss set so the pool only processes uncached files.
+def _prepare_miss_dispatch(
+    config: RunConfig, dim_id: str, jsonl: Path, classify: ClassifyResult,
+    trust_model: TrustModel | None,
+    writer_factory: Callable[[Path], EventEmitter] | None,
+) -> RunConfig:
+    """Build the dispatcher's file-filtered config, pre-write any cached
+    findings, and persist the miss-key sidecar the discard path needs."""
     miss_options = replace(config.options, incremental_file_filter=set(classify.misses))
     miss_config = replace(config, options=miss_options)
-
-    # Pre-write cached findings to the JSONL BEFORE dispatch. Two reasons:
-    # (1) Ordering: carries (prior runs' findings) appear first in the JSONL,
-    #     fresh dispatch findings appear after. The final report reads
-    #     foundation-then-new instead of "new findings, oh by the way here
-    #     are the carries tacked on at the end."
-    # (2) Single dedup pass: the dispatcher's internal dedup at the end of
-    #     its evidence collector runs on the merged JSONL, so the user sees
-    #     ONE final "Deduplicated ...: N unique findings" log line. Pre-fix
-    #     the user saw two confusing counts -- "27 unique" (dispatch only)
-    #     followed by "55 unique" (after we appended cached findings).
-    # A dimension whose every hit is unconsolidated has an EMPTY
-    # cached_findings, so guarding on that alone would skip this write and
-    # silently drop those findings from the run.
     if classify.cached_findings or classify.unconsolidated_findings:
         _write_findings(
             jsonl, classify.cached_findings, append=True,
             unconsolidated=classify.unconsolidated_findings,
-            trust_model=trust_model,
-            writer_factory=writer_factory,
+            trust_model=trust_model, writer_factory=writer_factory,
         )
-
-    # Persist the per-file cache keys to a sidecar so the discard path can
-    # locate this dim's V2 cache entries even after the process exits. Without
-    # this, a user clicking "discard partial findings" can't wipe entries that
-    # were written by the periodic-persist watcher above.
     sidecar = _evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
+    return miss_config
 
-    # Periodic persist watcher (safety net only — NOT authoritative).
-    # After Phase 1.5 Task 3.5, FindingsRouter.on_file_done writes cache
-    # entries synchronously the instant a worker emits mark_file_done(ok)
-    # (both API path and CLI/subprocess path). The watcher remains as a
-    # belt-and-suspenders guard for any future code path that constructs
-    # a router WITHOUT on_file_done (or for paths that bypass the router
-    # entirely). On a cancel/SIGTERM the synchronous writes are already on
-    # disk; the final watcher tick re-scans the JSONL and is a no-op for
-    # files that the sync path already persisted.
+
+def _start_watchers(
+    config: RunConfig, dim_id: str, jsonl: Path, classify: ClassifyResult,
+    cache: CacheBackend, persist_interval_s: float,
+) -> tuple[threading.Event, threading.Thread, FailureStreakWatcher]:
+    """Start the periodic-persist watcher (safety net only; on_file_done
+    already persists synchronously) and the failure-streak breaker.
+    Creates the evidence JSONL up front, when absent, so the breaker's
+    first poll doesn't warn about a missing file."""
     def _persist_now() -> None:
         persist_dispatch_results(
             config, dim_id, miss_files=classify.misses,
@@ -469,22 +186,12 @@ def process_dimension_with_cache(
     stop_event = threading.Event()
     watcher = threading.Thread(
         target=_periodic_persist,
-        args=(stop_event, _persist_now, persist_interval_s),
+        args=(stop_event, _persist_now, persist_interval_s, _logger.warning),
         daemon=True,
         name=f"v2-cache-persist-{dim_id}",
     )
     watcher.start()
 
-    # Create the evidence JSONL up front so the failure-streak watcher's
-    # first poll reads an existing (empty) file instead of logging a
-    # "Could not read ... No such file" warning every poll interval until
-    # the first finding lands. The file is otherwise created lazily when a
-    # worker emits its first finding; on a large dimension that startup
-    # window is seconds of misleading warnings. An empty file is safe: every
-    # downstream reader treats a 0-byte JSONL identically to a missing one
-    # (size guard, or line-by-line iteration that yields zero results).
-    # Only create when absent so a prior phase's pre-written cached findings
-    # (above) are left untouched.
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     if not jsonl.exists():
         jsonl.touch()
@@ -496,57 +203,35 @@ def process_dimension_with_cache(
         ),
     )
     breaker.start()
+    return stop_event, watcher, breaker
 
-    try:
-        miss_evidence = dispatcher(
-            miss_config, dim_id, idx, ctx, callbacks, log=log,
+
+def _handle_breaker_trip(
+    config: RunConfig, dim_id: str, ctx: _AnalysisContext, jsonl: Path,
+    classify: ClassifyResult, files: list[str],
+) -> Evidence:
+    """Salvage the completed-so-far JSONL instead of discarding the whole
+    dimension, flagging failure_streak. Raises when there is nothing to
+    salvage, so the dim is marked INCOMPLETE as before."""
+    if jsonl.exists():
+        salvaged = parse_evidence_from_jsonl(
+            config, dim_id, ctx, jsonl,
+            files_read=_compute_files_read(classify, jsonl, files),
         )
-    finally:
-        # Signal the watcher to do a final persist and exit. Whatever
-        # completed before this point gets cached, whether the dispatch
-        # returned cleanly or raised.
-        #
-        # No join timeout: the prior 5s cap was the c88be50e regression
-        # that dropped the final persist tick when it ran longer than 5s.
-        # On a 790-file flexibility run the user lost ~16% of the cache
-        # entries (790 file_done="ok" markers in the JSONL, only 662
-        # entries persisted) because the final tick was scanning the whole
-        # JSONL and rewriting per-file entries — each persist_dispatch_results
-        # call does O(n_files) work and an interrupted final tick silently
-        # abandoned every entry it hadn't yet written.
-        #
-        # The breaker join keeps its 5s cap: it's a separate thread with
-        # independent lifecycle whose final tick is bounded I/O.
-        stop_event.set()
-        watcher.join()
-        breaker.stop_and_join(timeout=5.0)
+        if salvaged is not None and salvaged.principles:
+            salvaged.exit_reason = "failure_streak"
+            return salvaged
+    raise CircuitBreakerError("circuit_breaker")
 
-    if breaker.trip_event is not None:
-        # The breaker tripped, but the finally block above already persisted
-        # every completed file to the JSONL. Salvage that work instead of
-        # discarding the whole dimension: parse the collected findings into
-        # Evidence and flag it failure_streak so the loop scores it (DONE +
-        # exit_reason) and the grade layer can exclude it. The breaker already
-        # requested run-wide cancellation, so the run still ends after this dim.
-        if jsonl.exists():
-            salvaged = parse_evidence_from_jsonl(
-                config, dim_id, ctx, jsonl,
-                files_read=_compute_files_read(classify, jsonl, files),
-            )
-            if salvaged is not None and salvaged.principles:
-                salvaged.exit_reason = "failure_streak"
-                return salvaged
-        # Nothing collected -- no score to fabricate. Surface the typed
-        # exception so the dim is marked INCOMPLETE/unscored as before.
-        raise CircuitBreakerError("circuit_breaker")
 
+def _handle_dispatch_result(
+    config: RunConfig, dim_id: str, ctx: _AnalysisContext, jsonl: Path,
+    classify: ClassifyResult, files: list[str],
+    miss_evidence: Evidence | None,
+) -> Evidence | None:
+    """Finalize Evidence after a normal (non-tripped) dispatch return,
+    re-parsing the JSONL so files_read reflects hits + misses."""
     if miss_evidence is None:
-        # Dispatch returned None - final persist already ran via the
-        # watcher, so any partial completion is preserved. If we have
-        # cached findings already in the JSONL (pre-written above), parse
-        # them so the run still has SOMETHING to score; otherwise None.
-        # Both replay groups count: an all-unconsolidated dimension has
-        # findings in the JSONL even though cached_findings is empty.
         replayed_anything = bool(
             classify.cached_findings or classify.unconsolidated_findings
         )
@@ -556,11 +241,59 @@ def process_dimension_with_cache(
                 files_read=_compute_files_read(classify, jsonl, files),
             )
         return None
-
-    # Re-parse the JSONL so files_read reflects the total (hits + misses),
-    # not just len(misses) which is what the dispatcher's Evidence carries.
-    # The dispatcher already deduped on its way out, so no extra dedup here.
     return parse_evidence_from_jsonl(
         config, dim_id, ctx, jsonl,
         files_read=_compute_files_read(classify, jsonl, files),
+    )
+
+
+def process_dimension_with_cache(
+    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
+    callbacks: DimensionCallbacks,
+    *,
+    cache: CacheBackend | None = None,
+    dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents,
+    persist_interval_s: float = _PERSIST_INTERVAL_S,
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
+    log: LogSink = NULL_LOG,
+) -> Evidence | None:
+    """V2 entry point — content-addressed cache replaces V1 change
+    detection. Falls through to *dispatcher* when there's no source-file
+    list to classify (matches V1's no-files fallback)."""
+    if cache is None:
+        cache = LocalFileBackend()
+        maybe_collect_legacy_entries(cache.root)
+    trust_model = resolve_trust_model(config.src) if config.src is not None else None
+    files, _ext, _excluded = _list_source_files(config, dim_id)
+    if not files:
+        return dispatcher(config, dim_id, idx, ctx, callbacks, log=log)
+
+    bypass_reads = _invalidate_for_clean_scan(config, files, dim_id, cache)
+    classify = _classify_and_log(config, dim_id, files, cache, bypass_reads)
+    jsonl = _jsonl_path(config, dim_id)
+    _write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
+
+    if not classify.misses:
+        return _handle_all_hits(
+            config, dim_id, ctx, jsonl, classify, files, trust_model, writer_factory,
+        )
+
+    miss_config = _prepare_miss_dispatch(
+        config, dim_id, jsonl, classify, trust_model, writer_factory,
+    )
+    stop_event, watcher, breaker = _start_watchers(
+        config, dim_id, jsonl, classify, cache, persist_interval_s,
+    )
+    try:
+        miss_evidence = dispatcher(miss_config, dim_id, idx, ctx, callbacks, log=log)
+    finally:
+        # No join timeout (c88be50e regression: a capped join dropped the
+        # final persist tick on long dims). Breaker keeps its own 5s cap.
+        stop_event.set()
+        watcher.join()
+        breaker.stop_and_join(timeout=5.0)
+    if breaker.trip_event is not None:
+        return _handle_breaker_trip(config, dim_id, ctx, jsonl, classify, files)
+    return _handle_dispatch_result(
+        config, dim_id, ctx, jsonl, classify, files, miss_evidence,
     )

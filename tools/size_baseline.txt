@@ -16,13 +16,11 @@ src/quodeq/analysis/_loops.py:292:function
 src/quodeq/analysis/_loops.py:434:function
 src/quodeq/analysis/_pipeline.py:122:function
 src/quodeq/analysis/api_prompt_assembly.py:76:function
+src/quodeq/analysis/cache/_replay.py:137:function
 src/quodeq/analysis/cache/cache_writer.py:37:function
 src/quodeq/analysis/cache/dimension_helpers.py:1:file
 src/quodeq/analysis/cache/dimension_helpers.py:200:function
 src/quodeq/analysis/cache/dimension_helpers.py:300:function
-src/quodeq/analysis/cache/dimension_runner.py:1:file
-src/quodeq/analysis/cache/dimension_runner.py:225:function
-src/quodeq/analysis/cache/dimension_runner.py:308:function
 src/quodeq/analysis/estimates.py:28:function
 src/quodeq/analysis/manifest_build.py:1:file
 src/quodeq/analysis/manifest_build.py:222:function
