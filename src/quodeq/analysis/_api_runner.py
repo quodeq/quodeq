@@ -3,11 +3,11 @@
 Calls LLM APIs directly via the raw OpenAI client and writes findings as
 JSONL evidence -- the same format the CLI runner produces via MCP.
 
-``_Finding`` (below) is a lenient short-key variant of the canonical
-``Judgment`` (``quodeq.core.events.models``). Local models drop required
-fields and balk at long field names under load -- this type's short keys
-(``req``/``t``/``w``) and Field descriptions are tuned for that constraint.
-The downstream wire-dict → Judgment lift happens via
+``_Finding`` (in ``_api_schema``) is a lenient short-key variant of the
+canonical ``Judgment`` (``quodeq.core.events.models``). Local models drop
+required fields and balk at long field names under load -- this type's short
+keys (``req``/``t``/``w``) and Field descriptions are tuned for that
+constraint. The downstream wire-dict → Judgment lift happens via
 ``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
 ``FindingEnricher`` maps ``req`` to ``practice_id``.
 
@@ -15,27 +15,47 @@ Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
-import functools
-import json
 import logging
-import time
-from dataclasses import dataclass
-from enum import Enum as _Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-import httpx
+# Kept so `patch("...._api_runner.openai.OpenAI")` still resolves -- the
+# real call site (`_call_api`) lives in `_api_call`, but patching an
+# attribute on this shared module object affects it there too.
 import openai
-from pydantic import BaseModel, Field
 
-from quodeq.analysis._drop_stats import record as _record_drop_stats
-from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
-from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
-from quodeq.config.analysis_env import (
-    api_read_timeout_override,
-    context_size_override,
-    max_output_tokens_override,
+from quodeq.analysis._api_call import (
+    ApiRunnerConfig,
+    _CLOUD_TIMEOUT,
+    _DEFAULT_LOCAL_MAX_TOKENS,
+    _LOCAL_TIMEOUT,
+    _OLLAMA_DEFAULT_API_KEY,
+    _OLLAMA_DEFAULT_BASE,
+    _OPENAI_API_HOST,
+    _build_create_kwargs,
+    _call_api,
+    _classify_fatal_api_error,
+    _log_call_outcome,
+    _resolve_max_tokens,
+    _resolve_timeout,
+    _warn_ollama_ctx_noop,
 )
+from quodeq.analysis._api_enrichment import (
+    _derive_run_paths,
+    _infer_end_line,
+    _resolve_file_paths,
+)
+from quodeq.analysis._api_schema import (
+    _SYSTEM_PROMPT,
+    _Finding,
+    _FindingType,
+    _Severity,
+    _extract_finding_dicts,
+    _looks_like_finding,
+    _parse_findings,
+)
+from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
@@ -45,450 +65,8 @@ from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
 from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
-from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
-
-_OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
-_OLLAMA_DEFAULT_API_KEY = "ollama"
-_OPENAI_API_HOST = "api.openai.com"
-_LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
-# Cloud calls get a finite timeout too: with max_retries=0 a stalled response
-# would otherwise block the analysis worker forever. Read budget matches the
-# SDK's own 600s default; a timeout lands in the existing lossy-file branch.
-_CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
-# Default output budget for local calls (QUODEQ_MAX_OUTPUT_TOKENS overrides,
-# 0 disables). Healthy per-batch responses are well under 4k tokens; the cap
-# bounds a runaway generation by output budget instead of only wall clock. A
-# capped response arrives with finish_reason=length and takes the existing
-# lossy path (error marker, re-dispatch next run), so nothing is silently lost.
-_DEFAULT_LOCAL_MAX_TOKENS = 8192
-_SYSTEM_PROMPT = (
-    "You are a code quality evaluator. Quote the offending code into "
-    "`snippet` VERBATIM from the source, one or a few contiguous lines, "
-    "exact characters, no paraphrase. Set `end_line` to match the last "
-    "line of the snippet. In `reason`, state what the code does wrong and "
-    "the concrete impact in 1 to 3 sentences. "
-    'Return JSON as {"findings": [...]}; an empty array is valid.'
-)
-
-
-# ---------------------------------------------------------------------------
-# Pydantic schema for structured LLM output
-# ---------------------------------------------------------------------------
-
-class _FindingType(str, _Enum):
-    violation = "violation"
-    compliance = "compliance"
-
-
-class _Severity(str, _Enum):
-    critical = "critical"
-    major = "major"
-    minor = "minor"
-
-
-class _Finding(BaseModel):
-    req: str = Field(description="Requirement ID (e.g. P-TIM-1, S-CON-3)")
-    t: _FindingType = Field(description="violation or compliance")
-    file: str = Field(description="File path relative to repo root")
-    line: int = Field(description="1-indexed line number of the offending expression. MUST be > 0.", gt=0)
-    end_line: int | None = Field(
-        default=None,
-        description=(
-            "Last line of the offending span. Set this whenever the violation "
-            "spans more than one line — both for structural issues (long "
-            "function, nesting depth) and for multi-line expressions or "
-            "blocks. Omit only when the issue is genuinely a single line. "
-            "The server reads the actual source to render the highlighted "
-            "snippet from line..end_line; getting end_line right is what "
-            "makes the highlight readable."
-        ),
-    )
-    severity: _Severity = Field(default=_Severity.minor)
-    vt: str | None = Field(
-        default=None,
-        description=(
-            "Violation type taxonomy code: a short, stable, kebab-case class "
-            "of the violation (e.g. 'code-injection', 'hardcoded-secret', "
-            "'missing-error-handling'). Reuse the exact same code for every "
-            "finding of the same kind so near-duplicates group together."
-        ),
-    )
-    w: str = Field(description="Short title of the finding")
-    snippet: str = Field(
-        description=(
-            "Offending code copied VERBATIM from the source file — exact "
-            "characters, no paraphrase, no summarisation. One or a few "
-            "contiguous lines: quote enough that the issue is self-evident, "
-            "no padding. The number of lines in `snippet` must match the "
-            "span from `line` to `end_line` (so end_line - line + 1 == "
-            "snippet line count). Required. If you cannot quote the code, "
-            "drop the finding."
-        ),
-        min_length=1,
-    )
-    reason: str = Field(
-        description=(
-            "1–3 sentences: state what the quoted code does wrong AS WRITTEN, "
-            "and name the concrete impact (what breaks, who is affected, or "
-            "what attack/failure it enables). "
-            "No hedging ('could', 'might', 'should consider', 'if X were larger')."
-        ),
-        min_length=1,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Config and API call
-# ---------------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class ApiRunnerConfig:
-    """Configuration for a single API runner invocation."""
-
-    model: str
-    api_base: str
-    api_key: str = ""
-    temperature: float = 0.1
-    max_tokens: int | None = None
-    context_size: int = 0
-    n_subagents: int = 1
-    """Pool size this call competes with; scales the local read timeout."""
-
-
-@functools.lru_cache(maxsize=8)
-def _warn_ollama_ctx_noop(api_base: str) -> None:
-    """One warning per base URL: Ollama's /v1 endpoint ignores num_ctx
-    (top-level and nested options alike, verified on 0.33.1), so a configured
-    context size never reaches the model there. The server-side setting is
-    the only lever."""
-    _log.warning(
-        "A context size is configured but %s looks like Ollama, whose "
-        "OpenAI-compatible endpoint ignores per-request num_ctx. Set "
-        "OLLAMA_CONTEXT_LENGTH (or the Ollama app's context-length setting) "
-        "instead.",
-        api_base,
-    )
-
-
-def _resolve_max_tokens(config: ApiRunnerConfig, *, is_openai: bool) -> int | None:
-    """Output budget for one completion call.
-
-    Explicit config wins; otherwise local calls get a default cap and cloud
-    calls stay uncapped. QUODEQ_MAX_OUTPUT_TOKENS overrides the local default
-    (0 disables the cap).
-    """
-    if config.max_tokens is not None:
-        return config.max_tokens
-    if is_openai:
-        return None
-    override = max_output_tokens_override()
-    if override is not None:
-        return override or None
-    return _DEFAULT_LOCAL_MAX_TOKENS
-
-
-def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeout:
-    """Read budget for one completion call.
-
-    Local servers serve one request per loaded model, so with N subagents a
-    queued request can wait up to (N-1) inferences before its own starts:
-    a fixed budget times out queued-but-healthy calls, and each timeout burns
-    the whole budget for zero findings. Scale the read budget linearly with N.
-    Cloud backends parallelize, so their budget stays fixed.
-    QUODEQ_API_READ_TIMEOUT (whole seconds) overrides the read budget outright.
-    """
-    base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
-    override = api_read_timeout_override()
-    if override is not None and override > 0:
-        return httpx.Timeout(
-            connect=base.connect, read=float(override),
-            write=base.write, pool=base.pool,
-        )
-    scale = max(1, config.n_subagents)
-    if is_openai or scale == 1:
-        return base
-    return httpx.Timeout(
-        connect=base.connect, read=base.read * scale,
-        write=base.write, pool=base.pool,
-    )
-
-
-# A dict that fails `_Finding` validation but carries the required, domain-specific
-# `req` identifier is a *dropped finding* attempt: counted once for observability,
-# then we stop (its own fields are not separate findings, mirroring the valid path).
-# A dict that LOOKS like a finding (shares >=2 fields with the schema) but is missing
-# `req` is also a dropped attempt -- BUT only when it is a leaf (no nested dict/list
-# values). A dict that shares field names yet nests dicts/lists is treated as a
-# wrapper and recursed into, so real findings inside it (e.g. {"findings": [...]}) are
-# recovered rather than swallowed. The trade-off: a malformed, req-less finding that
-# itself nests a container is recursed instead of counted, so it is not tallied in the
-# (observability-only) dropped count -- acceptable, since a req-bearing attempt is
-# still always counted regardless of nesting.
-_DROPPED_FINDING_KEY = "req"
-_FINDING_FIELDS = frozenset(_Finding.model_fields)
-
-
-def _looks_like_finding(node: dict) -> bool:
-    """True if *node* shares enough keys with the finding schema to be a finding
-    attempt rather than a generic container. Two-field floor avoids false
-    positives from generic short keys like ``t``/``w`` appearing alone.
-    """
-    return len(_FINDING_FIELDS.intersection(node)) >= 2
-
-
-def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:
-    """Walk a decoded JSON value, appending any dict that parses as a `_Finding`.
-
-    Recovers findings whether the model emitted them as a bare object, a list,
-    a wrapped ``{"findings": [...]}``, or nested somewhere unexpected. Recursion
-    stops at a successful ``_Finding`` validation. A dict that fails validation
-    but is a finding attempt (carries ``req`` or otherwise looks like a finding)
-    is counted as dropped, then recursion stops (mirroring the valid path). Pure
-    containers (no finding-like keys) are recursed to recover nested findings.
-    """
-    if isinstance(node, dict):
-        try:
-            f = _Finding.model_validate(node)
-            sink.append(f.model_dump())
-            return
-        except (ValueError, KeyError, TypeError):
-            if _DROPPED_FINDING_KEY in node:
-                dropped.append(node)
-                return
-            # A finding-shaped LEAF (shares finding fields, no nested containers)
-            # that failed validation is a malformed finding attempt -> count it.
-            # A dict that merely shares field names while NESTING dicts/lists is a
-            # wrapper: fall through and recurse so its real findings are recovered
-            # rather than swallowed (counting + stopping here would lose them).
-            has_nested = any(isinstance(v, (dict, list)) for v in node.values())
-            if _looks_like_finding(node) and not has_nested:
-                dropped.append(node)
-                return
-        for value in node.values():
-            _extract_finding_dicts(value, sink, dropped)
-    elif isinstance(node, list):
-        for item in node:
-            _extract_finding_dicts(item, sink, dropped)
-
-
-def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
-    """Parse findings from raw (possibly malformed) model output.
-
-    This is the primary parser, not a fallback. Local models produce several
-    failure shapes: bare finding objects concatenated without an array wrapper
-    (``{...}{...}``); a complete ``{"findings": [...]}`` wrapper with hedging
-    text around it; findings with nested fields like ``req_refs: [{...}]``.
-
-    Strategy: walk the input with ``json.JSONDecoder().raw_decode()`` to find
-    every complete top-level JSON value (bracket-aware, so nested structures
-    pass through), then harvest anything that validates as a ``_Finding``.
-
-    Returns ``(valid_findings, dropped_count)`` where *dropped_count* is the
-    number of finding-shaped dicts that failed validation (for observability).
-    """
-    decoder = json.JSONDecoder()
-    findings: list[dict] = []
-    dropped: list[dict] = []
-    i = 0
-    n = len(raw_json)
-    while i < n:
-        brace = raw_json.find("{", i)
-        bracket = raw_json.find("[", i)
-        candidates = [c for c in (brace, bracket) if c >= 0]
-        if not candidates:
-            break
-        start = min(candidates)
-        try:
-            node, end = decoder.raw_decode(raw_json, start)
-        except json.JSONDecodeError:
-            i = start + 1
-            continue
-        _extract_finding_dicts(node, findings, dropped)
-        i = end
-    return findings, len(dropped)
-
-
-def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
-    """Return ``(reason_code, detail)`` when no retry can fix *exc*, else None.
-
-    The OpenAI SDK normalizes every OpenAI-compatible provider's errors into
-    typed exceptions with a status code, so one classifier covers ollama,
-    llamacpp, openrouter, and custom endpoints alike. 429 is fatal only when
-    the body says quota/credits (OpenAI ``insufficient_quota``, OpenRouter
-    out-of-credits): a bare 429 is a transient rate limit and stays on the
-    lossy-retry path.
-    """
-    if isinstance(exc, openai.AuthenticationError):
-        return "auth", "authentication failed (401)"
-    if isinstance(exc, openai.PermissionDeniedError):
-        return "auth", "permission denied (403)"
-    if isinstance(exc, openai.APIStatusError):
-        if exc.status_code == 402:
-            return "payment", "out of credits (402 payment required)"
-        if exc.status_code == 429:
-            reason = classify_fatal_provider_message(str(exc))
-            if reason in ("quota", "payment"):
-                return reason, "quota/credits exhausted (429)"
-    return None
-
-
-def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
-    """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
-
-    ``was_lossy`` is True when the analysis is unreliable: we failed to REACH
-    the model (network / timeout), OR the response was truncated by the output
-    budget (``finish_reason == "length"``) so findings past the cut are lost. A
-    response where only some individual findings were malformed returns
-    ``(good_findings, False)`` -- the call succeeded end-to-end, so
-    ``run_api_analysis`` may mark files done. Dropped malformed findings are
-    logged (count) but do not set ``was_lossy``. See ``run_api_analysis`` for
-    the marker contract.
-
-    The OpenAI client owns an httpx connection pool whose sockets count against
-    the process FD limit; the ``with`` block closes it so a long scan (one call
-    per file) doesn't exhaust the FD soft cap.
-    """
-    if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
-        validate_url_safe(config.api_base, allow_private=True)
-
-    is_openai = _OPENAI_API_HOST in (config.api_base or "")
-    extra_body: dict = {}
-    # Disable reasoning-mode thinking (Gemma 4, Qwen3); without it they burn
-    # 1000s of hidden tokens before the JSON and can loop past the read
-    # timeout. Ollama only honours `reasoning_effort` (it silently ignores
-    # `chat_template_kwargs` and top-level `think` on /v1); llama.cpp/vLLM
-    # style servers take `chat_template_kwargs`, so local providers get both.
-    extra_body["reasoning_effort"] = "none"
-    if not is_openai:
-        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
-    ctx_size = config.context_size
-    if ctx_size <= 0:
-        ctx_size = context_size_override() or 0
-    if ctx_size > 0:
-        # Kept for proxies (LiteLLM-style) that forward it to Ollama's native
-        # API; direct Ollama ignores it on /v1, hence the warning.
-        extra_body["num_ctx"] = ctx_size
-        base = config.api_base or _OLLAMA_DEFAULT_BASE
-        if ":11434" in base:
-            _warn_ollama_ctx_noop(base)
-
-    create_kwargs: dict = dict(
-        model=config.model,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=config.temperature,
-    )
-    if is_openai:
-        # Cloud OpenAI honours JSON-mode; local providers ignore/reject it.
-        create_kwargs["response_format"] = {"type": "json_object"}
-    if extra_body:
-        create_kwargs["extra_body"] = extra_body
-    max_tokens = _resolve_max_tokens(config, is_openai=is_openai)
-    if max_tokens is not None:
-        create_kwargs["max_tokens"] = max_tokens
-
-    timeout = _resolve_timeout(config, is_openai=is_openai)
-    _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
-    start = time.monotonic()
-    with openai.OpenAI(
-        base_url=config.api_base,
-        api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
-        timeout=timeout,
-        # Disable the SDK's internal timeout retries: each waits the full read
-        # budget, compounding one timeout into minutes of dead wall time.
-        max_retries=0,
-    ) as client:
-        try:
-            response = client.chat.completions.create(**create_kwargs)
-        except Exception as exc:
-            elapsed = time.monotonic() - start
-            fatal = _classify_fatal_api_error(exc)
-            if fatal is not None:
-                reason_code, detail = fatal
-                _log.error(
-                    "Model %s: %s -- no retry can succeed, aborting: %s",
-                    config.model, detail, str(exc)[:300],
-                )
-                raise FatalProviderError(
-                    f"{detail}: {str(exc)[:300]}", reason=reason_code,
-                ) from exc
-            if isinstance(exc, (httpx.TimeoutException, openai.APITimeoutError)):
-                _log.warning(
-                    "Model %s call timed out after %.0fs. Likely causes: "
-                    "--n-subagents > 1 with OLLAMA_NUM_PARALLEL=1 (requests "
-                    "queue and the second exceeds the timeout), or context "
-                    "too large (on Ollama set OLLAMA_CONTEXT_LENGTH; "
-                    "QUODEQ_CONTEXT_SIZE only reaches non-Ollama providers).",
-                    config.model, elapsed,
-                )
-            else:
-                _log.warning(
-                    "Model %s call failed after %.0fs: %s",
-                    config.model, elapsed, str(exc)[:300],
-                )
-            return [], True
-
-    choice = response.choices[0] if response.choices else None
-    finish_reason = getattr(choice, "finish_reason", None)
-    text = (choice.message.content or "") if choice else ""
-    findings, dropped = _parse_findings(text)
-    elapsed = time.monotonic() - start
-
-    # Feed the per-run aggregate so the dimension loops can report ONE
-    # drop-ratio signal at end of run instead of N scattered per-call lines.
-    _record_drop_stats(dropped=dropped, kept=len(findings))
-
-    # A length-truncated response is an incomplete analysis: the model ran out of
-    # output budget mid-stream, so findings after the cut are simply gone. Treat
-    # it as lossy so run_api_analysis writes an 'error' marker and the file(s)
-    # re-dispatch next run, rather than caching a partial result as 'ok'.
-    truncated = finish_reason == "length"
-    if truncated:
-        _log.warning(
-            "Model %s response was truncated (finish_reason=length) after %.0fs; "
-            "kept %d finding(s) but the analysis is incomplete and will re-dispatch. "
-            "Reduce input size or raise the model context window.",
-            config.model, elapsed, len(findings),
-        )
-    if dropped:
-        _log.warning(
-            "Model %s: dropped %d malformed finding(s) of %d parsed in %.0fs "
-            "(kept %d). The call succeeded; malformed findings were discarded.",
-            config.model, dropped, dropped + len(findings), elapsed, len(findings),
-        )
-    _log.debug(
-        "Model %s returned %d valid findings in %.0fs (raw bytes: %d)",
-        config.model, len(findings), elapsed, len(text),
-    )
-    return findings, truncated
-
-
-# ---------------------------------------------------------------------------
-# Enrichment and path resolution
-# ---------------------------------------------------------------------------
-
-def _infer_end_line(findings: list[dict]) -> None:
-    """Derive end_line from snippet line count when the model omits it.
-
-    Small local models often skip end_line, which collapses the dashboard
-    highlight to a single line even when the model quoted several lines into
-    snippet. If snippet has N>1 lines and end_line is unset, assume the span
-    runs from line to line+N-1.
-    """
-    for f in findings:
-        if f.get("end_line"):
-            continue
-        snippet = f.get("snippet") or ""
-        line = f.get("line") or 0
-        if line <= 0 or not snippet:
-            continue
-        n = snippet.count("\n") + 1
-        if n > 1:
-            f["end_line"] = line + n - 1
 
 
 def _build_router_context(
@@ -536,38 +114,6 @@ def _build_router_context(
         return None
 
 
-def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[dict]:
-    """Resolve short filenames to full relative paths."""
-    name_to_path: dict[str, str] = {}
-    for p in source_paths:
-        name = Path(p).name
-        name_to_path[name] = p
-
-    for f in findings:
-        file_val = f.get("file", "")
-        if file_val and "/" not in file_val and file_val in name_to_path:
-            f["file"] = name_to_path[file_val]
-    return findings
-
-
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
-def _derive_run_paths(jsonl_file: Path) -> tuple[Path | None, Path | None]:
-    """``(project_dir, run_dir)`` derived from the evidence file location.
-
-    *jsonl_file* is ``<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl``,
-    so the project directory is its great-grandparent and the run directory
-    its grandparent. Used by the context-enricher pipeline to load prior
-    dismissals as precedents (fingerprints and, when the semantic-precedents
-    flag is on, the embedded corpus).
-    """
-    project_dir = jsonl_file.parent.parent.parent if jsonl_file else None
-    run_dir = jsonl_file.parent.parent if jsonl_file else None
-    return project_dir, run_dir
-
-
 def _build_event_log(run_dir: Path):
     """EventLogWriter on the run's ``events.jsonl``.
 
@@ -608,6 +154,79 @@ def _build_cache_writer(
     )
 
 
+def _resolve_run_collaborators(
+    jsonl_file: Path,
+    run_config: RunConfig | None,
+    dim_id: str | None,
+    event_log: EventLogWriter | None,
+    cache_writer: Callable | None,
+) -> tuple[EventLogWriter, Callable | None]:
+    """Ensure the evidence dir exists, and resolve the event-log/cache-writer
+    defaults for the ones the caller left unset."""
+    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
+    if event_log is None:
+        event_log = _build_event_log(jsonl_file.parent.parent)
+    if cache_writer is None:
+        cache_writer = _build_cache_writer(run_config, dim_id)
+    return event_log, cache_writer
+
+
+def _mark_source_files_done(
+    router: FindingsRouter,
+    source_file_paths: list[str] | None,
+    was_lossy: bool,
+    fatal_exc: FatalProviderError | None,
+) -> None:
+    """Mark every source file done: 'ok' on a clean call, 'error' on a lossy one.
+
+    Clean end-to-end call -> 'ok'; lossy call (model unreachable / network /
+    timeout) -> 'error'. The 'error' status is excluded from the cache's
+    ok_files set (files still re-dispatch next run), but lets the
+    failure-streak breaker and the post-run reachability guard see the
+    failure and fail the run loudly.
+    """
+    if not source_file_paths:
+        return
+    status = "error" if was_lossy else "ok"
+    reason = None
+    if fatal_exc is not None:
+        reason = f"fatal provider error ({fatal_exc.reason}): {fatal_exc}"
+    elif was_lossy:
+        reason = "model call failed (unreachable or errored)"
+    for path in source_file_paths:
+        router.mark_file_done(file=path, status=status, reason=reason)
+
+
+def _run_call_and_enrich(
+    prompt: str,
+    config: ApiRunnerConfig,
+    jsonl_file: Path,
+    compiled_dir: Path | None,
+    dimension: str | None,
+    work_dir: Path | None,
+    source_file_paths: list[str] | None,
+) -> tuple[list[dict], bool, FatalProviderError | None, CompiledContext | None]:
+    """Call the model, resolve/enrich its findings, and build the router context.
+
+    A fatal provider error (quota/auth/billing) is captured rather than raised
+    here -- the caller still needs to write 'error' markers first (the breaker
+    and reachability guard rely on them) before re-raising it.
+    """
+    fatal_exc: FatalProviderError | None = None
+    try:
+        findings, was_lossy = _call_api(prompt, config)
+    except FatalProviderError as exc:
+        fatal_exc, findings, was_lossy = exc, [], True
+
+    if source_file_paths:
+        findings = _resolve_file_paths(findings, source_file_paths)
+    _infer_end_line(findings)
+
+    project_dir, run_dir = _derive_run_paths(jsonl_file)
+    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir, run_dir)
+    return findings, was_lossy, fatal_exc, ctx
+
+
 def run_api_analysis(
     *,
     prompt: str,
@@ -625,96 +244,35 @@ def run_api_analysis(
 ) -> None:
     """Call the LLM and write findings as JSONL evidence through ``FindingsRouter``.
 
-    Both the CLI/MCP path and this API path write per-dim evidence through
-    a single canonical sink (``FindingsRouter``). The router owns:
+    Both the CLI/MCP and API paths write per-dim evidence through this one
+    sink, which owns atomic writes, dedup/enrichment, and the
+    ``mark_file_done`` marker the V2 cache's ``ok_files`` filter reads. See
+    ``_mark_source_files_done`` for the marker contract and
+    ``_run_call_and_enrich`` for the fatal-provider-error capture.
 
-    - Atomic per-line writes (concurrency-safe with sibling writers).
-    - Finding dedup + enrichment via the compiled standards context.
-    - The ``mark_file_done`` per-file completion marker that drives the
-      V2 cache's ``ok_files`` filter (``analysis/cache/dimension_helpers.py``).
-
-    Marker contract:
-        When the API call completes end-to-end (``was_lossy`` is False), every
-        file in *source_file_paths* gets an ``ok`` marker -- the call analysed
-        them all. Individual malformed findings may have been dropped during
-        per-finding parsing (and were logged with a count), but that does not
-        invalidate the file: it was analysed, so it should not re-dispatch.
-        On a lossy call (network/timeout/unreachable, or a length-truncated
-        response, ``was_lossy`` True), every file gets an ``error`` marker
-        instead. ``error`` markers
-        are excluded from the cache's ``ok_files`` set, so those files still
-        re-dispatch on the next run -- but, unlike emitting no marker at all,
-        they let the failure-streak breaker trip and the post-run
-        reachability guard fail the run loudly when the model is unreachable.
-
-    *source_file_paths* should be the full per-dim file list. When omitted,
-    no markers are emitted (preserves caller flexibility but the run will
-    not benefit from V2 cache hits across re-runs).
-
-    *run_config* and *dim_id*, when both provided, enable the synchronous
-    cache-write path: a closure built from the run's fingerprint inputs is
-    passed to ``FindingsRouter(on_file_done=...)`` so every clean ``ok``
-    marker writes its per-file cache entry to disk before returning. Legacy
-    callers that omit either remain unchanged -- no cache is written.
-
-    *event_log*, *cache_writer* and *router_factory* are injection seams for
-    tests: each defaults to the production collaborator it replaces
-    (``_build_event_log``, ``_build_cache_writer(run_config, dim_id)``,
-    ``FindingsRouter``) when omitted. ``cache_writer`` is resolved with an
-    explicit ``is None`` check rather than truthiness -- ``None`` is also
-    ``_build_cache_writer``'s legitimate "no cache" result, so it must stay
-    ``None`` once resolved, not get re-built on a later falsy check.
+    *run_config*/*dim_id* enable the cache-write path via
+    ``FindingsRouter(on_file_done=...)``. *event_log*, *cache_writer* and
+    *router_factory* are test injection seams; ``cache_writer`` uses an
+    explicit ``is None`` check since ``None`` is also its "no cache" result.
     """
-    # A fatal provider error (quota/auth/billing) still writes 'error'
-    # markers first -- the breaker and reachability guard rely on them --
-    # then re-raises so the pool layer can cancel the run instead of
-    # respawning agents against a dead provider.
-    fatal_exc: FatalProviderError | None = None
-    try:
-        findings, was_lossy = _call_api(prompt, config)
-    except FatalProviderError as exc:
-        fatal_exc, findings, was_lossy = exc, [], True
-
-    if source_file_paths:
-        findings = _resolve_file_paths(findings, source_file_paths)
-
-    _infer_end_line(findings)
-
-    project_dir, run_dir = _derive_run_paths(jsonl_file)
-    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir, run_dir)
-
+    findings, was_lossy, fatal_exc, ctx = _run_call_and_enrich(
+        prompt, config, jsonl_file, compiled_dir, dimension, work_dir, source_file_paths,
+    )
     _log.debug(
         "API runner: %d findings, lossy=%s, marking %d file(s) as %s",
         len(findings), was_lossy,
         len(source_file_paths) if source_file_paths else 0,
         "error" if was_lossy else "ok",
     )
-
-    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
-    if event_log is None:
-        event_log = _build_event_log(jsonl_file.parent.parent)
-    if cache_writer is None:
-        cache_writer = _build_cache_writer(run_config, dim_id)
-
+    event_log, cache_writer = _resolve_run_collaborators(
+        jsonl_file, run_config, dim_id, event_log, cache_writer,
+    )
     with open(jsonl_file, "a", encoding="utf-8") as fh:
         router = router_factory(
             fh, context=ctx, event_log=event_log, on_file_done=cache_writer,
         )
         for f in findings:
             router.receive(f)
-        if source_file_paths:
-            # Clean end-to-end call -> 'ok'; lossy call (model unreachable /
-            # network / timeout) -> 'error'. The 'error' status is excluded
-            # from the cache's ok_files set (files still re-dispatch next run),
-            # but lets the failure-streak breaker and the post-run
-            # reachability guard see the failure and fail the run loudly.
-            status = "error" if was_lossy else "ok"
-            reason = None
-            if fatal_exc is not None:
-                reason = f"fatal provider error ({fatal_exc.reason}): {fatal_exc}"
-            elif was_lossy:
-                reason = "model call failed (unreachable or errored)"
-            for path in source_file_paths:
-                router.mark_file_done(file=path, status=status, reason=reason)
+        _mark_source_files_done(router, source_file_paths, was_lossy, fatal_exc)
     if fatal_exc is not None:
         raise fatal_exc

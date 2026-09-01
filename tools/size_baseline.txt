@@ -8,9 +8,6 @@ src/quodeq/_cli_evaluation.py:467:function
 src/quodeq/_cli_evaluation.py:574:function
 src/quodeq/_cli_resolution.py:1:file
 src/quodeq/_cli_resolution.py:253:function
-src/quodeq/analysis/_api_runner.py:1:file
-src/quodeq/analysis/_api_runner.py:337:function
-src/quodeq/analysis/_api_runner.py:611:function
 src/quodeq/analysis/_command.py:1:file
 src/quodeq/analysis/_command.py:73:function
 src/quodeq/analysis/_dim_estimates.py:50:function
