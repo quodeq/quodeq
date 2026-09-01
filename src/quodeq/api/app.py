@@ -71,25 +71,18 @@ def _register_health_route(app: Flask, verbose: bool) -> None:
         return jsonify(payload)
 
 
-def create_app(
-    provider: ActionProvider | None = None,
-    static_dist: str | None = None,
-    rate_limit_store: RateLimitStore | None = None,
-    api_key: str | None = None,
-    test_config: dict | None = None,
-) -> Flask:
-    """Create and configure the Flask application with all API routes."""
-    app = Flask(__name__)
-    if test_config is not None:
-        app.config.update(test_config)
-    # Cap multipart uploads (project import) at the same size as the export
-    # limit, plus a small headroom for multipart framing. Flask aborts with
-    # 413 before reading the full body, which keeps large bogus uploads cheap.
+def _configure_upload_limits(app: Flask) -> None:
+    """Cap multipart uploads (project import) at the same size as the export
+    limit, plus a small headroom for multipart framing. Flask aborts with
+    413 before reading the full body, which keeps large bogus uploads cheap.
+    """
     from quodeq.api.zip import _max_zip_size_bytes
     app.config.setdefault("MAX_CONTENT_LENGTH", _max_zip_size_bytes() + 1 * 1024 * 1024)
-    provider = provider or _default_provider()
-    app.config["_provider"] = provider
 
+
+def _configure_extensions(app: Flask) -> None:
+    """Set up per-app extensions: assistant turn/SSE registry, background
+    task runner, and the CWE lookup cache."""
     # Per-app assistant turn/SSE registry (composition root for the state the
     # assistant routes used to keep in module globals).
     from quodeq.api.assistant_routes import AssistantTurnState
@@ -102,6 +95,10 @@ def create_app(
     from quodeq.api.standards_read_routes import CweCache
     app.extensions["cwe_cache"] = CweCache()
 
+
+def _configure_paths_and_cleanup(app: Flask) -> None:
+    """Sweep orphaned ephemeral clones, and default the STANDARDS_*/
+    ASSISTANT_DB_PATH config entries when the caller hasn't set them."""
     from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
@@ -111,10 +108,6 @@ def create_app(
     except Exception as exc:  # pragma: no cover - best-effort cleanup
         _logger.warning("Orphaned-clone sweep failed at startup: %s", exc)
 
-    store = rate_limit_store or create_rate_limit_store()
-    eval_store = InMemoryRateLimitStore(
-        window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
-    )
     if "STANDARDS_EVALUATORS_DIR" not in app.config:
         paths = default_paths()
         app.config["STANDARDS_EVALUATORS_DIR"] = str(paths.evaluators_dir)
@@ -125,6 +118,30 @@ def create_app(
         # QUODEQ_DIR must redirect this like every other state path, else
         # env-isolated servers write sessions into the real ~/.quodeq store.
         app.config["ASSISTANT_DB_PATH"] = str(get_quodeq_dir() / "assistant.db")
+
+
+def create_app(
+    provider: ActionProvider | None = None,
+    static_dist: str | None = None,
+    rate_limit_store: RateLimitStore | None = None,
+    api_key: str | None = None,
+    test_config: dict | None = None,
+) -> Flask:
+    """Create and configure the Flask application with all API routes."""
+    app = Flask(__name__)
+    if test_config is not None:
+        app.config.update(test_config)
+    _configure_upload_limits(app)
+    provider = provider or _default_provider()
+    app.config["_provider"] = provider
+
+    _configure_extensions(app)
+    _configure_paths_and_cleanup(app)
+
+    store = rate_limit_store or create_rate_limit_store()
+    eval_store = InMemoryRateLimitStore(
+        window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
+    )
 
     if api_key is None:
         _logger.warning(

@@ -12,16 +12,17 @@ from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_path_segment
 
 
+def _validate_params(*params: str) -> tuple[Response, int] | None:
+    try:
+        validate_path_segment(*params)
+    except ValueError:
+        body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    return None
+
+
 def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project dashboard, accumulated, evaluation, and violation routes."""
-
-    def _validate_params(*params: str) -> tuple[Response, int] | None:
-        try:
-            validate_path_segment(*params)
-        except ValueError:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
-        return None
 
     @app.get("/api/projects/<project>/dashboard")
     def dashboard(project: str) -> Response | tuple[Response, int]:

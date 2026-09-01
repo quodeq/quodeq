@@ -12,59 +12,67 @@ from quodeq.shared.serialization import to_camel_dict
 logger = logging.getLogger(__name__)
 
 
+def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, int]:
+    library = get_library_client(app)
+    if library is None:
+        return error_response("Standards library not configured", 400, "library_not_configured")
+    payload = request.get_json(force=True)
+    file_path = payload.get("file")
+    if not file_path:
+        return error_response("file is required", 400, "bad_request")
+    if ".." in file_path or file_path.startswith("/"):
+        return error_response("Invalid file path", 400, "bad_request")
+    try:
+        library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
+    except ValueError as exc:
+        logger.warning("Library import conflict: %s", exc)
+        return error_response("Import conflict", 409, "conflict")
+    except Exception as exc:
+        logger.warning("Library import failed: %s", exc)
+        return error_response(
+            "Import from library failed. Check that the library server is reachable and the standard file is valid.",
+            502, "import_error",
+        )
+    logger.info("standards.import_from_library file=%s", file_path)
+    return jsonify({"status": "imported"}), 201
+
+
+def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
+    svc = get_service(app)
+    payload = request.get_json(force=True)
+    data = payload.get("data")
+    if not data or not isinstance(data, dict):
+        return error_response("'data' field is required and must be an object", 400, "bad_request")
+    force = payload.get("force", False)
+    logger.info("standards.import id=%s", data.get("id", "<unknown>"))
+    try:
+        result = svc.import_from_file(data, force=force)
+    except ValueError as exc:
+        logger.warning("standards.import validation error: %s", exc)
+        return error_response("Invalid import data", 400, "validation_error")
+    except PermissionError as exc:
+        logger.warning("standards.import permission error: %s", exc)
+        return error_response("Permission denied", 403, "forbidden")
+    if result["status"] == "conflict":
+        return jsonify({
+            "status": "conflict",
+            "existing": to_camel_dict(result["existing"]),
+            "warnings": result["warnings"],
+        }), 409
+    return jsonify({
+        "status": "imported",
+        "detail": to_camel_dict(result["detail"]),
+        "warnings": result["warnings"],
+    }), 201
+
+
 def register_import_routes(app: Flask, get_service, get_library_client) -> None:
     """Register import and library routes for the standards API."""
 
     @app.post("/api/standards/library/import")
     def import_from_library() -> tuple[Response, int]:
-        library = get_library_client(app)
-        if library is None:
-            return error_response("Standards library not configured", 400, "library_not_configured")
-        payload = request.get_json(force=True)
-        file_path = payload.get("file")
-        if not file_path:
-            return error_response("file is required", 400, "bad_request")
-        if ".." in file_path or file_path.startswith("/"):
-            return error_response("Invalid file path", 400, "bad_request")
-        try:
-            library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
-        except ValueError as exc:
-            logger.warning("Library import conflict: %s", exc)
-            return error_response("Import conflict", 409, "conflict")
-        except Exception as exc:
-            logger.warning("Library import failed: %s", exc)
-            return error_response(
-                "Import from library failed. Check that the library server is reachable and the standard file is valid.",
-                502, "import_error",
-            )
-        logger.info("standards.import_from_library file=%s", file_path)
-        return jsonify({"status": "imported"}), 201
+        return _do_import_from_library(app, get_library_client)
 
     @app.post("/api/standards/import")
     def import_standard() -> tuple[Response, int]:
-        svc = get_service(app)
-        payload = request.get_json(force=True)
-        data = payload.get("data")
-        if not data or not isinstance(data, dict):
-            return error_response("'data' field is required and must be an object", 400, "bad_request")
-        force = payload.get("force", False)
-        logger.info("standards.import id=%s", data.get("id", "<unknown>"))
-        try:
-            result = svc.import_from_file(data, force=force)
-        except ValueError as exc:
-            logger.warning("standards.import validation error: %s", exc)
-            return error_response("Invalid import data", 400, "validation_error")
-        except PermissionError as exc:
-            logger.warning("standards.import permission error: %s", exc)
-            return error_response("Permission denied", 403, "forbidden")
-        if result["status"] == "conflict":
-            return jsonify({
-                "status": "conflict",
-                "existing": to_camel_dict(result["existing"]),
-                "warnings": result["warnings"],
-            }), 409
-        return jsonify({
-            "status": "imported",
-            "detail": to_camel_dict(result["detail"]),
-            "warnings": result["warnings"],
-        }), 201
+        return _do_import_standard(app, get_service)
