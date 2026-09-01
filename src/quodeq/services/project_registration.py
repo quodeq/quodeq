@@ -2,11 +2,14 @@
 
 Extracted from ``evaluation_mixin`` so the API layer has a public entry
 point instead of importing private helpers.
+
+Split (Task 12) into two sibling modules plus this orchestrator:
+  - _registration_url.py: credential-stripping and origin-remote reads.
+  - _registration_scan.py: the zero-run scan fallback and parent-project scan.
 """
 from __future__ import annotations
 
 import json
-import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +18,6 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._wiring import (
     ProjectIdentity,
     read_repository_info,
-    remote_origin_url_raw,
     resolve_project_uuid,
     validate_remote_url,
     write_repository_info,
@@ -23,6 +25,8 @@ from quodeq.services._wiring import (
 from quodeq.services._fs_clone import CloneError, run_git_clone
 from quodeq.services._fs_project_helpers import find_existing_project
 from quodeq.services._fs_scan import scan_project
+from quodeq.services._registration_scan import _scan_parent_project, _zero_run_scan_fallback
+from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
@@ -30,58 +34,77 @@ from quodeq.shared.utils import is_repo_url, project_name_from_repo
 _LOCATION_LOCAL = "local"
 
 
-def _zero_run_scan_fallback() -> dict:
-    """Fresh zero-run scan_data for a project whose scan.json is missing/corrupt.
+def _resolve_target_path(
+    repo: str, repo_resolved: str, project_name: str, project_uuid: str, *,
+    is_url: bool, ephemeral: bool, clone_dest: str | None, clones_dir: Path | None,
+) -> Path:
+    """Resolve/create the on-disk path the project will live at.
 
-    A factory, not a module-level constant: dict(_ZERO_RUN_SCAN_FALLBACK) used
-    to only shallow-copy, so every registration that hit this fallback shared
-    the same nested ``languages``/``branches``/``modules``/``file_tree``
-    containers -- a caller mutating one result's list/dict silently corrupted
-    every other fallback result (past and future).
+    For a URL input, clones into an ephemeral cache dir or the caller's
+    chosen *clone_dest*. For a local path input, resolves in place -- the
+    directory must already exist.
     """
-    return {
-        "total_files": 0, "code_files": 0, "languages": {},
-        "branches": [], "modules": [], "file_tree": [],
-    }
+    if is_url:
+        if ephemeral:
+            target_path = (clones_dir or get_clones_dir()) / project_uuid
+        else:
+            target_path = Path(clone_dest).resolve() / project_name
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
+        run_git_clone(repo, target_path)
+        return target_path
 
-# Mirrors _CREDENTIALS_RE in quodeq.api._evaluation_helpers. Not imported from
-# there: services must not depend on the api layer (no other services module
-# does), so the pattern is duplicated here rather than layered across.
-# Userinfo cannot contain an unencoded "/", so excluding it keeps matches
-# identical while a failing scan stays linear (no polynomial backtracking
-# on inputs like repeated "http://" runs).
-_CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
+    target_path = Path(repo_resolved)
+    if not target_path.is_dir():
+        # A path pointing at a FILE is a distinct user mistake from a
+        # missing path (a real registration once slipped through as
+        # .../lib/player.js) — say which one it was.
+        detail = "points at a file, not a directory" if target_path.exists() else "does not exist"
+        raise FileNotFoundError(f"Repo path {detail}: {target_path}")
+    return target_path
 
 
-def _strip_credentials(url: str) -> str:
-    """Remove embedded userinfo (``user:pass@`` / ``token@``) from *url*.
+def _persist_repository_info(
+    project_dir: Path, target_path: Path, *, is_url: bool, repo: str, ephemeral: bool,
+) -> None:
+    """Persist the resolved path + ephemeral flag in repository_info.json.
 
-    Only applies to scheme'd URLs (``https://user@host/...``). scp-style
-    remotes (``git@github.com:org/repo.git``) are left untouched, since the
-    leading ``git@`` there is a username convention, not a credential.
+    A corrupt existing file is treated as empty and rewritten (self-heal);
+    registration is the flow that owns this file's creation.
     """
-    return _CREDENTIALS_RE.sub(r"\1", url)
+    info = read_repository_info(project_dir) or {}
+    info["path"] = str(target_path.resolve())
+    info["location"] = _LOCATION_LOCAL
+    info["ephemeral"] = bool(ephemeral)
+    origin_url = repo if is_url else _read_origin_remote(target_path)
+    if origin_url:
+        # Defense in depth: _read_origin_remote already strips credentials
+        # from the local-remote branch, but strip again here so the
+        # URL-registration branch (raw *repo*) is covered too, and so this
+        # call site stays safe even if the helper's behavior changes.
+        info["originUrl"] = _strip_credentials(origin_url)
+    write_repository_info(project_dir, info)
 
 
-def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path) -> None:
-    """Scan the parent project directory if it lacks a scan.json."""
-    info_path = project_dir / "repository_info.json"
-    try:
-        parent_uuid = json.loads(info_path.read_text(encoding="utf-8")).get("parent")
-        if parent_uuid:
-            parent_dir = reports_path / parent_uuid
-            if not (parent_dir / "scan.json").exists():
-                scan_project(repo_path, output_dir=parent_dir)
-    except (json.JSONDecodeError, OSError):
-        pass
-
-
-def _read_origin_remote(repo_dir: Path) -> str | None:
-    """Best-effort ``git remote get-url origin`` for a local working copy."""
-    origin = remote_origin_url_raw(repo_dir)
-    if not origin:
-        return None
-    return _strip_credentials(origin)
+def _validate_clone_target(
+    repo: str, is_url: bool, ephemeral: bool, clone_dest: str | None,
+) -> None:
+    """Validate repo/clone_dest before any clone or directory side effects."""
+    if is_url:
+        # SSRF guard: reject private/loopback/link-local hosts before any clone
+        # or directory side effects. Mirrors the CLI prepare_repository path so
+        # the web API (POST /api/projects) cannot be pointed at internal hosts.
+        validate_remote_url(repo)
+    if is_url and not ephemeral and clone_dest is None:
+        raise ValueError(
+            "URL repos require either clone_dest (user-chosen path) or ephemeral=True"
+        )
+    if is_url and not ephemeral:
+        dest = Path(clone_dest)
+        if not dest.is_dir():
+            raise FileNotFoundError(
+                f"clone destination does not exist or is not a directory: {clone_dest}"
+            )
 
 
 def register_project(
@@ -108,21 +131,7 @@ def register_project(
     Returns the project's UUID.
     """
     is_url = is_repo_url(repo)
-    if is_url:
-        # SSRF guard: reject private/loopback/link-local hosts before any clone
-        # or directory side effects. Mirrors the CLI prepare_repository path so
-        # the web API (POST /api/projects) cannot be pointed at internal hosts.
-        validate_remote_url(repo)
-    if is_url and not ephemeral and clone_dest is None:
-        raise ValueError(
-            "URL repos require either clone_dest (user-chosen path) or ephemeral=True"
-        )
-    if is_url and not ephemeral:
-        dest = Path(clone_dest)
-        if not dest.is_dir():
-            raise FileNotFoundError(
-                f"clone destination does not exist or is not a directory: {clone_dest}"
-            )
+    _validate_clone_target(repo, is_url, ephemeral, clone_dest)
 
     project_name = project_name_from_repo(repo)
     repo_resolved = repo if is_url else str(Path(repo).resolve())
@@ -135,39 +144,11 @@ def register_project(
     project_dir = reports_path / project_uuid
     _ensure_onboarding_field(project_dir)
 
-    # Resolve the on-disk path the project will live at.
-    if is_url:
-        if ephemeral:
-            target_path = (clones_dir or get_clones_dir()) / project_uuid
-        else:
-            target_path = Path(clone_dest).resolve() / project_name
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
-        run_git_clone(repo, target_path)
-    else:
-        target_path = Path(repo_resolved)
-        if not target_path.is_dir():
-            # A path pointing at a FILE is a distinct user mistake from a
-            # missing path (a real registration once slipped through as
-            # .../lib/player.js) — say which one it was.
-            detail = "points at a file, not a directory" if target_path.exists() else "does not exist"
-            raise FileNotFoundError(f"Repo path {detail}: {target_path}")
-
-    # Persist the resolved path + ephemeral flag in repository_info.json.
-    # A corrupt existing file is treated as empty and rewritten (self-heal);
-    # registration is the flow that owns this file's creation.
-    info = read_repository_info(project_dir) or {}
-    info["path"] = str(target_path.resolve())
-    info["location"] = _LOCATION_LOCAL
-    info["ephemeral"] = bool(ephemeral)
-    origin_url = repo if is_url else _read_origin_remote(target_path)
-    if origin_url:
-        # Defense in depth: _read_origin_remote already strips credentials
-        # from the local-remote branch, but strip again here so the
-        # URL-registration branch (raw *repo*) is covered too, and so this
-        # call site stays safe even if the helper's behavior changes.
-        info["originUrl"] = _strip_credentials(origin_url)
-    write_repository_info(project_dir, info)
+    target_path = _resolve_target_path(
+        repo, repo_resolved, project_name, project_uuid,
+        is_url=is_url, ephemeral=ephemeral, clone_dest=clone_dest, clones_dir=clones_dir,
+    )
+    _persist_repository_info(project_dir, target_path, is_url=is_url, repo=repo, ephemeral=ephemeral)
 
     # Scan now that files are guaranteed on disk.
     scan_project(target_path, output_dir=project_dir)
@@ -204,6 +185,20 @@ def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
             pass
 
 
+def _rollback_and_report(
+    reports_dir: str, before: set[str], status: str, message: str = "", **extra,
+) -> CreateProjectResult:
+    """Roll back any partial project dirs and build the failure result."""
+    _rollback_new_dirs(reports_dir, before)
+    return CreateProjectResult(status=status, message=message, **extra)
+
+
+def _snapshot_project_dirs(reports_path: Path) -> set[str]:
+    """Names of project dirs present before registration, so a failed
+    scan/clone can be rolled back to exactly what existed before."""
+    return {p.name for p in reports_path.iterdir() if p.is_dir()} if reports_path.is_dir() else set()
+
+
 def register_project_with_rollback(
     reports_dir: str, spec: NewProjectSpec, *,
     clones_dir: Path | None = None, log: LogSink = NULL_LOG,
@@ -219,14 +214,8 @@ def register_project_with_rollback(
     if existing is not None:
         return CreateProjectResult(status="duplicate", existing_project_id=existing)
 
-    # Capture the set of project directories present before registration so a
-    # failed scan/clone can be rolled back to exactly what existed before.
     reports_root_path = Path(reports_dir)
-    before = (
-        {p.name for p in reports_root_path.iterdir() if p.is_dir()}
-        if reports_root_path.is_dir()
-        else set()
-    )
+    before = _snapshot_project_dirs(reports_root_path)
 
     try:
         project_uuid = register_project(
@@ -239,19 +228,18 @@ def register_project_with_rollback(
             clones_dir=clones_dir,
         )
     except (FileNotFoundError, ValueError) as exc:
-        _rollback_new_dirs(reports_dir, before)
-        return CreateProjectResult(status="invalid_repo", message=str(exc))
+        return _rollback_and_report(reports_dir, before, "invalid_repo", str(exc))
     except CloneError as exc:
-        _rollback_new_dirs(reports_dir, before)
-        return CreateProjectResult(status="clone_failed", message=str(exc), clone_error_kind=exc.kind)
+        return _rollback_and_report(
+            reports_dir, before, "clone_failed", str(exc), clone_error_kind=exc.kind,
+        )
     except Exception as exc:
         # error_response (route layer) swallows the traceback Flask's own 500
         # handler would have logged; record it before converting to a
         # generic, no-detail result (the exception text can carry filesystem
         # paths or backend internals that must not reach the remote caller).
         log.error(f"Registration failed for repo={spec.repo!r}: {exc}")
-        _rollback_new_dirs(reports_dir, before)
-        return CreateProjectResult(status="internal_error")
+        return _rollback_and_report(reports_dir, before, "internal_error")
 
     # scan.json is now always present after register_project succeeds.
     scan_path = reports_root_path / project_uuid / "scan.json"

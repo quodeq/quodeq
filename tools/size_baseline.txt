@@ -110,9 +110,6 @@ src/quodeq/services/evidence_rescore.py:46:function
 src/quodeq/services/jobs.py:1:file
 src/quodeq/services/jobs.py:490:function
 src/quodeq/services/mutation_rescore.py:1:file
-src/quodeq/services/project_registration.py:207:function
-src/quodeq/services/project_registration.py:87:function
-src/quodeq/services/rescore.py:131:function
 src/quodeq/services/scan_progress.py:1:file
 src/quodeq/services/scan_progress.py:257:function
 src/quodeq/services/score_run.py:50:function
@@ -121,8 +118,6 @@ src/quodeq/services/scoring/__init__.py:303:function
 src/quodeq/services/scoring/__init__.py:90:function
 src/quodeq/services/scoring/_summary.py:11:function
 src/quodeq/services/scoring_view/_resolution.py:80:function
-src/quodeq/services/shared_publish.py:173:function
-src/quodeq/services/shared_publish.py:1:file
 src/quodeq/services/violations.py:179:function
 src/quodeq/shared/_env.py:1:file
 src/quodeq/ui/src/App.jsx:1:file
