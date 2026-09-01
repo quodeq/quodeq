@@ -1,20 +1,36 @@
 """AI analysis runner -- dispatches to CLI subprocess or API runner.
 
 This module is the public entry point. Implementation is split across:
-- _config.py:      AnalysisConfig, HeartbeatCallback, dataclasses
-- _mcp_config.py:  MCP config file creation
-- _command.py:     CLI argument and environment construction
-- _process.py:     Process spawning, heartbeat, error handling
-- _api_runner.py:  OpenAI SDK-based direct API runner
+- _config.py:               AnalysisConfig, HeartbeatCallback, dataclasses
+- _mcp_config.py:            MCP config file creation
+- _command.py:               CLI argument and environment construction
+- _mcp_arg_builders.py:      MCP/tool/model arg construction for _command.py
+- _process.py:               Process spawning, heartbeat, error handling
+- _api_runner.py:            OpenAI SDK-based direct API runner
+- _api_standards_text.py:    Source-file gathering + compiled standards text
+                              for the API prompt
+- _api_source_gathering.py:  Credential loaders + queue-aware file batching
+                              for the API runner
 """
 from __future__ import annotations
 
-import json as _json
 import logging
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.analysis._api_source_gathering import (
+    _batch_files_by_size,
+    _CREDENTIAL_LOADERS,
+    _gather_api_source_files,
+)
+from quodeq.analysis._api_standards_text import (
+    _api_prompt_char_budget,
+    _gather_source_files,  # noqa: F401 -- re-export
+    _load_standards_text,
+    _render_standards_grouped,  # noqa: F401 -- re-export
+    _SKIP_DIRS,  # noqa: F401 -- re-export
+)
 from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
@@ -23,12 +39,10 @@ from quodeq.analysis._command import (
 )
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
-from quodeq.analysis import dispatch_policy
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
-from quodeq.analysis.subagents.file_queue import FileQueue
-from quodeq.context.trust_model import resolve_trust_model
+from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.shared import cancellation
 from quodeq.shared.utils import get_ai_cmd
 
@@ -103,195 +117,6 @@ def _run_cli_analysis(
         _check_process_result(process, stream_err)
 
 
-_DEFAULT_MAX_API_PROMPT_CHARS = 30000  # Target inlined-file budget for local models (~8K tokens)
-
-
-def _api_prompt_char_budget() -> int:
-    """Max bytes of file content to inline per model call.
-
-    Read per call (not at import) so QUODEQ_MAX_API_PROMPT_CHARS can be
-    raised together with QUODEQ_MAX_API_FILE_SIZE / QUODEQ_CONTEXT_SIZE
-    when running larger-context models.
-    """
-    raw = os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_MAX_API_PROMPT_CHARS
-    except ValueError:
-        return _DEFAULT_MAX_API_PROMPT_CHARS
-
-
-def _load_skip_dirs() -> frozenset[str]:
-    """Load skip_dirs from detection.json (shared with manifest builder)."""
-    try:
-        det_path = Path(__file__).resolve().parent.parent / "data" / "config" / "detection.json"
-        data = _json.loads(det_path.read_text(encoding="utf-8"))
-        return frozenset(data.get("skip_dirs", []))
-    except (OSError, _json.JSONDecodeError):
-        return frozenset({"node_modules", ".git", "__pycache__", "venv", ".venv", "dist", "build"})
-
-
-_SKIP_DIRS = _load_skip_dirs()
-# Code files first, style/markup last
-_CODE_EXTS = frozenset({".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs", ".rb", ".php", ".c", ".cpp", ".h", ".cs", ".swift", ".kt"})
-_MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
-
-
-def _gather_source_files(work_dir: Path) -> list[Path]:
-    """Collect source files from work_dir for API prompt assembly.
-
-    Prioritizes code files over markup/styles and caps total size to
-    fit within local model context limits.
-    """
-    _ALL_EXTS = _CODE_EXTS | _MARKUP_EXTS
-    all_files: list[Path] = [
-        f for f in work_dir.rglob("*") if f.is_file() and f.suffix in _ALL_EXTS
-    ]
-    # Cache stat results to avoid repeated syscalls on the same files
-    stat_cache: dict[Path, int] = {}
-    for f in all_files:
-        try:
-            stat_cache[f] = f.stat().st_size
-        except OSError:
-            pass
-
-    # Filter out non-source dirs, dotdirs, empty files, and oversized files
-    filtered = [
-        f for f in all_files
-        if f in stat_cache
-        and not any(p in f.parts for p in _SKIP_DIRS)
-        and not any(p.startswith(".") for p in f.relative_to(work_dir).parts)
-        and 0 < stat_cache[f] < dispatch_policy.api_file_size_cap()
-    ]
-    # Prioritize code files over markup
-    code_files = [f for f in filtered if f.suffix in _CODE_EXTS]
-    markup_files = [f for f in filtered if f.suffix in _MARKUP_EXTS]
-    # Within each group, sort by size (moderate files first — not too small, not too big)
-    code_files.sort(key=lambda f: stat_cache[f], reverse=True)
-    markup_files.sort(key=lambda f: stat_cache[f], reverse=True)
-
-    # Fill up to the prompt char budget
-    selected: list[Path] = []
-    total_chars = 0
-    for f in code_files + markup_files:
-        size = stat_cache[f]
-        if total_chars + size > _api_prompt_char_budget():
-            continue
-        selected.append(f)
-        total_chars += size
-
-    _log.debug("Selected %d files (%d chars) from %d candidates for API prompt",
-              len(selected), total_chars, len(filtered))
-    return selected
-
-
-_DEFAULT_MAX_STANDARDS_CHARS = 50000  # Allow full standards for models with large context
-
-
-def _max_standards_chars(env: dict[str, str] | None = None) -> int:
-    """Max chars of standards text to include in an API prompt.
-
-    Read per call (not at import) so QUODEQ_MAX_STANDARDS_CHARS can be
-    raised together with QUODEQ_MAX_API_PROMPT_CHARS / QUODEQ_CONTEXT_SIZE
-    when running larger-context models. Malformed values fall back to the
-    default instead of raising.
-    """
-    raw = (env or os.environ).get("QUODEQ_MAX_STANDARDS_CHARS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_MAX_STANDARDS_CHARS
-    except ValueError:
-        return _DEFAULT_MAX_STANDARDS_CHARS
-
-
-def _load_standards_text(
-    compiled_dir: Path | None,
-    dimension: str | None,
-    overrides: dict | None = None,
-    *,
-    max_chars: int | None = None,
-) -> str:
-    """Load compiled standards as structured JSON for the API prompt.
-
-    Renders from the compiled JSON as a compact JSON array grouped by principle,
-    so API models see explicit structure instead of a flat requirement list.
-    Falls back to the .md file if JSON is unavailable.
-
-    *overrides* is the per-project threshold override map from
-    :func:`quodeq.core.standards.overrides.load_project_overrides`.  When
-    supplied, placeholder templates in requirement text are resolved before
-    the text is sent to the model.
-
-    Truncates to *max_chars* (default :func:`_max_standards_chars`) to keep
-    prompts within context limits.
-    """
-    limit = max_chars if max_chars is not None else _max_standards_chars()
-    if not compiled_dir or not dimension:
-        return ""
-    json_path = compiled_dir / f"{dimension}.json"
-    if json_path.exists():
-        try:
-            data = _json.loads(json_path.read_text(encoding="utf-8"))
-            text = _render_standards_grouped(data, overrides=overrides)
-            if text:
-                if len(text) > limit:
-                    _log.info("Truncating %s standards from %d to %d chars for API prompt",
-                              dimension, len(text), limit)
-                    text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
-                return text
-        except (OSError, _json.JSONDecodeError):
-            pass
-    md_path = compiled_dir / f"{dimension}.md"
-    if md_path.exists():
-        try:
-            text = md_path.read_text(encoding="utf-8")
-            if len(text) > limit:
-                text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
-            return text
-        except OSError:
-            pass
-    return ""
-
-
-def _render_standards_grouped(data: dict, overrides: dict | None = None) -> str:
-    """Render standards as a compact JSON array grouped by principle.
-
-    The explicit structure helps local models give attention to ALL principle
-    groups instead of fixating on the first ones in a flat list.
-
-    *overrides* is the per-project ``{req_id: {param: value}}`` map produced
-    by :func:`quodeq.core.standards.overrides.load_project_overrides`.  When
-    present, each requirement's text template is resolved before being emitted
-    so that models never receive raw ``{placeholder}`` strings.
-    """
-    from quodeq.core.standards.overrides import resolve_requirement_text  # noqa: PLC0415
-
-    principles = data.get("principles", [])
-    if not principles:
-        return ""
-    checklist = []
-    for p in principles:
-        checklist.append({
-            "principle": p.get("name", "Unknown"),
-            "requirements": [
-                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
-                for r in p.get("requirements", [])
-            ],
-        })
-    return _json.dumps(checklist, separators=(",", ":"))
-
-
-def _read_omlx_key() -> str | None:
-    from quodeq.llm_bridge._omlx import _read_omlx_api_key  # noqa: PLC0415
-    return _read_omlx_api_key()
-
-
-# Registry of provider-specific credential loaders. Each callable returns the
-# API key string (or None/empty string) for that provider. New providers can
-# be added here without touching _resolve_provider_config.
-_CREDENTIAL_LOADERS: dict[str, Callable[[], str | None]] = {
-    "omlx": _read_omlx_key,
-}
-
-
 def _resolve_provider_config(
     cfg: AnalysisConfig, env: Mapping[str, str],
 ) -> tuple[str, str, str]:
@@ -337,66 +162,53 @@ def _resolve_provider_config(
     return model, api_base, api_key
 
 
-def _gather_api_source_files(
-    work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
-) -> list[Path] | None:
-    """Gather source files from queue or by scanning.
+def _dispatch_one_batch(
+    batch: list[Path], work_dir: Path, jsonl_file: Path, standards_text: str,
+    trust_model: TrustModel, cfg: AnalysisConfig, model: str, api_base: str, api_key: str,
+) -> None:
+    """Assemble the API prompt for one size-budgeted batch and dispatch it.
 
-    Returns None (and writes empty output) when the queue is exhausted.
+    Split out of the per-batch loop in _run_api_analysis_bridge so the bridge
+    itself stays a thin cancellation/orchestration loop.
     """
-    if cfg.queue_path and cfg.queue_path.exists():
-        queue = FileQueue(cfg.queue_path)
-        taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
-        # Enumeration applies the same predicate, so dropped files here mean
-        # the file changed (or vanished) between queue build and dispatch.
-        dispatchable, dropped = dispatch_policy.split_api_dispatchable(work_dir, taken)
-        if dropped:
-            # Lazy import keeps the baseline-pinned llm_bridge line above
-            # from shifting; the marker helper is router-owned wire format.
-            from quodeq.analysis.mcp.router import write_skip_markers  # noqa: PLC0415
-            write_skip_markers(
-                jsonl_file, dropped,
-                reason=(
-                    f"skipped: missing or over the API file-size cap "
-                    f"({dispatch_policy.api_file_size_cap()} bytes)"
-                ),
-            )
-        source_files = [work_dir / f for f in dispatchable]
-        _log.debug("Took %d files from queue for API analysis", len(source_files))
-        if not source_files:
-            # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`
-            # that every agent in the pool appends to via MCP. Truncating it
-            # here wipes findings from every other agent in the pool.
-            stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
-            return None
-        return source_files
-    return _gather_source_files(work_dir)
+    from quodeq.analysis import _api_runner
 
+    api_prompt = assemble_api_prompt(
+        source_files=batch,
+        standards_text=standards_text,
+        dimension=cfg.dimension or "general",
+        repo_name=str(work_dir.name),
+        repo_root=work_dir,
+        trust_model=trust_model,
+    )
 
-def _batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
-    """Greedy, order-preserving split so one model call's inlined file
-    content stays within *budget* bytes.
-
-    A single file over the budget still dispatches solo: the call may come
-    back truncated, but then only that file gets the error marker and
-    re-dispatches, instead of dragging its batchmates down with it.
-    """
-    batches: list[list[Path]] = []
-    current: list[Path] = []
-    current_size = 0
-    for f in files:
-        try:
-            size = f.stat().st_size
-        except OSError:
-            size = 0
-        if current and current_size + size > budget:
-            batches.append(current)
-            current, current_size = [], 0
-        current.append(f)
-        current_size += size
-    if current:
-        batches.append(current)
-    return batches
+    # POSIX-style separators: paths flow into findings (file fields,
+    # downstream JSONL projection) and into the prompt; the rest of the
+    # pipeline assumes forward slashes (path-role classifier, enrichment,
+    # SQLite store). Backslashes on Windows would break those joins.
+    rel_paths = [f.relative_to(work_dir).as_posix() for f in batch]
+    _api_runner.run_api_analysis(
+        prompt=api_prompt,
+        jsonl_file=jsonl_file,
+        config=_api_runner.ApiRunnerConfig(
+            model=model,
+            api_base=api_base,
+            api_key=api_key,
+            context_size=cfg.context_size,
+            n_subagents=max(
+                1, getattr(getattr(cfg.run_config, "options", None), "max_subagents", 1),
+            ),
+        ),
+        compiled_dir=cfg.compiled_dir,
+        dimension=cfg.dimension,
+        work_dir=work_dir,
+        source_file_paths=rel_paths,
+        # Wire the synchronous cache-write closure when the pool layer
+        # supplied a RunConfig carrier. Legacy callers pass nothing and
+        # the API runner simply skips the cache write.
+        run_config=cfg.run_config,
+        dim_id=cfg.dimension,
+    )
 
 
 def _run_api_analysis_bridge(
@@ -410,8 +222,6 @@ def _run_api_analysis_bridge(
     Files are dispatched in size-budgeted sub-batches (one model call each)
     so a batch of large files cannot overflow the model context.
     """
-    from quodeq.analysis import _api_runner
-
     model, api_base, api_key = _resolve_provider_config(cfg, env)
 
     jsonl_file = cfg.jsonl_file
@@ -438,45 +248,9 @@ def _run_api_analysis_bridge(
         if cancellation.is_cancelled():
             _log.info("Cancellation requested -- stopping API batch dispatch")
             break
-        api_prompt = assemble_api_prompt(
-            source_files=batch,
-            standards_text=standards_text,
-            dimension=cfg.dimension or "general",
-            repo_name=str(work_dir.name),
-            repo_root=work_dir,
-            trust_model=trust_model,
-        )
-
-        # POSIX-style separators: paths flow into findings (file fields,
-        # downstream JSONL projection) and into the prompt; the rest of the
-        # pipeline assumes forward slashes (path-role classifier, enrichment,
-        # SQLite store). Backslashes on Windows would break those joins.
-        rel_paths = [f.relative_to(work_dir).as_posix() for f in batch]
-        _api_runner.run_api_analysis(
-            prompt=api_prompt,
-            jsonl_file=jsonl_file,
-            config=_api_runner.ApiRunnerConfig(
-                model=model,
-                api_base=api_base,
-                api_key=api_key,
-                context_size=cfg.context_size,
-                n_subagents=max(
-                    1,
-                    getattr(
-                        getattr(cfg.run_config, "options", None),
-                        "max_subagents", 1,
-                    ),
-                ),
-            ),
-            compiled_dir=cfg.compiled_dir,
-            dimension=cfg.dimension,
-            work_dir=work_dir,
-            source_file_paths=rel_paths,
-            # Wire the synchronous cache-write closure when the pool layer
-            # supplied a RunConfig carrier. Legacy callers pass nothing and
-            # the API runner simply skips the cache write.
-            run_config=cfg.run_config,
-            dim_id=cfg.dimension,
+        _dispatch_one_batch(
+            batch, work_dir, jsonl_file, standards_text, trust_model,
+            cfg, model, api_base, api_key,
         )
 
     stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
