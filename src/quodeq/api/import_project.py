@@ -176,31 +176,60 @@ def _stage_and_commit(
     _update_index(reports_root, identity, target_uuid)
 
 
+def _read_and_validate_member_payloads(
+    zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], top_dir: str,
+) -> dict[str, Any]:
+    """Read + validate the required repository_info.json and optional
+    manifest.json members; return the parsed repository_info dict."""
+    repo_info_arc = f"{top_dir}/{_REPO_INFO_FILENAME}"
+    if repo_info_arc not in members:
+        raise _bad_request(
+            f"Archive missing required {_REPO_INFO_FILENAME}.",
+            "MISSING_REPO_INFO",
+        )
+    repo_info = _read_member_json(zf, members[repo_info_arc])
+    _validate_repository_info(repo_info, top_dir)
+
+    manifest_arc = f"{top_dir}/{_MANIFEST_FILENAME}"
+    if manifest_arc in members:
+        manifest = _read_member_json(zf, members[manifest_arc])
+        _validate_manifest(manifest, top_dir)
+
+    return repo_info
+
+
+def _build_success_outcome(
+    top_dir: str, target_uuid: str, action: str | None, remote_addr: str | None,
+    identity: ProjectIdentity,
+) -> ImportOutcome:
+    _logger.info(
+        "import_project: source_uuid=%s target_uuid=%s action=%s remote_addr=%s",
+        top_dir, target_uuid, action, remote_addr,
+    )
+    return ImportOutcome(HTTPStatus.OK, {
+        "imported": True,
+        "projectId": target_uuid,
+        "sourceProjectId": top_dir,
+        "renamed": target_uuid != top_dir,
+        "projectName": identity.project_name,
+    })
+
+
 def import_zip_stream(
     stream: Any, reports_dir: str, action: str | None, *,
     remote_addr: str | None = None,
 ) -> ImportOutcome:
     """Validate and materialize a project zip *stream* into *reports_dir*.
 
-    Contains all the hardened validation (path traversal, zip-bomb ratio,
-    symlinks, member limits, collision handling) that used to live directly
-    in ``import_project``. *stream* is anything with a ``.read(n)`` method
-    (a Werkzeug ``FileStorage``, an ``io.BytesIO``, or a plain file handle) —
-    this function never touches Flask, so it is callable from any caller that
-    already has zip bytes, such as the shared-repo "pull local copy" route.
-    It returns a plain :class:`ImportOutcome`; the caller decides how to
-    deliver it.
-
-    *action* is optional, ``"replace"`` or ``"copy"`` to resolve a 409
-    collision returned from a previous attempt. *remote_addr* is only for the
-    success audit log; HTTP callers pass the request's remote address.
+    Framework-free (*stream* need only support ``.read(n)``); returns a
+    plain :class:`ImportOutcome`. *action* is ``"replace"``/``"copy"`` to
+    resolve a 409 collision; *remote_addr* is only for the audit log.
     """
     if action is not None and action not in _ALLOWED_ACTIONS:
         return _error_outcome(
             f"Invalid action; expected one of {sorted(_ALLOWED_ACTIONS)}.",
             HTTPStatus.BAD_REQUEST, "INVALID_ACTION",
         )
-
     size_limit = _max_zip_size_bytes()
     raw = stream.read(size_limit + 1)
     if len(raw) > size_limit:
@@ -208,37 +237,19 @@ def import_zip_stream(
             f"Archive exceeds the {size_limit // (1024 * 1024)} MB import limit.",
             HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE",
         )
-
     reports_root = Path(reports_dir).resolve()
     if not reports_root.is_dir():
         return _error_outcome("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
-
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
             top_dir, members = _validate_archive(zf, max_total_bytes=size_limit * _EXTRACT_HEADROOM)
-
-            repo_info_arc = f"{top_dir}/{_REPO_INFO_FILENAME}"
-            if repo_info_arc not in members:
-                raise _bad_request(
-                    f"Archive missing required {_REPO_INFO_FILENAME}.",
-                    "MISSING_REPO_INFO",
-                )
-            repo_info = _read_member_json(zf, members[repo_info_arc])
-            _validate_repository_info(repo_info, top_dir)
-
-            manifest_arc = f"{top_dir}/{_MANIFEST_FILENAME}"
-            if manifest_arc in members:
-                manifest = _read_member_json(zf, members[manifest_arc])
-                _validate_manifest(manifest, top_dir)
-
+            repo_info = _read_and_validate_member_payloads(zf, members, top_dir)
             identity = _identity_from_info(repo_info)
             resolution = _resolve_import_conflict(reports_root, top_dir, action, identity)
             if isinstance(resolution, ImportOutcome):
                 return resolution
             target_uuid = resolution
-
             _stage_and_commit(zf, members, reports_root, top_dir, target_uuid, identity)
-
     except _ImportError as exc:
         return _error_outcome(str(exc), exc.status, exc.code)
     except zipfile.BadZipFile:
@@ -253,17 +264,7 @@ def import_zip_stream(
             HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
         )
 
-    _logger.info(
-        "import_project: source_uuid=%s target_uuid=%s action=%s remote_addr=%s",
-        top_dir, target_uuid, action, remote_addr,
-    )
-    return ImportOutcome(HTTPStatus.OK, {
-        "imported": True,
-        "projectId": target_uuid,
-        "sourceProjectId": top_dir,
-        "renamed": target_uuid != top_dir,
-        "projectName": identity.project_name,
-    })
+    return _build_success_outcome(top_dir, target_uuid, action, remote_addr, identity)
 
 
 # Re-export for routing module.

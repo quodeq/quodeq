@@ -25,7 +25,6 @@ src/quodeq/api/assistant_routes.py:1:file
 src/quodeq/api/assistant_routes.py:239:function
 src/quodeq/api/assistant_routes.py:354:function
 src/quodeq/api/assistant_workspace_routes.py:25:function
-src/quodeq/api/import_project.py:179:function
 src/quodeq/api/llm_bridge_routes.py:54:function
 src/quodeq/api/routes_findings.py:90:function
 src/quodeq/api/routes_project_data.py:15:function
