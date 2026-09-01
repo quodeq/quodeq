@@ -1,8 +1,11 @@
-"""Project-building helpers for the filesystem action provider."""
+"""Project-building helpers for the filesystem action provider.
+
+Split (Task 13): parent-detection and the max-projects-listed limit moved to
+_fs_project_parents.py, re-exported here for _fs_projects.py's import.
+"""
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,8 +22,12 @@ from quodeq.services._fs_metadata import (
     _read_language_stats,
     _read_repo_info,
 )
+from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
+    _auto_detect_parents,
+    _find_best_parent,
+    _max_projects_listed,
+)
 from quodeq.data.fs.report_parser.runs import RunInfo
-from quodeq.shared.utils import _env_int
 
 
 def _backfill_onboarding_field(
@@ -49,6 +56,19 @@ def _backfill_onboarding_field(
     data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
     write_repository_info(project_dir, data)
     return data
+
+
+def _derive_latest_done_run_id(runs: list[RunInfo]) -> str | None:
+    """The newest run a republish would actually move forward.
+
+    runs is sorted newest-first (list_runs); status is already read there
+    (cancelled/failed/in_progress detection), so no extra per-run read is
+    needed here. "Done" == the "complete" bucket list_runs assigns to
+    anything that isn't a live/cancelled/failed run -- this is what the
+    update-vs-in-sync comparison needs, skipping a newer run that failed or
+    was cancelled after the last successful one.
+    """
+    return next((run.run_id for run in runs if run.status == "complete"), None)
 
 
 def _build_project_entry(
@@ -81,14 +101,7 @@ def _build_project_entry(
     latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=inline_summaries,
     )
-    # runs is sorted newest-first (list_runs); status is already read there
-    # (cancelled/failed/in_progress detection), so no extra per-run read is
-    # needed here. "Done" == the "complete" bucket list_runs assigns to
-    # anything that isn't a live/cancelled/failed run -- this is what the
-    # update-vs-in-sync comparison needs: the newest run a republish would
-    # actually move forward, skipping a newer run that failed or was
-    # cancelled after the last successful one.
-    latest_done_run_id = next((run.run_id for run in runs if run.status == "complete"), None)
+    latest_done_run_id = _derive_latest_done_run_id(runs)
     return ProjectEntry(
         id=entry_name,
         name=meta["name"],
@@ -161,46 +174,3 @@ def project_record_exists(project_dir: Path) -> bool:
 def read_project_record(project_dir: Path) -> dict | None:
     """The project's repository record; None when absent or unreadable."""
     return read_repository_info(project_dir)
-
-
-def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntry]) -> str | None:
-    """Find the candidate whose path is the longest prefix of *p_path*.
-
-    Candidates must be pre-sorted by descending path length so the first
-    matching candidate is always the longest (best) prefix -- O(1) average case.
-    """
-    for candidate in candidates:
-        if candidate.id == project_id:
-            continue
-        c_path = candidate.path.rstrip("/")
-        if p_path.startswith(c_path + "/"):
-            return candidate.id
-    return None
-
-
-_DEFAULT_MAX_PROJECTS_LISTED = 200
-
-
-def _max_projects_listed(override: int | None = None, env: dict[str, str] | None = None) -> int:
-    """Return the max number of projects to list. *override* bypasses env."""
-    if override is not None:
-        return override
-    return _env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
-
-
-def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
-    """Return projects with parent set for local projects sharing a path prefix."""
-    local_with_path = [p for p in projects if p.location == "local" and p.path]
-    local_with_path.sort(key=lambda p: len(p.path), reverse=True)
-    parent_map: dict[str, str] = {}
-    for project in projects:
-        if project.parent is not None:
-            continue
-        if project.location != "local" or not project.path:
-            continue
-        best = _find_best_parent(project.path.rstrip("/"), project.id, local_with_path)
-        if best:
-            parent_map[project.id] = best
-    if not parent_map:
-        return projects
-    return [replace(p, parent=parent_map[p.id]) if p.id in parent_map else p for p in projects]

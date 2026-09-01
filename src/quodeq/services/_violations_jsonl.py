@@ -27,6 +27,36 @@ from quodeq.shared.utils import open_text
 _logger = logging.getLogger(__name__)
 
 
+def _resolve_and_dedupe(
+    obj: dict, matcher: SuppressionMatcher, resolver: PrincipleResolver | None, seen: "set[tuple]",
+) -> dict | None:
+    """Resolve *obj*'s principle, checking suppression and dedup.
+
+    Returns the (mutated, resolved-principle) obj to keep, or None when the
+    row should be dropped: not a finding-type row, suppressed
+    (dismissed/deleted), unmappable to the dimension's standard (the report
+    path quarantines it, so this live view must not show it either), or
+    already seen.
+    """
+    principle = obj.get("p") or obj.get("req")
+    if not principle or obj.get("t") not in _FINDING_TYPES:
+        return None
+    if matcher.is_suppressed(obj):
+        return None
+    if resolver is None:
+        obj["p"] = matcher.principle_for(principle)
+    else:
+        resolved = resolver.resolve(principle)
+        if resolved is None:
+            return None
+        obj["p"] = resolved
+    dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
+    if dedup_key in seen:
+        return None
+    seen.add(dedup_key)
+    return obj
+
+
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
     resolver: PrincipleResolver | None = None,
@@ -63,25 +93,11 @@ def _parse_jsonl_findings(
             continue
         if not isinstance(obj, dict):
             continue
-        principle = obj.get("p") or obj.get("req")
-        if not principle or obj.get("t") not in _FINDING_TYPES:
+        resolved_obj = _resolve_and_dedupe(obj, matcher, resolver, seen)
+        if resolved_obj is None:
             continue
-        if matcher.is_suppressed(obj):
-            continue
-        if resolver is None:
-            obj["p"] = matcher.principle_for(principle)
-        else:
-            # Unmappable: the report quarantines it, so this view must not show it.
-            resolved = resolver.resolve(principle)
-            if resolved is None:
-                continue
-            obj["p"] = resolved
-        dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
-        if dedup_key in seen:
-            continue
-        seen.add(dedup_key)
-        entry = _build_finding_entry(obj, dimension, req_refs_lookup)
-        if obj["t"] == _TYPE_VIOLATION:
+        entry = _build_finding_entry(resolved_obj, dimension, req_refs_lookup)
+        if resolved_obj["t"] == _TYPE_VIOLATION:
             violations.append(entry)
         else:
             compliance.append(entry)

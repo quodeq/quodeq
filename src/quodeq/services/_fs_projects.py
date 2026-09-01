@@ -75,24 +75,8 @@ def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[
     return parent_ids, subproject_ids
 
 
-def build_project_list(
-    reports_root: Path, *, backfill: bool = True, inline_summaries: bool = False,
-) -> list[ProjectEntry]:
-    """Collect eligible project dirs and build entries in parallel.
-
-    *backfill* controls the lazy ``onboardingCompletedAt`` backfill below (and
-    the equivalent one inside ``_build_project_entry``): when False, records
-    are read as-is and never rewritten. Local callers keep the default
-    (True); the shared-repo route passes False so listing a clone's projects
-    never dirties its git worktree (see routes_shared.py shared_projects).
-
-    *inline_summaries* is forwarded to ``_build_project_entry`` (as
-    ``compute_on_miss``): the shared-repo route has no warm-up engine to fill
-    a missing project-card summary, so it passes True to keep computing one
-    inline on a miss. Local callers keep the default (False) -- a miss is
-    reported pending and left for the warm-up engine.
-    """
-    max_listed = _max_projects_listed()
+def _collect_candidate_dirs(reports_root: Path, max_listed: int) -> list[str]:
+    """Return up to *max_listed* non-hidden directory names under reports_root."""
     dir_names: list[str] = []
     for entry in safe_read_dir(reports_root):
         if not entry.is_dir() or entry.name.startswith("."):
@@ -100,25 +84,21 @@ def build_project_list(
         dir_names.append(entry.name)
         if len(dir_names) >= max_listed:
             break
+    return dir_names
 
-    # Lazy backfill: ensure legacy project records have an
-    # ``onboardingCompletedAt`` field. Run before the parent/child sweep so
-    # any subsequent reads see the updated file. Idempotent — no-op for
-    # records that already have the field. Failures are silently ignored.
-    if backfill:
-        for name in dir_names:
-            _backfill_onboarding_field(reports_root / name)
 
-    parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
-    # A registered project (repository_info.json present) is listed even with
-    # zero runs — the onboarding wizard creates projects before any evaluation
-    # exists and the UI shows an empty state for them. Only dirs with neither
-    # runs nor a project record (stray non-project dirs) are dropped.
-    registered_ids = {
-        name for name in dir_names
-        if repository_info_exists(reports_root / name)
-    }
+def _build_project_entries_threaded(
+    reports_root: Path, dir_names: list[str],
+    registered_ids: set[str], parent_ids: set[str], subproject_ids: set[str],
+    *, backfill: bool, inline_summaries: bool,
+) -> list[ProjectEntry]:
+    """Build a ProjectEntry per candidate dir in parallel, dropping stray dirs.
 
+    A registered project (repository_info.json present) is listed even with
+    zero runs — the onboarding wizard creates projects before any evaluation
+    exists and the UI shows an empty state for them. Only dirs with neither
+    runs nor a project record (stray non-project dirs) are dropped.
+    """
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
         if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
@@ -142,7 +122,46 @@ def build_project_list(
         results = pool.map(
             lambda pair: pair[0].run(_build_one, pair[1]), zip(ctxs, dir_names),
         )
-    projects = [p for p in results if p is not None]
+    return [p for p in results if p is not None]
+
+
+def build_project_list(
+    reports_root: Path, *, backfill: bool = True, inline_summaries: bool = False,
+) -> list[ProjectEntry]:
+    """Collect eligible project dirs and build entries in parallel.
+
+    *backfill* controls the lazy ``onboardingCompletedAt`` backfill below (and
+    the equivalent one inside ``_build_project_entry``): when False, records
+    are read as-is and never rewritten. Local callers keep the default
+    (True); the shared-repo route passes False so listing a clone's projects
+    never dirties its git worktree (see routes_shared.py shared_projects).
+
+    *inline_summaries* is forwarded to ``_build_project_entry`` (as
+    ``compute_on_miss``): the shared-repo route has no warm-up engine to fill
+    a missing project-card summary, so it passes True to keep computing one
+    inline on a miss. Local callers keep the default (False) -- a miss is
+    reported pending and left for the warm-up engine.
+    """
+    dir_names = _collect_candidate_dirs(reports_root, _max_projects_listed())
+
+    # Lazy backfill: ensure legacy project records have an
+    # ``onboardingCompletedAt`` field. Run before the parent/child sweep so
+    # any subsequent reads see the updated file. Idempotent — no-op for
+    # records that already have the field. Failures are silently ignored.
+    if backfill:
+        for name in dir_names:
+            _backfill_onboarding_field(reports_root / name)
+
+    parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
+    registered_ids = {
+        name for name in dir_names
+        if repository_info_exists(reports_root / name)
+    }
+
+    projects = _build_project_entries_threaded(
+        reports_root, dir_names, registered_ids, parent_ids, subproject_ids,
+        backfill=backfill, inline_summaries=inline_summaries,
+    )
     projects.sort(key=lambda p: p.name)
     return _auto_detect_parents(projects)
 

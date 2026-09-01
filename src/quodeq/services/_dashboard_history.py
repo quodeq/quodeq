@@ -115,62 +115,70 @@ class _SelectedRunContext:
     summary: DimensionSummary
 
 
-def _compute_dashboard_payload(
-    reports_root: Path, project: str, runs: list[RunInfo],
-    ctx: _SelectedRunContext, cc: DashboardCacheConfig,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> _DashboardPayload:
-    """Compute history-dependent parts of the dashboard response."""
-    selected_dim_names = {d.dimension for d in ctx.dimensions}
-    # Shared trend rule (scoring_view.select_trend_runs): cancelled/failed
-    # runs are excluded — misleading history points. They remain visible in
-    # availableRuns for the UI.
+def _select_history_window(
+    runs: list[RunInfo], selected_run_id: str, max_history: int,
+) -> tuple[list[RunInfo], int]:
+    """Pick the history window and the selected run's index within it.
+
+    Shared trend rule (scoring_view.select_trend_runs): cancelled/failed
+    runs are excluded — misleading history points. They remain visible in
+    availableRuns for the UI.
+
+    Re-finds the selected run's index inside the scoreable runs: the
+    selected run's index in the full unfiltered run list can exceed
+    len(history_runs) when cancelled/failed runs sit above the selected
+    run. Passing the wrong index to collect_stale_dimensions /
+    _collect_previous_scores caused IndexError on history_runs[newer_idx].
+    """
     scoreable_runs = select_trend_runs(runs)
-    # Re-find the selected run's index inside scoreable_runs. ctx.index is
-    # the index in the full unfiltered run list, which can exceed
-    # len(history_runs) when cancelled/failed runs sit above the selected
-    # run. Passing the wrong index to collect_stale_dimensions /
-    # _collect_previous_scores caused IndexError on history_runs[newer_idx].
     selected_in_scoreable = next(
-        (i for i, r in enumerate(scoreable_runs) if r.run_id == ctx.run.run_id),
+        (i for i, r in enumerate(scoreable_runs) if r.run_id == selected_run_id),
         None,
     )
-    max_history = _max_history_runs()
     if selected_in_scoreable is None:
         # Selected run was cancelled/failed (so it's not in scoreable_runs).
         # Treat the entire scoreable history as "older" runs relative to it.
         history_runs = scoreable_runs[:max_history]
-        history_index = len(history_runs)
-    else:
-        history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
-        history_index = selected_in_scoreable
-    # History fetcher: cache-backed, dismiss-adjusted, SCALAR-only -- the same
-    # fetcher the /scores endpoint uses. The three consumers below
-    # (_collect_previous_scores, collect_stale_dimensions, build_accumulated_trend)
-    # read only per-run scalars (dimension + overallScore + overallGrade), not
-    # the full violations. Reading + rescoring FULL data for every history run
-    # (up to _max_history_runs()) was the ~2s cost this replaces.
-    #
-    # In-progress freshness is preserved: the fast path re-reads each request
-    # (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
-    # in-progress runs compute-through without persisting a partial set. Stale-
-    # partial detection is preserved inside read_run_scalars, which falls back to
-    # full read_run_data whenever the SQL scalar projection disagrees with the
-    # on-disk evaluation/*.json count -- the same self-heal the old status-aware
-    # fetcher did via _count_eval_files. The dismiss-adjustment (Bug B) stays;
-    # it is now cached rather than recomputed on every request.
+        return history_runs, len(history_runs)
+    history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
+    return history_runs, selected_in_scoreable
+
+
+def _make_history_fetcher(
+    reports_root: Path, project: str, history_runs: list[RunInfo], max_history: int,
+    params: ScoringParams, cc: DashboardCacheConfig,
+) -> Callable[[str], list[DimensionResult]]:
+    """Build the shared history dimension fetcher: cache-backed,
+    dismiss-adjusted, SCALAR-only -- the same fetcher the /scores endpoint
+    uses. The three consumers in ``_compute_dashboard_payload``
+    (_collect_previous_scores, collect_stale_dimensions,
+    build_accumulated_trend) read only per-run scalars (dimension +
+    overallScore + overallGrade), not the full violations. Reading +
+    rescoring FULL data for every history run (up to _max_history_runs())
+    was the ~2s cost this replaces.
+
+    In-progress freshness is preserved: the fast path re-reads each request
+    (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
+    in-progress runs compute-through without persisting a partial set. Stale-
+    partial detection is preserved inside read_run_scalars, which falls back to
+    full read_run_data whenever the SQL scalar projection disagrees with the
+    on-disk evaluation/*.json count -- the same self-heal the old status-aware
+    fetcher did via _count_eval_files. The dismiss-adjustment (Bug B) stays;
+    it is now cached rather than recomputed on every request.
+
+    Key the in-memory dimension cache by the project's suppression state so a
+    dismiss/delete (or a formula change) invalidates warmed entries and no
+    read path can serve a pre-dismiss score. ``score_cache_version`` already
+    hashes dismissed + deleted keys + params. This fetcher is SHARED across the
+    whole history window (previous-scores, stale-dimensions, and the trend all
+    iterate many runs through it), so we keep the global project-scoped version
+    here rather than a per-run scoped one -- per-run scoping only makes sense
+    when a single run is in play, which this path is not.
+    """
     cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
-    # Key the in-memory dimension cache by the project's suppression state so a
-    # dismiss/delete (or a formula change) invalidates warmed entries and no
-    # read path can serve a pre-dismiss score. ``score_cache_version`` already
-    # hashes dismissed + deleted keys + params. This fetcher is SHARED across the
-    # whole history window (previous-scores, stale-dimensions, and the trend all
-    # iterate many runs through it), so we keep the global project-scoped version
-    # here rather than a per-run scoped one -- per-run scoping only makes sense
-    # when a single run is in play, which this path is not.
     from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
     dim_cache_version = score_cache_version(reports_root / project, params)
-    get_run_dimensions = make_trend_fetcher(
+    return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         max_history=max_history,
         base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
@@ -178,6 +186,18 @@ def _compute_dashboard_payload(
             version=dim_cache_version,
         ),
     )
+
+
+def _compute_dashboard_payload(
+    reports_root: Path, project: str, runs: list[RunInfo],
+    ctx: _SelectedRunContext, cc: DashboardCacheConfig,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> _DashboardPayload:
+    """Compute history-dependent parts of the dashboard response."""
+    selected_dim_names = {d.dimension for d in ctx.dimensions}
+    max_history = _max_history_runs()
+    history_runs, history_index = _select_history_window(runs, ctx.run.run_id, max_history)
+    get_run_dimensions = _make_history_fetcher(reports_root, project, history_runs, max_history, params, cc)
     previous_by_dimension = _collect_previous_scores(
         history_runs, history_index, selected_dim_names, get_run_dimensions,
     )

@@ -30,8 +30,9 @@ from quodeq.services._job_model import (
     _MAX_COMPLETED_JOBS,
     _ANSI_RE,
     _CC_MARKER_PREFIX,
-    _CONSUME_BATCH_SIZE,
 )
+from quodeq.services._job_log_tee import consume_stream, drain_pre_marker_buffer, tee_run_log
+from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
 
 if TYPE_CHECKING:
     from quodeq.services._external_jobs import ProcessControl
@@ -337,40 +338,12 @@ class JobManager:
         return True
 
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
-        if stream is None:
-            return
-        batch: list[str] = []
-        self._pre_marker_buffer.setdefault(job_id, [])
-        try:
-            try:
-                for line in stream:
-                    stripped = line.rstrip("\n")
-                    batch.append(stripped)
-                    if len(batch) >= _CONSUME_BATCH_SIZE:
-                        if not self._flush_batch(job_id, batch):
-                            return
-                        batch.clear()
-                    # Tee after flush so the marker is already applied to the
-                    # job before we try to resolve run_dir. Skip _cc JSON
-                    # markers — they are structured IPC, not user-facing
-                    # terminal output, and leaking them makes the xterm pane
-                    # in the dashboard noisy.
-                    if not stripped.startswith(_CC_MARKER_PREFIX):
-                        self._tee_run_log(job_id, stripped)
-            except (IOError, BrokenPipeError) as exc:
-                self._log.warning(f"Stream read error for job {job_id}: {exc}")
-            if batch:
-                self._flush_batch(job_id, batch)
-            # Final drain: if the report_path marker arrived in the last batch,
-            # the writer may not have been created yet — try one more time so
-            # buffered pre-marker lines are not lost.
-            self._drain_pre_marker_buffer(job_id)
-        finally:
-            # Always release the writer and buffer, even on unexpected exceptions.
-            writer = self._run_log_writers.pop(job_id, None)
-            if writer is not None:
-                writer.close()
-            self._pre_marker_buffer.pop(job_id, None)
+        consume_stream(
+            job_id, stream,
+            store=self._store, reports_root=self._reports_root,
+            run_log_writers=self._run_log_writers, pre_marker_buffer=self._pre_marker_buffer,
+            log=self._log, flush_batch=self._flush_batch,
+        )
 
     def _drain_pre_marker_buffer(self, job_id: str) -> None:
         """Attempt to resolve run_dir and flush any buffered pre-marker lines.
@@ -379,18 +352,11 @@ class JobManager:
         the report_path marker are not lost when the marker arrives in the last
         batch of the stream.
         """
-        if self._run_log_writers.get(job_id) is not None:
-            # Writer already open — nothing to drain.
-            return
-        job = self._store.get(job_id)
-        if job and job.output_project and job.output_run_id and self._reports_root is not None:
-            run_dir = self._reports_root / job.output_project / job.output_run_id
-            if run_dir.is_dir():
-                writer = RunLogWriter(run_dir)
-                self._run_log_writers[job_id] = writer
-                for pending in self._pre_marker_buffer.get(job_id, []):
-                    writer.write(pending)
-                self._pre_marker_buffer[job_id] = []
+        drain_pre_marker_buffer(
+            job_id,
+            store=self._store, reports_root=self._reports_root,
+            run_log_writers=self._run_log_writers, pre_marker_buffer=self._pre_marker_buffer,
+        )
 
     def _tee_run_log(self, job_id: str, line: str) -> None:
         """Forward *line* to the job's run.log writer.
@@ -402,23 +368,11 @@ class JobManager:
         Caller invariant: at most one ``_consume_stream`` runs per job_id at a
         time.  This method is not re-entrant for the same job_id.
         """
-        writer = self._run_log_writers.get(job_id)
-        if writer is None:
-            # Try to resolve run_dir from the job snapshot now.
-            job = self._store.get(job_id)
-            if job and job.output_project and job.output_run_id and self._reports_root is not None:
-                run_dir = self._reports_root / job.output_project / job.output_run_id
-                if run_dir.is_dir():
-                    writer = RunLogWriter(run_dir)
-                    self._run_log_writers[job_id] = writer
-                    # Flush any buffered pre-marker lines.
-                    for pending in self._pre_marker_buffer.get(job_id, []):
-                        writer.write(pending)
-                    self._pre_marker_buffer[job_id] = []
-            if writer is None:
-                self._pre_marker_buffer.setdefault(job_id, []).append(line)
-                return
-        writer.write(line)
+        tee_run_log(
+            job_id, line,
+            store=self._store, reports_root=self._reports_root,
+            run_log_writers=self._run_log_writers, pre_marker_buffer=self._pre_marker_buffer,
+        )
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
@@ -449,19 +403,9 @@ class JobManager:
 
     def _watchdog_should_kill(self, job_id: str, started_at: float) -> bool:
         """Return True when the watchdog should SIGKILL the job process now."""
-        now = time.time()
-        cap = self._job_timeout_cap_s
-        if cap > 0 and (now - started_at) > cap:
-            return True
-        job = self._store.get(job_id)
-        deadline_at = getattr(job, "deadline_at", None) if job else None
-        if not deadline_at:
-            return False
-        try:
-            deadline = datetime.fromisoformat(deadline_at).timestamp()
-        except (TypeError, ValueError):
-            return False
-        return now > deadline + _WATCHDOG_DEADLINE_GRACE_S
+        return watchdog_should_kill(
+            job_id, started_at, store=self._store, job_timeout_cap_s=self._job_timeout_cap_s,
+        )
 
     def _run_status_exit_reason(self, job: Job | None) -> str | None:
         """Best-effort read of the run's ``status.json`` ``exit_reason``.
@@ -472,20 +416,21 @@ class JobManager:
         exits nonzero without the job watchdog ever firing, this is the only
         signal that the exit was a time-limit truncation, not a failure.
         """
-        if (
-            job is None
-            or not job.output_project
-            or not job.output_run_id
-            or self._reports_root is None
-        ):
-            return None
-        status_path = self._reports_root / job.output_project / job.output_run_id / "status.json"
-        try:
-            data = json.loads(status_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-        reason = data.get("exit_reason")
-        return reason if isinstance(reason, str) else None
+        return run_status_exit_reason(job, self._reports_root)
+
+    def _classify_exit(self, job_id: str, exit_code: int, watchdog_killed: bool) -> str | None:
+        """Resolve a time-limit ``deadline_reason``, or None for a plain exit.
+
+        Called before the lock is taken in ``_monitor_process`` — status.json
+        I/O must not block API request paths contending on self._lock.
+        """
+        if watchdog_killed:
+            return _EXIT_REASON_DEADLINE
+        if exit_code != 0:
+            reason = self._run_status_exit_reason(self._store.get(job_id))
+            if reason in _DEADLINE_EXIT_REASONS:
+                return reason
+        return None
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         started_at = time.time()
@@ -510,15 +455,7 @@ class JobManager:
                     exit_code = _EXIT_CODE_TIMEOUT
                     watchdog_killed = True
                     break
-        # Resolve a time-limit exit before taking the lock — status.json I/O
-        # must not block API request paths contending on self._lock.
-        deadline_reason: str | None = None
-        if watchdog_killed:
-            deadline_reason = _EXIT_REASON_DEADLINE
-        elif exit_code != 0:
-            reason = self._run_status_exit_reason(self._store.get(job_id))
-            if reason in _DEADLINE_EXIT_REASONS:
-                deadline_reason = reason
+        deadline_reason = self._classify_exit(job_id, exit_code, watchdog_killed)
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)
