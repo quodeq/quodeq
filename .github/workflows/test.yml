@@ -125,3 +125,10 @@ jobs:
         # New strings go in src/strings/en.json via t(); shrunk counts are locked
         # in with `npm run lint:strings:update`.
         run: npm run lint:strings
+
+      - name: Check UI file/function sizes (size ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on files/functions over 300/50 lines outside the grandfather
+        # list in tools/size_grandfather.mjs, or a grandfather list that grew
+        # past its committed ceiling.
+        run: npm run lint:size
