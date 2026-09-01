@@ -21,40 +21,36 @@ These are pure functions used by the V2 dimension processor (Phase B5):
 
 These helpers compose into the canonical V2 dimension processor in
 ``cache/dimension_runner.py``.
+
+Cache-key composition and provenance-drift tracking live in
+``_key_provenance.py`` and are re-exported below for backward compatibility.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
+from quodeq.analysis.cache._key_provenance import (
+    _SCHEMA_VERSION,
+    _accumulate_drift,
+    _current_provenance,
+    _hash_prompts_combined,
+    _model_id_from,
+    build_cache_key_for_file,
+    format_provenance_drift,  # noqa: F401 -- re-export
+)
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
-from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.fingerprint import (
     _hash_file,
-    _hash_prompts_map,
     _hash_standards,
     dimension_params_state,
 )
 
 _logger = logging.getLogger(__name__)
-
-# Bumped on any breaking change to key composition or entry format.
-# v1 -> v2: file_done marker contract; entries written without marker
-# filtering are no longer trusted, so old entries naturally invalidate
-# on the next input change.
-# v2 -> v3: permissive key — model/prompts/standards/sampling left the key
-# (now provenance on the entry). The formula change re-keys every entry, so
-# schema-2 entries land in a different namespace that schema-3 lookups never
-# reach; the one-time GC (cache/gc.py) then reclaims them. This is the LAST
-# key change that costs a re-eval: entries are now self-describing
-# (file_content_hash stored), so any future key change is losslessly
-# migratable.
-_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -82,119 +78,18 @@ class ClassifyResult:
     unconsolidated_hit_keys: dict[str, str] = field(default_factory=dict)
 
 
-# Provenance fields compared at classify time, in display order.
-_PROV_FIELDS = ("model_id", "standards_hash", "prompts_hash", "quodeq_version")
-# Fields whose values are human-readable enough to show in a summary; hashes
-# are not (an opaque SHA helps no one).
-_PROV_HUMAN_VALUE = frozenset({"model_id", "quodeq_version"})
-_PROV_LABELS = {
-    "model_id": "model",
-    "standards_hash": "standards",
-    "prompts_hash": "prompts",
-    "quodeq_version": "quodeq version",
-}
-
-
-def _current_provenance(config: RunConfig, dimension: str) -> dict:
-    """The provenance the current run would stamp on a fresh entry."""
-    standards_hash = (
-        _hash_standards(config.standards_dir, dimension, config.src)
-        if config.standards_dir else ""
-    ) or ""
-    return {
-        "model_id": _model_id_from(config),
-        "standards_hash": standards_hash,
-        "prompts_hash": _hash_prompts_combined(config.prompts_dir),
-        "quodeq_version": quodeq_version(),
-    }
-
-
-def _accumulate_drift(drift: dict, entry_provenance: dict, current: dict) -> None:
-    """Count, per provenance field, hits whose recorded value differs from the
-    current run. Unknown (blank/missing) entry values are skipped — we only
-    claim drift we can prove, so legacy/empty-provenance entries are quiet."""
-    for fname in _PROV_FIELDS:
-        old = entry_provenance.get(fname)
-        if not old:
-            continue
-        new = current.get(fname, "")
-        if old != new:
-            record = drift.setdefault(fname, {"count": 0, "from": old, "to": new})
-            record["count"] += 1
-
-
-def format_provenance_drift(drift: dict, *, reused: int) -> str:
-    """One-line summary of how many reused findings predate the current
-    model / standards / prompts. Empty string when nothing drifted."""
-    if not drift or reused <= 0:
-        return ""
-    parts: list[str] = []
-    for fname in _PROV_FIELDS:
-        record = drift.get(fname)
-        if not record:
-            continue
-        label = _PROV_LABELS[fname]
-        if fname in _PROV_HUMAN_VALUE:
-            parts.append(
-                f"{record['count']} across {label} change "
-                f"({record['from']} -> {record['to']})"
-            )
-        else:
-            parts.append(f"{record['count']} across {label} change")
-    return ", ".join(parts)
-
-
-def _hash_prompts_combined(prompts_dir: Path | None) -> str:
-    """Hash all rules-bearing prompts into a single SHA-256.
-
-    The fingerprint module stores a per-file map for selective
-    invalidation; here we collapse it to one string so the cache key
-    stays simple. Any prompt change still invalidates correctly.
-
-    *prompts_dir* is required: callers resolve ``default_paths().prompts_dir``
-    (composition-root concern, not this module's).
-    """
-    pmap = _hash_prompts_map(prompts_dir) or {}
-    if not pmap:
-        return ""
-    h = hashlib.sha256()
-    for name in sorted(pmap):
-        h.update(name.encode())
-        h.update(pmap[name].encode())
-    return h.hexdigest()
-
-
-def _model_id_from(config: RunConfig) -> str:
-    """Pick the most specific model identifier available."""
-    opts = config.options
-    return opts.subagent_model or opts.ai_model or "unknown"
-
-
-def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) -> str:
-    """Compute the cache key for a (file, dimension) pair under ``config``.
-
-    Returns a 64-char hex SHA-256. The key is permissive: it depends only on
-    the real per-unit inputs (file content, path, dimension, language, and
-    non-default threshold params), so a model switch or a quodeq/standards
-    update reuses the cached result. The volatile context is recorded on the
-    entry's provenance at write time.
-
-    MUST stay byte-for-byte identical to the key built in
-    ``cache_writer.build_cache_writer`` and ``cache.runner._key_for`` —
-    ``CacheKey`` is the single source of truth and all three populate exactly
-    its fields.
-    """
-    content_hash = _hash_file(config.src / file_path) or ""
-    params_hash, _ = dimension_params_state(config.standards_dir, dimension, config.src)
-    key = CacheKey(
-        schema_version=_SCHEMA_VERSION,
-        file_content_hash=content_hash,
-        file_path=file_path,
-        dimension=dimension,
-        language=config.language or "",
-        params_hash=params_hash,
-    )
-    return compute_key(key)
+def _classify_one_file(
+    config: RunConfig, dimension: str, f: str, cache: CacheBackend, *, bypass_reads: bool,
+    current_prov: dict | None,
+) -> tuple[str, CacheEntry | None, dict | None]:
+    """Classify one file against the cache. Returns (key, hit, current_prov),
+    where hit is None on a miss and current_prov is lazily computed on the
+    first hit (passed through so the caller only pays for it once)."""
+    key = build_cache_key_for_file(config, f, dimension)
+    hit = None if bypass_reads else cache.get(key)
+    if hit is not None and current_prov is None:
+        current_prov = _current_provenance(config, dimension)
+    return key, hit, current_prov
 
 
 def classify_files_via_cache(
@@ -232,8 +127,9 @@ def classify_files_via_cache(
     unconsolidated_hit_keys: dict[str, str] = {}
     current_prov: dict | None = None  # computed lazily, only if there are hits
     for f in files:
-        key = build_cache_key_for_file(config, f, dimension)
-        hit = None if bypass_reads else cache.get(key)
+        key, hit, current_prov = _classify_one_file(
+            config, dimension, f, cache, bypass_reads=bypass_reads, current_prov=current_prov,
+        )
         if hit is None:
             misses.append(f)
             miss_keys[f] = key
@@ -243,8 +139,7 @@ def classify_files_via_cache(
             else:
                 unconsolidated_findings.extend(hit.findings)
                 unconsolidated_hit_keys[f] = key
-            if current_prov is None:
-                current_prov = _current_provenance(config, dimension)
+            assert current_prov is not None  # set on the first hit, above
             _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
     result = ClassifyResult(
         cached_findings=cached_findings,
@@ -297,6 +192,42 @@ def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], se
     return grouped, ok_files
 
 
+def _build_cache_entry_for_file(
+    config: RunConfig, dimension: str, f: str, key: str, grouped: dict[str, list[dict]],
+    *, model_id: str, standards_hash: str, prompts_hash: str, effective_params: dict,
+    version: str,
+) -> CacheEntry:
+    """Build the CacheEntry for one dispatched file's persisted result."""
+    return CacheEntry(
+        key=key,
+        schema_version=_SCHEMA_VERSION,
+        findings=grouped.get(f, []),
+        files_read=1,
+        file_path=f,
+        dimension=dimension,
+        model_id=model_id,
+        file_content_hash=_hash_file(config.src / f) or "",
+        language=config.language or "",
+        provenance=build_provenance(
+            model_id=model_id, prompts_hash=prompts_hash,
+            standards_hash=standards_hash, version=version,
+            effective_params=effective_params,
+        ),
+        # Born unconsolidated: no completed run has these findings in its
+        # report yet. mark_run_consolidated flips it when this run ends done.
+        #
+        # Accepted race: two concurrent runs on one project can both treat
+        # file X as a miss. If run A reaches done and flips X to
+        # consolidated, run B's periodic-persist watcher can then rewrite
+        # X here with consolidated=False. If B is later cancelled, X reads
+        # as unconsolidated even though A already put those findings in a
+        # completed Overview, so the next run surfaces them as "new" once.
+        # Cosmetic, requires concurrent runs on one project, and
+        # self-heals on the next done run. Not fixing.
+        consolidated=False,
+    )
+
+
 def persist_dispatch_results(
     config: RunConfig, dimension: str, *, miss_files: list[str],
     jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
@@ -328,32 +259,9 @@ def persist_dispatch_results(
         if key is None:
             _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
             continue
-        entry = CacheEntry(
-            key=key,
-            schema_version=_SCHEMA_VERSION,
-            findings=grouped.get(f, []),
-            files_read=1,
-            file_path=f,
-            dimension=dimension,
-            model_id=model_id,
-            file_content_hash=_hash_file(config.src / f) or "",
-            language=config.language or "",
-            provenance=build_provenance(
-                model_id=model_id, prompts_hash=prompts_hash,
-                standards_hash=standards_hash, version=version,
-                effective_params=effective_params,
-            ),
-            # Born unconsolidated: no completed run has these findings in its
-            # report yet. mark_run_consolidated flips it when this run ends done.
-            #
-            # Accepted race: two concurrent runs on one project can both treat
-            # file X as a miss. If run A reaches done and flips X to
-            # consolidated, run B's periodic-persist watcher can then rewrite
-            # X here with consolidated=False. If B is later cancelled, X reads
-            # as unconsolidated even though A already put those findings in a
-            # completed Overview, so the next run surfaces them as "new" once.
-            # Cosmetic, requires concurrent runs on one project, and
-            # self-heals on the next done run. Not fixing.
-            consolidated=False,
+        entry = _build_cache_entry_for_file(
+            config, dimension, f, key, grouped,
+            model_id=model_id, standards_hash=standards_hash, prompts_hash=prompts_hash,
+            effective_params=effective_params, version=version,
         )
         cache.put(key, entry)

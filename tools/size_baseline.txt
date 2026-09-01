@@ -13,13 +13,9 @@ src/quodeq/analysis/_pipeline.py:118:function
 src/quodeq/analysis/api_prompt_assembly.py:76:function
 src/quodeq/analysis/cache/_replay.py:137:function
 src/quodeq/analysis/cache/cache_writer.py:37:function
-src/quodeq/analysis/cache/dimension_helpers.py:1:file
-src/quodeq/analysis/cache/dimension_helpers.py:200:function
-src/quodeq/analysis/cache/dimension_helpers.py:300:function
+src/quodeq/analysis/cache/dimension_helpers.py:95:function
 src/quodeq/analysis/estimates.py:28:function
-src/quodeq/analysis/manifest_build.py:1:file
-src/quodeq/analysis/manifest_build.py:222:function
-src/quodeq/analysis/manifest_build.py:323:function
+src/quodeq/analysis/manifest_build_scope.py:95:function
 src/quodeq/analysis/mcp/enricher.py:209:function
 src/quodeq/analysis/mcp/findings_server.py:98:function
 src/quodeq/analysis/mcp/handlers.py:79:function
