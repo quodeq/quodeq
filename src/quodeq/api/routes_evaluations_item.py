@@ -39,8 +39,12 @@ def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     return read_run_dim_states(_reports_dir(), project, run_id)
 
 
-def _score_completed_dims_in_bg(app: Flask, job: Any) -> None:
+def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
     """Score completed dimensions of a failed/cancelled *job*, once.
+
+    *job_id* is the route's URL parameter, not derived from *job* — a job
+    snapshot can be a plain dict (some providers/tests return one), so it
+    must not be assumed to carry a ``.job_id`` attribute.
 
     Offloaded to a background thread so the GET returns immediately;
     scoring may involve heavy I/O (reading evidence, writing score files).
@@ -49,7 +53,6 @@ def _score_completed_dims_in_bg(app: Flask, job: Any) -> None:
     job_status = getattr(job, "status", None)
     if job_status not in ("failed", "cancelled"):
         return
-    job_id = job.job_id
     if not _claim_scoring(job_id):
         return
     _reports = _reports_dir()
@@ -103,7 +106,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        _score_completed_dims_in_bg(app, job)
+        _score_completed_dims_in_bg(app, job_id, job)
         payload = to_camel_dict(job)
         payload["dimStates"] = _read_dim_states(job)
         return jsonify(payload)
