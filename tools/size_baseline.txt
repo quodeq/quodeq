@@ -11,10 +11,7 @@ src/quodeq/_cli_resolution.py:253:function
 src/quodeq/analysis/_command.py:1:file
 src/quodeq/analysis/_command.py:73:function
 src/quodeq/analysis/_dim_estimates.py:50:function
-src/quodeq/analysis/_loops.py:1:file
-src/quodeq/analysis/_loops.py:292:function
-src/quodeq/analysis/_loops.py:434:function
-src/quodeq/analysis/_pipeline.py:122:function
+src/quodeq/analysis/_pipeline.py:118:function
 src/quodeq/analysis/api_prompt_assembly.py:76:function
 src/quodeq/analysis/cache/_replay.py:137:function
 src/quodeq/analysis/cache/cache_writer.py:37:function

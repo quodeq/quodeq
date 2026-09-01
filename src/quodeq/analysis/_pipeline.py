@@ -7,12 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
-from quodeq.analysis._loops import (
-    _run_dir_for,
-    _safe_write_dim_state,
-    run_incremental_loop,
-    run_per_dimension_loop,
-)
+from quodeq.analysis._loop_state import _run_dir_for, _safe_write_dim_state
+from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
 from quodeq.analysis.cache.local import LocalFileBackend
