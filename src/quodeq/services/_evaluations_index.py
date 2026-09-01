@@ -2,89 +2,35 @@
 
 Owns the read-side query path for evaluations: ``list``, ``get_status``,
 ``delete``, ``is_complete``, ``get_log_run_dir``, plus the
-``promote_stale_to_cancelled`` fallback used by ``cancel_evaluation``.
-
-The ``ActionProvider`` methods on ``FilesystemActionProvider`` are 1-line
+``promote_stale_to_cancelled`` fallback used by ``cancel_evaluation``. The
+``ActionProvider`` methods on ``FilesystemActionProvider`` are 1-line
 delegates to an instance of this class.
 
-Split (Task 14): the status.json readers and the ``RunRow`` -> ``JobSnapshot``
-assembly live in ``_run_status_readers.py``, re-exported here for backward
-compatibility (``_read_dimensions_from_status`` / ``_read_time_limit_from_status``
-are imported directly by tests).
+Split (Task 14, + fix round): status.json readers, the terminal-state check,
+and ``RunRow`` -> ``JobSnapshot`` assembly live in ``_run_status_readers.py``
+(re-exported — tests import readers directly); directory-removal,
+filesystem-fallback-scan, and external-job liveness (none patched by any
+test) live in ``_run_index_fs.py`` as plain free functions.
 """
 from __future__ import annotations
 
-import json
 import logging
-import shutil
 from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import is_safe_run_segment
 from quodeq.services.jobs import JobManager
+from quodeq.services._run_index_fs import (
+    _external_job_is_complete, _merge_internal_jobs, _remove_run_directory, _scan_reports_root_for_run,
+)
 from quodeq.services._run_status_readers import build_job_snapshot
 from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
-    _read_deadline_from_status,
-    _read_dimensions_from_status,
-    _read_provider_model_from_status,
-    _read_time_limit_from_status,
-    _tail_run_log,
+    _read_deadline_from_status, _read_dimensions_from_status, _read_provider_model_from_status,
+    _read_time_limit_from_status, _status_json_terminal, _tail_run_log,
 )
 
 _logger = logging.getLogger(__name__)
-
-_TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
-
-
-def _status_json_terminal(run_dir: Path) -> bool:
-    """Return True when the run's status.json says it ended."""
-    status_path = run_dir / "status.json"
-    if not status_path.exists():
-        return False
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    state = data.get("state")
-    return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
-
-
-def _merge_internal_jobs(
-    snapshots: list[JobSnapshot], internal_jobs: list[JobSnapshot],
-) -> list[JobSnapshot]:
-    """Merge SQLite-index snapshots with in-memory internal jobs.
-
-    Internal dashboard-spawned jobs always take priority over index rows
-    that project the same on-disk run. The dedup key is (project, run_id)
-    rather than job_id because internal jobs carry bare UUIDs while
-    indexed rows carry "ext-<run_id>" — keying on job_id never matches
-    the two views of the same run and both end up in the merged list.
-
-    'lost' internal jobs are restart placeholders whose subprocess may
-    still be alive: they must not shadow the truthful ext- row derived
-    from the run's own status.json, and when such a row exists the
-    placeholder itself is dropped in its favor.
-    """
-    covered = {
-        (j.output_project, j.output_run_id) for j in internal_jobs
-        if j.output_project and j.output_run_id and j.status != "lost"
-    }
-    row_keys = {
-        (s.output_project, s.output_run_id) for s in snapshots
-        if s.output_project and s.output_run_id
-    }
-    visible_internal = [
-        j for j in internal_jobs
-        if not (
-            j.status == "lost"
-            and (j.output_project, j.output_run_id) in row_keys
-        )
-    ]
-    return [
-        s for s in snapshots
-        if (s.output_project, s.output_run_id) not in covered
-    ] + visible_internal
 
 
 class EvaluationsIndex:
@@ -145,23 +91,9 @@ class EvaluationsIndex:
         run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
         if snapshot.output_run_id:
             run_uuid = snapshot.output_run_id
-        removed_dir = False
-        if snapshot.output_project and reports_dir.is_dir():
-            candidate = reports_dir / snapshot.output_project / run_uuid
-            if candidate.is_dir():
-                shutil.rmtree(candidate, ignore_errors=True)
-                removed_dir = not candidate.exists()
-                if not removed_dir:
-                    _logger.warning("Could not remove run directory %s", candidate)
-        if not removed_dir and reports_dir.is_dir():
-            for project_dir in reports_dir.iterdir():
-                candidate = project_dir / run_uuid
-                if candidate.is_dir():
-                    shutil.rmtree(candidate, ignore_errors=True)
-                    removed_dir = not candidate.exists()
-                    if not removed_dir:
-                        _logger.warning("Could not remove run directory %s", candidate)
-                    break
+        removed_dir = _remove_run_directory(
+            reports_dir, snapshot.output_project, run_uuid, log=_logger,
+        )
         # Remove from index regardless so stale rows get cleaned up. The same
         # on-disk run can be indexed under "ext-<run_uuid>" even when the
         # caller holds the internal job id, so clear both key forms.
@@ -275,22 +207,7 @@ class EvaluationsIndex:
                         return candidate
 
         # Filesystem fallback: scan reports_root for <project>/<run_id>/.
-        reports_root = self._resolve_reports_root()
-        if reports_root is None or not reports_root.is_dir():
-            return None
-        resolved_root = reports_root.resolve()
-        for project_dir in reports_root.iterdir():
-            if not project_dir.is_dir():
-                continue
-            candidate = project_dir / run_id
-            try:
-                if not candidate.resolve().is_relative_to(resolved_root):
-                    continue
-            except (OSError, ValueError):
-                continue
-            if candidate.is_dir():
-                return candidate
-        return None
+        return _scan_reports_root_for_run(self._resolve_reports_root(), run_id)
 
     def rebuild(self, reports_root: Path | None = None) -> tuple[int, int]:
         """Rebuild the index from scratch by walking *reports_root*.
@@ -318,17 +235,7 @@ class EvaluationsIndex:
             run_dir = self.get_log_run_dir(job_id)
             if run_dir is None:
                 return False
-            if (run_dir / "scan.json").exists():
-                return True
-            if _status_json_terminal(run_dir):
-                return True
-            from quodeq.services._external_jobs import resolve_external_pid
-            pid_file = run_dir / ".pid"
-            if not pid_file.exists():
-                return True  # no PID file -> stale/crashed -> complete
-            # run_dir is already resolved; pass its parent straight through
-            # instead of splitting it into names and rejoining them.
-            return resolve_external_pid(run_dir.parent, run_dir.name) is None
+            return _external_job_is_complete(run_dir)
         snapshot = self._jobs.get_job(job_id)
         if snapshot is not None and snapshot.status in {"done", "failed", "cancelled"}:
             return True

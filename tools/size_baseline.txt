@@ -90,7 +90,6 @@ src/quodeq/data/sqlite/run_index.py:1:file
 src/quodeq/data/sqlite/run_index.py:93:function
 src/quodeq/data/sqlite/state_store.py:1:file
 src/quodeq/services/_cache.py:149:function
-src/quodeq/services/_evaluations_index.py:1:file
 src/quodeq/services/_job_model.py:1:file
 src/quodeq/services/_trend_fetcher.py:82:function
 src/quodeq/services/dashboard.py:183:function

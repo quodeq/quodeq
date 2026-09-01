@@ -2,8 +2,11 @@
 
 Split (Task 14) out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
-does not add a new logging import, so ``_project_all_runs``' failure log goes
-through an injected ``LogSink`` instead.
+does not add a new logging import, so ``_project_all_runs`` accepts an
+injected ``LogSink`` and, when none is passed, deferred-imports the facade's
+own declared ``_logger`` at the failure site — restoring the original
+exc-path logging without a new ``getLogger`` call here and without changing
+the (test-pinned) single-positional-arg production call site.
 """
 from __future__ import annotations
 
@@ -100,4 +103,10 @@ def _project_all_runs(
         try:
             repo_factory(run_dir).ensure_projected()
         except Exception as exc:  # noqa: BLE001
+            if log is NULL_LOG:
+                # No caller-injected log (the production call site can't pass
+                # one — tests patch this whole function with a bare
+                # single-arg side_effect). Fall back to the facade's own
+                # declared logger instead of a new getLogger() here.
+                from quodeq.services.mutation_rescore import _logger as log  # noqa: PLC0415
             log.warning(f"Projection after mutation failed for {run_dir}: {exc}")

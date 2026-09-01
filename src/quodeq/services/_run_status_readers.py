@@ -5,7 +5,10 @@ are not tracked by JobManager, so their dashboard-facing fields (dimensions,
 deadline, provider/model, time limit) are read straight from disk. All five
 readers, plus ``build_job_snapshot`` which assembles a ``JobSnapshot`` from
 an index ``RunRow`` using them, live here; ``_evaluations_index.py``
-re-exports every name for backward compatibility.
+re-exports every name for backward compatibility. ``_status_json_terminal``
+(the terminal-state check) also lives here (fix round) — ``_run_index_fs.py``
+needs it too, and putting it in ``_evaluations_index.py`` would have made
+that a circular import.
 """
 from __future__ import annotations
 
@@ -14,6 +17,21 @@ from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
+
+_TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
+
+
+def _status_json_terminal(run_dir: Path) -> bool:
+    """Return True when the run's status.json says it ended."""
+    status_path = run_dir / "status.json"
+    if not status_path.exists():
+        return False
+    try:
+        data = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    state = data.get("state")
+    return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
 
 
 def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
