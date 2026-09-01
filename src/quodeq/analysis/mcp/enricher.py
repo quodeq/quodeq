@@ -206,24 +206,20 @@ class FindingEnricher:
             p = self._reqs[req]["principle"]
         return (p, args.get("file"), args.get("line"), args.get("t"))
 
-    def enrich(self, args: dict) -> dict:
-        """Return a fully enriched finding dict built from *args*."""
-        req = args.get("req")
+    def _resolve_finding_dimension(
+        self, finding: dict, args: dict, req: str | None,
+    ) -> None:
+        """Reroute *finding*'s dimension (in place) per its requirement.
 
-        finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
-        finding.update({k: v for k, v in args.items() if v is not None})
-
-        if not args.get("p") and req and req in self._reqs:
-            finding["p"] = self._reqs[req]["principle"]
-
-        # The requirement is authoritative for a finding's dimension. When a
-        # requirement maps to a dimension (multi-dimension scans populate
-        # req_to_dim across standards), use it even if the model declared a
-        # different dimension -- this reroutes a misfiled finding to where it is
-        # actually scored, rather than letting a, say, security issue land under
-        # maintainability. Falls back to the model's value, then the scanned
-        # dimension. (An unresolvable requirement that cannot be rerouted is
-        # quarantined downstream at principle grouping.)
+        The requirement is authoritative for a finding's dimension. When a
+        requirement maps to a dimension (multi-dimension scans populate
+        req_to_dim across standards), use it even if the model declared a
+        different dimension -- this reroutes a misfiled finding to where it is
+        actually scored, rather than letting a, say, security issue land under
+        maintainability. Falls back to the model's value, then the scanned
+        dimension. (An unresolvable requirement that cannot be rerouted is
+        quarantined downstream at principle grouping.)
+        """
         req_dim = self._req_to_dim.get(req) if req else None
         declared = args.get("d")
         if req_dim:
@@ -237,11 +233,21 @@ class FindingEnricher:
         elif not declared and self._dimension:
             finding["d"] = self._dimension
 
-        if req and req in self._refs:
-            finding["req_refs"] = select_best_refs(
-                self._refs[req], args.get("w", ""), args.get("reason", ""),
-            )
+    def _apply_enrichment_pipeline(self, finding: dict) -> None:
+        """Attach code context and apply downweights + severity gates in place.
 
+        Gates the LIVE path only: this runs once per freshly-dispatched
+        finding, before it ever reaches the cache. A cached finding replayed on
+        a later run does NOT come back through here -- cache replay bypasses
+        enrich() entirely and writes straight to the per-dim JSONL, and a
+        deterministic checker never comes through here at all. Those two sinks
+        (dimension_runner._write_findings, checks.runner) call the same helper
+        for the same reason. Every call site is required: this one gates what
+        the model just emitted, the others gate what a warm cache is about to
+        replay and what a checker just computed, and skipping any one leaves a
+        class of findings ungated. See severity_gates.py for why the sequence
+        lives there rather than being repeated here.
+        """
         enrich_code(finding, self._work_dir, self._read_file)
         _apply_path_role_downweight(finding)
         _apply_shape_downweight(finding, self._project_shape)
@@ -249,17 +255,25 @@ class FindingEnricher:
             finding, self._precedent_fingerprints, self._precedent_corpus,
             log=self._log,
         )
-        # Gates the LIVE path only: this method runs once per freshly-dispatched
-        # finding, before it ever reaches the cache. A cached finding replayed on
-        # a later run does NOT come back through here -- cache replay bypasses
-        # enrich() entirely and writes straight to the per-dim JSONL, and a
-        # deterministic checker never comes through here at all. Those two sinks
-        # (dimension_runner._write_findings, checks.runner) call the same helper
-        # for the same reason. Every call site is required: this one gates what
-        # the model just emitted, the others gate what a warm cache is about to
-        # replay and what a checker just computed, and skipping any one leaves a
-        # class of findings ungated. See severity_gates.py for why the sequence
-        # lives there rather than being repeated here.
         apply_severity_gates(finding, self._trust_model)
+
+    def enrich(self, args: dict) -> dict:
+        """Return a fully enriched finding dict built from *args*."""
+        req = args.get("req")
+
+        finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
+        finding.update({k: v for k, v in args.items() if v is not None})
+
+        if not args.get("p") and req and req in self._reqs:
+            finding["p"] = self._reqs[req]["principle"]
+
+        self._resolve_finding_dimension(finding, args, req)
+
+        if req and req in self._refs:
+            finding["req_refs"] = select_best_refs(
+                self._refs[req], args.get("w", ""), args.get("reason", ""),
+            )
+
+        self._apply_enrichment_pipeline(finding)
 
         return finding

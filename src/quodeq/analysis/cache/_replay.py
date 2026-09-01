@@ -134,6 +134,76 @@ def _emit_cached_findings(
             )
 
 
+def _regate_replayed_findings(
+    findings: list[dict], pending: list[dict], trust_model: TrustModel | None,
+) -> None:
+    """Re-gate cached findings (in place) on the replay path (issue #657).
+
+    The live finding path gates in FindingEnricher.enrich(); cache replay
+    bypasses enrich(), so a stale, un-gated critical R-FT-2/S-AUT-3 finding
+    written by a pre-#639 quodeq version would otherwise replay at critical
+    and inflate the grade. The gate only touches un-gated criticals, so
+    re-gating an already-gated (or non-critical) finding is a no-op --
+    safe to apply unconditionally to every cached finding.
+
+    The scope gate is re-applied here for the identical reason: it too
+    runs at the FindingEnricher sink (enrich(), after apply_provenance_gate),
+    which cache replay bypasses just like the provenance gate. CacheKey
+    deliberately does not fingerprint the declared trust model (that would
+    defeat the point of gating at replay time instead of at the cache key),
+    so a cached finding survives untouched across a
+    ``.quodeq/project-profile.json`` edit unless something re-gates it on
+    every replay -- this is that something. The practical effect: editing
+    the profile to declare, say, ``networkExposure: loopback`` re-caps
+    already-cached ``major`` findings on the very next run, without a cache
+    miss or a CacheKey change.
+
+    apply_scope_gate is symmetric (see its own module docstring): the same
+    call also restores a finding this gate previously capped to ``minor``
+    once the profile is TIGHTENED enough that the rule that capped it no
+    longer fires. Without that other direction, a team that declares
+    loopback, scans, then honestly ships hosted and widens the profile back
+    to ``{"networkExposure": "public"}`` would see every already-cached
+    finding stay stuck at ``minor`` forever -- the exact same staleness
+    problem this whole re-gating pass exists to prevent, just in reverse.
+
+    apply_severity_gates owns the sequence and the order it must run in
+    (see severity_gates.py); this call site owns only the decision to
+    re-gate on replay at all.
+    """
+    for finding in findings:
+        apply_severity_gates(finding, trust_model)
+    for finding in pending:
+        apply_severity_gates(finding, trust_model)
+
+
+def _stamp_and_write_findings(
+    jsonl: Path, findings: list[dict], pending: list[dict], *, append: bool,
+) -> list[dict]:
+    """Stamp consolidated findings ``carried_forward`` and write both groups.
+
+    Every caller of this function is a cache replay -- the dispatcher writes
+    its own fresh findings and never comes through here. Stamp the origin so
+    the live evaluation feed can show only what this scan is actually
+    producing.
+
+    Copy, do not mutate: these dicts are owned by the cache entries, and the
+    periodic-persist watcher could otherwise write the flag back into the
+    cache, making a later fresh scan of the same file look carried.
+
+    Consolidated first, then unconsolidated, so the JSONL keeps reading
+    foundation-then-new. Returns the stamped list for event mirroring.
+    """
+    stamped = [{**finding, "carried_forward": True} for finding in findings]
+    stamped += [dict(finding) for finding in pending]
+    jsonl.parent.mkdir(parents=True, exist_ok=True)
+    mode = "a" if append else "w"
+    with jsonl.open(mode, encoding="utf-8") as out:
+        for finding in stamped:
+            out.write(json.dumps(finding) + "\n")
+    return stamped
+
+
 def _write_findings(
     jsonl: Path, findings: list[dict], *, append: bool,
     emit_events: bool = True,
@@ -157,60 +227,8 @@ def _write_findings(
     score disagreement that _emit_cached_findings exists to prevent.
     """
     pending = list(unconsolidated or [])
-    # Re-gate cached findings on the replay path (issue #657). The live
-    # finding path gates in FindingEnricher.enrich(); cache replay bypasses
-    # enrich(), so a stale, un-gated critical R-FT-2/S-AUT-3 finding written
-    # by a pre-#639 quodeq version would otherwise replay at critical and
-    # inflate the grade. The gate only touches un-gated criticals, so
-    # re-gating an already-gated (or non-critical) finding is a no-op --
-    # safe to apply unconditionally to every cached finding.
-    #
-    # The scope gate is re-applied here for the identical reason: it too
-    # runs at the FindingEnricher sink (enrich(), after apply_provenance_gate),
-    # which cache replay bypasses just like the provenance gate. CacheKey
-    # deliberately does not fingerprint the declared trust model (that would
-    # defeat the point of gating at replay time instead of at the cache key),
-    # so a cached finding survives untouched across a
-    # ``.quodeq/project-profile.json`` edit unless something re-gates it on
-    # every replay -- this is that something. The practical effect: editing
-    # the profile to declare, say, ``networkExposure: loopback`` re-caps
-    # already-cached ``major`` findings on the very next run, without a cache
-    # miss or a CacheKey change.
-    #
-    # apply_scope_gate is symmetric (see its own module docstring): the same
-    # call also restores a finding this gate previously capped to ``minor``
-    # once the profile is TIGHTENED enough that the rule that capped it no
-    # longer fires. Without that other direction, a team that declares
-    # loopback, scans, then honestly ships hosted and widens the profile back
-    # to ``{"networkExposure": "public"}`` would see every already-cached
-    # finding stay stuck at ``minor`` forever -- the exact same staleness
-    # problem this whole re-gating pass exists to prevent, just in reverse.
-    #
-    # apply_severity_gates owns the sequence and the order it must run in
-    # (see severity_gates.py); this call site owns only the decision to
-    # re-gate on replay at all.
-    for finding in findings:
-        apply_severity_gates(finding, trust_model)
-    for finding in pending:
-        apply_severity_gates(finding, trust_model)
-    # Every caller of this function is a cache replay -- the dispatcher
-    # writes its own fresh findings and never comes through here. Stamp the
-    # origin so the live evaluation feed can show only what this scan is
-    # actually producing.
-    #
-    # Copy, do not mutate: these dicts are owned by the cache entries, and
-    # the periodic-persist watcher could otherwise write the flag back into
-    # the cache, making a later fresh scan of the same file look carried.
-    #
-    # Consolidated first, then unconsolidated, so the JSONL keeps reading
-    # foundation-then-new.
-    stamped = [{**finding, "carried_forward": True} for finding in findings]
-    stamped += [dict(finding) for finding in pending]
-    jsonl.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if append else "w"
-    with jsonl.open(mode, encoding="utf-8") as out:
-        for finding in stamped:
-            out.write(json.dumps(finding) + "\n")
+    _regate_replayed_findings(findings, pending, trust_model)
+    stamped = _stamp_and_write_findings(jsonl, findings, pending, append=append)
     if emit_events:
         _emit_cached_findings(
             _events_log_path(jsonl), stamped, writer_factory=writer_factory,

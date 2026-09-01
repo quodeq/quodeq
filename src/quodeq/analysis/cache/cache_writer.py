@@ -34,6 +34,81 @@ from quodeq.analysis.fingerprint import _hash_file, _hash_standards, dimension_p
 _logger = logging.getLogger(__name__)
 
 
+def _resolve_writer_provenance(
+    dimension: str, src_root: Path, standards_dir: Path | None, prompts_dir: Path | None,
+) -> tuple[str, str, str, str, dict]:
+    """Resolve cache-writer provenance context, computed once per closure.
+
+    Returns (standards_hash, prompts_hash, version, params_hash, effective_params).
+    These left the cache key in schema 3 but are recorded on each entry so
+    reuse across a model/prompts/standards boundary is surfaceable, not
+    silent. ``src_root`` doubles as the project root whose threshold
+    overrides fold into the standards hash — must match classify's
+    ``_current_provenance``. ``params_hash`` keys threshold-override changes
+    into the cache key; ``effective_params`` is recorded on each entry's
+    provenance so the resolved thresholds findings were judged under are
+    surfaceable.
+    """
+    standards_hash = (
+        (_hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
+        or ""
+    )
+    prompts_hash = _hash_prompts_combined(prompts_dir)
+    version = quodeq_version()
+    params_hash, effective_params = dimension_params_state(
+        standards_dir, dimension, src_root,
+    )
+    return standards_hash, prompts_hash, version, params_hash, effective_params
+
+
+def _write_cache_entry(
+    cache: LocalFileBackend, src_root: Path, file_path: str, findings: list[dict],
+    *, dimension: str, language: str, model_id: str, params_hash: str,
+    standards_hash: str, prompts_hash: str, version: str, effective_params: dict,
+) -> None:
+    """Build the CacheEntry for one file's findings and persist it.
+
+    Key construction MUST match ``dimension_helpers.build_cache_key_for_file``
+    byte-for-byte; otherwise the parent's ``classify_files_via_cache`` would
+    MISS what this writes. Pinned by ``tests/analysis/cache/test_cache_writer.py``.
+    """
+    target = src_root / file_path
+    try:
+        inside = target.resolve().is_relative_to(src_root.resolve())
+    except (OSError, ValueError):
+        inside = False
+    content_hash = (_hash_file(target) or "") if inside else ""
+    key_struct = CacheKey(
+        schema_version=_SCHEMA_VERSION,
+        file_content_hash=content_hash,
+        file_path=file_path,
+        dimension=dimension,
+        language=language,
+        params_hash=params_hash,
+    )
+    key = compute_key(key_struct)
+    entry = CacheEntry(
+        key=key,
+        schema_version=_SCHEMA_VERSION,
+        findings=findings,
+        files_read=1,
+        file_path=file_path,
+        dimension=dimension,
+        model_id=model_id,
+        file_content_hash=content_hash,
+        language=language,
+        provenance=build_provenance(
+            model_id=model_id, prompts_hash=prompts_hash,
+            standards_hash=standards_hash, version=version,
+            effective_params=effective_params,
+        ),
+        # Born unconsolidated: no completed run has these findings in its
+        # report yet. mark_run_consolidated flips it when this run ends done.
+        consolidated=False,
+    )
+    cache.put(key, entry)
+
+
 def build_cache_writer(
     *,
     cache_root: Path,
@@ -51,82 +126,33 @@ def build_cache_writer(
     router fires it synchronously when ``mark_file_done(status="ok")`` arrives.
 
     Args:
-        cache_root: Directory where ``LocalFileBackend`` stores entries
-            (typically ``~/.quodeq/cache/results/``).
+        cache_root: Directory where ``LocalFileBackend`` stores entries.
         src_root: Project source root -- file content is hashed by reading
             ``src_root / file_path`` at closure-invocation time.
-        standards_dir: Compiled standards directory, or None when standards
-            are not configured for this run.
+        standards_dir: Compiled standards directory, or None when unconfigured.
         dimension: Dimension identifier (e.g. ``"flexibility"``).
-        model_id: Model identifier participating in the cache key --
-            ``config.options.subagent_model or config.options.ai_model``
-            in the parent's resolution.
+        model_id: Model identifier participating in the cache key.
         language: Language identifier from the project's manifest.
-        prompts_dir: Prompts directory folded into the entry's provenance
-            (``prompts_hash``). Callers resolve it at the composition root
-            (``RunConfig.prompts_dir`` / ``default_paths().prompts_dir``);
-            it MUST match what classify-time ``_current_provenance`` hashes,
-            or reused entries report phantom prompts drift.
+        prompts_dir: Prompts directory folded into the entry's provenance;
+            MUST match what classify-time ``_current_provenance`` hashes, or
+            reused entries report phantom prompts drift.
 
     Failures (disk full, permission denied, etc.) propagate as exceptions
     out of the closure. The router catches them and logs; the JSONL marker
     write already succeeded, so the run continues.
     """
     cache = LocalFileBackend(root=cache_root)
-    # Provenance context, captured once at construction (run-constant). These
-    # left the cache key in schema 3 but are recorded on each entry so reuse
-    # across a model/prompts/standards boundary is surfaceable, not silent.
-    # src_root doubles as the project root whose threshold overrides fold
-    # into the standards hash — must match classify's _current_provenance.
-    standards_hash = (
-        (_hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
-        or ""
-    )
-    prompts_hash = _hash_prompts_combined(prompts_dir)
-    version = quodeq_version()
-    # Computed once at construction: the params_hash keys threshold-override
-    # changes into the cache key below; effective_params is recorded on each
-    # entry's provenance so the resolved thresholds findings were judged
-    # under are surfaceable.
-    params_hash, effective_params = dimension_params_state(
-        standards_dir, dimension, src_root,
+    standards_hash, prompts_hash, version, params_hash, effective_params = (
+        _resolve_writer_provenance(dimension, src_root, standards_dir, prompts_dir)
     )
 
     def write(file_path: str, findings: list[dict]) -> None:
-        target = src_root / file_path
-        try:
-            inside = target.resolve().is_relative_to(src_root.resolve())
-        except (OSError, ValueError):
-            inside = False
-        content_hash = (_hash_file(target) or "") if inside else ""
-        key_struct = CacheKey(
-            schema_version=_SCHEMA_VERSION,
-            file_content_hash=content_hash,
-            file_path=file_path,
-            dimension=dimension,
-            language=language,
-            params_hash=params_hash,
+        _write_cache_entry(
+            cache, src_root, file_path, findings,
+            dimension=dimension, language=language, model_id=model_id,
+            params_hash=params_hash, standards_hash=standards_hash,
+            prompts_hash=prompts_hash, version=version,
+            effective_params=effective_params,
         )
-        key = compute_key(key_struct)
-        entry = CacheEntry(
-            key=key,
-            schema_version=_SCHEMA_VERSION,
-            findings=findings,
-            files_read=1,
-            file_path=file_path,
-            dimension=dimension,
-            model_id=model_id,
-            file_content_hash=content_hash,
-            language=language,
-            provenance=build_provenance(
-                model_id=model_id, prompts_hash=prompts_hash,
-                standards_hash=standards_hash, version=version,
-                effective_params=effective_params,
-            ),
-            # Born unconsolidated: no completed run has these findings in its
-            # report yet. mark_run_consolidated flips it when this run ends done.
-            consolidated=False,
-        )
-        cache.put(key, entry)
 
     return write

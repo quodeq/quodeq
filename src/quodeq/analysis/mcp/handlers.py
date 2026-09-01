@@ -76,6 +76,60 @@ def handle_tools_list(request_id: object, *, has_queue: bool = False) -> dict:
     return _ok(request_id, {"tools": tools})
 
 
+def _handle_report_finding(request_id: object, args: dict, router: FindingsRouter) -> dict:
+    """Handle a `report_finding` tool call."""
+    message, _is_dup = router.receive(args)
+    return _ok(request_id, {
+        "content": [{"type": "text", "text": message}],
+    })
+
+
+def _handle_get_next_files(
+    request_id: object, args: dict, queue: FileQueue | None, agent_id: str,
+) -> dict:
+    """Handle a `get_next_files` tool call."""
+    if queue is None:
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": "No file queue configured. Ensure the evaluation was started with a file manifest and the queue path is set."}],
+            "isError": True,
+        })
+    count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
+    if not isinstance(count, int) or count < 1:
+        count = _DEFAULT_FILE_BATCH_SIZE
+    count = min(count, _max_file_batch_size())
+    files = queue.take(count, agent_id=agent_id)
+    if not files:
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": "DONE. Queue empty — no more files to analyse. Stop immediately and do not call any more tools."}],
+        })
+    file_list = "\n".join(files)
+    return _ok(request_id, {
+        "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
+    })
+
+
+def _handle_mark_file_done(request_id: object, args: dict, router: FindingsRouter) -> dict:
+    """Handle a `mark_file_done` tool call."""
+    file = args.get("file")
+    status = args.get("status")
+    reason = args.get("reason") or None
+    if not isinstance(file, str) or not isinstance(status, str):
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": "mark_file_done requires 'file' (string) and 'status' (\"ok\"|\"error\")"}],
+            "isError": True,
+        })
+    try:
+        router.mark_file_done(file=file, status=status, reason=reason)
+    except ValueError as exc:
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": str(exc)}],
+            "isError": True,
+        })
+    return _ok(request_id, {
+        "content": [{"type": "text", "text": "marked"}],
+    })
+
+
 def handle_tools_call(
     request_id: object, params: dict,
     router: FindingsRouter, queue: FileQueue | None = None,
@@ -86,50 +140,13 @@ def handle_tools_call(
     args = params.get("arguments") or {}
 
     if name == REPORT_FINDING_NAME:
-        message, _is_dup = router.receive(args)
-        return _ok(request_id, {
-            "content": [{"type": "text", "text": message}],
-        })
+        return _handle_report_finding(request_id, args, router)
 
     if name == GET_NEXT_FILES_NAME:
-        if queue is None:
-            return _ok(request_id, {
-                "content": [{"type": "text", "text": "No file queue configured. Ensure the evaluation was started with a file manifest and the queue path is set."}],
-                "isError": True,
-            })
-        count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
-        if not isinstance(count, int) or count < 1:
-            count = _DEFAULT_FILE_BATCH_SIZE
-        count = min(count, _max_file_batch_size())
-        files = queue.take(count, agent_id=agent_id)
-        if not files:
-            return _ok(request_id, {
-                "content": [{"type": "text", "text": "DONE. Queue empty — no more files to analyse. Stop immediately and do not call any more tools."}],
-            })
-        file_list = "\n".join(files)
-        return _ok(request_id, {
-            "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
-        })
+        return _handle_get_next_files(request_id, args, queue, agent_id)
 
     if name == MARK_FILE_DONE_NAME:
-        file = args.get("file")
-        status = args.get("status")
-        reason = args.get("reason") or None
-        if not isinstance(file, str) or not isinstance(status, str):
-            return _ok(request_id, {
-                "content": [{"type": "text", "text": "mark_file_done requires 'file' (string) and 'status' (\"ok\"|\"error\")"}],
-                "isError": True,
-            })
-        try:
-            router.mark_file_done(file=file, status=status, reason=reason)
-        except ValueError as exc:
-            return _ok(request_id, {
-                "content": [{"type": "text", "text": str(exc)}],
-                "isError": True,
-            })
-        return _ok(request_id, {
-            "content": [{"type": "text", "text": "marked"}],
-        })
+        return _handle_mark_file_done(request_id, args, router)
 
     return _ok(request_id, {
         "content": [{"type": "text", "text": f"Unknown tool: {name}"}],

@@ -92,38 +92,40 @@ def _walk_and_partition_by_scope(
     return files_by_scope_lang, ext_counts_overall, ext_counts_by_scope_lang
 
 
-def _build_multi_scope_manifest(
-    src: Path,
-    ext_map: dict[str, str],
-    skip_dirs: set[str],
-    skip_patterns: list[str],
-    registry: DisciplineRegistry,
+def _resolve_scope_paths(
     sub_results: list[tuple[str, list[str]]],
-    ignore_patterns: list[str] | None = None,
-) -> SourceManifest:
-    """Produce a manifest with one target group per detected subproject scope."""
+) -> tuple[list[str], dict[str, list]]:
+    """Resolve scope_paths + matches_by_scope, ensuring a catch-all root scope.
+
+    No rule classified the repo root, but source can still live outside every
+    detected subproject — e.g. a Kotlin Multiplatform repo where only
+    ``iosApp/`` matches (via *.xcodeproj) while the Gradle/Kotlin root does
+    not. Without a catch-all root scope those files are dropped and the
+    manifest comes back with no targets, which downstream reads as "no
+    source files". "." is depth 0 in _deepest_scope, so it only claims files
+    no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
+    handful of stray root files from becoming a target.
+    """
+    scope_paths = [rel for rel, _ in sub_results]
+    matches_by_scope = {rel: matches for rel, matches in sub_results}
+    if "." not in matches_by_scope:
+        scope_paths.append(".")
+        matches_by_scope["."] = []
+    return scope_paths, matches_by_scope
+
+
+def _build_scope_targets(
+    scope_paths: list[str],
+    matches_by_scope: dict[str, list],
+    files_by_scope: dict[str, dict[str, list[str]]],
+    ext_counts_by_scope_lang: dict[str, dict[str, Counter]],
+    registry: DisciplineRegistry,
+) -> list[AnalysisTarget]:
+    """Build one AnalysisTarget group per scope from the partitioned files."""
     from quodeq.analysis.manifest_build import (
         _MIN_FILES_PER_TARGET,
         _build_targets_from_matches,
         target_name,
-    )
-
-    scope_paths = [rel for rel, _ in sub_results]
-    matches_by_scope = {rel: matches for rel, matches in sub_results}
-    if "." not in matches_by_scope:
-        # No rule classified the repo root, but source can still live outside every
-        # detected subproject — e.g. a Kotlin Multiplatform repo where only
-        # ``iosApp/`` matches (via *.xcodeproj) while the Gradle/Kotlin root does
-        # not. Without a catch-all root scope those files are dropped and the
-        # manifest comes back with no targets, which downstream reads as "no
-        # source files". "." is depth 0 in _deepest_scope, so it only claims files
-        # no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
-        # handful of stray root files from becoming a target.
-        scope_paths.append(".")
-        matches_by_scope["."] = []
-    files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
-        src, ext_map, skip_dirs, skip_patterns, scope_paths,
-        ignore_patterns=ignore_patterns,
     )
 
     targets: list[AnalysisTarget] = []
@@ -146,6 +148,28 @@ def _build_multi_scope_manifest(
                 language_stats=dict(ext_counts_by_lang.get(lang, Counter())),
                 scope_path=scope,
             ))
+    return targets
+
+
+def _build_multi_scope_manifest(
+    src: Path,
+    ext_map: dict[str, str],
+    skip_dirs: set[str],
+    skip_patterns: list[str],
+    registry: DisciplineRegistry,
+    sub_results: list[tuple[str, list[str]]],
+    ignore_patterns: list[str] | None = None,
+) -> SourceManifest:
+    """Produce a manifest with one target group per detected subproject scope."""
+    scope_paths, matches_by_scope = _resolve_scope_paths(sub_results)
+    files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
+        src, ext_map, skip_dirs, skip_patterns, scope_paths,
+        ignore_patterns=ignore_patterns,
+    )
+
+    targets = _build_scope_targets(
+        scope_paths, matches_by_scope, files_by_scope, ext_counts_by_scope_lang, registry,
+    )
 
     targets.sort(key=lambda t: t.total_files, reverse=True)
     total = sum(t.total_files for t in targets)

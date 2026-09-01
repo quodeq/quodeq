@@ -95,6 +95,49 @@ def main() -> None:
         sys.exit(1)
 
 
+def _resolve_dimension_cache_writer(server_args: ServerArgs):
+    """Build the per-file synchronous cache writer, or None when undimensioned.
+
+    When ``server_args.dimension`` is set, the cache writer becomes mandatory:
+    a findings_server scoped to a dimension MUST have ``--cache-root`` and
+    ``--model-id`` so each ok marker writes the cache entry synchronously.
+    Silent degradation to watcher-only is the failure mode the Phase 1 audit
+    warned against -- argparse-level enforcement comes in Task 7; this check
+    is defense-in-depth.
+    """
+    if not server_args.dimension:
+        return None
+    if not server_args.cache_root or not server_args.model_id:
+        raise RuntimeError(
+            "findings_server requires --cache-root and --model-id when "
+            "--dimension is set; got cache_root=%r, model_id=%r"
+            % (server_args.cache_root, server_args.model_id),
+        )
+    from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+    from quodeq.config.paths import default_paths  # noqa: PLC0415
+    src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
+    # NOTE: standards_dir must be the standards ROOT (parent of
+    # "compiled/"), not server_args.compiled_dir. build_cache_writer /
+    # dimension_params_state append "compiled/<dim>.json" themselves;
+    # passing compiled_dir here double-appends "compiled" and the
+    # params-fingerprint lookup silently misses, keying every entry
+    # under the default-thresholds key. --standards-dir is None when
+    # not supplied by the caller (back-compat: no params fingerprint).
+    standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
+    return build_cache_writer(
+        cache_root=Path(server_args.cache_root),
+        src_root=src_root,
+        standards_dir=standards_dir,
+        dimension=server_args.dimension,
+        model_id=server_args.model_id,
+        language=server_args.language or "",
+        # This subprocess is its own composition root: no RunConfig
+        # crosses the process boundary, so resolve the same default the
+        # parent's RunConfig.prompts_dir carries.
+        prompts_dir=default_paths().prompts_dir,
+    )
+
+
 def _build_router(
     findings_fh, findings_path: Path, ctx: CompiledContext,
     server_args: ServerArgs,
@@ -105,13 +148,6 @@ def _build_router(
     The findings_path is `<run_dir>/evidence/<dim>_evidence.jsonl`, so the run
     directory is its grandparent and the project directory its great-grandparent.
     The event log lives at `<run_dir>/events.jsonl`.
-
-    When ``server_args.dimension`` is set, the cache writer becomes mandatory:
-    a findings_server scoped to a dimension MUST have ``--cache-root`` and
-    ``--model-id`` so each ok marker writes the cache entry synchronously.
-    Silent degradation to watcher-only is the failure mode the Phase 1 audit
-    warned against -- argparse-level enforcement comes in Task 7; this check
-    is defense-in-depth.
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
@@ -122,37 +158,7 @@ def _build_router(
     from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 
-    cache_writer = None
-    if server_args.dimension:
-        if not server_args.cache_root or not server_args.model_id:
-            raise RuntimeError(
-                "findings_server requires --cache-root and --model-id when "
-                "--dimension is set; got cache_root=%r, model_id=%r"
-                % (server_args.cache_root, server_args.model_id),
-            )
-        from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
-        from quodeq.config.paths import default_paths  # noqa: PLC0415
-        src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
-        # NOTE: standards_dir must be the standards ROOT (parent of
-        # "compiled/"), not server_args.compiled_dir. build_cache_writer /
-        # dimension_params_state append "compiled/<dim>.json" themselves;
-        # passing compiled_dir here double-appends "compiled" and the
-        # params-fingerprint lookup silently misses, keying every entry
-        # under the default-thresholds key. --standards-dir is None when
-        # not supplied by the caller (back-compat: no params fingerprint).
-        standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
-        cache_writer = build_cache_writer(
-            cache_root=Path(server_args.cache_root),
-            src_root=src_root,
-            standards_dir=standards_dir,
-            dimension=server_args.dimension,
-            model_id=server_args.model_id,
-            language=server_args.language or "",
-            # This subprocess is its own composition root: no RunConfig
-            # crosses the process boundary, so resolve the same default the
-            # parent's RunConfig.prompts_dir carries.
-            prompts_dir=default_paths().prompts_dir,
-        )
+    cache_writer = _resolve_dimension_cache_writer(server_args)
 
     return FindingsRouter(
         findings_fh, context=ctx, event_log=event_log,

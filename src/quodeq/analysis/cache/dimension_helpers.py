@@ -92,6 +92,43 @@ def _classify_one_file(
     return key, hit, current_prov
 
 
+def _partition_files_by_cache(
+    config: RunConfig, dimension: str, files: list[str], cache: CacheBackend,
+    *, bypass_reads: bool,
+) -> ClassifyResult:
+    """Partition ``files`` into cache hits and misses, building a ClassifyResult."""
+    cached_findings: list[dict] = []
+    misses: list[str] = []
+    miss_keys: dict[str, str] = {}
+    provenance_drift: dict = {}
+    unconsolidated_findings: list[dict] = []
+    unconsolidated_hit_keys: dict[str, str] = {}
+    current_prov: dict | None = None  # computed lazily, only if there are hits
+    for f in files:
+        key, hit, current_prov = _classify_one_file(
+            config, dimension, f, cache, bypass_reads=bypass_reads, current_prov=current_prov,
+        )
+        if hit is None:
+            misses.append(f)
+            miss_keys[f] = key
+        else:
+            if hit.consolidated:
+                cached_findings.extend(hit.findings)
+            else:
+                unconsolidated_findings.extend(hit.findings)
+                unconsolidated_hit_keys[f] = key
+            assert current_prov is not None  # set on the first hit, above
+            _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
+    return ClassifyResult(
+        cached_findings=cached_findings,
+        misses=misses,
+        miss_keys=miss_keys,
+        provenance_drift=provenance_drift,
+        unconsolidated_findings=unconsolidated_findings,
+        unconsolidated_hit_keys=unconsolidated_hit_keys,
+    )
+
+
 def classify_files_via_cache(
     config: RunConfig, dimension: str, files: list[str],
     cache: CacheBackend,
@@ -119,36 +156,7 @@ def classify_files_via_cache(
         if stashed is not None and stashed[0] == files_tuple:
             return stashed[1]
 
-    cached_findings: list[dict] = []
-    misses: list[str] = []
-    miss_keys: dict[str, str] = {}
-    provenance_drift: dict = {}
-    unconsolidated_findings: list[dict] = []
-    unconsolidated_hit_keys: dict[str, str] = {}
-    current_prov: dict | None = None  # computed lazily, only if there are hits
-    for f in files:
-        key, hit, current_prov = _classify_one_file(
-            config, dimension, f, cache, bypass_reads=bypass_reads, current_prov=current_prov,
-        )
-        if hit is None:
-            misses.append(f)
-            miss_keys[f] = key
-        else:
-            if hit.consolidated:
-                cached_findings.extend(hit.findings)
-            else:
-                unconsolidated_findings.extend(hit.findings)
-                unconsolidated_hit_keys[f] = key
-            assert current_prov is not None  # set on the first hit, above
-            _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
-    result = ClassifyResult(
-        cached_findings=cached_findings,
-        misses=misses,
-        miss_keys=miss_keys,
-        provenance_drift=provenance_drift,
-        unconsolidated_findings=unconsolidated_findings,
-        unconsolidated_hit_keys=unconsolidated_hit_keys,
-    )
+    result = _partition_files_by_cache(config, dimension, files, cache, bypass_reads=bypass_reads)
     if not bypass_reads and run_cache is not None:
         run_cache[dimension] = (files_tuple, result)
     return result

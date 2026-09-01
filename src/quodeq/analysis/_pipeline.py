@@ -115,46 +115,48 @@ def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> None:
     write_dim_estimates(config.work_dir.parent, estimates)
 
 
-def _run_dimensions(
+def _prepare_run_context(
     config: RunConfig,
-    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
-) -> dict[str, Evidence]:
-    """Run AI analysis for each dimension and return per-dimension Evidence."""
-    if config.options.dry_run:
-        return _run_dry_run(config, on_dimension_done=on_dimension_done)
+) -> tuple[list[str], _AnalysisContext, DimensionRunner]:
+    """Load dimensions/context, warm the classify cache, and build the runner.
 
-    _warn_if_local_api_oversubscribed(config)
+    Activates the per-run classify stash so ``_persist_dim_estimates`` below
+    and the dim runner inside ``cache/dimension_runner.py`` share a single
+    walk of the source files per dim. Without this, the same
+    ``classify_files_via_cache`` call happens twice per dim (once for the
+    dashboard's upfront totals, once for the actual hit/miss dispatch), each
+    repeating thousands of source-file hashes and cache.get() lookups. Tests
+    and dry-run paths leave it as None.
 
+    One runner per run. Per-run construction (vs. a module-level singleton)
+    makes test substitution and concurrency-safety obvious: each evaluation
+    owns its own DimensionCallbacks instance.
+
+    Cache is constructed here (composition root) rather than left for
+    process_dimension_with_cache to default lazily, so every dimension in
+    this run shares one LocalFileBackend. The legacy-entry GC that used to
+    ride along with the lazy default is called explicitly here instead --
+    it's still once-per-(root, schema)-per-process (see
+    maybe_collect_legacy_entries's own memo), just triggered at runner
+    construction instead of on the first cache-is-None dimension call.
+    """
     dimensions, ctx = load_analysis_context(config)
-    # Activate the per-run classify stash so ``_persist_dim_estimates``
-    # below and the dim runner inside ``cache/dimension_runner.py`` share
-    # a single walk of the source files per dim. Without this, the same
-    # ``classify_files_via_cache`` call happens twice per dim (once for
-    # the dashboard's upfront totals, once for the actual hit/miss
-    # dispatch), each repeating thousands of source-file hashes and
-    # cache.get() lookups. Tests and dry-run paths leave it as None.
     if config._classify_cache is None:
         config._classify_cache = {}
     _persist_dim_estimates(config, dimensions)
 
-    # One runner per run. Per-run construction (vs. a module-level
-    # singleton) makes test substitution and concurrency-safety obvious:
-    # each evaluation owns its own DimensionCallbacks instance.
-    #
-    # Cache is constructed here (composition root) rather than left for
-    # process_dimension_with_cache to default lazily, so every dimension
-    # in this run shares one LocalFileBackend. The legacy-entry GC that
-    # used to ride along with the lazy default is called explicitly here
-    # instead -- it's still once-per-(root, schema)-per-process (see
-    # maybe_collect_legacy_entries's own memo), just triggered at runner
-    # construction instead of on the first cache-is-None dimension call.
     cache = LocalFileBackend()
     maybe_collect_legacy_entries(cache.root)
     runner = DimensionRunner(cache=cache, log=SHARED_LOG)
+    return dimensions, ctx, runner
 
-    # Set the run-level deadline once, just before the dim loop starts.
-    # Skipped for dry runs (already returned above), unlimited budget, or
-    # when an outer caller (tests) has pre-set deadline_at.
+
+def _set_run_deadline(config: RunConfig) -> None:
+    """Set the run-level deadline once, just before the dim loop starts.
+
+    Skipped for dry runs (caller returns earlier), unlimited budget, or when
+    an outer caller (tests) has pre-set deadline_at.
+    """
     budget_s = config.options.time_limit
     if config.options.deadline_at is None and budget_s is not None and budget_s > 0:
         config.options.deadline_at = time.monotonic() + budget_s
@@ -163,10 +165,52 @@ def _run_dimensions(
         ).isoformat()
         emit_marker("analyzing_start", deadline_at=deadline_iso, budget_s=budget_s)
 
-    # Diff mode always per-dimension — consolidated/incremental loops are
-    # incompatible with evidence-only runs (no prior fingerprint, no
-    # cross-dimension scoring). Explicit branch keeps intent clear even if
-    # the consolidated fall-through later changes.
+
+def _try_consolidated_mode(
+    config: RunConfig,
+    dimensions: list[str],
+    ctx: _AnalysisContext,
+) -> dict[str, Evidence] | None:
+    """Attempt consolidated (all-dimensions-in-one-pass) mode; None to fall back.
+
+    Disabled for API providers — per-dimension gives better coverage since
+    local models struggle with 8 dimensions in one prompt.
+    """
+    _provider_type = _get_provider_type(get_ai_cmd())
+    if not (config.options.consolidated
+            and len(dimensions) > 1
+            and config.options.max_subagents > 1
+            and _provider_type != "api"):
+        return None
+    try:
+        result = process_consolidated_dimensions(
+            config, dimensions, ctx, log=SHARED_LOG,
+        )
+        if result:
+            dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
+            for dim, ev in result.items():
+                idx = dim_index.get(dim, 0)
+                _log_dimension_result(ev, dim, idx, len(dimensions), log=SHARED_LOG)
+            return result
+        log_warning("Consolidated mode produced no results, falling back to per-dimension")
+    except (OSError, KeyError, ValueError, RuntimeError) as exc:
+        log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
+    return None
+
+
+def _dispatch_fixed_mode(
+    config: RunConfig,
+    dimensions: list[str],
+    ctx: _AnalysisContext,
+    runner: DimensionRunner,
+    on_dimension_done: "Callable[[str, Evidence], None] | None",
+) -> dict[str, Evidence] | None:
+    """Diff-mode or incremental-mode dispatch; None falls through to clean-scan.
+
+    Diff mode always per-dimension — consolidated/incremental loops are
+    incompatible with evidence-only runs (no prior fingerprint, no
+    cross-dimension scoring).
+    """
     if config.options.diff_from:
         emit_marker("setup", dimensions=dimensions)
         return run_per_dimension_loop(
@@ -175,7 +219,6 @@ def _run_dimensions(
             on_dimension_done=on_dimension_done,
             log=SHARED_LOG,
         )
-
     if config.options.incremental:
         # Default path. AnalysisOptions.incremental defaults to True so
         # any run that hasn't explicitly opted out (via --clean-scan or
@@ -188,33 +231,34 @@ def _run_dimensions(
             on_dimension_done=on_dimension_done,
             log=SHARED_LOG,
         )
+    return None
+
+
+def _run_dimensions(
+    config: RunConfig,
+    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
+) -> dict[str, Evidence]:
+    """Run AI analysis for each dimension and return per-dimension Evidence."""
+    if config.options.dry_run:
+        return _run_dry_run(config, on_dimension_done=on_dimension_done)
+
+    _warn_if_local_api_oversubscribed(config)
+
+    dimensions, ctx, runner = _prepare_run_context(config)
+    _set_run_deadline(config)
+
+    fixed_mode_result = _dispatch_fixed_mode(config, dimensions, ctx, runner, on_dimension_done)
+    if fixed_mode_result is not None:
+        return fixed_mode_result
 
     # Clean-scan path: full re-analysis, no carry-forward. Reached only
     # when the user requested --clean-scan or --diff-from. Consolidated
     # mode is allowed here because there is no prior fingerprint to honour.
     emit_marker("setup", dimensions=dimensions)
 
-    # Consolidated mode: evaluate all dimensions in one pass.
-    # Disabled for API providers — per-dimension gives better coverage
-    # since local models struggle with 8 dimensions in one prompt.
-    _provider_type = _get_provider_type(get_ai_cmd())
-    if (config.options.consolidated
-            and len(dimensions) > 1
-            and config.options.max_subagents > 1
-            and _provider_type != "api"):
-        try:
-            result = process_consolidated_dimensions(
-                config, dimensions, ctx, log=SHARED_LOG,
-            )
-            if result:
-                dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
-                for dim, ev in result.items():
-                    idx = dim_index.get(dim, 0)
-                    _log_dimension_result(ev, dim, idx, len(dimensions), log=SHARED_LOG)
-                return result
-            log_warning("Consolidated mode produced no results, falling back to per-dimension")
-        except (OSError, KeyError, ValueError, RuntimeError) as exc:
-            log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
+    consolidated_result = _try_consolidated_mode(config, dimensions, ctx)
+    if consolidated_result is not None:
+        return consolidated_result
 
     return run_per_dimension_loop(
         config, dimensions, ctx,
