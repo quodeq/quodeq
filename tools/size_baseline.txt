@@ -46,8 +46,6 @@ src/quodeq/cli_parser.py:136:function
 src/quodeq/cli_parser.py:43:function
 src/quodeq/config/_dependency_parsers.py:1:file
 src/quodeq/config/ai_provider.py:52:function
-src/quodeq/context/precedent.py:1:file
-src/quodeq/context/precedent.py:282:function
 src/quodeq/context/project_shape.py:1:file
 src/quodeq/core/checks/config_reads.py:37:function
 src/quodeq/core/checks/framework_deps.py:148:function
@@ -98,7 +96,6 @@ src/quodeq/services/scoring/__init__.py:303:function
 src/quodeq/services/scoring/__init__.py:90:function
 src/quodeq/services/scoring_view/_resolution.py:80:function
 src/quodeq/services/violations.py:179:function
-src/quodeq/shared/_env.py:1:file
 src/quodeq/ui/src/App.jsx:1:file
 src/quodeq/ui/src/App.test.jsx:1:file
 src/quodeq/ui/src/api/applyMutationDelta.test.jsx:1:file
