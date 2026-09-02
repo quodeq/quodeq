@@ -29,20 +29,8 @@ import { t } from '../strings/index.js';
  *
  * keepPlaceholder (default true): see useDashboard for rationale.
  */
-export function useProjectScores({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
-  const { getProjectScores, sharedGetProjectScores } = useApi();
-  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
-  const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  // Reuse the previous payload only within the same project+source subtree —
-  // see samePlaceholderScope for why an unguarded (prev) => prev shows the
-  // PREVIOUS project's overview after a project switch.
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
-
-  const latestQuery = useQuery({
+function buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selectedProject, keepInScope }) {
+  return {
     queryKey: projectKeys.scores(projectKey, null, selectedSource),
     queryFn: () => fetchScores(selectedProject),
     enabled: !!selectedProject,
@@ -51,20 +39,11 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     // there is nothing to flash — but a project/source switch must still drop
     // to a real loading state rather than showing the old project's grades.
     placeholderData: keepInScope,
-  });
+  };
+}
 
-  // Overview is anchored on completed runs. If selectedRun points at an
-  // in-progress run (or one that hasn't shown up in availableRuns yet),
-  // fall back to 'latest' so the cards keep showing the last finished
-  // evaluation instead of going blank mid-flight. Resolution waits for
-  // latestQuery so we never fire the scoped query with a stale asOf.
-  const isLatestSelection = !selectedRun || selectedRun === "latest";
-  const asOf = useMemo(
-    () => resolveAsOf({ isLatestSelection, selectedRun, latestQueryData: latestQuery.data }),
-    [isLatestSelection, selectedRun, latestQuery.data]
-  );
-
-  const scoresQuery = useQuery({
+function buildScoresQueryConfig({ projectKey, asOf, selectedSource, fetchScores, selectedProject, isLatestSelection, latestQuery, keepPlaceholder, keepInScope }) {
+  return {
     queryKey: projectKeys.scores(projectKey, asOf, selectedSource),
     queryFn: () => fetchScores(selectedProject, asOf),
     // Wait for the latest run-status list before issuing a scoped fetch —
@@ -80,18 +59,10 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     // Keep prior scores visible while switching runs — see useDashboard for
     // rationale. Scoped to this project+source, so a project switch loads clean.
     placeholderData: keepPlaceholder ? keepInScope : undefined,
-  });
+  };
+}
 
-  const availableRuns = useMemo(
-    () => deriveAvailableRuns({ scoresQueryData: scoresQuery.data, latestQueryData: latestQuery.data }),
-    [scoresQuery.data, latestQuery.data]
-  );
-
-  const refreshScores = useCallback(() => {
-    if (!selectedProject) return;
-    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject, selectedSource) });
-  }, [queryClient, selectedProject, selectedSource]);
-
+function buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, refreshScores }) {
   return {
     scores: scoresQuery.data ?? null,
     latestScores: latestQuery.data ?? null,
@@ -108,4 +79,45 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     availableRuns,
     refreshScores,
   };
+}
+
+export function useProjectScores({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+  const { getProjectScores, sharedGetProjectScores } = useApi();
+  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
+  const queryClient = useQueryClient();
+  const projectKey = selectedProject || "_none_";
+  // Reuse the previous payload only within the same project+source subtree —
+  // see samePlaceholderScope for why an unguarded (prev) => prev shows the
+  // PREVIOUS project's overview after a project switch.
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
+
+  const latestQuery = useQuery(buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selectedProject, keepInScope }));
+
+  // Overview is anchored on completed runs. If selectedRun points at an
+  // in-progress run (or one that hasn't shown up in availableRuns yet),
+  // fall back to 'latest' so the cards keep showing the last finished
+  // evaluation instead of going blank mid-flight. Resolution waits for
+  // latestQuery so we never fire the scoped query with a stale asOf.
+  const isLatestSelection = !selectedRun || selectedRun === "latest";
+  const asOf = useMemo(
+    () => resolveAsOf({ isLatestSelection, selectedRun, latestQueryData: latestQuery.data }),
+    [isLatestSelection, selectedRun, latestQuery.data]
+  );
+
+  const scoresQuery = useQuery(buildScoresQueryConfig({ projectKey, asOf, selectedSource, fetchScores, selectedProject, isLatestSelection, latestQuery, keepPlaceholder, keepInScope }));
+
+  const availableRuns = useMemo(
+    () => deriveAvailableRuns({ scoresQueryData: scoresQuery.data, latestQueryData: latestQuery.data }),
+    [scoresQuery.data, latestQuery.data]
+  );
+
+  const refreshScores = useCallback(() => {
+    if (!selectedProject) return;
+    queryClient.invalidateQueries({ queryKey: projectKeys.project(selectedProject, selectedSource) });
+  }, [queryClient, selectedProject, selectedSource]);
+
+  return buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, refreshScores });
 }

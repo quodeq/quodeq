@@ -75,10 +75,4 @@ export const SIZE_GRANDFATHER = [
   "src/features/violations/components/DimensionHeatGridView.jsx",
   "src/features/violations/components/useDismissedFindings.js",
   "src/hooks/useAppState.js",
-  "src/hooks/useEvaluationLifecycle.js",
-  "src/hooks/useNavStack.js",
-  "src/hooks/useProjectActions.js",
-  "src/hooks/useProjectScores.js",
-  "src/hooks/useProjectState.js",
-  "src/hooks/useRunNavigator.js",
 ];
