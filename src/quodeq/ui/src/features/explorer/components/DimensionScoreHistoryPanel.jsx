@@ -76,7 +76,13 @@ function makeChartClickHandler(data, onBarClick) {
   };
 }
 
-function DimensionBarCells({ data, selectedRunId, hoveredIndex }) {
+// Not a React component: recharts' <Bar> finds its per-bar <Cell> colors by
+// inspecting props.children for elements whose *type* is Cell. That check
+// only looks at Bar's immediate JSX children, so a <Cell> nested inside a
+// custom component (e.g. <DimensionBarCells />) is invisible to it and Bar
+// falls back to its default fill (black). Calling this as a plain function
+// keeps the <Cell> elements themselves as Bar's direct children.
+function renderDimensionBarCells({ data, selectedRunId, hoveredIndex }) {
   return data.map((entry, i) => (
     <Cell
       key={entry.runId ?? i}
@@ -114,7 +120,7 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
         ))}
         <Area dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <Bar dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>
-          <DimensionBarCells data={data} selectedRunId={selectedRunId} hoveredIndex={hoveredIndex} />
+          {renderDimensionBarCells({ data, selectedRunId, hoveredIndex })}
         </Bar>
         <Line
           isAnimationActive={false}

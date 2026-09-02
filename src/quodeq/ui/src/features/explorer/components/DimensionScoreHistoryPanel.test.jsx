@@ -8,6 +8,21 @@ const TREND = [
   { runId: 'r1', dateISO: '2026-04-03T10:00:00', dateLabel: 'Apr 3', dimensionDetails: [{ dimension: 'maintainability', score: 5.2 }] },
 ];
 
+// recharts' <Bar> only recognizes per-bar <Cell> colors when they are its
+// *direct* JSX children; ResponsiveContainer needs a ResizeObserver and a
+// non-zero container size to actually lay the bars out under jsdom.
+function stubChartLayout() {
+  global.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; }
+    observe(el) { this.cb([{ target: el, contentRect: { width: 400, height: 160 } }]); }
+    unobserve() {}
+    disconnect() {}
+  };
+  Element.prototype.getBoundingClientRect = function () {
+    return { width: 400, height: 160, top: 0, left: 0, bottom: 160, right: 400, x: 0, y: 0, toJSON() {} };
+  };
+}
+
 describe('DimensionScoreHistoryPanel', () => {
   it('renders min/max/avg meta from the dimension series', () => {
     render(<DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" />);
@@ -52,5 +67,20 @@ describe('DimensionScoreHistoryPanel', () => {
   it('omits the PeriodSelect when onGranularityChange is absent', () => {
     render(<DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" />);
     expect(screen.queryByLabelText(/Group score history by/i)).toBeNull();
+  });
+
+  it('applies each bar Cell\'s fill/opacity to the rendered bar (not the SVG black default)', () => {
+    stubChartLayout();
+    const { container } = render(<DimensionScoreHistoryPanel trend={TREND} dimension="maintainability" />);
+    const bars = container.querySelectorAll('.recharts-bar-rectangle .recharts-rectangle');
+    expect(bars.length).toBe(3);
+    bars.forEach((bar) => {
+      // The Cell's fill/opacity/stroke props must land on the path. If Cell
+      // is nested inside a wrapper component instead of being Bar's direct
+      // child, recharts never applies these and the attributes are absent
+      // entirely, leaving the browser's SVG default fill (black).
+      expect(bar.getAttribute('fill')).not.toBeNull();
+      expect(bar.getAttribute('opacity')).toBe('0.4');
+    });
   });
 });
