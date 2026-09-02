@@ -61,55 +61,39 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
   );
 }
 
-/**
- * @param {object} props
- * @param {object} [props.dimMetas] terminal variant only: dim id → pre-run
- *   meta lines (["312 files to analyze", "85% analyzed"]); null/missing → omitted.
- * @param {boolean} [props.metasLoading] terminal variant only: estimates are
- *   still being computed — cards show a small placeholder instead of nothing.
- */
-export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, metasLoading = false }) {
-  const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
-    const oa = (TYPE_CONFIG[a.standardType] || DEFAULT_TYPE_CONFIG).order;
-    const ob = (TYPE_CONFIG[b.standardType] || DEFAULT_TYPE_CONFIG).order;
-    if (oa !== ob) return oa - ob;
-    return (a.label || a.id).localeCompare(b.label || b.id);
-  }), [allDimensions]);
-
-  const isTerm = variant === 'terminal';
-
-  if (isTerm) {
-    return (
-      <div className="form-group eval-dims-section">
-        <div className="dimension-label-row dimension-label-row--terminal">
-          <span className="eval-dims-heading">
-            <label>{t('evaluate.dimensionsLabel')}</label>
-            <span className="eval-dims-counter">
-              {t('evaluate.dimsSelectedCounter', { selected: selectedDims.size, total: sorted.length })}
-            </span>
+function DimensionSelectorTerminal({ sorted, selectedDims, onToggle, onSelectAll, onClearAll, dimMetas, metasLoading }) {
+  return (
+    <div className="form-group eval-dims-section">
+      <div className="dimension-label-row dimension-label-row--terminal">
+        <span className="eval-dims-heading">
+          <label>{t('evaluate.dimensionsLabel')}</label>
+          <span className="eval-dims-counter">
+            {t('evaluate.dimsSelectedCounter', { selected: selectedDims.size, total: sorted.length })}
           </span>
-          <div className="dimension-chip-actions">
-            <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onSelectAll}>{t('evaluate.allBtn')}</button>
-            <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onClearAll}>{t('evaluate.clearBtn')}</button>
-          </div>
-        </div>
-
-        <div className="eval-dim-grid">
-          {sorted.map((dim) => (
-            <DimensionCard
-              key={dim.id}
-              dim={dim}
-              isSelected={selectedDims.has(dim.id)}
-              onToggle={onToggle}
-              meta={dimMetas?.[dim.id] ?? null}
-              metaLoading={metasLoading}
-            />
-          ))}
+        </span>
+        <div className="dimension-chip-actions">
+          <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onSelectAll}>{t('evaluate.allBtn')}</button>
+          <button type="button" className="dim-action-btn dim-action-btn--terminal" onClick={onClearAll}>{t('evaluate.clearBtn')}</button>
         </div>
       </div>
-    );
-  }
 
+      <div className="eval-dim-grid">
+        {sorted.map((dim) => (
+          <DimensionCard
+            key={dim.id}
+            dim={dim}
+            isSelected={selectedDims.has(dim.id)}
+            onToggle={onToggle}
+            meta={dimMetas?.[dim.id] ?? null}
+            metaLoading={metasLoading}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DimensionSelectorChips({ sorted, selectedDims, onToggle, onSelectAll, onClearAll }) {
   return (
     <div className="form-group">
       <div className="dimension-label-row">
@@ -127,4 +111,26 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
       </div>
     </div>
   );
+}
+
+/**
+ * @param {object} props
+ * @param {object} [props.dimMetas] terminal variant only: dim id → pre-run
+ *   meta lines (["312 files to analyze", "85% analyzed"]); null/missing → omitted.
+ * @param {boolean} [props.metasLoading] terminal variant only: estimates are
+ *   still being computed — cards show a small placeholder instead of nothing.
+ */
+export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, metasLoading = false }) {
+  const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
+    const oa = (TYPE_CONFIG[a.standardType] || DEFAULT_TYPE_CONFIG).order;
+    const ob = (TYPE_CONFIG[b.standardType] || DEFAULT_TYPE_CONFIG).order;
+    if (oa !== ob) return oa - ob;
+    return (a.label || a.id).localeCompare(b.label || b.id);
+  }), [allDimensions]);
+
+  const shared = { sorted, selectedDims, onToggle, onSelectAll, onClearAll };
+
+  return variant === 'terminal'
+    ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} metasLoading={metasLoading} />
+    : <DimensionSelectorChips {...shared} />;
 }

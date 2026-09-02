@@ -11,6 +11,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiContext.jsx";
 import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
+import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
 
 /**
@@ -58,15 +59,10 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   // evaluation instead of going blank mid-flight. Resolution waits for
   // latestQuery so we never fire the scoped query with a stale asOf.
   const isLatestSelection = !selectedRun || selectedRun === "latest";
-  const asOf = useMemo(() => {
-    if (isLatestSelection) return null;
-    const runs = latestQuery.data?.availableRuns;
-    if (!runs) return null;
-    const match = runs.find((r) => r.runId === selectedRun);
-    if (!match) return null;
-    if (match.status === "in_progress") return null;
-    return selectedRun;
-  }, [isLatestSelection, selectedRun, latestQuery.data]);
+  const asOf = useMemo(
+    () => resolveAsOf({ isLatestSelection, selectedRun, latestQueryData: latestQuery.data }),
+    [isLatestSelection, selectedRun, latestQuery.data]
+  );
 
   const scoresQuery = useQuery({
     queryKey: projectKeys.scores(projectKey, asOf, selectedSource),
@@ -86,17 +82,10 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
     placeholderData: keepPlaceholder ? keepInScope : undefined,
   });
 
-  const availableRuns = useMemo(() => {
-    const fromPayload =
-      scoresQuery.data?.availableRuns || latestQuery.data?.availableRuns;
-    if (fromPayload && fromPayload.length > 0) return fromPayload;
-    const trend = scoresQuery.data?.trend || latestQuery.data?.trend || [];
-    return trend.map((row) => ({
-      runId: row.runId,
-      dateLabel: row.dateLabel || row.runId,
-      status: "complete",
-    }));
-  }, [scoresQuery.data, latestQuery.data]);
+  const availableRuns = useMemo(
+    () => deriveAvailableRuns({ scoresQueryData: scoresQuery.data, latestQueryData: latestQuery.data }),
+    [scoresQuery.data, latestQuery.data]
+  );
 
   const refreshScores = useCallback(() => {
     if (!selectedProject) return;

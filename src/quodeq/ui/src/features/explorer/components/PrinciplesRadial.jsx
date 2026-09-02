@@ -49,80 +49,51 @@ function wrapLines(words, maxChars) {
   return lines.length ? lines : [''];
 }
 
-export default function PrinciplesRadial({
-  principles = [],
-  scaleMax = 10,
-  size = 400,
-  outerRadius = 200,
-  onPrincipleClick,
-}) {
-  const n = principles.length;
-  const angles = axisAngles(n);
-
-  const plotted = principles
-    .map((p, i) => ({ ...p, idx: i, angle: angles[i] }))
-    .filter((p) => p.hasEvidence && p.score != null && !Number.isNaN(parseFloat(p.score)));
-
-  const points = plotted.map((p) => {
-    const r = (Math.max(0, Math.min(p.score, scaleMax)) / scaleMax) * outerRadius;
-    return polar(p.angle, r);
-  });
-
-  const polylineFill = plotted.length >= 3
-    ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
-    : 'none';
-  const isClosed = plotted.length >= 3 && plotted.length === principles.length;
-  const showPolyline = plotted.length >= 2;
-
-  const half = size / 2;
-  const viewBox = `${-half - VIEWBOX_PAD_X} ${-half - VIEWBOX_PAD_Y} ${size + VIEWBOX_PAD_X * 2} ${size + VIEWBOX_PAD_Y * 2}`;
-
-  const handleClick = (name) => () => onPrincipleClick && onPrincipleClick(name);
-  const handleKey = (name) => (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && onPrincipleClick) {
-      e.preventDefault();
-      onPrincipleClick(name);
-    }
-  };
-
+function RadialRings({ angles, outerRadius }) {
   return (
-    <svg
-      className="qd-radial__svg"
-      viewBox={viewBox}
-      preserveAspectRatio="xMidYMid meet"
-      width="100%"
-      role="img"
-      aria-label={t('explorer.principlesRadial')}
-    >
-      {/* Rings */}
-      <g>
-        {RING_LEVELS.map((lvl, idx) => (
-          <polygon
-            key={idx}
-            className="qd-radial__ring"
-            points={ringPoints(angles, lvl * outerRadius)}
-            fill="none"
-          />
-        ))}
-      </g>
-      {/* Axes */}
-      <g>
-        {angles.map((a, idx) => {
-          const [x, y] = polar(a, outerRadius);
-          return <line key={idx} className="qd-radial__axis" x1="0" y1="0" x2={x} y2={y} />;
-        })}
-      </g>
-      {/* Polyline (3+ filled, 2 open, 1 or 0 absent) */}
-      {showPolyline && (
-        <polyline
-          className="qd-radial__poly"
-          fill={polylineFill}
-          points={(isClosed ? [...points, points[0]] : points)
-            .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
-            .join(' ')}
+    <g>
+      {RING_LEVELS.map((lvl, idx) => (
+        <polygon
+          key={idx}
+          className="qd-radial__ring"
+          points={ringPoints(angles, lvl * outerRadius)}
+          fill="none"
         />
-      )}
-      {/* Plotted vertices */}
+      ))}
+    </g>
+  );
+}
+
+function RadialAxes({ angles, outerRadius }) {
+  return (
+    <g>
+      {angles.map((a, idx) => {
+        const [x, y] = polar(a, outerRadius);
+        return <line key={idx} className="qd-radial__axis" x1="0" y1="0" x2={x} y2={y} />;
+      })}
+    </g>
+  );
+}
+
+/* Polyline (3+ filled, 2 open, 1 or 0 absent) */
+function RadialPolyline({ showPolyline, points, isClosed, polylineFill }) {
+  if (!showPolyline) return null;
+  return (
+    <polyline
+      className="qd-radial__poly"
+      fill={polylineFill}
+      points={(isClosed ? [...points, points[0]] : points)
+        .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
+        .join(' ')}
+    />
+  );
+}
+
+/* Plotted vertices, plus a small dashed marker near centre for each
+ * insufficient-evidence axis. */
+function RadialVertices({ points, plotted, principles, angles, outerRadius, onPrincipleClick, handleClick, handleKey }) {
+  return (
+    <>
       {points.map(([x, y], idx) => {
         const name = plotted[idx].name;
         return (
@@ -141,7 +112,6 @@ export default function PrinciplesRadial({
           />
         );
       })}
-      {/* Insufficient axis markers (small dashed dot near centre) */}
       {principles.map((p, i) => {
         if (p.hasEvidence) return null;
         const [x, y] = polar(angles[i], outerRadius * 0.2);
@@ -156,9 +126,16 @@ export default function PrinciplesRadial({
           />
         );
       })}
-      {/* Labels — name and score share an anchor point on a label ring just
-          outside the plot. Score is always rendered on the line below the name
-          via a tspan(dy), so the two never collide regardless of axis angle. */}
+    </>
+  );
+}
+
+/* Labels — name and score share an anchor point on a label ring just
+   outside the plot. Score is always rendered on the line below the name
+   via a tspan(dy), so the two never collide regardless of axis angle. */
+function RadialLabels({ principles, angles, outerRadius, onPrincipleClick, handleClick, handleKey }) {
+  return (
+    <>
       {principles.map((p, i) => {
         const [x, y] = polar(angles[i], outerRadius + LABEL_OFFSET);
         const isInsuf = !p.hasEvidence;
@@ -196,6 +173,78 @@ export default function PrinciplesRadial({
           </g>
         );
       })}
+    </>
+  );
+}
+
+/** Everything derived from the principles list + dimensions: the plotted
+ * (evidenced) subset, their world points, polyline fill/closed/visibility,
+ * and the SVG viewBox. */
+function computeRadialLayout(principles, angles, scaleMax, outerRadius, size) {
+  const plotted = principles
+    .map((p, i) => ({ ...p, idx: i, angle: angles[i] }))
+    .filter((p) => p.hasEvidence && p.score != null && !Number.isNaN(parseFloat(p.score)));
+
+  const points = plotted.map((p) => {
+    const r = (Math.max(0, Math.min(p.score, scaleMax)) / scaleMax) * outerRadius;
+    return polar(p.angle, r);
+  });
+
+  const polylineFill = plotted.length >= 3
+    ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
+    : 'none';
+  const isClosed = plotted.length >= 3 && plotted.length === principles.length;
+  const showPolyline = plotted.length >= 2;
+
+  const half = size / 2;
+  const viewBox = `${-half - VIEWBOX_PAD_X} ${-half - VIEWBOX_PAD_Y} ${size + VIEWBOX_PAD_X * 2} ${size + VIEWBOX_PAD_Y * 2}`;
+
+  return { plotted, points, polylineFill, isClosed, showPolyline, viewBox };
+}
+
+function makeRadialHandlers(onPrincipleClick) {
+  const handleClick = (name) => () => onPrincipleClick && onPrincipleClick(name);
+  const handleKey = (name) => (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && onPrincipleClick) {
+      e.preventDefault();
+      onPrincipleClick(name);
+    }
+  };
+  return { handleClick, handleKey };
+}
+
+export default function PrinciplesRadial({
+  principles = [],
+  scaleMax = 10,
+  size = 400,
+  outerRadius = 200,
+  onPrincipleClick,
+}) {
+  const angles = axisAngles(principles.length);
+  const { plotted, points, polylineFill, isClosed, showPolyline, viewBox } =
+    computeRadialLayout(principles, angles, scaleMax, outerRadius, size);
+  const { handleClick, handleKey } = makeRadialHandlers(onPrincipleClick);
+
+  return (
+    <svg
+      className="qd-radial__svg"
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      width="100%"
+      role="img"
+      aria-label={t('explorer.principlesRadial')}
+    >
+      <RadialRings angles={angles} outerRadius={outerRadius} />
+      <RadialAxes angles={angles} outerRadius={outerRadius} />
+      <RadialPolyline showPolyline={showPolyline} points={points} isClosed={isClosed} polylineFill={polylineFill} />
+      <RadialVertices
+        points={points} plotted={plotted} principles={principles} angles={angles} outerRadius={outerRadius}
+        onPrincipleClick={onPrincipleClick} handleClick={handleClick} handleKey={handleKey}
+      />
+      <RadialLabels
+        principles={principles} angles={angles} outerRadius={outerRadius}
+        onPrincipleClick={onPrincipleClick} handleClick={handleClick} handleKey={handleKey}
+      />
     </svg>
   );
 }

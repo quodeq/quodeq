@@ -22,6 +22,7 @@ import {
   DESELECTED_BAR_OPACITY,
   HISTORY_CHART_HEIGHT,
 } from '../../../components/scoreChartHelpers.js';
+import { computeHistoryChartStats, buildHistoryKbdItems } from './historyChartStats.js';
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = HISTORY_CHART_HEIGHT;
@@ -65,22 +66,45 @@ function RunHistoryTooltip({ active, payload }) {
   );
 }
 
-function ScoreHistoryChart({ data, interaction }) {
-  const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
-  // Click and hover live on the chart container, not on the Bar. The
-  // shared `.run-history-panel .recharts-surface *` rule sets
-  // pointer-events:none so the Area/Line layers cannot swallow clicks
-  // before they reach the visible bar; in turn we read activeTooltipIndex
-  // from Recharts' chart-level events.
-  const handleMove = (state) => {
-    setHoveredIndex(state?.activeTooltipIndex ?? null);
-  };
-  const handleClick = (state) => {
+function renderChartReferenceLines() {
+  return refLineValues([0, 10]).map((y, i) => (
+    <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+  ));
+}
+
+function renderScoreBarCells(data, { hoveredIndex, selectedRunId }) {
+  return data.map((entry, i) => (
+    <Cell
+      key={entry.runId ?? i}
+      fill={scoreBarColor(entry.numericAverage)}
+      opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
+      stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
+      strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
+    />
+  ));
+}
+
+// Click and hover live on the chart container, not on the Bar. The shared
+// `.run-history-panel .recharts-surface *` rule sets pointer-events:none so
+// the Area/Line layers cannot swallow clicks before they reach the visible
+// bar; in turn we read activeTooltipIndex from Recharts' chart-level events.
+function makeChartMoveHandler(setHoveredIndex) {
+  return (state) => setHoveredIndex(state?.activeTooltipIndex ?? null);
+}
+
+function makeChartClickHandler(data, onBarClick) {
+  return (state) => {
     const idx = state?.activeTooltipIndex;
     if (idx == null) return;
     const runId = data[idx]?.runId;
     if (runId) onBarClick?.(runId);
   };
+}
+
+function ScoreHistoryChart({ data, interaction }) {
+  const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
+  const handleMove = makeChartMoveHandler(setHoveredIndex);
+  const handleClick = makeChartClickHandler(data, onBarClick);
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
       <ComposedChart
@@ -94,24 +118,14 @@ function ScoreHistoryChart({ data, interaction }) {
         <XAxis dataKey="dateLabel" hide />
         <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
-        {refLineValues([0, 10]).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
-        ))}
+        {renderChartReferenceLines()}
         <Bar
               dataKey="numericAverage"
           radius={[0, 0, 0, 0]}
           maxBarSize={32}
           isAnimationActive={false}
         >
-          {data.map((entry, i) => (
-            <Cell
-              key={entry.runId ?? i}
-              fill={scoreBarColor(entry.numericAverage)}
-              opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
-              stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-              strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
-            />
-          ))}
+          {renderScoreBarCells(data, { hoveredIndex, selectedRunId })}
         </Bar>
         <Line
           isAnimationActive={false}
@@ -143,29 +157,13 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
   // the mockup's LATEST / AVG / MIN / MAX header row. Memoized on `trend` so the
   // O(N) scan doesn't re-run on every hover render (hoveredIndex changes fire a
   // re-render on each mouse move).
-  const { latest, min, max, avg } = useMemo(() => {
-    const scores = trend
-      .map((t) => parseFloat(t.runNumericAverage ?? t.numericAverage))
-      .filter((n) => !Number.isNaN(n));
-    return {
-      latest: scores[0],
-      min: scores.length ? Math.min(...scores) : null,
-      max: scores.length ? Math.max(...scores) : null,
-      avg: scores.length ? scores.reduce((s, n) => s + n, 0) / scores.length : null,
-    };
-  }, [trend]);
+  const { latest, min, max, avg } = useMemo(() => computeHistoryChartStats(trend), [trend]);
 
   if (!trend || trend.length < 2) return null;
 
   const fmt = (n) => (n == null ? '—' : n.toFixed(1));
 
-  const kbdItems = onBarClick
-    ? data.map((d, i) => ({
-        key: d.runId ?? i,
-        text: `${t('history.kbdRunItem', { date: d.dateLabel, score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
-        onActivate: () => d.runId && onBarClick(d.runId),
-      }))
-    : [];
+  const kbdItems = buildHistoryKbdItems({ data, onBarClick, selectedRunId });
 
   return (
     <section className="run-history-panel run-history-panel--terminal panel" aria-label={t('overview.scoreHistoryAria')}>

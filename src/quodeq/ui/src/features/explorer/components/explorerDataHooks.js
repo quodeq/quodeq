@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useApi } from '../../../api/ApiContext.jsx';
-import { projectKeys, samePlaceholderScope } from '../../../api/queryKeys.js';
+import { useState, useMemo, useCallback } from 'react';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { countBySeverity } from '../../../utils/severity.js';
+import { useExplorerQueries } from './useExplorerQueries.js';
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -107,37 +105,7 @@ function mergeRescoreIntoEval(prev, dimData) {
  * refetches after user actions exactly like the Overview does.
  */
 export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = 'local') {
-  const { getDimensionEval, getRunScores, sharedGetDimensionEval, sharedGetRunScores } = useApi();
-  const fetchDimensionEval = selectedSource === 'shared' ? sharedGetDimensionEval : getDimensionEval;
-  const fetchRunScores = selectedSource === 'shared' ? sharedGetRunScores : getRunScores;
-  const queryClient = useQueryClient();
-  const projectKey = project || '_none_';
-  // Reuse the previous payload only within this project+source subtree —
-  // run-navigator swaps keep the page up with an isFetching dim, a project
-  // switch drops to the real LoadingScreen (see samePlaceholderScope).
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
-
-  const evalQuery = useQuery({
-    queryKey: projectKeys.dimensionEval(projectKey, runId, dimension, selectedSource),
-    queryFn: () => fetchDimensionEval(project, runId, dimension),
-    enabled: !!project && !!dimension,
-    staleTime: 60_000,
-    placeholderData: keepInScope,
-  });
-
-  // The rescore side. Non-fatal by design: if it errors, the page renders
-  // the unrescored eval (the old fetchAndRescore caught and dropped scores
-  // errors the same way).
-  const scoresQuery = useQuery({
-    queryKey: projectKeys.runScores(projectKey, runId, selectedSource),
-    queryFn: () => fetchRunScores(project, runId),
-    enabled: !!project,
-    staleTime: 60_000,
-    placeholderData: keepInScope,
-  });
+  const { evalQuery, scoresQuery } = useExplorerQueries(project, dimension, runId, refreshSignal, selectedSource);
 
   const evalData = useMemo(() => {
     const data = evalQuery.data ?? null;
@@ -145,15 +113,6 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
     const dimData = (scoresQuery.data?.dimensions || []).find((d) => d.dimension === dimension);
     return dimData ? mergeRescoreIntoEval(data, dimData) : data;
   }, [evalQuery.data, scoresQuery.data, dimension]);
-
-  // refreshSignal (the dashboard payload identity) flips after external
-  // changes; re-pull the rescore data then, like the old effect did.
-  const initialRef = useRef(refreshSignal);
-  useEffect(() => {
-    if (refreshSignal === initialRef.current) return;
-    if (!project || !runId) return;
-    queryClient.invalidateQueries({ queryKey: projectKeys.runScores(projectKey, runId, selectedSource) });
-  }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Loading gates on BOTH queries so the first paint never shows pre-rescore
   // grades that visibly correct themselves a beat later (the old code

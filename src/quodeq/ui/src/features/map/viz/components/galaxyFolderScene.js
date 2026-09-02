@@ -2,7 +2,6 @@ import {
   TAU, scoreRGB, sevRGB,
   seedHash, seededRng,
 } from '../core/galaxyCore.js';
-import { t } from '../../../../strings/index.js';
 
 /* ── Position consistency engine ── */
 
@@ -67,15 +66,66 @@ export function countDescendants(node) {
   return n;
 }
 
-export function buildFolderScene(node, W, H) {
-  const positioned = layoutChildren(node);
+/** Folder-nebula alert particles (critical/major/minor blips), seeded by path. */
+function _buildFolderParticles(c, radius, sev) {
+  const particles = [];
+  if (!(sev.critical > 0 || sev.major > 0 || sev.minor > 0)) return particles;
+  const fRng = seededRng(seedHash((c.path || c.name) + ':fsev'));
+  const addAlert = (count, sevName) => {
+    const sevCol = sevRGB(sevName);
+    const pn = Math.min(count, 3);
+    for (let j = 0; j < pn; j++) {
+      particles.push({
+        col: sevCol, sev: sevName,
+        or: radius * 1.5 + fRng() * radius * 1.0,
+        os: (0.015 + fRng() * 0.03) * (fRng() > 0.5 ? 1 : -1),
+        op: fRng() * TAU,
+        sz: sevName === 'critical' ? 3.0 + fRng() * 0.7 : sevName === 'major' ? 2.3 + fRng() * 0.5 : 1.6 + fRng() * 0.4,
+        ec: 0.7 + fRng() * 0.3,
+        tp: fRng() * TAU,
+      });
+    }
+  };
+  if (sev.critical > 0) addAlert(sev.critical, 'critical');
+  if (sev.major > 0) addAlert(sev.major, 'major');
+  if (sev.minor > 0) addAlert(sev.minor, 'minor');
+  return particles;
+}
 
+/** Per-file violation particles orbiting a flagged file, seeded by path. */
+function _buildFileParticles(c, radius) {
+  const particles = [];
+  if (!(c.violations > 0)) return particles;
+  const sev = c.severity || { critical: 0, major: 0, minor: 0 };
+  const rng2 = seededRng(seedHash((c.path || c.name) + ':fp'));
+  const addP = (count, sevName) => {
+    const pcol = sevRGB(sevName);
+    for (let j = 0; j < Math.min(count, 10); j++) {
+      particles.push({
+        col: pcol, sev: sevName,
+        or: radius * 1.2 + rng2() * radius * 1.5,
+        os: (0.03 + rng2() * 0.07) * (rng2() > 0.5 ? 1 : -1),
+        op: rng2() * TAU,
+        sz: sevName === 'critical' ? 2.2 + rng2() * 0.5 : sevName === 'major' ? 1.8 + rng2() * 0.4 : 1.2 + rng2() * 0.3,
+        ec: 0.65 + rng2() * 0.35,
+        tp: rng2() * TAU,
+      });
+    }
+  };
+  addP(sev.critical || 0, 'critical');
+  addP(sev.major || 0, 'major');
+  addP(sev.minor || 0, 'minor');
+  return particles;
+}
+
+/** Every root star's position/radius/color/particles, before repulsion. Returns `{ rootStars, n }`. */
+function placeRootStars(positioned, W, H) {
   const rootStars = [];
   const n = positioned.length;
   const baseFactor = BASE_FACTOR_MIN + Math.sqrt(n) * BASE_FACTOR_SCALE;
   const spread = Math.min(W, H) * baseFactor;
 
-  positioned.forEach((ip, i) => {
+  positioned.forEach((ip) => {
     const c = ip.child;
     const desc = ip.isFolder ? countDescendants(c) : 0;
     const radius = ip.isFolder
@@ -90,49 +140,7 @@ export function buildFolderScene(node, W, H) {
     const ox = Math.cos(ip.angle) * dist;
     const oy = Math.sin(ip.angle) * dist;
 
-    let particles = [];
-    if (ip.isFolder) {
-      if (sev.critical > 0 || sev.major > 0 || sev.minor > 0) {
-        const fRng = seededRng(seedHash((c.path || c.name) + ':fsev'));
-        const addAlert = (count, sevName) => {
-          const sevCol = sevRGB(sevName);
-          const pn = Math.min(count, 3);
-          for (let j = 0; j < pn; j++) {
-            particles.push({
-              col: sevCol, sev: sevName,
-              or: radius * 1.5 + fRng() * radius * 1.0,
-              os: (0.015 + fRng() * 0.03) * (fRng() > 0.5 ? 1 : -1),
-              op: fRng() * TAU,
-              sz: sevName === 'critical' ? 3.0 + fRng() * 0.7 : sevName === 'major' ? 2.3 + fRng() * 0.5 : 1.6 + fRng() * 0.4,
-              ec: 0.7 + fRng() * 0.3,
-              tp: fRng() * TAU,
-            });
-          }
-        };
-        if (sev.critical > 0) addAlert(sev.critical, 'critical');
-        if (sev.major > 0) addAlert(sev.major, 'major');
-        if (sev.minor > 0) addAlert(sev.minor, 'minor');
-      }
-    } else if (c.violations > 0) {
-      const rng2 = seededRng(seedHash((c.path || c.name) + ':fp'));
-      const addP = (count, sevName) => {
-        const pcol = sevRGB(sevName);
-        for (let j = 0; j < Math.min(count, 10); j++) {
-          particles.push({
-            col: pcol, sev: sevName,
-            or: radius * 1.2 + rng2() * radius * 1.5,
-            os: (0.03 + rng2() * 0.07) * (rng2() > 0.5 ? 1 : -1),
-            op: rng2() * TAU,
-            sz: sevName === 'critical' ? 2.2 + rng2() * 0.5 : sevName === 'major' ? 1.8 + rng2() * 0.4 : 1.2 + rng2() * 0.3,
-            ec: 0.65 + rng2() * 0.35,
-            tp: rng2() * TAU,
-          });
-        }
-      };
-      addP(sev.critical || 0, 'critical');
-      addP(sev.major || 0, 'major');
-      addP(sev.minor || 0, 'minor');
-    }
+    const particles = ip.isFolder ? _buildFolderParticles(c, radius, sev) : _buildFileParticles(c, radius);
 
     rootStars.push({
       name: c.name,
@@ -151,15 +159,20 @@ export function buildFolderScene(node, W, H) {
     });
   });
 
-  // Centroid correction
-  if (rootStars.length > 0) {
-    let cx = 0, cy = 0;
-    rootStars.forEach(s => { cx += s.ox; cy += s.oy; });
-    cx /= rootStars.length; cy /= rootStars.length;
-    rootStars.forEach(s => { s.ox -= cx; s.oy -= cy; });
-  }
+  return { rootStars, n };
+}
 
-  // Repulsion pass
+/** Shift every star so the group's centroid sits at the origin. */
+function recenterStars(rootStars) {
+  if (rootStars.length === 0) return;
+  let cx = 0, cy = 0;
+  rootStars.forEach(s => { cx += s.ox; cy += s.oy; });
+  cx /= rootStars.length; cy /= rootStars.length;
+  rootStars.forEach(s => { s.ox -= cx; s.oy -= cy; });
+}
+
+/** Push overlapping stars apart until every pair clears its gap (folders need more room than files). */
+function applyRepulsion(rootStars, n) {
   const folderGap = 10 + Math.min(n, 20) * 1.0;
   const fileGap = 1;
   const repulsionIters = rootStars.length > REPULSION_ITERATIONS ? REPULSION_RADIUS : rootStars.length > 20 ? REPULSION_STRENGTH : REPULSION_DECAY;
@@ -182,58 +195,68 @@ export function buildFolderScene(node, W, H) {
       }
     }
   }
-  // Re-center after repulsion
-  if (rootStars.length > 0) {
-    let cx2 = 0, cy2 = 0;
-    rootStars.forEach(s => { cx2 += s.ox; cy2 += s.oy; });
-    cx2 /= rootStars.length; cy2 /= rootStars.length;
-    rootStars.forEach(s => { s.ox -= cx2; s.oy -= cy2; });
-  }
+}
 
-  // Normalize to fit
+/** Scale the layout down (never up) to fit the target radius; returns the resulting max extent. */
+function normalizeToFit(rootStars, W, H) {
   const targetR = Math.min(W, H) * TARGET_RADIUS_FRACTION;
-  let _maxExtent = 0;
+  let maxExtent = 0;
   rootStars.forEach(s => {
     const margin = s.particles.length > 0 ? s.radius * 3 : s.radius * 2;
     const ext = Math.max(Math.abs(s.ox) + margin, Math.abs(s.oy) + margin);
-    if (ext > _maxExtent) _maxExtent = ext;
+    if (ext > maxExtent) maxExtent = ext;
   });
-  if (_maxExtent > targetR && _maxExtent > 0) {
-    const scale = targetR / _maxExtent;
+  if (maxExtent > targetR && maxExtent > 0) {
+    const scale = targetR / maxExtent;
     rootStars.forEach(s => { s.ox *= scale; s.oy *= scale; });
-    _maxExtent = targetR;
+    maxExtent = targetR;
   }
+  return maxExtent;
+}
 
-  // Minimum spanning tree
+/** Minimum spanning tree over the star positions, for the constellation lines. */
+function buildMST(rootStars) {
   const lines = [];
-  if (rootStars.length >= 2) {
-    const connected = new Set([0]);
-    while (connected.size < rootStars.length) {
-      let bestA = -1, bestB = -1, bestD = Infinity;
-      for (const ai of connected) {
-        for (let bi = 0; bi < rootStars.length; bi++) {
-          if (connected.has(bi)) continue;
-          const dx = rootStars[ai].ox - rootStars[bi].ox;
-          const dy = rootStars[ai].oy - rootStars[bi].oy;
-          const d = dx * dx + dy * dy;
-          if (d < bestD) { bestD = d; bestA = ai; bestB = bi; }
-        }
+  if (rootStars.length < 2) return lines;
+  const connected = new Set([0]);
+  while (connected.size < rootStars.length) {
+    let bestA = -1, bestB = -1, bestD = Infinity;
+    for (const ai of connected) {
+      for (let bi = 0; bi < rootStars.length; bi++) {
+        if (connected.has(bi)) continue;
+        const dx = rootStars[ai].ox - rootStars[bi].ox;
+        const dy = rootStars[ai].oy - rootStars[bi].oy;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; bestA = ai; bestB = bi; }
       }
-      if (bestB >= 0) {
-        lines.push({ a: bestA, b: bestB });
-        connected.add(bestB);
-      } else break;
     }
+    if (bestB >= 0) {
+      lines.push({ a: bestA, b: bestB });
+      connected.add(bestB);
+    } else break;
   }
+  return lines;
+}
 
-  // Background
-  const bg = Array.from({ length: BG_STAR_COUNT }, () => ({
+/** Background starfield — decorative only, not part of the seeded layout. */
+function buildBackgroundStars() {
+  return Array.from({ length: BG_STAR_COUNT }, () => ({
     x: Math.random(), y: Math.random(),
     sz: Math.random() * 1.2,
     tw: Math.random() * TAU,
     sp: 0.3 + Math.random() * 0.7,
   }));
+}
 
+export function buildFolderScene(node, W, H) {
+  const positioned = layoutChildren(node);
+  const { rootStars, n } = placeRootStars(positioned, W, H);
+  recenterStars(rootStars);
+  applyRepulsion(rootStars, n);
+  recenterStars(rootStars);
+  const _maxExtent = normalizeToFit(rootStars, W, H);
+  const lines = buildMST(rootStars);
+  const bg = buildBackgroundStars();
   return { rootStars, lines, bg, _maxExtent };
 }
 
@@ -251,48 +274,7 @@ export function buildNavPath(root, targetPath) {
   return path;
 }
 
-/**
- * Build the level-info panel data object for the current view state.
- */
-export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, projectName, onFileClick }) {
-  if (!scene) return null;
-  const zf = zoomedFileRef.current;
-  if (zf && zf.data) {
-    const s = zf.data;
-    const sev = s.severity || {};
-    return {
-      title: s.name,
-      lines: [
-        { label: 'Violations', value: s.violations },
-        { label: 'Compliance', value: s.compliance },
-        ...(sev.critical ? [{ label: 'Critical', value: sev.critical }] : []),
-        ...(sev.major ? [{ label: 'Major', value: sev.major }] : []),
-        ...(sev.minor ? [{ label: 'Minor', value: sev.minor }] : []),
-      ],
-      hint: null,
-      detailAction: () => { if (onFileClick) onFileClick(s._node); },
-    };
-  }
-  const cn = currentNode;
-  const folderCount = scene.rootStars.filter(s => s.isFolder).length;
-  const fileCount = scene.rootStars.filter(s => !s.isFolder).length;
-  const rate = cn.complianceRate;
-  const cnSev = cn.severity || {};
-  const isRoot = navRef.current.path.length <= 1;
-  const lines = [
-    { label: 'Compliance', value: (rate * 100).toFixed(0) + '%' },
-    { label: 'Contents', value: folderCount + fileCount },
-    { label: 'Violations', value: cn.violations },
-  ];
-  if (cn.violations > 0) {
-    if (cnSev.critical > 0) lines.push({ label: 'Critical', value: cnSev.critical, color: 'var(--color-sev-critical-text)' });
-    if (cnSev.major > 0) lines.push({ label: 'Major', value: cnSev.major, color: 'var(--color-sev-major-text)' });
-    if (cnSev.minor > 0) lines.push({ label: 'Minor', value: cnSev.minor, color: 'var(--color-sev-minor-text)' });
-  }
-  return {
-    title: isRoot ? (projectName || 'Project') : cn.name,
-    lines,
-    hint: folderCount > 0 ? t('map.folderHint') : null,
-    detailAction: !isRoot ? () => { if (onFileClick) onFileClick(cn); } : null,
-  };
-}
+// Level-info panel builder split out to galaxyFolderLevelInfo.js (self-
+// contained; shares nothing with the layout math above) — re-exported so
+// GalaxyFolderView.jsx keeps one import path.
+export { buildLevelInfo } from './galaxyFolderLevelInfo.js';

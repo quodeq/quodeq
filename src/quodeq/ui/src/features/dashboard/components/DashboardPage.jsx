@@ -8,10 +8,11 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import WarmupNotice from '../../../components/WarmupNotice.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
-
-// Matches the .dashboard-appear animation length (dashboard.css) -- the
-// class is held for this long so re-renders can't cut the fade short.
-const DASHBOARD_APPEAR_MS = 400;
+import { useDashboardPageState } from '../hooks/useDashboardPageState.js';
+import {
+  ProjectsLoadFailedState, NoLocalProjectsSharedContent, NoProjectsContent, NoProjectSelectedContent,
+  LoadingProjectContent, LoadProjectFailedContent, NoRunsEmptyContent, RunLoadFailedContent,
+} from './DashboardPageEmptyStates.jsx';
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
@@ -173,143 +174,16 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const focusedDimensionData = useMemo(() => focusedDimension ? (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null : null, [focusedDimension, dashboard]);
   const handlers = useDashboardHandlers(onNavigate, dashboard);
 
-  // What each view needs before it can render real content: run detail only
-  // needs the dashboard payload; the Overview also needs the scores-derived
-  // `accumulated` block. This is the single readiness rule for the whole page
-  // -- DashboardContent is only mounted once it holds, and never re-derives
-  // its own readiness from `accumulated`, so there is exactly one loader
-  // decision instead of two that can disagree.
   // These hooks MUST stay above the early returns below — calling them after a
   // conditional return changes the hook count between renders (React error
-  // #310, a blank-crash on load).
-  const contentReady = runMode ? !!dashboard : (!!dashboard && !!accumulated);
-  // Grace state for the slow/cold-load fallback (consumed by isLoading below).
-  const [graceElapsed, setGraceElapsed] = useState(false);
-  // Reset synchronously during render, not from the effect below: contentReady
-  // flipping true (or dashboard disappearing) and graceElapsed resetting are
-  // the same logical transition. Doing it from an effect meant a stale
-  // intermediate commit (graceElapsed still true) landed first and ran ITS
-  // OWN effects -- including the appear-fade latch's ref write further down
-  // -- before this effect got a chance to correct it; a second, cascading
-  // commit then found the latch already spent and dropped the fade it had
-  // just armed. Resetting here settles the transition in a single commit,
-  // before any effects run at all -- same "adjust state during render"
-  // pattern as noRunsEmptySticky below, safe under StrictMode's double-
-  // render for the same reason: idempotent once the condition clears.
-  if (graceElapsed && (contentReady || !dashboard)) setGraceElapsed(false);
-  useEffect(() => {
-    if (contentReady || !dashboard) return undefined;
-    const timer = setTimeout(() => setGraceElapsed(true), 700);
-    return () => clearTimeout(timer);
-  }, [contentReady, dashboard]);
-
-  // Hold the full LoadingScreen until the content is ready, so we don't fade in
-  // a half-drawn page and then pop the real content in a beat later (the
-  // first-load flicker). BUT a cold score cache can take several seconds to
-  // rebuild (e.g. right after a dismiss/restore/formula change invalidates it);
-  // sitting on a blank spinner that whole time reads as "not opening". So once
-  // the dashboard payload is in and the grace has elapsed (graceElapsed, set
-  // above), fall back to the partial page (frame + a content spinner) so a slow
-  // load shows progress instead of a hang. The grace comfortably exceeds a warm
-  // load, so the fast path still gets one clean transition.
-  // Hoisted above the early returns (rather than kept by the main return where
-  // it's consumed) because the fade-once latch below needs it for every branch,
-  // not just the main one.
-  const isLoading = loading && !contentReady && !(dashboard && graceElapsed);
-
-  // Overview only (!runMode): both loader windows below (isLoading itself,
-  // and the grace-fallback window once dashboard has landed but accumulated
-  // hasn't) render one continuous OverviewSkeleton instead of a LoadingScreen.
-  // Computed here, above the appear latch, rather than beside the return
-  // where it's consumed: the latch below needs to know a skeleton (not real
-  // content) is what's showing, for every branch, not just the main one --
-  // same reason `isLoading` itself is hoisted above the early returns.
-  const showOverviewSkeleton = !runMode && !!(isLoading || (dashboard && !isLoading && !contentReady));
-
-  // Fade-once latch: `dashboard-fadein` should play when the page's content
-  // first appears for this project/source/run context, not on every
-  // loading<->ready flip within it (grace-fallback then content-ready, an
-  // error settling, the no-runs sticky state handing off to real content).
-  // Keyed like noRunsScopeKey below, but the run is folded in too so a run
-  // switch on run-detail gets its own fade. The animation itself lives on a
-  // separate `dashboard-appear` class (kept apart from the `dashboard-ready`
-  // state class) so re-adding `dashboard-ready` alone -- e.g. dropping
-  // `dashboard-refreshing` -- never replays it. The ref is only written from
-  // an effect (post-commit), never during render: mutating it inline would
-  // make the appear decision depend on how many times React happens to
-  // invoke this render (StrictMode double-invokes it in dev).
-  // isLoading, reused below as "was this render ready", isn't guaranteed
-  // false on every render of every early-return branch -- e.g. the no-runs
-  // sticky branch below CAN be reached with isLoading true, once
-  // wasNoRunsEmpty is already latched (a repeat render of an already-shown
-  // context, gated by showNoRunsEmpty's `!loading || wasNoRunsEmpty` below).
-  // What matters is narrower and does hold: on the render where a context's
-  // empty/error state genuinely first appears, `loading` is false --
-  // showNoRunsEmpty requires `!loading` until wasNoRunsEmpty is latched, and
-  // the error/runMode-empty branches gate on `!loading` outright -- so the
-  // latch is never consumed before real first-appearance content is on
-  // screen; isLoading being true only ever suppresses a repeat.
-  // `!showOverviewSkeleton` gates both the read and the write: without it,
-  // the grace-elapsed flip (isLoading true -> false while the Overview's
-  // skeleton keeps showing, accumulated still pending) would (a) play the
-  // 400ms fade over a skeleton that was already fully visible and unchanged
-  // -- a flash the skeleton is supposed to avoid -- and (b) spend the latch
-  // early, so the *real* content that mounts once accumulated lands would
-  // get no fade at all. showOverviewSkeleton is false for every other branch
-  // (runMode, error, empty states, sticky no-runs), so this is a no-op there.
-  const dashboardAppearKey = `${selectedProject}::${selectedSource}::${runMode ? selectedRunId : 'overview'}`;
-  const dashboardAppearedKeyRef = useRef(null);
-  const dashboardAppearNow = !isLoading && !showOverviewSkeleton && dashboardAppearedKeyRef.current !== dashboardAppearKey;
-  useEffect(() => {
-    if (!isLoading && !showOverviewSkeleton) dashboardAppearedKeyRef.current = dashboardAppearKey;
-  }, [isLoading, showOverviewSkeleton, dashboardAppearKey]);
-  // Hold the class for the animation's duration, not just the one render
-  // where dashboardAppearNow computes true: an unrelated re-render inside
-  // the window (isFetching flipping a moment after content appeared) used
-  // to drop it and snap opacity to 1, cutting the fade short. The className
-  // never toggles mid-window, so the animation runs uninterrupted; removal
-  // after the window is visually a no-op (the animation has finished).
-  // Latching until the key next changes was rejected instead: a key change
-  // then re-applies the class onto a node that still has it, which does not
-  // restart a CSS animation.
-  const [appearHeld, setAppearHeld] = useState(false);
-  const appearTimerRef = useRef(null);
-  useEffect(() => {
-    if (!dashboardAppearNow) return;
-    setAppearHeld(true);
-    clearTimeout(appearTimerRef.current);
-    appearTimerRef.current = setTimeout(() => setAppearHeld(false), DASHBOARD_APPEAR_MS);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardAppearNow, dashboardAppearKey]);
-  useEffect(() => () => clearTimeout(appearTimerRef.current), []);
-  const dashboardAppearClass = (dashboardAppearNow || appearHeld) ? ' dashboard-appear' : '';
-
-  // Sticky "no evaluations yet" latch: once that empty state is showing for
-  // this project+source, stay on it through a subsequent load (the post-eval
-  // selectedRun flip -- new dashboard key, loading true, dashboard still
-  // null) instead of popping to the full inline loader for a beat. Keyed off
-  // project+source so a project switch never inherits the previous
-  // project's stickiness (see the reset check below). runMode never shows
-  // this empty state, so it's excluded outright -- and a runMode render must
-  // never touch the latch at all: App.jsx doesn't always remount DashboardPage
-  // between the Overview and a run detail view for the same project+source,
-  // so writing `active: false` here on a runMode pass would clear a
-  // legitimately-active Overview latch out from under it.
-  const noRunsScopeKey = `${selectedProject}::${selectedSource}`;
-  const [noRunsEmptySticky, setNoRunsEmptySticky] = useState({ scopeKey: noRunsScopeKey, active: false });
-  const wasNoRunsEmpty = noRunsEmptySticky.scopeKey === noRunsScopeKey && noRunsEmptySticky.active;
-  // Latch on !contentReady, not !dashboard: releasing the latch the moment
-  // the dashboard payload lands (but before accumulated does) reopened the
-  // same pop this latch exists to close, just narrower -- empty(dimmed) ->
-  // inline spinner -> content instead of loader -> content. contentReady
-  // already folds in the accumulated wait for the Overview (runMode is
-  // excluded from this branch outright, so its own dashboard-only readiness
-  // never applies here), so holding the empty state open until BOTH payloads
-  // land closes the gap without a separate flag to keep in sync.
-  const showNoRunsEmpty = !runMode && !contentReady && !error && (!loading || wasNoRunsEmpty);
-  if (!runMode && (noRunsEmptySticky.scopeKey !== noRunsScopeKey || noRunsEmptySticky.active !== showNoRunsEmpty)) {
-    setNoRunsEmptySticky({ scopeKey: noRunsScopeKey, active: showNoRunsEmpty });
-  }
+  // #310, a blank-crash on load). The grace/appear/sticky-latch state machine
+  // is extracted into useDashboardPageState (hooks/useDashboardPageState.js);
+  // its sub-hooks run in the exact order they did when inline here, so the
+  // render-phase state adjustments (grace reset, sticky-latch write) and the
+  // StrictMode double-invocation semantics they depend on are unchanged.
+  const { contentReady, isLoading, showOverviewSkeleton, dashboardAppearClass, showNoRunsEmpty } = useDashboardPageState({
+    runMode, dashboard, accumulated, loading, error, selectedProject, selectedSource, selectedRunId,
+  });
 
   const { projectsLoaded, projectsLoadFailed } = data;
   if (!projectsLoaded) {
@@ -319,14 +193,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     // backend recovered). No hooks in either branch — the hook count across
     // the false -> true flip is pinned by tests.
     if (projectsLoadFailed) {
-      return (
-        <EmptyState
-          title={t('overview.projectsLoadFailedTitle')}
-          description={t('overview.projectsLoadFailedDesc')}
-          actionLabel={t('overview.retry')}
-          onAction={() => callbacks.onProjectsRetry?.()}
-        />
-      );
+      return <ProjectsLoadFailedState onRetry={callbacks.onProjectsRetry} />;
     }
     // The app-level FadingLoadingScreen overlay covers this state; render
     // nothing here so the loader lives at one stable spot and can fade out.
@@ -340,19 +207,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     if (sharedHasContent) {
       return (
         <>
-          {/* This `{null}` pins .dashboard-page to Fragment child index 1 in every
-              early-return branch, matching the main return's two-child Fragment
-              (loader + div) below -- so switching between branches reconciles
-              against the same slot instead of remounting the subtree and
-              replaying the fade-in. Don't remove it. */}
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-            <EmptyState
-              title={t('overview.noLocalProjectsTitle')}
-              description={t('overview.noLocalProjectsDesc')}
-              actionLabel={t('overview.browseRemote')}
-              onAction={() => onNavigate?.('projects')}
-            />
+            <NoLocalProjectsSharedContent onNavigate={onNavigate} />
           </div>
         </>
       );
@@ -361,12 +218,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <>
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-          <EmptyState
-            title={t('overview.noProjectsTitle')}
-            description={t('overview.noProjectsDesc')}
-            actionLabel={t('overview.addProject')}
-            onAction={() => onNavigate?.('projects')}
-          />
+          <NoProjectsContent onNavigate={onNavigate} />
         </div>
       </>
     );
@@ -376,12 +228,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <>
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-          <EmptyState
-            title={t('overview.noProjectSelectedTitle')}
-            description={t('overview.noProjectSelectedDesc')}
-            actionLabel={t('overview.chooseProject')}
-            onAction={() => onNavigate?.('projects')}
-          />
+          <NoProjectSelectedContent onNavigate={onNavigate} />
         </div>
       </>
     );
@@ -398,7 +245,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         <>
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-            <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />
+            <LoadingProjectContent projectName={projectName} />
           </div>
         </>
       );
@@ -407,34 +254,17 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <>
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-          <EmptyState
-            title={t('overview.loadProjectFailedTitle')}
-            description={error}
-            actionLabel={t('overview.retry')}
-            onAction={() => callbacks.onRetry?.()}
-          />
+          <LoadProjectFailedContent error={error} onRetry={callbacks.onRetry} />
         </div>
       </>
     );
   }
   if (showNoRunsEmpty) {
-    // Covers both the settled no-runs state and a background refetch of an
-    // empty project (isFetching true, dashboard still null -- previously a
-    // visually blank .dashboard-page with no dim and no loader), plus the
-    // post-eval selectedRun flip while wasNoRunsEmpty is latched (loading
-    // true, dashboard still null): stay here, dimmed, until the payload
-    // lands rather than swapping to the full inline loader and back.
     return (
       <>
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}${isFetching ? ' dashboard-refreshing' : ''}`}>
-          <IncompleteSetupCard projectInfo={projectInfo} onComplete={handleSetupComplete} />
-          <EmptyState
-            title={t('overview.noEvalsTitle')}
-            description={t('overview.noEvalsDesc', { name: projectName })}
-            actionLabel={t('overview.startEvaluation')}
-            onAction={() => onNavigate?.('evaluate')}
-          />
+          <NoRunsEmptyContent projectInfo={projectInfo} onComplete={handleSetupComplete} projectName={projectName} onNavigate={onNavigate} />
         </div>
       </>
     );
@@ -451,7 +281,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
         <>
           {null}
           <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-            <LoadingScreen variant="inline" message={projectName ? t('overview.loadingProjectMsg', { name: projectName }) : undefined} />
+            <LoadingProjectContent projectName={projectName} />
           </div>
         </>
       );
@@ -460,12 +290,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       <>
         {null}
         <div className={`dashboard-page dashboard-fade dashboard-ready${dashboardAppearClass}`}>
-          <EmptyState
-            title={t('overview.loadRunFailedTitle')}
-            description={t('overview.loadRunFailedDesc')}
-            actionLabel={t('overview.retry')}
-            onAction={() => callbacks.onRetry?.()}
-          />
+          <RunLoadFailedContent onRetry={callbacks.onRetry} />
         </div>
       </>
     );

@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`galaxyFolderDraw drawStars (pre-refactor baseline) > records the ctx-call sequence for a folder + file star (order-preserving refactor guard) > folder-plus-file-star-ctx-calls 1`] = `
+[
+  "createRadialGradient",
+  "beginPath",
+  "arc",
+  "fill",
+  "createRadialGradient",
+  "beginPath",
+  "arc",
+  "fill",
+  "createRadialGradient",
+  "beginPath",
+  "arc",
+  "fill",
+  "createRadialGradient",
+  "beginPath",
+  "arc",
+  "fill",
+  "beginPath",
+  "arc",
+  "setLineDash",
+  "stroke",
+  "setLineDash",
+]
+`;

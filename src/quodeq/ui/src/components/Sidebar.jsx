@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_COMPARE, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP, ICON_FOLDER as BASE_ICON_FOLDER } from '../constants/navigation.jsx';
 import { cloneElement } from 'react';
 import { BRAND_NAME } from '../strings/brand.js';
 import { t, LOCALE } from '../strings/index.js';
 import { isEvaluatableSource } from '../appGating.js';
+import { useSidebarPin } from '../hooks/useSidebarPin.js';
 
 // Folder glyph for the REPOSITORY row — same outline used in the file/folder
 // table on FileDetailPage, just sized up for the sidebar rail.
@@ -107,27 +107,11 @@ export default function Sidebar({
      redundant. The parent computes this from the projects list. */
   showCompareTab = false,
 }) {
-  const [internalPinned, setInternalPinned] = useState(false);
-  const isPinned = controlledPinned != null ? controlledPinned : internalPinned;
-  const setPinned = (next) => {
-    if (onPinChange) onPinChange(next);
-    else setInternalPinned(next);
-  };
+  const { isPinned, setPinned, handleTogglePin, handleNav } = useSidebarPin({ controlledPinned, onPinChange, onNavTab });
   const repoName = projectInfo?.displayName || projectInfo?.name || projectInfo?.id || null;
   const branch = projectInfo?.meta?.branch || projectInfo?.branch || null;
   const repoStatus = projectInfo?.meta?.repoStatus || (branch ? 'clean' : null);
   const lastEvalStr = formatLastEval(lastEvalAt);
-
-  const handleTogglePin = () => setPinned(!isPinned);
-
-  // Close the mobile drawer after navigating — otherwise the overlay stays
-  // covering the just-navigated-to page.
-  const handleNav = (id) => {
-    onNavTab(id);
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
-      setPinned(false);
-    }
-  };
 
   return (
     <>

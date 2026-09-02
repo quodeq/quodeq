@@ -36,7 +36,8 @@ function sortRows(items, sortCol, sortDir) {
   });
 }
 
-export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick, variant = 'heat' }) {
+/** Sort state + the sorted, violation/compliance-filtered rows for one node. */
+function useHeatGridSort(node) {
   const [sortCol, setSortCol] = useState(COL_VIOLATIONS);
   const [sortDir, setSortDir] = useState('desc');
 
@@ -55,6 +56,53 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
     }
   };
 
+  return { rows, sortCol, sortDir, handleSort };
+}
+
+function HeatGridHeaderRow({ sortCol, sortDir, onSort }) {
+  return (
+    <tr>
+      {COLUMNS.map((col) => (
+        <th
+          key={col.id}
+          className={`heat-grid-th-sort viz-focusable${col.align === 'left' ? ' left' : ''}`}
+          onClick={() => onSort(col.id)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(col.id); } }}
+          tabIndex={0}
+          aria-sort={sortCol === col.id ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        >
+          {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+        </th>
+      ))}
+    </tr>
+  );
+}
+
+function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
+  const canDrill = !row.isFile && row.children?.length > 0;
+  return (
+    <tr>
+      <td>
+        <div
+          className={`heat-grid-file${canDrill || row.isFile ? ' clickable viz-focusable' : ''}`}
+          role={canDrill || row.isFile ? 'button' : undefined}
+          tabIndex={canDrill || row.isFile ? 0 : undefined}
+          onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}
+          onKeyDown={(e) => e.key === 'Enter' && (canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
+          title={row.path}
+        >
+          {row.isFile ? null : <span className="heat-grid-folder-icon" aria-hidden="true">{ICON_FOLDER}</span>}
+          {row.name}
+        </div>
+      </td>
+      <HeatGridCells row={row} onCellClick={onCellClick} variant={variant} />
+    </tr>
+  );
+}
+
+export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick, variant = 'heat' }) {
+  const { rows, sortCol, sortDir, handleSort } = useHeatGridSort(node);
+
   if (rows.length === 0) {
     return <p className="empty-state">{t('map.noData')}</p>;
   }
@@ -67,43 +115,19 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
     <div className={wrapCls}>
       <table className={tableCls}>
         <thead>
-          <tr>
-            {COLUMNS.map((col) => (
-              <th
-                key={col.id}
-                className={`heat-grid-th-sort viz-focusable${col.align === 'left' ? ' left' : ''}`}
-                onClick={() => handleSort(col.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSort(col.id); } }}
-                tabIndex={0}
-                aria-sort={sortCol === col.id ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-              >
-                {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-              </th>
-            ))}
-          </tr>
+          <HeatGridHeaderRow sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
         </thead>
         <tbody>
-          {rows.map((row) => {
-            const canDrill = !row.isFile && row.children?.length > 0;
-            return (
-              <tr key={row.path}>
-                <td>
-                  <div
-                    className={`heat-grid-file${canDrill || row.isFile ? ' clickable viz-focusable' : ''}`}
-                    role={canDrill || row.isFile ? 'button' : undefined}
-                    tabIndex={canDrill || row.isFile ? 0 : undefined}
-                    onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}
-                    onKeyDown={(e) => e.key === 'Enter' && (canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
-                    title={row.path}
-                  >
-                    {row.isFile ? null : <span className="heat-grid-folder-icon" aria-hidden="true">{ICON_FOLDER}</span>}
-                    {row.name}
-                  </div>
-                </td>
-                <HeatGridCells row={row} onCellClick={onCellClick} variant={variant} />
-              </tr>
-            );
-          })}
+          {rows.map((row) => (
+            <HeatGridRow
+              key={row.path}
+              row={row}
+              onDrillDown={onDrillDown}
+              onFileClick={onFileClick}
+              onCellClick={onCellClick}
+              variant={variant}
+            />
+          ))}
         </tbody>
       </table>
     </div>

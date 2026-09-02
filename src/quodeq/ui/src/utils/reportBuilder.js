@@ -267,9 +267,7 @@ export function buildRunReport({ dashboard, runSummary, projectName }) {
   return lines.join('\n');
 }
 
-export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
-  const rawViolations = violations || [];
-  const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);
+function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData }) {
   const date = dateLabel || formatDate();
   const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
   const dimSuffix = dimension ? ` · **Dimension:** ${dimension}` : '';
@@ -293,17 +291,11 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     lines.push(principleData.justification);
     lines.push('');
   }
+  return lines;
+}
 
-  const showViolations = severityFilter !== 'compliance';
-  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
-
-  const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
-    ? rawViolations.filter((v) => (v.severity || 'minor').toLowerCase() === severityFilter)
-    : (showViolations ? rawViolations : []);
-  const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === 'all'))
-    ? violationsBySeverity
-    : groupBySeverity(filteredViolations);
-
+function buildPrincipleViolationsSection({ filteredViolations, bySeverity, severityFilter }) {
+  const lines = [];
   lines.push(`## Violations (${filteredViolations.length})`);
   lines.push('');
   if (filteredViolations.length === 0) {
@@ -319,6 +311,26 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
       for (const v of vs) lines.push(formatViolationEntry(v));
     }
   }
+  return lines;
+}
+
+export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
+  const rawViolations = violations || [];
+  const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);
+
+  const lines = buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData });
+
+  const showViolations = severityFilter !== 'compliance';
+  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
+
+  const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
+    ? rawViolations.filter((v) => (v.severity || 'minor').toLowerCase() === severityFilter)
+    : (showViolations ? rawViolations : []);
+  const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === 'all'))
+    ? violationsBySeverity
+    : groupBySeverity(filteredViolations);
+
+  lines.push(...buildPrincipleViolationsSection({ filteredViolations, bySeverity, severityFilter }));
 
   if (showCompliance) {
     lines.push(...buildComplianceSection(complianceList));

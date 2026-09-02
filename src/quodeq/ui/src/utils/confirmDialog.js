@@ -16,6 +16,7 @@
  *   });
  */
 import { t } from '../strings/index.js';
+import { buildDialogShell } from './domDialogBuilder.js';
 const _ALLOWED_VARIANTS = new Set(['default', 'danger']);
 
 export function confirmDialog({
@@ -34,21 +35,23 @@ export function confirmDialog({
       return;
     }
     const safeVariant = _ALLOWED_VARIANTS.has(variant) ? variant : 'default';
-    const overlay = document.createElement('div');
-    overlay.className = 'qd-confirm-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
 
-    const dialog = document.createElement('div');
-    dialog.className = `qd-confirm-dialog qd-confirm-dialog--${safeVariant}`;
+    function close(ok) {
+      shell.unmount();
+      if (checkboxInput) {
+        resolve({ ok, checked: ok ? checkboxInput.checked : false });
+      } else {
+        resolve(ok);
+      }
+    }
 
-    const titleEl = document.createElement('h3');
-    titleEl.className = 'qd-confirm-title';
-    titleEl.textContent = title;
-
-    const messageEl = document.createElement('p');
-    messageEl.className = 'qd-confirm-message';
-    messageEl.textContent = message;
+    const shell = buildDialogShell({
+      title, message,
+      dialogClassName: `qd-confirm-dialog qd-confirm-dialog--${safeVariant}`,
+      onCancel: () => close(false),
+      onConfirm: () => close(true),
+    });
+    const { dialog, actionsEl } = shell;
 
     let checkboxInput = null;
     if (checkboxLabel) {
@@ -68,16 +71,8 @@ export function confirmDialog({
         hint.textContent = checkboxHint;
         wrap.appendChild(hint);
       }
-      dialog.appendChild(titleEl);
-      dialog.appendChild(messageEl);
       dialog.appendChild(wrap);
-    } else {
-      dialog.appendChild(titleEl);
-      dialog.appendChild(messageEl);
     }
-
-    const actions = document.createElement('div');
-    actions.className = 'qd-confirm-actions';
 
     const cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
@@ -89,29 +84,12 @@ export function confirmDialog({
     confirmBtn.className = `qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--${safeVariant}`;
     confirmBtn.textContent = confirmLabel;
 
-    actions.appendChild(cancelBtn);
-    actions.appendChild(confirmBtn);
-    dialog.appendChild(actions);
-    overlay.appendChild(dialog);
+    actionsEl.appendChild(cancelBtn);
+    actionsEl.appendChild(confirmBtn);
 
-    function close(ok) {
-      overlay.remove();
-      document.removeEventListener('keydown', onKey);
-      if (checkboxInput) {
-        resolve({ ok, checked: ok ? checkboxInput.checked : false });
-      } else {
-        resolve(ok);
-      }
-    }
-    function onKey(e) {
-      if (e.key === 'Escape') close(false);
-      if (e.key === 'Enter') close(true);
-    }
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
     cancelBtn.addEventListener('click', () => close(false));
     confirmBtn.addEventListener('click', () => close(true));
-    document.addEventListener('keydown', onKey);
-    document.body.appendChild(overlay);
+    shell.mount();
     confirmBtn.focus();
   });
 }

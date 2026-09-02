@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useApi } from '../../../api/ApiContext.jsx';
-import { ACTIVE_PROVIDER_KEY, notifyProviderSettingsChanged } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
-import { useMigrateLegacySettings } from '../hooks/useMigrateLegacySettings.js';
+import { useProviderTabsState } from '../hooks/useProviderTabsState.js';
 import { classifyProvider, defaultsForProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import LlamaCppTab from './LlamaCppTab.jsx';
@@ -13,7 +10,6 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
-import { readString, writeString } from '../../../adapters/storage.js';
 
 const PROVIDER_HINT = (
   <>
@@ -29,7 +25,38 @@ const INSTALL_INSTRUCTIONS = {
   gemini: tRich('settings.installHintGemini'),
 };
 
-const DEFAULT_PROVIDER_ORDER = 50;
+function ProviderPillRow({ clients, activeTab, selectTab }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label-row">
+          <span className="settings-label">{t('settings.aiProvider')}</span>
+          <HelpHint label={t('settings.aiProviderHelpAria')}>{PROVIDER_HINT}</HelpHint>
+        </span>
+        <span className="settings-description">{t('settings.providerRunsDesc')}</span>
+      </div>
+      <div className="settings-pill-group" role="tablist">
+        {clients.map((c) => {
+          const installed = c.installed !== false;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={c.id === activeTab}
+              aria-disabled={!installed}
+              title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
+              className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
+              onClick={() => selectTab(c.id)}
+            >
+              {c.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function TabContent({ provider, providerConfig }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
@@ -52,41 +79,7 @@ function TabContent({ provider, providerConfig }) {
 }
 
 export default function ProviderTabs({ providerConfigs }) {
-  const { getAiClients } = useApi();
-  const [clients, setClients] = useState([]);
-  const [clientsError, setClientsError] = useState(null);
-  const [activeTab, setActiveTab] = useState(() => readString(ACTIVE_PROVIDER_KEY) || '');
-
-  useMigrateLegacySettings(clients);
-
-  useEffect(() => {
-    getAiClients().then((data) => {
-      const raw = data.clients || [];
-      // Sort by 'order' field from provider configs (ai_providers.json)
-      const list = [...raw].sort((a, b) => {
-        const oa = providerConfigs?.[a.id]?.order ?? DEFAULT_PROVIDER_ORDER;
-        const ob = providerConfigs?.[b.id]?.order ?? DEFAULT_PROVIDER_ORDER;
-        return oa - ob;
-      });
-      setClients(list);
-      if (!activeTab && list.length > 0) {
-        const firstInstalled = list.find((c) => c.installed !== false) || list[0];
-        setActiveTab(firstInstalled.id);
-        writeString(ACTIVE_PROVIDER_KEY, firstInstalled.id);
-      }
-      setClientsError(null);
-    }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });
-  }, []);
-
-  const selectTab = (id) => {
-    setActiveTab(id);
-    writeString(ACTIVE_PROVIDER_KEY, id);
-    // The assistant's Default mode follows the analysis provider — tell it to
-    // re-read so its displayed provider/model updates live.
-    notifyProviderSettingsChanged();
-  };
-
-  const active = clients.find((c) => c.id === activeTab);
+  const { clients, clientsError, activeTab, active, selectTab } = useProviderTabsState(providerConfigs);
 
   return (
     <section className="panel settings-section">
@@ -94,34 +87,7 @@ export default function ProviderTabs({ providerConfigs }) {
         <SectionLabel marker="▶">{t('settings.analysisLabel')}</SectionLabel>
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label-row">
-            <span className="settings-label">{t('settings.aiProvider')}</span>
-            <HelpHint label={t('settings.aiProviderHelpAria')}>{PROVIDER_HINT}</HelpHint>
-          </span>
-          <span className="settings-description">{t('settings.providerRunsDesc')}</span>
-        </div>
-        <div className="settings-pill-group" role="tablist">
-          {clients.map((c) => {
-            const installed = c.installed !== false;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                role="tab"
-                aria-selected={c.id === activeTab}
-                aria-disabled={!installed}
-                title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
-                className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
-                onClick={() => selectTab(c.id)}
-              >
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <ProviderPillRow clients={clients} activeTab={activeTab} selectTab={selectTab} />
       {active && active.installed === false && (
         <div className="settings-row">
           <div className="settings-install-hint">

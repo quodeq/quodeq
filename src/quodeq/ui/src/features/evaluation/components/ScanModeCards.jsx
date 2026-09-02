@@ -2,18 +2,7 @@ import { useEffect } from 'react';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { t } from '../../../strings/index.js';
-import { readString, removeKey, writeString } from '../../../adapters/storage.js';
-
-const STORAGE_KEY = 'quodeq.cleanScan.permanent';
-
-function readPermanent() {
-  return readString(STORAGE_KEY) === '1';
-}
-
-function writePermanent(on) {
-  if (on) writeString(STORAGE_KEY, '1');
-  else removeKey(STORAGE_KEY);
-}
+import { readPermanent, writePermanent } from './scanModePersistence.js';
 
 function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
   // The explanation lives behind the app's "?" hint, top-right of the card.
@@ -44,6 +33,57 @@ function ModeCard({ id, checked, onPick, disabled, title, tag, children }) {
   );
 }
 
+// mode is one of: 'incremental' | 'clean' (the two radio cards) or
+// 'once' | 'permanent' (the clean-scan persistence sub-choice). Picking
+// clean defaults to one-shot; "always" is the explicit sub-choice.
+function makeHandlePick({ isClean, onChange, showToast }) {
+  return function handlePick(mode) {
+    if (mode === 'clean') {
+      if (isClean) return;
+      onChange('once');
+      // Auto-dismissing heads-up: switching to clean is easy to underestimate.
+      showToast(t('evaluate.cleanScanToast'));
+      return;
+    }
+    if (mode === 'incremental') {
+      writePermanent(false);
+      onChange('off');
+      return;
+    }
+    writePermanent(mode === 'permanent');
+    onChange(mode);
+  };
+}
+
+function PersistToggle({ value, onPick, disabled }) {
+  return (
+    <span className="eval-scan-mode__persist">
+      <span className="eval-scan-mode__persist-label">{t('evaluate.applyCleanTo')}</span>
+      <span className="eval-scan-mode__seg" role="group" aria-label={t('evaluate.cleanPersistAria')}>
+        <button
+          type="button"
+          className={`eval-scan-mode__seg-btn${value === 'once' ? ' eval-scan-mode__seg-btn--on' : ''}`}
+          onClick={() => onPick('once')}
+          disabled={disabled}
+          aria-pressed={value === 'once'}
+        >
+          {t('evaluate.thisScanOnly')}
+        </button>
+        <button
+          type="button"
+          className={`eval-scan-mode__seg-btn${value === 'permanent' ? ' eval-scan-mode__seg-btn--on' : ''}`}
+          onClick={() => onPick('permanent')}
+          disabled={disabled}
+          aria-pressed={value === 'permanent'}
+          title={t('evaluate.alwaysTitle')}
+        >
+          {t('evaluate.always')}
+        </button>
+      </span>
+    </span>
+  );
+}
+
 /**
  * Scan-mode radio cards: incremental vs clean scan. Same tri-state contract
  * as the old CleanScanToggle — `value` is 'off' | 'once' | 'permanent' —
@@ -64,63 +104,19 @@ export default function ScanModeCards({ value, onChange, disabled = false }) {
   }, []);
 
   const isClean = value !== 'off';
-
-  function pickIncremental() {
-    writePermanent(false);
-    onChange('off');
-  }
-  function pickClean() {
-    // Default to one-shot; "always" is the explicit sub-choice.
-    if (isClean) return;
-    onChange('once');
-    // Auto-dismissing heads-up: switching to clean is easy to underestimate.
-    showToast(t('evaluate.cleanScanToast'));
-  }
-  function pickOnce() {
-    writePermanent(false);
-    onChange('once');
-  }
-  function pickPermanent() {
-    writePermanent(true);
-    onChange('permanent');
-  }
+  const handlePick = makeHandlePick({ isClean, onChange, showToast });
 
   return (
     <div className="eval-scan-mode">
       <div className="eval-scan-mode__head">
         <span className="eval-scan-mode__label">{t('evaluate.scanModeLabel')}</span>
-        {isClean && (
-          <span className="eval-scan-mode__persist">
-            <span className="eval-scan-mode__persist-label">{t('evaluate.applyCleanTo')}</span>
-            <span className="eval-scan-mode__seg" role="group" aria-label={t('evaluate.cleanPersistAria')}>
-              <button
-                type="button"
-                className={`eval-scan-mode__seg-btn${value === 'once' ? ' eval-scan-mode__seg-btn--on' : ''}`}
-                onClick={pickOnce}
-                disabled={disabled}
-                aria-pressed={value === 'once'}
-              >
-                {t('evaluate.thisScanOnly')}
-              </button>
-              <button
-                type="button"
-                className={`eval-scan-mode__seg-btn${value === 'permanent' ? ' eval-scan-mode__seg-btn--on' : ''}`}
-                onClick={pickPermanent}
-                disabled={disabled}
-                aria-pressed={value === 'permanent'}
-                title={t('evaluate.alwaysTitle')}
-              >
-                {t('evaluate.always')}
-              </button>
-            </span>
-          </span>
-        )}
+        {isClean && <PersistToggle value={value} onPick={handlePick} disabled={disabled} />}
       </div>
       <div className="eval-scan-mode__grid">
-        <ModeCard id="incremental" checked={!isClean} onPick={pickIncremental} disabled={disabled} title={t('evaluate.incremental')} tag={t('evaluate.recommended')}>
+        <ModeCard id="incremental" checked={!isClean} onPick={() => handlePick('incremental')} disabled={disabled} title={t('evaluate.incremental')} tag={t('evaluate.recommended')}>
           {t('evaluate.incrementalDesc')}
         </ModeCard>
-        <ModeCard id="clean" checked={isClean} onPick={pickClean} disabled={disabled} title={t('evaluate.cleanScanTitle')} tag={t('evaluate.slow')}>
+        <ModeCard id="clean" checked={isClean} onPick={() => handlePick('clean')} disabled={disabled} title={t('evaluate.cleanScanTitle')} tag={t('evaluate.slow')}>
           {t('evaluate.cleanScanDesc')}
         </ModeCard>
       </div>

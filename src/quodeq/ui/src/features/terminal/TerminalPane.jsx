@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { terminalStatus } from '../../api/terminal.js';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useTerminalSessions } from './useTerminalSessions.js';
+import { useTerminalPaneStatus } from './hooks/useTerminalPaneStatus.js';
+import { TerminalTabStrip } from './components/TerminalTabStrip.jsx';
 import TerminalSessionView from './TerminalSessionView.jsx';
 import TerminalHeader from './TerminalHeader.jsx';
-import { LockIcon, PlusIcon, XIcon } from '../../components/CopyButton.jsx';
+import { LockIcon } from '../../components/CopyButton.jsx';
 import { t } from '../../strings/index.js';
 
 /**
@@ -15,20 +16,7 @@ import { t } from '../../strings/index.js';
  * panel — `active` only gates fitting/focus in the views.
  */
 export default function TerminalPane({ active }) {
-  const [reason, setReason] = useState(null);
-  const [checked, setChecked] = useState(false);
-  const [shell, setShell] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    terminalStatus().then((s) => {
-      if (!alive) return;
-      setReason(s.enabled ? null : s.reason);
-      setShell(s.shell || '');
-      setChecked(true);
-    }).catch(() => { if (alive) { setReason(t('terminal.unavailable')); setChecked(true); } });
-    return () => { alive = false; };
-  }, []);
+  const { reason, checked, shell } = useTerminalPaneStatus();
 
   const paneLive = checked && reason === null;
   const { sessions, activeId, max, openSession, closeSession, selectSession, reconcile } =
@@ -59,10 +47,6 @@ export default function TerminalPane({ active }) {
 
   const handleGone = useCallback(() => { reconcile(); }, [reconcile]);
 
-  const onTabKeyDown = (e, id) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSession(id); }
-  };
-
   if (!checked) return null;
   if (reason) {
     return <div className="tty-disabled" data-testid="tty-disabled">{reason}</div>;
@@ -76,28 +60,10 @@ export default function TerminalPane({ active }) {
     <div className="tty-shell">
       <TerminalHeader onCopy={handleCopy} onNewSession={showTabs ? null : openSession} />
       {showTabs && (
-        <div className="tty-tabs" role="tablist" aria-label={t('terminal.sessions')}>
-          {sessions.map((s) => (
-            <div key={s.id} role="tab" aria-selected={s.id === activeId} tabIndex={0}
-              className={`tty-tab${s.id === activeId ? ' tty-tab--active' : ''}`}
-              onClick={() => selectSession(s.id)}
-              onKeyDown={(e) => onTabKeyDown(e, s.id)}>
-              <span className="tty-tab-dot" aria-hidden="true" />
-              <span className="tty-tab-name">{s.name}</span>
-              <button type="button" className="tty-tab-close"
-                aria-label={`Close ${s.name}`} title={t('terminal.closeSession')}
-                onClick={(e) => { e.stopPropagation(); closeSession(s.id); }}>
-                <XIcon />
-              </button>
-            </div>
-          ))}
-          <button type="button" className="tty-tab-add" onClick={openSession}
-            disabled={sessions.length >= max}
-            aria-label={t('terminal.newSession')}
-            title={sessions.length >= max ? t('terminal.sessionLimit', { max }) : t('terminal.newSession')}>
-            <PlusIcon />
-          </button>
-        </div>
+        <TerminalTabStrip
+          sessions={sessions} activeId={activeId} max={max}
+          selectSession={selectSession} closeSession={closeSession} openSession={openSession}
+        />
       )}
       <div className="tty-views">
         {sessions.map((s) => (

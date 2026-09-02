@@ -4,35 +4,14 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
+import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
+import { orderDimensions } from './liveViolationsOrdering.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
 const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor']);
-
-function severityOrder(s) {
-  return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
-}
-
-/**
- * Track the most recent activity timestamp per dimension so we can sort
- * "latest active first". The ref persists across renders; we update it
- * whenever a dim's violation count changes.
- */
-function useDimensionActivity(liveViolations) {
-  const lastActivityRef = useRef({});
-  const prevCountsRef = useRef({});
-  const now = Date.now();
-  for (const [dim, vs] of Object.entries(liveViolations || {})) {
-    const len = (vs || []).length;
-    if (prevCountsRef.current[dim] !== len) {
-      prevCountsRef.current[dim] = len;
-      lastActivityRef.current[dim] = now;
-    }
-  }
-  return lastActivityRef.current;
-}
 
 function ViolationDetail({ v }) {
   return (
@@ -126,35 +105,11 @@ function DimensionGroup({ dim, violations, open, onToggle }) {
   );
 }
 
-export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0 }) {
-  // Per-dim activity timestamps power "latest active dimension on top".
-  const lastActivity = useDimensionActivity(liveViolations);
-
-  const isRunning = job?.status === 'running';
-  // Shares the progress query cache entry with the strip/progress — the hook
-  // adds no polling of its own. Only used for the streaming footer/header.
-  const { data: progress } = useEvaluationProgress(job?.jobId, !isRunning);
-  const runningDim = (progress?.dimensions || []).find((d) => d?.state === 'running');
-  const queued = runningDim?.files
-    ? Math.max(0, (runningDim.files.total ?? 0) - (runningDim.files.taken ?? 0))
-    : null;
-
-  const orderedDims = useMemo(() => {
-    return Object.entries(liveViolations ?? {})
-      .map(([dim, vs]) => ({
-        dim,
-        violations: [...(vs ?? [])].sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity)),
-      }))
-      .filter(({ violations }) => violations.length > 0)
-      .sort((a, b) => (lastActivity[b.dim] ?? 0) - (lastActivity[a.dim] ?? 0));
-    // lastActivity is a ref's current value — it's intentionally not in deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveViolations]);
-
-  // Single-open-at-a-time accordion. The topmost (most recently active) dim
-  // auto-expands; whenever the topmost changes — i.e. a new dimension starts
-  // producing violations — the previous one collapses and the new one opens.
-  // The user can still click any header to switch which one is open.
+// Single-open-at-a-time accordion. The topmost (most recently active) dim
+// auto-expands; whenever the topmost changes — i.e. a new dimension starts
+// producing violations — the previous one collapses and the new one opens.
+// The user can still click any header to switch which one is open.
+function useAutoOpenTopDim(orderedDims) {
   const [openDim, setOpenDim] = useState(null);
   const topDim = orderedDims[0]?.dim;
   const prevTopRef = useRef(null);
@@ -164,6 +119,78 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
       setOpenDim(topDim);
     }
   }, [topDim]);
+  return [openDim, setOpenDim];
+}
+
+function computeQueuedFiles(runningDim) {
+  return runningDim?.files
+    ? Math.max(0, (runningDim.files.total ?? 0) - (runningDim.files.taken ?? 0))
+    : null;
+}
+
+function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, isRunning, currentDimension }) {
+  return (
+    <div className="vlive-head">
+      <span className="vlive-head-left">
+        <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
+        <span className="vlive-counter">
+          {totalCount > 0
+            ? (orderedDimsCount === 1
+                ? t('evaluate.acrossDimsOne', { count: totalCount, dims: orderedDimsCount })
+                : t('evaluate.acrossDimsMany', { count: totalCount, dims: orderedDimsCount }))
+            : t('evaluate.noNewFindings')}
+          {hiddenCarriedCount > 0 && (
+            <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
+          )}
+          {isRunning && <> · {t('evaluate.streaming')}</>}
+        </span>
+      </span>
+      {isRunning && currentDimension && (
+        <span className="vlive-head-dim">{currentDimension}</span>
+      )}
+    </div>
+  );
+}
+
+function LiveViolationsCard({ orderedDims, openDim, setOpenDim, isRunning, queued }) {
+  return (
+    <div className="vlive-card">
+      {orderedDims.map(({ dim, violations }) => (
+        <DimensionGroup
+          key={dim}
+          dim={dim}
+          violations={violations}
+          open={openDim === dim}
+          onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
+        />
+      ))}
+      {isRunning && (
+        <div className="vlive-footer">
+          <span className="vlive-footer__dot" aria-hidden="true" />
+          {t('evaluate.scanningForMore')}{queued != null ? <> · {t('evaluate.filesQueued', { count: queued })}</> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function LiveViolationsFeed({ liveViolations, job = null, hiddenCarriedCount = 0 }) {
+  // Per-dim activity timestamps power "latest active dimension on top".
+  const lastActivity = useDimensionActivity(liveViolations);
+
+  const isRunning = job?.status === 'running';
+  // Shares the progress query cache entry with the strip/progress — the hook
+  // adds no polling of its own. Only used for the streaming footer/header.
+  const { data: progress } = useEvaluationProgress(job?.jobId, !isRunning);
+  const runningDim = (progress?.dimensions || []).find((d) => d?.state === 'running');
+  const queued = computeQueuedFiles(runningDim);
+
+  const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity),
+    // lastActivity is a ref's current value — it's intentionally not in deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveViolations]);
+
+  const [openDim, setOpenDim] = useAutoOpenTopDim(orderedDims);
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   // A fully-cached dimension yields zero NEW findings. Bailing out here
@@ -173,43 +200,15 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
 
   return (
     <div className="vlive-feed">
-      <div className="vlive-head">
-        <span className="vlive-head-left">
-          <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
-          <span className="vlive-counter">
-            {totalCount > 0
-              ? (orderedDims.length === 1
-                  ? t('evaluate.acrossDimsOne', { count: totalCount, dims: orderedDims.length })
-                  : t('evaluate.acrossDimsMany', { count: totalCount, dims: orderedDims.length }))
-              : t('evaluate.noNewFindings')}
-            {hiddenCarriedCount > 0 && (
-              <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
-            )}
-            {isRunning && <> · {t('evaluate.streaming')}</>}
-          </span>
-        </span>
-        {isRunning && progress?.currentDimension && (
-          <span className="vlive-head-dim">{progress.currentDimension}</span>
-        )}
-      </div>
+      <LiveViolationsHead
+        totalCount={totalCount}
+        orderedDimsCount={orderedDims.length}
+        hiddenCarriedCount={hiddenCarriedCount}
+        isRunning={isRunning}
+        currentDimension={progress?.currentDimension}
+      />
       {(totalCount > 0 || isRunning) && (
-        <div className="vlive-card">
-          {orderedDims.map(({ dim, violations }) => (
-            <DimensionGroup
-              key={dim}
-              dim={dim}
-              violations={violations}
-              open={openDim === dim}
-              onToggle={() => setOpenDim((cur) => (cur === dim ? null : dim))}
-            />
-          ))}
-          {isRunning && (
-            <div className="vlive-footer">
-              <span className="vlive-footer__dot" aria-hidden="true" />
-              {t('evaluate.scanningForMore')}{queued != null ? <> · {t('evaluate.filesQueued', { count: queued })}</> : null}
-            </div>
-          )}
-        </div>
+        <LiveViolationsCard orderedDims={orderedDims} openDim={openDim} setOpenDim={setOpenDim} isRunning={isRunning} queued={queued} />
       )}
     </div>
   );

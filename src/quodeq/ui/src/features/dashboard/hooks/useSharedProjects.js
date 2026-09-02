@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { useCoalescedRefresh } from './useCoalescedRefresh.js';
+import { useSharedActions } from './useSharedActions.js';
 
 /**
  * useSharedProjects — shared-repo status + project list for the merged
@@ -74,35 +75,15 @@ export function useSharedProjects() {
     enabled: configured,
   });
 
-  const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   // Overridden to true by a failed refresh() round (either the POST or the
   // re-list that follows it); reset on the next round's outcome. Combined
   // with the list envelope's own `stale` flag below -- either can make the
   // toolbar show "· stale".
   const [staleOverride, setStaleOverride] = useState(false);
 
-  // In-flight guards: aria-disabled on the triggering button does not stop
-  // a click in this codebase's convention (buttons stay clickable so their
-  // handlers can surface a snackbar/tooltip), and the Enter-key path on
-  // TermInput bypasses the button entirely. So double-submit protection has
-  // to live here, at the hook, rather than on any one caller's button.
-  // Refs (not state) because the guard must be readable synchronously on
-  // the very next call, before any state update triggered by this call has
-  // committed/re-rendered.
-  const connectingRef = useRef(false);
-  const pullingRef = useRef(false);
-
-  // --- refresh(): coalescing wrapper around one POST + re-list round -----
-  // runningRef marks a round actually in flight; pendingRef marks that
-  // at least one more caller arrived while it was running and must be
-  // satisfied by an EXTRA round once the current one settles; waitersRef
-  // holds those callers' resolvers so their returned promise only settles
-  // once the round they asked for has actually run.
-  const runningRef = useRef(false);
-  const pendingRef = useRef(false);
-  const waitersRef = useRef([]);
+  // connect()/pull(): lifted verbatim into useSharedActions (see that
+  // file's doc comment) -- same in-flight-ref idiom as usePublishTrigger.
+  const { connecting, connectError, connect, pull } = useSharedActions({ connectShared, pullSharedProject, queryClient });
 
   const refreshCore = useCallback(async () => {
     try {
@@ -123,32 +104,9 @@ export function useSharedProjects() {
     }
   }, [refreshShared, queryClient]);
 
-  const refresh = useCallback(() => {
-    if (runningRef.current) {
-      pendingRef.current = true;
-      return new Promise((resolve) => { waitersRef.current.push(resolve); });
-    }
-    runningRef.current = true;
-    setRefreshing(true);
-    return (async () => {
-      try {
-        await refreshCore();
-        // Coalesce: run exactly one more round for every batch of callers
-        // that arrived while the previous round was in flight, instead of
-        // one round per call.
-        while (pendingRef.current) {
-          pendingRef.current = false;
-          const waiters = waitersRef.current;
-          waitersRef.current = [];
-          await refreshCore();
-          waiters.forEach((resolve) => resolve());
-        }
-      } finally {
-        runningRef.current = false;
-        setRefreshing(false);
-      }
-    })();
-  }, [refreshCore]);
+  // refresh(): coalescing wrapper around one POST + re-list round -- lifted
+  // verbatim into useCoalescedRefresh (see that file's doc comment).
+  const { refreshing, refresh } = useCoalescedRefresh(refreshCore);
 
   // Background revalidate: fires once, the first time the cached list
   // lands successfully (never when unconfigured, since the list query
@@ -160,38 +118,6 @@ export function useSharedProjects() {
       refresh();
     }
   }, [listQuery.isSuccess, refresh]);
-
-  const connect = useCallback(async (nextUrl) => {
-    if (connectingRef.current) return; // already connecting -- ignore the repeat click/Enter
-    connectingRef.current = true;
-    setConnecting(true);
-    setConnectError(null);
-    try {
-      await connectShared(nextUrl);
-      // Invalidate everything "shared"-prefixed, not just status: a
-      // reconnect to a DIFFERENT url while already configured=true would
-      // otherwise never re-fetch the list (its `enabled` flag never
-      // toggles, since configured was already true before and after).
-      await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
-    } catch (err) {
-      setConnectError(apiErrorMessage(err, 'projects.connectFailed'));
-    } finally {
-      connectingRef.current = false;
-      setConnecting(false);
-    }
-  }, [connectShared, queryClient]);
-
-  const pull = useCallback(async (projectId, action) => {
-    if (pullingRef.current) return; // a pull is already in flight -- ignore the repeat click
-    pullingRef.current = true;
-    try {
-      const result = await pullSharedProject(projectId, action);
-      queryClient.invalidateQueries({ queryKey: sharedKeys.list() });
-      return result;
-    } finally {
-      pullingRef.current = false;
-    }
-  }, [pullSharedProject, queryClient]);
 
   const url = statusQuery.data?.url ?? null;
   // Gated on `configured`, not just read off listQuery.data: the list query

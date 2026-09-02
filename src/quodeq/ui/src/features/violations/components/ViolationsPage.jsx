@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
-import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
+import { useCallback, useMemo } from 'react';
 import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 import { TermHeader, SevBadge, FlagPill } from '../../../components/terminal/index.js';
-import { useDismissedFindings } from './useDismissedFindings.js';
-import EmptyState from '../../../components/EmptyState.jsx';
-import LoadingScreen from '../../../components/LoadingScreen.jsx';
-import ViolationsSkeleton from './ViolationsSkeleton.jsx';
+import { renderViolationsEmptyState } from './ViolationsEmptyStates.jsx';
+import { useViolationsPageState } from '../hooks/useViolationsPageState.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 
@@ -100,47 +96,6 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
-  const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
-  const setFileCurrentPath = (v) => {
-    writeCachedState('violations', selectedProject, { fileCurrentPath: v });
-    _setFileCurrentPath(v);
-  };
-
-  const [restoreError, setRestoreError] = useState(null);
-  // dismissRefreshKey is bumped by App.jsx after a dismiss POST elsewhere.
-  // useDismissedFindings refetches when this changes, so the dismissed
-  // sub-tab reflects new entries without needing the user to re-open the
-  // page or switch projects.
-  const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
-    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey, selectedSource, onReconcile);
-
-  const visibleDimensions = useMemo(() => {
-    const visibleSet = new Set(readVisibleStandardIds());
-    return accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-  }, [accumulatedDimensions]);
-
-  const summary = useMemo(() => computeSummaryFromDimensions(visibleDimensions), [visibleDimensions]);
-
-  const topFilesCount = useMemo(
-    () => new Set(visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)).size,
-    [visibleDimensions]
-  );
-
-  const uniquePrinciples = useMemo(
-    () => new Set(visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.principle)).filter(Boolean)).size,
-    [visibleDimensions]
-  );
-
-  return {
-    dismissed,
-    handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
-    restoreError, visibleDimensions,
-    summary, topFilesCount, uniquePrinciples,
-    fileCurrentPath, setFileCurrentPath,
-  };
-}
-
 function SevInline({ severity }) {
   const sev = severity || {};
   if (!(sev.critical || sev.major || sev.minor)) return null;
@@ -150,6 +105,38 @@ function SevInline({ severity }) {
       {sev.major > 0    && <SevBadge level="major" count={sev.major} />}
       {sev.minor > 0    && <SevBadge level="minor" count={sev.minor} />}
     </span>
+  );
+}
+
+function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePrinciples, selectedSource, activeSubTab, setActiveSubTab, dismissed }) {
+  const total = summary.totalViolations || 0;
+  const subParts = [
+    t('violations.subTotal', { count: total }),
+    visibleDimensions.length === 1
+      ? t('violations.subDim', { count: visibleDimensions.length })
+      : t('violations.subDims', { count: visibleDimensions.length }),
+    t('violations.subPrinciples', { count: uniquePrinciples }),
+    t('violations.subFiles', { count: topFilesCount }),
+  ];
+  const subLine = (
+    <span className="violations-sub">
+      <span className="violations-sub__text">{subParts.join(' · ')}</span>
+      <SevInline severity={summary.severity} />
+    </span>
+  );
+  return (
+    <div className="violations-page__top">
+      <TermHeader
+        name={t('violations.termName')}
+        sub={subLine}
+        badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+      />
+      <div className="violations-flag-row">
+        <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
+        <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
+        <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
+      </div>
+    </div>
   );
 }
 
@@ -201,173 +188,28 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   const activeSubTab = subTab;
   const setActiveSubTab = (v) => onSubTabChange?.(v);
 
-  // Fresh tab click (tabKey changed) drops the cached file-tree path so the
-  // user lands at the root. Round-tripping through a file detail does NOT
-  // change tabKey, so the cache survives unmount and the tree resumes where
-  // it was.
-  const lastTabKeyRef = useRef(tabKey);
-  if (lastTabKeyRef.current !== tabKey) {
-    resetCachedScope('violations', selectedProject);
-    lastTabKeyRef.current = tabKey;
-  }
-
-  const cached = readCachedState('violations', selectedProject, {
-    fileCurrentPath: '',
-  });
-
-  // Fires on every mount, including plain drill-down/back navigation with no
-  // mutation involved (the page remounts on every round trip) -- onRefresh
-  // MUST stay the lazy refreshDashboard (mark-stale only). Do not wire this
-  // to an active-refetching callback (e.g. scheduleDashboardReconcile); that
-  // turns routine navigation into a forced re-download of the dashboard
-  // payload. See App.jsx's ViolationsRoute for the onRefresh/onReconcile split.
-  useEffect(() => {
-    onRefresh?.();
-  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const {
     dismissed,
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
-  } = useViolationsData({
-    accumulatedDimensions,
-    selectedProject,
-    onRefresh,
-    onReconcile,
-    initialFilePath: cached.fileCurrentPath,
-    dismissRefreshKey,
-    selectedSource,
+  } = useViolationsPageState({ tabKey, selectedProject, onRefresh, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource });
+
+  const emptyState = renderViolationsEmptyState({
+    projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
+    accumulatedDimensions, loading, isFetching, error, projectName, onRetry,
   });
-
-  if (!projectsLoaded) return <LoadingScreen />;
-  // The LOCAL projects list can legitimately be empty while a teammate is
-  // viewing a shared project (they may have never added a local project of
-  // their own) -- gate this wall on the local list only for local selections,
-  // so a shared selection falls through to the normal shared data flow below.
-  if (projects.length === 0 && selectedSource !== 'shared') {
-    return (
-      <div className="violations-page violations-page--terminal">
-        <TermHeader name={t('violations.termName')} sub={t('violations.subNoProjects')} />
-        <EmptyState
-          title={t('overview.noProjectsTitle')}
-          description={t('overview.noProjectsDesc')}
-          actionLabel={t('overview.addProject')}
-          onAction={() => onNavigate?.('projects')}
-        />
-      </div>
-    );
-  }
-  if (!selectedProject) {
-    return (
-      <div className="violations-page violations-page--terminal">
-        <TermHeader name={t('violations.termName')} sub={t('violations.subNoProjectSelected')} />
-        <EmptyState
-          title={t('overview.noProjectSelectedTitle')}
-          description={t('violations.noProjectSelectedDesc')}
-          actionLabel={t('overview.chooseProject')}
-          onAction={() => onNavigate?.('projects')}
-        />
-      </div>
-    );
-  }
-  const hasAnyDimensionData = (accumulatedDimensions || []).length > 0;
+  if (emptyState) return emptyState;
   const isRefreshing = isFetching && !loading;
-  if (!hasAnyDimensionData) {
-    if (loading) {
-      return (
-        <div className="violations-page violations-page--terminal">
-          <TermHeader name={t('violations.termName')} sub={t('overview.loading')} />
-          <ViolationsSkeleton />
-        </div>
-      );
-    }
-    // A failed fetch with nothing to show must render as an error, not the
-    // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
-    // the user their existing evaluations are gone. While a retry is in
-    // flight (error still set, isFetching true), show the loader instead so
-    // clicking Retry visibly does something.
-    if (error) {
-      if (isFetching) {
-        return (
-          <div className="violations-page violations-page--terminal">
-            <TermHeader name={t('violations.termName')} sub={t('overview.loading')} />
-            <ViolationsSkeleton />
-          </div>
-        );
-      }
-      return (
-        <div className="violations-page violations-page--terminal">
-          <TermHeader name={t('violations.termName')} sub={t('violations.subError')} />
-          <EmptyState
-            title={t('overview.loadProjectFailedTitle')}
-            description={error}
-            actionLabel={t('overview.retry')}
-            onAction={() => onRetry?.()}
-          />
-        </div>
-      );
-    }
-    // Shared projects are read-only in the app -- evaluations only ever run
-    // locally, so "Start evaluation" has nowhere useful to send a
-    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
-    // precedent this mirrors).
-    if (selectedSource === 'shared') {
-      return (
-        <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-          <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
-          <EmptyState
-            title={t('overview.noCompletedEvalTitle')}
-            description={t('overview.noCompletedEvalSharedDesc')}
-          />
-        </div>
-      );
-    }
-    return (
-      <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-        <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
-        <EmptyState
-          title={t('overview.noEvalsTitle')}
-          description={t('overview.noEvalsDesc', { name: projectName || selectedProject })}
-          actionLabel={t('overview.startEvaluation')}
-          onAction={() => onNavigate?.('evaluate')}
-        />
-      </div>
-    );
-  }
-
-  const total = summary.totalViolations || 0;
-  const subParts = [
-    t('violations.subTotal', { count: total }),
-    visibleDimensions.length === 1
-      ? t('violations.subDim', { count: visibleDimensions.length })
-      : t('violations.subDims', { count: visibleDimensions.length }),
-    t('violations.subPrinciples', { count: uniquePrinciples }),
-    t('violations.subFiles', { count: topFilesCount }),
-  ];
-  const subLine = (
-    <span className="violations-sub">
-      <span className="violations-sub__text">{subParts.join(' · ')}</span>
-      <SevInline severity={summary.severity} />
-    </span>
-  );
 
   return (
     <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       {restoreError && <div className="error-banner">{restoreError}</div>}
-      <div className="violations-page__top">
-        <TermHeader
-          name={t('violations.termName')}
-          sub={subLine}
-          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
-        />
-        <div className="violations-flag-row">
-          <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
-          <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
-          <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
-        </div>
-      </div>
+      <ViolationsHeader
+        summary={summary} visibleDimensions={visibleDimensions} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples}
+        selectedSource={selectedSource} activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab} dismissed={dismissed}
+      />
       <ViolationsSubTabContent
         activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
         callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}

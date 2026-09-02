@@ -1,22 +1,16 @@
 import { memo, useMemo, useEffect } from 'react';
-import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
-import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
-import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
-import { usePrincipleData } from './explorerDataHooks.js';
+import { usePrincipleFiltering } from './principleFiltering.js';
+import { usePrincipleReportSpec } from './usePrincipleReportSpec.jsx';
+import { usePrincipleFixPlanSpec } from './usePrincipleFixPlanSpec.jsx';
 import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
 import DeferredMount from './DeferredMount.jsx';
 import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
-
-function filterTitleSuffix(filter) {
-  if (!filter || filter === 'all') return '';
-  return ` (${filter})`;
-}
 
 // Rows are virtualized (same VirtualList as FileDetailPage): a principle can
 // carry hundreds of findings, and each card runs pretext measurement layout
@@ -100,21 +94,6 @@ function PrincipleHeader({ data }) {
   );
 }
 
-function computeEvalPrincipleData(evalPrincipal) {
-  const { principleData, dimViolations = [], dimCompliance = [] } = evalPrincipal;
-  const violations = (principleData?.violations?.length > 0) ? principleData.violations : dimViolations;
-  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
-  const violationsBySeverity = {};
-  const sevCounts = { critical: 0, major: 0, minor: 0 };
-  for (const sev of EVAL_SEVERITY_ORDER) violationsBySeverity[sev] = [];
-  for (const v of violations) {
-    const sev = (v.severity || 'minor').toLowerCase();
-    if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
-    if (sevCounts[sev] !== undefined) sevCounts[sev]++;
-  }
-  return { violations, compliance, violationsBySeverity, sevCounts };
-}
-
 function PrincipleContext({ principleData }) {
   return (
     <>
@@ -128,149 +107,28 @@ function PrincipleContext({ principleData }) {
   );
 }
 
-function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
-  if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
-  const filtered = {};
-  for (const sev of Object.keys(filteredBySeverity)) {
-    filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
+function renderPrincipleItem(item, { principle, cardDismiss }) {
+  switch (item.kind) {
+    case 'sev-header':
+      return <SectionLabel>{item.sev.toUpperCase()} · {item.count}</SectionLabel>;
+    case 'compliance-header':
+      return <SectionLabel>{t('overview.statCompliance')} · {item.count}</SectionLabel>;
+    case 'violation':
+      return <EvalViolationCard v={item.v} principle={principle} index={item.idx} onDismiss={cardDismiss} />;
+    case 'compliance':
+      return <ComplianceCard c={item.c} principle={principle} index={item.idx} />;
+    default:
+      return null;
   }
-  return filtered;
 }
 
-function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
-  const { violations, compliance, violationsBySeverity } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
-
-  const {
-    liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
-    handleDismiss, dismissedSet,
-  } = usePrincipleData(evalPrincipal, severityFilter, onDismiss);
-
-  const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
-    const bySev = {};
-    for (const sev of Object.keys(violationsBySeverity)) {
-      bySev[sev] = (violationsBySeverity[sev] || []).filter(
-        (v) => !dismissedSet.has(`${v.file}:${v.line}`)
-      );
-    }
-    const allFiltered = Object.values(bySev).flat();
-    const counts = { critical: 0, major: 0, minor: 0 };
-    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
-    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
-  }, [violationsBySeverity, dismissedSet]);
-
-  const displayedBySeverity = useMemo(
-    () => filterBySeveritySelection(filteredBySeverity, activeSevFilter),
-    [filteredBySeverity, activeSevFilter]
-  );
-
-  return {
-    violations, compliance, violationsBySeverity,
-    liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
-    handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
-  };
-}
-
-const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
-  const { principleDescriptions } = useStandardDescriptions(dimension);
-  const principleDescription = principleDescriptions[principle] || '';
-
-  const {
-    compliance, liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
-    handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
-  } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
-
-  const reportSpec = useMemo(() => {
-    if (!principle) return null;
-    const buildMarkdown = () => buildPrincipleReport({
-      principle, dimension,
-      score: liveScore ?? score, grade: liveGrade ?? grade,
-      violations: filteredViolations,
-      compliance, principleData, runId,
-      severityFilter: activeSevFilter,
-    });
-    const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
-    return {
-      id: `report:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
-      type: 'report',
-      title: `${principle} report${filterTitleSuffix(activeSevFilter)}`,
-      render: () => <ReportContent markdown={buildMarkdown()} />,
-      copy: () => buildMarkdown(),
-      download: () => ({ filename: `principle-${slug}-report.md`, body: buildMarkdown() }),
-    };
-  }, [principle, dimension, runId, score, grade, liveScore, liveGrade, filteredViolations, compliance, principleData, activeSevFilter]);
-  useRegisterWindowSpec('report', reportSpec);
-
-  const fixPlanSpec = useMemo(() => {
-    if (!principle || filteredViolations.length === 0) return null;
-    const buildBySeverity = () => {
-      const bucket = {};
-      for (const sev of EVAL_SEVERITY_ORDER) {
-        bucket[sev] = filteredViolations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
-      }
-      return bucket;
-    };
-    const buildMarkdown = () => buildPrinciplePlanText(
-      principle,
-      filteredViolations,
-      buildBySeverity(),
-      principleData,
-      activeSevFilter,
-    );
-    const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
-    return {
-      id: `fixplan:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
-      type: 'fixplan',
-      title: `${principle} fix plan${filterTitleSuffix(activeSevFilter)}`,
-      render: () => <ReportContent markdown={buildMarkdown()} />,
-      copy: () => buildMarkdown(),
-      download: () => ({ filename: `principle-${slug}-fix-plan.md`, body: buildMarkdown() }),
-    };
-  }, [principle, dimension, runId, filteredViolations, principleData, activeSevFilter]);
-  useRegisterWindowSpec('fixplan', fixPlanSpec);
-
-  const items = useMemo(
-    () => buildListItems({ displayedBySeverity, compliance, activeSevFilter }),
-    [displayedBySeverity, compliance, activeSevFilter],
-  );
-
-  const scrollElement = useDashboardScrollElement();
-
-  // Snap to top whenever the filter changes so a giant list doesn't dump the
-  // user mid-scroll into a freshly-mounted virtualizer.
-  useEffect(() => {
-    if (scrollElement) scrollElement.scrollTop = 0;
-  }, [activeSevFilter, scrollElement]);
-
-  // Remount the virtualizer whenever the items collection changes shape so
-  // stale cached row heights can't misplace recycled rows.
-  const virtualKey = `${activeSevFilter ?? 'all'}-${filteredViolations.length}-${principle}`;
-
-  // handleDismiss (from usePrincipleData) is always a stable, callable
-  // no-op-safe function regardless of whether the caller passed a
-  // real onDismiss — that contract lets callers omit onDismiss without
-  // usePrincipleData throwing. But EvalViolationCard's dismiss button
-  // gates on *this* prop being truthy, so passing handleDismiss
-  // unconditionally would keep the button visible for shared projects
-  // (where App.jsx passes onDismiss={undefined}). Gate on the
-  // original onDismiss here so the button actually vanishes.
-  const cardDismiss = onDismiss ? handleDismiss : undefined;
-
-  const renderItem = (item) => {
-    switch (item.kind) {
-      case 'sev-header':
-        return <SectionLabel>{item.sev.toUpperCase()} · {item.count}</SectionLabel>;
-      case 'compliance-header':
-        return <SectionLabel>{t('overview.statCompliance')} · {item.count}</SectionLabel>;
-      case 'violation':
-        return <EvalViolationCard v={item.v} principle={principle} index={item.idx} onDismiss={cardDismiss} />;
-      case 'compliance':
-        return <ComplianceCard c={item.c} principle={principle} index={item.idx} />;
-      default:
-        return null;
-    }
-  };
-
+/** Header, context blurb, severity filter pills, and the deferred
+ * virtualized item list. */
+function PrincipleDetailBody({
+  principle, principleDescription, liveScore, score, liveGrade, grade, filteredViolations, compliance,
+  liveSevCounts, dateLabel, runId, principleData, activeSevFilter, setActiveSevFilter, items, virtualKey,
+  scrollElement, cardDismiss,
+}) {
   return (
     <>
       <PrincipleHeader
@@ -296,10 +154,59 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
           scrollElement={scrollElement}
           estimateSize={estimateItemSize(items)}
           getItemKey={itemKey(items)}
-          renderItem={renderItem}
+          renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
         />
       </DeferredMount>
     </>
+  );
+}
+
+const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
+  const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
+  const { principleDescriptions } = useStandardDescriptions(dimension);
+  const principleDescription = principleDescriptions[principle] || '';
+
+  const {
+    compliance, liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
+    handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
+  } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
+
+  usePrincipleReportSpec({
+    principle, dimension, runId, score, grade, liveScore, liveGrade,
+    filteredViolations, compliance, principleData, activeSevFilter,
+  });
+  usePrincipleFixPlanSpec({ principle, dimension, runId, filteredViolations, principleData, activeSevFilter });
+
+  const items = useMemo(
+    () => buildListItems({ displayedBySeverity, compliance, activeSevFilter }),
+    [displayedBySeverity, compliance, activeSevFilter],
+  );
+
+  const scrollElement = useDashboardScrollElement();
+
+  // Snap to top whenever the filter changes so a giant list doesn't dump the
+  // user mid-scroll into a freshly-mounted virtualizer.
+  useEffect(() => {
+    if (scrollElement) scrollElement.scrollTop = 0;
+  }, [activeSevFilter, scrollElement]);
+
+  // Remount the virtualizer whenever the items collection changes shape so
+  // stale cached row heights can't misplace recycled rows.
+  const virtualKey = `${activeSevFilter ?? 'all'}-${filteredViolations.length}-${principle}`;
+  // handleDismiss is always a stable no-op-safe function (usePrincipleData's
+  // contract), but EvalViolationCard's dismiss button gates on THIS prop
+  // being truthy — gate on the original onDismiss so shared projects
+  // (App.jsx passes onDismiss={undefined}) don't show a button that no-ops.
+  const cardDismiss = onDismiss ? handleDismiss : undefined;
+
+  return (
+    <PrincipleDetailBody
+      principle={principle} principleDescription={principleDescription} liveScore={liveScore} score={score}
+      liveGrade={liveGrade} grade={grade} filteredViolations={filteredViolations} compliance={compliance}
+      liveSevCounts={liveSevCounts} dateLabel={dateLabel} runId={runId} principleData={principleData}
+      activeSevFilter={activeSevFilter} setActiveSevFilter={setActiveSevFilter} items={items}
+      virtualKey={virtualKey} scrollElement={scrollElement} cardDismiss={cardDismiss}
+    />
   );
 });
 

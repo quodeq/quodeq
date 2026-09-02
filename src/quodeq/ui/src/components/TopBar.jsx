@@ -19,6 +19,8 @@ import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
 import ServerStatusDot from './ServerStatusDot.jsx';
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 import { TerminalLauncherButton } from './TerminalLauncherButton.jsx';
+import { TopBarProviderPill } from './TopBarProviderPill.jsx';
+import { TopBarRunChip, TopBarProgressHairline } from './TopBarRunChip.jsx';
 import { t } from '../strings/index.js';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
@@ -184,59 +186,9 @@ export default function TopBar({
         <TerminalLauncherButton />
         <span className="topbar-divider" aria-hidden="true" />
 
-        {(provider || model) && (
-          onProviderClick ? (
-            <button
-              type="button"
-              className="topbar-pill topbar-pill--button"
-              onClick={onProviderClick}
-              title={t('common.openSettingsForModel')}
-            >
-              {provider && model
-                ? (
-                  <>
-                    {/* Model at rest; the provider prefix pays for its label
-                        only under the cursor (5a — icon at rest, label on
-                        hover, expanding leftward so the primary never moves) */}
-                    <span className="topbar-btn__label topbar-btn__label--lead">{provider} ·</span>
-                    <span className="topbar-pill-muted">{model}</span>
-                  </>
-                )
-                : (
-                  <>
-                    {provider && <span>{provider}</span>}
-                    {model && <span className="topbar-pill-muted">{model}</span>}
-                  </>
-                )}
-            </button>
-          ) : (
-            <span className="topbar-pill">
-              {provider && <span>{provider}</span>}
-              {provider && model && <span className="topbar-pill-sep">·</span>}
-              {model && <span className="topbar-pill-muted">{model}</span>}
-            </span>
-          )
-        )}
+        <TopBarProviderPill provider={provider} model={model} onProviderClick={onProviderClick} />
 
-        {onEvaluate && evaluating && (
-          <button
-            type="button"
-            className="topbar-run-chip"
-            onClick={onEvaluate}
-            title={t('common.viewRunningEvaluation')}
-          >
-            <span className="topbar-run-chip__dot" aria-hidden="true" />
-            <span className="topbar-run-chip__dim">{runProgress?.dimension || 'evaluating…'}</span>
-            {runProgress?.percent != null && (
-              <>
-                <span className="topbar-run-chip__bar" aria-hidden="true">
-                  <span style={{ width: `${runProgress.percent}%` }} />
-                </span>
-                <span className="topbar-run-chip__pct">{runProgress.percent}%</span>
-              </>
-            )}
-          </button>
-        )}
+        <TopBarRunChip onEvaluate={onEvaluate} evaluating={evaluating} runProgress={runProgress} />
         {onEvaluate && (
           <button
             type="button"
@@ -264,13 +216,7 @@ export default function TopBar({
         )}
       </div>
 
-      {/* Run-aware chrome: a 2px hairline along the bar's bottom edge carries
-          overall progress, so a long run stays visible from any page. */}
-      {evaluating && runProgress?.percent != null && (
-        <span className="topbar-progress" aria-hidden="true">
-          <span style={{ width: `${runProgress.percent}%` }} />
-        </span>
-      )}
+      <TopBarProgressHairline evaluating={evaluating} runProgress={runProgress} />
     </header>
   );
 }

@@ -1,17 +1,61 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { MessageList } from './MessageList.jsx';
 import { CommandMenu } from './CommandMenu.jsx';
 import { AssistantWelcome } from './AssistantWelcome.jsx';
-import { buildMetaResponse, matchCommands, parseMetaCommand } from './commands.js';
 import { StopIcon } from '../../components/CopyButton.jsx';
 import { t } from '../../strings/index.js';
+import { useAssistantComposer } from './hooks/useAssistantComposer.js';
 
 function SendIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 19V5M5 12l7-7 7 7" />
     </svg>
+  );
+}
+
+function AssistantInputRow({
+  menuVisible, suggestions, menuIndex, acceptSuggestion, inputRef, draft,
+  handleChange, handleKeyDown, streaming, stopTurn, handleSend,
+}) {
+  return (
+    <div className="assistant-drawer-input-row">
+      {menuVisible && (
+        <CommandMenu suggestions={suggestions} selectedIndex={menuIndex} onPick={acceptSuggestion} />
+      )}
+      <div className="assistant-composer">
+        <span className="assistant-composer-slash" aria-hidden="true">/</span>
+        <textarea
+          ref={inputRef}
+          className="assistant-drawer-input"
+          placeholder={t('assistant.inputPlaceholder')}
+          value={draft}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          disabled={streaming}
+          rows={1}
+        />
+        {streaming ? (
+          <button type="button" className="assistant-send-btn assistant-stop-btn"
+            onClick={stopTurn}
+            aria-label={t('assistant.stopGenerating')} title={t('assistant.stopGenerating')}>
+            <StopIcon />
+          </button>
+        ) : (
+          <button type="button"
+            className={`assistant-send-btn${draft.trim() ? ' assistant-send-btn--ready' : ''}`}
+            onClick={handleSend}
+            disabled={!draft.trim()}
+            aria-label={t('assistant.send')} title={t('assistant.sendHint')}>
+            <SendIcon />
+          </button>
+        )}
+      </div>
+      <div className="assistant-composer-hint">
+        {t('assistant.inputHint')}
+      </div>
+    </div>
   );
 }
 
@@ -34,70 +78,10 @@ export function AssistantPane({ uiState, active = true }) {
     messages, streaming, error, sendMessage, stopTurn,
     catalog, addLocalExchange, resetConversation, readOnly,
   } = useAssistantDrawer();
-  const [draft, setDraft] = useState('');
-  const [menuIndex, setMenuIndex] = useState(0);
-  const [menuDismissed, setMenuDismissed] = useState(false);
-  const inputRef = useRef(null);
-
-  // Give the prompt keyboard focus when this pane becomes the frontmost tab
-  // (drawer open or tab switch) so the user can type immediately without
-  // clicking in. The parent flips display:none→flex in the same commit, so by
-  // the time this effect runs the textarea is laid out and focusable. Skip
-  // while streaming (the textarea is disabled then); refocus once it ends.
-  useEffect(() => {
-    if (active && !streaming) inputRef.current?.focus();
-  }, [active, streaming]);
-
-  // Auto-grow the composer with its content (capped in CSS via max-height).
-  // Keyed on draft so external prefills (welcome cards, slash rows) resize
-  // too, not only direct typing.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-  }, [draft]);
-
-  const suggestions = useMemo(
-    () => (streaming ? [] : matchCommands(catalog, draft, { readOnly })),
-    [catalog, draft, streaming, readOnly],
-  );
-  const menuVisible = suggestions.length > 0 && !menuDismissed;
-
-  const acceptSuggestion = useCallback((cmd) => {
-    setDraft(`/${cmd.name} `);
-    setMenuIndex(0);
-  }, []);
-
-  const handleSend = useCallback(() => {
-    const text = draft.trim();
-    if (!text || streaming) return;
-    const meta = parseMetaCommand(text);
-    if (meta === 'clear') { resetConversation(); setDraft(''); return; }
-    if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog, { readOnly })); setDraft(''); return; }
-    sendMessage(text, uiState);
-    setDraft('');
-  }, [draft, streaming, sendMessage, uiState, catalog, addLocalExchange, resetConversation, readOnly]);
-
-  const handleKeyDown = useCallback((event) => {
-    if (menuVisible) {
-      if (event.key === 'ArrowDown') { event.preventDefault(); setMenuIndex((i) => (i + 1) % suggestions.length); return; }
-      if (event.key === 'ArrowUp') { event.preventDefault(); setMenuIndex((i) => (i - 1 + suggestions.length) % suggestions.length); return; }
-      if (event.key === 'Escape') { event.preventDefault(); setMenuDismissed(true); return; }
-      if (event.key === 'Tab') { event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return; }
-      // Enter completes a partial prefix; once the draft IS the command it sends.
-      if (event.key === 'Enter' && !event.shiftKey && draft.trim() !== `/${suggestions[menuIndex].name}`) {
-        event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return;
-      }
-    }
-    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); }
-  }, [menuVisible, suggestions, menuIndex, draft, acceptSuggestion, handleSend]);
-
-  const handleChange = useCallback((event) => {
-    setDraft(event.target.value);
-    setMenuDismissed(false);
-    setMenuIndex(0);
-  }, []);
+  const {
+    draft, setDraft, inputRef, suggestions, menuIndex, menuVisible,
+    acceptSuggestion, handleSend, handleKeyDown, handleChange,
+  } = useAssistantComposer({ active, streaming, catalog, readOnly, uiState, sendMessage, resetConversation, addLocalExchange });
 
   return (
     <>
@@ -105,42 +89,11 @@ export function AssistantPane({ uiState, active = true }) {
         ? <AssistantWelcome catalog={catalog} view={uiState?.view} onPick={setDraft} readOnly={readOnly} />
         : <MessageList messages={messages} streaming={streaming} />}
       {error && <div className="assistant-drawer-error" role="alert">{error}</div>}
-      <div className="assistant-drawer-input-row">
-        {menuVisible && (
-          <CommandMenu suggestions={suggestions} selectedIndex={menuIndex} onPick={acceptSuggestion} />
-        )}
-        <div className="assistant-composer">
-          <span className="assistant-composer-slash" aria-hidden="true">/</span>
-          <textarea
-            ref={inputRef}
-            className="assistant-drawer-input"
-            placeholder={t('assistant.inputPlaceholder')}
-            value={draft}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            disabled={streaming}
-            rows={1}
-          />
-          {streaming ? (
-            <button type="button" className="assistant-send-btn assistant-stop-btn"
-              onClick={stopTurn}
-              aria-label={t('assistant.stopGenerating')} title={t('assistant.stopGenerating')}>
-              <StopIcon />
-            </button>
-          ) : (
-            <button type="button"
-              className={`assistant-send-btn${draft.trim() ? ' assistant-send-btn--ready' : ''}`}
-              onClick={handleSend}
-              disabled={!draft.trim()}
-              aria-label={t('assistant.send')} title={t('assistant.sendHint')}>
-              <SendIcon />
-            </button>
-          )}
-        </div>
-        <div className="assistant-composer-hint">
-          {t('assistant.inputHint')}
-        </div>
-      </div>
+      <AssistantInputRow
+        menuVisible={menuVisible} suggestions={suggestions} menuIndex={menuIndex} acceptSuggestion={acceptSuggestion}
+        inputRef={inputRef} draft={draft} handleChange={handleChange} handleKeyDown={handleKeyDown}
+        streaming={streaming} stopTurn={stopTurn} handleSend={handleSend}
+      />
     </>
   );
 }

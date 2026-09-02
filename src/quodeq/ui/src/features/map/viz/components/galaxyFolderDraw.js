@@ -72,6 +72,113 @@ export function drawConstellationLines(ctx, activeScene, tc, w2s) {
 }
 
 /**
+ * Draw a folder star's nebula, texture blobs, and dashed cluster border.
+ * Mutates `s._clusterHitR` (the hit-test radius the click handler reads).
+ */
+function drawFolderNebula(ctx, s, sc, sr, cam, t, curFly, i) {
+  const { r: cr, g: cg, b: cb } = s.col;
+  const zoomed = cam.z > 2;
+  const isFlying = curFly && !curFly.reverse && !curFly.swapped && curFly.dimStarIdx === i;
+  const nebulaFade = isFlying ? Math.max(0, 1 - (curFly.t / 0.35)) : 1;
+
+  const nebulaR = zoomed
+    ? (s.radius + 40) * cam.z * 0.4
+    : sr * 5;
+  const nebulaA = (zoomed ? Math.min(1, (cam.z - 2) / 3) * 0.35 : 0.08) * nebulaFade;
+  const nebulaGrad = ctx.createRadialGradient(sc.x, sc.y, 0, sc.x, sc.y, nebulaR);
+  nebulaGrad.addColorStop(0, `rgba(${cr},${cg},${cb},${nebulaA})`);
+  nebulaGrad.addColorStop(0.5, `rgba(${cr},${cg},${cb},${nebulaA * 0.5})`);
+  nebulaGrad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+  ctx.beginPath(); ctx.arc(sc.x, sc.y, nebulaR, 0, TAU);
+  ctx.fillStyle = nebulaGrad; ctx.fill();
+
+  // Animated texture blobs
+  const blobA = (zoomed ? Math.min(0.18, (cam.z - 2) / 15) : 0.025) * nebulaFade;
+  for (let bi = 0; bi < 3; bi++) {
+    const ba = t * 0.01 + bi * TAU / 3;
+    const bx = sc.x + Math.cos(ba) * nebulaR * 0.3;
+    const by = sc.y + Math.sin(ba) * nebulaR * 0.3;
+    const br = nebulaR * (0.4 + 0.1 * Math.sin(t * 0.02 + bi * 2));
+    const blobGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    blobGrad.addColorStop(0, `rgba(${cr},${cg},${cb},${blobA})`);
+    blobGrad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU);
+    ctx.fillStyle = blobGrad; ctx.fill();
+  }
+
+  // Dashed circle border
+  const borderR = sr * 3.5;
+  ctx.beginPath(); ctx.arc(sc.x, sc.y, borderR, 0, TAU);
+  ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.1 * nebulaFade})`;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 12]); ctx.stroke(); ctx.setLineDash([]);
+  s._clusterHitR = borderR;
+
+  if (!zoomed) {
+    ctx.beginPath(); ctx.arc(sc.x, sc.y, sr * 2.2, 0, TAU);
+    ctx.strokeStyle = rgba(s.col, 0.12); ctx.lineWidth = 0.8; ctx.stroke();
+  }
+}
+
+/** Draw a star's own violation/alert particles (both folders and files). */
+function drawFileParticles(ctx, s, sc, cam, t) {
+  if (s.particles.length === 0) return;
+  const pScale = cam.z * 0.5;
+  drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
+}
+
+/** Labeled violation orbs around a file star, shown only at high zoom. */
+function drawLabeledOrbs(ctx, s, sc, cam, t, showLabels) {
+  if (s.isFolder || cam.z <= 2.5 || s.particles.length === 0) return;
+  const vAlpha = Math.min(1, (cam.z - 2.5) / 2);
+  const vScale = cam.z * 0.06;
+  s.particles.forEach(p => {
+    const a = t * p.os + p.op;
+    const px = sc.x + Math.cos(a) * p.or * p.ec * vScale;
+    const py = sc.y + Math.sin(a) * p.or * vScale;
+    const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
+    const psr = p.sz * vScale * 0.5;
+    if (psr > 1.5) {
+      drawGlow(ctx, { x: px, y: py, r: psr, col: p.col, alpha: vAlpha * tw });
+      if (showLabels && psr > 3) {
+        const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
+        ctx.font = `500 ${Math.max(7, Math.min(11, psr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;
+        ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, 0.85 * vAlpha);
+        ctx.fillText(sevName, px, py - psr - 4);
+      }
+    }
+  });
+}
+
+/** Collect this star's label-placement info (or null), for the collision pass in drawLabels. */
+function collectStarLabel(s, sc, sr, cam, showLabels) {
+  if (!showLabels || sr <= 1) return null;
+  const fs = Math.min(cam.z, 1.5);
+  const shortName = s.name.includes('/') ? s.name.split('/')[0] : s.name;
+  const label = s.isFolder ? shortName : s.name;
+  const fontSize = Math.max(9, 11 * fs);
+  const lw = label.length * fontSize * 0.55;
+  const lh = fontSize + 4;
+  const lx = sc.x;
+  const ly = sc.y - sr - 14 * fs;
+  const importance = (s.isFolder ? 1000 : 0) + (s.violations || 0) + (s.radius || 0);
+  return { s, sc, sr, fs, label, fontSize, lx, ly, lw, lh, importance, col: s.col };
+}
+
+/** Hit-test this star against the mouse position (idle only — no anim/fly in progress). */
+function hitTestStar(s, i, sc, sr, animRef, fly, mx, my) {
+  if (animRef.current || fly || mx < 0) return null;
+  const dx = mx - sc.x, dy = my - sc.y;
+  const d2 = dx * dx + dy * dy;
+  const clusterR = s.isFolder && s._clusterHitR > 0 ? s._clusterHitR : 0;
+  const starHitR = Math.max(sr * 2, 14);
+  if (d2 < starHitR * starHitR || (clusterR > 0 && d2 < clusterR * clusterR)) {
+    return { type: s.isFolder ? 'folder' : 'file', starIdx: i, data: s };
+  }
+  return null;
+}
+
+/**
  * Draw all stars and collect label/hit-test info. Returns { pendingLabels, newHovered }.
  */
 export function drawStars(ctx, activeScene, params) {
@@ -87,114 +194,21 @@ export function drawStars(ctx, activeScene, params) {
     const sr = s.radius * pulse * cam.z * 0.5;
 
     const curFly = flyRef.current;
-    const isFocusedFolder = s.isFolder && (
-      (focusedFolderRef.current && focusedFolderRef.current.starIdx === i) ||
-      (curFly && !curFly.reverse && !curFly.swapped && curFly.dimStarIdx === i)
-    );
     const dimThreshold = 30;
     const starAlpha = s.isFolder && sr > dimThreshold
       ? Math.max(0.15, 1 - (sr - dimThreshold) / 80)
       : 1;
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: starAlpha });
 
-    // Folder stars: nebula + cluster detail
-    if (s.isFolder) {
-      const { r: cr, g: cg, b: cb } = s.col;
-      const zoomed = cam.z > 2;
-      const isFlying = curFly && !curFly.reverse && !curFly.swapped && curFly.dimStarIdx === i;
-      const nebulaFade = isFlying ? Math.max(0, 1 - (curFly.t / 0.35)) : 1;
+    if (s.isFolder) drawFolderNebula(ctx, s, sc, sr, cam, t, curFly, i);
+    drawFileParticles(ctx, s, sc, cam, t);
+    drawLabeledOrbs(ctx, s, sc, cam, t, showLabels);
 
-      const nebulaR = zoomed
-        ? (s.radius + 40) * cam.z * 0.4
-        : sr * 5;
-      const nebulaA = (zoomed ? Math.min(1, (cam.z - 2) / 3) * 0.35 : 0.08) * nebulaFade;
-      const nebulaGrad = ctx.createRadialGradient(sc.x, sc.y, 0, sc.x, sc.y, nebulaR);
-      nebulaGrad.addColorStop(0, `rgba(${cr},${cg},${cb},${nebulaA})`);
-      nebulaGrad.addColorStop(0.5, `rgba(${cr},${cg},${cb},${nebulaA * 0.5})`);
-      nebulaGrad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-      ctx.beginPath(); ctx.arc(sc.x, sc.y, nebulaR, 0, TAU);
-      ctx.fillStyle = nebulaGrad; ctx.fill();
+    const label = collectStarLabel(s, sc, sr, cam, showLabels);
+    if (label) pendingLabels.push(label);
 
-      // Animated texture blobs
-      const blobA = (zoomed ? Math.min(0.18, (cam.z - 2) / 15) : 0.025) * nebulaFade;
-      for (let bi = 0; bi < 3; bi++) {
-        const ba = t * 0.01 + bi * TAU / 3;
-        const bx = sc.x + Math.cos(ba) * nebulaR * 0.3;
-        const by = sc.y + Math.sin(ba) * nebulaR * 0.3;
-        const br = nebulaR * (0.4 + 0.1 * Math.sin(t * 0.02 + bi * 2));
-        const blobGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
-        blobGrad.addColorStop(0, `rgba(${cr},${cg},${cb},${blobA})`);
-        blobGrad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-        ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU);
-        ctx.fillStyle = blobGrad; ctx.fill();
-      }
-
-      // Dashed circle border
-      const borderR = sr * 3.5;
-      ctx.beginPath(); ctx.arc(sc.x, sc.y, borderR, 0, TAU);
-      ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.1 * nebulaFade})`;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 12]); ctx.stroke(); ctx.setLineDash([]);
-      s._clusterHitR = borderR;
-
-      if (!zoomed) {
-        ctx.beginPath(); ctx.arc(sc.x, sc.y, sr * 2.2, 0, TAU);
-        ctx.strokeStyle = rgba(s.col, 0.12); ctx.lineWidth = 0.8; ctx.stroke();
-      }
-    }
-
-    // File particles
-    if (s.particles.length > 0) {
-      const pScale = cam.z * 0.5;
-      drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
-    }
-
-    // Labeled violation orbs at high zoom
-    if (!s.isFolder && cam.z > 2.5 && s.particles.length > 0) {
-      const vAlpha = Math.min(1, (cam.z - 2.5) / 2);
-      const vScale = cam.z * 0.06;
-      s.particles.forEach(p => {
-        const a = t * p.os + p.op;
-        const px = sc.x + Math.cos(a) * p.or * p.ec * vScale;
-        const py = sc.y + Math.sin(a) * p.or * vScale;
-        const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
-        const psr = p.sz * vScale * 0.5;
-        if (psr > 1.5) {
-          drawGlow(ctx, { x: px, y: py, r: psr, col: p.col, alpha: vAlpha * tw });
-          if (showLabels && psr > 3) {
-            const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
-            ctx.font = `500 ${Math.max(7, Math.min(11, psr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;
-            ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, 0.85 * vAlpha);
-            ctx.fillText(sevName, px, py - psr - 4);
-          }
-        }
-      });
-    }
-
-    // Collect label info
-    if (showLabels && sr > 1) {
-      const fs = Math.min(cam.z, 1.5);
-      const shortName = s.name.includes('/') ? s.name.split('/')[0] : s.name;
-      const label = s.isFolder ? shortName : s.name;
-      const fontSize = Math.max(9, 11 * fs);
-      const lw = label.length * fontSize * 0.55;
-      const lh = fontSize + 4;
-      const lx = sc.x;
-      const ly = sc.y - sr - 14 * fs;
-      const importance = (s.isFolder ? 1000 : 0) + (s.violations || 0) + (s.radius || 0);
-      pendingLabels.push({ s, sc, sr, fs, label, fontSize, lx, ly, lw, lh, importance, col: s.col });
-    }
-
-    // Hit testing
-    if (!animRef.current && !fly && mx >= 0) {
-      const dx = mx - sc.x, dy = my - sc.y;
-      const d2 = dx * dx + dy * dy;
-      const clusterR = s.isFolder && s._clusterHitR > 0 ? s._clusterHitR : 0;
-      const starHitR = Math.max(sr * 2, 14);
-      if (d2 < starHitR * starHitR || (clusterR > 0 && d2 < clusterR * clusterR)) {
-        newHovered = { type: s.isFolder ? 'folder' : 'file', starIdx: i, data: s };
-      }
-    }
+    const hovered = hitTestStar(s, i, sc, sr, animRef, fly, mx, my);
+    if (hovered) newHovered = hovered;
   });
 
   return { pendingLabels, newHovered };
