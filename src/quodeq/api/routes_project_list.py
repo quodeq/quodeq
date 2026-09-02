@@ -65,17 +65,18 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         """Return all projects with optional ``?limit=N&offset=M`` pagination."""
         result = provider.list_projects(reports_dir())
         projects = result.get("projects", [])
-        # Self-healing warm-up: anything still pending goes (back) on the
-        # queue before pagination, so unpolled pages heal too.
-        for entry in projects:
-            if getattr(entry, "summary_pending", False):
-                warmup_engine.enqueue(entry.id)
         offset = request.args.get("offset", 0, type=int)
         limit = request.args.get("limit", 0, type=int)
         if offset > 0:
             projects = projects[offset:]
         if limit > 0:
             projects = projects[:limit]
+        # Self-healing warm-up: anything still pending on the page being
+        # returned goes (back) on the queue, bounding this to page size
+        # instead of the full project count.
+        for entry in projects:
+            if getattr(entry, "summary_pending", False):
+                warmup_engine.enqueue(entry.id)
         # Serialize at the boundary: providers hand back ProjectEntry
         # entities (or already-serialized dicts from remote providers).
         wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
