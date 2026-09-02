@@ -11,6 +11,31 @@ import { t } from '../../strings/index.js';
  * pill, and the window controls (copy / maximize / hide) that used to live
  * in the shared drawer header.
  */
+function TerminalPanelControls({ copied, handleCopy, maximized, toggleMaximized, closeActiveTab }) {
+  return (
+    <div className="tty-panel-controls">
+      <button type="button" className={`assistant-drawer-btn${copied ? ' tty-copy-btn--done' : ''}`}
+        onClick={handleCopy}
+        aria-label={t('terminal.copyOutput')}
+        title={copied ? t('common.copiedShort') : t('terminal.copySelection')}>
+        <CopyIcon />
+      </button>
+      <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
+        aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
+        aria-pressed={maximized}
+        title={maximized ? 'Restore' : 'Maximize'}>
+        {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
+      </button>
+      {/* Chevron-down, NOT an ×: the shell keeps running server-side;
+          reopening the tab reattaches to it. */}
+      <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
+        aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
+        <ChevronDownIcon />
+      </button>
+    </div>
+  );
+}
+
 export default function TerminalHeader({ onCopy, onNewSession }) {
   const { maximized, toggleMaximized, closeActiveTab, openPanels } = useAssistantDrawer();
   const [copied, setCopied] = useState(false);
@@ -42,26 +67,7 @@ export default function TerminalHeader({ onCopy, onNewSession }) {
           <PlusIcon />
         </button>
       )}
-      <div className="tty-panel-controls">
-        <button type="button" className={`assistant-drawer-btn${copied ? ' tty-copy-btn--done' : ''}`}
-          onClick={handleCopy}
-          aria-label={t('terminal.copyOutput')}
-          title={copied ? t('common.copiedShort') : t('terminal.copySelection')}>
-          <CopyIcon />
-        </button>
-        <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-          aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
-          aria-pressed={maximized}
-          title={maximized ? 'Restore' : 'Maximize'}>
-          {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
-        </button>
-        {/* Chevron-down, NOT an ×: the shell keeps running server-side;
-            reopening the tab reattaches to it. */}
-        <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-          aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
-          <ChevronDownIcon />
-        </button>
-      </div>
+      <TerminalPanelControls copied={copied} handleCopy={handleCopy} maximized={maximized} toggleMaximized={toggleMaximized} closeActiveTab={closeActiveTab} />
     </header>
   );
 }
