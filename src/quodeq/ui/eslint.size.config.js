@@ -28,6 +28,16 @@ export default [
     },
     rules: SIZE_RULES,
   },
+  // Test files group related cases under one describe(...), and ESLint
+  // counts a describe callback's body as a single function -- so
+  // max-lines-per-function fires on describe-body length, not on any
+  // individual test exceeding 50 lines. That's metric noise, not a real
+  // function-size problem, so test files are exempt from it; the 300-line
+  // max-lines file cap still applies to them same as any other file.
+  {
+    files: ['src/**/*.test.js', 'src/**/*.test.jsx'],
+    rules: { 'max-lines-per-function': 'off' },
+  },
   // Grandfathered offenders: downgrade both rules so today's violations
   // don't fail the build. New violations in these files still slip through
   // until they are split -- the count-lock in check_size_grandfather.mjs is

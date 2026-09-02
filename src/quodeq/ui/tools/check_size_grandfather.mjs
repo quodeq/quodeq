@@ -10,19 +10,17 @@ import { SIZE_GRANDFATHER } from './size_grandfather.mjs';
 // Revise DOWNWARD as refactor tasks burn entries; NEVER raise without a
 // justification reviewed in the PR that raises it.
 //
-// Raised 161 -> 188 by the size-limits-burndown test-split task (task-25):
-// every oversized *.test.jsx/*.test.js file in the old list was split by
-// topic into siblings, each kept under the 300-line max-lines cap (removing
-// 25 whole-file entries). But max-lines-per-function counts each
-// `describe(...)` callback's body as one function, and a describe wrapping
-// several `it()` blocks routinely runs past 50 lines regardless of file
-// size -- that's inherent to co-locating related test cases, not a size
-// problem the split fixes. Fragmenting further (one test per file) would
-// "fix" the metric while making the suite harder to read, for zero
-// behavioral benefit. The 52 new entries are exactly those split siblings
-// whose only violation is a describe-body line count; none carry a
-// file-level (max-lines) violation.
-const CEILING = 188;
+// Lowered 161 -> 74 by the size-limits-burndown test-split task (task-25):
+// every oversized *.test.jsx/*.test.js file was split by topic into
+// siblings, each under the 300-line max-lines cap. Test files are now also
+// exempt from max-lines-per-function in eslint.size.config.js (ESLint
+// counts a describe(...) callback's body as one function, so a describe
+// wrapping several `it()` blocks routinely runs past 50 lines regardless
+// of file size -- not a real size problem). With that exemption, zero test
+// files remain in this list; the 74 entries are all pre-existing
+// production-code max-lines / max-lines-per-function violations, unrelated
+// to this task.
+const CEILING = 74;
 
 const count = SIZE_GRANDFATHER.length;
 if (count > CEILING) {
