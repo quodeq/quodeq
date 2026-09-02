@@ -136,43 +136,16 @@ function FollowToggle({ active, onToggle }) {
   );
 }
 
-export default function ConsoleLogViewer({ logs }) {
-  const scrollRef = useRef(null);
-  const contentRef = useRef(null);
-  const [follow, setFollow] = useState(true);
-  const followRef = useRef(true);
-  const lastLogCount = useRef(0);
-  const lastScrollHeight = useRef(0);
-  const programmaticScroll = useRef(false);
-
-  const cleanedLogs = useMemo(
-    () => dedupeConsecutive((logs ?? []).map(cleanLine)),
-    [logs],
-  );
-
-  useEffect(() => { followRef.current = follow; }, [follow]);
-
-  const scrollToBottom = useCallback(() => {
+// Resize alone never fires `scroll`, so adding a side-pane window or
+// dragging a divider would shrink clientHeight and silently leave the
+// user above the bottom — even with follow=true — until the next log
+// line. Watch BOTH the scroller (clientHeight changes) and its inner
+// content (scrollHeight changes from late `content-visibility` re-measures
+// and from new lines settling in) and re-snap on size changes.
+function makeScrollWatcherEffect({ scrollRef, contentRef, followRef, programmaticScroll, lastScrollHeight, setFollow }) {
+  return () => {
     const el = scrollRef.current;
-    if (!el) return;
-    if (hasActiveSelectionInside(el)) return;
-    programmaticScroll.current = true;
-    el.scrollTop = el.scrollHeight;
-    lastScrollHeight.current = el.scrollHeight;
-    requestAnimationFrame(() => { programmaticScroll.current = false; });
-  }, []);
-
-  useEffect(() => {
-    const count = cleanedLogs.length;
-    if (count !== lastLogCount.current) {
-      lastLogCount.current = count;
-      if (follow) scrollToBottom();
-    }
-  }, [cleanedLogs.length, follow, scrollToBottom]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const onScroll = () => {
       if (programmaticScroll.current) return;
       const grew = el.scrollHeight > lastScrollHeight.current;
@@ -193,12 +166,6 @@ export default function ConsoleLogViewer({ logs }) {
       setFollow((prev) => (prev === atBottom ? prev : atBottom));
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    // Resize alone never fires `scroll`, so adding a side-pane window or
-    // dragging a divider would shrink clientHeight and silently leave the
-    // user above the bottom — even with follow=true — until the next log
-    // line. Watch BOTH the scroller (clientHeight changes) and its inner
-    // content (scrollHeight changes from late `content-visibility` re-measures
-    // and from new lines settling in) and re-snap on size changes.
     const snap = () => {
       if (!followRef.current) return;
       if (hasActiveSelectionInside(el)) return;
@@ -214,7 +181,41 @@ export default function ConsoleLogViewer({ logs }) {
       el.removeEventListener('scroll', onScroll);
       ro?.disconnect();
     };
+  };
+}
+
+function useConsoleAutoScroll(logCount) {
+  const scrollRef = useRef(null);
+  const contentRef = useRef(null);
+  const [follow, setFollow] = useState(true);
+  const followRef = useRef(true);
+  const lastLogCount = useRef(0);
+  const lastScrollHeight = useRef(0);
+  const programmaticScroll = useRef(false);
+
+  useEffect(() => { followRef.current = follow; }, [follow]);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (hasActiveSelectionInside(el)) return;
+    programmaticScroll.current = true;
+    el.scrollTop = el.scrollHeight;
+    lastScrollHeight.current = el.scrollHeight;
+    requestAnimationFrame(() => { programmaticScroll.current = false; });
   }, []);
+
+  useEffect(() => {
+    if (logCount !== lastLogCount.current) {
+      lastLogCount.current = logCount;
+      if (follow) scrollToBottom();
+    }
+  }, [logCount, follow, scrollToBottom]);
+
+  useEffect(
+    makeScrollWatcherEffect({ scrollRef, contentRef, followRef, programmaticScroll, lastScrollHeight, setFollow }),
+    [],
+  );
 
   const handleToggle = useCallback(() => {
     setFollow((prev) => {
@@ -223,6 +224,16 @@ export default function ConsoleLogViewer({ logs }) {
       return next;
     });
   }, [scrollToBottom]);
+
+  return { scrollRef, contentRef, follow, handleToggle };
+}
+
+export default function ConsoleLogViewer({ logs }) {
+  const cleanedLogs = useMemo(
+    () => dedupeConsecutive((logs ?? []).map(cleanLine)),
+    [logs],
+  );
+  const { scrollRef, contentRef, follow, handleToggle } = useConsoleAutoScroll(cleanedLogs.length);
 
   return (
     <div className="console-shell">

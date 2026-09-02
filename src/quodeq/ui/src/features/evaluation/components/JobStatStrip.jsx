@@ -26,6 +26,26 @@ function sumSuppressed(progress) {
   return (progress?.dimensions || []).reduce((n, d) => n + (d?.suppressed || 0), 0);
 }
 
+// Current throughput from the persisted sliding window (null → "estimating…"
+// until ~30s of samples accumulate). No whole-run average: it over-reads
+// because the parallel start burst-completes cached files cheaply.
+function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount }) {
+  if (!jobId) return [];
+  const { takenFiles, totalFiles, overallPct } = computeOverallProgress(progress);
+  const liveCount = sumLiveViolations(liveViolations);
+  const rate = isTerminal ? null : computeRate(getRateSamples(jobId));
+  const etaHint = isTerminal ? null : buildEtaHint({ rate, takenFiles, totalFiles });
+  const suppressedCount = sumSuppressed(progress);
+  return buildJobStatCells(job.status, {
+    overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
+    carriedCount: hiddenCarriedCount,
+    exitReason: job.exitReason,
+    dimCycle: buildDimensionCycle(progress),
+    sevCounts: sumSeverities(liveViolations),
+    scanMode: deriveScanMode(progress),
+  });
+}
+
 export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0 }) {
   const jobId = job?.jobId;
   const isTerminal = TERMINAL_STATES.has(job?.status);
@@ -48,26 +68,11 @@ export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount =
     recordRateSample(jobId, Date.now(), takenFiles);
   }, [dataUpdatedAt, isTerminal, progress, jobId]);
 
-  const cells = useMemo(() => {
-    if (!jobId) return [];
-    const { takenFiles, totalFiles, overallPct } = computeOverallProgress(progress);
-    const liveCount = sumLiveViolations(liveViolations);
-    // Current throughput from the persisted sliding window (null → "estimating…"
-    // until ~30s of samples accumulate). No whole-run average: it over-reads
-    // because the parallel start burst-completes cached files cheaply.
-    const rate = isTerminal ? null : computeRate(getRateSamples(jobId));
-    const etaHint = isTerminal ? null : buildEtaHint({ rate, takenFiles, totalFiles });
-    const suppressedCount = sumSuppressed(progress);
-    return buildJobStatCells(job.status, {
-      overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
-      carriedCount: hiddenCarriedCount,
-      exitReason: job.exitReason,
-      dimCycle: buildDimensionCycle(progress),
-      sevCounts: sumSeverities(liveViolations),
-      scanMode: deriveScanMode(progress),
-    });
+  const cells = useMemo(
+    () => computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount }),
     // `elapsedS` advances once per second via useRunElapsed; the sample store is read (not a dep).
-  }, [jobId, job?.status, job?.exitReason, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS]);
+    [jobId, job?.status, job?.exitReason, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS],
+  );
 
   if (!jobId) return null;
 
