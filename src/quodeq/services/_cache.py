@@ -146,6 +146,42 @@ def _fetch_and_store(
     return data
 
 
+def _get_run_dimensions(
+    run_id: str, reports_root: Path, project: str, version: str, ctx: _CacheContext,
+) -> list[DimensionResult]:
+    key = (reports_root, project, run_id, version)
+
+    cached = _cache_lookup(key, ctx)
+    if cached is not None:
+        if not _cached_entry_is_stale(reports_root, project, run_id, cached):
+            return cached
+        with ctx.lock:
+            ctx.cache.pop(key, None)
+
+    if _run_is_in_progress(reports_root, project, run_id):
+        return _fetch_dimensions_from_disk(
+            reports_root, project, run_id, ctx.get_reader(),
+        )
+
+    with ctx.lock:
+        if key in ctx.cache:
+            ctx.cache.move_to_end(key)
+            return ctx.cache[key]
+        existing = ctx.inflight.get(key)
+        if existing is not None:
+            wait_event = existing
+        else:
+            wait_event = None
+            ctx.inflight[key] = threading.Event()
+
+    if wait_event is not None:
+        return _wait_for_inflight(key, wait_event, ctx)
+
+    return _fetch_and_store(
+        key, reports_root, project, run_id, ctx,
+    )
+
+
 def make_lru_dimension_fetcher(
     reports_root: Path,
     project: str,
@@ -181,36 +217,6 @@ def make_lru_dimension_fetcher(
     ctx = _CacheContext(cache=cache, lock=lock, max_size=max_size, reader=reader)
 
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
-        key = (reports_root, project, run_id, version)
-
-        cached = _cache_lookup(key, ctx)
-        if cached is not None:
-            if not _cached_entry_is_stale(reports_root, project, run_id, cached):
-                return cached
-            with ctx.lock:
-                ctx.cache.pop(key, None)
-
-        if _run_is_in_progress(reports_root, project, run_id):
-            return _fetch_dimensions_from_disk(
-                reports_root, project, run_id, ctx.get_reader(),
-            )
-
-        with ctx.lock:
-            if key in ctx.cache:
-                ctx.cache.move_to_end(key)
-                return ctx.cache[key]
-            existing = ctx.inflight.get(key)
-            if existing is not None:
-                wait_event = existing
-            else:
-                wait_event = None
-                ctx.inflight[key] = threading.Event()
-
-        if wait_event is not None:
-            return _wait_for_inflight(key, wait_event, ctx)
-
-        return _fetch_and_store(
-            key, reports_root, project, run_id, ctx,
-        )
+        return _get_run_dimensions(run_id, reports_root, project, version, ctx)
 
     return get_run_dimensions
