@@ -1,82 +1,103 @@
 import { buildFolderScene } from './galaxyFolderScene.js';
 
 /**
+ * Fly-out (back navigation): shrink out of the current scene, then swap to
+ * the parent scene atomically at `swapAt` and grow the bloom in. The swap
+ * (clearing zoom/focus refs, installing the new scene, resetting the
+ * camera) happens in one place so nothing can observe a half-swapped state.
+ */
+function advanceFlyOut(fly, cam, refs, params) {
+  const { W, H, saveNav } = params;
+  const gt = fly.t;
+  const tFz = fly._targetFz || 1;
+  let sceneAlpha = 1;
+  let bloomAlpha = 0;
+
+  const swapAt = 0.4;
+  if (gt < swapAt) {
+    const p = gt / swapAt;
+    cam.z = fly.sz * (1 - p * 0.7);
+    sceneAlpha = 1 - p * 0.8;
+  }
+  if (gt >= swapAt && !fly.swapped) {
+    fly.swapped = true;
+    refs.zoomedFileRef.current = null;
+    refs.focusedFolderRef.current = null;
+    refs.navRef.current = { path: [...fly.newPath] };
+    refs.sceneRef.current = refs.nextSceneRef.current;
+    refs.sceneRef.current._node = fly.newPath[fly.newPath.length - 1];
+    refs.nextSceneRef.current = null;
+    refs.frameCount.current = 0;
+    cam.x = W / 2; cam.y = H / 2; cam.z = tFz * 6;
+    saveNav();
+  }
+  if (gt >= swapAt) {
+    const p = (gt - swapAt) / (1 - swapAt);
+    const pe = 1 - (1 - p) * (1 - p);
+    cam.z = tFz * 6 + (tFz - tFz * 6) * pe;
+    sceneAlpha = 0;
+    bloomAlpha = 0.2 + 0.8 * pe;
+  }
+
+  return { sceneAlpha, bloomAlpha };
+}
+
+/**
+ * Fly-in (enter folder): zoom into the clicked star, then swap to its child
+ * scene atomically at `swapAt` and shrink the bloom out. The swap happens in
+ * one place, same as advanceFlyOut.
+ */
+function advanceFlyIn(fly, cam, refs, params) {
+  const { W, H, saveNav } = params;
+  const gt = fly.t;
+  const tFz = fly._targetFz || 1;
+  let sceneAlpha = 1;
+  let bloomAlpha = 0;
+
+  const swapAt = 0.35;
+  if (gt < swapAt) {
+    const p = gt / swapAt;
+    const pe = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    cam.x = fly.sx + (fly.starX - fly.sx) * pe;
+    cam.y = fly.sy + (fly.starY - fly.sy) * pe;
+    cam.z = fly.sz + (fly.sz * 4 - fly.sz) * pe;
+    sceneAlpha = 1 - pe * 0.85;
+  }
+  if (gt >= swapAt && !fly.swapped) {
+    fly.swapped = true;
+    refs.zoomedFileRef.current = null;
+    refs.navRef.current = { path: [...fly.newPath] };
+    refs.sceneRef.current = refs.nextSceneRef.current;
+    refs.sceneRef.current._node = fly.targetNode || fly.newPath[fly.newPath.length - 1];
+    refs.nextSceneRef.current = null;
+    refs.frameCount.current = 0;
+    cam.x = W / 2; cam.y = H / 2; cam.z = tFz * 0.3;
+    saveNav();
+  }
+  if (gt >= swapAt) {
+    const p = (gt - swapAt) / (1 - swapAt);
+    const pe = 1 - Math.pow(1 - p, 3);
+    cam.z = tFz * 0.3 + (tFz - tFz * 0.3) * pe;
+    sceneAlpha = 0;
+    bloomAlpha = 0.15 + 0.85 * pe;
+  }
+
+  return { sceneAlpha, bloomAlpha };
+}
+
+/**
  * Advance the fly-into/fly-out transition state.
  * Mutates fly, cam, and various refs. Returns { sceneAlpha, bloomAlpha }.
  */
 export function advanceFlyTransition(fly, cam, refs, params) {
-  const { W, H, FLY_DURATION, getFitZoom, saveNav } = params;
-  let sceneAlpha = 1;
-  let bloomAlpha = 0;
-
+  const { FLY_DURATION, getFitZoom } = params;
   fly.t = Math.min(1, fly.t + 0.016 / FLY_DURATION);
-  const gt = fly.t;
-  const ease = gt < 0.5 ? 2 * gt * gt : 1 - Math.pow(-2 * gt + 2, 2) / 2;
-
   if (!fly._targetFz) {
     fly._targetFz = getFitZoom(refs.nextSceneRef.current);
   }
-  const tFz = fly._targetFz || 1;
-
-  if (fly.reverse) {
-    // --- FLY-OUT (back navigation) ---
-    const swapAt = 0.4;
-    if (gt < swapAt) {
-      const p = gt / swapAt;
-      cam.z = fly.sz * (1 - p * 0.7);
-      sceneAlpha = 1 - p * 0.8;
-    }
-    if (gt >= swapAt && !fly.swapped) {
-      fly.swapped = true;
-      refs.zoomedFileRef.current = null;
-      refs.focusedFolderRef.current = null;
-      refs.navRef.current = { path: [...fly.newPath] };
-      refs.sceneRef.current = refs.nextSceneRef.current;
-      refs.sceneRef.current._node = fly.newPath[fly.newPath.length - 1];
-      refs.nextSceneRef.current = null;
-      refs.frameCount.current = 0;
-      cam.x = W / 2; cam.y = H / 2; cam.z = tFz * 6;
-      saveNav();
-    }
-    if (gt >= swapAt) {
-      const p = (gt - swapAt) / (1 - swapAt);
-      const pe = 1 - (1 - p) * (1 - p);
-      cam.z = tFz * 6 + (tFz - tFz * 6) * pe;
-      sceneAlpha = 0;
-      bloomAlpha = 0.2 + 0.8 * pe;
-    }
-  } else {
-    // --- FLY-IN (enter folder) ---
-    const swapAt = 0.35;
-    if (gt < swapAt) {
-      const p = gt / swapAt;
-      const pe = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-      cam.x = fly.sx + (fly.starX - fly.sx) * pe;
-      cam.y = fly.sy + (fly.starY - fly.sy) * pe;
-      cam.z = fly.sz + (fly.sz * 4 - fly.sz) * pe;
-      sceneAlpha = 1 - pe * 0.85;
-    }
-    if (gt >= swapAt && !fly.swapped) {
-      fly.swapped = true;
-      refs.zoomedFileRef.current = null;
-      refs.navRef.current = { path: [...fly.newPath] };
-      refs.sceneRef.current = refs.nextSceneRef.current;
-      refs.sceneRef.current._node = fly.targetNode || fly.newPath[fly.newPath.length - 1];
-      refs.nextSceneRef.current = null;
-      refs.frameCount.current = 0;
-      cam.x = W / 2; cam.y = H / 2; cam.z = tFz * 0.3;
-      saveNav();
-    }
-    if (gt >= swapAt) {
-      const p = (gt - swapAt) / (1 - swapAt);
-      const pe = 1 - Math.pow(1 - p, 3);
-      cam.z = tFz * 0.3 + (tFz - tFz * 0.3) * pe;
-      sceneAlpha = 0;
-      bloomAlpha = 0.15 + 0.85 * pe;
-    }
-  }
-
-  return { sceneAlpha, bloomAlpha };
+  return fly.reverse
+    ? advanceFlyOut(fly, cam, refs, params)
+    : advanceFlyIn(fly, cam, refs, params);
 }
 
 /**

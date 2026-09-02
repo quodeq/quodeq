@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`galaxyFolderDraw smoke coverage (pre-refactor baseline) > drawStars records the ctx-call sequence for a folder + file star (order-preserving refactor guard) > folder-plus-file-star-ctx-calls 1`] = `
+exports[`galaxyFolderDraw drawStars (pre-refactor baseline) > records the ctx-call sequence for a folder + file star (order-preserving refactor guard) > folder-plus-file-star-ctx-calls 1`] = `
 [
   "createRadialGradient",
   "beginPath",

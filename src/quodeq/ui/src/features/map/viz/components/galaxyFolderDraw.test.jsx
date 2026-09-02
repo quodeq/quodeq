@@ -105,7 +105,28 @@ describe('galaxyFolderDraw smoke coverage (pre-refactor baseline)', () => {
     expect(calls.length).toBeGreaterThan(0);
   });
 
-  it('drawStars records the ctx-call sequence for a folder + file star (order-preserving refactor guard)', () => {
+  it('drawLabels does not throw for collected labels', () => {
+    const ctx = makeMockCtx(calls);
+    const tc = { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } };
+    const folder = makeFolderStar();
+    const label = {
+      s: folder, sc: { x: 400, y: 300 }, sr: 20, fs: 1, label: 'src',
+      fontSize: 11, lx: 400, ly: 260, lw: 40, lh: 15, importance: 1003, col: folder.col,
+    };
+    expect(() => drawLabels(ctx, [label], tc)).not.toThrow();
+    expect(calls).toContain('fillText');
+  });
+});
+
+describe('galaxyFolderDraw drawStars (pre-refactor baseline)', () => {
+  let calls;
+
+  beforeEach(() => {
+    calls = [];
+    vi.clearAllMocks();
+  });
+
+  it('records the ctx-call sequence for a folder + file star (order-preserving refactor guard)', () => {
     const ctx = makeMockCtx(calls);
     const scene = makeScene();
     const tc = { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } };
@@ -120,7 +141,7 @@ describe('galaxyFolderDraw smoke coverage (pre-refactor baseline)', () => {
     expect(calls).toMatchSnapshot('folder-plus-file-star-ctx-calls');
   });
 
-  it('drawStars hit-tests the star under the mouse when idle', () => {
+  it('hit-tests the star under the mouse when idle', () => {
     const ctx = makeMockCtx(calls);
     const scene = makeScene();
     const tc = { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } };
@@ -131,17 +152,5 @@ describe('galaxyFolderDraw smoke coverage (pre-refactor baseline)', () => {
     });
     expect(newHovered).not.toBeNull();
     expect(newHovered.type).toBe('folder');
-  });
-
-  it('drawLabels does not throw for collected labels', () => {
-    const ctx = makeMockCtx(calls);
-    const tc = { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } };
-    const folder = makeFolderStar();
-    const label = {
-      s: folder, sc: { x: 400, y: 300 }, sr: 20, fs: 1, label: 'src',
-      fontSize: 11, lx: 400, ly: 260, lw: 40, lh: 15, importance: 1003, col: folder.col,
-    };
-    expect(() => drawLabels(ctx, [label], tc)).not.toThrow();
-    expect(calls).toContain('fillText');
   });
 });

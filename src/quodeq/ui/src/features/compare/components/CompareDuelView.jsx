@@ -15,11 +15,12 @@ import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import CompareDuelTrend from './CompareDuelTrend.jsx';
-import CompareRadar from './CompareRadar.jsx';
+import CompareDuelDimensionsTable from './CompareDuelDimensionsTable.jsx';
+import CompareDuelShapePanel from './CompareDuelShapePanel.jsx';
+import CompareDuelPrinciples from './CompareDuelPrinciples.jsx';
+import { gapClass, score1, signed1 } from './compareDuelShared.jsx';
 
 const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
-const signed1 = (g) => (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1));
 
 /* One half of the versus header: identity-coloured name, grade-coloured
    score, and the side's vitals. */
@@ -56,42 +57,52 @@ function VersusSide({ side, row, onOpenProject }) {
   );
 }
 
-function gapClass(gap) {
-  if (gap == null || gap === 0) return 'compare-duel__gap--even';
-  return gap > 0 ? 'compare-duel__gap--a' : 'compare-duel__gap--b';
-}
-
-/** Mirrored score bars growing from a shared centre line. */
-function DuelBars({ a, b }) {
+function DuelTrendPanel({ trend, a, b, onOpenProject }) {
+  const trendPoints = trend.a.length + trend.b.length;
   return (
-    <span className="compare-duel__bars" aria-hidden="true">
-      <span className="compare-duel__barLane compare-duel__barLane--a">
-        {a != null && (
-          <span className="compare-duel__bar compare-duel__bar--a" style={{ width: `${a * 10}%` }} />
-        )}
-      </span>
-      <span className="compare-duel__barLane compare-duel__barLane--b">
-        {b != null && (
-          <span className="compare-duel__bar compare-duel__bar--b" style={{ width: `${b * 10}%` }} />
-        )}
-      </span>
-    </span>
+    <section className="compare-panel" aria-label={t('compare.duelTrendAria')}>
+      <div className="compare-panel__head">
+        <SectionLabel>{t('compare.duelTrendHeader')}</SectionLabel>
+        <span className="compare-panel__note">{t('compare.duelTrendNote')}</span>
+      </div>
+      {trendPoints >= 2 ? (
+        <>
+          <CompareDuelTrend a={trend.a} b={trend.b} />
+          <div className="compare-radar__legend">
+            <button
+              type="button"
+              className="compare-duel__legendItem compare-duel__legendItem--a"
+              onClick={() => onOpenProject(a.id)}
+            >
+              {a.name}
+            </button>
+            <button
+              type="button"
+              className="compare-duel__legendItem compare-duel__legendItem--b"
+              onClick={() => onOpenProject(b.id)}
+            >
+              {b.name}
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="compare-panel__fallback">{t('compare.duelTrendTooFew')}</p>
+      )}
+    </section>
   );
 }
 
-export default function CompareDuelView({ duel, onOpenProject }) {
-  const { a, b } = duel;
-  const gapHint = duel.gap == null
-    ? ''
-    : duel.gap === 0
-      ? t('compare.duelEven')
-      : t('compare.duelLeads', {
-        name: duel.gap > 0 ? a.name : b.name,
-        gap: Math.abs(duel.gap).toFixed(1),
-      });
-  const trendPoints = duel.trend.a.length + duel.trend.b.length;
-  const sharedDims = duel.dimensions.filter((d) => d.shared);
+function duelGapHint(duel, a, b) {
+  if (duel.gap == null) return '';
+  if (duel.gap === 0) return t('compare.duelEven');
+  return t('compare.duelLeads', {
+    name: duel.gap > 0 ? a.name : b.name,
+    gap: Math.abs(duel.gap).toFixed(1),
+  });
+}
 
+/** Title + the versus header: both sides' vitals with the gap between them. */
+function CompareDuelHeader({ duel, a, b, onOpenProject }) {
   return (
     <>
       <div className="compare-page__top">
@@ -112,10 +123,21 @@ export default function CompareDuelView({ duel, onOpenProject }) {
           <span className={`compare-versus__gapValue ${gapClass(duel.gap)}`}>
             {duel.gap != null ? signed1(duel.gap) : '—'}
           </span>
-          <span className="compare-versus__gapHint">{gapHint}</span>
+          <span className="compare-versus__gapHint">{duelGapHint(duel, a, b)}</span>
         </div>
         <VersusSide side="b" row={b} onOpenProject={onOpenProject} />
       </div>
+    </>
+  );
+}
+
+export default function CompareDuelView({ duel, onOpenProject }) {
+  const { a, b } = duel;
+  const sharedDims = duel.dimensions.filter((d) => d.shared);
+
+  return (
+    <>
+      <CompareDuelHeader duel={duel} a={a} b={b} onOpenProject={onOpenProject} />
 
       {!duel.ready ? (
         <section className="compare-panel" aria-label={t('compare.duelAria')}>
@@ -123,138 +145,14 @@ export default function CompareDuelView({ duel, onOpenProject }) {
         </section>
       ) : (
         <>
-          <section className="compare-panel" aria-label={t('compare.duelDimsAria')}>
-            <div className="compare-panel__head">
-              <SectionLabel>{t('compare.dimensionsHeader', { count: duel.dimensions.length })}</SectionLabel>
-              <span className="compare-panel__note">{t('compare.duelDimsNote')}</span>
-            </div>
-            <ul className="compare-duel-dims">
-              {duel.dimensions.map((d) => (
-                <li key={d.key} className="compare-duel-dims__row">
-                  <span className="compare-duel-dims__label">{d.label}</span>
-                  <span className={`compare-duel-dims__score ${scoreColorClass(d.a)}`}>{score1(d.a)}</span>
-                  <DuelBars a={d.a} b={d.b} />
-                  <span className={`compare-duel-dims__score ${scoreColorClass(d.b)}`}>{score1(d.b)}</span>
-                  <span className={`compare-duel__gap ${gapClass(d.gap)}`}>
-                    {d.gap != null ? signed1(d.gap) : '—'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <CompareDuelDimensionsTable dimensions={duel.dimensions} />
 
           <div className="compare-lower compare-lower--duel">
-            <section className="compare-panel" aria-label={t('compare.duelShapeAria')}>
-              <div className="compare-panel__head">
-                <SectionLabel>{t('compare.duelShapeHeader')}</SectionLabel>
-                <span className="compare-panel__note">{t('compare.duelShapeNote')}</span>
-              </div>
-              {sharedDims.length >= 3 ? (
-                <>
-                  <CompareRadar
-                    axes={sharedDims.map((d) => ({ label: d.label, value: null }))}
-                    series={[
-                      { values: sharedDims.map((d) => d.a), variant: 'duelA' },
-                      { values: sharedDims.map((d) => d.b), variant: 'duelB' },
-                    ]}
-                  />
-                  <div className="compare-radar__legend">
-                    <span className="compare-duel__legendItem compare-duel__legendItem--a">{a.name}</span>
-                    <span className="compare-duel__legendItem compare-duel__legendItem--b">{b.name}</span>
-                  </div>
-                </>
-              ) : (
-                <p className="compare-panel__fallback">{t('compare.radialTooFew')}</p>
-              )}
-            </section>
-
-            <section className="compare-panel" aria-label={t('compare.duelTrendAria')}>
-              <div className="compare-panel__head">
-                <SectionLabel>{t('compare.duelTrendHeader')}</SectionLabel>
-                <span className="compare-panel__note">{t('compare.duelTrendNote')}</span>
-              </div>
-              {trendPoints >= 2 ? (
-                <>
-                  <CompareDuelTrend a={duel.trend.a} b={duel.trend.b} />
-                  <div className="compare-radar__legend">
-                    <button
-                      type="button"
-                      className="compare-duel__legendItem compare-duel__legendItem--a"
-                      onClick={() => onOpenProject(a.id)}
-                    >
-                      {a.name}
-                    </button>
-                    <button
-                      type="button"
-                      className="compare-duel__legendItem compare-duel__legendItem--b"
-                      onClick={() => onOpenProject(b.id)}
-                    >
-                      {b.name}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="compare-panel__fallback">{t('compare.duelTrendTooFew')}</p>
-              )}
-            </section>
+            <CompareDuelShapePanel sharedDims={sharedDims} a={a} b={b} />
+            <DuelTrendPanel trend={duel.trend} a={a} b={b} onOpenProject={onOpenProject} />
           </div>
 
-          <section className="compare-panel" aria-label={t('compare.duelPrinciplesAria')}>
-            <div className="compare-panel__head">
-              <SectionLabel>
-                {t('compare.duelPrinciplesHeader', {
-                  count: duel.principles.reduce((n, g) => n + g.items.length, 0),
-                })}
-              </SectionLabel>
-              <span className="compare-panel__note">{t('compare.duelPrinciplesNote')}</span>
-            </div>
-            {duel.principles.length ? (
-              <div className="compare-duel-principles">
-                {duel.principles.map((group) => {
-                  // The group IS a dimension: repeat its two scores and gap
-                  // in the heading so the diff reads without scrolling back
-                  // up to the dimensions table.
-                  const dim = duel.dimensions.find((d) => d.key === group.key);
-                  return (
-                  <article key={group.key} className="compare-duel-principles__group">
-                    <h3 className="compare-duel-principles__dim">
-                      <span className="compare-duel-principles__dimLabel">{group.label}</span>
-                      {dim && (
-                        /* Legend-style side swatches (the same dash language
-                           the charts' legends use) tie each number to its
-                           side without repeating the row bars up here. */
-                        <span className="compare-duel-principles__dimScores">
-                          <span className="compare-duel-principles__side compare-duel-principles__side--a" aria-hidden="true" />
-                          <span className={scoreColorClass(dim.a)}>{score1(dim.a)}</span>
-                          <span className="compare-duel-principles__side compare-duel-principles__side--b" aria-hidden="true" />
-                          <span className={scoreColorClass(dim.b)}>{score1(dim.b)}</span>
-                          <span className={`compare-duel__gap ${gapClass(dim.gap)}`}>
-                            {dim.gap != null ? signed1(dim.gap) : '—'}
-                          </span>
-                        </span>
-                      )}
-                    </h3>
-                    <ul className="compare-duel-principles__list">
-                      {group.items.map((p) => (
-                        <li key={p.key} className="compare-duel-principles__row">
-                          <span className="compare-duel-principles__label">{p.label}</span>
-                          <span className={`compare-duel-principles__score ${scoreColorClass(p.a)}`}>{score1(p.a)}</span>
-                          <DuelBars a={p.a} b={p.b} />
-                          <span className={`compare-duel-principles__score ${scoreColorClass(p.b)}`}>{score1(p.b)}</span>
-                          <span className={`compare-duel__gap ${gapClass(p.gap)}`}>
-                            {p.gap != null ? signed1(p.gap) : '—'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="compare-panel__fallback">{t('compare.duelNoShared')}</p>
-            )}
-          </section>
+          <CompareDuelPrinciples principles={duel.principles} dimensions={duel.dimensions} />
         </>
       )}
     </>

@@ -1,5 +1,9 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { collapseCrumbs, isRunDateEntry } from './crumbModel.js';
+import { useBreadcrumbDismiss } from './useBreadcrumbDismiss.js';
+import { useHoldToOpen } from './useHoldToOpen.js';
+import NavBreadcrumbEllipsisMenu from './NavBreadcrumbEllipsisMenu.jsx';
+import NavBreadcrumbSegmentMenu from './NavBreadcrumbSegmentMenu.jsx';
 import { t } from '../../../strings/index.js';
 
 const PAGE_LABELS = {
@@ -45,10 +49,67 @@ export function labelFor(entry) {
   }
 }
 
-// How long a pointer must stay down on an earlier segment before the
-// sibling menu opens instead of navigating (mirrors browser back-button
-// press-and-hold).
-const HOLD_TO_OPEN_MS = 450;
+/** Build the crumb list: project root (if any) + one entry per stack level. */
+function buildCrumbs(stack, projectName) {
+  const crumbs = [];
+  if (projectName) crumbs.push({ label: projectName, index: -1, isProject: true });
+  stack.forEach((entry, i) => crumbs.push({
+    label: labelFor(entry),
+    index: i,
+    entry,
+    isRunDate: isRunDateEntry(entry),
+  }));
+  return crumbs;
+}
+
+/** One rendered segment: the ellipsis chip, a sibling-menu segment, or a
+ * plain (possibly clickable) crumb. */
+function BreadcrumbSegment({ seg, sep, isLast, siblingsFor, openKey, setOpenKey, goTo, onGoTo, holder, onSelectProject }) {
+  if (seg.ellipsis) {
+    return (
+      <NavBreadcrumbEllipsisMenu
+        seg={seg} sep={sep} open={openKey === 'ellipsis'} setOpenKey={setOpenKey} goTo={goTo}
+      />
+    );
+  }
+
+  const siblings = seg.entry && siblingsFor ? siblingsFor(seg.entry, seg.index) : null;
+  const hasMenu = Array.isArray(siblings) && siblings.length > 1;
+  const crumbClass = `nav-breadcrumb__crumb${isLast ? ' is-current' : ''}${
+    seg.isProject ? ' nav-breadcrumb__crumb--project' : ''
+  }${hasMenu ? ' nav-breadcrumb__crumb--menu' : ''}`;
+
+  if (hasMenu) {
+    const menuKey = `seg-${seg.index}`;
+    return (
+      <NavBreadcrumbSegmentMenu
+        seg={seg} sep={sep} isLast={isLast} siblings={siblings} crumbClass={crumbClass}
+        open={openKey === menuKey} menuKey={menuKey} setOpenKey={setOpenKey} onGoTo={onGoTo} goTo={goTo}
+        consumeHold={holder.consumeHold} startHold={holder.startHold} cancelHold={holder.cancelHold}
+      />
+    );
+  }
+
+  // The project root is the persistent indicator: clickable whenever a
+  // handler is wired, regardless of position. Other crumbs only pop the
+  // nav stack and only when they aren't the current page.
+  const isProjectButton = seg.isProject && typeof onSelectProject === 'function';
+  const isClickable = isProjectButton || (!isLast && seg.index >= 0);
+  return (
+    <>
+      {sep}
+      <li className={crumbClass}>
+        {isClickable ? (
+          <button type="button" onClick={() => goTo(seg)}>
+            {seg.label}
+          </button>
+        ) : (
+          <span>{seg.label}</span>
+        )}
+      </li>
+    </>
+  );
+}
 
 /**
  * NavBreadcrumb — the app's address bar, in the TopBar on desktop.
@@ -74,28 +135,10 @@ const HOLD_TO_OPEN_MS = 450;
 export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelectProject, siblingsFor }) {
   const [openKey, setOpenKey] = useState(null);
   const rootRef = useRef(null);
+  useBreadcrumbDismiss(openKey, setOpenKey, rootRef);
+  const holder = useHoldToOpen(setOpenKey);
 
-  useEffect(() => {
-    if (openKey == null) return undefined;
-    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpenKey(null); };
-    const onEsc = (e) => { if (e.key === 'Escape') setOpenKey(null); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onEsc);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onEsc);
-    };
-  }, [openKey]);
-
-  const crumbs = [];
-  if (projectName) crumbs.push({ label: projectName, index: -1, isProject: true });
-  stack.forEach((entry, i) => crumbs.push({
-    label: labelFor(entry),
-    index: i,
-    entry,
-    isRunDate: isRunDateEntry(entry),
-  }));
-
+  const crumbs = buildCrumbs(stack, projectName);
   if (crumbs.length === 0) return null;
 
   const display = collapseCrumbs(crumbs);
@@ -107,170 +150,18 @@ export default function NavBreadcrumb({ stack = [], onGoTo, projectName, onSelec
     else onGoTo(seg.index);
   };
 
-  // Press-and-hold on an earlier jump-bar segment opens its sibling menu
-  // (the browser back-button convention); a released hold must then swallow
-  // the click that follows the pointerup so it doesn't also navigate.
-  const holdTimer = useRef(null);
-  const holdFired = useRef(false);
-  useEffect(() => () => clearTimeout(holdTimer.current), []);
-  const startHold = (key) => {
-    holdFired.current = false;
-    clearTimeout(holdTimer.current);
-    holdTimer.current = setTimeout(() => {
-      holdFired.current = true;
-      setOpenKey(key);
-    }, HOLD_TO_OPEN_MS);
-  };
-  const cancelHold = () => clearTimeout(holdTimer.current);
-  const consumeHold = () => {
-    const fired = holdFired.current;
-    holdFired.current = false;
-    return fired;
-  };
-
   return (
     <nav className="nav-breadcrumb" aria-label={t('explorer.breadcrumb')} ref={rootRef}>
       <ol className="nav-breadcrumb__crumbs">
         {display.map((seg, i) => {
           const sep = i > 0 && <li className="nav-breadcrumb__sep" aria-hidden="true">/</li>;
-
-          if (seg.ellipsis) {
-            const open = openKey === 'ellipsis';
-            return (
-              <Fragment key="ellipsis">
-                {sep}
-                <li className="nav-breadcrumb__crumb nav-breadcrumb__crumb--ellipsis">
-                  <button
-                    type="button"
-                    aria-label={t('explorer.showHiddenSegments')}
-                    aria-haspopup="menu"
-                    aria-expanded={open}
-                    onClick={() => setOpenKey(open ? null : 'ellipsis')}
-                  >
-                    …
-                  </button>
-                  {open && (
-                    <div className="nav-breadcrumb__menu" role="menu" aria-label={t('explorer.hiddenSegments')}>
-                      {seg.hidden.map((h) => (
-                        <button
-                          key={`${h.label}-${h.index}`}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => goTo(h)}
-                        >
-                          {h.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              </Fragment>
-            );
-          }
-
-          const isLast = seg === lastCrumb;
-          const siblings = seg.entry && siblingsFor ? siblingsFor(seg.entry, seg.index) : null;
-          const hasMenu = Array.isArray(siblings) && siblings.length > 1;
-          const crumbClass = `nav-breadcrumb__crumb${isLast ? ' is-current' : ''}${
-            seg.isProject ? ' nav-breadcrumb__crumb--project' : ''
-          }${hasMenu ? ' nav-breadcrumb__crumb--menu' : ''}`;
-
-          if (hasMenu) {
-            const key = `seg-${seg.index}`;
-            const open = openKey === key;
-            const toggleMenu = () => setOpenKey(open ? null : key);
-            const menu = open && (
-              <div className="nav-breadcrumb__menu nav-breadcrumb__menu--siblings" role="menu" aria-label={`Switch ${seg.label}`}>
-                {siblings.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={!!item.current}
-                    // Picking the current sibling means "back to this level".
-                    // onGoTo no-ops when this is already the last entry.
-                    onClick={() => { setOpenKey(null); if (item.current) onGoTo(seg.index); else item.onSelect(); }}
-                  >
-                    <span className="nav-breadcrumb__menu-dot" aria-hidden="true" />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            );
-
-            if (isLast) {
-              // Current level: there is no "back" target, so a plain click
-              // keeps opening the jump menu.
-              return (
-                <Fragment key={`${seg.label}-${i}`}>
-                  {sep}
-                  <li className={crumbClass}>
-                    <button
-                      type="button"
-                      aria-haspopup="menu"
-                      aria-expanded={open}
-                      onClick={toggleMenu}
-                    >
-                      {seg.label}
-                      <span className="nav-breadcrumb__caret" aria-hidden="true">▾</span>
-                    </button>
-                    {menu}
-                  </li>
-                </Fragment>
-              );
-            }
-
-            // Earlier level: click walks back like an address bar; the
-            // sibling menu opens from the caret button, a right-click, or a
-            // press-and-hold.
-            return (
-              <Fragment key={`${seg.label}-${i}`}>
-                {sep}
-                <li className={crumbClass}>
-                  <button
-                    type="button"
-                    onClick={() => { if (consumeHold()) return; goTo(seg); }}
-                    onContextMenu={(e) => { e.preventDefault(); setOpenKey(key); }}
-                    onPointerDown={() => startHold(key)}
-                    onPointerUp={cancelHold}
-                    onPointerLeave={cancelHold}
-                    onPointerCancel={cancelHold}
-                  >
-                    {seg.label}
-                  </button>
-                  <button
-                    type="button"
-                    className="nav-breadcrumb__caret-btn"
-                    aria-label={`Switch ${seg.label}`}
-                    aria-haspopup="menu"
-                    aria-expanded={open}
-                    onClick={toggleMenu}
-                  >
-                    <span className="nav-breadcrumb__caret" aria-hidden="true">▾</span>
-                  </button>
-                  {menu}
-                </li>
-              </Fragment>
-            );
-          }
-
-          // The project root is the persistent indicator: clickable whenever a
-          // handler is wired, regardless of position. Other crumbs only pop the
-          // nav stack and only when they aren't the current page.
-          const isProjectButton = seg.isProject && typeof onSelectProject === 'function';
-          const isClickable = isProjectButton || (!isLast && seg.index >= 0);
           return (
-            <Fragment key={`${seg.label}-${i}`}>
-              {sep}
-              <li className={crumbClass}>
-                {isClickable ? (
-                  <button type="button" onClick={() => goTo(seg)}>
-                    {seg.label}
-                  </button>
-                ) : (
-                  <span>{seg.label}</span>
-                )}
-              </li>
+            <Fragment key={seg.ellipsis ? 'ellipsis' : `${seg.label}-${i}`}>
+              <BreadcrumbSegment
+                seg={seg} sep={sep} isLast={seg === lastCrumb} siblingsFor={siblingsFor}
+                openKey={openKey} setOpenKey={setOpenKey} goTo={goTo} onGoTo={onGoTo}
+                holder={holder} onSelectProject={onSelectProject}
+              />
             </Fragment>
           );
         })}

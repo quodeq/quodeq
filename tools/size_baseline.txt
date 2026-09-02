@@ -72,11 +72,7 @@ src/quodeq/ui/src/App.test.jsx:1:file
 src/quodeq/ui/src/api/applyMutationDelta.test.jsx:1:file
 src/quodeq/ui/src/api/shared.test.jsx:1:file
 src/quodeq/ui/src/features/assistant/AssistantDrawerProvider.test.jsx:1:file
-src/quodeq/ui/src/features/compare/compareModel.js:1:file
 src/quodeq/ui/src/features/compare/compareModel.test.js:1:file
-src/quodeq/ui/src/features/compare/components/CompareDimensionView.jsx:1:file
-src/quodeq/ui/src/features/compare/components/CompareFleetView.jsx:1:file
-src/quodeq/ui/src/features/compare/components/CompareMatrix.jsx:1:file
 src/quodeq/ui/src/features/compare/components/ComparePage.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/DashboardPage.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/DashboardPage.test.jsx:1:file
@@ -90,10 +86,7 @@ src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.js:1:file
 src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.test.js:1:file
 src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.test.js:1:file
 src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.test.jsx:1:file
-src/quodeq/ui/src/features/explorer/components/FileDetailPage.jsx:1:file
-src/quodeq/ui/src/features/explorer/components/PrincipleDetailPage.jsx:1:file
 src/quodeq/ui/src/features/history/components/HistoryPage.jsx:1:file
-src/quodeq/ui/src/features/map/viz/components/GalaxyFolderView.jsx:1:file
 src/quodeq/ui/src/features/settings/components/SharedRepoSection.test.jsx:1:file
 src/quodeq/ui/src/features/standards/components/StandardEditor.test.jsx:1:file
 src/quodeq/ui/src/features/terminal/TerminalPane.test.jsx:1:file

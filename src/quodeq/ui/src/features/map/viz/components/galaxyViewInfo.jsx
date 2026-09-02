@@ -29,6 +29,110 @@ export function LevelInfoPanel({ levelInfo }) {
   );
 }
 
+/** Shared critical/major/minor line-items, omitting zero counts. */
+function buildSevLines(sev) {
+  const lines = [];
+  if (sev.critical > 0) lines.push({ label: 'Critical', value: sev.critical, color: 'var(--color-sev-critical-text)' });
+  if (sev.major > 0) lines.push({ label: 'Major', value: sev.major, color: 'var(--color-sev-major-text)' });
+  if (sev.minor > 0) lines.push({ label: 'Minor', value: sev.minor, color: 'var(--color-sev-minor-text)' });
+  return lines;
+}
+
+/** Depth 0: the whole system, or the active cluster if one is selected. */
+function computeSystemLevelInfo(scene, nav, projectName) {
+  const clusterStars = nav.clusterCx != null
+    ? scene.stars.filter(s => s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy)
+    : scene.stars;
+  const clusterCon = nav.clusterCx != null
+    ? (scene.constellations || []).find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy)
+    : null;
+  const totalV = clusterStars.reduce((s, d) => s + d.violations, 0);
+  const totalC = clusterStars.reduce((s, d) => s + d.compliance, 0);
+  const avgScore = clusterStars.length > 0 ? clusterStars.reduce((s, d) => s + d.score, 0) / clusterStars.length : 0;
+  const sevCounts = { critical: 0, major: 0, minor: 0 };
+  clusterStars.forEach(s => {
+    (s._raw?.violations || []).forEach(v => {
+      const sev = v.severity || 'minor';
+      if (sevCounts[sev] != null) sevCounts[sev]++;
+    });
+  });
+  const lines = [
+    { label: 'Score', value: avgScore.toFixed(1) },
+    { label: 'Dimensions', value: clusterStars.length },
+    { label: 'Violations', value: totalV },
+  ];
+  if (totalV > 0) lines.push(...buildSevLines(sevCounts));
+  lines.push({ label: 'Compliance', value: totalC });
+  return {
+    title: clusterCon?.label || (projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.projectSystem')),
+    lines, hint: t('map.clickDimension'), detailAction: null,
+  };
+}
+
+/** Depth 1: one dimension. */
+function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
+  const dim = scene.stars[nav.dim];
+  const prins = scene.principles[nav.dim] || [];
+  const rawDim = dim._raw;
+  const dimSev = { critical: 0, major: 0, minor: 0 };
+  (rawDim?.violations || []).forEach(v => {
+    const sev = v.severity || 'minor';
+    if (dimSev[sev] != null) dimSev[sev]++;
+  });
+  const dimLines = [
+    { label: 'Score', value: dim.score.toFixed(1) },
+    { label: 'Principles', value: prins.length },
+    { label: 'Violations', value: dim.violations },
+  ];
+  if (dim.violations > 0) dimLines.push(...buildSevLines(dimSev));
+  dimLines.push({ label: 'Compliance', value: dim.compliance });
+  return {
+    title: dim.name, lines: dimLines, hint: t('map.clickPrinciple'),
+    detailAction: () => {
+      const d = scene.stars[navRef.current.dim]?._raw;
+      if (!d) return;
+      onNavigate?.('explorer', { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
+    },
+  };
+}
+
+/** Depth 2: one principle within a dimension. */
+function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
+  const prin = scene.principles[nav.dim][nav.prin];
+  const prinLines = [
+    { label: 'Score', value: prin.score.toFixed(1) },
+    { label: 'Violations', value: prin.violations },
+  ];
+  if (prin.violations > 0) {
+    prinLines.push(...buildSevLines({ critical: prin.critical, major: prin.major, minor: prin.minor }));
+  }
+  prinLines.push({ label: 'Compliance', value: prin.compliance });
+  return {
+    title: prin.name, lines: prinLines, hint: null,
+    detailAction: () => {
+      const p = scene.principles[navRef.current.dim]?.[navRef.current.prin];
+      const d = scene.stars[navRef.current.dim];
+      if (!p || !d) return;
+      onNavigate?.('evalprinciple', {
+        evalPrincipal: {
+          principle: p.name,
+          score: p.rawScore || (p.score != null ? p.score.toFixed(1) : null),
+          grade: p.grade,
+          dimension: d.name,
+          // Carry the originating run id so PrincipleDetail's dismiss POST
+          // sends a real run_id — without it the backend can't rescore and
+          // the dismissed entry never lands on the Dismissed tab.
+          runId: d._raw?.fromRunId || '',
+          principleData: { name: p.name, grade: p.grade, violations: p._rawViolations, compliance: p._rawCompliance },
+          dimViolations: p._rawViolations,
+          dimCompliance: p._rawCompliance,
+        },
+        sourceTab: 'map',
+      });
+    },
+  };
+}
+
 /**
  * Compute the level info panel data for the current navigation depth.
  *
@@ -41,108 +145,9 @@ export function LevelInfoPanel({ levelInfo }) {
  */
 export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
   if (!scene) return null;
-  if (nav.depth === 0) {
-    const clusterStars = nav.clusterCx != null
-      ? scene.stars.filter(s => s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy)
-      : scene.stars;
-    const clusterCon = nav.clusterCx != null
-      ? (scene.constellations || []).find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy)
-      : null;
-    const totalV = clusterStars.reduce((s, d) => s + d.violations, 0);
-    const totalC = clusterStars.reduce((s, d) => s + d.compliance, 0);
-    const avgScore = clusterStars.length > 0 ? clusterStars.reduce((s, d) => s + d.score, 0) / clusterStars.length : 0;
-    const sevCounts = { critical: 0, major: 0, minor: 0 };
-    clusterStars.forEach(s => {
-      (s._raw?.violations || []).forEach(v => {
-        const sev = v.severity || 'minor';
-        if (sevCounts[sev] != null) sevCounts[sev]++;
-      });
-    });
-    const lines = [
-      { label: 'Score', value: avgScore.toFixed(1) },
-      { label: 'Dimensions', value: clusterStars.length },
-      { label: 'Violations', value: totalV },
-    ];
-    if (totalV > 0) {
-      if (sevCounts.critical > 0) lines.push({ label: 'Critical', value: sevCounts.critical, color: 'var(--color-sev-critical-text)' });
-      if (sevCounts.major > 0) lines.push({ label: 'Major', value: sevCounts.major, color: 'var(--color-sev-major-text)' });
-      if (sevCounts.minor > 0) lines.push({ label: 'Minor', value: sevCounts.minor, color: 'var(--color-sev-minor-text)' });
-    }
-    lines.push({ label: 'Compliance', value: totalC });
-    return {
-      title: clusterCon?.label || (projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.projectSystem')),
-      lines, hint: t('map.clickDimension'), detailAction: null,
-    };
-  }
-
-  if (nav.depth === 1 && nav.dim !== null) {
-    const dim = scene.stars[nav.dim];
-    const prins = scene.principles[nav.dim] || [];
-    const rawDim = dim._raw;
-    const dimSev = { critical: 0, major: 0, minor: 0 };
-    (rawDim?.violations || []).forEach(v => {
-      const sev = v.severity || 'minor';
-      if (dimSev[sev] != null) dimSev[sev]++;
-    });
-    const dimLines = [
-      { label: 'Score', value: dim.score.toFixed(1) },
-      { label: 'Principles', value: prins.length },
-      { label: 'Violations', value: dim.violations },
-    ];
-    if (dim.violations > 0) {
-      if (dimSev.critical > 0) dimLines.push({ label: 'Critical', value: dimSev.critical, color: 'var(--color-sev-critical-text)' });
-      if (dimSev.major > 0) dimLines.push({ label: 'Major', value: dimSev.major, color: 'var(--color-sev-major-text)' });
-      if (dimSev.minor > 0) dimLines.push({ label: 'Minor', value: dimSev.minor, color: 'var(--color-sev-minor-text)' });
-    }
-    dimLines.push({ label: 'Compliance', value: dim.compliance });
-    return {
-      title: dim.name, lines: dimLines, hint: t('map.clickPrinciple'),
-      detailAction: () => {
-        const d = scene.stars[navRef.current.dim]?._raw;
-        if (!d) return;
-        onNavigate?.('explorer', { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
-      },
-    };
-  }
-
-  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) {
-    const prin = scene.principles[nav.dim][nav.prin];
-    const prinLines = [
-      { label: 'Score', value: prin.score.toFixed(1) },
-      { label: 'Violations', value: prin.violations },
-    ];
-    if (prin.violations > 0) {
-      if (prin.critical > 0) prinLines.push({ label: 'Critical', value: prin.critical, color: 'var(--color-sev-critical-text)' });
-      if (prin.major > 0) prinLines.push({ label: 'Major', value: prin.major, color: 'var(--color-sev-major-text)' });
-      if (prin.minor > 0) prinLines.push({ label: 'Minor', value: prin.minor, color: 'var(--color-sev-minor-text)' });
-    }
-    prinLines.push({ label: 'Compliance', value: prin.compliance });
-    return {
-      title: prin.name, lines: prinLines, hint: null,
-      detailAction: () => {
-        const p = scene.principles[navRef.current.dim]?.[navRef.current.prin];
-        const d = scene.stars[navRef.current.dim];
-        if (!p || !d) return;
-        onNavigate?.('evalprinciple', {
-          evalPrincipal: {
-            principle: p.name,
-            score: p.rawScore || (p.score != null ? p.score.toFixed(1) : null),
-            grade: p.grade,
-            dimension: d.name,
-            // Carry the originating run id so PrincipleDetail's dismiss POST
-            // sends a real run_id — without it the backend can't rescore and
-            // the dismissed entry never lands on the Dismissed tab.
-            runId: d._raw?.fromRunId || '',
-            principleData: { name: p.name, grade: p.grade, violations: p._rawViolations, compliance: p._rawCompliance },
-            dimViolations: p._rawViolations,
-            dimCompliance: p._rawCompliance,
-          },
-          sourceTab: 'map',
-        });
-      },
-    };
-  }
-
+  if (nav.depth === 0) return computeSystemLevelInfo(scene, nav, projectName);
+  if (nav.depth === 1 && nav.dim !== null) return computeDimensionLevelInfo(scene, nav, navRef, onNavigate);
+  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) return computePrincipleLevelInfo(scene, nav, navRef, onNavigate);
   return null;
 }
 
