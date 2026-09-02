@@ -17,22 +17,18 @@ src/quodeq/api/routes_shared_config.py:27:function
 src/quodeq/api/routes_shared_mirrors.py:41:function
 src/quodeq/api/standards_overrides_routes.py:29:function
 src/quodeq/api/terminal_routes.py:97:function
-src/quodeq/ui/src/App.jsx:1:file
 src/quodeq/ui/src/App.test.jsx:1:file
 src/quodeq/ui/src/api/applyMutationDelta.test.jsx:1:file
 src/quodeq/ui/src/api/shared.test.jsx:1:file
 src/quodeq/ui/src/features/assistant/AssistantDrawerProvider.test.jsx:1:file
 src/quodeq/ui/src/features/compare/compareModel.test.js:1:file
 src/quodeq/ui/src/features/compare/components/ComparePage.test.jsx:1:file
-src/quodeq/ui/src/features/dashboard/components/DashboardPage.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/DashboardPage.test.jsx:1:file
-src/quodeq/ui/src/features/dashboard/components/ProjectsPage.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/useDashboard.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/usePublish.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/useSharedProjects.test.jsx:1:file
 src/quodeq/ui/src/features/evaluation/components/ReEvaluateCard.test.jsx:1:file
-src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.js:1:file
 src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.test.js:1:file
 src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.test.js:1:file
 src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.test.jsx:1:file
@@ -46,4 +42,3 @@ src/quodeq/ui/src/hooks/useNavStack.test.jsx:1:file
 src/quodeq/ui/src/hooks/useProjectScores.test.jsx:1:file
 src/quodeq/ui/src/hooks/useProjectState.test.jsx:1:file
 src/quodeq/ui/src/utils/dailyGrouping.test.js:1:file
-src/quodeq/ui/src/utils/reportBuilder.js:1:file

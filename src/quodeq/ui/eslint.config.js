@@ -14,6 +14,11 @@ const NOT_USER_FACING = [
   'src/utils/planBuilder.js',
   'src/utils/planTextBuilders.js',
   'src/utils/reportBuilder.js',
+  'src/utils/reportBuilder/shared.js',
+  'src/utils/reportBuilder/dimensionSummary.js',
+  'src/utils/reportBuilder/runBuilders.js',
+  'src/utils/reportBuilder/principleBuilder.js',
+  'src/utils/reportBuilder/fileBuilder.js',
 ];
 
 export default [

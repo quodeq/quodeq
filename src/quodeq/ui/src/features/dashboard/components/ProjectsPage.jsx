@@ -1,372 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
-import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
+import { useState } from 'react';
 import { TermHeader } from '../../../components/terminal/index.js';
-import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { useProjectsPageData } from '../hooks/useProjectsPageData.js';
 import { usePullToLocal } from '../hooks/usePullToLocal.js';
-import Badge from '../../../components/Badge.jsx';
-import { t, LOCALE } from '../../../strings/index.js';
-
-// Technology and discipline names are proper nouns: a translator handed
-// "React Native" would be right to leave it, and wrong to change it.
-/* eslint-disable i18n/no-prose-literals */
-const DISCIPLINE_LABEL = {
-  frontend_nextjs: 'Next.js',
-  frontend_react: 'React',
-  frontend_vue: 'Vue',
-  frontend_angular: 'Angular',
-  frontend: 'Frontend',
-  backend: 'Backend',
-  backend_python: 'Python',
-  backend_java: 'Java',
-  backend_node: 'Node.js',
-  mobile_ios: 'iOS',
-  mobile_android: 'Android',
-  mobile_react_native: 'React Native',
-  mobile: 'Mobile',
-  fullstack: 'Full Stack',
-  devops: 'DevOps',
-  data: 'Data',
-};
-/* eslint-enable i18n/no-prose-literals */
-
-function disciplineLabel(d) {
-  if (!d) return null;
-  return DISCIPLINE_LABEL[d.toLowerCase()] ?? d.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-
-function formatDate(iso) {
-  if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
-  } catch {
-    return null;
-  }
-}
-
-function formatPath(path) {
-  if (!path) return null;
-  const gitMatch = path.match(/[@/](github\.com|gitlab\.com|bitbucket\.org)[:/](.+?)(?:\.git)?$/);
-  if (gitMatch) return `${gitMatch[1]}/${gitMatch[2]}`;
-  return path;
-}
-
-function GradeChip({ grade, score, pending = false }) {
-  if (pending && !grade && score == null) {
-    return <span className="projects-grade projects-grade--pending" aria-label={t('projects.gradePending')} />;
-  }
-  if (!grade && score == null) return null;
-  const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
-  return (
-    <span className={`projects-grade ${cls}`}>
-      {score != null ? `${score} ` : ''}{gradeLetter(grade)}
-    </span>
-  );
-}
-
-function LanguageNumbers({ stats, filesCount }) {
-  if (!stats || Object.keys(stats).length === 0) {
-    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString(LOCALE)}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>;
-    return null;
-  }
-  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 4);
-  const total = filesCount || sorted.reduce((s, [, c]) => s + c, 0);
-  return (
-    <div className="project-lang-row">
-      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString(LOCALE)}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>
-      {sorted.map(([lang, count]) => (
-        <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extDisplayName(lang)}</span></span>
-      ))}
-    </div>
-  );
-}
-
-// Small top-right pill stating a card's sync state rather than its raw
-// location: LOCAL (only on this machine), PUBLISHED (local and in the
-// shared repo), REMOTE (shared repo only). `chips` comes straight from the
-// merged entry (see useMergedProjects), which still speaks in locations —
-// the state wording is purely presentational.
-const BADGE_LABELS = { local: t('projects.badgeLocal'), both: t('projects.badgePublished'), shared: t('projects.badgeRemote') };
-const BADGE_TONES = { local: 'neutral', both: 'success', shared: 'info' };
-
-function ProjectCardChips({ chips }) {
-  if (!chips) return null;
-  return (
-    <Badge variant="pill" tone={BADGE_TONES[chips]}>{BADGE_LABELS[chips]}</Badge>
-  );
-}
-
-// "published by <name> · <relative time>" — shared-only cards.
-function PublishedMeta({ publishedBy, publishedAt }) {
-  if (!publishedBy) return null;
-  const rel = relativeTime(publishedAt);
-  return (
-    <div className="project-card-published-meta">
-      {t('projects.publishedBy', { name: publishedBy })}{rel ? ` · ${rel}` : ''}
-    </div>
-  );
-}
-
-// "published <relative time>" - LOCAL cards that have a counterpart on the
-// shared list (matched by id in ProjectsPage, see publishedAtByProject).
-// Unlike PublishedMeta above, a local card doesn't know a publishedBy (it's
-// always "you"), so this omits the "by <name>" clause entirely rather than
-// hardcoding a name.
-function LocalPublishedMeta({ publishedAt }) {
-  if (!publishedAt) return null;
-  const rel = relativeTime(publishedAt);
-  if (!rel) return null;
-  return <div className="project-card-published-meta">{t('projects.published', { time: rel })}</div>;
-}
-
-function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips, publishedAt }) {
-  const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
-  const id = project.id || project.name || project;
-  const name = project.name || project;
-  const grade = gradeLabel(project.overallGrade ?? project.latestGrade);
-  const score = project.latestScore != null ? parseFloat(project.latestScore).toFixed(1) : null;
-  const date = formatDate(project.latestDate);
-  const discipline = disciplineLabel(project.discipline);
-  // Prefer the caller's resolved publishedAt (which falls back to the
-  // merged entry's `shared.publishedAt` for origin-URL matches -- see
-  // ProjectsPage's per-entry `publishedAt` computation) over the raw
-  // project field, which is only ever populated for id-matched publishes.
-  const resolvedPublishedAt = publishedAt !== undefined ? publishedAt : project.publishedAt;
-
-  return (
-    <div className={`project-card${isChild ? ' project-card--child' : ''} panel${isSelected ? ' project-card--selected' : ''}`}>
-      <div
-        className="project-card-main"
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect?.(id)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
-      >
-        <div className="project-card-top">
-          <div className="project-card-top-left">
-            <span className="project-card-name">{project.displayName || name}</span>
-            {project.location === 'online' && (
-              <Badge
-                variant="tag"
-                tone="warning"
-                title={t('projects.setupIncompleteTitle')}
-              >
-                {t('projects.setupIncomplete')}
-              </Badge>
-            )}
-            {project.onboardingCompletedAt === null && onResumeSetup && (
-              <button
-                type="button"
-                className="resume-setup-badge"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onResumeSetup(id);
-                }}
-              >
-                {t('projects.resumeSetup')}
-              </button>
-            )}
-            {project.scopePath && <span className="scope-badge">{project.scopePath}</span>}
-            <GradeChip grade={grade} score={score} pending={project.summaryPending} />
-          </div>
-          <div className="project-card-top-right">
-            <ProjectCardChips chips={chips} />
-            {discipline && <span className="project-meta-tag">{discipline}</span>}
-            <span className="project-meta-item">{project.runsCount === 1 ? t('projects.runsOne', { count: project.runsCount }) : t('projects.runsMany', { count: project.runsCount })}</span>
-            {date && <span className="project-meta-date">{date}</span>}
-          </div>
-        </div>
-        <div className="project-card-bottom">
-          <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
-          {chips === 'shared' ? (
-            <PublishedMeta publishedBy={project.publishedBy} publishedAt={resolvedPublishedAt} />
-          ) : (
-            <LocalPublishedMeta publishedAt={resolvedPublishedAt} />
-          )}
-          {cardChildren}
-        </div>
-      </div>
-      {footer && <div className="project-card-footer" onClick={isChild ? (e) => e.stopPropagation() : undefined}>{footer}</div>}
-    </div>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-    </svg>
-  );
-}
-
-// `action` ('publish' | 'update' | null) comes from the merged entry (see
-// useMergedProjects/deriveAction) -- null for entries that need no publish
-// button (unconfigured, already up to date). Shared-only cards never render
-// this footer at all (they get the pull footer instead).
-function CardFooter({ name, confirming, setConfirming, onDelete, onExport, publishActions, action }) {
-  if (confirming === name) {
-    return (
-      <div className="project-card-actions">
-        <span className="project-delete-confirm-label">{t('projects.deleteConfirm')}</span>
-        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onDelete?.(name); setConfirming(null); }}>{t('projects.yes')}</button>
-        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); setConfirming(null); }}>{t('projects.no')}</button>
-      </div>
-    );
-  }
-  const {
-    publishState = 'idle',
-    publishingProject = null,
-    publishError = null,
-    publishErrorProject = null,
-    onPublish,
-  } = publishActions || {};
-  const isThisPublishing = publishState === 'running' && publishingProject === name;
-  // Single global publish job: while ANY project is publishing, every
-  // publish button is disabled, not just the one that was clicked.
-  const publishDisabled = publishState === 'running';
-  const showError = !!publishError && publishErrorProject === name;
-  return (
-    <>
-      <div className="project-card-actions">
-        {action && (
-          <button
-            type="button"
-            className={`project-delete-btn project-delete-btn--accent${isThisPublishing ? ' project-delete-btn--pending' : ''}`}
-            aria-disabled={publishDisabled || undefined}
-            onClick={(e) => { e.stopPropagation(); onPublish?.(name); }}
-          >
-            {isThisPublishing
-              ? t('projects.publishing')
-              : action === 'publish' ? t('projects.actionPublish') : action === 'update' ? t('projects.actionUpdate') : action}
-          </button>
-        )}
-        <button type="button" className="project-delete-btn" title={t('projects.downloadReportsTitle')} aria-label={t('projects.downloadReportsTitle')} onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
-        <button type="button" className="project-delete-btn" title={t('projects.deleteProjectTitle')} aria-label={t('projects.deleteProjectTitle')} onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
-      </div>
-      {showError && <p className="inline-error project-card-footer-error">{publishError}</p>}
-    </>
-  );
-}
-
-function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
-  const { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
-  const path = formatPath(p.path);
-  const pathMissing = p.location === 'local' && p.pathExists === false;
-  if (relocating === id) {
-    return (
-      <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
-        <input className="project-relocate-input" value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }} placeholder="/new/path/to/repo" autoFocus />
-        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>{t('projects.save')}</button>
-        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>{t('common.cancel')}</button>
-      </div>
-    );
-  }
-  return (
-    <div className="project-path-row">
-      {pathMissing && <span className="project-path-missing">{t('projects.pathNotFound')}</span>}
-      {p.location === 'online' && p.path ? (
-        <span onClick={(e) => e.stopPropagation()}>
-          <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
-        </span>
-      ) : (
-        path && <div className="project-card-path">{path}</div>
-      )}
-      {pathMissing && (
-        <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>{t('projects.relocate')}</button>
-      )}
-      {subprojectCount > 0 && (
-        <Badge variant="pill" tone="neutral" className="project-subprojects-tag">
-          {t('projects.subprojects')} <span className="project-subprojects-tag-count">{subprojectCount}</span>
-        </Badge>
-      )}
-    </div>
-  );
-}
-
-function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup, publishActions, entryLookup }) {
-  const { confirming, setConfirming, onDelete, onExport } = confirmActions;
-  return (
-    <div className="project-children-outer">
-      {childList.map((child) => {
-        const childId = child.id || child.name || child;
-        const childEntry = entryLookup?.get(childId);
-        // Origin-URL-matched shared entries never share the child's own id,
-        // so child.publishedAt (only set for id matches, see usePublish's
-        // publishedAtByProject) misses them -- fall back to the merged
-        // entry's shared side.
-        const childPublishedAt = child.publishedAt ?? childEntry?.shared?.publishedAt;
-        return (
-          <div key={childId} className="project-child-entry">
-            <ProjectCard
-              project={child}
-              isSelected={childId === selectedProject}
-              chips={childEntry?.chips}
-              publishedAt={childPublishedAt}
-              cardProps={{
-                onSelect, isChild: true, onResumeSetup,
-                footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={childEntry?.action} />,
-              }}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// entryLookup (local id/name -> merged entry) lets both this root card and
-// its nested subprojects (see ProjectChildren) show their own derived
-// chips/action instead of one blanket value for the whole group.
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions, action, chips, publishedAt, entryLookup }) {
-  const { confirmActions, relocateActions } = dialogActions;
-  const { confirming, setConfirming, onDelete, onExport } = confirmActions;
-  const id = p.id || p.name || p;
-  const isSelected = id === selectedProject;
-  const hasChildren = !!(childProjects?.[id]?.length);
-  const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
-  return (
-    <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} chips={chips} publishedAt={publishedAt} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} /> }}>
-        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} subprojectCount={hasChildren ? childProjects[id].length : 0} />
-      </ProjectCard>
-      {hasChildren && (
-        <ProjectChildren
-          childList={childProjects[id]}
-          selectedProject={selectedProject}
-          onSelect={onSelect}
-          confirmActions={confirmActions}
-          onResumeSetup={onResumeSetup}
-          publishActions={publishActions}
-          entryLookup={entryLookup}
-        />
-      )}
-    </div>
-  );
-}
-
-function useRelocateDialog(onRelocate) {
-  const [relocating, setRelocating] = useState(null);
-  const [relocatePath, setRelocatePath] = useState('');
-  const startRelocate = (name, currentPath) => { setRelocating(name); setRelocatePath(currentPath || ''); };
-  const submitRelocate = (name) => { if (relocatePath.trim()) onRelocate?.(name, relocatePath.trim()); setRelocating(null); };
-  return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
-}
+import { t } from '../../../strings/index.js';
+import { ProjectCard } from './projectCards/ProjectCard.jsx';
+import { ProjectCardGroup, useRelocateDialog } from './projectCards/ProjectCardGroup.jsx';
+import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
+import { ProjectsToolbar } from './ProjectsToolbar.jsx';
 
 const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
@@ -406,155 +47,129 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   );
 }
 
-// ── Shared entries: pull-local-copy footer (409-conflict inline confirm) ──
-// Mirrors CardFooter's inline delete-confirm idiom for the collision case
-// instead of the global chooseDialog modal used by manual import. Global
-// refresh lives in the toolbar (SyncedIndicator) now, not per card.
-
-function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCancelConflict, pulled }) {
-  if (pullConflict) {
-    return (
-      <div className="project-card-actions">
-        <span className="project-delete-confirm-label">{t('projects.alreadyExists')}</span>
-        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onConfirmCopy(projectId); }}>{t('projects.copy')}</button>
-        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); onCancelConflict(projectId); }}>{t('evaluate.cancelBtn')}</button>
-      </div>
-    );
-  }
-  // Inline confirmation replacing the pull button for this one card, for the
-  // lifetime of the ProjectsPage mount.
-  if (pulled) {
-    return (
-      <div className="project-card-actions">
-        <span className="project-delete-confirm-label">{t('projects.pulledToLocal')}</span>
-      </div>
-    );
-  }
+function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject, onAddProject, isEvaluating }) {
   return (
-    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>{t('projects.pullLocalCopy')}</button>
-  );
-}
-
-// ── Toolbar: name search, filter pills, sync status ────────────────────────
-// Controlled entirely by the `filters` prop -- state lives one level up in
-// the nav stack (see actions.onFiltersChange), not here.
-
-// One dropdown filter pill ("location: all ▾"). The first option is the
-// default; the pill lights up whenever a non-default value is picked so an
-// active filter is visible at a glance. Menu closes on pick, outside
-// mousedown, or Escape.
-function FilterPill({ label, value, options, valueLabels = {}, onChange }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-  const display = (v) => valueLabels[v] || v;
-  const isSet = value !== options[0];
-  return (
-    <span className={`projects-filter-pill${isSet ? ' projects-filter-pill--set' : ''}`} ref={rootRef}>
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        {label}: <b>{display(value)}</b> <span className="projects-filter-pill-caret">▾</span>
-      </button>
-      {open && (
-        <div className="projects-filter-pill-menu" role="menu" aria-label={t('projects.filterMenuAria', { label })}>
-          {options.map((opt) => (
+    <div className="projects-page__header">
+      <TermHeader
+        name={t('projects.termName')}
+        sub={
+          projectsLoaded
+            ? (projects.length === 1
+                ? t('projects.reposEvaluatedOne', { count: projects.length })
+                : t('projects.reposEvaluatedMany', { count: projects.length }))
+            : t('overview.loading')
+        }
+      />
+      {!isEmpty && (
+        <div className="projects-page__header-actions">
+          {onImportProject && (
             <button
-              key={opt}
               type="button"
-              role="menuitemradio"
-              aria-checked={opt === value}
-              onClick={() => { onChange(opt); setOpen(false); }}
+              className={`projects-page__import-btn${isEvaluating ? ' is-disabled' : ''}`}
+              onClick={onImportProject}
+              aria-label={t('projects.importAria')}
+              aria-disabled={isEvaluating || undefined}
+              title={isEvaluating ? EVAL_BLOCKED_TITLE : t('projects.importTitle')}
             >
-              {display(opt)}
+              {t('projects.importProject')}
             </button>
-          ))}
+          )}
+          {onAddProject && (
+            <button
+              type="button"
+              className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+              onClick={onAddProject}
+              aria-label={t('projects.addAria')}
+              aria-disabled={isEvaluating || undefined}
+              title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+            >
+              <span aria-hidden="true">▸</span> {t('projects.addProject')}
+            </button>
+          )}
         </div>
       )}
-    </span>
-  );
-}
-
-function ProjectsToolbar({ filters = {}, onFiltersChange, configured, lastSynced, stale, error, refreshing, onRefresh }) {
-  const { query = '', location = 'all', sort = 'activity' } = filters;
-  const set = (patch) => onFiltersChange?.({ query, location, sort, ...patch });
-  return (
-    <div className="projects-toolbar">
-      <input
-        type="text"
-        className="projects-toolbar-search"
-        placeholder={t('projects.searchPlaceholder')}
-        aria-label={t('projects.searchAria')}
-        value={query}
-        onChange={(e) => set({ query: e.target.value })}
-      />
-      {configured && (
-        <FilterPill
-          label={t('projects.filterLocation')}
-          value={location}
-          options={['all', 'local', 'shared']}
-          valueLabels={{ all: t('projects.optAll'), local: t('projects.optLocal'), shared: t('projects.optRemote') }}
-          onChange={(loc) => set({ location: loc })}
-        />
-      )}
-      <FilterPill
-        label={t('projects.filterSort')}
-        value={sort}
-        options={['activity', 'name', 'score']}
-        valueLabels={{ activity: t('projects.optActivity'), name: t('projects.optName'), score: t('projects.optScore') }}
-        onChange={(s) => set({ sort: s })}
-      />
-      <SyncedIndicator configured={configured} lastSynced={lastSynced} stale={stale} error={error} refreshing={refreshing} onRefresh={onRefresh} />
     </div>
   );
 }
 
-// "syncing…" while a background refresh is in flight, else "sync failed ·
-// retry" when the shared hook reports an error (an initial status/list load
-// that never landed -- audit A2; onRefresh doubles as the retry affordance
-// since useSharedProjects' refresh() re-checks both status and list), else
-// "synced <relative time>" (+ " · stale" when the last refresh failed but a
-// prior successful listing is still on screen), or "not synced yet" before
-// the first list has EVER landed and there is no error either -- the merged
-// list's only sync-status surface now that the old online sub-tab (and its
-// "refresh failed, showing results synced..." banner) is gone. Renders
-// nothing at all (refresh button included) when no shared repo is
-// configured -- there is nothing to sync.
-function SyncedIndicator({ configured, lastSynced, stale, error, refreshing, onRefresh }) {
-  if (!configured) return null;
-  const label = refreshing
-    ? t('projects.syncing')
-    : error
-      ? t('projects.syncFailedRetry')
-      : lastSynced == null
-        ? t('projects.notSyncedYet')
-        : `${t('projects.synced', { time: relativeTime(lastSynced) })}${stale ? ` · ${t('projects.stale')}` : ''}`;
+function LocalProjectEntry({ entry, ctx }) {
+  const { children, selectedProject, onSelect, onResumeSetup, confirming, setConfirming, onDelete, onExport, relocateActions, publishActions, localEntryById, shared } = ctx;
   return (
-    <span className="projects-toolbar-sync">
-      <span className="projects-toolbar-sync-label">{label}</span>
-      <button
-        type="button"
-        className="projects-page__import-btn"
-        aria-label={t('projects.refreshAria')}
-        onClick={onRefresh}
-        aria-disabled={refreshing || undefined}
-      >
-        ⟳
-      </button>
-    </span>
+    <ProjectCardGroup
+      key={entry.key}
+      p={entry.local}
+      children={children}
+      selectedProject={selectedProject}
+      onSelect={onSelect}
+      onResumeSetup={onResumeSetup}
+      dialogActions={{
+        confirmActions: { confirming, setConfirming, onDelete, onExport },
+        relocateActions,
+      }}
+      publishActions={publishActions}
+      action={entry.action}
+      chips={shared.configured ? entry.chips : null}
+      publishedAt={entry.local?.publishedAt ?? entry.shared?.publishedAt}
+      entryLookup={localEntryById}
+    />
+  );
+}
+
+function SharedProjectEntry({ entry, ctx }) {
+  const { onSelect, pullConflictId, handlePull, handleConfirmCopy, cancelConflict, pulledIds } = ctx;
+  const sharedId = entry.shared.id || entry.shared.name || entry.shared;
+  return (
+    <ProjectCard
+      key={entry.key}
+      project={entry.shared}
+      chips="shared"
+      cardProps={{
+        onSelect: (pid) => onSelect?.(pid, 'shared'),
+        footer: (
+          <OnlineCardFooter
+            projectId={sharedId}
+            onPull={handlePull}
+            pullConflict={pullConflictId === sharedId}
+            onConfirmCopy={handleConfirmCopy}
+            onCancelConflict={cancelConflict}
+            pulled={pulledIds.has(sharedId)}
+          />
+        ),
+      }}
+    />
+  );
+}
+
+function ProjectsCardsList({ visibleEntries, ctx }) {
+  if (visibleEntries.length === 0) {
+    return <div className="projects-empty">{t('projects.noMatches')}</div>;
+  }
+  return (
+    <div className="projects-cards">
+      {visibleEntries.map((entry) => (
+        entry.local
+          ? <LocalProjectEntry key={entry.key} entry={entry} ctx={ctx} />
+          : <SharedProjectEntry key={entry.key} entry={entry} ctx={ctx} />
+      ))}
+    </div>
+  );
+}
+
+function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }) {
+  return (
+    <>
+      <ProjectsToolbar
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+        configured={shared.configured}
+        lastSynced={shared.lastSynced}
+        stale={shared.stale}
+        error={shared.error}
+        refreshing={shared.refreshing}
+        onRefresh={shared.refresh}
+      />
+      <ProjectsCardsList visibleEntries={visibleEntries} ctx={cardsListCtx} />
+    </>
   );
 }
 
@@ -573,115 +188,34 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
 
   const { pullConflictId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared, onProjectsReload });
 
+  const cardsListCtx = {
+    children, selectedProject, onSelect, onResumeSetup, confirming, setConfirming, onDelete, onExport,
+    relocateActions, publishActions, localEntryById, shared, pullConflictId, handlePull, handleConfirmCopy,
+    cancelConflict, pulledIds,
+  };
+
   return (
     <section className="projects-page projects-page--terminal">
-      <div className="projects-page__header">
-        <TermHeader
-          name={t('projects.termName')}
-          sub={
-            projectsLoaded
-              ? (projects.length === 1
-                  ? t('projects.reposEvaluatedOne', { count: projects.length })
-                  : t('projects.reposEvaluatedMany', { count: projects.length }))
-              : t('overview.loading')
-          }
-        />
-        {!isEmpty && (
-          <div className="projects-page__header-actions">
-            {onImportProject && (
-              <button
-                type="button"
-                className={`projects-page__import-btn${isEvaluating ? ' is-disabled' : ''}`}
-                onClick={onImportProject}
-                aria-label={t('projects.importAria')}
-                aria-disabled={isEvaluating || undefined}
-                title={isEvaluating ? EVAL_BLOCKED_TITLE : t('projects.importTitle')}
-              >
-                {t('projects.importProject')}
-              </button>
-            )}
-            {onAddProject && (
-              <button
-                type="button"
-                className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
-                onClick={onAddProject}
-                aria-label={t('projects.addAria')}
-                aria-disabled={isEvaluating || undefined}
-                title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
-              >
-                <span aria-hidden="true">▸</span> {t('projects.addProject')}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      <ProjectsPageHeader
+        projectsLoaded={projectsLoaded}
+        projects={projects}
+        isEmpty={isEmpty}
+        onImportProject={onImportProject}
+        onAddProject={onAddProject}
+        isEvaluating={isEvaluating}
+      />
       {!projectsLoaded ? (
         <LoadingScreen variant="inline" />
       ) : isEmpty ? (
         <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
       ) : (
-        <>
-          <ProjectsToolbar
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            configured={shared.configured}
-            lastSynced={shared.lastSynced}
-            stale={shared.stale}
-            error={shared.error}
-            refreshing={shared.refreshing}
-            onRefresh={shared.refresh}
-          />
-          {visibleEntries.length === 0 ? (
-            <div className="projects-empty">{t('projects.noMatches')}</div>
-          ) : (
-            <div className="projects-cards">
-              {visibleEntries.map((entry) => {
-                if (entry.local) {
-                  return (
-                    <ProjectCardGroup
-                      key={entry.key}
-                      p={entry.local}
-                      children={children}
-                      selectedProject={selectedProject}
-                      onSelect={onSelect}
-                      onResumeSetup={onResumeSetup}
-                      dialogActions={{
-                        confirmActions: { confirming, setConfirming, onDelete, onExport },
-                        relocateActions,
-                      }}
-                      publishActions={publishActions}
-                      action={entry.action}
-                      chips={shared.configured ? entry.chips : null}
-                      publishedAt={entry.local?.publishedAt ?? entry.shared?.publishedAt}
-                      entryLookup={localEntryById}
-                    />
-                  );
-                }
-                const sharedId = entry.shared.id || entry.shared.name || entry.shared;
-                return (
-                  <ProjectCard
-                    key={entry.key}
-                    project={entry.shared}
-                    chips="shared"
-                    cardProps={{
-                      onSelect: (pid) => onSelect?.(pid, 'shared'),
-                      footer: (
-                        <OnlineCardFooter
-                          projectId={sharedId}
-                          onPull={handlePull}
-                          pullConflict={pullConflictId === sharedId}
-                          onConfirmCopy={handleConfirmCopy}
-                          onCancelConflict={cancelConflict}
-                          pulled={pulledIds.has(sharedId)}
-                        />
-                      ),
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </>
+        <ProjectsPageBody
+          filters={filters}
+          onFiltersChange={onFiltersChange}
+          shared={shared}
+          visibleEntries={visibleEntries}
+          cardsListCtx={cardsListCtx}
+        />
       )}
     </section>
   );

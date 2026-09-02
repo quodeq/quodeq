@@ -1,19 +1,10 @@
-import { lazy, Suspense, useCallback, useMemo, useState, useEffect } from 'react';
-import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
-import UpdateBanner from './features/updates/UpdateBanner.jsx';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
-
-const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
-import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api/ApiContext.jsx';
 import { applyMutationDelta } from './api/applyMutationDelta.js';
-import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import { useEvaluationProgress } from './features/evaluation/hooks/useEvaluationProgress.js';
 import { computeOverallProgress } from './features/evaluation/components/scanProgressTotals.js';
-import LoadingScreen, { FadingLoadingScreen } from './components/LoadingScreen.jsx';
-import Sidebar from './components/Sidebar.jsx';
-import TopBar from './components/TopBar.jsx';
 import { readActiveProviderSelection, readActiveProviderModel } from './utils/effectiveProviderSettings.js';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
@@ -22,20 +13,10 @@ import { useWizardLifecycle } from './features/onboarding/useWizardLifecycle.js'
 import { warmOverviewChunks } from './bootChunks.js';
 import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
-import { SidePane, useSidePane } from './features/side-pane/index.js';
-import { VerifiedFindingsProvider } from './features/violations/components/verifiedFindingsContext.jsx';
-import { BottomDrawer } from './features/drawer/BottomDrawer.jsx';
+import { useSidePane } from './features/side-pane/index.js';
 import { useAssistantDrawer } from './features/assistant/AssistantDrawerProvider.jsx';
 import { useAssistantProvider } from './features/settings/hooks/useAssistantProvider.js';
 import { deriveAssistantContext } from './features/assistant/useAssistantContext.js';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.jsx';
-import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
-import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
-import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
-import {
-  MainContent, buildDashboardDataBundle, buildNavigationBundle,
-} from './routes/renderers.jsx';
 import {
   resolveProjectDisplayName, selectSidebarCounts,
 } from './appGating.js';
@@ -47,7 +28,8 @@ import {
   useInitialLandingEffect, useProjectScrollResetEffect, useVisibleStandardsHydrationEffect,
 } from './hooks/useAppEffects.js';
 import { buildBreadcrumbSiblingsFor } from './features/side-pane/breadcrumbSiblings.js';
-import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
+import { buildContentProps } from './appShellProps.js';
+import AppMain from './AppMain.jsx';
 
 // Route rendering, gating policies, wizard lifecycle, assistant glue and
 // startup chrome moved to their own modules (see routes/renderers.jsx,
@@ -69,36 +51,6 @@ export {
 } from './features/assistant/assistantAppBridge.js';
 export { buildWizardHandlers, shouldAutoOpenOnboardingWizard } from './features/onboarding/useWizardLifecycle.js';
 export { shouldShowStartupLoader } from './hooks/useStartupTheme.js';
-
-/**
- * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
- * @returns {JSX.Element}
- */
-function AppShell({ sidebar, header, content, drawer, navPending }) {
-  return (
-    <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
-      {header && <div className="app-shell__topbar">{header}</div>}
-      <div className="app-shell__body">
-        {sidebar}
-        <div className="app-shell__main-column">
-          {/* Feedback while a navigation's target page renders (useNavStack
-              transition). Must live HERE, outside the scrolling <main>: the
-              .dashboard is position:relative, so an absolutely-positioned bar
-              inside it anchors to the top of the scrollable CONTENT and
-              scrolls out of view — exactly where every detail-page card
-              lives, so the one navigation that needed feedback never got it. */}
-          {navPending && <div className="nav-pending-bar" aria-hidden="true" />}
-          <UpdateBanner />
-          <main className="dashboard">
-            {content}
-          </main>
-        </div>
-        <SidePane />
-        {drawer}
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const { dismissFinding } = useApi();
@@ -298,34 +250,10 @@ export default function App() {
     };
   }, [isEvaluating, evalProgress]);
 
-  const contentProps = {
-    dashboardData: buildDashboardDataBundle({ state, sharedHasContent: sharedSignal.hasContent }),
-    navigation: buildNavigationBundle({
-      state, navTab, navStackLength: navStack.length,
-      isEvaluating, showToast, setWizardEntry,
-      sharedHasContent: sharedSignal.hasContent,
-    }),
-    evaluation: state.evalLifecycle,
-    serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
-    settings: state.settings,
-    refreshDashboard: state.refreshDashboard,
-    // Debounced ACTIVE reconcile for suppression mutations (dismiss/restore/
-    // delete) — see useDashboard.js. refreshDashboard's refetchType:'none'
-    // only marks the cache stale; this actually refetches the always-mounted
-    // Overview observer after the 1200ms window, so restore-all/delete-all
-    // (whose response can't be patched via applyMutationDelta) and every
-    // other suppression mutation converge without waiting for a project
-    // switch.
-    scheduleDashboardReconcile: state.scheduleDashboardReconcile,
-    dismissFinding,
-    // Patch the dashboard/scores caches from the dismiss response delta so the
-    // Overview updates instantly. Additive — the refreshDashboard /
-    // bumpDismissRefresh mechanisms below still run. The delta carries only the
-    // mutation shape; the caller folds in the rescored dims from result.scores.
-    applyDelta,
-    bumpDismissRefresh,
-    dismissRefreshKey,
-  };
+  const contentProps = buildContentProps({
+    state, sharedSignal, navTab, navStackLength: navStack.length, isEvaluating, showToast, setWizardEntry,
+    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
+  });
 
   // Resolve the project's friendly name (see resolveProjectDisplayName): local
   // selections read the local projects list; shared/remote selections (absent
@@ -343,112 +271,17 @@ export default function App() {
     filteredAccumulated, accumulated: state.accumulated, filteredTrend, dashboard: state.dashboard,
   });
 
-  return (
-    <>
-      <EvalLogProvider>
-        <ServerLogProvider>
-          <OllamaLogProvider>
-            <LlamaCppLogProvider>
-              <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
-              <AppShell
-          navPending={state.navPending}
-          drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
-            onOpenSettings={() => navTab('settings')} />}
-          sidebar={
-            <Sidebar
-              {...buildSidebarProps({
-                activeTab,
-                navTab,
-                projectsCount: state.projects.length,
-                selectedSource: state.selectedSource,
-                hasCurrentProjectRuns,
-                sharedProjectInfo: state.sharedProjectInfo,
-                projects: state.projects,
-                sharedHasContent: sharedSignal.hasContent,
-                resolvedDisplayName,
-                headerMeta: state.headerMeta,
-                version: APP_VERSION,
-                sidebarCounts,
-                lastEvalAt: state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null,
-                isPinned: sidebarPinned,
-                onPinChange: setSidebarPinned,
-              })}
-            />
-          }
-          header={
-            <TopBar
-              {...buildTopBarProps({
-                resolvedDisplayName,
-                activeTab,
-                serverConnected: state.serverConnected,
-                sidebarProvider,
-                sidebarModel,
-                selectedSource: state.selectedSource,
-                projectsCount: state.projects?.length,
-                onEvaluateClick: () => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) }),
-                evaluating: state.evalLifecycle?.job?.status === 'running',
-                topbarRunProgress,
-                navTab,
-                setSidebarPinned,
-                breadcrumb: (
-                  <NavBreadcrumb
-                    stack={navStack}
-                    onGoTo={navGoTo}
-                    projectName={resolvedDisplayName}
-                    onSelectProject={() => navTab('projects')}
-                    siblingsFor={breadcrumbSiblingsFor}
-                  />
-                ),
-                mobileTitle: navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || ''),
-                navStackLength: navStack.length,
-                navPop,
-                effectiveDark,
-                toggleTheme,
-              })}
-            />
-          }
-          content={
-            <>
-              {/* One stable mount for the startup loader, OUTSIDE the
-                  Suspense: inside it, a lazy chunk's suspension unmounts the
-                  loader itself and the plain fallback restarts the fade and
-                  tips from zero (a loader-to-loader flash). Out here it
-                  covers chunk loads AND holds through the Overview's first
-                  data (shouldShowStartupLoader), so boot goes loader ->
-                  content with no skeleton in between. */}
-              <FadingLoadingScreen
-                show={showStartupLoader}
-                tips
-                warmup={state.warmup}
-              />
-            <Suspense fallback={<LoadingScreen />}>
-              {/* Every route, not just Evaluate. A dead backend is the one
-                  failure no page can render around: the Overview's own wall
-                  falls back to a bare loading spinner that never resolves, so
-                  a killed server read as "quodeq won't start" with nothing
-                  on screen to say why or to retry from. */}
-              {!state.serverConnected && (
-                <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
-              )}
-              <div className="tab-fade" key={activeTab}>
-                <MainContent activePage={activePage} props={contentProps} />
-              </div>
-              {wizardEntry && (
-                <OnboardingWizard
-                  entry={wizardEntry}
-                  {...wizardHandlers}
-                />
-              )}
-            </Suspense>
-            </>
-          }
-            />
-              </VerifiedFindingsProvider>
-            </LlamaCppLogProvider>
-          </OllamaLogProvider>
-        </ServerLogProvider>
-      </EvalLogProvider>
-    {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-    </>
-  );
+  // Bundles every already-computed value AppMain's render tree needs — same
+  // values AppMain used to close over inline before this move (see
+  // AppMain.jsx). No logic here, just a grouping so App.jsx's own function
+  // body stays under the file-size cap without touching hook order above.
+  const shell = {
+    state, navTab, activeTab, activePage, hasCurrentProjectRuns, sharedSignal, assistantCtx,
+    resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned,
+    sidebarProvider, sidebarModel, topbarRunProgress, navStack, navGoTo, navPop,
+    breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, contentProps,
+    wizardEntry, wizardHandlers,
+  };
+
+  return <AppMain shell={shell} />;
 }

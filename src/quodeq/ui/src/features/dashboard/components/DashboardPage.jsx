@@ -1,133 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import DimensionCard from './DimensionCard.jsx';
-import AccumulatedOverviewPanel, { preloadRunHistoryPanel } from './AccumulatedOverviewPanel.jsx';
-import RunOverviewPanel from './RunOverviewPanel.jsx';
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import WarmupNotice from '../../../components/WarmupNotice.jsx';
-import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
 import { useDashboardPageState } from '../hooks/useDashboardPageState.js';
+import { useDashboardHandlers } from '../hooks/useDashboardHandlers.js';
+import { preloadRunHistoryPanel } from './AccumulatedOverviewPanel.jsx';
+import DashboardContent from './DashboardContent.jsx';
 import {
   ProjectsLoadFailedState, NoLocalProjectsSharedContent, NoProjectsContent, NoProjectSelectedContent,
   LoadingProjectContent, LoadProjectFailedContent, NoRunsEmptyContent, RunLoadFailedContent,
 } from './DashboardPageEmptyStates.jsx';
 
-function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
-  const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
-  if (hasRunning) {
-    // First-ever evaluation is still running. There's no prior data to
-    // show, but we still avoid claiming the project has "no" evaluations
-    // — they just haven't finished yet.
-    return (
-      <EmptyState
-        title={t('overview.firstEvalTitle')}
-        description={t('overview.firstEvalDesc')}
-        actionLabel={t('overview.openHistory')}
-        onAction={() => onNavigate?.('history')}
-      />
-    );
-  }
-  // Shared projects are read-only in the app -- evaluations only ever run
-  // locally (see api/shared.js's read-only-mirrors note), so the "Start
-  // evaluation" CTA has nowhere useful to send a shared-project viewer. Show
-  // the same empty shell without the button and with copy that doesn't imply
-  // there's an action to take here.
-  if (selectedSource === 'shared') {
-    return (
-      <EmptyState
-        title={t('overview.noCompletedEvalTitle')}
-        description={t('overview.noCompletedEvalSharedDesc')}
-      />
-    );
-  }
-  return (
-    <EmptyState
-      title={t('overview.noCompletedEvalTitle')}
-      description={t('overview.noCompletedEvalDesc')}
-      actionLabel={t('overview.startEvaluation')}
-      onAction={() => onNavigate?.('evaluate')}
-    />
-  );
-}
-
-function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, selectedProject, projectInfo, granularity, selectedSource, scoresPending, customFormula } = data;
-  const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
-  const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onNavigate, onGranularityChange } = callbacks;
-  // No readiness check here on purpose: the page only mounts this component
-  // once contentReady is true (see DashboardPage's return), so there is
-  // exactly one place in the whole page that decides whether a loader is
-  // shown -- never a render decision split between here and the parent.
-  if (runMode) {
-    return (
-      <RunOverviewPanel
-        dashboard={dashboard}
-        selectedRunId={selectedRunId}
-        projectName={projectInfo?.displayName || projectInfo?.name || selectedProject}
-        onDimensionClick={onDimensionCardClick}
-        onFileClick={onFileClick}
-        onNavigate={onNavigate}
-      />
-    );
-  }
-  if (accumulatedDimensions.length === 0) {
-    // Project has runs (otherwise the upstream `!dashboard` empty
-    // state would have fired) but none have terminated cleanly yet —
-    // first evaluation in progress, or every prior attempt was
-    // cancelled/failed. Render a clear waiting-for-results state in
-    // place of the empty stat strip and dim cards (the page header
-    // above still shows project name, language mix, file count).
-    return <NoCompletedEvalPanel availableRuns={availableRuns} onNavigate={onNavigate} selectedSource={selectedSource} />;
-  }
-  if (focusedDimension) {
-    return (
-      <div className="dimensions-panel">
-        <div className="section-header">
-          <h3 className="section-title">{focusedDimension}</h3>
-          <button type="button" className="btn-secondary" onClick={() => setFocusedDimension(null)}>
-            {t('overview.showAll')}
-          </button>
-        </div>
-        <DimensionCard title={focusedDimension} dimension={focusedDimensionData} isSingleFocus={true} />
-      </div>
-    );
-  }
-  return (
-    <AccumulatedOverviewPanel
-      data={{
-        accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
-        accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
-        trend: dashboard?.trend || [], selectedRunId, selectedProject, projectInfo, granularity, selectedSource,
-        scoresPending, customFormula,
-      }}
-      callbacks={{
-        onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick, onNavigate, onGranularityChange,
-      }}
-    />
-  );
-}
-
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
 // Top-level page component that receives all dashboard state and callbacks
 // directly from App; the high prop count is intentional and not worth splitting.
+// The ready-state body (DashboardContent) and the click-handler memo
+// (useDashboardHandlers) live in sibling files; the early-return ladder below
+// is DOM-identity-pinned (each branch's wrapper element type/position is load
+// -bearing for the fade/appear latch -- see useDashboardPageState) and stays
+// here whole.
 // ---------------------------------------------------------------------------
-
-function useDashboardHandlers(onNavigate, dashboard) {
-  return useMemo(() => ({
-    handleDimensionCardClick: (item, runId) => {
-      if (!onNavigate) return;
-      const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
-      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel, fromProject: item.fromProject });
-    },
-    handleAccumulatedDimensionClick: (item) => {
-      if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel, fromProject: item.fromProject });
-    },
-    handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
-  }), [onNavigate, dashboard]);
-}
 
 // Shared projects aren't in the LOCAL projects list, and a shared selection's
 // id can collide with an unrelated local project (e.g. after a clone-on-add
