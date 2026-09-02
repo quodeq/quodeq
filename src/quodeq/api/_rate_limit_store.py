@@ -114,6 +114,8 @@ class InMemoryRateLimitStore:
 
     def check_and_record(self, ip: str, now: float) -> bool:
         """Same contract as check()+record(), but one lock acquisition."""
+        if not ip:
+            return False
         with self._lock:
             if self._check_unlocked(ip, now):
                 return True
