@@ -12,12 +12,9 @@ src/quodeq/api/routes_evaluations_item.py:98:function
 src/quodeq/api/routes_evaluations_list.py:55:function
 src/quodeq/api/routes_findings.py:90:function
 src/quodeq/api/routes_project_data.py:24:function
-src/quodeq/api/routes_project_list.py:139:function
-src/quodeq/api/routes_project_list.py:60:function
+src/quodeq/api/routes_project_list.py:59:function
 src/quodeq/api/routes_shared_config.py:27:function
 src/quodeq/api/routes_shared_mirrors.py:41:function
-src/quodeq/api/routes_shared_pull.py:27:function
-src/quodeq/api/routes_shared_pull.py:30:function
 src/quodeq/api/standards_overrides_routes.py:29:function
 src/quodeq/api/terminal_routes.py:97:function
 src/quodeq/ui/src/App.jsx:1:file
