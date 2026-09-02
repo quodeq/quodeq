@@ -125,3 +125,26 @@ def test_wipe_cache_removes_all_entries():
     assert list(online_cache.cache_root().iterdir()) == []
     # Cache root itself still exists.
     assert online_cache.cache_root().exists()
+
+
+def test_ensure_clone_evicts_oldest_entries_beyond_the_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(online_cache, "_MAX_CACHED_REPOS", 2)
+
+    def fake_git(args, *, cwd=None, timeout=300):
+        if args[0] == "clone":
+            dest = Path(args[-1])
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / ".git").mkdir()
+            return True
+        return True  # fetch/reset no-ops on an already-cloned repo
+
+    with patch.object(online_cache, "_git", side_effect=fake_git):
+        online_cache.ensure_clone("https://example.com/a.git")
+        online_cache.ensure_clone("https://example.com/b.git")
+        online_cache.ensure_clone("https://example.com/c.git")  # 3rd entry, cap is 2
+
+    entries = [e for e in online_cache.cache_root().iterdir() if e.is_dir()]
+    assert len(entries) == 2, "cache must be pruned to _MAX_CACHED_REPOS entries"
+    # The most recently cloned ("c") must survive.
+    c_dir = online_cache.cache_dir_for_url("https://example.com/c.git")
+    assert c_dir in entries

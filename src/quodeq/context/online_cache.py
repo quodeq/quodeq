@@ -29,6 +29,7 @@ _logger = logging.getLogger(__name__)
 _CACHE_ENV = "QUODEQ_CACHE_ROOT"  # override the cache root for tests / sandboxing
 _DISABLE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
 _DEFAULT_CLONE_TIMEOUT_S = 300
+_MAX_CACHED_REPOS = 20  # bounds ~/.quodeq/cache/online/ disk growth; wipe_cache() clears it fully
 
 
 def cache_root(env: dict[str, str] | None = None) -> Path:
@@ -110,6 +111,20 @@ def _refresh_existing(repo: Path) -> bool:
     return _git(["reset", "--hard", "FETCH_HEAD"], cwd=repo)
 
 
+def _prune_lru(root: Path, *, keep: int) -> None:
+    """Remove the least-recently-used cache entries beyond *keep*.
+
+    "Recently used" = mtime of the entry directory itself, which
+    ``_refresh_existing``'s fetch+reset and a fresh clone both update.
+    """
+    entries = [e for e in root.iterdir() if e.is_dir()]
+    if len(entries) <= keep:
+        return
+    entries.sort(key=lambda e: e.stat().st_mtime)
+    for stale in entries[: len(entries) - keep]:
+        shutil.rmtree(stale, ignore_errors=True)
+
+
 def ensure_clone(url: str) -> Path | None:
     """Return a cached working copy of *url*, cloning or refreshing as needed.
 
@@ -125,6 +140,7 @@ def ensure_clone(url: str) -> Path | None:
         # Refresh failures don't invalidate the cache: stale code is
         # better than a hard failure when the network is flaky.
         _refresh_existing(repo)
+        _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS)
         return repo
 
     # First-time clone — shallow, single-branch, default ref.
@@ -132,6 +148,7 @@ def ensure_clone(url: str) -> Path | None:
         # Clean up a half-clone so the next ensure_clone retries cleanly.
         shutil.rmtree(repo, ignore_errors=True)
         return None
+    _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS)
     return repo
 
 
