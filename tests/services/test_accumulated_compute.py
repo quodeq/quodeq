@@ -1,165 +1,18 @@
-"""Tests for quodeq.services.accumulated — cross-run aggregation logic."""
+"""Tests for quodeq.services.accumulated — compute_accumulated (integration).
+
+Split from test_accumulated.py. Shared builders live in
+tests/services/_accumulated_fixtures.py.
+"""
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
-from typing import Any
 
-import pytest
+from quodeq.services.accumulated import compute_accumulated
 
-from quodeq.core.types import DimensionResult
-from quodeq.data.mappers import parse_dimension_result
-from quodeq.services.accumulated import (
-    _aggregate_severity_counts,
-    _compute_accumulated_scores,
-    _compute_accumulated_trends,
-    numeric_average,
-    _read_all_run_data,
-    compute_accumulated,
-)
+from tests.services._accumulated_fixtures import _dim, _setup_project
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _dim(name: str, score: str = "7.5", grade: str = "B", **extra: Any) -> DimensionResult:
-    """Build a minimal DimensionResult."""
-    raw: dict[str, Any] = {"dimension": name, "overallScore": score, "overallGrade": grade, **extra}
-    return parse_dimension_result(raw)
-
-
-def _write_eval(path: Path, dim_name: str, score: str = "7.5", grade: str = "B", **extra: Any) -> None:
-    """Write a minimal evaluation JSON file for a dimension."""
-    path.mkdir(parents=True, exist_ok=True)
-    data = {"dimension": dim_name, "overallScore": score, "overallGrade": grade, "principles": [], "violations": [], "compliance": [], **extra}
-    (path / f"{dim_name}.json").write_text(json.dumps(data))
-
-
-def _write_evidence(path: Path, dim_name: str, discipline: str = "typescript") -> None:
-    """Write a minimal evidence JSON file."""
-    path.mkdir(parents=True, exist_ok=True)
-    (path / f"{dim_name}_evidence.json").write_text(json.dumps({"dimension": dim_name, "discipline": discipline}))
-
-
-def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[DimensionResult]]]) -> Path:
-    """Set up a project directory with the given runs and dimensions.
-
-    *runs* is a list of (run_id, [DimensionResult, ...]) pairs, newest first.
-    Returns the reports root path.
-    """
-    reports_root = tmp_path / "evaluations"
-    for run_id, dims in runs:
-        run_dir = reports_root / project / run_id
-        for dim in dims:
-            dim_name = dim.dimension
-            eval_dir = run_dir / "evaluation"
-            _write_eval(eval_dir, dim_name, dim.overall_score or "7.5", dim.overall_grade or "B")
-            evidence_dir = run_dir / "evidence"
-            _write_evidence(evidence_dir, dim_name)
-        evidence_dir = run_dir / "evidence"
-        evidence_dir.mkdir(parents=True, exist_ok=True)
-        (evidence_dir / "manifest.json").write_text("{}")
-        (run_dir / "scan.json").write_text("{}")
-    return reports_root
-
-
-# ---------------------------------------------------------------------------
-# _numeric_average
-# ---------------------------------------------------------------------------
-
-class TestZeroCoverageStubExcluded:
-    """A cancelled run's coverage-0 stub eval (filesRead=0) must not drive
-    the accumulated Overview. _score_completed_evidence can write such a stub
-    at cancel time when no findings landed; its score is meaningless. The
-    accumulated reader falls through to an older run with real coverage."""
-
-    def _info(self, run_id):
-        from quodeq.data.fs.report_parser.runs import RunInfo
-        return RunInfo(run_id=run_id, date_iso="2024-01-01", date_label="Jan 01")
-
-    def test_zero_files_read_dim_falls_through_to_real_run(self):
-        from quodeq.services._accumulated_data import _read_all_run_data
-        stub = _dim("security", "9.9", "A", filesRead=0)   # coverage-0 stub, newest
-        real = _dim("security", "6.0", "C", filesRead=5)   # real, older
-        fetch = {"r2": [stub], "r1": [real]}
-        latest, _prev, _prev_run = _read_all_run_data(
-            Path("/x"), "proj", [self._info("r2"), self._info("r1")],
-            ["r2", "r1"], get_run_data=lambda rid: fetch[rid],
-        )
-        assert latest["security"].overall_score == "6.0"
-
-    def test_missing_files_read_is_still_trusted(self):
-        # Legacy evals carry no filesRead (None); those must stay valid.
-        from quodeq.services._accumulated_data import _read_all_run_data
-        legacy = _dim("security", "8.0", "A")  # no filesRead field
-        fetch = {"r1": [legacy]}
-        latest, _p, _pr = _read_all_run_data(
-            Path("/x"), "proj", [self._info("r1")], ["r1"],
-            get_run_data=lambda rid: fetch[rid],
-        )
-        assert latest["security"].overall_score == "8.0"
-
-
-class TestNumericAverage:
-    def test_computes_average(self):
-        """Two dimensions with scores 8.0 and 6.0 should average to 7.0."""
-        dims = [_dim("a", "8.0"), _dim("b", "6.0")]
-        assert numeric_average(dims) == 7.0
-
-    def test_returns_none_for_empty(self):
-        assert numeric_average([]) is None
-
-    def test_skips_none_scores(self):
-        dims = [_dim("a", "8.0"), DimensionResult(dimension="b", overall_score=None)]
-        assert numeric_average(dims) == 8.0
-
-    def test_handles_grade_strings(self):
-        dims = [_dim("a", "A"), _dim("b", "9.0")]
-        # "A" is not numeric, should be skipped
-        result = numeric_average(dims)
-        assert result == 9.0
-
-    def test_all_non_numeric_returns_none(self):
-        dims = [_dim("a", "A"), _dim("b", "B+")]
-        assert numeric_average(dims) is None
-
-    def test_single_dimension(self):
-        dims = [_dim("a", "10.0")]
-        assert numeric_average(dims) == 10.0
-
-
-# ---------------------------------------------------------------------------
-# _aggregate_severity_counts
-# ---------------------------------------------------------------------------
-
-class TestAggregateSeverityCounts:
-    def test_sums_across_dimensions(self):
-        dims = [
-            _dim("a", totals={"violationCount": 3, "complianceCount": 5, "severity": {"critical": 1, "major": 1, "minor": 1}}),
-            _dim("b", totals={"violationCount": 2, "complianceCount": 1, "severity": {"critical": 0, "major": 2, "minor": 0}}),
-        ]
-        result = _aggregate_severity_counts(dims)
-        assert result["totalViolations"] == 5
-        assert result["totalCompliance"] == 6
-        assert result["critical"] == 1
-        assert result["major"] == 3
-        assert result["minor"] == 1
-
-    def test_handles_missing_totals(self):
-        dims = [_dim("a")]
-        result = _aggregate_severity_counts(dims)
-        assert result["totalViolations"] == 0
-
-    def test_empty_list(self):
-        result = _aggregate_severity_counts([])
-        assert result["totalViolations"] == 0
-        assert result["critical"] == 0
-
-
-# ---------------------------------------------------------------------------
-# compute_accumulated (integration)
-# ---------------------------------------------------------------------------
 
 class TestComputeAccumulated:
     def test_single_run(self, tmp_path: Path):
@@ -246,7 +99,6 @@ class TestComputeAccumulated:
         # (status.json with state="running" doesn't trigger in_progress
         # — only a live PID does). The test process's own pid is
         # guaranteed alive for the duration of the call.
-        import os
         reports_root = _setup_project(tmp_path, "proj", [
             ("run2", [_dim("usability", "9.5", "A")]),
             ("run1", [_dim("usability", "7.0", "B"), _dim("flexibility", "6.0", "C")]),
@@ -277,7 +129,6 @@ class TestComputeAccumulated:
         # no run has terminated yet. The user sees a blank dashboard until
         # the run finishes — by design. (Previously the overview leaked
         # mid-flight scores; now it waits for terminal status.)
-        import os
         reports_root = _setup_project(tmp_path, "proj", [
             ("run1", [_dim("performance", "9.5", "A")]),
         ])
