@@ -11,7 +11,6 @@
 export const SIZE_GRANDFATHER = [
   "src/features/assistant/useAssistantStream.js",
   "src/features/dashboard/components/DashboardPage.jsx",
-  "src/features/drawer/BottomDrawer.jsx",
   "src/features/evaluation/components/BranchScopeSelector.jsx",
   "src/features/evaluation/components/CleanScanToggle.jsx",
   "src/features/evaluation/components/ConsoleLogViewer.jsx",

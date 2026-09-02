@@ -14,9 +14,7 @@ const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
  * unmounted) so the terminal's xterm buffers and PTY-attached sockets
  * survive a tab switch.
  */
-export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
-  const { isOpen, height, setHeight, openPanels, activeTab,
-          maximized, setMaximized } = useAssistantDrawer();
+function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -47,6 +45,14 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
     window.removeEventListener('pointermove', handleDragMove);
     window.removeEventListener('pointerup', handleDragEnd);
   }, [handleDragMove, handleDragEnd]);
+
+  return handleDragStart;
+}
+
+export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
+  const { isOpen, height, setHeight, openPanels, activeTab,
+          maximized, setMaximized } = useAssistantDrawer();
+  const handleDragStart = useDrawerDrag({ height, setHeight, maximized, setMaximized });
 
   if (!isOpen) return null;
   // Guard against a transient render where activeTab isn't (yet) an open panel.
