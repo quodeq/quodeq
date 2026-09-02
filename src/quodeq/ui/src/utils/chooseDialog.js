@@ -14,6 +14,7 @@
  *   if (choice === null) return; // user cancelled
  */
 import { t } from '../strings/index.js';
+import { buildDialogShell } from './domDialogBuilder.js';
 const _ALLOWED_VARIANTS = new Set(['default', 'primary', 'danger']);
 
 export function chooseDialog({
@@ -27,26 +28,18 @@ export function chooseDialog({
       resolve(null);
       return;
     }
-    const overlay = document.createElement('div');
-    overlay.className = 'qd-confirm-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
 
-    const dialog = document.createElement('div');
-    dialog.className = 'qd-confirm-dialog qd-confirm-dialog--default';
+    function close(value) {
+      shell.unmount();
+      resolve(value);
+    }
 
-    const titleEl = document.createElement('h3');
-    titleEl.className = 'qd-confirm-title';
-    titleEl.textContent = title;
-    dialog.appendChild(titleEl);
-
-    const messageEl = document.createElement('p');
-    messageEl.className = 'qd-confirm-message';
-    messageEl.textContent = message;
-    dialog.appendChild(messageEl);
-
-    const actionsEl = document.createElement('div');
-    actionsEl.className = 'qd-confirm-actions';
+    const shell = buildDialogShell({
+      title, message,
+      dialogClassName: 'qd-confirm-dialog qd-confirm-dialog--default',
+      onCancel: () => close(null),
+    });
+    const { actionsEl } = shell;
 
     const cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
@@ -70,24 +63,12 @@ export function chooseDialog({
       actionsEl.appendChild(btn);
       return { btn, key: a.key };
     });
-    dialog.appendChild(actionsEl);
-    overlay.appendChild(dialog);
 
-    function close(value) {
-      overlay.remove();
-      document.removeEventListener('keydown', onKey);
-      resolve(value);
-    }
-    function onKey(e) {
-      if (e.key === 'Escape') close(null);
-    }
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
     cancelBtn.addEventListener('click', () => close(null));
     for (const { btn, key } of buttons) {
       btn.addEventListener('click', () => close(key));
     }
-    document.addEventListener('keydown', onKey);
-    document.body.appendChild(overlay);
+    shell.mount();
     // Default focus: when any action is destructive, focus Cancel so Enter
     // cannot accidentally fire the destructive button. Otherwise focus the
     // last (rightmost / primary) action.

@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { exportStandard } from '../../../api/index.js';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
+import { useStandardRowModals } from '../hooks/useStandardRowModals.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const BASE_LABELS = {
   [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'),
@@ -57,24 +56,6 @@ function DuplicateModal({ standardId, onConfirm, onCancel }) {
       </div>
     </div>
   );
-}
-
-async function downloadStandard(standardId) {
-  const { data, fileName } = await exportStandard(standardId);
-  const content = JSON.stringify(data, null, 2);
-  if (window.pywebview?.api?.save_file) {
-    window.pywebview.api.save_file(content, fileName);
-    return;
-  }
-  const blob = new Blob([content], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 function StarToggle({ isVisible, standardId, onToggleVisibility }) {
@@ -138,10 +119,58 @@ function isDeletableStandard(type) {
   return type !== STANDARD_TYPES.BUILTIN && type !== STANDARD_TYPES.QUODEQ;
 }
 
+function StandardRowMain({
+  standard, isVisible, onToggleVisibility, baseLabel, customizedCounts, principleCount, requirementCount,
+  isDeletable, onEdit, openDuplicate, handleDownload, openDelete,
+}) {
+  return (
+    <div
+      className={`standards-row${isVisible ? '' : ' standards-row--disabled'}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isVisible}
+      onClick={() => onToggleVisibility(standard.id)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); } }}
+    >
+      <div className="standards-cell standards-cell--name">
+        <span className="standards-row-name">{standard.name}</span>
+        {standard.description && <span className="standards-row-subtitle">{standard.description}</span>}
+      </div>
+      <div className="standards-cell standards-cell--base">
+        <span className={`standards-base-pill standards-base-pill--${standard.type}`}>{baseLabel}</span>
+        {customizedCounts?.[standard.id] > 0 && (
+          <span className="standards-customized-badge">
+            {t('standards.customizedCount', { count: customizedCounts[standard.id] })}
+          </span>
+        )}
+      </div>
+      <div className="standards-cell standards-cell--num">{principleCount}</div>
+      <div className="standards-cell standards-cell--num">{requirementCount}</div>
+      <div className="standards-cell standards-cell--enabled">
+        <StarToggle isVisible={isVisible} standardId={standard.id} onToggleVisibility={onToggleVisibility} />
+      </div>
+      <div className="standards-cell standards-cell--actions">
+        <RowActions
+          standard={standard}
+          isDeletable={isDeletable}
+          isEditable={isDeletable}
+          onOpen={() => onEdit(standard.id)}
+          onDuplicate={openDuplicate}
+          onDownload={handleDownload}
+          onDelete={openDelete}
+        />
+      </div>
+    </div>
+  );
+}
+
 function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onToggleVisibility, customizedCounts }) {
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-  const [downloadError, setDownloadError] = useState(null);
+  const {
+    showDeleteModal, showDuplicateModal, downloadError,
+    openDelete, closeDelete, confirmDelete,
+    openDuplicate, closeDuplicate, confirmDuplicate,
+    handleDownload,
+  } = useStandardRowModals({ standard, onDelete, onDuplicate });
   const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
   const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce((sum, p) => sum + (p.requirements?.length ?? 0), 0);
   const isDeletable = isDeletableStandard(standard.type);
@@ -149,48 +178,11 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
 
   return (
     <>
-      <div
-        className={`standards-row${isVisible ? '' : ' standards-row--disabled'}`}
-        role="button"
-        tabIndex={0}
-        aria-pressed={isVisible}
-        onClick={() => onToggleVisibility(standard.id)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleVisibility(standard.id); } }}
-      >
-        <div className="standards-cell standards-cell--name">
-          <span className="standards-row-name">{standard.name}</span>
-          {standard.description && <span className="standards-row-subtitle">{standard.description}</span>}
-        </div>
-        <div className="standards-cell standards-cell--base">
-          <span className={`standards-base-pill standards-base-pill--${standard.type}`}>{baseLabel}</span>
-          {customizedCounts?.[standard.id] > 0 && (
-            <span className="standards-customized-badge">
-              {t('standards.customizedCount', { count: customizedCounts[standard.id] })}
-            </span>
-          )}
-        </div>
-        <div className="standards-cell standards-cell--num">{principleCount}</div>
-        <div className="standards-cell standards-cell--num">{requirementCount}</div>
-        <div className="standards-cell standards-cell--enabled">
-          <StarToggle isVisible={isVisible} standardId={standard.id} onToggleVisibility={onToggleVisibility} />
-        </div>
-        <div className="standards-cell standards-cell--actions">
-          <RowActions
-            standard={standard}
-            isDeletable={isDeletable}
-            isEditable={isDeletable}
-            onOpen={() => onEdit(standard.id)}
-            onDuplicate={() => setShowDuplicateModal(true)}
-            onDownload={() => {
-              setDownloadError(null);
-              downloadStandard(standard.id).catch((err) => {
-                setDownloadError(apiErrorMessage(err, 'standards.downloadFailed'));
-              });
-            }}
-            onDelete={() => setShowDeleteModal(true)}
-          />
-        </div>
-      </div>
+      <StandardRowMain
+        standard={standard} isVisible={isVisible} onToggleVisibility={onToggleVisibility} baseLabel={baseLabel}
+        customizedCounts={customizedCounts} principleCount={principleCount} requirementCount={requirementCount}
+        isDeletable={isDeletable} onEdit={onEdit} openDuplicate={openDuplicate} handleDownload={handleDownload} openDelete={openDelete}
+      />
       {downloadError && (
         <div role="alert" className="standards-row-error">
           {t('standards.downloadError', { message: downloadError })}
@@ -201,15 +193,15 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
           standardName={standard.name}
           principleCount={principleCount}
           requirementCount={requirementCount}
-          onConfirm={() => { setShowDeleteModal(false); onDelete(standard.id); }}
-          onCancel={() => setShowDeleteModal(false)}
+          onConfirm={confirmDelete}
+          onCancel={closeDelete}
         />
       )}
       {showDuplicateModal && (
         <DuplicateModal
           standardId={standard.id}
-          onConfirm={(newId) => { setShowDuplicateModal(false); onDuplicate(standard.id, newId); }}
-          onCancel={() => setShowDuplicateModal(false)}
+          onConfirm={confirmDuplicate}
+          onCancel={closeDuplicate}
         />
       )}
     </>

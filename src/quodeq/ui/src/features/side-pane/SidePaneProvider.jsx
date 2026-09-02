@@ -3,6 +3,7 @@ import { SidePaneContext } from './SidePaneContext.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
 import { readString, removeKey, writeString } from '../../adapters/storage.js';
 import { t } from '../../strings/index.js';
+import { useRegisteredSpecs } from './hooks/useRegisteredSpecs.js';
 
 const STORAGE_KEY = 'quodeq.sidePaneWidth';
 const LEGACY_STORAGE_KEY = 'quodeq.reportPaneWidth';
@@ -120,28 +121,7 @@ export function SidePaneProvider({ children }) {
 
   const closeAll = useCallback(() => setWindows([]), []);
 
-  const [registeredSpecs, setRegisteredSpecs] = useState({}); // { [type]: spec }
-
-  const registerSpec = useCallback((type, spec) => {
-    setRegisteredSpecs((prev) => {
-      if (prev[type] === spec) return prev;
-      return { ...prev, [type]: spec };
-    });
-  }, []);
-
-  const unregisterSpec = useCallback((type) => {
-    setRegisteredSpecs((prev) => {
-      if (!(type in prev)) return prev;
-      const next = { ...prev };
-      delete next[type];
-      return next;
-    });
-  }, []);
-
-  const getRegisteredSpec = useCallback(
-    (type) => registeredSpecs[type] ?? null,
-    [registeredSpecs],
-  );
+  const { registerSpec, unregisterSpec, getRegisteredSpec } = useRegisteredSpecs();
 
   const setPaneWidth = useCallback((px) => {
     const next = clampSidePaneWidth(px, typeof window !== 'undefined' ? window.innerWidth : 1920);

@@ -10,8 +10,13 @@ import { lazy } from 'react';
 import EmptyState from '../components/EmptyState.jsx';
 import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWithTour.jsx';
 import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
-import { buildProjectRootFile } from '../utils/explorerUtils.js';
 import { t } from '../strings/index.js';
+import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
+import { mapRoute } from './mapRoute.jsx';
+import { historyRoute } from './historyRoute.jsx';
+import { compareRoute } from './compareRoute.jsx';
+import { buildDashboardDataBundle } from './dashboardDataBundle.js';
+import { buildNavigationBundle } from './navigationBundle.js';
 
 const DashboardPage = lazy(() => import('../features/dashboard/components/DashboardPage.jsx'));
 const ExplorerPage = lazy(() => import('../features/explorer/components/ExplorerPage.jsx'));
@@ -19,15 +24,20 @@ const FileDetailPage = lazy(() => import('../features/explorer/components/FileDe
 const PrincipleDetailPage = lazy(() => import('../features/explorer/components/PrincipleDetailPage.jsx'));
 const FindingDetailPage = lazy(() => import('../features/explorer/components/FindingDetailPage.jsx'));
 const ProjectsPage = lazy(() => import('../features/dashboard/components/ProjectsPage.jsx'));
-const HistoryPage = lazy(() => import('../features/history/components/HistoryPage.jsx'));
 const EvaluateScreen = lazy(() => import('../features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));
 const GradeFormulaPage = lazy(() => import('../features/grade-formula/GradeFormulaPage.jsx'));
 const StandardsPage = lazy(() => import('../features/standards/StandardsPage.jsx'));
-const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
-const MapPage = lazy(() => import('../features/map/components/MapPage.jsx'));
 const HelpPage = lazy(() => import('../features/help/components/HelpPage.jsx'));
-const ComparePage = lazy(() => import('../features/compare/components/ComparePage.jsx'));
+
+// buildEvalPrincipal, buildDashboardDataBundle and buildNavigationBundle are
+// re-exported below (their consumers -- App.jsx, this file's own route
+// renderers, and the tests that pin producer/consumer contracts -- all
+// import them from here) even though they now live in sibling modules; see
+// violationsRoute.jsx, dashboardDataBundle.js and navigationBundle.js.
+export { buildEvalPrincipal };
+export { buildDashboardDataBundle };
+export { buildNavigationBundle };
 
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
@@ -90,104 +100,6 @@ function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnected }) {
   );
 }
 
-function resolveHistorySelectedRunId(selectedRun, trend) {
-  if (selectedRun && selectedRun !== 'latest' && trend.some((t) => t.runId === selectedRun)) return selectedRun;
-  return trend.length > 0 ? trend[0].runId : null;
-}
-
-/**
- * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
- * navigation key a route renderer reads MUST be forwarded here -- a route
- * consuming a key the bundle lacks fails silently at click time (the
- * handler throws mid-event and the UI just doesn't respond; that's how the
- * repositories local/online tab flip broke when handleNavigateReplace was
- * consumed but never forwarded). Exported so producer and consumer can be
- * pinned together in tests without mounting the whole App.
- */
-/**
- * The dashboard data bundle handed to every DashboardPage route.
- *
- * Same hazard as buildNavigationBundle, quieter failure: this is an explicit
- * key whitelist, so a field added to useAppState and read by DashboardPage
- * silently arrives as undefined unless it is forwarded here. Nothing throws --
- * the feature just never activates (that is how scoresPending, and the
- * dimension-panel pending state that depends on it, was inert at first).
- * Exported so producer and consumer can be pinned together in tests.
- */
-export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
-  return {
-    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
-    projectsLoaded: state.projectsLoaded,
-    projectsLoadFailed: state.projectsLoadFailed,
-    onProjectsRetry: state.retryLoadProjects,
-    warmup: state.warmup,
-    dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
-    onRetry: state.refreshDashboardActive,
-    scoresPending: state.scoresPending,
-    sharedProjectInfo: state.sharedProjectInfo,
-    availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
-    selectedDisplayName: state.selectedDisplayName,
-    granularity: state.granularity, onGranularityChange: state.onGranularityChange,
-    sharedHasContent,
-  };
-}
-
-export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
-  return {
-    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
-    projectsLoaded: state.projectsLoaded,
-    projectsLoadFailed: state.projectsLoadFailed,
-    retryLoadProjects: state.retryLoadProjects,
-    warmup: state.warmup,
-    loadProjects: state.loadProjects,
-    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
-    // navStack + navGoTo let a route unwind history to an earlier entry of
-    // its own page (the map's drill-up) instead of pushing a duplicate.
-    navStack: state.navStack, navGoTo: state.navGoTo,
-    handleProjectChange: state.handleProjectChange, navTab, navStackLength,
-    handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
-    historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
-    currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
-    prefetchHandlers: state.prefetchHandlers,
-    onAddProject: () => {
-      if (isEvaluating) {
-        showToast(t('evaluate.busyAddProject'));
-        return;
-      }
-      setWizardEntry({ startStep: 'repo-scan', isFirstProject: state.projects.length === 0 });
-    },
-    onImportProject: () => {
-      if (isEvaluating) {
-        showToast(t('evaluate.busyImportProject'));
-        return;
-      }
-      state.handleImportProject();
-    },
-    onTakeTour: () => {
-      if (isEvaluating) {
-        showToast(t('evaluate.busyStartTour'));
-        return;
-      }
-      setWizardEntry({ startStep: 'welcome', isFirstProject: true });
-    },
-    onResumeSetup: (projectId) => {
-      if (isEvaluating) {
-        showToast(t('evaluate.busyResumeSetup'));
-        return;
-      }
-      setWizardEntry({
-        startStep: 'provider',
-        isFirstProject: false,
-        presetProjectId: projectId,
-      });
-    },
-    // null when the shared repo has no content — consumers use the nullness
-    // to hide their "browse remote repositories" affordance.
-    onBrowseRemote: sharedHasContent ? () => navTab('projects') : null,
-    isEvaluating,
-  };
-}
-
 /**
  * After the shared repository is disconnected in Settings, a currently
  * 'shared' selection is left pointing at a project that no longer resolves
@@ -236,127 +148,6 @@ function renderEvalPrincipleDetail(params, props) {
   );
 }
 
-// Exported so unit tests can pin the runId-threading contract without having
-// to mount the whole App. Callers from the Violations page must pass the
-// dimension's ``fromRunId`` — see ``ViolationsRoute.navigateToPrinciple`` for
-// the regression history.
-export function buildEvalPrincipal(principleObj, principleGrade, runId) {
-  const violations = principleObj.violations || [];
-  const compliance = principleObj.compliance || [];
-  return {
-    principle: principleObj.principle,
-    score: principleGrade?.score || null,
-    grade: principleGrade?.grade || null,
-    dimension: principleObj.dimension || '',
-    runId: runId || '',
-    principleData: {
-      name: principleObj.principle,
-      grade: principleGrade?.grade || null,
-      violations,
-      compliance,
-    },
-    dimViolations: violations,
-    dimCompliance: compliance,
-  };
-}
-
-function ViolationsRoute({ params, props }) {
-  const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
-  const dims = acc?.dimensions || [];
-  const nav = props.navigation.handleNavigate;
-
-  const dimMap = new Map(dims.map(d => [d.dimension, d]));
-  const principleMap = new Map(
-    dims.flatMap(d => (d.principles || []).map(p => [`${d.dimension}\0${p.name || p.principle}`, p]))
-  );
-  function navigateToPrinciple(principleObj, severity) {
-    const dim = dimMap.get(principleObj.dimension);
-    const pg = principleMap.get(`${principleObj.dimension}\0${principleObj.principle}`);
-    // dim.fromRunId is the run whose data populated this accumulated entry;
-    // threading it through lets the dismiss POST carry a real run id so the
-    // backend can rescore and project the action into SQL — without this the
-    // PrincipleDetail score never moves on dismiss and the entry never lands
-    // on the Dismissed tab.
-    nav('evalprinciple', {
-      evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
-      severity,
-      sourceTab: 'violations',
-    });
-  }
-
-  function navigateToDimension(row, severity) {
-    const dim = row.raw || dimMap.get(row.dimension);
-    if (!dim) return;
-    // Cell clicks on a dimension row (numeric severity columns or the
-    // "violations" total) drill into the dimension's findings — match the
-    // project/run pattern by handing FileDetailPage a synthetic file
-    // aggregated from the dimension, with the chosen severity preselected.
-    const dimFile = buildProjectRootFile([dim], dim.dimension);
-    const severityFilter = severity || 'all';
-    nav('file', {
-      file: dimFile,
-      severityFilter,
-      runId: dim.fromRunId,
-      dateLabel: dim.fromDateLabel,
-      sourceTab: 'violations',
-    });
-  }
-
-  return (
-    <ViolationsPage
-      data={{
-        accumulated: acc,
-        accumulatedDimensions: dims,
-        selectedProject: props.navigation.selectedProject,
-        selectedSource: props.navigation.selectedSource,
-        projects: props.navigation.projects,
-        projectsLoaded: props.navigation.projectsLoaded,
-        projectName: props.dashboardData.selectedDisplayName,
-        loading: props.dashboardData.loading,
-        isFetching: props.dashboardData.isFetching,
-        error: props.dashboardData.error,
-        dismissRefreshKey: props.dismissRefreshKey,
-      }}
-      callbacks={{
-        onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-        onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
-        onCellClick: ({ row, severity }) => {
-          if (row.type === 'principle' && row.principleObj) {
-            navigateToPrinciple(row.principleObj, severity);
-          } else {
-            navigateToDimension(row, severity);
-          }
-        },
-        onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
-        // ViolationsPage fires onRefresh on EVERY mount (its tabKey effect),
-        // including plain drill-down/back navigation with no mutation --
-        // the page remounts on every round trip. onRefresh must stay wired
-        // to the lazy refreshDashboard (mark-stale, refetchType:'none') so
-        // plain navigation never forces an active refetch of the 10-20 MB
-        // dashboard payload. Restore/delete (single + bulk) route through a
-        // SEPARATE onReconcile callback via useDismissedFindings, called
-        // alongside onRefresh from its four mutation handlers.
-        // restore-all/delete-all return a payload applyMutationDelta can't
-        // patch (scores:null, delta.isLatest:false), so those need the
-        // debounced ACTIVE reconcile — see scheduleDashboardReconcile in
-        // useDashboard.js.
-        onRefresh: props.refreshDashboard,
-        onReconcile: props.scheduleDashboardReconcile,
-        onNavigate: nav,
-        onRetry: props.dashboardData.onRetry,
-      }}
-      isDirectNav={props.navigation.navStackLength === 1}
-      tabKey={params._tabKey || 0}
-      // The by-dimension / by-file / dismissed flip is view state on the SAME
-      // screen: it lives in the route entry so back/forward and the crumb see
-      // it, but flipping replaces (never pushes) so history doesn't grow.
-      // Params are spread forward so _tabKey survives the flip.
-      subTab={params.subTab || 'dimension'}
-      onSubTabChange={(v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v })}
-    />
-  );
-}
-
 // Exported for the same reason as buildEvalPrincipal — a unit-testable pin
 // on the per-route onDismiss source-gating contract without mounting the
 // whole App (which needs ~8 providers). Calling e.g.
@@ -365,96 +156,9 @@ function ViolationsRoute({ params, props }) {
 export const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect, onProjectsReload: props.navigation.loadProjects, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={false} />,
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
-  map: (params, props) => {
-    const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
-    const isDirectNav = props.navigation.navStackLength === 1;
-    // The viz drill-down is a real nav-stack entry: drilling into a folder
-    // pushes (browser back climbs back out), and navigating up to a path
-    // that already sits in the trailing run of map entries unwinds history
-    // to it instead of stacking a duplicate. Mode/style toggles replace in
-    // place so flipping them never grows history. Params are spread forward
-    // on every hop so _tabKey (the fresh-tab-click reset signal) survives.
-    const handlePathChange = (path) => {
-      const current = params.path || '';
-      if (path === current) return;
-      const stack = props.navigation.navStack || [];
-      for (let i = stack.length - 2; i >= 0 && stack[i].page === 'map'; i--) {
-        if ((stack[i].path || '') === path) {
-          props.navigation.navGoTo(i);
-          return;
-        }
-      }
-      props.navigation.handleNavigate('map', { ...params, path });
-    };
-    const replaceView = (patch) => props.navigation.handleNavigateReplace('map', { ...params, ...patch });
-    return <MapPage
-      data={{
-        accumulated: acc,
-        dashboard: props.dashboardData.dashboard,
-        projectName: props.dashboardData.selectedDisplayName,
-        projects: props.navigation.projects,
-        projectsLoaded: props.navigation.projectsLoaded,
-        selectedProject: props.navigation.selectedProject,
-        selectedSource: props.navigation.selectedSource,
-        loading: props.dashboardData.loading,
-        isFetching: props.dashboardData.isFetching,
-        error: props.dashboardData.error,
-      }}
-      callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard, onRetry: props.dashboardData.onRetry }}
-      nav={{
-        path: params.path || '',
-        vizStyle: params.vizStyle,
-        viewMode: params.viewMode,
-        galaxyMode: params.galaxyMode,
-        onPathChange: handlePathChange,
-        onVizStyleChange: (v) => replaceView({ vizStyle: v }),
-        onViewModeChange: (v) => replaceView({ viewMode: v }),
-        onGalaxyModeChange: (v) => replaceView({ galaxyMode: v }),
-      }}
-      isDirectNav={isDirectNav}
-      tabKey={params._tabKey || 0}
-    />;
-  },
+  map: mapRoute,
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={true} />,
-  history: (params, props) => {
-    const trend = props.dashboardData.dashboard?.trend || [];
-    const runs = props.dashboardData.availableRuns || [];
-    const idx = props.dashboardData.overviewRunIndex || 0;
-    return (
-      <HistoryPage
-        trend={trend}
-        selection={{
-          selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
-          selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
-        }}
-        availableRuns={runs}
-        dimensions={{
-          accumulatedDimensions: props.dashboardData.accumulated?.dimensions || [],
-          lastRun: { date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId },
-        }}
-        callbacks={{
-          onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
-          onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
-          onNavigate: props.navigation.handleNavigate,
-          onRunChange: props.navigation.setHistorySelectedRun,
-          // Run deletion changes the accumulated rollup the Overview grade is
-          // built from — same mutation class as dismiss/restore, so it gets
-          // the same debounced ACTIVE reconcile (mark-stale alone never
-          // reaches the always-mounted Overview observer).
-          onRunDeleted: () => props.scheduleDashboardReconcile?.(),
-        }}
-        projects={props.navigation.projects}
-        projectsLoaded={props.navigation.projectsLoaded}
-        selectedProject={props.navigation.selectedProject}
-        selectedSource={props.navigation.selectedSource}
-        loading={props.dashboardData.loading}
-        isFetching={props.dashboardData.isFetching}
-        error={props.dashboardData.error}
-        onRetry={props.dashboardData.onRetry}
-        projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
-      />
-    );
-  },
+  history: historyRoute,
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
   explorer: (params, props) => (
     <ExplorerPage
@@ -537,46 +241,7 @@ export const ROUTE_RENDERERS = {
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} projectsLoaded={props.navigation.projectsLoaded} selectedProject={props.navigation.selectedProject} isEvaluating={props.navigation.isEvaluating} filters={params.filters} actions={{ onSelect: (id, source) => { props.navigation.handleProjectChange(id, source); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject, onAddProject: props.navigation.onAddProject, onImportProject: props.navigation.onImportProject, onResumeSetup: props.navigation.onResumeSetup, onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }), onProjectsReload: props.navigation.loadProjects }} />,
   standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
   help: () => <HelpPage />,
-  compare: (params, props) => (
-    <ComparePage
-      projects={props.navigation.projects}
-      projectsLoaded={props.navigation.projectsLoaded}
-      dimension={params.dimension || null}
-      onOpenProject={(id, source = 'local') => {
-        // Remote fleet rows open through the shared source; the same
-        // machinery the projects drawer uses for shared selections.
-        props.navigation.handleProjectChange(id, source);
-        props.navigation.navTab('overview');
-      }}
-      // Drill-down is a real nav-stack entry: push from the fleet so the
-      // browser back button returns there; replace when switching between
-      // dimensions so tab-hopping doesn't grow history.
-      onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
-      onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
-      // Cross-project principle jump: the evalPrincipal carries its own
-      // project, so the selection doesn't change and back pops to Compare.
-      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
-      // Standings row -> that project's own screen of the SAME dimension
-      // (the explorer's cross-project fromProject entry), pushed for the
-      // same back-pops-to-Compare contract.
-      onOpenProjectDimension={(target) => props.navigation.handleNavigate('explorer', {
-        dimension: target.dimName,
-        runId: target.runId,
-        dateLabel: target.dateLabel,
-        fromProject: target.id,
-        // The entry's own source, like its own project: the explorer must
-        // read a local fromProject from the local API even while the
-        // global selection sits on the shared source (and vice versa).
-        fromSource: target.source || 'local',
-        sourceTab: 'compare',
-      })}
-      // Head-to-head is a push like the dimension drill-down: back returns
-      // to the fleet with the two-project scope still selected.
-      duel={params.duel || null}
-      onOpenDuel={(ids) => props.navigation.handleNavigate('compare', { duel: ids })}
-      onBack={props.navigation.navPop}
-    />
-  ),
+  compare: compareRoute,
 };
 
 // The app-level "no local projects" wall in MainContent. Route pages that

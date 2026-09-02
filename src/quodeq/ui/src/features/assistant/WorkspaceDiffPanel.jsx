@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import {
-  applyAssistantWorkspace, createAssistantWorkspacePr,
-  discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
+  applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace,
 } from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
+import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
 
 export function classifyDiffLine(line) {
   if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) return 'wsdiff-file';
@@ -13,71 +13,23 @@ export function classifyDiffLine(line) {
   return 'wsdiff-ctx';
 }
 
-export function WorkspaceDiffPanel({ sessionId, onChanged }) {
-  const [diff, setDiff] = useState(null);
-  const [truncated, setTruncated] = useState(false);
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [outcome, setOutcome] = useState(null); // {kind, message, prUrl}
-  const [prOpen, setPrOpen] = useState(false);
-  const [prTitle, setPrTitle] = useState(t('assistant.defaultPrTitle'));
-  const [prBody, setPrBody] = useState('');
-
-  const loadDiff = useCallback(() => {
-    let cancelled = false;
-    setDiff(null); setError(null);
-    fetchAssistantWorkspaceDiff(sessionId)
-      .then((d) => { if (!cancelled) { setDiff(d.diff ?? ''); setTruncated(!!d.truncated); } })
-      .catch((err) => { if (!cancelled) setError(err?.message || String(err)); });
-    return () => { cancelled = true; };
-  }, [sessionId]);
-
-  useEffect(() => loadDiff(), [loadDiff]);
-
-  const act = useCallback(async (fn, kind) => {
-    setBusy(true); setError(null);
-    try {
-      const res = await fn();
-      // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
-      // surface the message and let the user retry, apply, or discard.
-      if (kind === 'pr' && !res.prUrl) {
-        if (res.pushed) {
-          // Branch is on the remote; local apply is moot. Terminal message.
-          setOutcome({ kind: 'pr', message: res.message || null, prUrl: null });
-        } else {
-          // Push failed: changes restored to the worktree; keep buttons to retry/apply/discard.
-          setError(res.message || t('assistant.prNotCreated'));
-        }
-        onChanged?.();
-        return;
-      }
-      setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
-      onChanged?.();
-    } catch (err) {
-      setError(err?.message || String(err));
-    } finally {
-      setBusy(false);
-    }
-  }, [onChanged]);
-
-  if (outcome) {
-    return (
-      <div className="workspace-diff">
-        <p className="workspace-diff-outcome" role="status" aria-live="polite">
-          {outcome.kind === 'applied' && t('assistant.outcomeApplied')}
-          {outcome.kind === 'discarded' && t('assistant.outcomeDiscarded')}
-          {outcome.kind === 'pr' && (outcome.prUrl
-            ? <>{t('assistant.prCreated')} <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a></>
-            : (outcome.message || t('assistant.outcomeBranchKept')))}
-        </p>
-      </div>
-    );
-  }
-
-  const empty = diff !== null && diff.trim() === '';
-
+function WorkspaceDiffOutcome({ outcome }) {
   return (
     <div className="workspace-diff">
+      <p className="workspace-diff-outcome" role="status" aria-live="polite">
+        {outcome.kind === 'applied' && t('assistant.outcomeApplied')}
+        {outcome.kind === 'discarded' && t('assistant.outcomeDiscarded')}
+        {outcome.kind === 'pr' && (outcome.prUrl
+          ? <>{t('assistant.prCreated')} <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a></>
+          : (outcome.message || t('assistant.outcomeBranchKept')))}
+      </p>
+    </div>
+  );
+}
+
+function WorkspaceDiffBody({ diff, truncated, error, empty }) {
+  return (
+    <>
       {truncated && (
         <p className="workspace-diff-warning" role="alert">
           {t('assistant.diffTruncated')}
@@ -94,6 +46,13 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
           ))}
         </pre>
       )}
+    </>
+  );
+}
+
+function WorkspaceDiffActions({ sessionId, diff, empty, busy, prOpen, setPrOpen, prTitle, setPrTitle, prBody, setPrBody, loadDiff, act }) {
+  return (
+    <>
       <div className="workspace-diff-actions">
         <button type="button" disabled={busy} onClick={() => loadDiff()}>
           {t('assistant.refresh')}
@@ -124,6 +83,29 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+export function WorkspaceDiffPanel({ sessionId, onChanged }) {
+  const {
+    diff, truncated, error, busy, outcome,
+    prOpen, setPrOpen, prTitle, setPrTitle, prBody, setPrBody,
+    loadDiff, act,
+  } = useWorkspaceDiff({ sessionId, onChanged });
+
+  if (outcome) return <WorkspaceDiffOutcome outcome={outcome} />;
+
+  const empty = diff !== null && diff.trim() === '';
+
+  return (
+    <div className="workspace-diff">
+      <WorkspaceDiffBody diff={diff} truncated={truncated} error={error} empty={empty} />
+      <WorkspaceDiffActions
+        sessionId={sessionId} diff={diff} empty={empty} busy={busy}
+        prOpen={prOpen} setPrOpen={setPrOpen} prTitle={prTitle} setPrTitle={setPrTitle}
+        prBody={prBody} setPrBody={setPrBody} loadDiff={loadDiff} act={act}
+      />
     </div>
   );
 }

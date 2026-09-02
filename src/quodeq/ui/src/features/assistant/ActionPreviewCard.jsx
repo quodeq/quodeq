@@ -27,6 +27,69 @@ function CardSummary({ actionType, summary }) {
   );
 }
 
+function ActionStatusBanner({ status }) {
+  if (status === 'applied') {
+    return <div className="assistant-card-status assistant-card-status-applied">{t('assistant.applied')}</div>;
+  }
+  if (status === 'rejected') {
+    return <div className="assistant-card-status assistant-card-status-rejected">{t('assistant.rejected')}</div>;
+  }
+  if (status === 'error') {
+    return (
+      <div className="assistant-card-status assistant-card-status-error">
+        {t('assistant.somethingWrong')}
+      </div>
+    );
+  }
+  return null;
+}
+
+async function applyAction({ actionId, actionType, setStatus }) {
+  setStatus('pending');
+  try {
+    const res = await applyAssistantAction(actionId);
+    window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', {
+      detail: { actionType, scores: res?.result?.scores, delta: res?.result?.delta },
+    }));
+    setStatus('applied');
+  } catch {
+    setStatus('error');
+  }
+}
+
+async function rejectAction({ actionId, setStatus }) {
+  setStatus('pending');
+  try {
+    await rejectAssistantAction(actionId);
+    setStatus('rejected');
+  } catch {
+    setStatus('error');
+  }
+}
+
+function ActionCardButtons({ disabled, onApply, onReject }) {
+  return (
+    <div className="assistant-card-actions">
+      <button
+        type="button"
+        className="assistant-card-apply"
+        onClick={onApply}
+        disabled={disabled}
+      >
+        {t('assistant.apply')}
+      </button>
+      <button
+        type="button"
+        className="assistant-card-reject"
+        onClick={onReject}
+        disabled={disabled}
+      >
+        {t('assistant.reject')}
+      </button>
+    </div>
+  );
+}
+
 /**
  * Renders the server-canonical summary of a proposed assistant action
  * (name, principle count, action type) with Apply / Reject controls.
@@ -40,61 +103,15 @@ export function ActionPreviewCard({ action }) {
 
   const disabled = status !== 'idle';
 
-  async function handleApply() {
-    setStatus('pending');
-    try {
-      const res = await applyAssistantAction(actionId);
-      window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', {
-        detail: { actionType, scores: res?.result?.scores, delta: res?.result?.delta },
-      }));
-      setStatus('applied');
-    } catch {
-      setStatus('error');
-    }
-  }
-
-  async function handleReject() {
-    setStatus('pending');
-    try {
-      await rejectAssistantAction(actionId);
-      setStatus('rejected');
-    } catch {
-      setStatus('error');
-    }
-  }
-
   return (
     <div className="assistant-card">
       <CardSummary actionType={actionType} summary={summary} />
-      <div className="assistant-card-actions">
-        <button
-          type="button"
-          className="assistant-card-apply"
-          onClick={handleApply}
-          disabled={disabled}
-        >
-          {t('assistant.apply')}
-        </button>
-        <button
-          type="button"
-          className="assistant-card-reject"
-          onClick={handleReject}
-          disabled={disabled}
-        >
-          {t('assistant.reject')}
-        </button>
-      </div>
-      {status === 'applied' && (
-        <div className="assistant-card-status assistant-card-status-applied">{t('assistant.applied')}</div>
-      )}
-      {status === 'rejected' && (
-        <div className="assistant-card-status assistant-card-status-rejected">{t('assistant.rejected')}</div>
-      )}
-      {status === 'error' && (
-        <div className="assistant-card-status assistant-card-status-error">
-          {t('assistant.somethingWrong')}
-        </div>
-      )}
+      <ActionCardButtons
+        disabled={disabled}
+        onApply={() => applyAction({ actionId, actionType, setStatus })}
+        onReject={() => rejectAction({ actionId, setStatus })}
+      />
+      <ActionStatusBanner status={status} />
     </div>
   );
 }

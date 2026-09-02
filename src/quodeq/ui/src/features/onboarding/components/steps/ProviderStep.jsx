@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
 import ProviderTabs from '../../../settings/components/ProviderTabs.jsx';
-import { getProviderConfigs } from '../../../../api/index.js';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../../constants.js';
 import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
+import { useActiveProviderState, readActiveProviderState } from '../../hooks/useActiveProviderState.js';
 
 // Product names, not copy.
 /* eslint-disable i18n/no-prose-literals */
@@ -18,56 +16,24 @@ const PROVIDER_LABELS = {
 };
 /* eslint-enable i18n/no-prose-literals */
 
-function readActiveProviderState() {
-  try {
-    const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;
-    if (!id) return { id: null, model: null, timeLimitS: null };
-    const model = localStorage.getItem(providerKey(id, 'model')) || null;
-    // ProviderTabs persists time-limit per provider as a stringified number of
-    // seconds. Treat 0 as unlimited; missing key falls back to null so the
-    // wizard's existing default applies.
-    const tlRaw = localStorage.getItem(providerKey(id, 'time-limit'));
-    const timeLimitS = tlRaw === null ? null : Number.parseInt(tlRaw, 10);
-    return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
-  } catch {
-    return { id: null, model: null, timeLimitS: null };
+function ProviderSummary({ activeProvider }) {
+  if (!activeProvider.id) {
+    return (
+      <p className="onboarding-provider-active onboarding-provider-active--empty">
+        {t('onboarding.pickProviderHint')}
+      </p>
+    );
   }
+  return (
+    <p className="onboarding-provider-active">
+      {t('onboarding.selectedPrefix')} <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
+      {activeProvider.model && <> · <code>{activeProvider.model}</code></>}
+    </p>
+  );
 }
 
-/**
- * ProviderStep
- *
- * Reuses the same `<ProviderTabs />` component the Settings page renders,
- * so the picker is identical: one pill per installed provider (uninstalled
- * providers shown disabled with install hints), the appropriate per-provider
- * tab below (CLI / Ollama / Cloud), and the time-limit + advanced settings
- * inside each tab.
- *
- * The wizard reads the active provider+model from localStorage (which
- * ProviderTabs writes into) and gates Continue until both are set.
- */
-export default function ProviderStep({ state, actions, onContinue, onBack, stepIndex = 0, stepTotal = 0 }) {
-  const [providerConfigs, setProviderConfigs] = useState({});
-  // Mirror localStorage so Continue updates as the user picks a provider/model.
-  const [activeProvider, setActiveProvider] = useState(readActiveProviderState);
-
-  useEffect(() => {
-    getProviderConfigs().then(setProviderConfigs).catch(() => setProviderConfigs({}));
-  }, []);
-
-  // Poll localStorage for changes — ProviderTabs / its children write directly,
-  // and the `storage` event only fires for cross-tab writes. A short interval
-  // is enough; the picker is interactive and the user is on the screen.
-  useEffect(() => {
-    const tick = () => setActiveProvider(readActiveProviderState());
-    const interval = setInterval(tick, 400);
-    window.addEventListener('storage', tick);
-    return () => { clearInterval(interval); window.removeEventListener('storage', tick); };
-  }, []);
-
-  const continueDisabled = !activeProvider.id || !activeProvider.model;
-
-  function handleContinue() {
+function makeHandleContinue({ state, actions, onContinue }) {
+  return () => {
     // Read fresh from localStorage at click time — the polled `activeProvider`
     // can lag the user's last interaction by up to one polling interval.
     const fresh = readActiveProviderState();
@@ -84,20 +50,25 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
       actions.setTimeLimit(fresh.timeLimitS);
     }
     onContinue();
-  }
+  };
+}
 
-  const summary = activeProvider.id
-    ? (
-      <p className="onboarding-provider-active">
-        {t('onboarding.selectedPrefix')} <strong>{PROVIDER_LABELS[activeProvider.id] || activeProvider.id}</strong>
-        {activeProvider.model && <> · <code>{activeProvider.model}</code></>}
-      </p>
-    )
-    : (
-      <p className="onboarding-provider-active onboarding-provider-active--empty">
-        {t('onboarding.pickProviderHint')}
-      </p>
-    );
+/**
+ * ProviderStep
+ *
+ * Reuses the same `<ProviderTabs />` component the Settings page renders,
+ * so the picker is identical: one pill per installed provider (uninstalled
+ * providers shown disabled with install hints), the appropriate per-provider
+ * tab below (CLI / Ollama / Cloud), and the time-limit + advanced settings
+ * inside each tab.
+ *
+ * The wizard reads the active provider+model from localStorage (which
+ * ProviderTabs writes into) and gates Continue until both are set.
+ */
+export default function ProviderStep({ state, actions, onContinue, onBack, stepIndex = 0, stepTotal = 0 }) {
+  const { providerConfigs, activeProvider } = useActiveProviderState();
+  const continueDisabled = !activeProvider.id || !activeProvider.model;
+  const handleContinue = makeHandleContinue({ state, actions, onContinue });
 
   return (
     <div className="onboarding-step onboarding-step--provider">
@@ -106,7 +77,7 @@ export default function ProviderStep({ state, actions, onContinue, onBack, stepI
         {t('onboarding.providerDesc')}
       </p>
 
-      {summary}
+      <ProviderSummary activeProvider={activeProvider} />
 
       <div className="onboarding-provider-tabs-host">
         <ProviderTabs providerConfigs={providerConfigs} />

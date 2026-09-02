@@ -1,8 +1,6 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStandardDetail } from '../hooks/useStandardDetail.js';
-import { useStandardsOverrides } from '../hooks/useStandardsOverrides.js';
-import { applyParamOverride, countCustomizedRequirements, decideSave } from '../overridesModel.js';
-import { useAppState } from '../../../hooks/useAppState.js';
+import { useStandardEditorOverrides } from '../hooks/useStandardEditorOverrides.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
 import ThresholdImpactDialog from './ThresholdImpactDialog.jsx';
@@ -137,57 +135,12 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved, onR
     save,
   } = useStandardDetail(standardId, isNew);
 
-  const { selectedProject } = useAppState();
-  const { overrides: savedOverrides, save: saveOverrides, preview: previewOverrides } = useStandardsOverrides(selectedProject);
-  const [draftOverrides, setDraftOverrides] = useState(null);
-  const [overridesSaveError, setOverridesSaveError] = useState(null);
-  const [pendingImpact, setPendingImpact] = useState(null); // string[] of changed dimensions while the dialog is open
-  const overrides = draftOverrides ?? savedOverrides;
-  const overridesDirty = draftOverrides !== null;
-
-  const savedOverridesRef = useRef(savedOverrides);
-  useEffect(() => { savedOverridesRef.current = savedOverrides; }, [savedOverrides]);
-
-  const handleChangeParam = useCallback((reqId, paramName, value) => {
-    setDraftOverrides((prev) => applyParamOverride(prev ?? savedOverridesRef.current, reqId, paramName, value));
-  }, []);
-
-  const customizedCount = useMemo(
-    () => countCustomizedRequirements(standard, overrides),
-    [standard, overrides],
-  );
+  const {
+    selectedProject, overrides, overridesDirty, overridesSaveError, pendingImpact, setPendingImpact,
+    customizedCount, handleChangeParam, commitSave, handleSave,
+  } = useStandardEditorOverrides({ standard, editable, save, onSaved, onRescan });
 
   const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
-
-  const commitSave = async (rescanDims = null) => {
-    setPendingImpact(null);
-    setOverridesSaveError(null);
-    try {
-      if (editable) await save();
-      if (overridesDirty) {
-        await saveOverrides(overrides);
-        setDraftOverrides(null);
-      }
-      if (rescanDims?.length && onRescan) onRescan(rescanDims);
-      if (onSaved) onSaved(standard?.id);
-    } catch (err) {
-      // Keep the draft so the user can retry; surface the error inline.
-      setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
-    }
-  };
-
-  const handleSave = async () => {
-    setOverridesSaveError(null);
-    if (!overridesDirty) { await commitSave(); return; }
-    try {
-      const impact = await previewOverrides(overrides);
-      const decision = decideSave({ overridesDirty, impact });
-      if (decision === 'commit') { await commitSave(); return; }
-      setPendingImpact(decision.confirm);
-    } catch (err) {
-      setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
-    }
-  };
 
   const earlyReturn = EditorLoadingOrError({ loading, error, standard, onBack });
   if (earlyReturn) return earlyReturn;

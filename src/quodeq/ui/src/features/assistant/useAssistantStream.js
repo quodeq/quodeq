@@ -9,6 +9,29 @@ const INACTIVITY_MS = 60000;
 // in at a readable rate instead of popping as a block.
 const CHARS_PER_TICK = 60;
 
+/**
+ * Pure frame-dispatch table: given a parsed SSE frame and the effect's
+ * (already-bound) per-type handlers, calls the one matching frame.type.
+ * Extracted verbatim from useAssistantStream's `es.onmessage` handler —
+ * partial extraction only, per the split's scope; the rest of the effect
+ * (scheduling, refs, EventSource wiring) stays inline.
+ */
+export function applyFrame(frame, handlers) {
+  if (!frame || typeof frame !== 'object') return;
+  const { onToken, onToolCall, onActionDraft, onWarning, onError, onStopped, onDone, onHeartbeat } = handlers;
+  if (frame.type === 'token') onToken(frame);
+  else if (frame.type === 'tool_call') onToolCall(frame);
+  else if (frame.type === 'action_draft') onActionDraft(frame);
+  else if (frame.type === 'warning') onWarning(frame);
+  else if (frame.type === 'error') onError(frame);
+  // User-initiated stop: terminal like done (turn over, stream stays
+  // open), plus a visible marker so the truncated answer isn't mistaken
+  // for a complete one.
+  else if (frame.type === 'stopped') onStopped(frame);
+  else if (frame.type === 'done') onDone(frame);
+  else if (frame.type === 'heartbeat') onHeartbeat?.(frame); // liveness only: resetInactivity() already ran by the caller
+}
+
 export function useAssistantStream(sessionId, { onDone } = {}) {
   const [messages, setMessages] = useState([]);
   const [streaming, setStreaming] = useState(false);
@@ -93,24 +116,21 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
     es.onmessage = (e) => {
       resetInactivity();
       let frame; try { frame = JSON.parse(e.data); } catch { return; }
-      if (!frame || typeof frame !== 'object') return;
-      if (frame.type === 'token') {
-        // A next-turn token during the previous turn's reveal: close that
-        // turn out first so the new text starts its own bubble.
-        if (endPending.current) drain(true);
-        beginContent(); pending.current += frame.text || ''; scheduleFlush();
-      }
-      else if (frame.type === 'tool_call') { beginContent(); flushTokens(); append({ role: 'tool', name: frame.name, argsSummary: frame.argsSummary }); }
-      else if (frame.type === 'action_draft') { beginContent(); flushTokens();
-        append({ role: 'action', actionId: frame.actionId, actionType: frame.actionType, summary: frame.summary }); }
-      else if (frame.type === 'warning') { beginContent(); flushTokens(); append({ role: 'warning', message: frame.message }); }
-      else if (frame.type === 'error') { flushTokens(); setError(frame.message || 'error'); endTurn(); }
-      // User-initiated stop: terminal like done (turn over, stream stays
-      // open), plus a visible marker so the truncated answer isn't mistaken
-      // for a complete one.
-      else if (frame.type === 'stopped') { flushTokens(); append({ role: 'warning', message: 'Stopped.' }); endTurn(); }
-      else if (frame.type === 'done') { endTurn(); }
-      else if (frame.type === 'heartbeat') { /* liveness only: resetInactivity() already ran above */ }
+      applyFrame(frame, {
+        onToken: (f) => {
+          // A next-turn token during the previous turn's reveal: close that
+          // turn out first so the new text starts its own bubble.
+          if (endPending.current) drain(true);
+          beginContent(); pending.current += f.text || ''; scheduleFlush();
+        },
+        onToolCall: (f) => { beginContent(); flushTokens(); append({ role: 'tool', name: f.name, argsSummary: f.argsSummary }); },
+        onActionDraft: (f) => { beginContent(); flushTokens();
+          append({ role: 'action', actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
+        onWarning: (f) => { beginContent(); flushTokens(); append({ role: 'warning', message: f.message }); },
+        onError: (f) => { flushTokens(); setError(f.message || 'error'); endTurn(); },
+        onStopped: () => { flushTokens(); append({ role: 'warning', message: 'Stopped.' }); endTurn(); },
+        onDone: () => { endTurn(); },
+      });
     };
     es.addEventListener('done', endTurn);
     es.onerror = () => { if (es.readyState === 2) { setStreaming(false); setError((p) => p || 'disconnected'); } };

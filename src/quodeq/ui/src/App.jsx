@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState, useEffect } from 'react';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import UpdateBanner from './features/updates/UpdateBanner.jsx';
 import { useSharedContentSignal } from './features/dashboard/hooks/useSharedProjects.js';
@@ -8,8 +8,6 @@ import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.js
 import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from './api/ApiContext.jsx';
 import { applyMutationDelta } from './api/applyMutationDelta.js';
-import { getGradeFormula } from './api/index.js';
-import { setGradeThresholds } from './utils/gradeThresholds.js';
 import { deriveEvaluatePreselect } from './utils/evaluatePreselect.js';
 import { useEvaluationProgress } from './features/evaluation/hooks/useEvaluationProgress.js';
 import { computeOverallProgress } from './features/evaluation/components/scanProgressTotals.js';
@@ -22,7 +20,7 @@ import { useNativeNavBridge } from './hooks/useNativeNavBridge.js';
 import { useStartupTheme, useStartupLoader } from './hooks/useStartupTheme.js';
 import { useWizardLifecycle } from './features/onboarding/useWizardLifecycle.js';
 import { warmOverviewChunks } from './bootChunks.js';
-import { readVisibleStandardIds, hydrateVisibleStandardIds } from './utils/visibleStandards.js';
+import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 import { SidePane, useSidePane } from './features/side-pane/index.js';
 import { VerifiedFindingsProvider } from './features/violations/components/verifiedFindingsContext.jsx';
@@ -39,13 +37,17 @@ import {
   MainContent, buildDashboardDataBundle, buildNavigationBundle,
 } from './routes/renderers.jsx';
 import {
-  shouldBounceToEvaluate, shouldShowEvaluateButton, resolveProjectDisplayName,
-  shouldShowProjectTabs, selectSidebarCounts, shouldRedirectToRemoteRepositories,
-  shouldShowCompareTab,
+  resolveProjectDisplayName, selectSidebarCounts,
 } from './appGating.js';
 import {
   buildAssistantSessionPayload, buildAssistantActionAppliedHandler,
 } from './features/assistant/assistantAppBridge.js';
+import {
+  useAssistantActionAppliedEffect, useGradeFormulaBootSyncEffect, useEvaluateBounceEffect,
+  useInitialLandingEffect, useProjectScrollResetEffect, useVisibleStandardsHydrationEffect,
+} from './hooks/useAppEffects.js';
+import { buildBreadcrumbSiblingsFor } from './features/side-pane/breadcrumbSiblings.js';
+import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
 
 // Route rendering, gating policies, wizard lifecycle, assistant glue and
 // startup chrome moved to their own modules (see routes/renderers.jsx,
@@ -131,16 +133,9 @@ export default function App() {
   // a refetch.
   const applyDelta = (project, scores, delta) =>
     applyMutationDelta(queryClient, project, delta && { ...delta, dimensions: scores?.dimensions });
-  useEffect(() => {
-    const handler = buildAssistantActionAppliedHandler({
-      applyDelta,
-      bumpDismissRefresh,
-      scheduleDashboardReconcile: scheduleReconcileForApply,
-      selectedProject,
-    });
-    window.addEventListener('quodeq:assistant-action-applied', handler);
-    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
-  }, [scheduleReconcileForApply, selectedProject]);
+  useAssistantActionAppliedEffect({
+    applyDelta, bumpDismissRefresh, scheduleReconcileForApply, selectedProject,
+  });
 
   const { showToast } = useSidePane();
 
@@ -172,11 +167,7 @@ export default function App() {
   // boot so every gauge/badge agrees with the applied Q² parameters. The
   // gradeThresholds store seeds with the Q² defaults, so a failed/absent
   // fetch leaves a sane fallback in place.
-  useEffect(() => {
-    getGradeFormula()
-      .then((d) => setGradeThresholds(d?.current?.gradeThresholds))
-      .catch(() => {});
-  }, []);
+  useGradeFormulaBootSyncEffect();
 
   // While an evaluation is running we block any path that would open the
   // onboarding wizard or start a second evaluation — only one job may be in
@@ -206,18 +197,7 @@ export default function App() {
   // to show. There is no Evaluate for shared projects at all, so it must
   // never fire outside 'local' — shouldBounceToEvaluate encodes that.
   const hasCurrentProjectRuns = (selectedProjectInfo?.runsCount ?? 0) > 0;
-  useEffect(() => {
-    if (shouldBounceToEvaluate({
-      projectsLoaded: state.projectsLoaded,
-      projectsCount: state.projects.length,
-      selectedProjectInfo,
-      hasCurrentProjectRuns,
-      activeTab: state.activeTab,
-      selectedSource: state.selectedSource,
-    })) {
-      state.navTab('evaluate');
-    }
-  }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrentProjectRuns });
 
   // NOT memoized on purpose: a per-render read is what makes this pick up a
   // Settings change (active provider/model) without its own change listener.
@@ -241,22 +221,7 @@ export default function App() {
   // Initial landing: decided exactly once, the first render after both the
   // local projects list and the shared signal have settled (whatever the
   // outcome). Mid-session changes never re-trigger it.
-  const initialLandingDecidedRef = useRef(false);
-  useEffect(() => {
-    if (initialLandingDecidedRef.current) return;
-    if (!state.projectsLoaded || !sharedSignal.settled) return;
-    initialLandingDecidedRef.current = true;
-    if (shouldRedirectToRemoteRepositories({
-      projectsLoaded: state.projectsLoaded,
-      projectsCount: state.projects.length,
-      selectedSource: state.selectedSource,
-      sharedSettled: sharedSignal.settled,
-      sharedHasContent: sharedSignal.hasContent,
-      activeTab,
-    })) {
-      navTab('projects');
-    }
-  }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
+  useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
 
   // Native-shell bridge: the macOS Help menu opens tabs by dispatching
   // quodeq:navigate (see _webview_window._install_macos_help_menu).
@@ -266,10 +231,7 @@ export default function App() {
   // tab/page changes, but selectedProject lives outside the nav stack.
   // Without this, switching from a project scrolled deep into Projects
   // lands the user partway down the next project's Overview.
-  useEffect(() => {
-    const main = document.querySelector('.app-shell__main-column > .dashboard');
-    if (main) main.scrollTop = 0;
-  }, [state.selectedProject]);
+  useProjectScrollResetEffect(state.selectedProject);
 
   // Sync the visible-standards cache (localStorage) with the server's
   // per-project file whenever the selected project settles. This is the
@@ -288,12 +250,7 @@ export default function App() {
   // right before every write it makes (including the migration PUT), so
   // flipping `cancelled` in the cleanup is enough to make a stale response a
   // no-op.
-  useEffect(() => {
-    if (!state.selectedProject) return;
-    let cancelled = false;
-    hydrateVisibleStandardIds(state.selectedProject, { isStale: () => cancelled });
-    return () => { cancelled = true; };
-  }, [state.selectedProject]);
+  useVisibleStandardsHydrationEffect(state.selectedProject);
 
   const currentDayLabel = useMemo(
     () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
@@ -318,40 +275,13 @@ export default function App() {
   );
 
   // Breadcrumb jump-bar data: which siblings a given path segment can swap
-  // to. Two levels have a known sibling set — the root tab (the sidebar's
-  // main destinations) and the explorer dimension. Levels without one return
-  // null and stay plain links.
-  const breadcrumbSiblingsFor = useCallback((entry, index) => {
-    if (index === 0) {
-      if (!state.selectedProject) return null;
-      return ['overview', 'violations', 'map', 'history', 'evaluate'].map((id) => ({
-        key: id,
-        label: navLabelFor({ page: id }),
-        current: entry.page === id,
-        onSelect: () => (id === 'evaluate'
-          ? navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })
-          : navTab(id)),
-      }));
-    }
-    if (entry.page === 'explorer') {
-      const dims = filteredAccumulated?.dimensions || [];
-      if (dims.length < 2) return null;
-      return dims.map((dim) => ({
-        key: dim.dimension,
-        label: (dim.dimension || '').toLowerCase(),
-        current: dim.dimension === entry.dimension,
-        onSelect: () => navSwapAt(index, {
-          page: 'explorer',
-          dimension: dim.dimension,
-          runId: dim.fromRunId,
-          dateLabel: dim.fromDateLabel,
-          fromProject: dim.fromProject,
-          sourceTab: entry.sourceTab || 'violations',
-        }),
-      }));
-    }
-    return null;
-  }, [state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated]);
+  // to — see features/side-pane/breadcrumbSiblings.js.
+  const breadcrumbSiblingsFor = useCallback(
+    buildBreadcrumbSiblingsFor({
+      selectedProject: state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated,
+    }),
+    [state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated]
+  );
 
   // Live run progress for the topbar chrome (run chip + bottom hairline).
   // Shares the JobStatStrip/ScanProgress query cache entry, so this adds no
@@ -426,60 +356,55 @@ export default function App() {
             onOpenSettings={() => navTab('settings')} />}
           sidebar={
             <Sidebar
-              activeTab={activeTab}
-              onNavTab={navTab}
-              hasEvaluations={state.projects.length > 0}
-              showProjectTabs={shouldShowProjectTabs({
+              {...buildSidebarProps({
+                activeTab,
+                navTab,
+                projectsCount: state.projects.length,
                 selectedSource: state.selectedSource,
                 hasCurrentProjectRuns,
                 sharedProjectInfo: state.sharedProjectInfo,
-              })}
-              showCompareTab={shouldShowCompareTab({
                 projects: state.projects,
                 sharedHasContent: sharedSignal.hasContent,
+                resolvedDisplayName,
+                headerMeta: state.headerMeta,
+                version: APP_VERSION,
+                sidebarCounts,
+                lastEvalAt: state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null,
+                isPinned: sidebarPinned,
+                onPinChange: setSidebarPinned,
               })}
-              selectedSource={state.selectedSource}
-              projectInfo={{
-                displayName: resolvedDisplayName,
-                meta: state.headerMeta,
-              }}
-              version={APP_VERSION}
-              violationsCount={sidebarCounts.violationsCount}
-              historyCount={sidebarCounts.historyCount}
-              lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
-              isPinned={sidebarPinned}
-              onPinChange={setSidebarPinned}
             />
           }
           header={
             <TopBar
-              projectName={resolvedDisplayName}
-              activeTab={activeTab}
-              serverConnected={state.serverConnected}
-              serverUrl={typeof window !== 'undefined' ? window.location.origin : null}
-              provider={sidebarProvider}
-              model={sidebarModel}
-              selectedSource={state.selectedSource}
-              onEvaluate={shouldShowEvaluateButton(state.projects?.length, state.selectedSource) ? (() => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) })) : null}
-              evaluating={state.evalLifecycle?.job?.status === 'running'}
-              runProgress={topbarRunProgress}
-              onProviderClick={() => navTab('settings')}
-              onMenuToggle={() => setSidebarPinned((v) => !v)}
-              onSelectProject={() => navTab('projects')}
-              breadcrumb={
-                <NavBreadcrumb
-                  stack={navStack}
-                  onGoTo={navGoTo}
-                  projectName={resolvedDisplayName}
-                  onSelectProject={() => navTab('projects')}
-                  siblingsFor={breadcrumbSiblingsFor}
-                />
-              }
-              mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
-              canGoBack={navStack.length > 1}
-              onBack={navPop}
-              effectiveDark={effectiveDark}
-              onToggleTheme={toggleTheme}
+              {...buildTopBarProps({
+                resolvedDisplayName,
+                activeTab,
+                serverConnected: state.serverConnected,
+                sidebarProvider,
+                sidebarModel,
+                selectedSource: state.selectedSource,
+                projectsCount: state.projects?.length,
+                onEvaluateClick: () => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) }),
+                evaluating: state.evalLifecycle?.job?.status === 'running',
+                topbarRunProgress,
+                navTab,
+                setSidebarPinned,
+                breadcrumb: (
+                  <NavBreadcrumb
+                    stack={navStack}
+                    onGoTo={navGoTo}
+                    projectName={resolvedDisplayName}
+                    onSelectProject={() => navTab('projects')}
+                    siblingsFor={breadcrumbSiblingsFor}
+                  />
+                ),
+                mobileTitle: navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || ''),
+                navStackLength: navStack.length,
+                navPop,
+                effectiveDark,
+                toggleTheme,
+              })}
             />
           }
           content={
