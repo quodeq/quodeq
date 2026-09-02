@@ -1,13 +1,23 @@
 """Cache replays must be distinguishable from this scan's own findings.
 
-The live evaluation feed filters on carried_forward. It is stamped here,
-at the only place that knows a finding came from the cache rather than
-from the running scan.
+Split from test_dimension_runner_carried_forward.py: the integration
+tests that drive replay through ``process_dimension_with_cache`` (cache
+hit vs. dispatch, unconsolidated hits, the sidecar, and the cancelled-run
+user story). The direct unit tests for ``_write_findings`` /
+``_emit_cached_findings`` live in test_dimension_runner_carried_forward_write.py.
 """
 import json
 from pathlib import Path
 
-from quodeq.analysis.cache.dimension_runner import _emit_cached_findings, _write_findings
+from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
+from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.entry import CacheEntry
+from tests.analysis.cache.conftest import (
+    _make_callbacks,
+    _make_ctx,
+    _make_dummy_evidence,
+    _setup,
+)
 
 
 def _finding(title: str) -> dict:
@@ -18,64 +28,8 @@ def _finding(title: str) -> dict:
     }
 
 
-def test_write_findings_stamps_carried_forward(tmp_path: Path):
-    jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(jsonl, [_finding("carry-a")], append=False, emit_events=False)
-    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
-    assert written[0]["carried_forward"] is True
-
-
-def test_emit_cached_findings_uses_injected_writer_factory(tmp_path: Path):
-    """[8]: the event-log writer is an injectable seam. A fake factory
-    receives the events.jsonl path and its emit() sees one JUDGMENT_CREATED
-    event per replayed finding — no concrete EventLogWriter constructed."""
-    class _RecordingWriter:
-        def __init__(self, path: Path) -> None:
-            self.path = path
-            self.events = []
-
-        def emit(self, event) -> None:
-            self.events.append(event)
-
-    writers: list[_RecordingWriter] = []
-
-    def factory(path: Path) -> _RecordingWriter:
-        writer = _RecordingWriter(path)
-        writers.append(writer)
-        return writer
-
-    events_log = tmp_path / "events.jsonl"
-    _emit_cached_findings(
-        events_log, [_finding("carry-a"), _finding("carry-b")],
-        writer_factory=factory,
-    )
-
-    assert len(writers) == 1
-    assert writers[0].path == events_log
-    assert len(writers[0].events) == 2
-    assert all(e.payload.title in {"carry-a", "carry-b"} for e in writers[0].events)
-
-
-def test_write_findings_does_not_mutate_the_source_dicts(tmp_path: Path):
-    """The dicts belong to the cache entry. Stamping in place risks the
-    persist watcher writing the flag back into the cache, which would make
-    a later fresh scan of the same file look carried."""
-    jsonl = tmp_path / "security_evidence.jsonl"
-    source = [_finding("carry-a")]
-    _write_findings(jsonl, source, append=False, emit_events=False)
-    assert "carried_forward" not in source[0]
-
-
-from quodeq.analysis.cache.entry import CacheEntry
-from tests.analysis.cache.test_dimension_runner import (
-    _make_callbacks, _make_ctx, _make_dummy_evidence, _setup, cache,
-)
-
-
 def test_only_cache_replays_are_flagged(tmp_path: Path, cache):
     """a.py is a cache hit, b.py is dispatched. Exactly one is flagged."""
-    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 
     config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
 
@@ -107,59 +61,11 @@ def test_only_cache_replays_are_flagged(tmp_path: Path, cache):
     assert by_title["fresh-b"].get("carried_forward", False) is False
 
 
-def test_write_findings_does_not_stamp_unconsolidated_replays(tmp_path: Path):
-    """A finding produced by a run that never completed was never consolidated
-    into an Overview. Replaying it must read as this scan's own finding."""
-    jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(
-        jsonl, [_finding("carry-a")], append=False, emit_events=False,
-        unconsolidated=[dict(_finding("pending-b"), file="b.py")],
-    )
-    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
-    by_title = {ln["w"]: ln for ln in written}
-    assert by_title["carry-a"]["carried_forward"] is True
-    assert "carried_forward" not in by_title["pending-b"]
-
-
-def test_write_findings_orders_consolidated_replays_first(tmp_path: Path):
-    """Foundation-then-new ordering in the JSONL, matching the existing
-    carried-before-fresh contract."""
-    jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(
-        jsonl, [_finding("carry-a")], append=False, emit_events=False,
-        unconsolidated=[dict(_finding("pending-b"), file="b.py")],
-    )
-    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
-    assert [ln["w"] for ln in written] == ["carry-a", "pending-b"]
-
-
-def test_write_findings_does_not_stamp_the_unconsolidated_source_dicts(tmp_path: Path):
-    jsonl = tmp_path / "security_evidence.jsonl"
-    source = [dict(_finding("pending-b"), file="b.py")]
-    _write_findings(
-        jsonl, [], append=False, emit_events=False, unconsolidated=source,
-    )
-    assert "carried_forward" not in source[0]
-
-
-def test_write_findings_accepts_only_unconsolidated(tmp_path: Path):
-    """A dimension whose every hit is unconsolidated still writes findings."""
-    jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(
-        jsonl, [], append=False, emit_events=False,
-        unconsolidated=[dict(_finding("pending-b"), file="b.py")],
-    )
-    written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
-    assert [ln["w"] for ln in written] == ["pending-b"]
-
-
 def test_all_unconsolidated_hits_are_still_written(tmp_path: Path, cache):
     """Two truthiness guards used to test classify.cached_findings to decide
     whether to write anything. Splitting the list makes both false when every
     hit is unconsolidated, which would silently DROP those findings from the
     run rather than merely mis-flagging them."""
-    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 
     config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
 
@@ -199,8 +105,6 @@ def test_salvage_path_keeps_unconsolidated_hits_when_dispatch_returns_none(
     every hit is unconsolidated would compute ``replayed_anything=False`` and
     return None -- discarding an unconsolidated finding that was already
     sitting in the JSONL."""
-    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 
     config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y"})
 
@@ -234,8 +138,6 @@ def test_salvage_path_keeps_unconsolidated_hits_when_dispatch_returns_none(
 def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
     """The headline case: a consolidated hit is carried, an unconsolidated hit
     is not, and a dispatched finding is not."""
-    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 
     config, _src = _setup(tmp_path, {"a.py": "x", "b.py": "y", "c.py": "z"})
 
@@ -278,8 +180,6 @@ def test_replayed_unconsolidated_keys_sidecar_is_written_on_the_all_hits_path(
     """A fully cached dimension dispatches nothing, so it writes no
     dispatch_keys sidecar. Without this one it would never flip its entries
     and its findings would replay as new forever."""
-    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 
     config, _src = _setup(tmp_path, {"a.py": "x"})
 
@@ -301,8 +201,6 @@ def test_replayed_unconsolidated_keys_sidecar_is_written_on_the_all_hits_path(
 
 
 def test_no_sidecar_when_every_hit_is_already_consolidated(tmp_path: Path, cache):
-    from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 
     config, _src = _setup(tmp_path, {"a.py": "x"})
 
@@ -331,8 +229,8 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
     completes, which consolidates them. Run 3 replays them as carried.
     """
     from quodeq.analysis.cache.consolidation import mark_run_consolidated
-    from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
     from quodeq.analysis.cache.local import LocalFileBackend
+    from tests.analysis.cache.conftest import _make_config
 
     src = tmp_path / "src"
     src.mkdir()
@@ -342,7 +240,6 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
     def _run_config(run_id: str):
         """A config whose work_dir IS <run_dir>/evidence, so the sidecars land
         where mark_run_consolidated looks for them."""
-        from tests.analysis.cache.test_dimension_runner import _make_config
         run_dir = tmp_path / "reports" / "proj" / run_id
         (run_dir / "evidence").mkdir(parents=True, exist_ok=True)
         return _make_config(
