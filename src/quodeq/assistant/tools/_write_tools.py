@@ -34,6 +34,8 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
     target = _jail_write(ctx, path)
     if not target.is_file():
         raise ToolError(f"not a file: {path}")
+    if target.stat().st_size > _MAX_CONTENT_BYTES:
+        raise ToolError(f"file is too large to edit ({_MAX_CONTENT_BYTES} byte cap)")
     raw = target.read_bytes()
     if b"\x00" in raw[:1024]:
         raise ToolError("cannot edit a binary file")
