@@ -42,29 +42,22 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def write_status(
-    run_dir: Path,
+def _build_status_payload(
     *,
     state: RunState,
     job_id: str,
     started_at: str,
     dimensions: list[str],
-    phase: str | None = None,
-    current_dimension: str | None = None,
-    pid: int | None = None,
-    exit_reason: str | None = None,
-    finalized_at: str | None = None,
-    deadline_at: str | None = None,
-    ai_provider: str | None = None,
-    ai_model: str | None = None,
-    time_limit_s: int | None = None,
-) -> None:
-    """Atomically write status.json with *state* and metadata.
-
-    Uses write-tmp-then-rename so readers never see a partial file.
-    Caller is responsible for calling ``validate_transition`` first if a
-    transition is being performed.
-    """
+    phase: str | None,
+    current_dimension: str | None,
+    pid: int | None,
+    exit_reason: str | None,
+    finalized_at: str | None,
+    deadline_at: str | None,
+    ai_provider: str | None,
+    ai_model: str | None,
+    time_limit_s: int | None,
+) -> dict[str, Any]:
     if pid is None:
         pid = os.getpid()
     if finalized_at is None and state in TERMINAL_STATES:
@@ -89,6 +82,38 @@ def write_status(
         payload["ai_provider"] = ai_provider
     if ai_model is not None:
         payload["ai_model"] = ai_model
+    return payload
+
+
+def write_status(
+    run_dir: Path,
+    *,
+    state: RunState,
+    job_id: str,
+    started_at: str,
+    dimensions: list[str],
+    phase: str | None = None,
+    current_dimension: str | None = None,
+    pid: int | None = None,
+    exit_reason: str | None = None,
+    finalized_at: str | None = None,
+    deadline_at: str | None = None,
+    ai_provider: str | None = None,
+    ai_model: str | None = None,
+    time_limit_s: int | None = None,
+) -> None:
+    """Atomically write status.json with *state* and metadata.
+
+    Uses write-tmp-then-rename so readers never see a partial file.
+    Caller is responsible for calling ``validate_transition`` first if a
+    transition is being performed.
+    """
+    payload = _build_status_payload(
+        state=state, job_id=job_id, started_at=started_at, dimensions=dimensions,
+        phase=phase, current_dimension=current_dimension, pid=pid,
+        exit_reason=exit_reason, finalized_at=finalized_at, deadline_at=deadline_at,
+        ai_provider=ai_provider, ai_model=ai_model, time_limit_s=time_limit_s,
+    )
     body = json.dumps(payload, indent=2)
     tmp_path = run_dir / (STATUS_FILENAME + ".tmp")
     final_path = run_dir / STATUS_FILENAME
