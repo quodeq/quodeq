@@ -53,7 +53,7 @@ export function buildTopBarProps({
     canGoBack: navStackLength > 1,
     onBack: navPop,
     effectiveDark,
-    onToggleTheme,
+    onToggleTheme: toggleTheme,
   };
 }
 

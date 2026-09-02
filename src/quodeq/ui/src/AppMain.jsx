@@ -114,7 +114,7 @@ function AppTopBar({ shell }) {
 }
 
 function AppRouteContent({ shell }) {
-  const { state, showStartupLoader, activePage, contentProps, wizardEntry, wizardHandlers } = shell;
+  const { state, showStartupLoader, activePage, activeTab, contentProps, wizardEntry, wizardHandlers } = shell;
   return (
     <>
       {/* One stable mount for the startup loader, OUTSIDE the
