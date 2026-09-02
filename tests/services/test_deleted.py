@@ -184,6 +184,17 @@ def test_sweep_emits_per_run_instead_of_accumulating_all_runs_first(tmp_path: Pa
 
 
 def test_sweep_never_holds_more_than_one_runs_matches_at_once(tmp_path: Path, monkeypatch):
+    """Verify streaming by tracking order of find and emit events.
+
+    Streaming implementation interleaves finds and emits per run:
+      [find run-a, emit run-a's match, find run-b, emit run-b's match]
+
+    Accumulation implementation would do all finds first, then all emits:
+      [find run-a, find run-b, emit run-a's match, emit run-b's match]
+
+    This test verifies the streaming behavior by recording both kinds of events
+    in order and asserting they interleave (not all finds before all emits).
+    """
     from quodeq.services import deleted as deleted_mod
     from quodeq.services.dismissed import dismiss_finding
 
@@ -196,24 +207,44 @@ def test_sweep_never_holds_more_than_one_runs_matches_at_once(tmp_path: Path, mo
     _apply_actions(project_dir, run_a)
     _apply_actions(project_dir, run_b)
 
-    max_batch_seen = {"n": 0}
+    # Track the order of find calls and emit calls.
+    event_order = []
     real_find = deleted_mod.find_dismissed_matching
 
     def spying_find(run_dir, **kw):
-        result = real_find(run_dir, **kw)
-        max_batch_seen["n"] = max(max_batch_seen["n"], len(result))
-        return result
+        run_name = run_dir.name  # extract run id (e.g. "run-a", "run-b")
+        event_order.append(("find", run_name))
+        return real_find(run_dir, **kw)
 
     monkeypatch.setattr(deleted_mod, "find_dismissed_matching", spying_find)
 
-    class _NullLog:
+    class _RecordingLog:
         def emit(self, event):
-            pass
+            # Tag emit with the req from the event payload for identification.
+            req = getattr(event.payload, "req", "?")
+            event_order.append(("emit", req))
 
     deleted_mod._sweep_dismissed_matching(
-        project_dir, ("maintainability", "Modularity", "a.py"), writer=_NullLog(),
+        project_dir, ("maintainability", "Modularity", "a.py"), writer=_RecordingLog(),
     )
-    assert max_batch_seen["n"] == 1, "each run contributes only its own match, never accumulated across runs"
+
+    # Verify we got both events.
+    assert len(event_order) == 4, f"expected 4 events (2 finds + 2 emits), got {len(event_order)}: {event_order}"
+
+    # Verify they interleave: find run-a, emit, find run-b, emit (or similar interleaving).
+    # The key assertion: an emit must come before the NEXT find is called.
+    # This means no "all finds first, then all emits" pattern.
+
+    find_indices = [i for i, (event_type, _) in enumerate(event_order) if event_type == "find"]
+    emit_indices = [i for i, (event_type, _) in enumerate(event_order) if event_type == "emit"]
+
+    # If streaming, emits should NOT all come after all finds.
+    # That is, max(emit_indices) should not be > min(find_indices) with all finds before all emits.
+    # Specifically, we expect interleaving: find(0) emit(1) find(2) emit(3) or similar.
+    assert not (min(emit_indices) > max(find_indices)), (
+        f"All finds occurred before any emits, indicating accumulation not streaming. "
+        f"Order: {event_order}"
+    )
 
 
 class TestIsFindingDeleted:
