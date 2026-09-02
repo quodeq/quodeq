@@ -11,8 +11,6 @@
 export const SIZE_GRANDFATHER = [
   "src/features/assistant/useAssistantStream.js",
   "src/features/dashboard/components/DashboardPage.jsx",
-  "src/features/grade-formula/GradeBoundaryBar.jsx",
-  "src/features/grade-formula/GradeFormulaPage.jsx",
   "src/features/history/components/HistoryRunRow.jsx",
   "src/features/map/components/MapPage.jsx",
   "src/features/map/viz/components/GalaxyView.jsx",
