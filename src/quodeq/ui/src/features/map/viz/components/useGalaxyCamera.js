@@ -49,6 +49,70 @@ function interpolateCamera(cam, tg, anim, frameCount) {
   return false;
 }
 
+// One animation-loop tick: advances star/camera positions, draws the frame,
+// and schedules the next tick. Extracted as a factory (built once per effect
+// run, called repeatedly via requestAnimationFrame) purely to keep the
+// useGalaxyCamera effect body under the function-length cap.
+function makeAnimationFrame({
+  ctx, canvasRef, scene, size, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef,
+  showLabels, w2s, getTarget, getFitZoom, camRef, frameCount, timeRef, runningBox,
+}) {
+  return function frame() {
+    if (!runningBox.current) return;
+    const t = timeRef.current += 0.016;
+    const nav = navRef.current;
+    const W = size.w, H = size.h;
+    const SP = Math.min(W, H) * 0.22;
+    if (!camRef.current) camRef.current = { x: W / 2, y: H / 2, z: getFitZoom(), _sceneId: scene };
+    const cam = camRef.current;
+
+    updateStarPositions(scene.stars, W, H, SP, t);
+
+    const prev = prevNavRef.current;
+    const rDim = nav.dim ?? prev?.dim ?? null;
+    const rPrin = nav.prin ?? prev?.prin ?? null;
+
+    if (rDim !== null) {
+      const rStar = scene.stars[rDim];
+      if (rStar) updatePrinciplePositions(scene.principles[rDim], rStar, t);
+    }
+
+    const tg = getTarget();
+    const anim = animRef.current;
+    frameCount.current++;
+    const done = interpolateCamera(cam, tg, anim, frameCount.current);
+    if (done) { animRef.current = null; prevNavRef.current = null; }
+
+    const { hovered } = drawFrame(ctx, scene, cam, nav, {
+      W, H, t,
+      mx: mouseRef.current.x, my: mouseRef.current.y,
+      showLabels, animating: !!anim,
+      rDim, rPrin, w2s,
+      focusedIdx: focusedIdxRef?.current ?? null,
+      parentEl: canvasRef.current?.parentElement,
+    });
+    hoveredRef.current = hovered;
+
+    frameRef.current = requestAnimationFrame(frame);
+  };
+}
+
+function computeTarget({ nav, scene, size, camRef, fz }) {
+  if (nav.depth === 0) {
+    if (nav.clusterCx != null) {
+      const con = scene?.constellations?.find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy);
+      const clusterExtent = con ? con.spread + 15 : 80;
+      const halfView = Math.min(size.w, size.h) / 2 - 30;
+      const clusterFz = halfView / clusterExtent;
+      return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: clusterFz };
+    }
+    return { x: size.w / 2, y: size.h / 2, z: fz };
+  }
+  if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: 5 }; }
+  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: 50 }; }
+  return camRef.current;
+}
+
 /**
  * Manages camera state, target computation, and the animation loop for GalaxyView.
  */
@@ -69,23 +133,10 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRe
     return Math.min(halfView / ext, 4);
   }, [scene, size.w, size.h]);
 
-  const getTarget = useCallback(() => {
-    const nav = navRef.current;
-    const fz = getFitZoom();
-    if (nav.depth === 0) {
-      if (nav.clusterCx != null) {
-        const con = scene?.constellations?.find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy);
-        const clusterExtent = con ? con.spread + 15 : 80;
-        const halfView = Math.min(size.w, size.h) / 2 - 30;
-        const clusterFz = halfView / clusterExtent;
-        return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: clusterFz };
-      }
-      return { x: size.w / 2, y: size.h / 2, z: fz };
-    }
-    if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: 5 }; }
-    if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: 50 }; }
-    return camRef.current;
-  }, [scene, size.w, size.h, getFitZoom, navRef]);
+  const getTarget = useCallback(
+    () => computeTarget({ nav: navRef.current, scene, size, camRef, fz: getFitZoom() }),
+    [scene, size.w, size.h, getFitZoom, navRef],
+  );
 
   const startTransition = useCallback((zoomingOut = false) => {
     const cam = camRef.current;
@@ -97,54 +148,20 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRe
     const canvas = canvasRef.current;
     if (!canvas || !scene) return;
     const ctx = canvas.getContext('2d');
-    let running = true;
+    const runningBox = { current: true };
 
     if (camRef.current?._sceneId !== scene) {
       camRef.current = null;
       frameCount.current = 0;
     }
 
-    function frame() {
-      if (!running) return;
-      const t = timeRef.current += 0.016;
-      const nav = navRef.current;
-      const W = size.w, H = size.h;
-      const SP = Math.min(W, H) * 0.22;
-      if (!camRef.current) camRef.current = { x: W / 2, y: H / 2, z: getFitZoom(), _sceneId: scene };
-      const cam = camRef.current;
-
-      updateStarPositions(scene.stars, W, H, SP, t);
-
-      const prev = prevNavRef.current;
-      const rDim = nav.dim ?? prev?.dim ?? null;
-      const rPrin = nav.prin ?? prev?.prin ?? null;
-
-      if (rDim !== null) {
-        const rStar = scene.stars[rDim];
-        if (rStar) updatePrinciplePositions(scene.principles[rDim], rStar, t);
-      }
-
-      const tg = getTarget();
-      const anim = animRef.current;
-      frameCount.current++;
-      const done = interpolateCamera(cam, tg, anim, frameCount.current);
-      if (done) { animRef.current = null; prevNavRef.current = null; }
-
-      const { hovered } = drawFrame(ctx, scene, cam, nav, {
-        W, H, t,
-        mx: mouseRef.current.x, my: mouseRef.current.y,
-        showLabels, animating: !!anim,
-        rDim, rPrin, w2s,
-        focusedIdx: focusedIdxRef?.current ?? null,
-        parentEl: canvasRef.current?.parentElement,
-      });
-      hoveredRef.current = hovered;
-
-      frameRef.current = requestAnimationFrame(frame);
-    }
+    const frame = makeAnimationFrame({
+      ctx, canvasRef, scene, size, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef,
+      showLabels, w2s, getTarget, getFitZoom, camRef, frameCount, timeRef, runningBox,
+    });
 
     frameRef.current = requestAnimationFrame(frame);
-    return () => { running = false; cancelAnimationFrame(frameRef.current); };
+    return () => { runningBox.current = false; cancelAnimationFrame(frameRef.current); };
   }, [scene, size, showLabels, w2s, getTarget, canvasRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef, getFitZoom]);
 
   return { camRef, w2s, startTransition, getTarget };

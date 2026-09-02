@@ -56,11 +56,8 @@ export const CONSTELLATION_LABELS = {
   builtin: t('map.constellationBuiltin'), quodeq: t('map.constellationQuodeq'), community: t('map.constellationCommunity'), custom: t('map.constellationCustom'), _default: '',
 };
 
-export function buildScene(dimensions, W, H, standardTypes) {
-  const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
-  const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
-
-  // Group dimensions by standard type
+/** Group dimensions by standard type, returning the groups and whether they warrant constellations. */
+function groupDimensionsByType(dimensions, standardTypes) {
   const dimGroups = {};
   dimensions.forEach(dim => {
     const id = (dim.dimension || '').toLowerCase();
@@ -73,83 +70,80 @@ export function buildScene(dimensions, W, H, standardTypes) {
   if (dimGroups._default) groupKeys.push('_default');
   const useConstellations = groupKeys.length > 1 || (groupKeys.length === 1 && groupKeys[0] !== '_default');
 
+  return { dimGroups, groupKeys, useConstellations };
+}
+
+/** One dimension's star object, shared shape between the constellation and single-group layouts. */
+function buildDimStar(dim, extra) {
+  const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
+  const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
+  const score = dim.overallScore ? parseFloat(dim.overallScore) : 5;
+  const radius = 3 + Math.sqrt(totalV + totalC) * 0.4;
+  return {
+    name: dim.dimension || 'Unknown',
+    score, radius,
+    violations: totalV, compliance: totalC,
+    col: scoreRGB(score),
+    x: 0, y: 0,
+    principleCount: 0,
+    _raw: dim,
+    ...extra,
+  };
+}
+
+// Seeded organic layout — scattered but balanced.
+function buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng }) {
   const stars = [];
   const constellations = [];
   let globalIdx = 0;
+  const clusterPositions = computeClusterPositions(groupKeys);
 
-  const spread = Math.min(W, H) * 0.5;
-  const baseClusterSpread = Math.min(W, H) * 0.3;
+  groupKeys.forEach((type, gi) => {
+    const [px, py] = clusterPositions[gi];
+    const clusterCx = px * spread * 1.8;
+    const clusterCy = py * spread * 1.8;
+    const groupDims = dimGroups[type];
+    const clusterSpread = baseClusterSpread + groupDims.length * 12;
+    const startIdx = globalIdx;
 
-  if (useConstellations) {
-    const clusterPositions = computeClusterPositions(groupKeys);
-
-    groupKeys.forEach((type, gi) => {
-      const [px, py] = clusterPositions[gi];
-      const clusterCx = px * spread * 1.8;
-      const clusterCy = py * spread * 1.8;
-      const groupDims = dimGroups[type];
-      const clusterSpread = baseClusterSpread + groupDims.length * 12;
-
-      const startIdx = globalIdx;
-
-      // Seeded organic layout — scattered but balanced
-      const clRng = seededRng(seedHash('cl:' + type));
-      const phaseOffset = clRng() * TAU;
-      groupDims.forEach((dim) => {
-        const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
-        const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
-        const score = dim.overallScore ? parseFloat(dim.overallScore) : 5;
-        const radius = 3 + Math.sqrt(totalV + totalC) * 0.4;
-        const n2 = groupDims.length;
-        const a = phaseOffset + clRng() * TAU;
-        const distVar = 0.3 + clRng() * 0.45;
-        const dist = n2 === 1 ? 0 : Math.max(clusterSpread * distVar, 40);
-        stars.push({
-          name: dim.dimension || 'Unknown',
-          score, radius,
-          violations: totalV, compliance: totalC,
-          col: scoreRGB(score),
-          ba: 0, j: 0,
-          _clusterCx: clusterCx, _clusterCy: clusterCy,
-          _ox: Math.cos(a) * dist, _oy: Math.sin(a) * dist,
-          pp: rng() * TAU,
-          x: 0, y: 0,
-          principleCount: 0,
-          _raw: dim,
-        });
-        globalIdx++;
-      });
-
-      const clusterStars = stars.slice(startIdx);
-      const lines = buildMSTLines(clusterStars, startIdx);
-      applyRepulsionAndRecenter(clusterStars);
-
-      constellations.push({ type, label: CONSTELLATION_LABELS[type] || type, cx: clusterCx, cy: clusterCy, spread: clusterSpread, lines });
-    });
-  } else {
-    // Single group — seeded circular layout
-    dimensions.forEach((dim, i) => {
-      const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
-      const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
-      const score = dim.overallScore ? parseFloat(dim.overallScore) : 5;
-      const radius = 3 + Math.sqrt(totalV + totalC) * 0.4;
-      stars.push({
-        name: dim.dimension || 'Unknown',
-        score, radius,
-        violations: totalV, compliance: totalC,
-        col: scoreRGB(score),
-        ba: (i / dimensions.length) * TAU - Math.PI / 2,
-        j: (rng() - 0.5) * 40,
-        _clusterCx: 0, _clusterCy: 0, _ox: 0, _oy: 0,
+    const clRng = seededRng(seedHash('cl:' + type));
+    const phaseOffset = clRng() * TAU;
+    groupDims.forEach((dim) => {
+      const n2 = groupDims.length;
+      const a = phaseOffset + clRng() * TAU;
+      const distVar = 0.3 + clRng() * 0.45;
+      const dist = n2 === 1 ? 0 : Math.max(clusterSpread * distVar, 40);
+      stars.push(buildDimStar(dim, {
+        ba: 0, j: 0,
+        _clusterCx: clusterCx, _clusterCy: clusterCy,
+        _ox: Math.cos(a) * dist, _oy: Math.sin(a) * dist,
         pp: rng() * TAU,
-        x: 0, y: 0,
-        principleCount: 0,
-        _raw: dim,
-      });
+      }));
+      globalIdx++;
     });
-  }
 
-  // Level 1: Principles per dimension
+    const clusterStars = stars.slice(startIdx);
+    const lines = buildMSTLines(clusterStars, startIdx);
+    applyRepulsionAndRecenter(clusterStars);
+
+    constellations.push({ type, label: CONSTELLATION_LABELS[type] || type, cx: clusterCx, cy: clusterCy, spread: clusterSpread, lines });
+  });
+
+  return { stars, constellations };
+}
+
+// Single group — seeded circular layout.
+function buildSingleGroupLayout(dimensions, rng) {
+  return dimensions.map((dim, i) => buildDimStar(dim, {
+    ba: (i / dimensions.length) * TAU - Math.PI / 2,
+    j: (rng() - 0.5) * 40,
+    _clusterCx: 0, _clusterCy: 0, _ox: 0, _oy: 0,
+    pp: rng() * TAU,
+  }));
+}
+
+/** Level 1: principles per dimension. */
+function buildPrinciples(dimensions) {
   const principles = {};
   dimensions.forEach((dim, di) => {
     const groups = groupByPrinciple(dim);
@@ -195,19 +189,37 @@ export function buildScene(dimensions, W, H, standardTypes) {
       };
     });
   });
+  return principles;
+}
 
-  stars.forEach((s, i) => { s.principleCount = (principles[i] || []).length; });
-
-  const connections = buildSharedFileConnections(dimensions);
-
+function buildBackgroundStars(dimFingerprint) {
   const bgRng = seededRng(seedHash('bg:' + dimFingerprint));
-  const bg = Array.from({ length: 120 }, () => ({
+  return Array.from({ length: 120 }, () => ({
     x: bgRng(), y: bgRng(),
     sz: bgRng() * 1.2,
     tw: bgRng() * TAU,
     sp: 0.3 + bgRng() * 0.7,
   }));
+}
 
+export function buildScene(dimensions, W, H, standardTypes) {
+  const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
+  const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
+
+  const { dimGroups, groupKeys, useConstellations } = groupDimensionsByType(dimensions, standardTypes);
+
+  const spread = Math.min(W, H) * 0.5;
+  const baseClusterSpread = Math.min(W, H) * 0.3;
+
+  const { stars, constellations } = useConstellations
+    ? buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng })
+    : { stars: buildSingleGroupLayout(dimensions, rng), constellations: [] };
+
+  const principles = buildPrinciples(dimensions);
+  stars.forEach((s, i) => { s.principleCount = (principles[i] || []).length; });
+
+  const connections = buildSharedFileConnections(dimensions);
+  const bg = buildBackgroundStars(dimFingerprint);
   const _maxExtent = computeMaxExtent(stars, constellations);
 
   return { stars, principles, connections, constellations, bg, _maxExtent };

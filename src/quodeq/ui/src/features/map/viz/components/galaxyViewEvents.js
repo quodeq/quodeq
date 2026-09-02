@@ -149,26 +149,27 @@ function announceNode(announce, node, idx, total) {
  * @param {object} params - { scene, navigateTo, startTransition, saveNav, announce }
  * @returns {{ handleKeyDown: Function, handleFocus: Function, handleBlur: Function }}
  */
-export function createKeyboardHandlers(refs, params) {
-  const { navRef, animRef, focusedIdxRef } = refs;
-  const { scene, navigateTo, startTransition, saveNav, announce } = params;
-
-  function focusAt(idx) {
+function makeFocusAt({ scene, navRef, focusedIdxRef, announce }) {
+  return (idx) => {
     const nodes = focusableNodes(scene, navRef.current);
     if (!nodes.length) return;
     const clamped = ((idx % nodes.length) + nodes.length) % nodes.length;
     focusedIdxRef.current = clamped;
     announceNode(announce, nodes[clamped], clamped, nodes.length);
-  }
+  };
+}
 
-  function move(delta) {
+function makeMove({ scene, navRef, focusedIdxRef, focusAt }) {
+  return (delta) => {
     const nodes = focusableNodes(scene, navRef.current);
     if (!nodes.length) return;
     const cur = focusedIdxRef.current;
     focusAt(cur === null ? (delta > 0 ? 0 : nodes.length - 1) : cur + delta);
-  }
+  };
+}
 
-  function activate() {
+function makeActivate({ scene, navRef, focusedIdxRef, navigateTo, announce }) {
+  return () => {
     const nav = navRef.current;
     const nodes = focusableNodes(scene, nav);
     const idx = focusedIdxRef.current;
@@ -179,9 +180,11 @@ export function createKeyboardHandlers(refs, params) {
     else return;
     focusedIdxRef.current = null;
     if (announce) announce(`Opened ${node.name}`);
-  }
+  };
+}
 
-  function goUp() {
+function makeGoUp({ navRef, focusedIdxRef, navigateTo, startTransition, saveNav, announce }) {
+  return () => {
     const nav = navRef.current;
     if (nav.depth === 2) { navigateTo(1, nav.dim); announce?.(t('map.returnedToPrinciples')); }
     else if (nav.depth === 1) { navigateTo(0); announce?.(t('map.returnedToOverview')); }
@@ -192,9 +195,11 @@ export function createKeyboardHandlers(refs, params) {
     } else return false;
     focusedIdxRef.current = null;
     return true;
-  }
+  };
+}
 
-  function handleKeyDown(e) {
+function makeHandleKeyDown({ animRef, move, activate, goUp }) {
+  return (e) => {
     if (animRef.current) return; // mid-transition: let the camera settle first
     switch (e.key) {
       case 'ArrowRight':
@@ -211,7 +216,18 @@ export function createKeyboardHandlers(refs, params) {
         break;
       default: break;
     }
-  }
+  };
+}
+
+export function createKeyboardHandlers(refs, params) {
+  const { navRef, animRef, focusedIdxRef } = refs;
+  const { scene, navigateTo, startTransition, saveNav, announce } = params;
+
+  const focusAt = makeFocusAt({ scene, navRef, focusedIdxRef, announce });
+  const move = makeMove({ scene, navRef, focusedIdxRef, focusAt });
+  const activate = makeActivate({ scene, navRef, focusedIdxRef, navigateTo, announce });
+  const goUp = makeGoUp({ navRef, focusedIdxRef, navigateTo, startTransition, saveNav, announce });
+  const handleKeyDown = makeHandleKeyDown({ animRef, move, activate, goUp });
 
   function handleFocus() {
     if (focusedIdxRef.current === null) focusAt(0);

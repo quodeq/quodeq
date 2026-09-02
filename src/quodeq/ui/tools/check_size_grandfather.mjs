@@ -20,7 +20,7 @@ import { SIZE_GRANDFATHER } from './size_grandfather.mjs';
 // files remain in this list; the 74 entries are all pre-existing
 // production-code max-lines / max-lines-per-function violations, unrelated
 // to this task.
-const CEILING = 35;
+const CEILING = 28;
 
 const count = SIZE_GRANDFATHER.length;
 if (count > CEILING) {
