@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
-import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
-import ComparePage from './ComparePage.jsx';
 
 vi.mock('../../../api/index.js', () => ({
   getCompareSummary: vi.fn(),
@@ -20,44 +17,13 @@ vi.mock('../../../api/shared.js', () => ({
 
 import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
 import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
+import { PROJECTS, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
 
-const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
-
-const PROJECTS = [
-  { id: 'alpha', name: 'alpha', displayName: 'alpha', languageStats: { py: 100 }, totalFiles: 200, analyzedFiles: 190, runsCount: 2, latestDate: iso(1) },
-  { id: 'beta', name: 'beta', displayName: 'beta', languageStats: { ts: 80 }, totalFiles: 100, analyzedFiles: 100, runsCount: 1, latestDate: iso(2) },
-];
-
-function summary(score, dimScore) {
-  return {
-    summary: {
-      numericAverage: score,
-      overallGrade: 'Good',
-      totalViolations: 12,
-      totalCompliance: 88,
-      severity: { critical: 1, major: 4, minor: 7 },
-    },
-    dimensions: [{
-      dimension: 'Security',
-      overallScore: `${dimScore}/10`,
-      overallGrade: 'Good',
-      fromRunId: 'r2',
-      fromDateLabel: '25 Aug',
-      totals: { violationCount: 6, severity: { critical: 1, major: 2, minor: 3 } },
-      principles: [
-        { principle: 'Integrity', score: `${dimScore}` },
-        { principle: 'Confidentiality', score: `${dimScore}` },
-        { principle: 'Authenticity', score: `${dimScore}` },
-      ],
-    }],
-    trend: [
-      { runId: 'r1', dateISO: iso(10), numericAverage: score - 0.4, dimensionDetails: [{ dimension: 'Security', score: dimScore - 0.4 }] },
-      { runId: 'r2', dateISO: iso(1), numericAverage: score, dimensionDetails: [{ dimension: 'Security', score: dimScore }] },
-    ],
-    runsCount: 2,
-    lastRun: { runId: 'r2', dateISO: iso(1), status: 'complete' },
-  };
-}
+/**
+ * Split from ComparePage.test.jsx: the local-fleet table, matrix, and
+ * drill-down/duel interactions. The remote-projects describe block is
+ * split further into ComparePage.remote.test.jsx.
+ */
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,32 +35,6 @@ beforeEach(() => {
   sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
   sharedGetCompareSummary.mockRejectedValue(new Error('unexpected shared fetch'));
 });
-
-/* Mimics the App wiring: `dimension` is a route param — drilling in pushes,
-   switching replaces, back pops. The harness keeps a tiny stack so the
-   push/pop contract is exercised, not just a boolean. */
-function NavHarness(props) {
-  const [stack, setStack] = useState([{}]);
-  const params = stack[stack.length - 1];
-  return (
-    <ComparePage
-      projects={PROJECTS}
-      projectsLoaded
-      onOpenProject={vi.fn()}
-      dimension={params.dimension || null}
-      duel={params.duel || null}
-      onOpenDimension={(key) => setStack((s) => s.concat([{ dimension: key }]))}
-      onSwitchDimension={(key) => setStack((s) => s.slice(0, -1).concat([{ dimension: key }]))}
-      onOpenDuel={(ids) => setStack((s) => s.concat([{ duel: ids }]))}
-      onBack={() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s))}
-      {...props}
-    />
-  );
-}
-
-function renderPage(props = {}) {
-  return render(<NavHarness {...props} />, { wrapper: withQueryClient() });
-}
 
 describe('ComparePage', () => {
   it('shows the empty state when there are no projects', () => {
@@ -326,73 +266,5 @@ describe('ComparePage', () => {
     expect(await screen.findByText('failed to load scores', undefined, { timeout: 4000 })).toBeInTheDocument();
     // The healthy project still renders its data (row + scope card).
     expect((await screen.findAllByText('7.4')).length).toBeGreaterThan(0);
-  });
-});
-
-describe('ComparePage remote projects', () => {
-  const REMOTE = {
-    id: 'gamma', name: 'gamma', displayName: 'gamma', languageStats: { rb: 10 }, totalFiles: 50, analyzedFiles: 50, runsCount: 1, latestDate: iso(3),
-  };
-
-  beforeEach(() => {
-    sharedListProjects.mockResolvedValue({ projects: [REMOTE], lastSynced: null, stale: false });
-    sharedGetCompareSummary.mockResolvedValue(summary(6.5, 6.2));
-  });
-
-  it('remote rows join the fleet through the shared route, tagged', async () => {
-    renderPage();
-    expect(await screen.findByText('gamma')).toBeInTheDocument();
-    expect((await screen.findAllByText('remote')).length).toBeGreaterThan(0);
-    await waitFor(() => expect(sharedGetCompareSummary).toHaveBeenCalledWith('gamma'));
-    // The local endpoint is never asked for the remote project.
-    expect(getCompareSummary).not.toHaveBeenCalledWith('gamma');
-  });
-
-  it('opening a remote row switches to the shared source', async () => {
-    const onOpenProject = vi.fn();
-    renderPage({ onOpenProject });
-    const rowName = (await screen.findAllByText('gamma'))
-      .find((el) => el.classList.contains('compare-row__name'));
-    await userEvent.click(rowName);
-    await waitFor(() => expect(onOpenProject).toHaveBeenCalledWith('gamma', 'shared'));
-  });
-
-  it('duels a local project against a remote one', async () => {
-    renderPage();
-    await screen.findByText('gamma');
-    await userEvent.click(await screen.findByRole('button', { name: 'Start a duel' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /alpha/ }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /gamma/ }));
-    expect(await screen.findByText(/PRINCIPLE_DIFFS/)).toBeInTheDocument();
-  });
-
-  it('a published copy of a local project is deduplicated, local prevailing', async () => {
-    // Same id as the local 'alpha' — the Projects page's merge rule says
-    // this is the SAME project, so no remote row appears for it.
-    sharedListProjects.mockResolvedValue({
-      projects: [
-        { id: 'alpha', name: 'alpha', displayName: 'alpha', languageStats: { py: 100 }, runsCount: 2, latestDate: iso(5) },
-        REMOTE,
-      ],
-      lastSynced: null,
-      stale: false,
-    });
-    renderPage();
-    await screen.findByText('gamma');
-    const alphaRows = screen.getAllByText('alpha')
-      .filter((el) => el.classList.contains('compare-row__name'));
-    expect(alphaRows).toHaveLength(1);
-    // The local endpoint serves alpha; the shared route is only asked for
-    // the genuinely remote project.
-    await waitFor(() => expect(getCompareSummary).toHaveBeenCalledWith('alpha'));
-    expect(sharedGetCompareSummary).not.toHaveBeenCalledWith('alpha');
-  });
-
-  it('leaves the fleet local-only when no shared repository is configured', async () => {
-    sharedListProjects.mockRejectedValue(Object.assign(new Error('no shared repository configured'), { status: 409 }));
-    renderPage();
-    expect(await screen.findByText('alpha')).toBeInTheDocument();
-    expect(screen.queryByText('gamma')).toBeNull();
-    expect(screen.queryByText('remote')).toBeNull();
   });
 });
