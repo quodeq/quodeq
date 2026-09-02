@@ -130,6 +130,13 @@ def test_update_without_prior_checkpoint_processes_all(tmp_path: Path):
 
 
 def test_project_holds_one_connection_for_the_whole_replay(tmp_path: Path):
+    """rebuild() opens O(1) connections, not O(events).
+
+    clear_all() and the event replay each hold their own connection (2
+    total, independent of event count) via store.clear_all() and
+    store.connection() respectively - clear_all() already reuses a held
+    connection when one is open, so this stays O(1) rather than O(events).
+    """
     log = tmp_path / "events.jsonl"
     _write_events(log, 5)
     engine = ProjectionEngine()
@@ -146,7 +153,7 @@ def test_project_holds_one_connection_for_the_whole_replay(tmp_path: Path):
     with patch.object(state_store_mod, "open_evaluation_db", counting_factory):
         engine.rebuild(log, tmp_path)
 
-    assert calls["n"] == 1, "expected one connection for the whole event replay"
+    assert calls["n"] == 2, "expected one connection for clear_all and one for the event replay"
 
 
 def test_update_resumes_from_stored_byte_offset_not_a_full_reparse(tmp_path: Path):

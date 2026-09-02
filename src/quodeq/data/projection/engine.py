@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -24,7 +25,8 @@ class ProjectionEngine:
     def rebuild(self, event_log: Path, run_dir: Path) -> int:
         """Full rebuild: clear all state and replay every event."""
         store = self._store_factory(run_dir)
-        return self._project(event_log, store, since=None, _clear=True)
+        store.clear_all()
+        return self._project(event_log, store, since=None)
 
     def update(self, event_log: Path, run_dir: Path) -> int:
         """Incremental: replay only events after the stored checkpoint.
@@ -90,21 +92,12 @@ class ProjectionEngine:
         *,
         since: Optional[datetime],
         from_offset: int = 0,
-        _clear: bool = False,
     ) -> int:
         reader = EventLogReader(event_log)
         count = 0
         last_ts = None
-        with store.connection():
-            if _clear:
-                conn = store._held
-                conn.execute("DELETE FROM findings")
-                conn.execute("DELETE FROM dimension_scores")
-                conn.execute(
-                    "DELETE FROM run_meta WHERE key IN (?, ?, ?)",
-                    ("projection_checkpoint", "projection_event_log_size", "actions_log_projected_size"),
-                )
-                conn.commit()
+        conn_ctx = store.connection() if hasattr(store, "connection") else nullcontext()
+        with conn_ctx:
             for event in reader.stream(since_timestamp=since, from_offset=from_offset):
                 try:
                     handle(event, store)
