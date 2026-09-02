@@ -75,14 +75,22 @@ class EventLogReader:
     def __init__(self, log_path: Path):
         self.log_path = log_path
 
-    def stream(self, since_timestamp: Optional[datetime] = None) -> Generator[BaseEvent, None, None]:
+    def stream(
+        self, since_timestamp: Optional[datetime] = None, from_offset: int = 0,
+    ) -> Generator[BaseEvent, None, None]:
         """
         Iterate over events in the log.
-        
+
         Args:
-            since_timestamp: If provided, only yield events with a timestamp 
+            since_timestamp: If provided, only yield events with a timestamp
                              strictly greater than this value.
-        
+            from_offset: Byte offset to seek to before reading — lets a caller
+                         that already tracks how many bytes it has projected
+                         (e.g. ``SQLiteStateStore.get_projected_size()``) resume
+                         without re-parsing already-consumed lines. Offsets must
+                         land on a line boundary (any offset previously returned
+                         by ``event_log.stat().st_size`` after a full read does).
+
         Yields:
             An instance of a BaseEvent.
         """
@@ -91,6 +99,8 @@ class EventLogReader:
             return
 
         with open(self.log_path, mode="r", encoding="utf-8") as f:
+            if from_offset:
+                f.seek(from_offset)
             for line_num, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:

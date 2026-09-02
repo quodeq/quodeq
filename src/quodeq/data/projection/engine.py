@@ -24,13 +24,23 @@ class ProjectionEngine:
     def rebuild(self, event_log: Path, run_dir: Path) -> int:
         """Full rebuild: clear all state and replay every event."""
         store = self._store_factory(run_dir)
-        store.clear_all()
-        return self._project(event_log, store, since=None)
+        return self._project(event_log, store, since=None, _clear=True)
 
     def update(self, event_log: Path, run_dir: Path) -> int:
-        """Incremental: replay only events after the stored checkpoint."""
+        """Incremental: replay only events after the stored checkpoint.
+
+        Resumes from the stored byte offset (``get_projected_size``) so a
+        call with few new events doesn't re-parse the whole file; ``since``
+        stays as a belt-and-suspenders timestamp filter for the (rare) case
+        the offset predates the checkpoint, e.g. a first-ever call where no
+        offset was recorded yet.
+        """
         store = self._store_factory(run_dir)
-        return self._project(event_log, store, since=store.get_checkpoint())
+        return self._project(
+            event_log, store,
+            since=store.get_checkpoint(),
+            from_offset=store.get_projected_size() or 0,
+        )
 
     def update_actions(self, actions_log: Path, run_dir: Path, *, force: bool = False) -> int:
         """Replay actions.jsonl events into run_dir's state store.
@@ -79,24 +89,36 @@ class ProjectionEngine:
         store: SQLiteStateStore,
         *,
         since: Optional[datetime],
+        from_offset: int = 0,
+        _clear: bool = False,
     ) -> int:
         reader = EventLogReader(event_log)
         count = 0
         last_ts = None
-        for event in reader.stream(since_timestamp=since):
-            try:
-                handle(event, store)
-                last_ts = event.timestamp
-                count += 1
-            except (ValueError, KeyError, TypeError):
-                _logger.error(
-                    "Handler failed for event %s (type=%s) - skipping",
-                    event.event_id,
-                    event.event_type,
-                    exc_info=True,
+        with store.connection():
+            if _clear:
+                conn = store._held
+                conn.execute("DELETE FROM findings")
+                conn.execute("DELETE FROM dimension_scores")
+                conn.execute(
+                    "DELETE FROM run_meta WHERE key IN (?, ?, ?)",
+                    ("projection_checkpoint", "projection_event_log_size", "actions_log_projected_size"),
                 )
-        if last_ts is not None:
-            store.save_checkpoint(last_ts)
-            store.save_projected_size(event_log.stat().st_size)
+                conn.commit()
+            for event in reader.stream(since_timestamp=since, from_offset=from_offset):
+                try:
+                    handle(event, store)
+                    last_ts = event.timestamp
+                    count += 1
+                except (ValueError, KeyError, TypeError):
+                    _logger.error(
+                        "Handler failed for event %s (type=%s) - skipping",
+                        event.event_id,
+                        event.event_type,
+                        exc_info=True,
+                    )
+            if last_ts is not None:
+                store.save_checkpoint(last_ts)
+                store.save_projected_size(event_log.stat().st_size)
         _logger.info("Projected %d events from %s", count, event_log)
         return count
