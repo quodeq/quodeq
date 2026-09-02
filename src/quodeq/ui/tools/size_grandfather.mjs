@@ -9,7 +9,6 @@
 // list may only shrink: split a file, then remove its entry here
 // (tools/check_size_grandfather.mjs enforces the ceiling).
 export const SIZE_GRANDFATHER = [
-  "src/App.jsx",
   "src/api/applyMutationDelta.js",
   "src/features/assistant/AssistantDrawerProvider.jsx",
   "src/features/assistant/AssistantHeader.jsx",

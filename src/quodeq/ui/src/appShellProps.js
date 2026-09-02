@@ -1,4 +1,7 @@
-import { shouldShowEvaluateButton, shouldShowProjectTabs, shouldShowCompareTab } from './appGating.js';
+import {
+  shouldShowEvaluateButton, shouldShowProjectTabs, shouldShowCompareTab,
+  resolveProjectDisplayName, selectSidebarCounts,
+} from './appGating.js';
 import { buildDashboardDataBundle, buildNavigationBundle } from './routes/renderers.jsx';
 
 // Pure prop-builders for App.jsx's Sidebar/TopBar wiring, extracted
@@ -92,5 +95,47 @@ export function buildContentProps({
     applyDelta,
     bumpDismissRefresh,
     dismissRefreshKey,
+  };
+}
+
+// Bundles every already-computed value AppMain's render tree needs (contentProps,
+// resolvedDisplayName, sidebarCounts included) — same values AppMain used to close
+// over inline before this move (see AppMain.jsx). No new logic here, just a
+// grouping so App.jsx's own function body stays under the function-length cap
+// without touching hook order.
+export function buildAppShell({
+  state, sharedSignal, navTab, navStack, activeTab, activePage, isEvaluating, showToast, setWizardEntry,
+  dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey, selectedProjectInfo, hasCurrentProjectRuns,
+  assistantCtx, APP_VERSION, sidebarPinned, setSidebarPinned, sidebarProvider, sidebarModel, topbarRunProgress,
+  navGoTo, navPop, breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, wizardEntry, wizardHandlers,
+  filteredAccumulated, filteredTrend,
+}) {
+  const contentProps = buildContentProps({
+    state, sharedSignal, navTab, navStackLength: navStack.length, isEvaluating, showToast, setWizardEntry,
+    dismissFinding, applyDelta, bumpDismissRefresh, dismissRefreshKey,
+  });
+
+  // Resolve the project's friendly name (see resolveProjectDisplayName): local
+  // selections read the local projects list; shared/remote selections (absent
+  // from that list) fall back to the resolved sharedProjectInfo name. Until the
+  // lists populate this stays null so the raw UUID never flashes.
+  const resolvedDisplayName = resolveProjectDisplayName({
+    selectedProjectInfo,
+    selectedSource: state.selectedSource,
+    sharedProjectInfo: state.sharedProjectInfo,
+    selectedDisplayName: state.selectedDisplayName,
+    selectedProject: state.selectedProject,
+  });
+
+  const sidebarCounts = selectSidebarCounts({
+    filteredAccumulated, accumulated: state.accumulated, filteredTrend, dashboard: state.dashboard,
+  });
+
+  return {
+    state, navTab, activeTab, activePage, hasCurrentProjectRuns, sharedSignal, assistantCtx,
+    resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned,
+    sidebarProvider, sidebarModel, topbarRunProgress, navStack, navGoTo, navPop,
+    breadcrumbSiblingsFor, effectiveDark, toggleTheme, showStartupLoader, contentProps,
+    wizardEntry, wizardHandlers,
   };
 }
