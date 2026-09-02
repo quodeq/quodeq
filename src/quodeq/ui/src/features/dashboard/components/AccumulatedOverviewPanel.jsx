@@ -17,11 +17,10 @@ import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import { buildTopOffendingFiles, buildProjectRootFile } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
-import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
-import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 import { t } from '../../../strings/index.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
 import { AccumulatedHeroSection } from './AccumulatedHeroSection.jsx';
+import { useAccumulatedReportSpec } from './accumulatedReportSpecs.jsx';
 
 export { useAccumulatedComputations, computeAccumulatedStats, AccumulatedHeroSection };
 
@@ -65,30 +64,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     [filteredDimensions]
   );
 
-  const reportProjectName =
-    data.projectInfo?.displayName
-    || data.projectInfo?.name
-    || data.selectedDisplayName
-    || data.selectedProject
-    || 'project';
-  const hasReportData = Boolean(
-    filteredAccumulated?.summary
-    && Number.isFinite(parseFloat(filteredAccumulated.summary.numericAverage))
-    && (filteredDimensions?.length ?? 0) > 0
-  );
-  const reportSpec = useMemo(() => {
-    if (!hasReportData) return null;
-    const buildMarkdown = () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], reportProjectName);
-    return {
-      id: `report:overview:${reportProjectName}`,
-      type: 'report',
-      title: t('overview.reportTitle', { name: reportProjectName }),
-      render: () => <ReportContent markdown={buildMarkdown()} />,
-      copy: () => buildMarkdown(),
-      download: () => ({ filename: `code-quality-report-${reportProjectName}.md`, body: buildMarkdown() }),
-    };
-  }, [hasReportData, reportProjectName, filteredAccumulated, filteredDimensions]);
-  useRegisterWindowSpec('report', reportSpec);
+  const reportProjectName = useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions });
 
   const onCardNavigate = useMemo(() => {
     if (!onNavigate) return undefined;
