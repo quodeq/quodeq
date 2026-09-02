@@ -33,31 +33,16 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
 
 
 def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
-    """Walk existing projects to see if any other UUID matches this identity.
+    """Return the UUID of any other project matching this identity, via the index.
 
-    Mirrors ``services._fs_project_helpers.find_existing_project`` but takes a
-    ``ProjectIdentity`` directly and ignores the candidate UUID being imported.
+    O(1) index lookup instead of a directory walk + repository_info.json parse
+    per existing project (mirrors ``_update_index``'s use of the same index).
     """
-    if not reports_root.is_dir():
+    index = load_index(reports_root)
+    candidate = index.get(index_key(identity))
+    if candidate is None or candidate == ignore_uuid:
         return None
-    for child in reports_root.iterdir():
-        if not child.is_dir() or child.name == ignore_uuid:
-            continue
-        info_file = child / _REPO_INFO_FILENAME
-        if not info_file.exists():
-            continue
-        try:
-            data = json.loads(info_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if data.get("name") != identity.project_name:
-            continue
-        if data.get("path") != identity.repo_path:
-            continue
-        if (data.get("scopePath") or None) != (identity.scope_path or None):
-            continue
-        return child.name
-    return None
+    return candidate
 
 
 def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
