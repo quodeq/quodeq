@@ -87,13 +87,10 @@ src/quodeq/ui/src/features/dashboard/hooks/useDashboard.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/usePublish.js:1:file
 src/quodeq/ui/src/features/dashboard/hooks/usePublish.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/useSharedProjects.test.jsx:1:file
-src/quodeq/ui/src/features/evaluation/components/ReEvaluateCard.jsx:1:file
 src/quodeq/ui/src/features/evaluation/components/ReEvaluateCard.test.jsx:1:file
-src/quodeq/ui/src/features/evaluation/components/ScanProgress.jsx:1:file
 src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.js:1:file
 src/quodeq/ui/src/features/evaluation/components/buildJobStatCells.test.js:1:file
 src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.test.js:1:file
-src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.js:1:file
 src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.test.jsx:1:file
 src/quodeq/ui/src/features/explorer/components/FileDetailPage.jsx:1:file
 src/quodeq/ui/src/features/explorer/components/PrincipleDetailPage.jsx:1:file

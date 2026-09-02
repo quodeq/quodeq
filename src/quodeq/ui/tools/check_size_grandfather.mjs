@@ -9,7 +9,7 @@ import { SIZE_GRANDFATHER } from './size_grandfather.mjs';
 
 // Revise DOWNWARD as refactor tasks burn entries; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const CEILING = 217;
+const CEILING = 210;
 
 const count = SIZE_GRANDFATHER.length;
 if (count > CEILING) {

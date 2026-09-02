@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
-import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
+import { useEvaluationForm } from '../hooks/useEvaluationForm.js';
 import DimensionSelector from './DimensionSelector.jsx';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
 import { useScanData } from '../hooks/useScanData.js';
@@ -9,8 +8,7 @@ import CleanScanToggle from './CleanScanToggle.jsx';
 import { t } from '../../../strings/index.js';
 import { isLocalRepo as isLocalRepoValue } from '../../../models/repo.js';
 
-const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
-
+export { buildEvaluationPayload } from './evaluationFormHelpers.js';
 
 const FOLDER_MARGIN_BOTTOM = 8;
 
@@ -54,70 +52,44 @@ export function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   );
 }
 
-export function buildEvaluationPayload({ repo, selectedDims, branch, scopePath, cleanScan }) {
-  const payload = { repo };
-  if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
-  if (branch) payload.branch = branch;
-  if (scopePath) payload.scopePath = scopePath;
-  payload.cleanScan = cleanScan !== 'off';
-  return payload;
-}
+function EvaluationFormBody({ repo, setRepo, isLocalRepo, scanData, branch, scopePath, setScopePath, dimLoadError, allDimensions, selectedDims, toggleDim, selectAll, clearAll, cleanScan, setCleanScan, canSubmit, disabled, handleSubmit, handleRepoClear, onBrowse }) {
+  return (
+    <form className="evaluate-form-large" onSubmit={handleSubmit}>
+      <RepoInput
+        repo={repo}
+        onRepoChange={setRepo}
+        onClear={handleRepoClear}
+        onBrowse={onBrowse}
+      />
 
-function buildAndSubmit(onStart, formState) {
-  const { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan } = formState;
-  const result = onStart(buildEvaluationPayload({ repo, selectedDims, branch, scopePath, cleanScan }));
-  // Blocked start (another evaluation is running): keep the form and the
-  // one-shot clean toggle intact so the user's retry submits the same thing.
-  if (result === false) return;
-  setRepo('');
-  setSelectedDims(new Set());
-  setBranch(null);
-  setScopePath(null);
-  if (cleanScan === 'once') {
-    Promise.resolve(result).then(
-      () => setCleanScan('off'),
-      () => {},
-    );
-  }
-}
+      {isLocalRepo && (
+        <BranchScopeSelector
+          branches={scanData?.branches}
+          currentBranch={scanData?.currentBranch || branch}
+          projectPath={repo}
+          onScopeChange={setScopePath}
+          scopePath={scopePath}
+        />
+      )}
 
-function useEvaluationForm(onStart, onValidationFail) {
-  const [repo, setRepo] = useState('');
-  const { allDimensions, dimLoadError } = usePluginDimensions();
-  const [selectedDims, setSelectedDims] = useState(new Set());
-  const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
-  const [branch, setBranch] = useState(null);
-  const [scopePath, setScopePath] = useState(null);
-  const [cleanScan, setCleanScan] = useState('off');
+      {dimLoadError && <p className="inline-error" role="alert" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
+      {repo && allDimensions.length > 0 && (
+        <DimensionSelector
+          allDimensions={allDimensions}
+          selectedDims={selectedDims}
+          onToggle={toggleDim}
+          onSelectAll={selectAll}
+          onClearAll={clearAll}
+        />
+      )}
 
-  useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
+      <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canSubmit} />
 
-  const toggleDim = (id) => setSelectedDims((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
-  const clearAll = () => setSelectedDims(new Set());
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (allDimensions.length > 0 && selectedDims.size === 0) {
-      onValidationFail?.(NO_STANDARDS_MESSAGE);
-      return;
-    }
-    buildAndSubmit(onStart, { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan });
-  };
-  const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
-  const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
-
-  return {
-    repo, setRepo, allDimensions, selectedDims,
-    folderBrowserOpen, setFolderBrowserOpen,
-    toggleDim, selectAll, clearAll, handleSubmit,
-    handleFolderSelect, handleRepoClear, dimLoadError,
-    branch, setBranch, scopePath, setScopePath,
-    cleanScan, setCleanScan,
-  };
+      <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
+        {disabled ? t('evaluate.running') : t('evaluate.scanCap')}
+      </button>
+    </form>
+  );
 }
 
 export default function EvaluationForm({ onStart, disabled, selectedProject }) {
@@ -125,7 +97,7 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
     toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
-    branch, setBranch, scopePath, setScopePath,
+    branch, scopePath, setScopePath,
     cleanScan, setCleanScan,
   } = useEvaluationForm(onStart, showToast);
 
@@ -136,44 +108,16 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
   // can fire on click. ``disabled`` (the prop) covers the running state and
   // the missing-repo case keeps the button greyed.
   const canSubmit = !disabled && !!repo;
+  const bodyProps = {
+    repo, setRepo, isLocalRepo, scanData, branch, scopePath, setScopePath,
+    dimLoadError, allDimensions, selectedDims, toggleDim, selectAll, clearAll,
+    cleanScan, setCleanScan, canSubmit, disabled, handleSubmit, handleRepoClear,
+    onBrowse: () => setFolderBrowserOpen(true),
+  };
 
   return (
     <>
-      <form className="evaluate-form-large" onSubmit={handleSubmit}>
-        <RepoInput
-          repo={repo}
-          onRepoChange={setRepo}
-          onClear={handleRepoClear}
-          onBrowse={() => setFolderBrowserOpen(true)}
-        />
-
-        {isLocalRepo && (
-          <BranchScopeSelector
-            branches={scanData?.branches}
-            currentBranch={scanData?.currentBranch || branch}
-            projectPath={repo}
-            onScopeChange={setScopePath}
-            scopePath={scopePath}
-          />
-        )}
-
-        {dimLoadError && <p className="inline-error" role="alert" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
-        {repo && allDimensions.length > 0 && (
-          <DimensionSelector
-            allDimensions={allDimensions}
-            selectedDims={selectedDims}
-            onToggle={toggleDim}
-            onSelectAll={selectAll}
-            onClearAll={clearAll}
-          />
-        )}
-
-        <CleanScanToggle value={cleanScan} onChange={setCleanScan} disabled={!canSubmit} />
-
-        <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
-          {disabled ? t('evaluate.running') : t('evaluate.scanCap')}
-        </button>
-      </form>
+      <EvaluationFormBody {...bodyProps} />
 
       {folderBrowserOpen && (
         <FolderBrowser
