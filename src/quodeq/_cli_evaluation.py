@@ -3,11 +3,13 @@
 Input resolution lives in ``_cli_resolution.py``; run lifecycle (directory
 setup, RunLifecycleContext wiring, cleanup, SARIF export) lives in
 ``_cli_lifecycle.py``; suppression-aware score printing lives in
-``_cli_scoring.py``. All public names stay re-exported here (and, in turn,
-by ``quodeq.cli``) — ~15 test files patch ``quodeq._cli_evaluation.<name>``.
-A few re-exports below have no direct caller left here (their callers moved
-out and reach them via a deferred facade lookup on this module) but must
-stay importable as patch targets.
+``_cli_scoring.py``; run_evaluate's --diff-from resolution and post-run
+consolidation/SARIF finalization live in ``_cli_evaluate_finalize.py``. All
+public names stay re-exported here (and, in turn, by ``quodeq.cli``) — ~15
+test files patch ``quodeq._cli_evaluation.<name>``. A few re-exports below
+have no direct caller left here (their callers moved out and reach them via
+a deferred facade lookup on this module) but must stay importable as patch
+targets.
 """
 
 from __future__ import annotations
@@ -32,7 +34,7 @@ from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # noqa: F401 — fa
 from quodeq.analysis._runner_markers import emit_marker  # noqa: F401 — facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
-from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
+from quodeq.analysis._diff_resolver import resolve_diff_files  # noqa: F401 — facade patch target
 from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
@@ -49,6 +51,7 @@ from quodeq._cli_lifecycle import (  # noqa: F401
 from quodeq._cli_scoring import (  # noqa: F401
     _count_excluded_findings, _dim_evidence_counts, _format_adjusted_score, _print_scores,
 )
+from quodeq._cli_evaluate_finalize import _apply_diff_from, _finalize_run_evaluate  # noqa: F401
 
 _logger = logging.getLogger(__name__)
 
@@ -158,18 +161,11 @@ def _save_manifest(manifest, evidence_dir: Path) -> None:
             _logger.debug("Could not write manifest: %s", exc)
 
 
-def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, run_dir: Path | None = None, env: dict[str, str] | None = None) -> RunConfig:
-    """Assemble a RunConfig from CLI args and resolved inputs."""
+def _resolve_run_config_locals(args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None):
+    """Resolve the per-run scalars _build_run_config needs before assembling RunConfig."""
     _env = env or os.environ
-    standards_dir = default_paths().standards_dir
-    expanded_dimensions = expand_dimension_aliases(args.dimensions)
-    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
-    log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
-
-    is_single_file = inputs.single_file
-
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
-    if is_single_file:
+    if inputs.single_file:
         consolidated = False
         log_info("Single-file mode: per-dimension analysis for deeper coverage")
 
@@ -179,8 +175,22 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
 
     diff_from = getattr(args, "diff_from", None)
     diff_files: set[str] | None = getattr(args, "_diff_files", None)
-    incremental_file_filter: set[str] | None = diff_files
     skip_scoring = diff_from is not None
+    return consolidated, effective_ai_model, subagent_model_val, diff_from, diff_files, skip_scoring
+
+
+def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, run_dir: Path | None = None, env: dict[str, str] | None = None) -> RunConfig:
+    """Assemble a RunConfig from CLI args and resolved inputs."""
+    standards_dir = default_paths().standards_dir
+    expanded_dimensions = expand_dimension_aliases(args.dimensions)
+    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
+    log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
+
+    (
+        consolidated, effective_ai_model, subagent_model_val,
+        diff_from, diff_files, skip_scoring,
+    ) = _resolve_run_config_locals(args, inputs, env)
+    incremental_file_filter: set[str] | None = diff_files
 
     return RunConfig(
         src=inputs.src,
@@ -208,7 +218,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             diff_from=diff_from,
             skip_scoring=skip_scoring,
         ),
-        dispatch=default_dispatch_policy(env=_env),
+        dispatch=default_dispatch_policy(env=env or os.environ),
     )
 
 
@@ -241,19 +251,9 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if inputs is None:
         return 1
 
-    # Resolve --diff-from here (not inside _build_run_config) so a DiffResolveError
-    # fails fast before any run directory is created — once a run dir exists, its
-    # state is always written by RunLifecycleContext.
-    diff_from = getattr(args, "diff_from", None)
-    if diff_from:
-        try:
-            args._diff_files = set(resolve_diff_files(inputs.src, diff_from))
-        except DiffResolveError as exc:
-            log_error(f"Error: could not resolve --diff-from {diff_from!r}: {exc}")
-            return 1
-        log_info(f"PR diff mode: {len(args._diff_files)} changed file(s) vs {diff_from}")
-    else:
-        args._diff_files = None
+    diff_from_error = _apply_diff_from(args, inputs)
+    if diff_from_error is not None:
+        return diff_from_error
 
     try:
         paths = _setup_run_dirs(args, inputs.src)
@@ -263,23 +263,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
         raise
     result = _run_pipeline_with_cleanup(args, inputs, paths)
     _, _evidence_dir, evaluation_dir = paths
-    # --diff-from / --evidence-only produce no scored reports: nothing to export.
-    no_scored_reports = bool(
-        getattr(args, "diff_from", None) or getattr(args, "evidence_only", False)
-    )
-    # Fail-soft consolidation pass, OUTSIDE the run lifecycle (already closed), so a
-    # failure here can never flip the run state. Marks this run's cache entries
-    # consolidated so the NEXT run replays their findings as carried forward; gated
-    # internally on status.json reading "done" (a cancelled/failed/killed run leaves
-    # entries unconsolidated, so their findings still read as new in the live feed).
-    if not no_scored_reports:
-        from quodeq.analysis.cache.consolidation import mark_run_consolidated
-        mark_run_consolidated(evaluation_dir.parent)
-    # Fail-soft SARIF export, OUTSIDE the run lifecycle, only on success and only
-    # when scored reports exist. A SARIF error here can never flip the run state.
-    if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
-        _write_sarif_if_requested(args, evaluation_dir)
-    return result
+    return _finalize_run_evaluate(args, evaluation_dir, result)
 
 
 def run_diff_evaluation(

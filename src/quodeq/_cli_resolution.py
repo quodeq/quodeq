@@ -200,6 +200,19 @@ def _override_manifest_single_file(language: str, single_file: str) -> SourceMan
     return SourceManifest(targets=[target], total_files=1, language_stats={ext: 1} if ext else {})
 
 
+def _require_standards_config(paths) -> bool:
+    """Return True if detection.json/dimensions.json exist; else print and return False."""
+    if paths.detection_file.exists() and paths.dimensions_file.exists():
+        return True
+    print(
+        "Configuration not found: detection.json and dimensions.json are required. "
+        "These files are created automatically when you install Quodeq standards. "
+        f"Expected location: {paths.detection_file.parent}",
+        file=sys.stderr,
+    )
+    return False
+
+
 def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | None:
     """Resolve src, language, manifest, and dims_data from CLI args.
 
@@ -217,13 +230,7 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     src, single_file = _resolve_single_file(src)
 
     paths = default_paths()
-    if not paths.detection_file.exists() or not paths.dimensions_file.exists():
-        print(
-            "Configuration not found: detection.json and dimensions.json are required. "
-            "These files are created automatically when you install Quodeq standards. "
-            f"Expected location: {paths.detection_file.parent}",
-            file=sys.stderr,
-        )
+    if not _require_standards_config(paths):
         return None
 
     language = _resolve_language(args, src, paths)
