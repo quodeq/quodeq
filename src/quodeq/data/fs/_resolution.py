@@ -32,6 +32,46 @@ def _index_key(identity: ProjectIdentity) -> str:
     return base
 
 
+def _scan_legacy_projects(
+    reports_dir: Path,
+    identity: ProjectIdentity,
+    key: str,
+    index: dict[str, str],
+    save_fn: Callable[[Path, dict[str, str]], None],
+) -> str | None:
+    """Directory scan fallback for projects created before the index existed.
+
+    Updates *index* (and persists via *save_fn*) on a match so the next
+    lookup hits the index directly.
+    """
+    scanned = 0
+    for entry in reports_dir.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        scanned += 1
+        if scanned > _MAX_LEGACY_SCAN:
+            break
+        info_file = entry / _REPO_INFO_FILENAME
+        if not info_file.exists():
+            continue
+        try:
+            info = json.loads(info_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if info.get("name") != identity.project_name:
+            continue
+        # Prefer remote_url match when both sides have one
+        if identity.remote_url and info.get("remote_url") == identity.remote_url:
+            index[key] = entry.name
+            save_fn(reports_dir, index)
+            return entry.name
+        if info.get("path") == identity.repo_path:
+            index[key] = entry.name
+            save_fn(reports_dir, index)
+            return entry.name
+    return None
+
+
 def _find_existing_project(
     reports_dir: Path,
     identity: ProjectIdentity,
@@ -59,32 +99,7 @@ def _find_existing_project(
             save_fn(reports_dir, index)
             return uuid_value
 
-    scanned = 0
-    for entry in reports_dir.iterdir():
-        if not entry.is_dir() or entry.name.startswith("."):
-            continue
-        scanned += 1
-        if scanned > _MAX_LEGACY_SCAN:
-            break
-        info_file = entry / _REPO_INFO_FILENAME
-        if not info_file.exists():
-            continue
-        try:
-            info = json.loads(info_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            continue
-        if info.get("name") != identity.project_name:
-            continue
-        # Prefer remote_url match when both sides have one
-        if identity.remote_url and info.get("remote_url") == identity.remote_url:
-            index[key] = entry.name
-            save_fn(reports_dir, index)
-            return entry.name
-        if info.get("path") == identity.repo_path:
-            index[key] = entry.name
-            save_fn(reports_dir, index)
-            return entry.name
-    return None
+    return _scan_legacy_projects(reports_dir, identity, key, index, save_fn)
 
 
 def _create_project(

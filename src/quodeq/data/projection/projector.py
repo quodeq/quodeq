@@ -16,6 +16,17 @@ class ProjectionResult:
     rebuilt: bool
 
 
+@dataclass(frozen=True)
+class _StalenessCheck:
+    """What ``_detect_staleness`` found -- consumed by ``_apply_projection_deltas``."""
+
+    events_changed: bool
+    pre_pr1_db: bool
+    actions_changed: bool
+    actions_log: Path | None
+    grades_stale: bool
+
+
 class EnsureLockRegistry:
     """Per-run-dir locks serializing ``ensure_projected``.
 
@@ -79,6 +90,85 @@ class Projector:
             count = self._engine.update(events_path, run_dir)
             return ProjectionResult(events_projected=count, rebuilt=False)
 
+    def _detect_staleness(
+        self,
+        store: SQLiteStateStore,
+        events_path: Path,
+        project_dir: Path | None,
+    ) -> _StalenessCheck:
+        """Compare stored projection state against the on-disk event/action logs."""
+        # Events.jsonl branch (today's behavior)
+        projected_size = store.get_projected_size()
+        current_size = events_path.stat().st_size
+        events_changed = projected_size is None or projected_size != current_size
+
+        # Pre-PR-1 DBs have a checkpoint (older code projected them) but no
+        # ``projection_event_log_size`` key (added in PR 1). Their findings
+        # may be missing columns the current mappers write (e.g. requirement).
+        # Force a full rebuild on first contact so every column is correct.
+        pre_pr1_db = projected_size is None and store.get_checkpoint() is not None
+
+        # Actions.jsonl branch (new)
+        actions_changed = False
+        actions_log: Path | None = None
+        if project_dir is not None:
+            actions_log = project_dir / "actions.jsonl"
+            last_actions_size = store.get_actions_projected_size() or 0
+            current_actions_size = actions_log.stat().st_size if actions_log.is_file() else 0
+            actions_changed = current_actions_size != last_actions_size
+
+        # Grade tables embody the scoring math that computed them. When
+        # that math changes (see GRADE_ALGO_VERSION), a run whose logs are
+        # untouched still carries grades no fresh rescore would produce —
+        # the same principle read differently depending on which screen's
+        # read path served it. Re-derive from the already-projected
+        # findings; no event replay needed.
+        from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
+        grades_stale = store.get_grades_algo_version() != GRADE_ALGO_VERSION
+
+        return _StalenessCheck(
+            events_changed=events_changed,
+            pre_pr1_db=pre_pr1_db,
+            actions_changed=actions_changed,
+            actions_log=actions_log,
+            grades_stale=grades_stale,
+        )
+
+    def _apply_projection_deltas(
+        self,
+        events_path: Path,
+        run_dir: Path,
+        staleness: _StalenessCheck,
+    ) -> ProjectionResult:
+        """Project events, then actions, then recompute grades -- in that order.
+
+        Order matters: events must land before action events touch them, and
+        action-replay is forced when events changed so brand-new findings get
+        matched against pre-existing dismissals.
+        """
+        # Project events first (so new findings exist before action events touch them).
+        if staleness.events_changed:
+            result = self.project(events_path, run_dir, force_rebuild=staleness.pre_pr1_db)
+        else:
+            result = ProjectionResult(events_projected=0, rebuilt=False)
+
+        # Project actions. If events changed too, force-replay so brand-new findings
+        # get matched against pre-existing dismissals.
+        if staleness.actions_log is not None and (staleness.actions_changed or staleness.events_changed):
+            self._engine.update_actions(
+                staleness.actions_log, run_dir, force=staleness.events_changed,
+            )
+
+        # Grade tables are derived from findings + dismissals. Recompute
+        # whenever either source changed, or when the stored grades were
+        # computed with an older version of the math (recompute_grades
+        # stamps the current one).
+        if staleness.events_changed or staleness.actions_changed or staleness.grades_stale:
+            from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
+            recompute_grades(run_dir)
+
+        return result
+
     def ensure_projected(
         self,
         events_path: Path,
@@ -98,55 +188,9 @@ class Projector:
                 migrate_if_needed(project_dir)
             store = self._store_factory(run_dir)
 
-            # Events.jsonl branch (today's behavior)
-            projected_size = store.get_projected_size()
-            current_size = events_path.stat().st_size
-            events_changed = projected_size is None or projected_size != current_size
+            staleness = self._detect_staleness(store, events_path, project_dir)
 
-            # Pre-PR-1 DBs have a checkpoint (older code projected them) but no
-            # ``projection_event_log_size`` key (added in PR 1). Their findings
-            # may be missing columns the current mappers write (e.g. requirement).
-            # Force a full rebuild on first contact so every column is correct.
-            pre_pr1_db = projected_size is None and store.get_checkpoint() is not None
-
-            # Actions.jsonl branch (new)
-            actions_changed = False
-            actions_log: Path | None = None
-            if project_dir is not None:
-                actions_log = project_dir / "actions.jsonl"
-                last_actions_size = store.get_actions_projected_size() or 0
-                current_actions_size = actions_log.stat().st_size if actions_log.is_file() else 0
-                actions_changed = current_actions_size != last_actions_size
-
-            # Grade tables embody the scoring math that computed them. When
-            # that math changes (see GRADE_ALGO_VERSION), a run whose logs are
-            # untouched still carries grades no fresh rescore would produce —
-            # the same principle read differently depending on which screen's
-            # read path served it. Re-derive from the already-projected
-            # findings; no event replay needed.
-            from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
-            grades_stale = store.get_grades_algo_version() != GRADE_ALGO_VERSION
-
-            if not events_changed and not actions_changed and not grades_stale:
+            if not staleness.events_changed and not staleness.actions_changed and not staleness.grades_stale:
                 return ProjectionResult(events_projected=0, rebuilt=False)
 
-            # Project events first (so new findings exist before action events touch them).
-            if events_changed:
-                result = self.project(events_path, run_dir, force_rebuild=pre_pr1_db)
-            else:
-                result = ProjectionResult(events_projected=0, rebuilt=False)
-
-            # Project actions. If events changed too, force-replay so brand-new findings
-            # get matched against pre-existing dismissals.
-            if actions_log is not None and (actions_changed or events_changed):
-                self._engine.update_actions(actions_log, run_dir, force=events_changed)
-
-            # Grade tables are derived from findings + dismissals. Recompute
-            # whenever either source changed, or when the stored grades were
-            # computed with an older version of the math (recompute_grades
-            # stamps the current one).
-            if events_changed or actions_changed or grades_stale:
-                from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
-                recompute_grades(run_dir)
-
-            return result
+            return self._apply_projection_deltas(events_path, run_dir, staleness)

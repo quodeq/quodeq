@@ -31,6 +31,29 @@ MIGRATION_MARKER = ".dismissed_migrated"
 _migration_locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
 
 
+def _fold_legacy_entries(writer: ActionLogWriter, entries: list) -> int:
+    """Emit a FindingDismissed event for each legacy dismissed.json entry.
+
+    Tolerant per-entry: a malformed entry is logged and skipped rather than
+    aborting the whole fold.
+    """
+    count = 0
+    for entry in entries:
+        try:
+            payload = FindingDismissed(
+                req=str(entry.get("req", "")),
+                file=str(entry.get("file", "")),
+                line=int(entry.get("line", 0)),
+                reason=None,
+            )
+            writer.emit(FindingDismissedEvent(payload=payload))
+            count += 1
+        except Exception:
+            _logger.exception("Failed to migrate dismissed entry: %s", entry)
+            continue
+    return count
+
+
 def migrate_if_needed(project_dir: Path) -> int:
     """Fold dismissed.json into actions.jsonl exactly once. Returns count migrated."""
     marker = project_dir / MIGRATION_MARKER
@@ -58,20 +81,7 @@ def migrate_if_needed(project_dir: Path) -> int:
             return 0
 
         writer = ActionLogWriter(project_dir)
-        count = 0
-        for entry in entries:
-            try:
-                payload = FindingDismissed(
-                    req=str(entry.get("req", "")),
-                    file=str(entry.get("file", "")),
-                    line=int(entry.get("line", 0)),
-                    reason=None,
-                )
-                writer.emit(FindingDismissedEvent(payload=payload))
-                count += 1
-            except Exception:
-                _logger.exception("Failed to migrate dismissed entry: %s", entry)
-                continue
+        count = _fold_legacy_entries(writer, entries)
 
         # Mark last: a crash mid-fold leaves the marker absent so the next call
         # re-folds. Re-folding only appends duplicate FindingDismissed events,
