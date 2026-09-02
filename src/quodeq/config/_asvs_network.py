@@ -19,13 +19,15 @@ _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 _DEFAULT_FETCH_TIMEOUT_S = 30
 _RETRY_BASE_DELAY_S = 0.5
 _RETRY_JITTER_S = 0.3
+_MAX_FETCH_BYTES = 50 * 1024 * 1024  # ASVS standard docs are well under this; guards against a compromised/misconfigured allowlisted host
 
 
 def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retries: int = 3) -> bytes:
     """Fetch URL content with exponential-backoff retries.
 
     Retries on network errors up to *max_retries* times, raising
-    ``ConnectionError`` if all attempts fail.
+    ``ConnectionError`` if all attempts fail or the response exceeds
+    ``_MAX_FETCH_BYTES``.
     """
     if not url.startswith("https://"):
         raise ValueError(f"Only https:// URLs are allowed, got: {url!r}")
@@ -36,7 +38,12 @@ def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retr
         _logger.info("Fetching %s (attempt %d/%d)", url, attempt + 1, max_retries)
         try:
             with urllib.request.urlopen(url, timeout=timeout) as r:
-                return r.read()
+                data = r.read(_MAX_FETCH_BYTES + 1)
+                if len(data) > _MAX_FETCH_BYTES:
+                    raise ConnectionError(
+                        f"Response from {url} exceeds the {_MAX_FETCH_BYTES}-byte cap"
+                    )
+                return data
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last_exc = exc
             if attempt < max_retries - 1:
