@@ -19,6 +19,44 @@ import { t } from '../strings/index.js';
 import { buildDialogShell } from './domDialogBuilder.js';
 const _ALLOWED_VARIANTS = new Set(['default', 'danger']);
 
+function createCheckbox(dialog, { checkboxLabel, checkboxHint, checkboxDefault }) {
+  if (!checkboxLabel) return null;
+  const wrap = document.createElement('label');
+  wrap.className = 'qd-confirm-checkbox';
+  const checkboxInput = document.createElement('input');
+  checkboxInput.type = 'checkbox';
+  checkboxInput.checked = !!checkboxDefault;
+  const labelText = document.createElement('span');
+  labelText.className = 'qd-confirm-checkbox-label';
+  labelText.textContent = checkboxLabel;
+  wrap.appendChild(checkboxInput);
+  wrap.appendChild(labelText);
+  if (checkboxHint) {
+    const hint = document.createElement('span');
+    hint.className = 'qd-confirm-checkbox-hint';
+    hint.textContent = checkboxHint;
+    wrap.appendChild(hint);
+  }
+  dialog.appendChild(wrap);
+  return checkboxInput;
+}
+
+function createConfirmButtons(actionsEl, { cancelLabel, confirmLabel, safeVariant }) {
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'qd-confirm-btn qd-confirm-btn--cancel';
+  cancelBtn.textContent = cancelLabel;
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.type = 'button';
+  confirmBtn.className = `qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--${safeVariant}`;
+  confirmBtn.textContent = confirmLabel;
+
+  actionsEl.appendChild(cancelBtn);
+  actionsEl.appendChild(confirmBtn);
+  return { cancelBtn, confirmBtn };
+}
+
 export function confirmDialog({
   title = t('common.confirm'),
   message = t('common.areYouSure'),
@@ -53,39 +91,8 @@ export function confirmDialog({
     });
     const { dialog, actionsEl } = shell;
 
-    let checkboxInput = null;
-    if (checkboxLabel) {
-      const wrap = document.createElement('label');
-      wrap.className = 'qd-confirm-checkbox';
-      checkboxInput = document.createElement('input');
-      checkboxInput.type = 'checkbox';
-      checkboxInput.checked = !!checkboxDefault;
-      const labelText = document.createElement('span');
-      labelText.className = 'qd-confirm-checkbox-label';
-      labelText.textContent = checkboxLabel;
-      wrap.appendChild(checkboxInput);
-      wrap.appendChild(labelText);
-      if (checkboxHint) {
-        const hint = document.createElement('span');
-        hint.className = 'qd-confirm-checkbox-hint';
-        hint.textContent = checkboxHint;
-        wrap.appendChild(hint);
-      }
-      dialog.appendChild(wrap);
-    }
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'qd-confirm-btn qd-confirm-btn--cancel';
-    cancelBtn.textContent = cancelLabel;
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.type = 'button';
-    confirmBtn.className = `qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--${safeVariant}`;
-    confirmBtn.textContent = confirmLabel;
-
-    actionsEl.appendChild(cancelBtn);
-    actionsEl.appendChild(confirmBtn);
+    const checkboxInput = createCheckbox(dialog, { checkboxLabel, checkboxHint, checkboxDefault });
+    const { cancelBtn, confirmBtn } = createConfirmButtons(actionsEl, { cancelLabel, confirmLabel, safeVariant });
 
     cancelBtn.addEventListener('click', () => close(false));
     confirmBtn.addEventListener('click', () => close(true));

@@ -81,6 +81,4 @@ export const SIZE_GRANDFATHER = [
   "src/hooks/useProjectScores.js",
   "src/hooks/useProjectState.js",
   "src/hooks/useRunNavigator.js",
-  "src/utils/chooseDialog.js",
-  "src/utils/confirmDialog.js",
 ];
