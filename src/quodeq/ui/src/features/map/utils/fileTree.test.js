@@ -94,3 +94,13 @@ test('buildFileTree sorts children by violation count descending', () => {
   assert.equal(tree.children[0].name, 'a.py');
   assert.equal(tree.children[1].name, 'b.py');
 });
+
+test('buildFileTree does not stack-overflow on a deeply nested single-child chain', () => {
+  const dimensions = [{
+    dimension: 'Security',
+    violations: [
+      { file: Array.from({ length: 200 }, (_, i) => `d${i}`).join('/') + '/leaf.py', severity: 'minor' },
+    ],
+  }];
+  assert.doesNotThrow(() => buildFileTree(dimensions));
+});
