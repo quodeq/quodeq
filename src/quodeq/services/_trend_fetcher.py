@@ -79,6 +79,72 @@ def make_rescoring_fetcher(
     return rescoring_fetcher
 
 
+def _make_version_for(
+    project_dir: Path, project: str, params: ScoringParams,
+    dismissed: set, deleted: set, keys_cache: dict,
+    cacheable_run_ids: set[str] | None,
+) -> Callable[[str], str]:
+    from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
+    from quodeq.services.score_cache import (  # noqa: PLC0415
+        open_score_cache, run_scoped_version, store_run_keys,
+    )
+
+    def version_for(run_id: str) -> str:
+        keys = keys_cache.get(run_id)
+        if keys is None:
+            keys = read_run_key_sets(project_dir / run_id)
+            keys_cache[run_id] = keys
+            if cacheable_run_ids is None or run_id in cacheable_run_ids:
+                try:
+                    with open_score_cache() as _c:
+                        store_run_keys(_c, project, run_id, keys[0], keys[1])
+                except (OSError, sqlite3.Error):
+                    _logger.debug(
+                        "Could not store run keys in score cache for %s/%s",
+                        project, run_id, exc_info=True,
+                    )
+        return run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
+
+    return version_for
+
+
+def _make_heavy_trend_fetcher(
+    reports_root: Path, project: str, params: ScoringParams,
+    cacheable_run_ids: set[str] | None,
+    *,
+    base_fetcher_factory: Callable[[Path, str], _Fetcher],
+    dismissed_keys: Callable[[Path], set],
+    deleted_keys: Callable[[Path], set],
+) -> _Fetcher:
+    """Wrap the findings-based rescoring fetcher with the read-through score
+    cache. The cache version is a content hash of dismissals/deletions/
+    params, so any change auto-invalidates."""
+    project_dir = reports_root / project
+    base = make_rescoring_fetcher(
+        reports_root, project, params=params,
+        base_fetcher=base_fetcher_factory(reports_root, project),
+        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+    )
+    from quodeq.services.score_cache import load_run_keys, open_score_cache  # noqa: PLC0415
+    dismissed = dismissed_keys(project_dir)
+    deleted = deleted_keys(project_dir)
+    try:
+        with open_score_cache() as _conn:
+            keys_cache = load_run_keys(_conn, project)
+    except (OSError, sqlite3.Error):
+        _logger.debug("Could not load run keys from score cache for %s", project, exc_info=True)
+        keys_cache = {}
+
+    version_for = _make_version_for(
+        project_dir, project, params, dismissed, deleted, keys_cache, cacheable_run_ids,
+    )
+    is_cacheable = (
+        None if cacheable_run_ids is None
+        else (lambda rid: rid in cacheable_run_ids)
+    )
+    return make_cache_backed_fetcher(project, version_for, base, is_cacheable=is_cacheable)
+
+
 def make_trend_fetcher(
     reports_root: Path,
     project: str,
@@ -98,9 +164,7 @@ def make_trend_fetcher(
     (findings-less) results never collide with the shared full-data cache used
     for the selected run.
 
-    Heavy path (dismissals/deletions active): wrap the findings-based rescoring
-    fetcher with the read-through score cache. The cache version is a content
-    hash of dismissals/deletions/params, so any change auto-invalidates.
+    Heavy path (dismissals/deletions active): see _make_heavy_trend_fetcher.
 
     ``cacheable_run_ids`` restricts which runs the heavy-path cache may
     *persist*: only terminal (complete) runs are safe. An in-progress run's
@@ -117,45 +181,11 @@ def make_trend_fetcher(
     """
     project_dir = reports_root / project
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
-        base = make_rescoring_fetcher(
-            reports_root, project, params=params,
-            base_fetcher=base_fetcher_factory(reports_root, project),
+        return _make_heavy_trend_fetcher(
+            reports_root, project, params, cacheable_run_ids,
+            base_fetcher_factory=base_fetcher_factory,
             dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
         )
-        from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
-        from quodeq.services.score_cache import (  # noqa: PLC0415
-            load_run_keys, open_score_cache, run_scoped_version, store_run_keys,
-        )
-        dismissed = dismissed_keys(project_dir)
-        deleted = deleted_keys(project_dir)
-        try:
-            with open_score_cache() as _conn:
-                _keys = load_run_keys(_conn, project)
-        except (OSError, sqlite3.Error):
-            _logger.debug("Could not load run keys from score cache for %s", project, exc_info=True)
-            _keys = {}
-
-        def version_for(run_id: str) -> str:
-            keys = _keys.get(run_id)
-            if keys is None:
-                keys = read_run_key_sets(project_dir / run_id)
-                _keys[run_id] = keys
-                if cacheable_run_ids is None or run_id in cacheable_run_ids:
-                    try:
-                        with open_score_cache() as _c:
-                            store_run_keys(_c, project, run_id, keys[0], keys[1])
-                    except (OSError, sqlite3.Error):
-                        _logger.debug(
-                            "Could not store run keys in score cache for %s/%s",
-                            project, run_id, exc_info=True,
-                        )
-            return run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
-
-        is_cacheable = (
-            None if cacheable_run_ids is None
-            else (lambda rid: rid in cacheable_run_ids)
-        )
-        return make_cache_backed_fetcher(project, version_for, base, is_cacheable=is_cacheable)
 
     cache: OrderedDict = OrderedDict()
     return make_lru_dimension_fetcher(
