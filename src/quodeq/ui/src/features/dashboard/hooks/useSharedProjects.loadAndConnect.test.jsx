@@ -1,0 +1,196 @@
+import { describe, it, expect, vi } from 'vitest';
+import { renderHook, waitFor, act } from '@testing-library/react';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useSharedProjects, useSharedContentSignal } from './useSharedProjects.js';
+import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
+import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { sharedKeys } from '../../../api/queryKeys.js';
+
+function makeFakeApi(overrides = {}) {
+  return {
+    getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
+    sharedListProjects: vi.fn(async () => ({
+      projects: [{ id: 'p1', name: 'demo' }],
+      lastSynced: '2026-07-16T00:00:00Z',
+      stale: false,
+    })),
+    connectShared: vi.fn(async (url) => ({ configured: true, url })),
+    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
+    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    ...overrides,
+  };
+}
+
+// A promise the test controls the settlement of, so we can assert on
+// behaviour while a call is genuinely still in flight (the double-submit
+// window), rather than a promise that resolves on the same microtask tick.
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+function wrap(fakeApi, children) {
+  const QC = withQueryClient();
+  return (
+    <QC>
+      <ApiProvider value={fakeApi}>{children}</ApiProvider>
+    </QC>
+  );
+}
+
+
+// Split from useSharedProjects.test.jsx: mount cache/background
+// revalidate, configured gating, connect(), and refresh() stale handling.
+
+describe('useSharedProjects', () => {
+  it('lists from cache on mount and refreshes in the background (never blocks)', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // First render comes from cache — regression lock for the blocking-load bug.
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledWith({ refresh: false });
+    expect(fakeApi.sharedListProjects).not.toHaveBeenCalledWith({ refresh: true });
+
+    // Background revalidate: refreshShared fires after the cached render, then re-lists.
+    await waitFor(() => expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not fire a background refresh when no shared repo is configured', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
+    expect(fakeApi.refreshShared).not.toHaveBeenCalled();
+  });
+
+  it('does not list projects when unconfigured', async () => {
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => ({ configured: false, url: null })) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.configured).toBe(false);
+    expect(fakeApi.sharedListProjects).not.toHaveBeenCalled();
+    expect(result.current.projects).toEqual([]);
+  });
+
+  it('connect(url) calls connectShared then reloads status and lists projects', async () => {
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => ({ configured: false, url: null })) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.configured).toBe(false);
+
+    // After connecting, status flips to configured.
+    fakeApi.getSharedStatus.mockResolvedValue({ configured: true, url: 'https://github.com/team/results.git' });
+
+    await act(async () => {
+      await result.current.connect('https://github.com/team/results.git');
+    });
+
+    expect(fakeApi.connectShared).toHaveBeenCalledWith('https://github.com/team/results.git');
+    await waitFor(() => expect(result.current.configured).toBe(true));
+    // The list query only becomes enabled once `configured` flips true (a
+    // render after connect()'s own status invalidation resolves), so its
+    // own fetch settles slightly after connect()'s returned promise does.
+    await waitFor(() => expect(result.current.projects).toHaveLength(1));
+  });
+
+  it('connect(url) surfaces the API error message on failure without touching configured state', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+      connectShared: vi.fn(async () => { throw new Error('not a valid git repository'); }),
+    });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.connect('not-a-url');
+    });
+
+    expect(result.current.connectError).toBe('not a valid git repository');
+    expect(result.current.configured).toBe(false);
+  });
+
+  it('refresh() calls refreshShared then re-lists without forcing another refresh fetch', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Let the mount's own background revalidate settle first, then measure
+    // a manual refresh() call in isolation from it.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
+    fakeApi.sharedListProjects.mockClear();
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1);
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
+    expect(fakeApi.sharedListProjects).toHaveBeenLastCalledWith({ refresh: false });
+    expect(result.current.stale).toBe(false);
+  });
+
+  // Error -> stale handling: a failed refresh must not blank out the
+  // existing listing -- it flags `stale` so the page can show the
+  // "refresh failed, showing results synced <time> ago" banner over the
+  // still-valid last-known data.
+  it('refresh() sets stale to true when refreshShared throws, keeping the existing projects/lastSynced', async () => {
+    const fakeApi = makeFakeApi({
+      refreshShared: vi.fn(async () => { throw new Error('network unreachable'); }),
+    });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const priorProjects = result.current.projects;
+    const priorLastSynced = result.current.lastSynced;
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(result.current.stale).toBe(true);
+    expect(result.current.projects).toBe(priorProjects);
+    expect(result.current.lastSynced).toBe(priorLastSynced);
+  });
+
+  it('refresh() sets stale to true when the re-list after a successful refreshShared throws', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Let the mount's own background revalidate settle first, so only the
+    // manual refresh() call below is counted.
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
+    fakeApi.refreshShared.mockClear();
+
+    fakeApi.sharedListProjects.mockRejectedValueOnce(new Error('boom'));
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1);
+    expect(result.current.stale).toBe(true);
+  });
+});
