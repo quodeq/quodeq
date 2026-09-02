@@ -28,25 +28,22 @@ function usePackLayout(node, viewMode) {
   }, [node, viewMode]);
 }
 
-/* ---- useFocusManager: focus state and click handling ---- */
-function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, onFileClick }) {
-  const [focus, setFocus] = useState(null);
-  const skipTransition = useRef(true);
+function useFocusResetSync(resetKey, setFocus) {
   const prevResetKey = useRef(resetKey);
-  const prevPath = useRef(null);
-
   useEffect(() => {
     if (resetKey !== prevResetKey.current) {
       prevResetKey.current = resetKey;
       setFocus(null);
     }
   }, [resetKey]);
+}
 
-  // Sync focus to currentPath
+// Sync focus to currentPath
+function useFocusPathSync({ currentPath, circles, setFocus, skipTransition, prevPathRef }) {
   useEffect(() => {
-    if (currentPath === prevPath.current) return;
-    const isMount = prevPath.current === null;
-    prevPath.current = currentPath;
+    if (currentPath === prevPathRef.current) return;
+    const isMount = prevPathRef.current === null;
+    prevPathRef.current = currentPath;
     if (!currentPath) {
       if (!isMount) skipTransition.current = true;
       setFocus(null);
@@ -60,30 +57,29 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
       }
     }
   }, [currentPath, circles]);
+}
 
-  // Enable transitions after first paint
-  useEffect(() => {
-    requestAnimationFrame(() => { skipTransition.current = false; });
-  }, []);
-
-  const focusNode = focus || root;
-
-  const { k, tx, ty } = useMemo(() => {
+function useFocusTransform(focusNode) {
+  return useMemo(() => {
     if (!focusNode) return { k: 1, tx: 0, ty: 0 };
     const k = BASE_SIZE / (focusNode.r * 2);
     const tx = BASE_SIZE / 2 - focusNode.x * k;
     const ty = BASE_SIZE / 2 - focusNode.y * k;
     return { k, tx, ty };
   }, [focusNode]);
+}
 
-  const screenCoords = useMemo(() =>
+function useScreenCoords(circles, k, tx, ty) {
+  return useMemo(() =>
     circles.map(c => ({
       cx: c.x * k + tx,
       cy: c.y * k + ty,
       r: c.r * k,
     })),
   [circles, k, tx, ty]);
+}
 
+function useFocusHandlers({ focusNode, setFocus, onFileClick, onDrillDown, prevPathRef }) {
   const handleClick = useCallback((e, c) => {
     e.stopPropagation();
     const isFolder = !c.data.isFile && c.data.children?.length > 0;
@@ -92,13 +88,13 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
     } else if (isFolder && c !== focusNode) {
       setFocus(c);
       onDrillDown?.(c.data.path || '');
-      prevPath.current = c.data.path || '';
+      prevPathRef.current = c.data.path || '';
     } else if (c === focusNode) {
       const parent = focusNode?.parent;
       setFocus(parent || null);
       const parentPath = parent?.data?.path || '';
       onDrillDown?.(parentPath);
-      prevPath.current = parentPath;
+      prevPathRef.current = parentPath;
     }
   }, [focusNode, onFileClick, onDrillDown]);
 
@@ -107,11 +103,15 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
     setFocus(parent || null);
     const parentPath = parent?.data?.path || '';
     onDrillDown?.(parentPath);
-    prevPath.current = parentPath;
+    prevPathRef.current = parentPath;
   }, [focusNode, onDrillDown]);
 
-  // Pre-categorize circles
-  const { folderIndices, fileIndices } = useMemo(() => {
+  return { handleClick, handleBgClick };
+}
+
+// Pre-categorize circles
+function useCircleIndices(circles) {
+  return useMemo(() => {
     const fi = [], fli = [];
     circles.forEach((c, i) => {
       const d = c.data;
@@ -121,6 +121,27 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
     });
     return { folderIndices: fi, fileIndices: fli };
   }, [circles]);
+}
+
+/* ---- useFocusManager: focus state and click handling ---- */
+function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, onFileClick }) {
+  const [focus, setFocus] = useState(null);
+  const skipTransition = useRef(true);
+  const prevPathRef = useRef(null);
+
+  useFocusResetSync(resetKey, setFocus);
+  useFocusPathSync({ currentPath, circles, setFocus, skipTransition, prevPathRef });
+
+  // Enable transitions after first paint
+  useEffect(() => {
+    requestAnimationFrame(() => { skipTransition.current = false; });
+  }, []);
+
+  const focusNode = focus || root;
+  const { k, tx, ty } = useFocusTransform(focusNode);
+  const screenCoords = useScreenCoords(circles, k, tx, ty);
+  const { handleClick, handleBgClick } = useFocusHandlers({ focusNode, setFocus, onFileClick, onDrillDown, prevPathRef });
+  const { folderIndices, fileIndices } = useCircleIndices(circles);
 
   return { focusNode, k, tx, ty, screenCoords, handleClick, handleBgClick, skipTransition, folderIndices, fileIndices };
 }

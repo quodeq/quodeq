@@ -24,18 +24,8 @@ function readStoredActive() {
  *  - on tab activation: refetch lazily so the status bar's cwd stays fresh
  *    without polling.
  */
-export function useTerminalSessions({ enabled }) {
-  const { listTerminalSessions, createTerminalSession, killTerminalSession } = useApi();
-  const [sessions, setSessions] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [max, setMax] = useState(6);
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
-  // Serialize reconciles: a burst (N sockets all reporting 'gone' after a
-  // server restart) must not fan out into N concurrent create calls.
-  const reconcilingRef = useRef(null);
-
-  const reconcile = useCallback(({ createIfEmpty = true } = {}) => {
+function makeReconcile({ listTerminalSessions, createTerminalSession, setSessions, setMax, setActiveId, reconcilingRef }) {
+  return function reconcile({ createIfEmpty = true } = {}) {
     if (!reconcilingRef.current) {
       reconcilingRef.current = (async () => {
         try {
@@ -60,20 +50,11 @@ export function useTerminalSessions({ enabled }) {
       })();
     }
     return reconcilingRef.current;
-  }, [listTerminalSessions, createTerminalSession]);
+  };
+}
 
-  useEffect(() => {
-    if (enabled) reconcile();
-  }, [enabled, reconcile]);
-
-  // Persist every selection change (click, create, close-neighbor, restore)
-  // so the next mount of this hook starts from the same tab.
-  useEffect(() => {
-    if (!activeId) return;
-    writeString(ACTIVE_SESSION_KEY, activeId);
-  }, [activeId]);
-
-  const openSession = useCallback(async () => {
+function makeOpenSession({ createTerminalSession, reconcile, setActiveId }) {
+  return async () => {
     try {
       const created = await createTerminalSession();
       await reconcile();
@@ -82,9 +63,11 @@ export function useTerminalSessions({ enabled }) {
       // 409 at the cap (or a race): the server is the source of truth.
       await reconcile();
     }
-  }, [reconcile, createTerminalSession]);
+  };
+}
 
-  const closeSession = useCallback(async (id) => {
+function makeCloseSession({ sessionsRef, setSessions, setActiveId, killTerminalSession, reconcile }) {
+  return async (id) => {
     // Drop it locally FIRST: unmounting the view closes its socket and
     // disposes xterm before the server kill, so the socket never sees the
     // kill as an unexpected drop and starts reconnect backoff into a 4004.
@@ -97,13 +80,52 @@ export function useTerminalSessions({ enabled }) {
     await killTerminalSession(id).catch(() => {});
     // Recreates a fresh session when the last tab was closed.
     await reconcile();
-  }, [reconcile, killTerminalSession]);
+  };
+}
 
-  const selectSession = useCallback((id) => {
+function makeSelectSession({ setActiveId, reconcile }) {
+  return (id) => {
     setActiveId(id);
     // Lazy cwd refresh for the status bar; no polling.
     reconcile({ createIfEmpty: false });
-  }, [reconcile]);
+  };
+}
+
+export function useTerminalSessions({ enabled }) {
+  const { listTerminalSessions, createTerminalSession, killTerminalSession } = useApi();
+  const [sessions, setSessions] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [max, setMax] = useState(6);
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  // Serialize reconciles: a burst (N sockets all reporting 'gone' after a
+  // server restart) must not fan out into N concurrent create calls.
+  const reconcilingRef = useRef(null);
+
+  const reconcile = useCallback(
+    makeReconcile({ listTerminalSessions, createTerminalSession, setSessions, setMax, setActiveId, reconcilingRef }),
+    [listTerminalSessions, createTerminalSession],
+  );
+
+  useEffect(() => {
+    if (enabled) reconcile();
+  }, [enabled, reconcile]);
+
+  // Persist every selection change (click, create, close-neighbor, restore)
+  // so the next mount of this hook starts from the same tab.
+  useEffect(() => {
+    if (!activeId) return;
+    writeString(ACTIVE_SESSION_KEY, activeId);
+  }, [activeId]);
+
+  const openSession = useCallback(makeOpenSession({ createTerminalSession, reconcile, setActiveId }), [reconcile, createTerminalSession]);
+
+  const closeSession = useCallback(
+    makeCloseSession({ sessionsRef, setSessions, setActiveId, killTerminalSession, reconcile }),
+    [reconcile, killTerminalSession],
+  );
+
+  const selectSession = useCallback(makeSelectSession({ setActiveId, reconcile }), [reconcile]);
 
   return { sessions, activeId, max, openSession, closeSession, selectSession, reconcile };
 }

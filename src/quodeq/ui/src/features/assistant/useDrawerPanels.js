@@ -11,6 +11,60 @@ import {
   closeActiveTabPanels, closeSpecificPanel, dropDisabledPanels, fallbackActiveTab,
 } from './drawerPanelsModel.js';
 
+// Activate a panel, opening it if it isn't already (in-drawer tab click /
+// programmatic). Keeps any other open panel selected.
+function makeOpenTab(setActiveTab, setOpenPanels) {
+  return (tab) => {
+    setActiveTab(tab);
+    setOpenPanels((prev) => openTabPanels(prev, tab));
+  };
+}
+// Topbar launcher / chord toggle.
+function makeToggleTopbar(setOpenPanels, setActiveTab, activeTabRef) {
+  return (tab) => {
+    setOpenPanels((prev) => {
+      const result = togglePanel(prev, activeTabRef.current, tab);
+      setActiveTab(result.activeTab);
+      return result.openPanels;
+    });
+  };
+}
+// Open the drawer with the previously active tab; exposed on the context
+// for programmatic callers besides the keydown handler.
+function makeOpen(setOpenPanels, activeTabRef) {
+  return () => {
+    setOpenPanels((prev) => openPanelsIfClosed(prev, activeTabRef.current));
+  };
+}
+function makeToggle(setOpenPanels, activeTabRef) {
+  return () => {
+    setOpenPanels((prev) => togglePanels(prev, activeTabRef.current));
+  };
+}
+// Close just the ACTIVE tab: if another panel is still open the drawer stays
+// open and switches to it; only the last one closing hides the drawer.
+function makeCloseActiveTab(setOpenPanels, setActiveTab, activeTabRef) {
+  return () => {
+    setOpenPanels((prev) => {
+      const result = closeActiveTabPanels(prev, activeTabRef.current);
+      setActiveTab(result.activeTab);
+      return result.openPanels;
+    });
+  };
+}
+// Close one SPECIFIC panel, active or not, leaving any other open panel
+// alone. If it was the active one, fall back to the most recent remaining
+// panel, same rule as closeActiveTab.
+function makeClosePanel(setOpenPanels, setActiveTab, activeTabRef) {
+  return (tab) => {
+    setOpenPanels((prev) => {
+      const result = closeSpecificPanel(prev, activeTabRef.current, tab);
+      setActiveTab(result.activeTab);
+      return result.openPanels;
+    });
+  };
+}
+
 export function useDrawerPanels({ assistantEnabled, terminalEnabled }) {
   const [openPanels, setOpenPanels] = useState([]);
   const [activeTab, setActiveTab] = useState('assistant');
@@ -18,51 +72,16 @@ export function useDrawerPanels({ assistantEnabled, terminalEnabled }) {
   activeTabRef.current = activeTab;
   const isOpen = openPanels.length > 0;
 
-  // Activate a panel, opening it if it isn't already (in-drawer tab click /
-  // programmatic). Keeps any other open panel selected.
-  const openTab = useCallback((tab) => {
-    setActiveTab(tab);
-    setOpenPanels((prev) => openTabPanels(prev, tab));
-  }, []);
+  const openTab = useCallback(makeOpenTab(setActiveTab, setOpenPanels), []);
   // In-drawer title-bar tab click: just change which open panel is active.
   const selectTab = useCallback((tab) => setActiveTab(tab), []);
-  // Topbar launcher / chord toggle.
-  const toggleTopbar = useCallback((tab) => {
-    setOpenPanels((prev) => {
-      const result = togglePanel(prev, activeTabRef.current, tab);
-      setActiveTab(result.activeTab);
-      return result.openPanels;
-    });
-  }, []);
+  const toggleTopbar = useCallback(makeToggleTopbar(setOpenPanels, setActiveTab, activeTabRef), []);
 
-  // Open the drawer with the previously active tab; exposed on the context
-  // for programmatic callers besides the keydown handler.
-  const open = useCallback(() => {
-    setOpenPanels((prev) => openPanelsIfClosed(prev, activeTabRef.current));
-  }, []);
+  const open = useCallback(makeOpen(setOpenPanels, activeTabRef), []);
   const close = useCallback(() => setOpenPanels([]), []);          // close ALL panels
-  const toggle = useCallback(() => {
-    setOpenPanels((prev) => togglePanels(prev, activeTabRef.current));
-  }, []);
-  // Close just the ACTIVE tab: if another panel is still open the drawer stays
-  // open and switches to it; only the last one closing hides the drawer.
-  const closeActiveTab = useCallback(() => {
-    setOpenPanels((prev) => {
-      const result = closeActiveTabPanels(prev, activeTabRef.current);
-      setActiveTab(result.activeTab);
-      return result.openPanels;
-    });
-  }, []);
-  // Close one SPECIFIC panel, active or not, leaving any other open panel
-  // alone. If it was the active one, fall back to the most recent remaining
-  // panel, same rule as closeActiveTab.
-  const closePanel = useCallback((tab) => {
-    setOpenPanels((prev) => {
-      const result = closeSpecificPanel(prev, activeTabRef.current, tab);
-      setActiveTab(result.activeTab);
-      return result.openPanels;
-    });
-  }, []);
+  const toggle = useCallback(makeToggle(setOpenPanels, activeTabRef), []);
+  const closeActiveTab = useCallback(makeCloseActiveTab(setOpenPanels, setActiveTab, activeTabRef), []);
+  const closePanel = useCallback(makeClosePanel(setOpenPanels, setActiveTab, activeTabRef), []);
 
   // Drop any panel whose feature was disabled in Settings; keep the rest.
   useEffect(() => {

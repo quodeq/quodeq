@@ -75,22 +75,12 @@ function patchDimScore(dim, scoreByDim) {
 // violation source and let it refetch on next view.
 const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
 
-export function applyMutationDelta(queryClient, projectId, delta) {
-  if (!queryClient || !projectId || !delta) return;
-  if (!KNOWN_KINDS.has(delta.kind)) return;
-
-  const dims = Array.isArray(delta.dimensions) ? delta.dimensions : [];
-  const scoreByDim = new Map(dims.map((d) => [d.dimension, d]));
-  const dismissed = delta.dismissed || {};
-  // Only dismiss can splice locally — it carries the full violation key and is
-  // a single-finding removal. Every other kind invalidates instead.
-  const splices = delta.kind === "dismiss";
-
-  // Patch dim score/grade in place, preserving referential identity for
-  // untouched dims. ``spliceDismissed`` additionally removes the dismissed
-  // violation from the dashboard cache (which carries full violation arrays);
-  // the per-run scores cache is slim so it never splices.
-  const patchScores = (key, { spliceDismissed = false } = {}) => {
+// Patch dim score/grade in place, preserving referential identity for
+// untouched dims. ``spliceDismissed`` additionally removes the dismissed
+// violation from the dashboard cache (which carries full violation arrays);
+// the per-run scores cache is slim so it never splices.
+function makePatchScores(queryClient, scoreByDim, dismissed) {
+  return (key, { spliceDismissed = false } = {}) => {
     const prev = queryClient.getQueryData(key);
     if (!prev || !Array.isArray(prev.dimensions)) {
       queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
@@ -104,14 +94,16 @@ export function applyMutationDelta(queryClient, projectId, delta) {
       }),
     }));
   };
+}
 
-  // Accumulated (cross-run) scores cache: when the server sent a whole rollup,
-  // swap it in wholesale; if absent, invalidate (it's small — a default refetch
-  // is fine). The dismiss/restore/delete deltas no longer carry one (computing
-  // it server-side ran compute_accumulated over every run — ~100s cold on large
-  // projects — and blew past the client's 30s timeout, aborting the whole
-  // delta), so this path is only taken by callers that still provide one.
-  const patchAccumulated = (key, accumulated) => {
+// Accumulated (cross-run) scores cache: when the server sent a whole rollup,
+// swap it in wholesale; if absent, invalidate (it's small — a default refetch
+// is fine). The dismiss/restore/delete deltas no longer carry one (computing
+// it server-side ran compute_accumulated over every run — ~100s cold on large
+// projects — and blew past the client's 30s timeout, aborting the whole
+// delta), so this path is only taken by callers that still provide one.
+function makePatchAccumulated(queryClient) {
+  return (key, accumulated) => {
     const prev = queryClient.getQueryData(key);
     if (!accumulated || !prev) {
       queryClient.invalidateQueries({ queryKey: key });
@@ -119,17 +111,19 @@ export function applyMutationDelta(queryClient, projectId, delta) {
     }
     queryClient.setQueryData(key, (old) => ({ ...old, accumulated }));
   };
+}
 
-  // Client-derive the Overview's accumulated dimension grades from the per-run
-  // rescore instead of a server-computed rollup. The accumulated entry for each
-  // dimension the latest run OWNS (``fromRunId === runId``) equals that run's
-  // rescored dimension, so we copy overallScore/overallGrade across — no
-  // cross-run recompute, so the dismiss POST stays ~0.1s and never times out.
-  // The weighted overall summary is deliberately left untouched (a lazy refetch
-  // reconciles it); recomputing it here would duplicate the grade formula.
-  // No-op — crucially NOT an invalidate, which would trigger the slow refetch —
-  // when the entry isn't cached; it fills in on its next fetch.
-  const patchAccumulatedDims = (key) => {
+// Client-derive the Overview's accumulated dimension grades from the per-run
+// rescore instead of a server-computed rollup. The accumulated entry for each
+// dimension the latest run OWNS (``fromRunId === runId``) equals that run's
+// rescored dimension, so we copy overallScore/overallGrade across — no
+// cross-run recompute, so the dismiss POST stays ~0.1s and never times out.
+// The weighted overall summary is deliberately left untouched (a lazy refetch
+// reconciles it); recomputing it here would duplicate the grade formula.
+// No-op — crucially NOT an invalidate, which would trigger the slow refetch —
+// when the entry isn't cached; it fills in on its next fetch.
+function makePatchAccumulatedDims(queryClient, scoreByDim, runId) {
+  return (key) => {
     const prev = queryClient.getQueryData(key);
     if (!Array.isArray(prev?.accumulated?.dimensions)) return;
     queryClient.setQueryData(key, (old) => ({
@@ -149,47 +143,71 @@ export function applyMutationDelta(queryClient, projectId, delta) {
       },
     }));
   };
+}
 
-  // Invalidate the run-detail violation source so lists refetch on next view.
-  // refetchType:"none" keeps it lazy — no eager network churn while scores
-  // already updated instantly via the score-patch above.
-  const invalidateViolations = (key) => {
+// Invalidate the run-detail violation source so lists refetch on next view.
+// refetchType:"none" keeps it lazy — no eager network churn while scores
+// already updated instantly via the score-patch above.
+function makeInvalidateViolations(queryClient) {
+  return (key) => {
     queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
   };
+}
 
+function applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolations, splices }) {
+  if (!runId) return;
+  const dashKey = projectKeys.dashboard(projectId, runId);
+  const scoresKey = projectKeys.scores(projectId, runId);
+  // Score-patch is shared across all kinds; dashboard additionally splices
+  // for dismiss.
+  patchScores(dashKey, { spliceDismissed: splices });
+  patchScores(scoresKey);
+  // Non-dismiss kinds can't mirror the violation-list change locally →
+  // invalidate the run-detail sources so they refetch (scores already patched).
+  if (!splices) {
+    invalidateViolations(dashKey);
+    invalidateViolations(scoresKey);
+  }
+}
+
+function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, splices }) {
+  if (!delta.isLatest) return;
+  patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
+  if (delta.accumulated) {
+    // A caller supplied the authoritative rollup — prefer it.
+    patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
+    if (runId) patchAccumulated(projectKeys.scores(projectId, runId), delta.accumulated);
+  } else if (runId) {
+    // Client-derive from the per-run rescore. The Overview's app-root
+    // useDashboard reads `accumulated` from the null "latest" entry OR the
+    // run-scoped scores(projectId, runId) entry (the latter the moment the
+    // user drills into any run / dimension detail — see useProjectScores asOf
+    // resolution). Both are patched: the run-scoped entry has
+    // staleTime:Infinity and refreshDashboard only marks it stale
+    // (refetchType:"none"), so without this the Overview grade cards would sit
+    // stale until a window-focus refetch.
+    patchAccumulatedDims(projectKeys.scores(projectId, null));
+    patchAccumulatedDims(projectKeys.scores(projectId, runId));
+  }
+}
+
+export function applyMutationDelta(queryClient, projectId, delta) {
+  if (!queryClient || !projectId || !delta) return;
+  if (!KNOWN_KINDS.has(delta.kind)) return;
+
+  const dims = Array.isArray(delta.dimensions) ? delta.dimensions : [];
+  const scoreByDim = new Map(dims.map((d) => [d.dimension, d]));
+  const dismissed = delta.dismissed || {};
+  // Only dismiss can splice locally — it carries the full violation key and is
+  // a single-finding removal. Every other kind invalidates instead.
+  const splices = delta.kind === "dismiss";
   const runId = delta.runId;
-  if (runId) {
-    const dashKey = projectKeys.dashboard(projectId, runId);
-    const scoresKey = projectKeys.scores(projectId, runId);
-    // Score-patch is shared across all kinds; dashboard additionally splices
-    // for dismiss.
-    patchScores(dashKey, { spliceDismissed: splices });
-    patchScores(scoresKey);
-    // Non-dismiss kinds can't mirror the violation-list change locally →
-    // invalidate the run-detail sources so they refetch (scores already patched).
-    if (!splices) {
-      invalidateViolations(dashKey);
-      invalidateViolations(scoresKey);
-    }
-  }
 
-  if (delta.isLatest) {
-    patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
-    if (delta.accumulated) {
-      // A caller supplied the authoritative rollup — prefer it.
-      patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
-      if (runId) patchAccumulated(projectKeys.scores(projectId, runId), delta.accumulated);
-    } else if (runId) {
-      // Client-derive from the per-run rescore. The Overview's app-root
-      // useDashboard reads `accumulated` from the null "latest" entry OR the
-      // run-scoped scores(projectId, runId) entry (the latter the moment the
-      // user drills into any run / dimension detail — see useProjectScores asOf
-      // resolution). Both are patched: the run-scoped entry has
-      // staleTime:Infinity and refreshDashboard only marks it stale
-      // (refetchType:"none"), so without this the Overview grade cards would sit
-      // stale until a window-focus refetch.
-      patchAccumulatedDims(projectKeys.scores(projectId, null));
-      patchAccumulatedDims(projectKeys.scores(projectId, runId));
-    }
-  }
+  const patchScores = makePatchScores(queryClient, scoreByDim, dismissed);
+  const patchAccumulated = makePatchAccumulated(queryClient);
+  const patchAccumulatedDims = makePatchAccumulatedDims(queryClient, scoreByDim, runId);
+  const invalidateViolations = makeInvalidateViolations(queryClient);
+
+  applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolations, splices });
+  applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, splices });
 }

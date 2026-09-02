@@ -1,0 +1,235 @@
+"""Tests for project_registration.py — register_project clone/scan paths.
+
+Split from test_evaluation_mixin_register.py: local/URL registration,
+clone destination handling, and the SSRF guard rejecting private/localhost
+URLs before any clone runs.
+"""
+import json
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from quodeq.services.project_registration import (
+    _zero_run_scan_fallback,
+)
+from quodeq.services.project_registration import (
+    register_project as _register_project,
+)
+
+
+def _read_info(reports_root: Path, uuid: str) -> dict:
+    return json.loads((reports_root / uuid / "repository_info.json").read_text())
+
+
+def test_zero_run_scan_fallback_returns_independent_nested_containers():
+    """Each call must return its own nested dict/lists.
+
+    Regression: the fallback used to be a module-level dict and callers did
+    ``dict(_ZERO_RUN_SCAN_FALLBACK)`` -- a shallow copy that left every
+    result's ``languages``/``branches``/``modules``/``file_tree`` pointing at
+    the SAME shared containers, so mutating one project's zero-run scan_data
+    (e.g. a caller appending to "modules") silently corrupted every other
+    project's fallback result, past and future.
+    """
+    a = _zero_run_scan_fallback()
+    b = _zero_run_scan_fallback()
+    assert a == b
+    assert a["languages"] is not b["languages"]
+    assert a["branches"] is not b["branches"]
+    assert a["modules"] is not b["modules"]
+    assert a["file_tree"] is not b["file_tree"]
+
+    a["languages"]["python"] = 1
+    a["modules"].append("mutated")
+    assert b["languages"] == {}
+    assert b["modules"] == []
+
+
+def test_register_local_path_scans_in_place(tmp_path):
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    (repo / "main.py").write_text("print('hi')\n")
+    reports = tmp_path / "reports"
+    reports.mkdir()
+
+    uuid = _register_project(str(repo), None, str(reports))
+
+    info = _read_info(reports, uuid)
+    assert info["location"] == "local"
+    assert info["path"] == str(repo.resolve())
+    assert (reports / uuid / "scan.json").exists()
+
+
+def test_register_url_clones_to_dest_then_scans(tmp_path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    clone_dest = tmp_path / "code"
+    clone_dest.mkdir()
+
+    def fake_clone(url, dest):
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+        uuid = _register_project(
+            "https://github.com/example/repo.git",
+            None,
+            str(reports),
+            clone_dest=str(clone_dest),
+        )
+
+    info = _read_info(reports, uuid)
+    assert info["location"] == "local"
+    assert info["path"].startswith(str(clone_dest))
+    assert info.get("ephemeral") is False
+    assert (reports / uuid / "scan.json").exists()
+
+
+def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    def fake_clone(url, dest):
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+        uuid = _register_project(
+            "https://github.com/example/repo.git",
+            None,
+            str(reports),
+            ephemeral=True,
+        )
+
+    info = _read_info(reports, uuid)
+    assert info["location"] == "local"
+    assert info["ephemeral"] is True
+    expected_root = fake_home / ".quodeq" / "clones" / uuid
+    assert Path(info["path"]) == expected_root
+
+
+def test_register_url_clone_failure_raises(tmp_path):
+    """run_git_clone raises CloneError on failure (Task A8 contract)."""
+    from quodeq.services._fs_clone import CloneError
+
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    clone_dest = tmp_path / "code"
+    clone_dest.mkdir()
+
+    with patch(
+        "quodeq.services.project_registration.run_git_clone",
+        side_effect=CloneError("network", "git clone failed (network)"),
+    ):
+        with pytest.raises(CloneError):
+            _register_project(
+                "https://github.com/example/repo.git",
+                None,
+                str(reports),
+                clone_dest=str(clone_dest),
+            )
+
+
+def test_register_url_without_dest_or_ephemeral_raises(tmp_path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    with pytest.raises(ValueError, match="clone_dest"):
+        _register_project("https://github.com/example/repo.git", None, str(reports))
+
+
+def test_register_url_clone_dest_must_exist(tmp_path):
+    """Pre-flight rejects a non-existent clone_dest before any side effects."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    nonexistent = tmp_path / "no-such-dir"
+
+    with pytest.raises(FileNotFoundError, match="clone destination"):
+        _register_project(
+            "https://github.com/example/repo.git",
+            None,
+            str(reports),
+            clone_dest=str(nonexistent),
+        )
+
+    # Verify nothing was created under the missing path
+    assert not nonexistent.exists()
+
+
+def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch):
+    """SSRF guard: a URL whose host is a private/link-local literal is rejected
+    before git clone runs, matching the CLI prepare_repository path."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    clone_calls = []
+
+    def fake_clone(url, dest):
+        clone_calls.append(url)
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+        with pytest.raises(ValueError, match="private"):
+            _register_project(
+                "https://169.254.169.254/latest/meta-data",
+                None,
+                str(reports),
+                ephemeral=True,
+            )
+
+    assert clone_calls == [], "git clone must not run for a private-host URL"
+
+
+def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
+    """A localhost URL is rejected by the SSRF guard before any clone."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    clone_calls = []
+
+    def fake_clone(url, dest):
+        clone_calls.append(url)
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+        with pytest.raises(ValueError):
+            _register_project(
+                "https://localhost/git/repo.git",
+                None,
+                str(reports),
+                ephemeral=True,
+            )
+
+    assert clone_calls == []
+
+
+def test_start_evaluation_rejects_url_input(tmp_path):
+    """start_evaluation no longer clones; URLs must already be registered as local."""
+    from quodeq.services.base import EvaluationOptions
+    from quodeq.services.evaluation_mixin import FsEvaluationMixin
+
+    class _Stub(FsEvaluationMixin):
+        _jobs = None
+        _dispatcher = None
+
+    with pytest.raises(ValueError, match="not supported"):
+        _Stub().start_evaluation(
+            "https://github.com/example/repo.git",
+            str(tmp_path),
+            EvaluationOptions(),
+        )

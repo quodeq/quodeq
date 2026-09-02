@@ -91,62 +91,73 @@ function drawConstellations(ctx, scene, cam, nav, w2s, showLabels, W, H, mr, mg,
  * Phase 3: dimension stars with principle particles, glow, labels, and hit-test.
  * Returns the currently hovered element (or null).
  */
+/** Orbiting principle particles around one dimension star (part of phase 3). */
+function drawDimParticles(ctx, scene, i, sc, cam, t, particleAlpha) {
+  if (particleAlpha <= 0.01) return;
+  (scene.principles[i] || []).forEach(p => {
+    const dp = p.dimParticle;
+    const a = t * dp.os + dp.op;
+    const px = sc.x + Math.cos(a) * dp.or * dp.ec * cam.z;
+    const py = sc.y + Math.sin(a) * dp.or * cam.z;
+    const tw = 0.5 + 0.08 * Math.sin(t * 0.6 + dp.tp);
+    const sz = dp.sz * cam.z;
+    if (sz > 0.3) {
+      const { r, g, b } = dp.col;
+      ctx.beginPath(); ctx.arc(px, py, sz * 2.5, 0, TAU);
+      ctx.fillStyle = `rgba(${r},${g},${b},${tw * 0.08 * particleAlpha})`; ctx.fill();
+      ctx.beginPath(); ctx.arc(px, py, sz, 0, TAU);
+      ctx.fillStyle = `rgba(${r},${g},${b},${(tw + 0.15) * particleAlpha})`; ctx.fill();
+    }
+  });
+}
+
+/** Draws one dimension star (glow, label, focus ring) and returns hover info when hit. */
+function drawOneDimStar(ctx, scene, s, i, cam, nav, opts, tc, mr, mg, mb) {
+  const { t, mx, my, showLabels, animating, rDim, w2s } = opts;
+  const sc = w2s(s.x, s.y);
+  const pulse = 1 + 0.01 * Math.sin(t * 0.4 + s.pp);
+  const isSelected = rDim === i;
+  const sr = s.radius * pulse * cam.z * 0.5;
+  // Dim stars not in the focused cluster
+  const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
+  const clusterDim = inFocusedCluster ? 1 : Math.max(0.08, 1 - (cam.z - 1) / 2);
+  // All dim-level decorations fade out once we zoom past galaxy level
+  const dimFade = isSelected ? 1 : Math.max(0, 1 - (cam.z - 1.5) / 3) * clusterDim;
+
+  // Principle particles orbiting this dimension — fade out as principle planets fade in
+  const particleAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
+  drawDimParticles(ctx, scene, i, sc, cam, t, particleAlpha);
+
+  drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: isSelected ? clusterDim : dimFade });
+  // Hide dimension label when zoomed past galaxy level
+  const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
+  if (showLabels && labelAlpha > 0.01) {
+    const fs = Math.min(cam.z, 1.5);
+    ctx.font = `600 ${Math.max(11, 14 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * labelAlpha);
+    ctx.fillText(s.name, sc.x, sc.y - sr - 24 * fs);
+    ctx.font = `${Math.max(9, 12 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.fillStyle = rgba(tc.textMuted, 0.8 * labelAlpha);
+    ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + 24 * fs);
+  }
+  // Keyboard focus ring (a11y, #675) — drawn at the dim's hit radius so it
+  // lines up with where Enter activates.
+  if (nav.depth === 0 && opts.focusedIdx === i) {
+    drawFocusRing(ctx, sc.x, sc.y, Math.max(sr * 2, 20) + 4, tc);
+  }
+  if (!animating && nav.depth === 0 && mx >= 0) {
+    const dx = mx - sc.x, dy = my - sc.y;
+    const hitR = Math.max(sr * 2, 20);
+    if (dx * dx + dy * dy < hitR * hitR) return { type: 'dim', idx: i, data: s };
+  }
+  return null;
+}
+
 function drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb) {
-  const { W, H, t, mx, my, showLabels, animating, rDim, w2s } = opts;
   let newHovered = null;
   scene.stars.forEach((s, i) => {
-    const sc = w2s(s.x, s.y);
-    const pulse = 1 + 0.01 * Math.sin(t * 0.4 + s.pp);
-    const isSelected = rDim === i;
-    const sr = s.radius * pulse * cam.z * 0.5;
-    // Dim stars not in the focused cluster
-    const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
-    const clusterDim = inFocusedCluster ? 1 : Math.max(0.08, 1 - (cam.z - 1) / 2);
-    // All dim-level decorations fade out once we zoom past galaxy level
-    const dimFade = isSelected ? 1 : Math.max(0, 1 - (cam.z - 1.5) / 3) * clusterDim;
-
-    // Principle particles orbiting this dimension — fade out as principle planets fade in
-    const particleAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
-    if (particleAlpha > 0.01) {
-      (scene.principles[i] || []).forEach(p => {
-        const dp = p.dimParticle;
-        const a = t * dp.os + dp.op;
-        const px = sc.x + Math.cos(a) * dp.or * dp.ec * cam.z;
-        const py = sc.y + Math.sin(a) * dp.or * cam.z;
-        const tw = 0.5 + 0.08 * Math.sin(t * 0.6 + dp.tp);
-        const sz = dp.sz * cam.z;
-        if (sz > 0.3) {
-          const { r, g, b } = dp.col;
-          ctx.beginPath(); ctx.arc(px, py, sz * 2.5, 0, TAU);
-          ctx.fillStyle = `rgba(${r},${g},${b},${tw * 0.08 * particleAlpha})`; ctx.fill();
-          ctx.beginPath(); ctx.arc(px, py, sz, 0, TAU);
-          ctx.fillStyle = `rgba(${r},${g},${b},${(tw + 0.15) * particleAlpha})`; ctx.fill();
-        }
-      });
-    }
-
-    drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: isSelected ? clusterDim : dimFade });
-    // Hide dimension label when zoomed past galaxy level
-    const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
-    if (showLabels && labelAlpha > 0.01) {
-      const fs = Math.min(cam.z, 1.5);
-      ctx.font = `600 ${Math.max(11, 14 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
-      ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * labelAlpha);
-      ctx.fillText(s.name, sc.x, sc.y - sr - 24 * fs);
-      ctx.font = `${Math.max(9, 12 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
-      ctx.fillStyle = rgba(tc.textMuted, 0.8 * labelAlpha);
-      ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + 24 * fs);
-    }
-    // Keyboard focus ring (a11y, #675) — drawn at the dim's hit radius so it
-    // lines up with where Enter activates.
-    if (nav.depth === 0 && opts.focusedIdx === i) {
-      drawFocusRing(ctx, sc.x, sc.y, Math.max(sr * 2, 20) + 4, tc);
-    }
-    if (!animating && nav.depth === 0 && mx >= 0) {
-      const dx = mx - sc.x, dy = my - sc.y;
-      const hitR = Math.max(sr * 2, 20);
-      if (dx * dx + dy * dy < hitR * hitR) newHovered = { type: 'dim', idx: i, data: s };
-    }
+    const hit = drawOneDimStar(ctx, scene, s, i, cam, nav, opts, tc, mr, mg, mb);
+    if (hit) newHovered = hit;
   });
   return newHovered;
 }

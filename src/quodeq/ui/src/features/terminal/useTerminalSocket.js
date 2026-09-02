@@ -12,6 +12,47 @@ const CLOSE_GONE = 4004;     // unknown session id (e.g. server restarted)
 const RETRY_BASE_MS = 500;
 const RETRY_MAX_MS = 5000;
 
+function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef, onDataRef, setStatus, setGen }) {
+  const ws = new WebSocket(terminalSocketUrl(window.location, sessionId));
+  wsRef.current = ws;
+  setStatus(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
+  ws.onopen = () => {
+    attemptsRef.current = 0;
+    // Runs before onmessage (WS delivers open before any frame), so the
+    // reset lands ahead of the scrollback replay.
+    onOpenRef.current?.();
+    setStatus('open');
+  };
+  ws.onclose = (e) => {
+    if (wsRef.current === ws) wsRef.current = null;
+    if (e?.code === CLOSE_BUSY) { setStatus('busy'); return; }
+    if (e?.code === CLOSE_REFUSED) { setStatus('refused'); return; }
+    // Session no longer exists server-side. Retrying this URL can never
+    // succeed; the owner reconciles against /terminal/sessions instead.
+    if (e?.code === CLOSE_GONE) { setStatus('gone'); return; }
+    // Unexpected drop (server restart/crash/sleep). A dead socket swallows
+    // keystrokes silently, so surface it and retry with capped exponential
+    // backoff — the local server can come back at any moment.
+    setStatus('reconnecting');
+    const delay = Math.min(RETRY_BASE_MS * 2 ** attemptsRef.current, RETRY_MAX_MS);
+    attemptsRef.current += 1;
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      setGen((g) => g + 1);
+    }, delay);
+  };
+  ws.onmessage = (e) => {
+    const s = typeof e.data === 'string' ? e.data : '';
+    if (s[0] === '0') onDataRef.current?.(s.slice(1));
+  };
+  return () => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    ws.onopen = ws.onmessage = ws.onclose = null;
+    try { ws.close(); } catch { /* noop */ }
+    if (wsRef.current === ws) wsRef.current = null;
+  };
+}
+
 // status: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'busy' | 'refused' | 'gone'
 export function useTerminalSocket({ active, onData, onOpen, restartKey = 0, sessionId = null }) {
   const [status, setStatus] = useState('idle');
@@ -37,44 +78,7 @@ export function useTerminalSocket({ active, onData, onOpen, restartKey = 0, sess
   // current socket and opens a fresh one (restart from Settings / auto-retry).
   useEffect(() => {
     if (!active) return undefined;
-    const ws = new WebSocket(terminalSocketUrl(window.location, sessionId));
-    wsRef.current = ws;
-    setStatus(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
-    ws.onopen = () => {
-      attemptsRef.current = 0;
-      // Runs before onmessage (WS delivers open before any frame), so the
-      // reset lands ahead of the scrollback replay.
-      onOpenRef.current?.();
-      setStatus('open');
-    };
-    ws.onclose = (e) => {
-      if (wsRef.current === ws) wsRef.current = null;
-      if (e?.code === CLOSE_BUSY) { setStatus('busy'); return; }
-      if (e?.code === CLOSE_REFUSED) { setStatus('refused'); return; }
-      // Session no longer exists server-side. Retrying this URL can never
-      // succeed; the owner reconciles against /terminal/sessions instead.
-      if (e?.code === CLOSE_GONE) { setStatus('gone'); return; }
-      // Unexpected drop (server restart/crash/sleep). A dead socket swallows
-      // keystrokes silently, so surface it and retry with capped exponential
-      // backoff — the local server can come back at any moment.
-      setStatus('reconnecting');
-      const delay = Math.min(RETRY_BASE_MS * 2 ** attemptsRef.current, RETRY_MAX_MS);
-      attemptsRef.current += 1;
-      retryTimerRef.current = setTimeout(() => {
-        retryTimerRef.current = null;
-        setGen((g) => g + 1);
-      }, delay);
-    };
-    ws.onmessage = (e) => {
-      const s = typeof e.data === 'string' ? e.data : '';
-      if (s[0] === '0') onDataRef.current?.(s.slice(1));
-    };
-    return () => {
-      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
-      ws.onopen = ws.onmessage = ws.onclose = null;
-      try { ws.close(); } catch { /* noop */ }
-      if (wsRef.current === ws) wsRef.current = null;
-    };
+    return connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef, onDataRef, setStatus, setGen });
   }, [active, restartKey, gen, sessionId]);
 
   const send = useCallback((data) => {

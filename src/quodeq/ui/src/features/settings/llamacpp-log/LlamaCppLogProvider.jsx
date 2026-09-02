@@ -24,16 +24,10 @@ function buildSpec(logs, status) {
   };
 }
 
-export function LlamaCppLogProvider({ children }) {
-  const { getLlamacppLogAvailable } = useApi();
-  const [open, setOpen] = useState(false);
-  const [available, setAvailable] = useState(false);
-  const { logs, status } = useLlamaCppLogStream(open);
-  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
-
-  // The console toggle is hidden unless the server reports a configured
-  // LLAMACPP_LOG_FILE. Probe once on mount; the result is stable for the
-  // session since the env var is set at server-launch time.
+// The console toggle is hidden unless the server reports a configured
+// LLAMACPP_LOG_FILE. Probe once on mount; the result is stable for the
+// session since the env var is set at server-launch time.
+function useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable) {
   useEffect(() => {
     let cancelled = false;
     getLlamacppLogAvailable()
@@ -45,6 +39,16 @@ export function LlamaCppLogProvider({ children }) {
       });
     return () => { cancelled = true; };
   }, [getLlamacppLogAvailable]);
+}
+
+export function LlamaCppLogProvider({ children }) {
+  const { getLlamacppLogAvailable } = useApi();
+  const [open, setOpen] = useState(false);
+  const [available, setAvailable] = useState(false);
+  const { logs, status } = useLlamaCppLogStream(open);
+  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
+
+  useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable);
 
   const spec = useMemo(() => (open ? buildSpec(logs, status) : null), [open, logs, status]);
 

@@ -41,6 +41,53 @@ function appendBoundedFinding(prev, data) {
   return [...prev, data];
 }
 
+function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
+  source.addEventListener("status", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      writeCache(evaluationKeys.status(jobId), data);
+      if (data && TERMINAL_STATES.has(data.state)) {
+        // Run just hit a terminal state -- the trend's view of this run is
+        // about to flip from "in-progress / partial" to "terminal / final".
+        // Invalidate the project subtree so the History row rerenders against
+        // the freshly-fetched trend instead of staying on the SSE-fed live
+        // dim cache for an unbounded time.
+        queryClient.invalidateQueries({ queryKey: projectKeys.all() });
+      }
+    } catch {
+      // ignore malformed frames; reconnect handles recovery via Last-Event-ID
+    }
+  });
+
+  source.addEventListener("dimension-completed", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      writeCache(
+        evaluationKeys.dimensions(jobId),
+        (prev = {}) => ({ ...prev, [data.dimension]: data }),
+      );
+    } catch {
+      // ignore
+    }
+  });
+
+  source.addEventListener("finding", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      writeCache(
+        evaluationKeys.findings(jobId),
+        (prev = []) => appendBoundedFinding(prev, data),
+      );
+    } catch {
+      // ignore
+    }
+  });
+
+  source.addEventListener("done", () => {
+    source.close();
+  });
+}
+
 export function useRunEventStream(jobId) {
   const queryClient = useQueryClient();
 
@@ -54,51 +101,7 @@ export function useRunEventStream(jobId) {
     };
 
     const source = new EventSource(`/api/evaluations/${jobId}/events`);
-
-    source.addEventListener("status", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        writeCache(evaluationKeys.status(jobId), data);
-        if (data && TERMINAL_STATES.has(data.state)) {
-          // Run just hit a terminal state -- the trend's view of this run is
-          // about to flip from "in-progress / partial" to "terminal / final".
-          // Invalidate the project subtree so the History row rerenders against
-          // the freshly-fetched trend instead of staying on the SSE-fed live
-          // dim cache for an unbounded time.
-          queryClient.invalidateQueries({ queryKey: projectKeys.all() });
-        }
-      } catch {
-        // ignore malformed frames; reconnect handles recovery via Last-Event-ID
-      }
-    });
-
-    source.addEventListener("dimension-completed", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        writeCache(
-          evaluationKeys.dimensions(jobId),
-          (prev = {}) => ({ ...prev, [data.dimension]: data }),
-        );
-      } catch {
-        // ignore
-      }
-    });
-
-    source.addEventListener("finding", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        writeCache(
-          evaluationKeys.findings(jobId),
-          (prev = []) => appendBoundedFinding(prev, data),
-        );
-      } catch {
-        // ignore
-      }
-    });
-
-    source.addEventListener("done", () => {
-      source.close();
-    });
+    wireRunEventSource({ source, jobId, writeCache, queryClient });
 
     return () => source.close();
   }, [jobId, queryClient]);

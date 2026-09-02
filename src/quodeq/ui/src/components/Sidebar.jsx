@@ -78,13 +78,118 @@ function formatLastEval(iso) {
   }
 }
 
+function SidebarHeader({ isPinned, handleTogglePin, version }) {
+  return (
+    <div className="sidebar-header">
+      <button
+        type="button"
+        className="sidebar-brand-icon sidebar-brand-icon--toggle"
+        onClick={handleTogglePin}
+        aria-label={isPinned ? t('common.closeMenu') : t('common.openMenu')}
+        aria-expanded={isPinned}
+      >
+        <Logo />
+      </button>
+      <span className="sidebar-brand-text">{BRAND_NAME}</span>
+      {version && <span className="sidebar-version">{t('common.versionPrefix', { version })}</span>}
+    </div>
+  );
+}
+
+function ProjectTabsNav({ showProjectTabs, showCompareTab, activeTab, handleNav, violationsCount, historyCount }) {
+  if (!showProjectTabs && !showCompareTab) return null;
+  return (
+    <nav className="sidebar-nav sidebar-block">
+      {showProjectTabs && (
+        <NavButton id="overview" label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
+      )}
+      {showCompareTab && (
+        <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
+      )}
+      {showProjectTabs && (
+        <>
+          <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
+          <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+        </>
+      )}
+    </nav>
+  );
+}
+
+function SidebarFooter({ lastEvalStr, activeTab, handleNav, standardsCount }) {
+  return (
+    <div className="sidebar-footer">
+      <div className="sidebar-status">
+        {lastEvalStr && (
+          <div className="sidebar-status-row">
+            <span className="sidebar-status-label">{t('common.lastEval')}</span>
+            <span className="sidebar-status-value">{lastEvalStr}</span>
+          </div>
+        )}
+      </div>
+      <div className="sidebar-nav sidebar-block sidebar-block--flush">
+        <NavButton id="settings" label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
+        <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
+      </div>
+    </div>
+  );
+}
+
+function SidebarScrim({ isPinned, onClose }) {
+  return (
+    <button
+      type="button"
+      className={`sidebar-scrim${isPinned ? ' sidebar-scrim--visible' : ''}`}
+      aria-label={t('common.closeMenu')}
+      aria-hidden={!isPinned}
+      tabIndex={isPinned ? 0 : -1}
+      onClick={onClose}
+    />
+  );
+}
+
+function EvaluateNav({ selectedSource, activeTab, handleNav }) {
+  if (!isEvaluatableSource(selectedSource)) return null;
+  return (
+    <nav className="sidebar-nav sidebar-block">
+      <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+    </nav>
+  );
+}
+
+function ProjectsNav({ repoName, activeTab, handleNav }) {
+  return (
+    <nav className="sidebar-nav sidebar-block">
+      <NavButton id="projects" label={repoName || 'project'} icon={ICON_FOLDER} activeTab={activeTab} onNavTab={handleNav} />
+    </nav>
+  );
+}
+
+/**
+ * @param {object} props
+ * @param {boolean} [props.showProjectTabs] - When false, the project-data tabs
+ *   (overview, violations, map, history) are hidden from the sidebar — they
+ *   have nothing useful to show until at least one evaluation has completed
+ *   for the selected project.
+ * @param {boolean} [props.isPinned] - Controlled pin state — when provided,
+ *   the parent owns the toggle. Falls back to internal state when the parent
+ *   doesn't care.
+ * @param {'local'|'shared'} [props.selectedSource] - Evaluation is local-only
+ *   (there is no shared mutation route on the backend), so the Evaluate nav
+ *   item is hidden outright for a shared selection. Without this, a shared
+ *   project's id (which can collide with a local one by design) could start
+ *   a real evaluation run whose output writes into the LOCAL project's store.
+ * @param {boolean} [props.showCompareTab] - Compare ranks projects against
+ *   each other, so it needs at least two analyzed projects to say anything —
+ *   below that the tab is hidden as redundant. The parent computes this from
+ *   the projects list.
+ */
 export default function Sidebar({
   activeTab,
   onNavTab,
   hasEvaluations,
-  /* When false, the project-data tabs (overview, violations, map, history)
-     are hidden from the sidebar — they have nothing useful to show until at
-     least one evaluation has completed for the selected project. */
   showProjectTabs = true,
   projectInfo = null,
   version = null,
@@ -92,19 +197,9 @@ export default function Sidebar({
   historyCount = null,
   standardsCount = null,
   lastEvalAt = null,
-  /* Controlled pin state — when provided, the parent owns the toggle.
-     Falls back to internal state when the parent doesn't care. */
   isPinned: controlledPinned,
   onPinChange,
-  /* 'local' | 'shared' — evaluation is local-only (there is no shared
-     mutation route on the backend), so the Evaluate nav item is hidden
-     outright for a shared selection. Without this, a shared project's id
-     (which can collide with a local one by design) could start a real
-     evaluation run whose output writes into the LOCAL project's store. */
   selectedSource = 'local',
-  /* Compare ranks projects against each other, so it needs at least two
-     analyzed projects to say anything — below that the tab is hidden as
-     redundant. The parent computes this from the projects list. */
   showCompareTab = false,
 }) {
   const { isPinned, setPinned, handleTogglePin, handleNav } = useSidebarPin({ controlledPinned, onPinChange, onNavTab });
@@ -115,80 +210,25 @@ export default function Sidebar({
 
   return (
     <>
-      <button
-        type="button"
-        className={`sidebar-scrim${isPinned ? ' sidebar-scrim--visible' : ''}`}
-        aria-label={t('common.closeMenu')}
-        aria-hidden={!isPinned}
-        tabIndex={isPinned ? 0 : -1}
-        onClick={() => setPinned(false)}
-      />
+      <SidebarScrim isPinned={isPinned} onClose={() => setPinned(false)} />
       <aside className={`sidebar sidebar--expanded${isPinned ? ' sidebar--pinned' : ''}`}>
-        <div className="sidebar-header">
-          <button
-            type="button"
-            className="sidebar-brand-icon sidebar-brand-icon--toggle"
-            onClick={handleTogglePin}
-            aria-label={isPinned ? t('common.closeMenu') : t('common.openMenu')}
-            aria-expanded={isPinned}
-          >
-            <Logo />
-          </button>
-          <span className="sidebar-brand-text">{BRAND_NAME}</span>
-          {version && <span className="sidebar-version">{t('common.versionPrefix', { version })}</span>}
-        </div>
+        <SidebarHeader isPinned={isPinned} handleTogglePin={handleTogglePin} version={version} />
 
-        {(showProjectTabs || showCompareTab) && (
-          <nav className="sidebar-nav sidebar-block">
-            {showProjectTabs && (
-              <NavButton id="overview" label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
-            )}
-            {showCompareTab && (
-              <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
-            )}
-            {showProjectTabs && (
-              <>
-                <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
-                <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
-                <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
-              </>
-            )}
-          </nav>
-        )}
+        <ProjectTabsNav
+          showProjectTabs={showProjectTabs}
+          showCompareTab={showCompareTab}
+          activeTab={activeTab}
+          handleNav={handleNav}
+          violationsCount={violationsCount}
+          historyCount={historyCount}
+        />
 
-        {isEvaluatableSource(selectedSource) && (
-          <nav className="sidebar-nav sidebar-block">
-            <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
-          </nav>
-        )}
-
-        <nav className="sidebar-nav sidebar-block">
-          <NavButton
-            id="projects"
-            label={repoName || 'project'}
-            icon={ICON_FOLDER}
-            activeTab={activeTab}
-            onNavTab={handleNav}
-          />
-        </nav>
+        <EvaluateNav selectedSource={selectedSource} activeTab={activeTab} handleNav={handleNav} />
+        <ProjectsNav repoName={repoName} activeTab={activeTab} handleNav={handleNav} />
 
         <div className="sidebar-spacer" />
 
-        <div className="sidebar-footer">
-          <div className="sidebar-status">
-            {lastEvalStr && (
-              <div className="sidebar-status-row">
-                <span className="sidebar-status-label">{t('common.lastEval')}</span>
-                <span className="sidebar-status-value">{lastEvalStr}</span>
-              </div>
-            )}
-          </div>
-          <div className="sidebar-nav sidebar-block sidebar-block--flush">
-            <NavButton id="settings" label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
-            <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
-            <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
-          </div>
-        </div>
+        <SidebarFooter lastEvalStr={lastEvalStr} activeTab={activeTab} handleNav={handleNav} standardsCount={standardsCount} />
       </aside>
     </>
   );

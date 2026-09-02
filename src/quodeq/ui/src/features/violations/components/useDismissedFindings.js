@@ -35,6 +35,94 @@ import { t } from '../../../strings/index.js';
  *   gates can't patch (scores:null, delta.isLatest:false), and mark-stale
  *   alone never reaches the always-mounted Overview observer.
  */
+function makeHandleRestore({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }) {
+  return async (d) => {
+    if (isShared) return;
+    try {
+      const result = await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
+      applyDelta(result);
+      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
+      onReconcile?.();
+    } catch (err) {
+      console.error('Failed to restore finding:', err);
+      setRestoreError?.(t('violations.restoreFailed'));
+    }
+  };
+}
+
+// Restoring un-suppresses every finding the user ever triaged away, and the
+// only undo is dismissing them again one by one. The button sits next to the
+// per-item Restore, so a mis-click is cheap to make and expensive to reverse.
+// Delete-all has always confirmed; this needs it at least as much.
+function makeHandleRestoreAll({ selectedProject, isShared, dismissedCount, applyDelta, setDismissed, onReconcile, setRestoreError }) {
+  return async () => {
+    if (isShared) return;
+    const ok = await confirmDialog({
+      title: t('violations.restoreDismissedTitle'),
+      message: t('violations.restoreDismissedBody', { count: dismissedCount }),
+      confirmLabel: t('violations.restoreAll'),
+    });
+    if (!ok) return;
+    try {
+      const result = await restoreAllFindings(selectedProject);
+      applyDelta(result);
+      setDismissed([]);
+      onReconcile?.();
+    } catch (err) {
+      console.error('Failed to restore all findings:', err);
+      setRestoreError?.(t('violations.restoreAllFailed'));
+    }
+  };
+}
+
+function makeHandleDelete({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }) {
+  return async (d) => {
+    if (isShared) return;
+    try {
+      const result = await deleteFinding(selectedProject, {
+        dimension: d.dimension,
+        principle: d.principle,
+        file: d.file,
+      });
+      applyDelta(result);
+      // Sweep every dismissed entry that shares the same (dimension, principle, file),
+      // matching the backend sweep so the local list stays in sync without a refetch.
+      setDismissed((prev) => prev.filter((item) => !(
+        item.dimension === d.dimension
+        && item.principle === d.principle
+        && item.file === d.file
+      )));
+      onReconcile?.();
+    } catch (err) {
+      console.error('Failed to delete finding:', err);
+      setRestoreError?.(t('violations.deleteFailed'));
+    }
+  };
+}
+
+function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyDelta, setDismissed, onReconcile, setRestoreError }) {
+  return async () => {
+    if (isShared) return;
+    const ok = await confirmDialog({
+      title: t('violations.deleteDismissedTitle'),
+      message: t('violations.deleteDismissedBody', { count: dismissedCount }),
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      const result = await deleteAllFindings(selectedProject);
+      applyDelta(result);
+      setDismissed([]);
+      onReconcile?.();
+    } catch (err) {
+      console.error('Failed to delete all findings:', err);
+      setRestoreError?.(t('violations.deleteAllFailed'));
+    }
+  };
+}
+
 export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile) {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
@@ -63,87 +151,25 @@ export function useDismissedFindings(selectedProject, onRefresh, setRestoreError
     fetchDismissed(selectedProject).then(setDismissed).catch(() => setDismissed([]));
   }, [selectedProject, refreshKey, isShared]);
 
-  const handleRestore = useCallback(async (d) => {
-    if (isShared) return;
-    try {
-      const result = await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
-      applyDelta(result);
-      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
-      onReconcile?.();
-    } catch (err) {
-      console.error('Failed to restore finding:', err);
-      setRestoreError?.(t('violations.restoreFailed'));
-    }
-  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
+  const handleRestore = useCallback(
+    makeHandleRestore({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }),
+    [selectedProject, onReconcile, setRestoreError, applyDelta, isShared],
+  );
 
-  // Restoring un-suppresses every finding the user ever triaged away, and the
-  // only undo is dismissing them again one by one. The button sits next to the
-  // per-item Restore, so a mis-click is cheap to make and expensive to reverse.
-  // Delete-all has always confirmed; this needs it at least as much.
-  const handleRestoreAll = useCallback(async () => {
-    if (isShared) return;
-    const count = dismissed.length;
-    const ok = await confirmDialog({
-      title: t('violations.restoreDismissedTitle'),
-      message: t('violations.restoreDismissedBody', { count }),
-      confirmLabel: t('violations.restoreAll'),
-    });
-    if (!ok) return;
-    try {
-      const result = await restoreAllFindings(selectedProject);
-      applyDelta(result);
-      setDismissed([]);
-      onReconcile?.();
-    } catch (err) {
-      console.error('Failed to restore all findings:', err);
-      setRestoreError?.(t('violations.restoreAllFailed'));
-    }
-  }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
+  const handleRestoreAll = useCallback(
+    makeHandleRestoreAll({ selectedProject, isShared, dismissedCount: dismissed.length, applyDelta, setDismissed, onReconcile, setRestoreError }),
+    [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared],
+  );
 
-  const handleDelete = useCallback(async (d) => {
-    if (isShared) return;
-    try {
-      const result = await deleteFinding(selectedProject, {
-        dimension: d.dimension,
-        principle: d.principle,
-        file: d.file,
-      });
-      applyDelta(result);
-      // Sweep every dismissed entry that shares the same (dimension, principle, file),
-      // matching the backend sweep so the local list stays in sync without a refetch.
-      setDismissed((prev) => prev.filter((item) => !(
-        item.dimension === d.dimension
-        && item.principle === d.principle
-        && item.file === d.file
-      )));
-      onReconcile?.();
-    } catch (err) {
-      console.error('Failed to delete finding:', err);
-      setRestoreError?.(t('violations.deleteFailed'));
-    }
-  }, [selectedProject, onReconcile, setRestoreError, applyDelta, isShared]);
+  const handleDelete = useCallback(
+    makeHandleDelete({ selectedProject, isShared, applyDelta, setDismissed, onReconcile, setRestoreError }),
+    [selectedProject, onReconcile, setRestoreError, applyDelta, isShared],
+  );
 
-  const handleDeleteAll = useCallback(async () => {
-    if (isShared) return;
-    const count = dismissed.length;
-    const ok = await confirmDialog({
-      title: t('violations.deleteDismissedTitle'),
-      message: t('violations.deleteDismissedBody', { count }),
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    try {
-      const result = await deleteAllFindings(selectedProject);
-      applyDelta(result);
-      setDismissed([]);
-      onReconcile?.();
-    } catch (err) {
-      console.error('Failed to delete all findings:', err);
-      setRestoreError?.(t('violations.deleteAllFailed'));
-    }
-  }, [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared]);
+  const handleDeleteAll = useCallback(
+    makeHandleDeleteAll({ selectedProject, isShared, dismissedCount: dismissed.length, applyDelta, setDismissed, onReconcile, setRestoreError }),
+    [selectedProject, onReconcile, setRestoreError, dismissed.length, applyDelta, isShared],
+  );
 
   return { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll };
 }

@@ -26,18 +26,15 @@ function sanitizeFilename(name) {
     .slice(0, 100) || 'project';
 }
 
-export function useProjectActions(
-  { projects, selectedProject, handleProjectChange, loadProjects },
-  { onError = () => {} } = {},
-) {
-  const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
-
-  function fail(messageKey, vars) {
+function makeFail(onError) {
+  return function fail(messageKey, vars) {
     onError(messageKey, vars);
     return { ok: false, messageKey, vars };
-  }
+  };
+}
 
-  async function handleDeleteProject(projectId) {
+function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
+  return async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);
     } catch (err) {
@@ -46,9 +43,11 @@ export function useProjectActions(
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();
     return { ok: true };
-  }
+  };
+}
 
-  function handleExportProject(projectId) {
+function makeHandleExportProject({ projects, getProjectExportUrl }) {
+  return function handleExportProject(projectId) {
     const proj = projects.find((p) => (p.id || p.name) === projectId);
     const filename = `${sanitizeFilename(proj?.name || projectId)}.zip`;
     // PyWebView: native Save dialog, fetches server-side
@@ -64,9 +63,11 @@ export function useProjectActions(
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }
+  };
+}
 
-  async function handleRelocateProject(projectId, newPath) {
+function makeHandleRelocateProject({ relocateProject, loadProjects, fail }) {
+  return async function handleRelocateProject(projectId, newPath) {
     try {
       await relocateProject(projectId, newPath);
     } catch (err) {
@@ -75,17 +76,21 @@ export function useProjectActions(
     }
     loadProjects();
     return { ok: true };
-  }
+  };
+}
 
-  async function _attemptImport(file, action) {
+function makeAttemptImport(importProject) {
+  return async function _attemptImport(file, action) {
     try {
       return { ok: true, result: await importProject(file, action ? { action } : {}) };
     } catch (err) {
       return { ok: false, err };
     }
-  }
+  };
+}
 
-  async function _resolveImportConflict(file, err) {
+function makeResolveImportConflict(attemptImport) {
+  return async function _resolveImportConflict(file, err) {
     const isSameUuid = err.kind === 'same_uuid';
     // Four whole sentences rather than one with an optional ` "name"` spliced
     // in: the quoting style is locale-dependent (guillemets, low-high quotes)
@@ -110,27 +115,36 @@ export function useProjectActions(
       actions,
     });
     if (!choice) return null;
-    return _attemptImport(file, choice);
-  }
+    return attemptImport(file, choice);
+  };
+}
 
-  async function handleImportProject() {
-    if (typeof document === 'undefined') return { ok: false, cancelled: true };
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.zip,application/zip,application/x-zip-compressed';
-    input.style.display = 'none';
-    document.body.appendChild(input);
-    const file = await new Promise((resolve) => {
-      input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
-      input.addEventListener('cancel', () => resolve(null), { once: true });
-      input.click();
-    });
-    document.body.removeChild(input);
+async function pickImportFile() {
+  if (typeof document === 'undefined') return null;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.zip,application/zip,application/x-zip-compressed';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  const file = await new Promise((resolve) => {
+    input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
+    input.addEventListener('cancel', () => resolve(null), { once: true });
+    input.click();
+  });
+  document.body.removeChild(input);
+  return file;
+}
+
+function makeHandleImportProject({ importProject, loadProjects, fail }) {
+  const attemptImport = makeAttemptImport(importProject);
+  const resolveImportConflict = makeResolveImportConflict(attemptImport);
+  return async function handleImportProject() {
+    const file = await pickImportFile();
     if (!file) return { ok: false, cancelled: true };
 
-    let attempt = await _attemptImport(file);
+    let attempt = await attemptImport(file);
     if (!attempt.ok && attempt.err.status === 409 && attempt.err.kind) {
-      attempt = await _resolveImportConflict(file, attempt.err);
+      attempt = await resolveImportConflict(file, attempt.err);
       if (attempt === null) return { ok: false, cancelled: true }; // user cancelled
     }
     if (!attempt.ok) {
@@ -138,7 +152,20 @@ export function useProjectActions(
     }
     loadProjects();
     return { ok: true };
-  }
+  };
+}
+
+export function useProjectActions(
+  { projects, selectedProject, handleProjectChange, loadProjects },
+  { onError = () => {} } = {},
+) {
+  const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
+  const fail = makeFail(onError);
+
+  const handleDeleteProject = makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail });
+  const handleExportProject = makeHandleExportProject({ projects, getProjectExportUrl });
+  const handleRelocateProject = makeHandleRelocateProject({ relocateProject, loadProjects, fail });
+  const handleImportProject = makeHandleImportProject({ importProject, loadProjects, fail });
 
   return { handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject };
 }

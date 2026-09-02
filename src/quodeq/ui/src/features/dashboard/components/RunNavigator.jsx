@@ -5,6 +5,38 @@
 
 import { t } from '../../../strings/index.js';
 
+function RunNavPager({ currentRun, isLatest, isOldest, onPrev, onNext, onPrevHover, onNextHover }) {
+  return (
+    <div className="run-nav-pager">
+      <button
+        type="button"
+        className="run-nav-btn"
+        onClick={onPrev}
+        onMouseEnter={onPrevHover}
+        onFocus={onPrevHover}
+        disabled={isOldest}
+        aria-label={t('runNav.older')}
+        title={t('runNav.older')}
+      >
+        ‹
+      </button>
+      <span className="run-nav-label">{currentRun}</span>
+      <button
+        type="button"
+        className="run-nav-btn"
+        onClick={onNext}
+        onMouseEnter={onNextHover}
+        onFocus={onNextHover}
+        disabled={isLatest}
+        aria-label={t('runNav.newer')}
+        title={t('runNav.newer')}
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
 export default function RunNavigator({
   currentRun, isLatest, isOldest,
   actions: { onPrev, onNext, onLatest, onView, onPrevHover, onNextHover, onLatestHover } = {},
@@ -23,33 +55,10 @@ export default function RunNavigator({
         {t('runNav.latest')}
       </button>
 
-      <div className="run-nav-pager">
-        <button
-          type="button"
-          className="run-nav-btn"
-          onClick={onPrev}
-          onMouseEnter={onPrevHover}
-          onFocus={onPrevHover}
-          disabled={isOldest}
-          aria-label={t('runNav.older')}
-          title={t('runNav.older')}
-        >
-          ‹
-        </button>
-        <span className="run-nav-label">{currentRun}</span>
-        <button
-          type="button"
-          className="run-nav-btn"
-          onClick={onNext}
-          onMouseEnter={onNextHover}
-          onFocus={onNextHover}
-          disabled={isLatest}
-          aria-label={t('runNav.newer')}
-          title={t('runNav.newer')}
-        >
-          ›
-        </button>
-      </div>
+      <RunNavPager
+        currentRun={currentRun} isLatest={isLatest} isOldest={isOldest}
+        onPrev={onPrev} onNext={onNext} onPrevHover={onPrevHover} onNextHover={onNextHover}
+      />
 
       {onView && (
         <button

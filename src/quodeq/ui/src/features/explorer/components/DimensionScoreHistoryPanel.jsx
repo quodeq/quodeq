@@ -67,13 +67,29 @@ function SelectedDot({ cx, cy, payload, selectedRunId }) {
   return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
 }
 
-function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIndex, onBarClick }) {
-  const handleClick = (state) => {
+function makeChartClickHandler(data, onBarClick) {
+  return (state) => {
     const idx = state?.activeTooltipIndex;
     if (idx == null) return;
     const point = data[idx];
     if (point?.runId) onBarClick?.(point);
   };
+}
+
+function DimensionBarCells({ data, selectedRunId, hoveredIndex }) {
+  return data.map((entry, i) => (
+    <Cell
+      key={entry.runId ?? i}
+      fill={scoreBarColor(entry.numericAverage)}
+      opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
+      stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
+      strokeWidth={hoveredIndex === i ? 1.5 : 0}
+    />
+  ));
+}
+
+function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIndex, onBarClick }) {
+  const handleClick = makeChartClickHandler(data, onBarClick);
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
       <ComposedChart
@@ -98,15 +114,7 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
         ))}
         <Area dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <Bar dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>
-          {data.map((entry, i) => (
-            <Cell
-              key={entry.runId ?? i}
-              fill={scoreBarColor(entry.numericAverage)}
-              opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
-              stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-              strokeWidth={hoveredIndex === i ? 1.5 : 0}
-            />
-          ))}
+          <DimensionBarCells data={data} selectedRunId={selectedRunId} hoveredIndex={hoveredIndex} />
         </Bar>
         <Line
           isAnimationActive={false}
@@ -123,19 +131,30 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
   );
 }
 
+function computeDimensionStats(data) {
+  const scores = data.map((d) => d.numericAverage).filter(Number.isFinite);
+  if (scores.length === 0) return null;
+  return {
+    min: Math.min(...scores),
+    max: Math.max(...scores),
+    avg: scores.reduce((s, n) => s + n, 0) / scores.length,
+  };
+}
+
+function buildKbdItems({ data, onBarClick, selectedRunId }) {
+  if (!onBarClick) return [];
+  return data.map((d, i) => ({
+    key: d.runId ?? i,
+    text: `${t('history.kbdRunItem', { date: d.dateLabel, score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
+    onActivate: () => onBarClick(d),
+  }));
+}
+
 export default function DimensionScoreHistoryPanel({ trend = [], dimension, selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const data = useMemo(() => buildDimensionData(trend, dimension, granularity, MAX), [trend, dimension, granularity]);
 
-  const stats = useMemo(() => {
-    const scores = data.map((d) => d.numericAverage).filter(Number.isFinite);
-    if (scores.length === 0) return null;
-    return {
-      min: Math.min(...scores),
-      max: Math.max(...scores),
-      avg: scores.reduce((s, n) => s + n, 0) / scores.length,
-    };
-  }, [data]);
+  const stats = useMemo(() => computeDimensionStats(data), [data]);
 
   const suffix = GRANULARITY_SUFFIX[granularity] || GRANULARITY_SUFFIX.day;
 
@@ -165,11 +184,7 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
           />
           <ChartKeyboardControls
             label={t('explorer.dimScoreHistoryKbd', { dimension })}
-            items={onBarClick ? data.map((d, i) => ({
-              key: d.runId ?? i,
-              text: `${t('history.kbdRunItem', { date: d.dateLabel, score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
-              onActivate: () => onBarClick(d),
-            })) : []}
+            items={buildKbdItems({ data, onBarClick, selectedRunId })}
           />
         </div>
       )}

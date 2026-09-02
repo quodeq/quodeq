@@ -2,6 +2,39 @@ import { useState, useEffect, useRef } from 'react';
 import { resolveRequirementText } from '../resolveRequirementText.js';
 import { t } from '../../../strings/index.js';
 
+function TreeExpandIcon({ showExpand, expanded }) {
+  if (!showExpand) return <span className="tree-expand-btn tree-expand-btn--invisible" />;
+  return (
+    <span className="tree-expand-btn" aria-hidden="true">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"
+        style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}>
+        <path d="M3 2l4 3-4 3V2z" />
+      </svg>
+    </span>
+  );
+}
+
+function TreeNodeActions({ onAdd, onRemove, addTitle, removeTitle }) {
+  return (
+    <div className="tree-node-actions" onClick={(e) => e.stopPropagation()}>
+      {onAdd && (
+        <button type="button" className="tree-action-btn" onClick={onAdd} title={addTitle || t('standards.add')}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      )}
+      {onRemove && (
+        <button type="button" className="tree-action-btn tree-action-btn--remove" onClick={onRemove} title={removeTitle || t('standards.remove')}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+            <path d="M5 12h14" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TreeNodeRow({ node, actions, titles, expand }) {
   const { label, isSelected } = node;
   const { onClick, onAdd, onRemove } = actions;
@@ -22,35 +55,11 @@ function TreeNodeRow({ node, actions, titles, expand }) {
         }
       }}
     >
-      {showExpand ? (
-        <span className="tree-expand-btn" aria-hidden="true">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"
-            style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}>
-            <path d="M3 2l4 3-4 3V2z" />
-          </svg>
-        </span>
-      ) : (
-        <span className="tree-expand-btn tree-expand-btn--invisible" />
-      )}
+      <TreeExpandIcon showExpand={showExpand} expanded={expanded} />
 
       <span className={`tree-node-label${node.customized ? ' tree-node-label--customized' : ''}`}>{label}</span>
 
-      <div className="tree-node-actions" onClick={(e) => e.stopPropagation()}>
-        {onAdd && (
-          <button type="button" className="tree-action-btn" onClick={onAdd} title={addTitle || t('standards.add')}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-        )}
-        {onRemove && (
-          <button type="button" className="tree-action-btn tree-action-btn--remove" onClick={onRemove} title={removeTitle || t('standards.remove')}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-              <path d="M5 12h14" />
-            </svg>
-          </button>
-        )}
-      </div>
+      <TreeNodeActions onAdd={onAdd} onRemove={onRemove} addTitle={addTitle} removeTitle={removeTitle} />
     </div>
   );
 }

@@ -15,24 +15,54 @@ import { t } from '../../strings/index.js';
  * whole panel likewise stays mounted while backgrounded behind the assistant
  * panel — `active` only gates fitting/focus in the views.
  */
-export default function TerminalPane({ active }) {
-  const { reason, checked, shell } = useTerminalPaneStatus();
+function TerminalStatusBar({ shell, sessions, activeSession }) {
+  return (
+    <div className="tty-statusbar">
+      {shell && <span>{shell}</span>}
+      {shell && <span className="tty-statusbar-sep" aria-hidden="true">·</span>}
+      <span>{sessions.length === 1
+        ? t('terminal.sessionsOne', { count: sessions.length })
+        : t('terminal.sessionsMany', { count: sessions.length })}</span>
+      <span className="tty-statusbar-sep" aria-hidden="true">·</span>
+      {/* The gate only ever admits loopback clients (terminal/gate.py); a
+          shell in a browser deserves a visible, if quiet, answer to "who
+          else can reach this?". */}
+      <span className="tty-statusbar-lock" title={t('terminal.localhostTitle')}>
+        <LockIcon />
+        {t('terminal.localhostOnly')}
+      </span>
+      <span className="tty-statusbar-spacer" />
+      {activeSession?.cwd && <span className="tty-statusbar-cwd" title={activeSession.cwd}>{activeSession.cwd}</span>}
+    </div>
+  );
+}
 
-  const paneLive = checked && reason === null;
-  const { sessions, activeId, max, openSession, closeSession, selectSession, reconcile } =
-    useTerminalSessions({ enabled: paneLive });
+function TerminalSessionViews({ sessions, paneLive, active, activeId, onGone, registerApi }) {
+  return (
+    <div className="tty-views">
+      {sessions.map((s) => (
+        <TerminalSessionView key={s.id} sessionId={s.id} live={paneLive}
+          active={active && s.id === activeId}
+          onGone={onGone} registerApi={registerApi} />
+      ))}
+    </div>
+  );
+}
 
-  // "Restart terminal" (from Settings) killed EVERY session server-side; the
-  // stale views' sockets are about to report 'gone'. Reconcile immediately:
-  // stale tabs drop, a fresh session is created, new views mount clean.
+// "Restart terminal" (from Settings) killed EVERY session server-side; the
+// stale views' sockets are about to report 'gone'. Reconcile immediately:
+// stale tabs drop, a fresh session is created, new views mount clean.
+function useTerminalRestartListener(reconcile) {
   useEffect(() => {
     const onRestart = () => reconcile();
     window.addEventListener('quodeq:terminal-restart', onRestart);
     return () => window.removeEventListener('quodeq:terminal-restart', onRestart);
   }, [reconcile]);
+}
 
-  // Copy support: each view registers its copy source; the header copies from
-  // whichever session is frontmost.
+// Copy support: each view registers its copy source; the header copies from
+// whichever session is frontmost.
+function useCopySupport(activeId) {
   const viewApis = useRef({});
   const registerApi = useCallback((id, api) => {
     if (api) viewApis.current[id] = api;
@@ -44,6 +74,18 @@ export default function TerminalPane({ active }) {
     navigator.clipboard?.writeText(text).catch(() => {});
     return true;
   }, [activeId]);
+  return { registerApi, handleCopy };
+}
+
+export default function TerminalPane({ active }) {
+  const { reason, checked, shell } = useTerminalPaneStatus();
+
+  const paneLive = checked && reason === null;
+  const { sessions, activeId, max, openSession, closeSession, selectSession, reconcile } =
+    useTerminalSessions({ enabled: paneLive });
+
+  useTerminalRestartListener(reconcile);
+  const { registerApi, handleCopy } = useCopySupport(activeId);
 
   const handleGone = useCallback(() => { reconcile(); }, [reconcile]);
 
@@ -65,30 +107,8 @@ export default function TerminalPane({ active }) {
           selectSession={selectSession} closeSession={closeSession} openSession={openSession}
         />
       )}
-      <div className="tty-views">
-        {sessions.map((s) => (
-          <TerminalSessionView key={s.id} sessionId={s.id} live={paneLive}
-            active={active && s.id === activeId}
-            onGone={handleGone} registerApi={registerApi} />
-        ))}
-      </div>
-      <div className="tty-statusbar">
-        {shell && <span>{shell}</span>}
-        {shell && <span className="tty-statusbar-sep" aria-hidden="true">·</span>}
-        <span>{sessions.length === 1
-          ? t('terminal.sessionsOne', { count: sessions.length })
-          : t('terminal.sessionsMany', { count: sessions.length })}</span>
-        <span className="tty-statusbar-sep" aria-hidden="true">·</span>
-        {/* The gate only ever admits loopback clients (terminal/gate.py); a
-            shell in a browser deserves a visible, if quiet, answer to "who
-            else can reach this?". */}
-        <span className="tty-statusbar-lock" title={t('terminal.localhostTitle')}>
-          <LockIcon />
-          {t('terminal.localhostOnly')}
-        </span>
-        <span className="tty-statusbar-spacer" />
-        {activeSession?.cwd && <span className="tty-statusbar-cwd" title={activeSession.cwd}>{activeSession.cwd}</span>}
-      </div>
+      <TerminalSessionViews sessions={sessions} paneLive={paneLive} active={active} activeId={activeId} onGone={handleGone} registerApi={registerApi} />
+      <TerminalStatusBar shell={shell} sessions={sessions} activeSession={activeSession} />
     </div>
   );
 }

@@ -112,6 +112,31 @@ function useCodeLayout(raw) {
   }, [raw]);
 }
 
+function splitContextLines(ctxLines, startLineNum) {
+  const before = [];
+  const highlighted = [];
+  const after = [];
+  let pastHighlighted = false;
+  for (let i = 0; i < ctxLines.length; i++) {
+    const isHl = isHighlightedLine(ctxLines[i]);
+    const entry = { raw: ctxLines[i], lineNum: startLineNum + i };
+    if (isHl) { pastHighlighted = true; highlighted.push(entry); }
+    else if (!pastHighlighted) before.push(entry);
+    else after.push(entry);
+  }
+  return { before, highlighted, after };
+}
+
+function renderContextLines(ctxLines, line) {
+  const startLineNum = Math.max(1, (line || 1) - CONTEXT_PADDING);
+  const { before, highlighted, after } = splitContextLines(ctxLines, startLineNum);
+  return [
+    ...before.map((l) => renderLine(l.raw, l.lineNum, false)),
+    ...highlighted.map((l) => renderLine(l.raw, l.lineNum, true)),
+    ...after.map((l) => renderLine(l.raw, l.lineNum, false)),
+  ];
+}
+
 export default function ContextBlock({ context, snippet, scope, line, endLine }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = () => setExpanded((e) => !e);
@@ -131,23 +156,7 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
   }
 
   if (context) {
-    const startLineNum = Math.max(1, (line || 1) - CONTEXT_PADDING);
-    const before = [];
-    const highlighted = [];
-    const after = [];
-    let pastHighlighted = false;
-    for (let i = 0; i < ctxLines.length; i++) {
-      const isHl = isHighlightedLine(ctxLines[i]);
-      const entry = { raw: ctxLines[i], lineNum: startLineNum + i };
-      if (isHl) { pastHighlighted = true; highlighted.push(entry); }
-      else if (!pastHighlighted) before.push(entry);
-      else after.push(entry);
-    }
-    const rendered = [
-      ...before.map((l) => renderLine(l.raw, l.lineNum, false)),
-      ...highlighted.map((l) => renderLine(l.raw, l.lineNum, true)),
-      ...after.map((l) => renderLine(l.raw, l.lineNum, false)),
-    ];
+    const rendered = renderContextLines(ctxLines, line);
     return (
       <ScopeBar label="See code" lineCount={ctxLines.length} expanded={expanded} onToggle={toggle}>
         <CodeBlockPre renderedLines={rendered} codeLines={ctxLines} />

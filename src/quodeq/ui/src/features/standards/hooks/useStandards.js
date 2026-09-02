@@ -7,6 +7,43 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
+function makeHandleDelete({ deleteStandard, setMutationError, refresh }) {
+  return async (id) => {
+    try {
+      await deleteStandard(id);
+      setMutationError(null);
+      await refresh();
+    } catch (err) {
+      setMutationError(apiErrorMessage(err, 'standards.deleteFailed'));
+    }
+  };
+}
+
+function makeHandleDuplicate({ duplicateStandard, setMutationError, refresh }) {
+  return async (id, newId) => {
+    try {
+      await duplicateStandard(id, newId);
+      setMutationError(null);
+      await refresh();
+    } catch (err) {
+      setMutationError(apiErrorMessage(err, 'standards.duplicateFailed'));
+    }
+  };
+}
+
+function groupStandards(standards) {
+  const g = {
+    [STANDARD_TYPES.BUILTIN]: [],
+    [STANDARD_TYPES.QUODEQ]: [],
+    [STANDARD_TYPES.COMMUNITY]: [],
+    [STANDARD_TYPES.CUSTOM]: [],
+  };
+  for (const s of standards) {
+    if (g[s.type]) g[s.type].push(s);
+  }
+  return g;
+}
+
 export function useStandards() {
   const { listStandards, deleteStandard, duplicateStandard } = useApi();
   const queryClient = useQueryClient();
@@ -24,38 +61,17 @@ export function useStandards() {
     return refetch();
   }, [queryClient, refetch]);
 
-  const handleDelete = useCallback(async (id) => {
-    try {
-      await deleteStandard(id);
-      setMutationError(null);
-      await refresh();
-    } catch (err) {
-      setMutationError(apiErrorMessage(err, 'standards.deleteFailed'));
-    }
-  }, [deleteStandard, refresh]);
+  const handleDelete = useCallback(
+    makeHandleDelete({ deleteStandard, setMutationError, refresh }),
+    [deleteStandard, refresh],
+  );
 
-  const handleDuplicate = useCallback(async (id, newId) => {
-    try {
-      await duplicateStandard(id, newId);
-      setMutationError(null);
-      await refresh();
-    } catch (err) {
-      setMutationError(apiErrorMessage(err, 'standards.duplicateFailed'));
-    }
-  }, [duplicateStandard, refresh]);
+  const handleDuplicate = useCallback(
+    makeHandleDuplicate({ duplicateStandard, setMutationError, refresh }),
+    [duplicateStandard, refresh],
+  );
 
-  const grouped = useMemo(() => {
-    const g = {
-      [STANDARD_TYPES.BUILTIN]: [],
-      [STANDARD_TYPES.QUODEQ]: [],
-      [STANDARD_TYPES.COMMUNITY]: [],
-      [STANDARD_TYPES.CUSTOM]: [],
-    };
-    for (const s of standards) {
-      if (g[s.type]) g[s.type].push(s);
-    }
-    return g;
-  }, [standards]);
+  const grouped = useMemo(() => groupStandards(standards), [standards]);
 
   const combinedError = mutationError || (error ? error.message : null);
 

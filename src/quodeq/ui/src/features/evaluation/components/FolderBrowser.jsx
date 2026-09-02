@@ -12,56 +12,65 @@ function FileIcon() {
   );
 }
 
+function FolderDirItems({ directories, selectedFolder, setSelectedFolder, navigate }) {
+  return directories.map((dir) => (
+    <div
+      key={dir.path}
+      className={`folder-item ${dir.isGitRepo ? 'is-git-repo' : ''} ${selectedFolder === dir.path ? 'selected' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selectedFolder === dir.path}
+      onClick={() => setSelectedFolder(dir.path)}
+      onDoubleClick={() => navigate(dir.path)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') navigate(dir.path);
+        if (e.key === ' ') { e.preventDefault(); setSelectedFolder(dir.path); }
+      }}
+    >
+      <span className="folder-icon">{dir.isGitRepo ? '\uD83D\uDCE6' : '\uD83D\uDCC1'}</span>
+      <span className="folder-name">{dir.name}</span>
+      {dir.isGitRepo && <span className="git-indicator">{t('evaluate.repoIndicator')}</span>}
+    </div>
+  ));
+}
+
+function FolderFileItems({ files, selectedFolder, setSelectedFolder }) {
+  return files.map((file) => (
+    <div
+      key={file.path}
+      className={`folder-item file-item ${selectedFolder === file.path ? 'selected' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selectedFolder === file.path}
+      onClick={() => setSelectedFolder(file.path)}
+      onKeyDown={(e) => {
+        if (e.key === ' ') { e.preventDefault(); setSelectedFolder(file.path); }
+      }}
+    >
+      <span className="folder-icon file-icon"><FileIcon /></span>
+      <span className="folder-name">{file.name}</span>
+    </div>
+  ));
+}
+
 function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate, showFiles }) {
   const files = showFiles ? (data?.files || []) : [];
+  const directories = data?.directories || [];
   return (
     <>
       {navError && <p className="inline-error" role="alert">{navError}</p>}
-      {!navError && data?.directories?.length === 0 && files.length === 0 && (
+      {!navError && directories.length === 0 && files.length === 0 && (
         <p className="empty-folder">{t('evaluate.noItemsInDir')}</p>
       )}
-      {!navError && (data?.directories?.length > 0 || files.length > 0) && (
+      {!navError && (directories.length > 0 || files.length > 0) && (
         <div className="folder-browser-hint">
-          {data?.directories?.length > 0 && t('evaluate.clickToSelectHint')}
-          {data?.directories?.length > 0 && files.length > 0 && ' · '}
+          {directories.length > 0 && t('evaluate.clickToSelectHint')}
+          {directories.length > 0 && files.length > 0 && ' · '}
           {files.length > 0 && t('evaluate.clickFileHint')}
         </div>
       )}
-      {(data?.directories || []).map((dir) => (
-        <div
-          key={dir.path}
-          className={`folder-item ${dir.isGitRepo ? 'is-git-repo' : ''} ${selectedFolder === dir.path ? 'selected' : ''}`}
-          role="button"
-          tabIndex={0}
-          aria-pressed={selectedFolder === dir.path}
-          onClick={() => setSelectedFolder(dir.path)}
-          onDoubleClick={() => navigate(dir.path)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') navigate(dir.path);
-            if (e.key === ' ') { e.preventDefault(); setSelectedFolder(dir.path); }
-          }}
-        >
-          <span className="folder-icon">{dir.isGitRepo ? '\uD83D\uDCE6' : '\uD83D\uDCC1'}</span>
-          <span className="folder-name">{dir.name}</span>
-          {dir.isGitRepo && <span className="git-indicator">{t('evaluate.repoIndicator')}</span>}
-        </div>
-      ))}
-      {files.map((file) => (
-        <div
-          key={file.path}
-          className={`folder-item file-item ${selectedFolder === file.path ? 'selected' : ''}`}
-          role="button"
-          tabIndex={0}
-          aria-pressed={selectedFolder === file.path}
-          onClick={() => setSelectedFolder(file.path)}
-          onKeyDown={(e) => {
-            if (e.key === ' ') { e.preventDefault(); setSelectedFolder(file.path); }
-          }}
-        >
-          <span className="folder-icon file-icon"><FileIcon /></span>
-          <span className="folder-name">{file.name}</span>
-        </div>
-      ))}
+      <FolderDirItems directories={directories} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
+      <FolderFileItems files={files} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} />
     </>
   );
 }

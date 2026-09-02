@@ -14,6 +14,41 @@ const COLUMNS = [
   { id: 'health', label: t('violations.colHealth') },
 ];
 
+function HeatGridHead({ sortCol, sortDir, handleSort }) {
+  return (
+    <thead>
+      <tr>
+        {COLUMNS.map((col) => (
+          <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
+            {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+function HeatGridRow({ row, i, onDimensionClick, onPrincipleClick, onCellClick }) {
+  const isDim = row.type === 'dimension';
+  return (
+    <tr key={`${row.type}-${row.name}-${i}`} className={isDim ? 'heat-grid-dim-row' : undefined}>
+      <td>
+        <div
+          className="heat-grid-file clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
+          onKeyDown={(e) => e.key === 'Enter' && (isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
+          style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
+        >
+          {row.name}
+        </div>
+      </td>
+      <HeatGridCells row={row} onCellClick={onCellClick} variant="flat" />
+    </tr>
+  );
+}
+
 export default function DimensionHeatGridView({ dimensions, onDimensionClick, onPrincipleClick, onCellClick }) {
   const [sortCol, setSortCol] = useState('violations');
   const [sortDir, setSortDir] = useState('desc');
@@ -36,36 +71,11 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
   return (
     <div className="heat-grid-wrap heat-grid-wrap--flat">
       <table className="heat-grid heat-grid--flat">
-        <thead>
-          <tr>
-            {COLUMNS.map((col) => (
-              <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
-                {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        <HeatGridHead sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} />
         <tbody>
-          {rows.map((row, i) => {
-            const isDim = row.type === 'dimension';
-            return (
-              <tr key={`${row.type}-${row.name}-${i}`} className={isDim ? 'heat-grid-dim-row' : undefined}>
-                <td>
-                  <div
-                    className="heat-grid-file clickable"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
-                    onKeyDown={(e) => e.key === 'Enter' && (isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
-                    style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
-                  >
-                    {row.name}
-                  </div>
-                </td>
-                <HeatGridCells row={row} onCellClick={onCellClick} variant="flat" />
-              </tr>
-            );
-          })}
+          {rows.map((row, i) => (
+            <HeatGridRow key={`${row.type}-${row.name}-${i}`} row={row} i={i} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={onCellClick} />
+          ))}
         </tbody>
       </table>
     </div>

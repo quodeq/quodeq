@@ -40,34 +40,29 @@ export function dimFileEstimate(progress) {
 const NO_COVERAGE = { projectTotal: null, cachedFiles: null, coveredFiles: null, coveredPct: null };
 const NO_EXCLUDED = { excludedFiles: null };
 
-export function computeOverallProgress(progress) {
-  const dims = progress?.dimensions || [];
-  if (dims.length === 0) {
-    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE, ...NO_EXCLUDED };
-  }
-
-  // "preparing…" only when *nothing* is known yet — i.e. no dim has
-  // started AND no pending dim has an estimate. Once any dim is
-  // running/done or has a total, we show what we know rather than
-  // contradicting an obviously-running run with a "preparing" label.
+// "preparing…" only when *nothing* is known yet — i.e. no dim has started
+// AND no pending dim has an estimate. Once any dim is running/done or has a
+// total, we show what we know rather than contradicting an obviously-running
+// run with a "preparing" label.
+function hasKnownProgress(dims) {
   const anyDimStarted = dims.some((d) => d?.state === 'running' || d?.state === 'done');
   const anyTotalKnown = dims.some((d) => (d?.files?.total ?? 0) > 0);
-  if (!anyDimStarted && !anyTotalKnown) {
-    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE, ...NO_EXCLUDED };
-  }
+  return anyDimStarted || anyTotalKnown;
+}
 
-  // Sum across dims using whatever total each one carries. Pending dims
-  // with no estimate (total=0) contribute nothing — they'll join the
-  // header sum once their estimate or queue lands.
+// Sum across dims using whatever total each one carries. Pending dims with
+// no estimate (total=0) contribute nothing — they'll join the header sum
+// once their estimate or queue lands. Whole-project coverage (incremental
+// runs) requires every dim to carry the fields — a single legacy dim would
+// make the sum lie, so it nulls out (hasCoverage=false). Excluded files: the
+// API size cap is dim-agnostic, so every dim reports the same count — max,
+// not sum, or N dims would multiply it.
+function accumulateDimTotals(dims) {
   let takenFiles = 0;
   let totalFiles = 0;
-  // Whole-project coverage (incremental runs): every dim must carry the
-  // fields — a single legacy dim would make the sum lie, so it nulls out.
   let hasCoverage = true;
   let cachedFiles = 0;
   let projectTotal = 0;
-  // Files over the API size cap. The cap is dim-agnostic, so every dim
-  // reports the same count — max, not sum, or N dims would multiply it.
   let excludedFiles = null;
   for (const d of dims) {
     takenFiles += d?.files?.taken ?? 0;
@@ -82,17 +77,29 @@ export function computeOverallProgress(progress) {
       excludedFiles = Math.max(excludedFiles ?? 0, d.filesExcluded);
     }
   }
+  return { takenFiles, totalFiles, hasCoverage, cachedFiles, projectTotal, excludedFiles };
+}
 
-  const coverage = hasCoverage
-    ? {
-        projectTotal,
-        cachedFiles,
-        // Estimate-time totals vs live queue counts can drift when files
-        // change on disk mid-run; clamp so we never render "105 / 100".
-        coveredFiles: Math.min(cachedFiles + takenFiles, projectTotal),
-        coveredPct: pct(cachedFiles + takenFiles, projectTotal),
-      }
-    : NO_COVERAGE;
+function buildCoverage(hasCoverage, cachedFiles, projectTotal, takenFiles) {
+  if (!hasCoverage) return NO_COVERAGE;
+  return {
+    projectTotal,
+    cachedFiles,
+    // Estimate-time totals vs live queue counts can drift when files
+    // change on disk mid-run; clamp so we never render "105 / 100".
+    coveredFiles: Math.min(cachedFiles + takenFiles, projectTotal),
+    coveredPct: pct(cachedFiles + takenFiles, projectTotal),
+  };
+}
+
+export function computeOverallProgress(progress) {
+  const dims = progress?.dimensions || [];
+  if (dims.length === 0 || !hasKnownProgress(dims)) {
+    return { totalFiles: 0, takenFiles: 0, overallPct: 0, ...NO_COVERAGE, ...NO_EXCLUDED };
+  }
+
+  const { takenFiles, totalFiles, hasCoverage, cachedFiles, projectTotal, excludedFiles } = accumulateDimTotals(dims);
+  const coverage = buildCoverage(hasCoverage, cachedFiles, projectTotal, takenFiles);
 
   return { totalFiles, takenFiles, overallPct: pct(takenFiles, totalFiles), ...coverage, excludedFiles };
 }

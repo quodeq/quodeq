@@ -23,6 +23,49 @@ function writePermanent(on, storage) {
  * toggle is off and the user clicks it, a popup asks whether to enable for
  * one scan, always, or cancel.
  */
+function ToggleButton({ value, isOn, disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      className={`clean-scan-toggle${isOn ? ' clean-scan-toggle--on' : ''}${value === 'permanent' ? ' clean-scan-toggle--permanent' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={
+        value === 'permanent'
+          ? t('evaluate.cleanAlwaysTitle')
+          : value === 'once'
+            ? t('evaluate.cleanOnceTitle')
+            : t('evaluate.cleanOffTitle')
+      }
+      aria-pressed={isOn}
+    >
+      {t('evaluate.cleanScan')}
+      {value === 'permanent' && <span className="clean-scan-toggle__dot" aria-hidden="true" />}
+    </button>
+  );
+}
+
+function ConfirmDialog({ onCancel, onPickOnce, onPickPermanent }) {
+  return (
+    <div className="qd-confirm-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="qd-confirm-dialog">
+        <h3 className="qd-confirm-title">{t('evaluate.cleanScan')}</h3>
+        <div className="qd-confirm-message">
+          <p>{t('evaluate.cleanDialogP1')}</p>
+          <p>{t('evaluate.cleanDialogP2')}</p>
+        </div>
+        <div className="qd-confirm-actions clean-scan-confirm-actions">
+          <button type="button" className="qd-confirm-btn qd-confirm-btn--cancel" onClick={onCancel}>{t('common.cancel')}</button>
+          <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm" onClick={onPickOnce}>{t('evaluate.justThisScan')}</button>
+          <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--danger" onClick={onPickPermanent}>
+            {t('evaluate.alwaysCap')} <span className="clean-scan-confirm-meta">{t('evaluate.allProjects')}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CleanScanToggle({ value, onChange, disabled = false }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -62,42 +105,8 @@ export default function CleanScanToggle({ value, onChange, disabled = false }) {
 
   return (
     <>
-      <button
-        type="button"
-        className={`clean-scan-toggle${isOn ? ' clean-scan-toggle--on' : ''}${value === 'permanent' ? ' clean-scan-toggle--permanent' : ''}`}
-        onClick={handleClick}
-        disabled={disabled}
-        title={
-          value === 'permanent'
-            ? t('evaluate.cleanAlwaysTitle')
-            : value === 'once'
-              ? t('evaluate.cleanOnceTitle')
-              : t('evaluate.cleanOffTitle')
-        }
-        aria-pressed={isOn}
-      >
-        {t('evaluate.cleanScan')}
-        {value === 'permanent' && <span className="clean-scan-toggle__dot" aria-hidden="true" />}
-      </button>
-
-      {confirmOpen && (
-        <div className="qd-confirm-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) cancel(); }}>
-          <div className="qd-confirm-dialog">
-            <h3 className="qd-confirm-title">{t('evaluate.cleanScan')}</h3>
-            <div className="qd-confirm-message">
-              <p>{t('evaluate.cleanDialogP1')}</p>
-              <p>{t('evaluate.cleanDialogP2')}</p>
-            </div>
-            <div className="qd-confirm-actions clean-scan-confirm-actions">
-              <button type="button" className="qd-confirm-btn qd-confirm-btn--cancel" onClick={cancel}>{t('common.cancel')}</button>
-              <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm" onClick={pickOnce}>{t('evaluate.justThisScan')}</button>
-              <button type="button" className="qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--danger" onClick={pickPermanent}>
-                {t('evaluate.alwaysCap')} <span className="clean-scan-confirm-meta">{t('evaluate.allProjects')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ToggleButton value={value} isOn={isOn} disabled={disabled} onClick={handleClick} />
+      {confirmOpen && <ConfirmDialog onCancel={cancel} onPickOnce={pickOnce} onPickPermanent={pickPermanent} />}
     </>
   );
 }

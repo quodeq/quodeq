@@ -50,20 +50,11 @@ function writeStoredWidth(px) {
   writeString(STORAGE_KEY, String(px));
 }
 
-export function SidePaneProvider({ children }) {
-  const [windows, setWindows] = useState([]);
-  const [paneWidth, setPaneWidthState] = useState(readStoredWidth);
-  // Transient notice surfaced as a toast (e.g. "max panels open"). The `key`
-  // forces a fresh mount when the same message is shown twice in a row, so
-  // the auto-dismiss timer resets and the slide-in animation replays.
+// Transient notice surfaced as a toast (e.g. "max panels open"). The `key`
+// forces a fresh mount when the same message is shown twice in a row, so
+// the auto-dismiss timer resets and the slide-in animation replays.
+function useNoticeState() {
   const [notice, setNotice] = useState(null);
-
-  const isOpen = windows.length > 0;
-
-  const hasWindow = useCallback(
-    (id) => windows.some((w) => w.id === id),
-    [windows],
-  );
 
   const showAtCapNotice = useCallback(() => {
     setNotice({ message: AT_CAP_MESSAGE, key: Date.now() });
@@ -79,6 +70,15 @@ export function SidePaneProvider({ children }) {
     if (!message) return;
     setNotice({ message, key: Date.now() });
   }, []);
+
+  return { notice, showAtCapNotice, clearNotice, showToast };
+}
+
+function useWindowActions({ windows, setWindows, showAtCapNotice }) {
+  const hasWindow = useCallback(
+    (id) => windows.some((w) => w.id === id),
+    [windows],
+  );
 
   const addWindow = useCallback((spec) => {
     if (!spec || !spec.id) return;
@@ -121,15 +121,11 @@ export function SidePaneProvider({ children }) {
 
   const closeAll = useCallback(() => setWindows([]), []);
 
-  const { registerSpec, unregisterSpec, getRegisteredSpec } = useRegisteredSpecs();
+  return { hasWindow, addWindow, removeWindow, replaceWindow, toggleWindow, closeAll };
+}
 
-  const setPaneWidth = useCallback((px) => {
-    const next = clampSidePaneWidth(px, typeof window !== 'undefined' ? window.innerWidth : 1920);
-    setPaneWidthState(next);
-    writeStoredWidth(next);
-  }, []);
-
-  // Sync the open width into a CSS variable on the root so the grid template can read it.
+// Sync the open width into a CSS variable on the root so the grid template can read it.
+function useSidePaneWidthCssSync(isOpen, paneWidth) {
   useEffect(() => {
     const root = document.documentElement;
     if (isOpen) {
@@ -138,8 +134,10 @@ export function SidePaneProvider({ children }) {
       root.style.setProperty('--side-pane-width', '0px');
     }
   }, [isOpen, paneWidth]);
+}
 
-  // Escape closes all windows when the pane is open.
+// Escape closes all windows when the pane is open.
+function useEscapeClosesAll(isOpen, setWindows) {
   useEffect(() => {
     if (!isOpen) return undefined;
     function onKey(e) {
@@ -151,6 +149,27 @@ export function SidePaneProvider({ children }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen]);
+}
+
+export function SidePaneProvider({ children }) {
+  const [windows, setWindows] = useState([]);
+  const [paneWidth, setPaneWidthState] = useState(readStoredWidth);
+
+  const isOpen = windows.length > 0;
+
+  const { notice, showAtCapNotice, clearNotice, showToast } = useNoticeState();
+  const { hasWindow, addWindow, removeWindow, replaceWindow, toggleWindow, closeAll } = useWindowActions({ windows, setWindows, showAtCapNotice });
+
+  const { registerSpec, unregisterSpec, getRegisteredSpec } = useRegisteredSpecs();
+
+  const setPaneWidth = useCallback((px) => {
+    const next = clampSidePaneWidth(px, typeof window !== 'undefined' ? window.innerWidth : 1920);
+    setPaneWidthState(next);
+    writeStoredWidth(next);
+  }, []);
+
+  useSidePaneWidthCssSync(isOpen, paneWidth);
+  useEscapeClosesAll(isOpen, setWindows);
 
   const value = useMemo(
     () => ({

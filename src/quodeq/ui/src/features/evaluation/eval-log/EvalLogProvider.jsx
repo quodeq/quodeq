@@ -59,6 +59,42 @@ function buildSpec({ jobId, jobStatus, status, terminalState }) {
   };
 }
 
+function resetActiveJob(setActiveJobId, setActiveJobLabel, setActiveJobStatus) {
+  setActiveJobId(null);
+  setActiveJobLabel(null);
+  setActiveJobStatus(null);
+}
+
+function makeOpenLog({ setActiveJobId, setActiveJobLabel, setActiveJobStatus, addWindow, replaceWindow }) {
+  return (jobId, label = null, jobStatus = null) => {
+    if (!jobId) return;
+    setActiveJobId(jobId);
+    setActiveJobLabel(label);
+    setActiveJobStatus(jobStatus);
+    const fresh = buildSpec({ jobId, jobStatus, status: 'streaming' });
+    addWindow(fresh);
+    replaceWindow(fresh);
+  };
+}
+
+function makeCloseLog({ setActiveJobId, setActiveJobLabel, setActiveJobStatus, removeWindow }) {
+  return () => {
+    resetActiveJob(setActiveJobId, setActiveJobLabel, setActiveJobStatus);
+    removeWindow(WINDOW_ID);
+  };
+}
+
+// If the user closes the side-pane window via the X (or Escape closes all
+// panes), sync our active-job state — otherwise consoleOpen stays truthy
+// and the Console button needs two clicks to reopen.
+function useWindowCloseSync({ activeJobId, hasWindow, setActiveJobId, setActiveJobLabel, setActiveJobStatus }) {
+  useEffect(() => {
+    if (activeJobId && !hasWindow(WINDOW_ID)) {
+      resetActiveJob(setActiveJobId, setActiveJobLabel, setActiveJobStatus);
+    }
+  }, [activeJobId, hasWindow]);
+}
+
 export function EvalLogProvider({ children }) {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJobLabel, setActiveJobLabel] = useState(null);
@@ -75,37 +111,21 @@ export function EvalLogProvider({ children }) {
     if (spec) replaceWindow(spec);
   }, [spec, replaceWindow]);
 
-  const openLog = useCallback((jobId, label = null, jobStatus = null) => {
-    if (!jobId) return;
-    setActiveJobId(jobId);
-    setActiveJobLabel(label);
-    setActiveJobStatus(jobStatus);
-    const fresh = buildSpec({ jobId, jobStatus, status: 'streaming' });
-    addWindow(fresh);
-    replaceWindow(fresh);
-  }, [addWindow, replaceWindow]);
+  const openLog = useCallback(
+    makeOpenLog({ setActiveJobId, setActiveJobLabel, setActiveJobStatus, addWindow, replaceWindow }),
+    [addWindow, replaceWindow],
+  );
 
   const updateJobStatus = useCallback((jobStatus) => {
     setActiveJobStatus(jobStatus ?? null);
   }, []);
 
-  const closeLog = useCallback(() => {
-    setActiveJobId(null);
-    setActiveJobLabel(null);
-    setActiveJobStatus(null);
-    removeWindow(WINDOW_ID);
-  }, [removeWindow]);
+  const closeLog = useCallback(
+    makeCloseLog({ setActiveJobId, setActiveJobLabel, setActiveJobStatus, removeWindow }),
+    [removeWindow],
+  );
 
-  // If the user closes the side-pane window via the X (or Escape closes all
-  // panes), sync our active-job state — otherwise consoleOpen stays truthy
-  // and the Console button needs two clicks to reopen.
-  useEffect(() => {
-    if (activeJobId && !hasWindow(WINDOW_ID)) {
-      setActiveJobId(null);
-      setActiveJobLabel(null);
-      setActiveJobStatus(null);
-    }
-  }, [activeJobId, hasWindow]);
+  useWindowCloseSync({ activeJobId, hasWindow, setActiveJobId, setActiveJobLabel, setActiveJobStatus });
 
   const value = useMemo(
     () => ({ activeJobId, activeJobLabel, activeJobStatus, status, openLog, closeLog, updateJobStatus }),

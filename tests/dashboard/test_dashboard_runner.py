@@ -1,29 +1,19 @@
 import os
 from pathlib import Path
-import logging
 
 import pytest
 
-from quodeq.dashboard import runner, _networking
+from quodeq.dashboard import _networking, runner
 from quodeq.dashboard._probes import DashboardHooks
-from quodeq.dashboard.runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard, validate_paths
-
+from quodeq.dashboard.runner import (
+    BuildConfig,
+    DashboardConfig,
+    run_dashboard,
+    validate_paths,
+)
 from tests.conftest import DummyProcess
-
-_TEST_PORT = 7863
-
-
-def _make_config(tmp_path: Path, **overrides) -> DashboardConfig:
-    """Build a DashboardConfig with sensible test defaults, overridable by keyword."""
-    defaults = {
-        "server": ServerConfig(port=_TEST_PORT),
-        "build": BuildConfig(open_browser=False, no_build=True, reinstall=False),
-        "reports_dir": tmp_path / "reports",
-        "static_dist": tmp_path / "ui/web/dist",
-        "repo_root": tmp_path,
-    }
-    defaults.update(overrides)
-    return DashboardConfig(**defaults)
+from tests.dashboard._runner_helpers import TEST_PORT as _TEST_PORT
+from tests.dashboard._runner_helpers import _make_config, _setup_dashboard
 
 
 def test_validate_paths_missing_reports(tmp_path: Path):
@@ -59,22 +49,11 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
 
 
 def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
-    static_dist = tmp_path / "ui/web/dist"
-    static_dist.mkdir(parents=True)
-    (static_dist / "index.html").write_text("ok")
-
-    monkeypatch.setattr(
-        runner, "_ensure_action_api",
-        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
-    )
-    hooks = DashboardHooks(
-        kill_stale=lambda *_a, **_k: None,
-        build_ui=lambda *a, **k: static_dist,
-        check_prereqs=lambda: None,
-    )
-
     reports_dir = tmp_path / "reports"
-    config = _make_config(tmp_path, reports_dir=reports_dir, static_dist=static_dist, reports_defaulted=True)
+    config, hooks, _static_dist = _setup_dashboard(
+        tmp_path, monkeypatch, reports=False,
+        reports_dir=reports_dir, reports_defaulted=True,
+    )
 
     run_dashboard(config, hooks=hooks)
     assert reports_dir.exists()
@@ -135,23 +114,12 @@ def test_build_config_browser_mode():
 
 def test_run_dashboard_native_window(tmp_path: Path, monkeypatch):
     """When use_native=True, _serve_and_wait uses webview instead of webbrowser."""
-    (tmp_path / "reports").mkdir()
-    static_dist = tmp_path / "ui/web/dist"
-    static_dist.mkdir(parents=True)
-    (static_dist / "index.html").write_text("ok")
+    config, hooks, _static_dist = _setup_dashboard(
+        tmp_path, monkeypatch,
+        build=BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=True),
+    )
 
     webview_calls = []
-
-    monkeypatch.setattr(
-        runner, "_ensure_action_api",
-        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
-    )
-    hooks = DashboardHooks(
-        kill_stale=lambda *_a, **_k: None,
-        build_ui=lambda *a, **k: static_dist,
-        check_prereqs=lambda: None,
-    )
-
     from quodeq.dashboard import _server
 
     def fake_serve(url, proc, config):
@@ -159,72 +127,37 @@ def test_run_dashboard_native_window(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr(_server, "serve_and_wait", fake_serve)
 
-    config = _make_config(
-        tmp_path,
-        static_dist=static_dist,
-        build=BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=True),
-    )
     run_dashboard(config, hooks=hooks)
     assert webview_calls == [True]
 
 
 def test_run_dashboard_browser_fallback(tmp_path: Path, monkeypatch):
     """When use_native=False, _serve_and_wait opens browser."""
-    (tmp_path / "reports").mkdir()
-    static_dist = tmp_path / "ui/web/dist"
-    static_dist.mkdir(parents=True)
-    (static_dist / "index.html").write_text("ok")
+    config, hooks, _static_dist = _setup_dashboard(
+        tmp_path, monkeypatch,
+        build=BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=False),
+    )
 
     from quodeq.dashboard import _server
     browser_calls = []
-
-    monkeypatch.setattr(
-        runner, "_ensure_action_api",
-        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
-    )
-    hooks = DashboardHooks(
-        kill_stale=lambda *_a, **_k: None,
-        build_ui=lambda *a, **k: static_dist,
-        check_prereqs=lambda: None,
-    )
 
     def fake_serve(url, proc, config):
         browser_calls.append(config.build.use_native)
 
     monkeypatch.setattr(_server, "serve_and_wait", fake_serve)
 
-    config = _make_config(
-        tmp_path,
-        static_dist=static_dist,
-        build=BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=False),
-    )
     run_dashboard(config, hooks=hooks)
     assert browser_calls == [False]
 
 
 def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
     """When verbose=True, QUODEQ_VERBOSE env var is set in the injected env dict."""
-    (tmp_path / "reports").mkdir()
-    static_dist = tmp_path / "ui/web/dist"
-    static_dist.mkdir(parents=True)
-    (static_dist / "index.html").write_text("ok")
-
-    monkeypatch.setattr(
-        runner, "_ensure_action_api",
-        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
-    )
-    hooks = DashboardHooks(
-        kill_stale=lambda *_a, **_k: None,
-        build_ui=lambda *a, **k: static_dist,
-        check_prereqs=lambda: None,
+    config, hooks, _static_dist = _setup_dashboard(
+        tmp_path, monkeypatch,
+        build=BuildConfig(open_browser=False, no_build=True, reinstall=False, verbose=True),
     )
 
     test_env: dict[str, str] = {}
-    config = _make_config(
-        tmp_path,
-        static_dist=static_dist,
-        build=BuildConfig(open_browser=False, no_build=True, reinstall=False, verbose=True),
-    )
     run_dashboard(config, env=test_env, hooks=hooks)
 
     # run_dashboard copies the env dict, so original is not mutated;
