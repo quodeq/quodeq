@@ -1,51 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
-
-const POLL_INTERVAL_MS = 2000;
-
-function buildPublishedAtMap(list) {
-  const map = {};
-  for (const p of list || []) {
-    const id = p.id || p.name;
-    if (id && p.publishedAt) map[id] = p.publishedAt;
-  }
-  return map;
-}
-
-// Upserts the just-published project into the shared list cache's `projects`
-// array, merging over any existing entry with the same id (audit C3/C4).
-// `local` is the LOCAL project object the publish() call was made with (see
-// publishingLocalRef below) -- its originUrl/latestRunId/latestDoneRunId are
-// copied over so the merge in projectsMerge.js immediately recognizes this as
-// the SAME project (chips flip to PUBLISHED, no stale publish/update button)
-// without waiting for the authoritative refresh to learn those fields from
-// the backend. Falls back to whatever the existing entry already had for any
-// field `local` doesn't know, so a merge never regresses already-good data.
-function upsertPublishedProject(projects, id, local) {
-  const idx = projects.findIndex((p) => (p.id || p.name) === id);
-  const existing = idx === -1 ? null : projects[idx];
-  const merged = {
-    ...existing,
-    id,
-    name: local?.name ?? existing?.name ?? id,
-    publishedAt: Date.now(),
-    publishedBy: null, // backend's published.json is authoritative; the UI
-    // shows "published <relative time>" regardless (see PublishedMeta/
-    // LocalPublishedMeta -- both render gracefully with no publishedBy).
-    source: 'shared',
-    latestRunId: local?.latestRunId ?? existing?.latestRunId ?? null,
-    latestDoneRunId: local?.latestDoneRunId ?? existing?.latestDoneRunId ?? null,
-    originUrl: local?.originUrl ?? existing?.originUrl ?? null,
-  };
-  if (idx === -1) return [...projects, merged];
-  const next = [...projects];
-  next[idx] = merged;
-  return next;
-}
+import { usePublishQueries } from './usePublishQueries.js';
+import { usePublishPolling } from './usePublishPolling.js';
+import { useApplyOptimisticPublish } from './publishOptimisticCache.js';
 
 /**
  * usePublish -- publish action + job progress for local cards on the merged
@@ -85,145 +45,8 @@ function upsertPublishedProject(projects, id, local) {
  * this hook's own gating and always performs the fetch, updating the same
  * cache entry every other consumer reads.
  */
-export function usePublish({ enabled = true } = {}) {
-  const { getSharedStatus, sharedListProjects, publishProject } = useApi();
-  const queryClient = useQueryClient();
-
-  const statusQuery = useQuery({
-    queryKey: sharedKeys.status(),
-    queryFn: getSharedStatus,
-    enabled,
-  });
-
-  const configured = !!statusQuery.data?.configured;
-
-  const listQuery = useQuery({
-    queryKey: sharedKeys.list(),
-    queryFn: () => sharedListProjects({ refresh: false }),
-    enabled: enabled && configured,
-  });
-
-  const publishedAtByProject = useMemo(
-    () => buildPublishedAtMap(listQuery.data?.projects),
-    [listQuery.data],
-  );
-
-  // idle | running | done | error -- mirrors the backend's global publish job.
-  const [publishState, setPublishState] = useState('idle');
-  const [publishingProject, setPublishingProject] = useState(null);
-  const [publishError, setPublishError] = useState(null);
-  const [publishErrorProject, setPublishErrorProject] = useState(null);
-
-  // In-flight guard for the publish trigger -- same synchronous-ref idiom as
-  // useSharedProjects' connectingRef/pullingRef. A ref (not state) because
-  // it must be readable synchronously on the very next call, before any
-  // state update triggered by this call has committed/re-rendered. It only
-  // guards the POST round-trip itself (a rapid double-click/Enter race),
-  // not the whole background job -- once the POST resolves, a click on a
-  // DIFFERENT card's button is expected to reach the backend and get a real
-  // 409, which is how that card's own inline error gets populated.
-  const publishingRef = useRef(false);
-  const pollTimerRef = useRef(null);
-  const mountedRef = useRef(true);
-  // Mirrors `publishingProject` state synchronously, so the poll callback
-  // (memoized once, reused across ticks) always reads the latest value
-  // instead of whatever was captured in its closure at creation time.
-  const publishingProjectRef = useRef(null);
-  // The local project object passed to the most recent publish() call (see
-  // that callback below) -- carries the identity fields (name, originUrl,
-  // latestRunId, latestDoneRunId) the optimistic cache patch needs but the
-  // backend's status/publish payload doesn't echo back.
-  const publishingLocalRef = useRef(null);
-
-  const setPublishingProjectBoth = useCallback((id) => {
-    publishingProjectRef.current = id;
-    setPublishingProject(id);
-  }, []);
-
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
-
-  // Synchronous, BEFORE any network round trip: patches the shared list
-  // cache with the just-published id the instant the job reports 'done', so
-  // every consumer of sharedKeys.list() (useMergedProjects' chips/action via
-  // useSharedProjects, and this hook's own publishedAtByProject) flips in the
-  // SAME render (audit C3/C4) instead of waiting up to 30s for the
-  // authoritative refresh below to land. Only uses `publishingLocalRef` when
-  // it actually corresponds to `id` -- a fresh mount that reconciles a job
-  // started elsewhere never had a local project object handed to it, and a
-  // stale ref must never get attributed to the wrong id.
-  const applyOptimisticPublish = useCallback((id) => {
-    const local = publishingLocalRef.current;
-    const matchedLocal = local && (local.id ?? local.name) === id ? local : null;
-    queryClient.setQueryData(sharedKeys.list(), (old) => ({
-      ...old,
-      projects: upsertPublishedProject(old?.projects ?? [], id, matchedLocal),
-    }));
-  }, [queryClient]);
-
-  const refreshListAfterCompletion = useCallback(() => {
-    // Imperative and cache-key-targeted rather than a plain refetch of
-    // THIS hook's own (possibly disabled) listQuery -- fetchQuery ignores
-    // `enabled` entirely, so the meta line updates even when this hook was
-    // mounted with `enabled: false` (e.g. no local projects at the moment
-    // the job that just finished was started for a project elsewhere).
-    return queryClient
-      .fetchQuery({
-        queryKey: sharedKeys.list(),
-        queryFn: () => sharedListProjects({ refresh: false }),
-        // Force the fetch: the production QueryClient's default staleTime is
-        // 30s (see api/queryClient.js), so without this a still-fresh cache
-        // entry would let fetchQuery resolve without ever hitting the
-        // network -- silently contradicting the comment above this function.
-        staleTime: 0,
-      })
-      .catch(() => {
-        // Best effort -- a failed refresh just leaves the "published <time
-        // ago>" meta stale on cards; it is not primary content worth an
-        // error banner over.
-      });
-  }, [queryClient, sharedListProjects]);
-
-  const checkStatus = useCallback(async () => {
-    let data;
-    try {
-      data = await getSharedStatus();
-    } catch {
-      return; // transient poll failure -- the job keeps running server-side regardless; try again next tick
-    }
-    if (!mountedRef.current) return;
-    const publish = data?.publish || {};
-    if (publish.state === 'running') return; // keep polling
-    stopPolling();
-    const finishedProject = publish.project ?? publishingProjectRef.current;
-    if (publish.state === 'error') {
-      setPublishState('error');
-      setPublishError(publish.error || t('projects.publishFailed'));
-      setPublishErrorProject(finishedProject);
-    } else {
-      // 'done' (or an unexpected 'idle') -- refresh the shared list once so
-      // the card that just finished gets its "published <relative time>"
-      // meta line updated. Also clear any error left over from a PREVIOUS
-      // failed attempt on this same project (single global job -- only one
-      // publish is ever in flight): without this, a retry that succeeds
-      // still shows the stale error banner under the card, since CardFooter
-      // keys showError on publishErrorProject alone, not on publishState.
-      setPublishState('done');
-      setPublishError(null);
-      setPublishErrorProject(null);
-      // Flip the card BEFORE the network round trip below, then let the
-      // authoritative refresh overwrite this optimistic entry once it lands.
-      if (finishedProject) applyOptimisticPublish(finishedProject);
-      await refreshListAfterCompletion();
-    }
-    setPublishingProjectBoth(null);
-  }, [getSharedStatus, stopPolling, applyOptimisticPublish, refreshListAfterCompletion, setPublishingProjectBoth]);
-
-  const publish = useCallback(async (projectId, localProject) => {
+function usePublishTrigger({ publishProject, startPolling, publishingRef, publishingLocalRef, setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth }) {
+  return useCallback(async (projectId, localProject) => {
     if (publishingRef.current) return; // already in flight -- ignore the repeat click
     publishingRef.current = true;
     setPublishError(null);
@@ -242,19 +65,22 @@ export function usePublish({ enabled = true } = {}) {
       // only place originUrl/latestRunId/latestDoneRunId are known from,
       // since the backend's publish/status payloads never echo them back.
       publishingLocalRef.current = localProject ?? null;
-      stopPolling();
-      pollTimerRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
+      startPolling();
     } catch (err) {
       setPublishError(apiErrorMessage(err, 'projects.publishStartFailed'));
       setPublishErrorProject(projectId);
     } finally {
       publishingRef.current = false;
     }
-  }, [publishProject, checkStatus, stopPolling, setPublishingProjectBoth]);
+  }, [publishProject, startPolling, setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth]);
+}
 
-  // Mount/unmount lifecycle -- guards the async checkStatus/refreshList
-  // continuations above against setting state after unmount, and always
-  // clears any live interval on the way out.
+// Mount/unmount lifecycle -- guards the async checkStatus/refreshList
+// continuations against setting state after unmount, and always clears any
+// live interval on the way out. Polling must also stop whenever `enabled`
+// toggles (either direction) -- a tab switch away must not keep ticking in
+// the background for a hook the caller has disabled.
+function usePublishLifecycleEffects({ mountedRef, stopPolling, enabled }) {
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -264,31 +90,29 @@ export function usePublish({ enabled = true } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
   }, []);
 
-  // Polling must stop whenever `enabled` toggles (either direction), same
-  // as the old effect's cleanup used to -- a tab switch away must not keep
-  // ticking in the background for a hook the caller has disabled.
   useEffect(() => {
     return () => { stopPolling(); };
   }, [enabled, stopPolling]);
+}
 
-  // Reconcile local publish state whenever a fresh status lands (mount,
-  // re-enable after being disabled while a job was running, or any OTHER
-  // consumer's invalidation of sharedKeys.status() -- e.g. useSharedProjects'
-  // own refresh()). Mirrors the old loadStatus()'s two branches exactly:
-  // the server saying "running" is adopted unconditionally (a job started
-  // elsewhere -- a CLI publish, or before this mount -- surfaces here too);
-  // otherwise, if THIS hook was locally tracking a running job that the
-  // fresh status no longer reports as running, the job finished while this
-  // hook wasn't polling (disabled, or a fresh mount after external
-  // completion) and local state is reconciled to match the server.
+// Reconcile local publish state whenever a fresh status lands (mount,
+// re-enable after being disabled while a job was running, or any OTHER
+// consumer's invalidation of sharedKeys.status() -- e.g. useSharedProjects'
+// own refresh()). Mirrors the old loadStatus()'s two branches exactly: the
+// server saying "running" is adopted unconditionally (a job started
+// elsewhere -- a CLI publish, or before this mount -- surfaces here too);
+// otherwise, if THIS hook was locally tracking a running job that the fresh
+// status no longer reports as running, the job finished while this hook
+// wasn't polling (disabled, or a fresh mount after external completion) and
+// local state is reconciled to match the server.
+function useReconcilePublishStatus({ statusQueryData, setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth, publishingProjectRef, startPolling, stopPolling, applyOptimisticPublish, refreshListAfterCompletion }) {
   useEffect(() => {
-    const publish = statusQuery.data?.publish;
+    const publish = statusQueryData?.publish;
     if (!publish) return;
     if (publish.state === 'running') {
       setPublishState('running');
       setPublishingProjectBoth(publish.project ?? null);
-      stopPolling();
-      pollTimerRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
+      startPolling();
     } else if (publishingProjectRef.current) {
       stopPolling();
       if (publish.state === 'error') {
@@ -306,7 +130,57 @@ export function usePublish({ enabled = true } = {}) {
       setPublishingProjectBoth(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on a genuinely new status payload
-  }, [statusQuery.data]);
+  }, [statusQueryData]);
+}
+
+// publishingRef: in-flight guard for the publish trigger -- same
+// synchronous-ref idiom as useSharedProjects' connectingRef/pullingRef. A ref
+// (not state) because it must be readable synchronously on the very next
+// call, before any state update triggered by this call has committed/
+// re-rendered. It only guards the POST round-trip itself (a rapid
+// double-click/Enter race), not the whole background job -- once the POST
+// resolves, a click on a DIFFERENT card's button is expected to reach the
+// backend and get a real 409, which is how that card's own inline error gets
+// populated.
+// publishingLocalRef: the local project object passed to the most recent
+// publish() call -- carries the identity fields (name, originUrl,
+// latestRunId, latestDoneRunId) the optimistic cache patch needs but the
+// backend's status/publish payload doesn't echo back.
+function usePublishRefGuards() {
+  const publishingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const publishingLocalRef = useRef(null);
+  return { publishingRef, mountedRef, publishingLocalRef };
+}
+
+export function usePublish({ enabled = true } = {}) {
+  const { getSharedStatus, sharedListProjects, publishProject } = useApi();
+  const queryClient = useQueryClient();
+
+  const { statusQuery, configured, publishedAtByProject } = usePublishQueries({ enabled, getSharedStatus, sharedListProjects });
+  const { publishingRef, mountedRef, publishingLocalRef } = usePublishRefGuards();
+
+  const applyOptimisticPublish = useApplyOptimisticPublish({ queryClient, publishingLocalRef });
+
+  const {
+    publishState, publishingProject, publishError, publishErrorProject,
+    setPublishState, setPublishError, setPublishErrorProject,
+    publishingProjectRef, setPublishingProjectBoth,
+    stopPolling, startPolling, refreshListAfterCompletion,
+  } = usePublishPolling({ queryClient, sharedListProjects, getSharedStatus, applyOptimisticPublish, mountedRef });
+
+  const publish = usePublishTrigger({
+    publishProject, startPolling, publishingRef, publishingLocalRef,
+    setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth,
+  });
+
+  usePublishLifecycleEffects({ mountedRef, stopPolling, enabled });
+
+  useReconcilePublishStatus({
+    statusQueryData: statusQuery.data,
+    setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth,
+    publishingProjectRef, startPolling, stopPolling, applyOptimisticPublish, refreshListAfterCompletion,
+  });
 
   return {
     configured,

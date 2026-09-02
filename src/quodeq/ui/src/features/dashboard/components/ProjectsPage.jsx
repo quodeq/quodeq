@@ -1,12 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
-import { useSharedProjects } from '../hooks/useSharedProjects.js';
-import { usePublish } from '../hooks/usePublish.js';
-import { useMergedProjects } from '../hooks/useMergedProjects.js';
+import { useProjectsPageData } from '../hooks/useProjectsPageData.js';
+import { usePullToLocal } from '../hooks/usePullToLocal.js';
 import Badge from '../../../components/Badge.jsx';
 import { t, LOCALE } from '../../../strings/index.js';
 
@@ -214,29 +213,6 @@ function TrashIcon() {
       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
   );
-}
-
-function computeProjectTree(projects) {
-  const lookup = {};
-  for (const p of projects) {
-    const id = p.id || p.name || p;
-    const name = p.name || p;
-    lookup[id] = p;
-    lookup[name] = p;
-  }
-  const children = {};
-  const roots = [];
-  for (const p of projects) {
-    const parent = p.parent;
-    if (parent && lookup[parent]) {
-      const parentId = lookup[parent].id || lookup[parent].name || parent;
-      if (!children[parentId]) children[parentId] = [];
-      children[parentId].push(p);
-    } else {
-      roots.push(p);
-    }
-  }
-  return { children, roots };
 }
 
 // `action` ('publish' | 'update' | null) comes from the merged entry (see
@@ -590,183 +566,12 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
 
-  // Cached-first: renders instantly from whatever's cached, then revalidates
-  // against the remote in the background (see useSharedProjects.js's own
-  // doc comment for the full contract).
-  const shared = useSharedProjects();
+  // The merge/filter memo chain (shared sync, publish state, local/shared
+  // merge, subproject nesting, query filter) is extracted verbatim into
+  // useProjectsPageData -- same hooks, same deps, same order.
+  const { shared, children, localEntryById, publishActions, isEmpty, visibleEntries } = useProjectsPageData({ projects, filters });
 
-  // Publish action + job-progress polling for local cards (Task 20). Only
-  // fetches shared status/the shared list (both with refresh:false, so this
-  // never forces a real git fetch) when there's actually something to
-  // decorate: at least one local card. Hooks run unconditionally either way;
-  // only the internal effect is gated.
-  const {
-    configured: sharedConfigured,
-    publishedAtByProject,
-    publishState,
-    publishingProject,
-    publishError,
-    publishErrorProject,
-    publish,
-  } = usePublish({ enabled: projects.length > 0 });
-
-  // Local project objects never carry publishedAt on their own (it lives
-  // only on the shared list's git-log-derived metadata) -- merge it in by
-  // id/name so ProjectCard can read `project.publishedAt` uniformly. Belt
-  // and suspenders with `entry.shared?.publishedAt` below (the merged
-  // entry already carries it too, since usePublish and useSharedProjects
-  // share the same sharedKeys.list() cache entry -- see Task 5) but this
-  // keeps LocalPublishedMeta's prop stable even for callers that only ever
-  // look at `project.publishedAt` directly.
-  const projectsWithPublished = useMemo(() => {
-    if (!sharedConfigured || Object.keys(publishedAtByProject).length === 0) return projects;
-    return projects.map((p) => {
-      const id = p.id || p.name || p;
-      const publishedAt = publishedAtByProject[id];
-      return publishedAt ? { ...p, publishedAt } : p;
-    });
-  }, [projects, publishedAtByProject, sharedConfigured]);
-
-  // The full merge with no filters applied at all -- the basis for (a) the
-  // id->entry lookup nested subproject cards read chips/action from
-  // regardless of what the current query/location filter out, and (b) the
-  // "is there anything at all" check that decides between the empty-CTA and
-  // the toolbar's own no-matches line (see `localEntryById` and `isEmpty`
-  // below).
-  const allEntries = useMergedProjects({
-    localProjects: projectsWithPublished,
-    sharedProjects: shared.projects,
-    configured: shared.configured,
-  });
-
-  // Location-filtered and sorted, but NOT query-filtered yet -- query
-  // matching needs subproject-group awareness (see `entries` below), which
-  // useMergedProjects has no notion of. With no shared repo configured the
-  // location filter is forced to 'all': the pill to change it is hidden
-  // then, and a leftover location=shared in the nav params would otherwise
-  // blank the page with no visible control to clear it.
-  const locationFilteredEntries = useMergedProjects({
-    localProjects: projectsWithPublished,
-    sharedProjects: shared.projects,
-    configured: shared.configured,
-    filters: {
-      location: shared.configured ? filters?.location : 'all',
-      sort: filters?.sort,
-    },
-  });
-
-  // Subproject nesting: computed over the same flat local list the merge
-  // draws from, so a child project's own derived chips/action (looked up
-  // via `localEntryById`) stay in sync with its parent's.
-  const { children } = useMemo(() => computeProjectTree(projectsWithPublished), [projectsWithPublished]);
-  const childIdSet = useMemo(() => {
-    const set = new Set();
-    for (const list of Object.values(children)) {
-      for (const c of list) set.add(c.id || c.name || c);
-    }
-    return set;
-  }, [children]);
-
-  // Built from the UNFILTERED merge (not the query-filtered `entries` below)
-  // so a subproject keeps its own chips/publish-or-update action even when
-  // the current query only matches its parent (or only matches a sibling) --
-  // otherwise a matching parent would render children with no chips/button
-  // at all the moment a query excluded the child's own entry.
-  // Chips are stripped here (and at the root-card site below) when no
-  // shared repo is configured: every card would read LOCAL, which
-  // distinguishes nothing.
-  const localEntryById = useMemo(() => {
-    const map = new Map();
-    for (const e of allEntries) {
-      if (e.local) {
-        map.set(
-          e.local.id || e.local.name || e.local,
-          shared.configured ? e : { ...e, chips: null },
-        );
-      }
-    }
-    return map;
-  }, [allEntries, shared.configured]);
-
-  // Group-aware query filter: a name search must not hide a whole
-  // parent/child group just because only one side of it matched. A parent
-  // entry survives the query if its own name matches OR any of its
-  // children's does; children are always excluded from top-level rendering
-  // below regardless of their own match (see `visibleEntries`) since they
-  // render nested under their parent, so their individual match status
-  // doesn't otherwise matter here.
-  const query = (filters?.query || '').trim().toLowerCase();
-  const entries = useMemo(() => {
-    if (!query) return locationFilteredEntries;
-    const matches = (displayName, name) =>
-      (displayName || '').toLowerCase().includes(query) || (name || '').toLowerCase().includes(query);
-    return locationFilteredEntries.filter((e) => {
-      if (matches(e.displayName, e.name)) return true;
-      if (!e.local) return false;
-      const localId = e.local.id || e.local.name || e.local;
-      const childList = children[localId];
-      return !!childList && childList.some((c) => matches(c.displayName, c.name));
-    });
-  }, [locationFilteredEntries, query, children]);
-
-  const publishActions = {
-    publishState,
-    publishingProject,
-    publishError,
-    publishErrorProject,
-    // Passes the local project object alongside its id -- usePublish's own
-    // done-branch optimistic cache patch (audit C3/C4) needs
-    // originUrl/latestRunId/latestDoneRunId to attribute the completed
-    // publish to the right merged entry, and CardFooter's onClick only ever
-    // hands back the bare id/name string.
-    onPublish: (id) => publish(id, localEntryById.get(id)?.local),
-  };
-
-  // Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
-  // the 409 same-uuid collision case.
-  const [pullConflictId, setPullConflictId] = useState(null);
-  const [pulledIds, setPulledIds] = useState(() => new Set());
-
-  async function handlePull(id) {
-    try {
-      await shared.pull(id);
-      setPullConflictId(null);
-      setPulledIds((prev) => new Set(prev).add(id));
-      // Without this, a project pulled here never appears in the merged list
-      // until some unrelated action happens to reload the project list --
-      // the user has no way to tell the pull actually landed a local copy.
-      await onProjectsReload?.();
-    } catch (err) {
-      if (err?.status === 409) {
-        setPullConflictId(id);
-      } else {
-        alert(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
-      }
-    }
-  }
-
-  async function handleConfirmCopy(id) {
-    try {
-      await shared.pull(id, 'copy');
-      setPulledIds((prev) => new Set(prev).add(id));
-      await onProjectsReload?.();
-    } catch (err) {
-      alert(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
-    } finally {
-      setPullConflictId(null);
-    }
-  }
-
-  // Based on the UNFILTERED merge -- filtering everything out must never
-  // show the "add your first project" CTA (there's no way to clear a filter
-  // from there); that's the post-filter "no projects match" line below
-  // instead. The CTA is only for a page with truly nothing on it at all.
-  const isEmpty = allEntries.length === 0;
-  // Child (subproject) entries render nested under their root via
-  // ProjectCardGroup/ProjectChildren, not as their own top-level card.
-  const visibleEntries = entries.filter(
-    (e) => !(e.local && childIdSet.has(e.local.id || e.local.name || e.local)),
-  );
+  const { pullConflictId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared, onProjectsReload });
 
   return (
     <section className="projects-page projects-page--terminal">
@@ -866,7 +671,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
                           onPull={handlePull}
                           pullConflict={pullConflictId === sharedId}
                           onConfirmCopy={handleConfirmCopy}
-                          onCancelConflict={() => setPullConflictId(null)}
+                          onCancelConflict={cancelConflict}
                           pulled={pulledIds.has(sharedId)}
                         />
                       ),

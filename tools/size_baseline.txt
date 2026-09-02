@@ -78,13 +78,11 @@ src/quodeq/ui/src/features/compare/components/CompareDimensionView.jsx:1:file
 src/quodeq/ui/src/features/compare/components/CompareFleetView.jsx:1:file
 src/quodeq/ui/src/features/compare/components/CompareMatrix.jsx:1:file
 src/quodeq/ui/src/features/compare/components/ComparePage.test.jsx:1:file
-src/quodeq/ui/src/features/dashboard/components/AccumulatedOverviewPanel.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/DashboardPage.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/DashboardPage.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.jsx:1:file
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/useDashboard.test.jsx:1:file
-src/quodeq/ui/src/features/dashboard/hooks/usePublish.js:1:file
 src/quodeq/ui/src/features/dashboard/hooks/usePublish.test.jsx:1:file
 src/quodeq/ui/src/features/dashboard/hooks/useSharedProjects.test.jsx:1:file
 src/quodeq/ui/src/features/evaluation/components/ReEvaluateCard.test.jsx:1:file

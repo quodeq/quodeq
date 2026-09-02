@@ -104,6 +104,19 @@ function ScoreBars({ data, hoveredIndex, selectedRunId }) {
   );
 }
 
+// Shaved out of ScoreHistoryChart to clear the 50-line function gate --
+// recharts-declarative, no logic beyond the gradient definition.
+function ChartDefs() {
+  return (
+    <defs>
+      <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={cssVar('--color-accent')} stopOpacity={0.08} />
+        <stop offset="100%" stopColor={cssVar('--color-accent')} stopOpacity={0} />
+      </linearGradient>
+    </defs>
+  );
+}
+
 function ScoreHistoryChart({ data, interaction }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
   // Hit-detection lives on the chart, not on the Bar: the <Area> gradient
@@ -131,12 +144,7 @@ function ScoreHistoryChart({ data, interaction }) {
         onClick={onBarClick ? handleClick : undefined}
         style={onBarClick ? { cursor: 'pointer' } : undefined}
       >
-        <defs>
-          <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={cssVar('--color-accent')} stopOpacity={0.08} />
-            <stop offset="100%" stopColor={cssVar('--color-accent')} stopOpacity={0} />
-          </linearGradient>
-        </defs>
+        <ChartDefs />
         {/* Axes/grid/reference lines intentionally omitted — the mockup shows
             clean edge-to-edge bars with just the accent-coloured trend line
             on top. Labels live in the banner (MIN / MAX / AVG). */}

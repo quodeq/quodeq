@@ -4,6 +4,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { useCoalescedRefresh } from './useCoalescedRefresh.js';
 
 /**
  * useSharedProjects — shared-repo status + project list for the merged
@@ -76,7 +77,6 @@ export function useSharedProjects() {
 
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   // Overridden to true by a failed refresh() round (either the POST or the
   // re-list that follows it); reset on the next round's outcome. Combined
   // with the list envelope's own `stale` flag below -- either can make the
@@ -93,16 +93,6 @@ export function useSharedProjects() {
   // committed/re-rendered.
   const connectingRef = useRef(false);
   const pullingRef = useRef(false);
-
-  // --- refresh(): coalescing wrapper around one POST + re-list round -----
-  // runningRef marks a round actually in flight; pendingRef marks that
-  // at least one more caller arrived while it was running and must be
-  // satisfied by an EXTRA round once the current one settles; waitersRef
-  // holds those callers' resolvers so their returned promise only settles
-  // once the round they asked for has actually run.
-  const runningRef = useRef(false);
-  const pendingRef = useRef(false);
-  const waitersRef = useRef([]);
 
   const refreshCore = useCallback(async () => {
     try {
@@ -123,32 +113,9 @@ export function useSharedProjects() {
     }
   }, [refreshShared, queryClient]);
 
-  const refresh = useCallback(() => {
-    if (runningRef.current) {
-      pendingRef.current = true;
-      return new Promise((resolve) => { waitersRef.current.push(resolve); });
-    }
-    runningRef.current = true;
-    setRefreshing(true);
-    return (async () => {
-      try {
-        await refreshCore();
-        // Coalesce: run exactly one more round for every batch of callers
-        // that arrived while the previous round was in flight, instead of
-        // one round per call.
-        while (pendingRef.current) {
-          pendingRef.current = false;
-          const waiters = waitersRef.current;
-          waitersRef.current = [];
-          await refreshCore();
-          waiters.forEach((resolve) => resolve());
-        }
-      } finally {
-        runningRef.current = false;
-        setRefreshing(false);
-      }
-    })();
-  }, [refreshCore]);
+  // refresh(): coalescing wrapper around one POST + re-list round -- lifted
+  // verbatim into useCoalescedRefresh (see that file's doc comment).
+  const { refreshing, refresh } = useCoalescedRefresh(refreshCore);
 
   // Background revalidate: fires once, the first time the cached list
   // lands successfully (never when unconfigured, since the list query
