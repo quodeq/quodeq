@@ -10,12 +10,7 @@
 // (tools/check_size_grandfather.mjs enforces the ceiling).
 export const SIZE_GRANDFATHER = [
   "src/features/assistant/useAssistantStream.js",
-  "src/features/dashboard/components/AccumulatedOverviewPanel.jsx",
   "src/features/dashboard/components/DashboardPage.jsx",
-  "src/features/dashboard/components/DimensionGaugeCard.jsx",
-  "src/features/dashboard/components/RunNavigator.jsx",
-  "src/features/dashboard/hooks/useDashboard.js",
-  "src/features/dashboard/hooks/useSharedProjects.js",
   "src/features/drawer/BottomDrawer.jsx",
   "src/features/evaluation/components/BranchScopeSelector.jsx",
   "src/features/evaluation/components/CleanScanToggle.jsx",

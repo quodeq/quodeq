@@ -58,6 +58,70 @@ import { useSharedActions } from './useSharedActions.js';
  * (audit A2): a stuck `configured=false` with no data would otherwise never
  * get another chance, since a disabled list query never fetches on its own.
  */
+function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
+  return async () => {
+    try {
+      await refreshShared();
+    } catch {
+      // Keep whatever projects/lastSynced are already on screen; just flag
+      // it stale. The exact API error message isn't shown here -- the
+      // stale banner copy is fixed regardless of cause.
+      setStaleOverride(true);
+      return;
+    }
+    try {
+      await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
+      const listState = queryClient.getQueryState(sharedKeys.list());
+      setStaleOverride(listState?.status === 'error');
+    } catch {
+      setStaleOverride(true);
+    }
+  };
+}
+
+function deriveSharedProjectsState({ statusQuery, listQuery, configured, staleOverride }) {
+  const url = statusQuery.data?.url ?? null;
+  // Gated on `configured`, not just read off listQuery.data: the list query
+  // is disabled (not removed) when unconfigured, so a lingering cache entry
+  // from before a disconnect (or from a DIFFERENT shared repo before a
+  // reconnect) would otherwise keep rendering shared cards -- with live pull
+  // buttons -- on a page that has nothing connected (ghost shared cards
+  // after disconnect, final whole-branch review).
+  const projects = configured ? (listQuery.data?.projects || []) : [];
+  const lastSynced = listQuery.data?.lastSynced ?? statusQuery.data?.lastSynced ?? null;
+  const stale = staleOverride || !!listQuery.data?.stale;
+  // loading: true until BOTH the status query and (when configured) the
+  // list query have settled at least once. isLoading (not isPending) is
+  // "no data yet AND actively fetching" -- a disabled query is never
+  // isLoading, so an unconfigured repo's never-run list query doesn't hold
+  // this true forever.
+  const loading = statusQuery.isLoading || (configured && listQuery.isLoading);
+  // error: only for an INITIAL load failure (no data has ever landed for
+  // that query) -- a background refresh failure after data already exists
+  // is `stale`, not `error`, so it never blanks an already-working view.
+  const statusFailedInitial = statusQuery.isError && statusQuery.data === undefined;
+  const listFailedInitial = configured && listQuery.isError && listQuery.data === undefined;
+  const error = statusFailedInitial
+    ? (statusQuery.error?.message || t('projects.sharedStatusFailed'))
+    : listFailedInitial
+      ? (listQuery.error?.message || t('projects.sharedStatusFailed'))
+      : null;
+  return { url, projects, lastSynced, stale, loading, error };
+}
+
+// Background revalidate: fires once, the first time the cached list lands
+// successfully (never when unconfigured, since the list query never runs in
+// that case).
+function useBackgroundRevalidate(listQuerySuccess, refresh) {
+  const bgTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (listQuerySuccess && !bgTriggeredRef.current) {
+      bgTriggeredRef.current = true;
+      refresh();
+    }
+  }, [listQuerySuccess, refresh]);
+}
+
 export function useSharedProjects() {
   const { getSharedStatus, sharedListProjects, connectShared, refreshShared, pullSharedProject } = useApi();
   const queryClient = useQueryClient();
@@ -85,68 +149,20 @@ export function useSharedProjects() {
   // file's doc comment) -- same in-flight-ref idiom as usePublishTrigger.
   const { connecting, connectError, connect, pull } = useSharedActions({ connectShared, pullSharedProject, queryClient });
 
-  const refreshCore = useCallback(async () => {
-    try {
-      await refreshShared();
-    } catch {
-      // Keep whatever projects/lastSynced are already on screen; just flag
-      // it stale. The exact API error message isn't shown here -- the
-      // stale banner copy is fixed regardless of cause.
-      setStaleOverride(true);
-      return;
-    }
-    try {
-      await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
-      const listState = queryClient.getQueryState(sharedKeys.list());
-      setStaleOverride(listState?.status === 'error');
-    } catch {
-      setStaleOverride(true);
-    }
-  }, [refreshShared, queryClient]);
+  const refreshCore = useCallback(
+    makeRefreshCore({ refreshShared, queryClient, setStaleOverride }),
+    [refreshShared, queryClient],
+  );
 
   // refresh(): coalescing wrapper around one POST + re-list round -- lifted
   // verbatim into useCoalescedRefresh (see that file's doc comment).
   const { refreshing, refresh } = useCoalescedRefresh(refreshCore);
 
-  // Background revalidate: fires once, the first time the cached list
-  // lands successfully (never when unconfigured, since the list query
-  // never runs in that case).
-  const bgTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (listQuery.isSuccess && !bgTriggeredRef.current) {
-      bgTriggeredRef.current = true;
-      refresh();
-    }
-  }, [listQuery.isSuccess, refresh]);
+  useBackgroundRevalidate(listQuery.isSuccess, refresh);
 
-  const url = statusQuery.data?.url ?? null;
-  // Gated on `configured`, not just read off listQuery.data: the list query
-  // is disabled (not removed) when unconfigured, so a lingering cache entry
-  // from before a disconnect (or from a DIFFERENT shared repo before a
-  // reconnect) would otherwise keep rendering shared cards -- with live pull
-  // buttons -- on a page that has nothing connected (ghost shared cards
-  // after disconnect, final whole-branch review).
-  const projects = configured ? (listQuery.data?.projects || []) : [];
-  const lastSynced = listQuery.data?.lastSynced ?? statusQuery.data?.lastSynced ?? null;
-  const stale = staleOverride || !!listQuery.data?.stale;
-
-  // loading: true until BOTH the status query and (when configured) the
-  // list query have settled at least once. isLoading (not isPending) is
-  // "no data yet AND actively fetching" -- a disabled query is never
-  // isLoading, so an unconfigured repo's never-run list query doesn't hold
-  // this true forever.
-  const loading = statusQuery.isLoading || (configured && listQuery.isLoading);
-
-  // error: only for an INITIAL load failure (no data has ever landed for
-  // that query) -- a background refresh failure after data already exists
-  // is `stale`, not `error`, so it never blanks an already-working view.
-  const statusFailedInitial = statusQuery.isError && statusQuery.data === undefined;
-  const listFailedInitial = configured && listQuery.isError && listQuery.data === undefined;
-  const error = statusFailedInitial
-    ? (statusQuery.error?.message || t('projects.sharedStatusFailed'))
-    : listFailedInitial
-      ? (listQuery.error?.message || t('projects.sharedStatusFailed'))
-      : null;
+  const { url, projects, lastSynced, stale, loading, error } = deriveSharedProjectsState({
+    statusQuery, listQuery, configured, staleOverride,
+  });
 
   return {
     configured, url, projects, lastSynced, stale,

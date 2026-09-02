@@ -60,6 +60,75 @@ function handleKey(e, onActivate) {
   }
 }
 
+function InsufficientGauge() {
+  return (
+    <>
+      <div className="dim-gauge-card__gauge dim-gauge-card__gauge--insuf" aria-hidden="true">
+        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+          <circle
+            className="dim-gauge-card__ring-bg"
+            cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+            strokeWidth={RING_STROKE}
+            strokeDasharray="3 4"
+          />
+          <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
+          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>{t('overview.insufficientGrade')}</text>
+        </svg>
+      </div>
+      <div className="dim-gauge-card__insuf-line">{t('overview.insufficientEvidence')}</div>
+    </>
+  );
+}
+
+function ScoreGauge({ scoreDisplay, gradeWord, ringColor, dashOffset }) {
+  return (
+    <div className="dim-gauge-card__gauge" aria-hidden="true">
+      <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+        <circle
+          className="dim-gauge-card__ring-bg"
+          cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+          strokeWidth={RING_STROKE}
+        />
+        <circle
+          className="dim-gauge-card__ring-fill"
+          cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+          strokeWidth={RING_STROKE}
+          stroke={ringColor}
+          strokeDasharray={RING_CIRC}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
+        />
+        <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>
+          {scoreDisplay}
+        </text>
+        {gradeWord && (
+          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>
+            {gradeWord}
+          </text>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev }) {
+  return (
+    <>
+      <ScoreGauge scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset} />
+
+      <div className="dim-gauge-card__meta">
+        {t('overview.violAbbrev')} · {violationCount} · {ratio}
+      </div>
+
+      <div className="dim-gauge-card__sev-row">
+        {(sev.critical ?? 0) > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
+        {(sev.major ?? 0)    > 0 && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
+        {(sev.minor ?? 0)    > 0 && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
+      </div>
+    </>
+  );
+}
+
 /**
  * @param {object}   props
  * @param {object}   props.item                - dimension entry (dashboard shape)
@@ -69,15 +138,7 @@ function handleKey(e, onActivate) {
  * @param {string}   [props.dateLabel]         - forwarded to children for run overview
  * @param {string}   [props.selectedRunId]     - forwarded to click handler for run overview
  */
-export default function DimensionGaugeCard({
-  item,
-  delta = null,
-  onDimensionClick,
-  evaluatedToday = true,
-  dateLabel,
-  selectedRunId,
-  isInsufficient = false,
-}) {
+function computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId }) {
   const { value: scoreDisplay } = splitScore(item.overallScore);
   const scoreNum = parseFloat(item.overallScore);
   const hasScore = !Number.isNaN(scoreNum);
@@ -92,11 +153,31 @@ export default function DimensionGaugeCard({
   const ratio = complianceRatio(violationCount, complianceCount);
   const sev = item.totals?.severity || {};
 
-  const activate = () => onDimensionClick?.(item, selectedRunId);
   const staleClass = evaluatedToday ? '' : 'dim-gauge-card--stale';
   const dateText = item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId);
   const coverage = computeCoverageInfo(item.filesRead, item.sourceFileCount, item.exitReason);
   const partialTooltip = coverage.isPartial ? buildPartialTooltip(coverage) : undefined;
+
+  return {
+    scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev,
+    staleClass, dateText, coverage, partialTooltip,
+  };
+}
+
+export default function DimensionGaugeCard({
+  item,
+  delta = null,
+  onDimensionClick,
+  evaluatedToday = true,
+  dateLabel,
+  selectedRunId,
+  isInsufficient = false,
+}) {
+  const {
+    scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev,
+    staleClass, dateText, coverage, partialTooltip,
+  } = computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId });
+  const activate = () => onDimensionClick?.(item, selectedRunId);
 
   return (
     <article
@@ -113,60 +194,12 @@ export default function DimensionGaugeCard({
       </div>
 
       {isInsufficient ? (
-        <>
-          <div className="dim-gauge-card__gauge dim-gauge-card__gauge--insuf" aria-hidden="true">
-            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-              <circle
-                className="dim-gauge-card__ring-bg"
-                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-                strokeWidth={RING_STROKE}
-                strokeDasharray="3 4"
-              />
-              <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
-              <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>{t('overview.insufficientGrade')}</text>
-            </svg>
-          </div>
-          <div className="dim-gauge-card__insuf-line">{t('overview.insufficientEvidence')}</div>
-        </>
+        <InsufficientGauge />
       ) : (
-        <>
-          <div className="dim-gauge-card__gauge" aria-hidden="true">
-            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-              <circle
-                className="dim-gauge-card__ring-bg"
-                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-                strokeWidth={RING_STROKE}
-              />
-              <circle
-                className="dim-gauge-card__ring-fill"
-                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-                strokeWidth={RING_STROKE}
-                stroke={ringColor}
-                strokeDasharray={RING_CIRC}
-                strokeDashoffset={dashOffset}
-                transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
-              />
-              <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>
-                {scoreDisplay}
-              </text>
-              {gradeWord && (
-                <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>
-                  {gradeWord}
-                </text>
-              )}
-            </svg>
-          </div>
-
-          <div className="dim-gauge-card__meta">
-            {t('overview.violAbbrev')} · {violationCount} · {ratio}
-          </div>
-
-          <div className="dim-gauge-card__sev-row">
-            {(sev.critical ?? 0) > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
-            {(sev.major ?? 0)    > 0 && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
-            {(sev.minor ?? 0)    > 0 && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
-          </div>
-        </>
+        <DimensionScoreBody
+          scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset}
+          violationCount={violationCount} ratio={ratio} sev={sev}
+        />
       )}
 
       <CoverageLine

@@ -55,26 +55,58 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
-export default function AccumulatedOverviewPanel({ data, callbacks }) {
-  const { onRunClick, onDimensionClick, onNavigate } = callbacks;
-  const { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends } = useAccumulatedComputations(data);
-
-  const topFiles = useMemo(
-    () => withDimensionsStr(buildTopOffendingFiles(filteredDimensions || [])),
-    [filteredDimensions]
+function HistoryPanelsRow({
+  chartMountable, filteredPeriodTrend, currentOverviewRun, onRunClick, granularity, onGranularityChange,
+  filteredDimensions, onDimensionClick, dimTrends,
+}) {
+  return (
+    <div className="history-panels-row">
+      <Suspense fallback={<RunHistoryPanelPlaceholder />}>
+        {chartMountable && (
+          <RunHistoryPanel
+            trend={filteredPeriodTrend}
+            selectedRunId={currentOverviewRun}
+            onBarClick={onRunClick}
+            granularity={granularity || 'day'}
+            onGranularityChange={onGranularityChange}
+          />
+        )}
+      </Suspense>
+      <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} dimTrends={dimTrends} />
+    </div>
   );
+}
 
-  const reportProjectName = useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions });
+function OffendingFilesSection({ topFiles, onNavigate }) {
+  if (topFiles.length === 0) return null;
+  return (
+    <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
+      <div className="qd-cards-panel__head">
+        <SectionLabel>{t('overview.violationsByFileLabel')} · {topFiles.length}</SectionLabel>
+        <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
+      </div>
+      <TopOffendingFilesTable
+        files={topFiles}
+        onFileClick={onNavigate ? (f) => onNavigate('file', { file: f }) : undefined}
+      />
+    </section>
+  );
+}
 
-  const onCardNavigate = useMemo(() => {
-    if (!onNavigate) return undefined;
-    return (kind) => {
-      const projectFile = buildProjectRootFile(filteredDimensions || [], reportProjectName);
-      const severityFilter = kind === 'violations' ? 'all' : kind;
-      onNavigate('file', { file: projectFile, severityFilter });
-    };
-  }, [onNavigate, filteredDimensions, reportProjectName]);
+function makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName }) {
+  if (!onNavigate) return undefined;
+  return (kind) => {
+    const projectFile = buildProjectRootFile(filteredDimensions || [], reportProjectName);
+    const severityFilter = kind === 'violations' ? 'all' : kind;
+    onNavigate('file', { file: projectFile, severityFilter });
+  };
+}
 
+function AccumulatedOverviewSections({
+  data, callbacks, currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredDimensions,
+  filteredAccumulated, filteredStats, chartMountable, dimTrends, topFiles, onCardNavigate,
+}) {
+  const { onRunClick, onDimensionClick, onNavigate } = callbacks;
   return (
     <>
       <AccumulatedHeroSection
@@ -89,20 +121,17 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         customFormula={data.customFormula}
       />
 
-      <div className="history-panels-row">
-        <Suspense fallback={<RunHistoryPanelPlaceholder />}>
-          {chartMountable && (
-            <RunHistoryPanel
-              trend={filteredPeriodTrend}
-              selectedRunId={currentOverviewRun}
-              onBarClick={onRunClick}
-              granularity={data.granularity || 'day'}
-              onGranularityChange={callbacks.onGranularityChange}
-            />
-          )}
-        </Suspense>
-        <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} dimTrends={dimTrends} />
-      </div>
+      <HistoryPanelsRow
+        chartMountable={chartMountable}
+        filteredPeriodTrend={filteredPeriodTrend}
+        currentOverviewRun={currentOverviewRun}
+        onRunClick={onRunClick}
+        granularity={data.granularity}
+        onGranularityChange={callbacks.onGranularityChange}
+        filteredDimensions={filteredDimensions}
+        onDimensionClick={onDimensionClick}
+        dimTrends={dimTrends}
+      />
 
       <AccumulatedDimensionsSection
         sortedDimensions={filteredStats.sorted}
@@ -112,18 +141,34 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         pending={data.scoresPending}
       />
 
-      {topFiles.length > 0 && (
-        <section className="qd-cards-panel offending-panel" aria-label={t('overview.violationsByFileAria')}>
-          <div className="qd-cards-panel__head">
-            <SectionLabel>{t('overview.violationsByFileLabel')} · {topFiles.length}</SectionLabel>
-            <span className="run-history-panel__stats">{t('overview.sortedBySeverity')}</span>
-          </div>
-          <TopOffendingFilesTable
-            files={topFiles}
-            onFileClick={onNavigate ? (f) => onNavigate('file', { file: f }) : undefined}
-          />
-        </section>
-      )}
+      <OffendingFilesSection topFiles={topFiles} onNavigate={onNavigate} />
     </>
+  );
+}
+
+export default function AccumulatedOverviewPanel({ data, callbacks }) {
+  const { onNavigate } = callbacks;
+  const { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends } = useAccumulatedComputations(data);
+
+  const topFiles = useMemo(
+    () => withDimensionsStr(buildTopOffendingFiles(filteredDimensions || [])),
+    [filteredDimensions]
+  );
+
+  const reportProjectName = useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions });
+
+  const onCardNavigate = useMemo(
+    () => makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName }),
+    [onNavigate, filteredDimensions, reportProjectName],
+  );
+
+  return (
+    <AccumulatedOverviewSections
+      data={data} callbacks={callbacks} currentOverviewRun={currentOverviewRun}
+      selectedDayDimNames={selectedDayDimNames} filteredPeriodTrend={filteredPeriodTrend}
+      filteredDimensions={filteredDimensions} filteredAccumulated={filteredAccumulated}
+      filteredStats={filteredStats} chartMountable={chartMountable} dimTrends={dimTrends}
+      topFiles={topFiles} onCardNavigate={onCardNavigate}
+    />
   );
 }

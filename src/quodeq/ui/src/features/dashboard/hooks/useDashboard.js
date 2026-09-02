@@ -33,48 +33,30 @@ const EMPTY_TREND = [];
  * not via SSE. ``refreshDashboard`` is what the dismiss handlers call to
  * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
-export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
-  const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
-  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
-  const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
-
-  // Shared projects aren't in the LOCAL projects list DashboardPage otherwise
-  // reads projectInfo from, and a shared selection's id can collide with an
-  // unrelated local project (e.g. after a clone-on-add pull) -- looking it up
-  // there would silently bleed the local twin's languageStats/publishedBy/etc.
-  // into a shared Overview. Fetch the shared project's own info instead, keyed
-  // by source so switching sources never serves the other source's cache.
-  const sharedProjectInfoQuery = useQuery({
+// Shared projects aren't in the LOCAL projects list DashboardPage otherwise
+// reads projectInfo from, and a shared selection's id can collide with an
+// unrelated local project (e.g. after a clone-on-add pull) -- looking it up
+// there would silently bleed the local twin's languageStats/publishedBy/etc.
+// into a shared Overview. Fetch the shared project's own info instead, keyed
+// by source so switching sources never serves the other source's cache.
+function buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedGetProjectInfo, selectedProject }) {
+  return {
     queryKey: projectKeys.info(projectKey, selectedSource),
     queryFn: () => sharedGetProjectInfo(selectedProject),
     enabled: selectedSource === "shared" && !!selectedProject,
-  });
+  };
+}
 
-  const {
-    scores,
-    latestScores,
-    loading: scoresLoading,
-    error: scoresError,
-    scoresPending,
-    availableRuns,
-  } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
-
-  // A completed historical run is immutable on disk: its payload only changes
-  // through explicit user actions (dismiss, delete, verify, grade formula,
-  // run deletion), and every one of those invalidates the project query
-  // subtree — which forces a refetch regardless of staleTime. Freezing the
-  // query here removes the routine time-based background refetch (and the
-  // dashboard-refreshing dim flash) on re-entering a run view. The rule
-  // itself (including why an unknown run counts as frozen) lives in
-  // models/runRules.js.
-  const frozenRun = isFrozenRun(selectedRun, availableRuns);
-
-  const dashboardQuery = useQuery({
+// A completed historical run is immutable on disk: its payload only changes
+// through explicit user actions (dismiss, delete, verify, grade formula,
+// run deletion), and every one of those invalidates the project query
+// subtree — which forces a refetch regardless of staleTime. Freezing the
+// query here removes the routine time-based background refetch (and the
+// dashboard-refreshing dim flash) on re-entering a run view. The rule
+// itself (including why an unknown run counts as frozen) lives in
+// models/runRules.js.
+function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fetchDashboard, selectedProject, frozenRun, keepPlaceholder, keepInScope }) {
+  return {
     queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
@@ -87,39 +69,13 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // real loading state instead of parking the old project's overview on
     // screen (see samePlaceholderScope).
     placeholderData: keepPlaceholder ? keepInScope : undefined,
-  });
+  };
+}
 
-  // Trend to use for payloads that lack their own (older cached payloads /
-  // the grade-formula early-return path). Memoized on its own: scores and
-  // latestScores get new object identities on every refetch/resolution even
-  // when the trend array they carry hasn't changed, and dashboardWithTrend
-  // below needs a stable reference here to avoid busting its own memo.
-  // EMPTY_TREND is a module-level constant so the `|| []` default doesn't
-  // itself mint a fresh identity every render.
-  const fallbackTrend = useMemo(
-    () => scores?.trend || latestScores?.trend || EMPTY_TREND,
-    [scores, latestScores],
-  );
-
-  const dashboardWithTrend = useMemo(() => {
-    if (!dashboardQuery.data) return null;
-    // The dashboard payload carries its OWN cache-backed, dismiss-adjusted
-    // trend that is byte-identical to scores.trend (tests/services/
-    // test_scoring_parity.py pins every read path to the same per-run score).
-    // Return the payload UNCHANGED when it has one: the scoped scores query
-    // resolves a beat AFTER the dashboard query, and folding scores.trend in
-    // then would mint a new `dashboard` object identity. RunOverviewPanel
-    // memoizes every derived value on the whole dashboard object and has a fade
-    // animation, so a new identity re-renders the panel and replays the fade —
-    // the run-detail entry "flicker". Fall back to the scores trend only when
-    // the payload lacks one (older cached payloads / the grade-formula
-    // early-return path).
-    if (dashboardQuery.data.trend?.length) return dashboardQuery.data;
-    return { ...dashboardQuery.data, trend: fallbackTrend };
-  }, [dashboardQuery.data, fallbackTrend]);
-
-  const { refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile } = useDashboardInvalidation({ queryClient, selectedProject, selectedSource });
-
+function buildDashboardResult({
+  dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
+  availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfoQuery,
+}) {
   return {
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
@@ -147,4 +103,72 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     scheduleDashboardReconcile,
     sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
+}
+
+// The dashboard payload carries its OWN cache-backed, dismiss-adjusted
+// trend that is byte-identical to scores.trend (tests/services/
+// test_scoring_parity.py pins every read path to the same per-run score).
+// Return the payload UNCHANGED when it has one: the scoped scores query
+// resolves a beat AFTER the dashboard query, and folding scores.trend in
+// then would mint a new `dashboard` object identity. RunOverviewPanel
+// memoizes every derived value on the whole dashboard object and has a fade
+// animation, so a new identity re-renders the panel and replays the fade —
+// the run-detail entry "flicker". Fall back to the scores trend only when
+// the payload lacks one (older cached payloads / the grade-formula
+// early-return path).
+// Trend to use for payloads that lack their own (older cached payloads /
+// the grade-formula early-return path). Memoized on its own (by the caller):
+// scores and latestScores get new object identities on every
+// refetch/resolution even when the trend array they carry hasn't changed,
+// and dashboardWithTrend needs a stable reference here to avoid busting its
+// own memo. EMPTY_TREND is a module-level constant so the `|| []` default
+// doesn't itself mint a fresh identity every render.
+function computeFallbackTrend(scores, latestScores) {
+  return scores?.trend || latestScores?.trend || EMPTY_TREND;
+}
+
+function mergeTrendIntoDashboard(dashboardData, fallbackTrend) {
+  if (!dashboardData) return null;
+  if (dashboardData.trend?.length) return dashboardData;
+  return { ...dashboardData, trend: fallbackTrend };
+}
+
+export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+  const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
+  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
+  const queryClient = useQueryClient();
+  const projectKey = selectedProject || "_none_";
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
+
+  const sharedProjectInfoQuery = useQuery(buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedGetProjectInfo, selectedProject }));
+
+  const {
+    scores,
+    latestScores,
+    loading: scoresLoading,
+    error: scoresError,
+    scoresPending,
+    availableRuns,
+  } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
+
+  const frozenRun = isFrozenRun(selectedRun, availableRuns);
+
+  const dashboardQuery = useQuery(buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fetchDashboard, selectedProject, frozenRun, keepPlaceholder, keepInScope }));
+
+  const fallbackTrend = useMemo(() => computeFallbackTrend(scores, latestScores), [scores, latestScores]);
+
+  const dashboardWithTrend = useMemo(
+    () => mergeTrendIntoDashboard(dashboardQuery.data, fallbackTrend),
+    [dashboardQuery.data, fallbackTrend],
+  );
+
+  const { refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile } = useDashboardInvalidation({ queryClient, selectedProject, selectedSource });
+
+  return buildDashboardResult({
+    dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
+    availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfoQuery,
+  });
 }
