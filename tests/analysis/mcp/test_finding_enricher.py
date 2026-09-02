@@ -338,3 +338,23 @@ def test_reroute_is_logged() -> None:
          "severity": "critical", "file": "a.py", "line": 1}
     )
     assert any("security" in m and "maintainability" in m for m in captured)
+
+
+def test_read_file_is_cached_across_findings_in_the_same_file(tmp_path) -> None:
+    src = tmp_path / "a.py"
+    src.write_text("line1\nline2\nline3\n", encoding="utf-8")
+
+    read_calls = {"n": 0}
+
+    def counting_reader(path):
+        read_calls["n"] += 1
+        return path.read_text(encoding="utf-8")
+
+    context = CompiledContext(work_dir=tmp_path)
+    enricher = FindingEnricher(context, counting_reader)
+
+    enricher.enrich({"p": "P1", "t": "violation", "d": "perf", "file": "a.py", "line": 1})
+    enricher.enrich({"p": "P1", "t": "violation", "d": "perf", "file": "a.py", "line": 2})
+    enricher.enrich({"p": "P1", "t": "violation", "d": "perf", "file": "a.py", "line": 3})
+
+    assert read_calls["n"] == 1, f"expected 1 read for 3 findings in the same file, got {read_calls['n']}"

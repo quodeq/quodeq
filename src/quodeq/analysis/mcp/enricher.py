@@ -195,8 +195,18 @@ class FindingEnricher:
         self._trust_model = context.trust_model
         self._precedent_fingerprints = context.precedent_fingerprints
         self._precedent_corpus = context.precedent_corpus
-        self._read_file: Callable[[Path], str] = file_reader or _default_read_file
         self._log = log
+        base_reader: Callable[[Path], str] = file_reader or _default_read_file
+        self._file_cache: dict[Path, str] = {}
+
+        def _cached_read_file(path: Path) -> str:
+            cached = self._file_cache.get(path)
+            if cached is None:
+                cached = base_reader(path)
+                self._file_cache[path] = cached
+            return cached
+
+        self._read_file: Callable[[Path], str] = _cached_read_file
 
     def dedup_key(self, args: dict) -> tuple:
         """Compute the deduplication key for a raw finding args dict."""
