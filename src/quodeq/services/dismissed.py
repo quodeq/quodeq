@@ -118,6 +118,41 @@ def _enrich_from_json_eval(run_dir: Path, keys: set[tuple], out: dict[tuple, dic
         out.setdefault(key, detail)
 
 
+def _collect_dismissed_details(project_dir: Path, keys: set[tuple]) -> dict[tuple, dict]:
+    """Look up finding detail for every dismissed key, across all runs."""
+    details: dict[tuple, dict] = {}
+    for run_dir in project_dir.iterdir():
+        if not run_dir.is_dir():
+            continue
+        if len(details) >= len(keys):
+            break
+        _enrich_from_sql(run_dir, keys, details)
+        if len(details) >= len(keys):
+            break
+        _enrich_from_json_eval(run_dir, keys, details)
+    return details
+
+
+def _dismissed_items(keys: set[tuple], details: dict[tuple, dict]) -> list[dict]:
+    """Build the response list, stubbing any key whose detail wasn't found."""
+    items: list[dict] = []
+    for req, file, line in keys:
+        match = details.get((req, file, line))
+        if match is not None:
+            items.append(match)
+        else:
+            # Couldn't find the original finding anywhere — surface a minimal
+            # stub so the user can still see (and restore/delete) the entry.
+            items.append({
+                "req": req, "file": file, "line": line,
+                "dimension": "", "principle": "",
+                "severity": "", "title": "", "reason": "",
+                "snippet": "", "context": "", "scope": "",
+                "endLine": 0, "reqRefs": [],
+            })
+    return items
+
+
 def load_dismissed(
     project_dir: Path,
     *,
@@ -141,32 +176,8 @@ def load_dismissed(
     if not keys:
         return []
 
-    details: dict[tuple, dict] = {}
-    for run_dir in project_dir.iterdir():
-        if not run_dir.is_dir():
-            continue
-        if len(details) >= len(keys):
-            break
-        _enrich_from_sql(run_dir, keys, details)
-        if len(details) >= len(keys):
-            break
-        _enrich_from_json_eval(run_dir, keys, details)
-
-    items: list[dict] = []
-    for req, file, line in keys:
-        match = details.get((req, file, line))
-        if match is not None:
-            items.append(match)
-        else:
-            # Couldn't find the original finding anywhere — surface a minimal
-            # stub so the user can still see (and restore/delete) the entry.
-            items.append({
-                "req": req, "file": file, "line": line,
-                "dimension": "", "principle": "",
-                "severity": "", "title": "", "reason": "",
-                "snippet": "", "context": "", "scope": "",
-                "endLine": 0, "reqRefs": [],
-            })
+    details = _collect_dismissed_details(project_dir, keys)
+    items = _dismissed_items(keys, details)
 
     if offset <= 0 and limit is None:
         return items
