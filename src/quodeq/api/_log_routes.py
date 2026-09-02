@@ -20,6 +20,10 @@ _PAGES_DIR = Path(__file__).resolve().parent / "pages"
 
 def register_log_routes(app: Flask, log_buffer: LogBuffer) -> None:
     """Register the /api/logs endpoint and the /logs viewer page."""
+    html = (_PAGES_DIR / "logs.html").read_text(encoding="utf-8")
+    css = (_PAGES_DIR / "logs.css").read_text(encoding="utf-8")
+    js_template = (_PAGES_DIR / "logs.js").read_text(encoding="utf-8")
+    js = js_template.replace("{{POLL_INTERVAL_MS}}", str(_LOG_POLL_INTERVAL_MS))
 
     @app.get("/api/logs")
     def get_logs() -> Response:
@@ -28,16 +32,12 @@ def register_log_routes(app: Flask, log_buffer: LogBuffer) -> None:
 
     @app.get("/logs")
     def logs_page() -> Response:
-        html = (_PAGES_DIR / "logs.html").read_text(encoding="utf-8")
         return Response(html, content_type="text/html")
 
     @app.get("/logs.css")
     def logs_css() -> Response:
-        css = (_PAGES_DIR / "logs.css").read_text(encoding="utf-8")
         return Response(css, content_type="text/css")
 
     @app.get("/logs.js")
     def logs_js() -> Response:
-        template = (_PAGES_DIR / "logs.js").read_text(encoding="utf-8")
-        js = template.replace("{{POLL_INTERVAL_MS}}", str(_LOG_POLL_INTERVAL_MS))
         return Response(js, content_type="application/javascript")
