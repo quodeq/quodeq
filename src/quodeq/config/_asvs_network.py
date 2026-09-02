@@ -27,7 +27,9 @@ def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retr
 
     Retries on network errors up to *max_retries* times, raising
     ``ConnectionError`` if all attempts fail or the response exceeds
-    ``_MAX_FETCH_BYTES``.
+    ``_MAX_FETCH_BYTES``. An oversized response is not retried (a retry
+    cannot shrink the response), so it raises immediately on the first
+    attempt that observes it.
     """
     if not url.startswith("https://"):
         raise ValueError(f"Only https:// URLs are allowed, got: {url!r}")
@@ -39,15 +41,16 @@ def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retr
         try:
             with urllib.request.urlopen(url, timeout=timeout) as r:
                 data = r.read(_MAX_FETCH_BYTES + 1)
-                if len(data) > _MAX_FETCH_BYTES:
-                    raise ConnectionError(
-                        f"Response from {url} exceeds the {_MAX_FETCH_BYTES}-byte cap"
-                    )
-                return data
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last_exc = exc
             if attempt < max_retries - 1:
                 time.sleep(_RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _RETRY_JITTER_S))
+            continue
+        if len(data) > _MAX_FETCH_BYTES:
+            raise ConnectionError(
+                f"Response from {url} exceeds the {_MAX_FETCH_BYTES}-byte cap"
+            )
+        return data
     raise ConnectionError(f"Failed to fetch after {max_retries} attempts: {last_exc}") from last_exc
 
 

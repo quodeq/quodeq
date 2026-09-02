@@ -13,9 +13,15 @@ def test_fetch_with_retry_rejects_oversized_response():
     fake_response.__enter__ = lambda self: fake_response
     fake_response.__exit__ = lambda self, *a: False
 
-    with patch("urllib.request.urlopen", return_value=fake_response):
+    with patch("urllib.request.urlopen", return_value=fake_response) as mock_urlopen, \
+         patch("quodeq.config._asvs_network.time.sleep") as mock_sleep:
         with pytest.raises(ConnectionError, match="exceeds"):
-            fetch_with_retry("https://example.com/asvs.json", max_retries=1)
+            fetch_with_retry("https://example.com/asvs.json", max_retries=3)
+
+    # An oversized response can't be fixed by retrying, so it must raise on
+    # the first attempt instead of being caught and retried as a network error.
+    mock_urlopen.assert_called_once()
+    mock_sleep.assert_not_called()
 
 
 def test_fetch_with_retry_returns_content_under_the_cap():
