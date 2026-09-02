@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { AssistantDrawerProvider, useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 
+// Split from AssistantDrawerProvider.test.jsx: session lifecycle
+// (start/send/reset/stop), error surfacing, and the create-race guards.
+// The full mock header + Probe harness are duplicated here (vi.mock
+// hoisting is file-scoped).
+
 vi.mock('../../api/assistant.js', () => ({
   createAssistantSession: vi.fn(async (payload) => ({ sessionId: 's1', readOnly: payload?.source === 'shared' })),
   postAssistantMessage: vi.fn(async () => ({ accepted: true })),
@@ -75,69 +80,6 @@ it('toggle flips visibility', () => {
   expect(screen.getByTestId('open').textContent).toBe('false');
   act(() => screen.getByText('toggle').click());
   expect(screen.getByTestId('open').textContent).toBe('true');
-});
-
-describe('Ctrl+` shortcut', () => {
-  // Shared projects get read-only sessions server-side: the backend roots
-  // reads in the shared clone and registers no mutating tools, so the
-  // shortcut opens the drawer for any persisted source.
-  const fireCtrlBacktick = () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, cancelable: true }));
-  };
-  const fireCtrlShiftBacktick = () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backquote', ctrlKey: true, shiftKey: true, cancelable: true }));
-  };
-
-  it('Ctrl+` opens the assistant even when the persisted source is shared (read-only sessions handle safety)', () => {
-    localStorage.setItem('quodeq_selected_source', 'shared');
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => fireCtrlBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('true');
-  });
-
-  it('opens the drawer when the persisted source is local', () => {
-    localStorage.setItem('quodeq_selected_source', 'local');
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => fireCtrlBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('true');
-  });
-
-  it('opens the drawer when no source is persisted (defaults to local)', () => {
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => fireCtrlBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('true');
-  });
-
-  it('terminal shortcut (Ctrl+Shift+`) opens terminal for shared projects', () => {
-    localStorage.setItem('quodeq_selected_source', 'shared');
-    localStorage.setItem('cc-assistant-enabled', 'true');
-    localStorage.setItem('cc-terminal-enabled', 'true');
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => fireCtrlShiftBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('true');
-  });
-
-  it('terminal shortcut (Ctrl+Shift+`) opens terminal for local projects', () => {
-    localStorage.setItem('quodeq_selected_source', 'local');
-    localStorage.setItem('cc-assistant-enabled', 'true');
-    localStorage.setItem('cc-terminal-enabled', 'true');
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => fireCtrlShiftBacktick());
-    expect(screen.getByTestId('open').textContent).toBe('true');
-  });
-});
-
-it('exposes activeTab defaulting to assistant; openTab switches the active tab', () => {
-  // Both features enabled so the per-tab disable-fallback effect doesn't
-  // reroute the initial tab.
-  localStorage.setItem('cc-assistant-enabled', 'true');
-  localStorage.setItem('cc-terminal-enabled', 'true');
-  let hookRef;
-  const Grab = () => { hookRef = useAssistantDrawer(); return null; };
-  render(<AssistantDrawerProvider><Grab /></AssistantDrawerProvider>);
-  expect(hookRef.activeTab).toBe('assistant');
-  act(() => hookRef.openTab('terminal'));
-  expect(hookRef.activeTab).toBe('terminal');
 });
 
 it('startSession creates a session; sendMessage posts to it', async () => {
@@ -294,44 +236,6 @@ it('resetConversation is a no-op while a turn is in flight or before any session
   expect(createAssistantSession).toHaveBeenCalledTimes(1);
 });
 
-it('fetches the catalog once when the drawer opens, cached across open/close/open', async () => {
-  fetchAssistantCatalog.mockResolvedValue({ commands: [], skills: [], actions: [] });
-  render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-
-  // Drawer is closed; catalog should be null and fetch should not have been called.
-  expect(screen.getByTestId('catalog').textContent).toBe('null');
-  expect(fetchAssistantCatalog).not.toHaveBeenCalled();
-
-  // Open the assistant panel.
-  await act(async () => { screen.getByText('openAssistant').click(); });
-  expect(fetchAssistantCatalog).toHaveBeenCalledTimes(1);
-  expect(screen.getByTestId('catalog').textContent).toBe(
-    JSON.stringify({ commands: [], skills: [], actions: [] }),
-  );
-
-  // Close and reopen: still only 1 call (catalog is cached).
-  act(() => screen.getByText('toggle').click()); // close
-  await act(async () => { screen.getByText('openAssistant').click(); }); // reopen
-  expect(fetchAssistantCatalog).toHaveBeenCalledTimes(1);
-});
-
-it('addLocalExchange appends a user and a local message', async () => {
-  let hookRef;
-  const Grab = () => { hookRef = useAssistantDrawer(); return null; };
-  render(<AssistantDrawerProvider><Probe /><Grab /></AssistantDrawerProvider>);
-
-  // Capture initial messages count (should be empty).
-  expect(hookRef.messages).toHaveLength(0);
-
-  // Invoke addLocalExchange.
-  act(() => { hookRef.addLocalExchange('/help', 'HELP TEXT'); });
-
-  // Two messages appended: user turn then local response.
-  expect(hookRef.messages).toHaveLength(2);
-  expect(hookRef.messages[0]).toMatchObject({ role: 'user', text: '/help', atIndex: 0 });
-  expect(hookRef.messages[1]).toMatchObject({ role: 'local', text: 'HELP TEXT', atIndex: 0 });
-});
-
 it('stopTurn posts a stop for the active session while a turn is in flight', async () => {
   render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
   await act(async () => { screen.getByText('start').click(); });
@@ -354,35 +258,4 @@ it('stopTurn failure surfaces an error instead of dying silently', async () => {
   await act(async () => { screen.getByText('send').click(); });
   await act(async () => { screen.getByText('stop').click(); });
   expect(screen.getByTestId('error').textContent).toContain('stop failed');
-});
-
-describe('closePanel', () => {
-  it('closes only the named panel; the terminal stays open and becomes active', () => {
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => screen.getByText('openAssistant').click());
-    act(() => screen.getByText('openTerminal').click());
-    act(() => screen.getByText('openAssistant').click()); // assistant active again
-    expect(screen.getByTestId('panels').textContent).toBe('["assistant","terminal"]');
-    expect(screen.getByTestId('active').textContent).toBe('assistant');
-    act(() => screen.getByText('closeAssistantPanel').click());
-    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
-    expect(screen.getByTestId('active').textContent).toBe('terminal');
-    expect(screen.getByTestId('open').textContent).toBe('true'); // drawer stays open
-  });
-
-  it('closing a non-active panel does not steal the active tab', () => {
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => screen.getByText('openAssistant').click());
-    act(() => screen.getByText('openTerminal').click()); // terminal is active
-    act(() => screen.getByText('closeAssistantPanel').click());
-    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
-    expect(screen.getByTestId('active').textContent).toBe('terminal');
-  });
-
-  it('no-ops when the panel is not open', () => {
-    render(<AssistantDrawerProvider><Probe /></AssistantDrawerProvider>);
-    act(() => screen.getByText('openTerminal').click());
-    act(() => screen.getByText('closeAssistantPanel').click());
-    expect(screen.getByTestId('panels').textContent).toBe('["terminal"]');
-  });
 });
