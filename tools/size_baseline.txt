@@ -70,8 +70,6 @@ src/quodeq/services/violations.py:179:function
 src/quodeq/ui/src/App.jsx:1:file
 src/quodeq/ui/src/App.test.jsx:1:file
 src/quodeq/ui/src/api/applyMutationDelta.test.jsx:1:file
-src/quodeq/ui/src/api/index.js:1:file
-src/quodeq/ui/src/api/shared.js:1:file
 src/quodeq/ui/src/api/shared.test.jsx:1:file
 src/quodeq/ui/src/features/assistant/AssistantDrawerProvider.test.jsx:1:file
 src/quodeq/ui/src/features/compare/compareModel.js:1:file
