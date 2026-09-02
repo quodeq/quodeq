@@ -5,6 +5,75 @@ import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
 
+function VersionRow({ available, status, current, checking, onCheck }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.versionLabel')}</span>
+        <span className="settings-description">
+          {available
+            ? (status.is_security
+                ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
+                : t('settings.updateAvailable', { current, latest: status.latest }))
+            : t('settings.upToDate', { version: current })}
+        </span>
+      </div>
+      <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
+        {checking ? t('settings.checking') : t('settings.checkNow')}
+      </button>
+    </div>
+  );
+}
+
+function UpdateAvailableRow({ status }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.getTheUpdate')}</span>
+        <span className="settings-description">
+          {status.action_command ? status.action_command : t('settings.downloadNewBuild')}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="settings-pill"
+        onClick={() => openExternal(status.latest_url || status.download_url)}
+      >
+        {status.action_command ? t('settings.whatsNew') : t('settings.download')}
+      </button>
+    </div>
+  );
+}
+
+function AutoCheckRow({ auto, onToggle }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.automaticChecks')}</span>
+        <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
+      </div>
+      <div className="settings-pill-group">
+        <button
+          type="button"
+          className={`settings-pill${auto ? ' settings-pill--active' : ''}`}
+          onClick={() => onToggle(true)}
+          aria-pressed={auto}
+        >
+          {t('settings.on')}
+        </button>
+        <button
+          type="button"
+          className={`settings-pill${!auto ? ' settings-pill--active' : ''}`}
+          onClick={() => onToggle(false)}
+          aria-pressed={!auto}
+        >
+          {t('settings.off')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function UpdatesSection() {
   const { checkForUpdates, setUpdateAutoCheck } = useApi();
   const { status, setStatus } = useUpdateStatus();
@@ -31,64 +100,11 @@ export default function UpdatesSection() {
         <SectionLabel marker="▶">{t('settings.updatesLabel')}</SectionLabel>
       </div>
 
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.versionLabel')}</span>
-          <span className="settings-description">
-            {available
-              ? (status.is_security
-                  ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
-                  : t('settings.updateAvailable', { current, latest: status.latest }))
-              : t('settings.upToDate', { version: current })}
-          </span>
-        </div>
-        <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
-          {checking ? t('settings.checking') : t('settings.checkNow')}
-        </button>
-      </div>
+      <VersionRow available={available} status={status} current={current} checking={checking} onCheck={onCheck} />
 
-      {available && (
-        <div className="settings-row">
-          <div className="settings-row-label">
-            <span className="settings-label">{t('settings.getTheUpdate')}</span>
-            <span className="settings-description">
-              {status.action_command ? status.action_command : t('settings.downloadNewBuild')}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="settings-pill"
-            onClick={() => openExternal(status.latest_url || status.download_url)}
-          >
-            {status.action_command ? t('settings.whatsNew') : t('settings.download')}
-          </button>
-        </div>
-      )}
+      {available && <UpdateAvailableRow status={status} />}
 
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.automaticChecks')}</span>
-          <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
-        </div>
-        <div className="settings-pill-group">
-          <button
-            type="button"
-            className={`settings-pill${auto ? ' settings-pill--active' : ''}`}
-            onClick={() => onToggle(true)}
-            aria-pressed={auto}
-          >
-            {t('settings.on')}
-          </button>
-          <button
-            type="button"
-            className={`settings-pill${!auto ? ' settings-pill--active' : ''}`}
-            onClick={() => onToggle(false)}
-            aria-pressed={!auto}
-          >
-            {t('settings.off')}
-          </button>
-        </div>
-      </div>
+      <AutoCheckRow auto={auto} onToggle={onToggle} />
     </section>
   );
 }

@@ -6,28 +6,23 @@ import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
-export default function SharedRepoSection({ onDisconnected }) {
-  const { getSharedStatus, connectShared, disconnectShared } = useApi();
-  const queryClient = useQueryClient();
-
+// Groups the section's own useState/useRef declarations so the outer
+// component's body stays under the function-length cap; still called
+// unconditionally at the top of the outer component, so hook-order is
+// unaffected.
+function useSharedRepoFields() {
   const [newUrl, setNewUrl] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState(null);
-
   // Guards for synchronous dedup of save/disconnect calls
   const savingRef = useRef(false);
   const disconnectingRef = useRef(false);
   const initializedRef = useRef(false);
+  return { newUrl, setNewUrl, confirming, setConfirming, error, setError, savingRef, disconnectingRef, initializedRef };
+}
 
-  const { data: status, isLoading, refetch: refetchStatus } = useQuery({
-    queryKey: [...sharedKeys.status(), 'settings-detail'],
-    queryFn: () => getSharedStatus().catch(() => ({ configured: false, url: null })),
-  });
-
-  const configured = status?.configured ?? false;
-  const currentUrl = status?.url ?? null;
-
-  // Initialize newUrl when currentUrl changes (only once per status update)
+// Initialize newUrl when currentUrl changes (only once per status update)
+function useInitNewUrl({ currentUrl, setNewUrl, initializedRef }) {
   useEffect(() => {
     if (currentUrl && !initializedRef.current) {
       setNewUrl(currentUrl);
@@ -36,8 +31,10 @@ export default function SharedRepoSection({ onDisconnected }) {
       initializedRef.current = false;
     }
   }, [currentUrl]);
+}
 
-  const connectMutation = useMutation({
+function buildConnectMutationConfig({ connectShared, setError, setNewUrl, refetchStatus, savingRef, queryClient }) {
+  return {
     mutationFn: async (url) => {
       if (savingRef.current) return;
       savingRef.current = true;
@@ -63,9 +60,11 @@ export default function SharedRepoSection({ onDisconnected }) {
       // already covers that one specifically, for the inline UI).
       queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },
-  });
+  };
+}
 
-  const disconnectMutation = useMutation({
+function buildDisconnectMutationConfig({ disconnectShared, setError, setNewUrl, setConfirming, refetchStatus, disconnectingRef, queryClient, onDisconnected }) {
+  return {
     mutationFn: async () => {
       if (disconnectingRef.current) return;
       disconnectingRef.current = true;
@@ -101,7 +100,129 @@ export default function SharedRepoSection({ onDisconnected }) {
       queryClient.removeQueries({ queryKey: sharedKeys.list() });
       queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },
-  });
+  };
+}
+
+function buildStatusQueryConfig(getSharedStatus) {
+  return {
+    queryKey: [...sharedKeys.status(), 'settings-detail'],
+    queryFn: () => getSharedStatus().catch(() => ({ configured: false, url: null })),
+  };
+}
+
+function ErrorRow({ error }) {
+  if (!error) return null;
+  return (
+    <div className="settings-row settings-row--last">
+      <p className="inline-error">{error}</p>
+    </div>
+  );
+}
+
+function UrlStatusRow({ isLoading, status, configured, currentUrl }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.repositoryUrl')}</span>
+        <span className="settings-description">
+          {isLoading && !status ? (
+            t('settings.checkingEllipsis')
+          ) : configured ? (
+            <>{t('settings.configuredPrefix')} <code>{currentUrl}</code></>
+          ) : (
+            t('settings.notConfigured')
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function UrlInputRow({ newUrl, setNewUrl, isSaving, isDisconnecting, handleSave }) {
+  return (
+    <div className="settings-row">
+      <input
+        type="text"
+        className="settings-input"
+        placeholder="https://github.com/team/results.git"
+        value={newUrl}
+        onChange={(e) => setNewUrl(e.target.value)}
+        disabled={isSaving || isDisconnecting}
+        aria-label={t('settings.sharedRepoUrlAria')}
+      />
+      <button
+        type="button"
+        className="settings-pill"
+        onClick={handleSave}
+        disabled={isSaving || isDisconnecting}
+        aria-disabled={isSaving || isDisconnecting || undefined}
+      >
+        {isSaving ? t('settings.saving') : t('settings.save')}
+      </button>
+    </div>
+  );
+}
+
+function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisconnecting, handleDisconnect }) {
+  if (!configured) return null;
+  if (!confirming) {
+    return (
+      <div className="settings-row settings-row--last">
+        <button
+          type="button"
+          className="settings-pill settings-pill--accent"
+          onClick={() => setConfirming(true)}
+          disabled={isSaving || isDisconnecting}
+          aria-disabled={isSaving || isDisconnecting || undefined}
+        >
+          {t('settings.disconnect')}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="settings-row settings-row--last">
+      <span className="settings-row-confirm-label">{t('settings.disconnectConfirm')}</span>
+      <button
+        type="button"
+        className="settings-pill settings-pill--confirm"
+        onClick={handleDisconnect}
+        disabled={isDisconnecting}
+        aria-disabled={isDisconnecting || undefined}
+      >
+        {isDisconnecting ? t('settings.disconnecting') : t('settings.yes')}
+      </button>
+      <button
+        type="button"
+        className="settings-pill"
+        onClick={() => setConfirming(false)}
+        disabled={isDisconnecting}
+        aria-disabled={isDisconnecting || undefined}
+      >
+        {t('settings.no')}
+      </button>
+    </div>
+  );
+}
+
+export default function SharedRepoSection({ onDisconnected }) {
+  const { getSharedStatus, connectShared, disconnectShared } = useApi();
+  const queryClient = useQueryClient();
+
+  const { newUrl, setNewUrl, confirming, setConfirming, error, setError, savingRef, disconnectingRef, initializedRef } = useSharedRepoFields();
+
+  const { data: status, isLoading, refetch: refetchStatus } = useQuery(buildStatusQueryConfig(getSharedStatus));
+
+  const configured = status?.configured ?? false;
+  const currentUrl = status?.url ?? null;
+
+  useInitNewUrl({ currentUrl, setNewUrl, initializedRef });
+
+  const connectMutation = useMutation(buildConnectMutationConfig({ connectShared, setError, setNewUrl, refetchStatus, savingRef, queryClient }));
+
+  const disconnectMutation = useMutation(buildDisconnectMutationConfig({
+    disconnectShared, setError, setNewUrl, setConfirming, refetchStatus, disconnectingRef, queryClient, onDisconnected,
+  }));
 
   const handleSave = () => {
     const trimmed = newUrl.trim();
@@ -110,9 +231,7 @@ export default function SharedRepoSection({ onDisconnected }) {
     }
   };
 
-  const handleDisconnect = () => {
-    disconnectMutation.mutate();
-  };
+  const handleDisconnect = () => disconnectMutation.mutate();
 
   const isSaving = connectMutation.isPending;
   const isDisconnecting = disconnectMutation.isPending;
@@ -125,85 +244,14 @@ export default function SharedRepoSection({ onDisconnected }) {
         </span>
       </div>
 
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.repositoryUrl')}</span>
-          <span className="settings-description">
-            {isLoading && !status ? (
-              t('settings.checkingEllipsis')
-            ) : configured ? (
-              <>{t('settings.configuredPrefix')} <code>{currentUrl}</code></>
-            ) : (
-              t('settings.notConfigured')
-            )}
-          </span>
-        </div>
-      </div>
+      <UrlStatusRow isLoading={isLoading} status={status} configured={configured} currentUrl={currentUrl} />
+      <UrlInputRow newUrl={newUrl} setNewUrl={setNewUrl} isSaving={isSaving} isDisconnecting={isDisconnecting} handleSave={handleSave} />
+      <ErrorRow error={error} />
 
-      <div className="settings-row">
-        <input
-          type="text"
-          className="settings-input"
-          placeholder="https://github.com/team/results.git"
-          value={newUrl}
-          onChange={(e) => setNewUrl(e.target.value)}
-          disabled={isSaving || isDisconnecting}
-          aria-label={t('settings.sharedRepoUrlAria')}
-        />
-        <button
-          type="button"
-          className="settings-pill"
-          onClick={handleSave}
-          disabled={isSaving || isDisconnecting}
-          aria-disabled={isSaving || isDisconnecting || undefined}
-        >
-          {isSaving ? t('settings.saving') : t('settings.save')}
-        </button>
-      </div>
-
-      {error && (
-        <div className="settings-row settings-row--last">
-          <p className="inline-error">{error}</p>
-        </div>
-      )}
-
-      {configured && !confirming && (
-        <div className="settings-row settings-row--last">
-          <button
-            type="button"
-            className="settings-pill settings-pill--accent"
-            onClick={() => setConfirming(true)}
-            disabled={isSaving || isDisconnecting}
-            aria-disabled={isSaving || isDisconnecting || undefined}
-          >
-            {t('settings.disconnect')}
-          </button>
-        </div>
-      )}
-
-      {configured && confirming && (
-        <div className="settings-row settings-row--last">
-          <span className="settings-row-confirm-label">{t('settings.disconnectConfirm')}</span>
-          <button
-            type="button"
-            className="settings-pill settings-pill--confirm"
-            onClick={handleDisconnect}
-            disabled={isDisconnecting}
-            aria-disabled={isDisconnecting || undefined}
-          >
-            {isDisconnecting ? t('settings.disconnecting') : t('settings.yes')}
-          </button>
-          <button
-            type="button"
-            className="settings-pill"
-            onClick={() => setConfirming(false)}
-            disabled={isDisconnecting}
-            aria-disabled={isDisconnecting || undefined}
-          >
-            {t('settings.no')}
-          </button>
-        </div>
-      )}
+      <DisconnectRow
+        configured={configured} confirming={confirming} setConfirming={setConfirming}
+        isSaving={isSaving} isDisconnecting={isDisconnecting} handleDisconnect={handleDisconnect}
+      />
     </section>
   );
 }

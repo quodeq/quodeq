@@ -12,6 +12,31 @@ const LOCAL_SERVER_HINT = t('settings.localServerHint');
 
 const HEALTH_POLL_MS = 10000;
 
+function ServerDetails({ health }) {
+  return (
+    <div className="server-details">
+      {t('settings.serverPortLabel')} <strong>{health.port}</strong>
+      {' · '}
+      {t('settings.serverPidLabel')} <strong>{health.pid}</strong>
+      {' · '}
+      {t('settings.serverVersion', { version: health.version })}
+    </div>
+  );
+}
+
+function OfflineRestartHint() {
+  return (
+    <div className="settings-row settings-row--last">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.restart')}</span>
+        <span className="settings-description">
+          {tRich('settings.restartDesc')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function ServerSection() {
   const serverLog = useServerLog();
 
@@ -45,26 +70,9 @@ export default function ServerSection() {
         consoleOpen={serverLog.open}
       />
 
-      {status === 'online' && health && (
-        <div className="server-details">
-          {t('settings.serverPortLabel')} <strong>{health.port}</strong>
-          {' · '}
-          {t('settings.serverPidLabel')} <strong>{health.pid}</strong>
-          {' · '}
-          {t('settings.serverVersion', { version: health.version })}
-        </div>
-      )}
+      {status === 'online' && health && <ServerDetails health={health} />}
 
-      {status === 'offline' && (
-        <div className="settings-row settings-row--last">
-          <div className="settings-row-label">
-            <span className="settings-label">{t('settings.restart')}</span>
-            <span className="settings-description">
-              {tRich('settings.restartDesc')}
-            </span>
-          </div>
-        </div>
-      )}
+      {status === 'offline' && <OfflineRestartHint />}
     </section>
   );
 }
