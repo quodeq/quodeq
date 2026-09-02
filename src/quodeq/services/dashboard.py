@@ -180,6 +180,45 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     return selected_run, selected_index
 
 
+def _resolve_selected_dims(
+    reports_root: Path, project: str, project_dir: Path,
+    selected_run: RunInfo, params: ScoringParams,
+) -> tuple[list[DimensionResult], dict[str, int], dict[str, int]]:
+    """Read the selected run's raw dims, rescore them, and compute the
+    dismissed/suppressed violation counts. ``read_run_data`` overlays the
+    run's SQL grade tables, but those grades only reflect dismissals
+    projected into THIS run and NOT project-wide dismissals/deletions that
+    accrued later -- so the raw selected-run score can disagree with the
+    accumulated overview. Rescore the selected run's dimensions with the
+    SAME project-wide ``_rescore_dimension`` transform the accumulated view
+    and the per-run explorer use, so every path reports the identical
+    dismiss-adjusted score/grade AND drops the dismissed + deleted
+    violations from the counts. ``read_run_data`` stays the dimension source
+    here (a stable seam other callers and tests inject through).
+
+    Returns (selected_dims, dismissed_counts, suppressed_counts).
+    """
+    raw_dims = read_run_data(reports_root, project, selected_run.run_id)
+    # ``dismissedCount`` reports how many of the scan's re-found violations were
+    # hidden by the *dismissed* filter specifically (deletions are a separate,
+    # permanent suppression), so measure it against the dismissed-only filter.
+    pre_filter_counts = {d.dimension: len(d.violations) for d in raw_dims}
+    dismissed_only = filter_dismissed_from_dimensions(raw_dims, project_dir)
+    dismissed_counts = {
+        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
+        for d in dismissed_only
+    }
+    selected_dims = _rescore_run_dimensions(
+        raw_dims, reports_root, project, selected_run.run_id, params)
+    # Measured against the SAME dimensions the response ships, so the number
+    # the UI shows always reconciles: shown + suppressed == what the scan found.
+    suppressed_counts = {
+        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
+        for d in selected_dims
+    }
+    return selected_dims, dismissed_counts, suppressed_counts
+
+
 def build_dashboard(
     reports_dir: str,
     project: str,
@@ -212,34 +251,10 @@ def build_dashboard(
         }
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
-    # ``read_run_data`` overlays the run's SQL grade tables, but those grades
-    # only reflect dismissals projected into THIS run and NOT project-wide
-    # dismissals/deletions that accrued later -- so the raw selected-run score
-    # can disagree with the accumulated overview. Rescore the selected run's
-    # dimensions with the SAME project-wide ``_rescore_dimension`` transform the
-    # accumulated view and the per-run explorer use, so every path reports the
-    # identical dismiss-adjusted score/grade AND drops the dismissed + deleted
-    # violations from the counts. ``read_run_data`` stays the dimension source
-    # here (a stable seam other callers and tests inject through).
     project_dir = reports_root / project
-    raw_dims = read_run_data(reports_root, project, selected_run.run_id)
-    # ``dismissedCount`` reports how many of the scan's re-found violations were
-    # hidden by the *dismissed* filter specifically (deletions are a separate,
-    # permanent suppression), so measure it against the dismissed-only filter.
-    pre_filter_counts = {d.dimension: len(d.violations) for d in raw_dims}
-    dismissed_only = filter_dismissed_from_dimensions(raw_dims, project_dir)
-    dismissed_counts = {
-        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in dismissed_only
-    }
-    selected_dims = _rescore_run_dimensions(
-        raw_dims, reports_root, project, selected_run.run_id, params)
-    # Measured against the SAME dimensions the response ships, so the number
-    # the UI shows always reconciles: shown + suppressed == what the scan found.
-    suppressed_counts = {
-        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in selected_dims
-    }
+    selected_dims, dismissed_counts, suppressed_counts = _resolve_selected_dims(
+        reports_root, project, project_dir, selected_run, params,
+    )
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,

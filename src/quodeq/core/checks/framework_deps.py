@@ -145,6 +145,49 @@ def _clean_report(req: str, dimension: str, anchor: str, checked: int) -> Judgme
     )
 
 
+def _file_framework_judgments(
+    file: str,
+    by_file: dict[str, list[ImportEdge]],
+    by_module: dict[str, str],
+    framework_packages: frozenset[str],
+    first_party: frozenset[str],
+    dimension: str,
+) -> list[Judgment]:
+    """Direct + transitive framework-dependency judgments for one inner file."""
+    judgments: list[Judgment] = []
+    direct = _direct_frameworks(by_file[file], framework_packages)
+    for package in sorted(direct):
+        judgments.append(violation(
+            req=REQ_DIRECT, dimension=dimension, file=file, line=direct[package],
+            title=f"Inner layer imports framework package '{package}'",
+            reason=(
+                f"This file is in an inner layer and imports the framework "
+                f"package '{package}' directly. Clean Architecture keeps "
+                f"frameworks at the edges: business rules must not depend on "
+                f"the delivery mechanism."
+            ),
+        ))
+    transitive = _transitive_frameworks(
+        file, by_file, by_module, framework_packages, first_party,
+    )
+    for package in sorted(transitive):
+        if package in direct:
+            continue  # already billed once, as a direct import
+        line, path = transitive[package]
+        judgments.append(violation(
+            req=REQ_TRANSITIVE, dimension=dimension, file=file, line=line,
+            title=f"Inner layer depends on framework '{package}' transitively",
+            reason=(
+                f"This file is in an inner layer and reaches the framework "
+                f"package '{package}' through {path}. Nothing in this file "
+                f"names '{package}', so the dependency is invisible when "
+                f"reading it, but the inner layer cannot be built or tested "
+                f"without the framework."
+            ),
+        ))
+    return judgments
+
+
 def check_framework_dependencies(
     graph: ImportGraph,
     *,
@@ -166,36 +209,9 @@ def check_framework_dependencies(
 
     judgments: list[Judgment] = []
     for file in inner:
-        direct = _direct_frameworks(by_file[file], framework_packages)
-        for package in sorted(direct):
-            judgments.append(violation(
-                req=REQ_DIRECT, dimension=dimension, file=file, line=direct[package],
-                title=f"Inner layer imports framework package '{package}'",
-                reason=(
-                    f"This file is in an inner layer and imports the framework "
-                    f"package '{package}' directly. Clean Architecture keeps "
-                    f"frameworks at the edges: business rules must not depend on "
-                    f"the delivery mechanism."
-                ),
-            ))
-        transitive = _transitive_frameworks(
-            file, by_file, by_module, framework_packages, graph.first_party,
+        judgments += _file_framework_judgments(
+            file, by_file, by_module, framework_packages, graph.first_party, dimension,
         )
-        for package in sorted(transitive):
-            if package in direct:
-                continue  # already billed once, as a direct import
-            line, path = transitive[package]
-            judgments.append(violation(
-                req=REQ_TRANSITIVE, dimension=dimension, file=file, line=line,
-                title=f"Inner layer depends on framework '{package}' transitively",
-                reason=(
-                    f"This file is in an inner layer and reaches the framework "
-                    f"package '{package}' through {path}. Nothing in this file "
-                    f"names '{package}', so the dependency is invisible when "
-                    f"reading it, but the inner layer cannot be built or tested "
-                    f"without the framework."
-                ),
-            ))
     # A requirement the traversal covered without finding anything is clean,
     # and saying so is the difference between "measured" and "never looked".
     violated = {j.practice_id for j in judgments}

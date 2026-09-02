@@ -33,6 +33,76 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
     return comment
 
 
+def _score_summary_lines(reports: list[dict], is_diff_mode: bool, baseline_available: bool) -> list[str]:
+    """Baseline note (if applicable) + per-dimension score lines."""
+    lines: list[str] = []
+    if not baseline_available and not is_diff_mode:
+        lines.append(
+            "> **Note:** No baseline available — this is the first run. "
+            "All violations are shown as new; no baseline comparison was made."
+        )
+        lines.append("")
+
+    # Per-dimension scores (skipped in diff mode — nothing was scored).
+    if not is_diff_mode:
+        for report in reports:
+            dimension = report.get("dimension", "unknown")
+            score = report.get("overallScore", "N/A")
+            grade = report.get("overallGrade", "N/A")
+            lines.append(f"**{dimension.title()}**: {score} ({grade})")
+        lines.append("")
+    return lines
+
+
+def _violation_breakdown_lines(new_violations: list[dict], existing_violations: list[dict], is_diff_mode: bool) -> list[str]:
+    """Headline new/existing counts + a by-severity breakdown of the new ones."""
+    lines: list[str] = []
+    new_count = len(new_violations)
+    existing_count = len(existing_violations)
+    if is_diff_mode:
+        lines.append(f"🔍 **{new_count} violation(s) found in PR diff**")
+    else:
+        lines.append(f"🆕 **{new_count} new** violation(s) introduced by this PR")
+        if existing_count > 0:
+            lines.append(f"⚠️ **{existing_count} pre-existing** issue(s) in changed files (not introduced by this PR)")
+    lines.append("")
+
+    if new_count > 0:
+        new_severity_counts: dict[str, int] = {}
+        for v in new_violations:
+            sev = v.get("severity", "minor")
+            new_severity_counts[sev] = new_severity_counts.get(sev, 0) + 1
+        parts = [f"{n} {sev}" for sev, n in new_severity_counts.items() if n > 0]
+        if parts:
+            lines.append(f"New violations by severity: {', '.join(parts)}")
+        lines.append("")
+    return lines
+
+
+def _outside_diff_lines(outside: list[dict]) -> list[str]:
+    """List NEW violations that fall outside the PR's changed hunks."""
+    if not outside:
+        return []
+    lines: list[str] = []
+    n = len(outside)
+    noun = "finding" if n == 1 else "findings"
+    lines.append(
+        f"**{n} {noun} outside the changed lines** "
+        "(GitHub can't anchor an inline comment to unchanged lines, so "
+        "they're listed here):"
+    )
+    lines.append("")
+    for v in outside:
+        file = v.get("file", "?")
+        line = v.get("line")
+        loc = f"{file}:{line}" if line is not None else file
+        severity = str(v.get("severity", "minor")).upper()
+        title = v.get("title") or "Violation"
+        lines.append(f"- `{loc}` — **{severity}** {title}")
+    lines.append("")
+    return lines
+
+
 def build_review_summary(
     reports: list[dict],
     new_violations: list[dict],
@@ -65,61 +135,9 @@ def build_review_summary(
     )
 
     lines = ["## Quodeq Evaluation", ""]
-
-    if not baseline_available and not is_diff_mode:
-        lines.append(
-            "> **Note:** No baseline available — this is the first run. "
-            "All violations are shown as new; no baseline comparison was made."
-        )
-        lines.append("")
-
-    # Per-dimension scores (skipped in diff mode — nothing was scored).
-    if not is_diff_mode:
-        for report in reports:
-            dimension = report.get("dimension", "unknown")
-            score = report.get("overallScore", "N/A")
-            grade = report.get("overallGrade", "N/A")
-            lines.append(f"**{dimension.title()}**: {score} ({grade})")
-        lines.append("")
-
-    # Violation breakdown
-    new_count = len(new_violations)
-    existing_count = len(existing_violations)
-    if is_diff_mode:
-        lines.append(f"🔍 **{new_count} violation(s) found in PR diff**")
-    else:
-        lines.append(f"🆕 **{new_count} new** violation(s) introduced by this PR")
-        if existing_count > 0:
-            lines.append(f"⚠️ **{existing_count} pre-existing** issue(s) in changed files (not introduced by this PR)")
-    lines.append("")
-
-    if new_count > 0:
-        new_severity_counts: dict[str, int] = {}
-        for v in new_violations:
-            sev = v.get("severity", "minor")
-            new_severity_counts[sev] = new_severity_counts.get(sev, 0) + 1
-        parts = [f"{n} {sev}" for sev, n in new_severity_counts.items() if n > 0]
-        if parts:
-            lines.append(f"New violations by severity: {', '.join(parts)}")
-        lines.append("")
-
-    if outside:
-        n = len(outside)
-        noun = "finding" if n == 1 else "findings"
-        lines.append(
-            f"**{n} {noun} outside the changed lines** "
-            "(GitHub can't anchor an inline comment to unchanged lines, so "
-            "they're listed here):"
-        )
-        lines.append("")
-        for v in outside:
-            file = v.get("file", "?")
-            line = v.get("line")
-            loc = f"{file}:{line}" if line is not None else file
-            severity = str(v.get("severity", "minor")).upper()
-            title = v.get("title") or "Violation"
-            lines.append(f"- `{loc}` — **{severity}** {title}")
-        lines.append("")
+    lines += _score_summary_lines(reports, is_diff_mode, baseline_available)
+    lines += _violation_breakdown_lines(new_violations, existing_violations, is_diff_mode)
+    lines += _outside_diff_lines(outside)
 
     if duration_seconds is not None:
         minutes = duration_seconds // 60

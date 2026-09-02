@@ -95,6 +95,53 @@ def _no_scope_error() -> ToolError:
         "scope, then ask the user to open a project overview or select a run.")
 
 
+def _eval_json_finding_keys(ctx: ToolContext, add) -> None:
+    """Keys from the run's UNCAPPED eval-JSON violations (the
+    get_report/get_violations source)."""
+    eval_dir = ctx.run_dir / "evaluation"
+    if not eval_dir.is_dir():
+        return
+    # Parse each dimension file INDEPENDENTLY: one corrupt/truncated file
+    # (a known failure mode of deadline-cut runs) must drop only its own
+    # findings, not discard every healthy dimension's keys.
+    for p in sorted(eval_dir.glob("*.json")):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for v in (data.get("violations") or []):
+            add(v)
+
+
+def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> None:
+    """Keys from the SQL findings table (the search_findings source). Read
+    only an EXISTING db so a read-only draft never creates evaluation.db or
+    kicks a projection on a run that has none -- when there is no db there
+    are no SQL findings to miss anyway."""
+    if not (ctx.run_dir / "evaluation.db").is_file():
+        return
+    try:
+        for f in _findings_repo(ctx, ctx.run_dir).list_all():
+            keys.add((str(f.req or ""), str(f.file or ""),
+                      _violations_facade._coerce_line(f.line)))
+    except Exception:  # noqa: BLE001 - a corrupt db must not block the read
+        _logger.warning(
+            "evaluation.db unreadable in %s; finding keys may be incomplete",
+            ctx.run_dir, exc_info=True)
+
+
+def _accumulated_finding_keys(ctx: ToolContext, add) -> None:
+    try:
+        # rescored=False: the identity check must keep seeing every finding
+        # a dismiss/verify key could reference, including already-dismissed
+        # ones (idempotent re-dismiss / verify must still match).
+        for d in (_accumulated_dims(ctx, rescored=False) or []):
+            for v in (d.get("violations") or []):
+                add(v)
+    except (ToolError, OSError, ValueError):
+        pass
+
+
 def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
     """Every ``(req, file, line)`` identity the model can see in this scope.
 
@@ -120,39 +167,8 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
                   _violations_facade._coerce_line(v.get("line"))))
 
     if _has_run(ctx):
-        eval_dir = ctx.run_dir / "evaluation"
-        if eval_dir.is_dir():
-            # Parse each dimension file INDEPENDENTLY: one corrupt/truncated file
-            # (a known failure mode of deadline-cut runs) must drop only its own
-            # findings, not discard every healthy dimension's keys.
-            for p in sorted(eval_dir.glob("*.json")):
-                try:
-                    data = json.loads(p.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    continue
-                for v in (data.get("violations") or []):
-                    _add(v)
-        # SQL findings (the search_findings source). Read only an EXISTING db so
-        # a read-only draft never creates evaluation.db or kicks a projection on
-        # a run that has none -- when there is no db there are no SQL findings to
-        # miss anyway.
-        if (ctx.run_dir / "evaluation.db").is_file():
-            try:
-                for f in _findings_repo(ctx, ctx.run_dir).list_all():
-                    keys.add((str(f.req or ""), str(f.file or ""),
-                              _violations_facade._coerce_line(f.line)))
-            except Exception:  # noqa: BLE001 - a corrupt db must not block the read
-                _logger.warning(
-                    "evaluation.db unreadable in %s; finding keys may be incomplete",
-                    ctx.run_dir, exc_info=True)
+        _eval_json_finding_keys(ctx, _add)
+        _sql_finding_keys(ctx, keys)
     else:
-        try:
-            # rescored=False: the identity check must keep seeing every finding
-            # a dismiss/verify key could reference, including already-dismissed
-            # ones (idempotent re-dismiss / verify must still match).
-            for d in (_accumulated_dims(ctx, rescored=False) or []):
-                for v in (d.get("violations") or []):
-                    _add(v)
-        except (ToolError, OSError, ValueError):
-            pass
+        _accumulated_finding_keys(ctx, _add)
     return keys

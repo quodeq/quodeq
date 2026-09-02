@@ -34,24 +34,14 @@ CONFIG_PACKAGES = frozenset({
 })
 
 
-def check_config_reads(
-    graph: ImportGraph,
-    symbol_uses: Sequence[SymbolUse],
-    *,
-    dimension: str,
-) -> list[Judgment]:
-    """Judge CLEA-DEP-07 against *graph* and the resolved *symbol_uses*.
+def _collect_config_reads(
+    graph: ImportGraph, symbol_uses: Sequence[SymbolUse], inner_set: set[str],
+) -> dict[tuple[str, str], int]:
+    """First line per (file, source) where an inner-layer file reads config.
 
-    Empty when the project has no recognisable inner layer.
+    One finding per (file, source): three os.environ reads in one module are
+    one dependency on the environment.
     """
-    known = graph.files() | {u.file for u in symbol_uses}
-    inner = sorted(inner_layer_files(known))
-    if not inner:
-        return []
-
-    inner_set = set(inner)
-    # One finding per (file, source): three os.environ reads in one module are
-    # one dependency on the environment.
     first_line: dict[tuple[str, str], int] = {}
 
     def note(file: str, source: str, line: int) -> None:
@@ -64,7 +54,12 @@ def check_config_reads(
     for edge in graph.edges:
         if edge.file in inner_set and top_level(edge.module) in CONFIG_PACKAGES:
             note(edge.file, top_level(edge.module), edge.line)
+    return first_line
 
+
+def _build_config_read_judgments(
+    dimension: str, inner: list[str], first_line: dict[tuple[str, str], int],
+) -> list[Judgment]:
     judgments = [
         violation(
             req=REQ, dimension=dimension, file=file, line=line,
@@ -91,3 +86,22 @@ def check_config_reads(
         ))
     judgments.sort(key=lambda j: (j.file, j.line))
     return judgments
+
+
+def check_config_reads(
+    graph: ImportGraph,
+    symbol_uses: Sequence[SymbolUse],
+    *,
+    dimension: str,
+) -> list[Judgment]:
+    """Judge CLEA-DEP-07 against *graph* and the resolved *symbol_uses*.
+
+    Empty when the project has no recognisable inner layer.
+    """
+    known = graph.files() | {u.file for u in symbol_uses}
+    inner = sorted(inner_layer_files(known))
+    if not inner:
+        return []
+
+    first_line = _collect_config_reads(graph, symbol_uses, set(inner))
+    return _build_config_read_judgments(dimension, inner, first_line)

@@ -37,7 +37,6 @@ export const SIZE_GRANDFATHER = [
   "src/features/dashboard/components/DimensionGaugeCard.jsx",
   "src/features/dashboard/components/DimensionGaugeCard.test.jsx",
   "src/features/dashboard/components/OverviewSkeleton.test.jsx",
-  "src/features/dashboard/components/ProjectsPage.jsx",
   "src/features/dashboard/components/ProjectsPage.test.jsx",
   "src/features/dashboard/components/RunHistoryPanel.test.jsx",
   "src/features/dashboard/components/RunNavigator.jsx",
@@ -62,7 +61,6 @@ export const SIZE_GRANDFATHER = [
   "src/features/evaluation/components/LiveViolationsFeed.test.jsx",
   "src/features/evaluation/components/ReEvaluateCard.test.jsx",
   "src/features/evaluation/components/ScanProgress.test.jsx",
-  "src/features/evaluation/components/buildJobStatCells.js",
   "src/features/evaluation/components/buildJobStatCells.test.js",
   "src/features/evaluation/components/scanProgressTotals.js",
   "src/features/evaluation/components/scanProgressTotals.test.js",
@@ -169,5 +167,4 @@ export const SIZE_GRANDFATHER = [
   "src/utils/chooseDialog.js",
   "src/utils/confirmDialog.js",
   "src/utils/dailyGrouping.test.js",
-  "src/utils/reportBuilder.js",
 ];

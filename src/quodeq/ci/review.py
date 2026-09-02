@@ -105,13 +105,13 @@ def snapshot_run_dirs(output_dir: Path) -> set[Path]:
     return {p.parent for p in output_dir.rglob("evidence") if p.is_dir()}
 
 
-def handle_review(args) -> int:
-    """Entry point for `quodeq review`."""
+def _resolve_pr_and_repo(args) -> tuple[int, str, str, str] | None:
+    """Detect the PR and its GitHub owner/repo. Prints and returns None on failure."""
     try:
         pr_number, base_branch = detect_pr(pr_override=getattr(args, "pr", None))
     except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        return None
 
     print(f"Detected PR #{pr_number} (base: {base_branch})")
 
@@ -119,15 +119,19 @@ def handle_review(args) -> int:
         owner, repo = get_repo_info()
     except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        return None
+    return pr_number, base_branch, owner, repo
 
-    output_dir = Path(getattr(args, "output", None) or get_evaluations_dir())
-    output_dir.mkdir(parents=True, exist_ok=True)
 
+def _run_pr_diff_and_locate_evidence(
+    output_dir: Path, base_branch: str, dims: str | None, pool_budget: int | None,
+) -> tuple[int, Path | None, int]:
+    """Run the PR-diff evaluation and locate the new run's evidence dir.
+
+    Returns (exit_code, evidence_dir, duration_seconds). evidence_dir is None
+    when the run failed (exit_code != 0) or produced no new run directory.
+    """
     baseline_runs = snapshot_run_dirs(output_dir)
-
-    dims = getattr(args, "dimensions", None)
-    pool_budget = getattr(args, "pool_budget", None)
 
     print(f"Running PR diff evaluation (base: origin/{base_branch})...")
     start = time.time()
@@ -140,19 +144,19 @@ def handle_review(args) -> int:
         time_limit=pool_budget if pool_budget is not None else 300,
     )
     duration = int(time.time() - start)
-
     if exit_code != 0:
-        print(f"Evaluation failed with exit code {exit_code}", file=sys.stderr)
-        return exit_code
+        return exit_code, None, duration
 
     all_runs = snapshot_run_dirs(output_dir)
     new_runs = all_runs - baseline_runs
     if not new_runs:
-        print("Error: no new evaluation directory produced.", file=sys.stderr)
-        return 1
+        return exit_code, None, duration
     current_run_dir = max(new_runs, key=lambda p: p.stat().st_mtime)
-    evidence_dir = current_run_dir / "evidence"
+    return exit_code, current_run_dir / "evidence", duration
 
+
+def _build_diff_report_and_payload(evidence_dir: Path, duration: int) -> tuple[dict, dict]:
+    """Load evidence violations, filter suppressions, and build the review payload."""
     from quodeq.ci._evidence_reader import load_violations_from_evidence
     from quodeq.ci._suppressions import filter_suppressed_violations
     violations = load_violations_from_evidence(evidence_dir)
@@ -168,20 +172,19 @@ def handle_review(args) -> int:
         "overallScore": "N/A",
         "overallGrade": "N/A",
     }, project_dir)
-    reports = [report]
 
     from quodeq.ci.reporter import build_review_payload
     payload = build_review_payload(
-        reports,
+        [report],
         baseline_violations=[],
         duration_seconds=duration,
         baseline_available=False,
     )
+    return report, payload
 
-    total_violations = len(report["violations"])
-    print(f"Evaluation complete: {total_violations} violation(s) found in diff")
-    print(f"Verdict: {payload['event']}")
 
+def _post_review_or_dry_run(args, payload: dict, owner: str, repo: str, pr_number: int) -> int:
+    """Print the review body for --dry-run, else post it to GitHub."""
     if getattr(args, "dry_run", False):
         print("\n--- Review body (dry-run, not posted) ---")
         print(payload["body"])
@@ -199,3 +202,33 @@ def handle_review(args) -> int:
     post_review(owner=owner, repo=repo, pr_number=pr_number, payload=payload, token=token)
     print(f"Review posted to https://github.com/{owner}/{repo}/pull/{pr_number}")
     return 0
+
+
+def handle_review(args) -> int:
+    """Entry point for `quodeq review`."""
+    resolved = _resolve_pr_and_repo(args)
+    if resolved is None:
+        return 1
+    pr_number, base_branch, owner, repo = resolved
+
+    output_dir = Path(getattr(args, "output", None) or get_evaluations_dir())
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    dims = getattr(args, "dimensions", None)
+    pool_budget = getattr(args, "pool_budget", None)
+    exit_code, evidence_dir, duration = _run_pr_diff_and_locate_evidence(
+        output_dir, base_branch, dims, pool_budget,
+    )
+    if exit_code != 0:
+        print(f"Evaluation failed with exit code {exit_code}", file=sys.stderr)
+        return exit_code
+    if evidence_dir is None:
+        print("Error: no new evaluation directory produced.", file=sys.stderr)
+        return 1
+
+    report, payload = _build_diff_report_and_payload(evidence_dir, duration)
+    total_violations = len(report["violations"])
+    print(f"Evaluation complete: {total_violations} violation(s) found in diff")
+    print(f"Verdict: {payload['event']}")
+
+    return _post_review_or_dry_run(args, payload, owner, repo, pr_number)

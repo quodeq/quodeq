@@ -43,6 +43,66 @@ def standard_dirs() -> tuple[Path | None, Path | None]:
     return compiled, paths.evaluators_dir
 
 
+def _resolve_evidence_jsonl(run_dir: Path, dim_id: str) -> Path | None:
+    """Return the dimension's evidence jsonl path, or None if it escapes
+    run_dir/evidence (logged) or dim_id fails validation (raises).
+
+    dim_id / run_dir are built from request-supplied values. Guard with the
+    path-injection remediation CodeQL recommends: normalize with
+    os.path.normpath (a pure-string op, no filesystem access) to collapse any
+    ".." segments, then confirm the result stays within run_dir/evidence
+    before touching the filesystem. (validate_path_segment additionally
+    rejects separators in dim_id at the input.)
+    """
+    validate_path_segment(dim_id)
+    evidence_dir = os.path.normpath(str(run_dir / "evidence"))
+    candidate = os.path.normpath(os.path.join(evidence_dir, f"{dim_id}_evidence.jsonl"))
+    if not candidate.startswith(evidence_dir + os.sep):
+        _logger.debug("Evidence path escapes run dir for %s/%s", run_dir.name, dim_id)
+        return None
+    return Path(candidate)
+
+
+def _apply_suppressions_and_recompute(
+    evidence, dim_id: str, dismissed: set[tuple], deleted: set[tuple], source_file_count: int,
+) -> None:
+    """Drop dismissed/deleted violations from each principle's evidence and
+    recompute its metrics in place."""
+    for pe in evidence.principles.values():
+        pe.violations = [
+            v for v in pe.violations
+            if not is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
+                                file=v.get("file"), line=v.get("line"))
+            and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
+                               file=v.get("file"))
+        ]
+        # Same call shape as core/evidence/parser._build_principles so the
+        # recomputed metrics (confidence, compliance %) match scan time.
+        pe.compute_metrics(source_file_count=source_file_count)
+
+
+def _parse_evidence_jsonl(
+    jsonl: Path, run_dir: Path, dim_id: str,
+    compiled_dir: Path | None, evaluators_dir: Path | None,
+    source_file_count: int, files_read: int,
+):
+    """Parse the evidence jsonl into an Evidence object, or None on any
+    parse failure (logged at debug)."""
+    try:
+        return parse_jsonl_to_evidence(jsonl, EvidenceContext(
+            language="", repository="", date_str="",
+            source_file_count=source_file_count, files_read=files_read,
+        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+            req_map_reader=read_req_to_principle_map,
+            refs_reader=load_compiled_refs,
+            cwe_url_template=cwe_url_template(),
+            on_quarantine=log_quarantined_findings,
+            on_malformed_line=log_malformed_jsonl_line)
+    except (OSError, ValueError, KeyError) as exc:
+        _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
+        return None
+
+
 def score_dimension_from_evidence(
     run_dir: Path,
     dim_id: str,
@@ -63,49 +123,17 @@ def score_dimension_from_evidence(
     the module-level :func:`standard_dirs` (global config resolution) so
     existing callers stay valid while tests can substitute fixed dirs.
     """
-    # dim_id / run_dir are built from request-supplied values. Guard with the
-    # path-injection remediation CodeQL recommends: normalize with
-    # os.path.normpath (a pure-string op, no filesystem access) to collapse any
-    # ".." segments, then confirm the result stays within run_dir/evidence
-    # before touching the filesystem. (validate_path_segment additionally
-    # rejects separators in dim_id at the input.)
-    validate_path_segment(dim_id)
-    evidence_dir = os.path.normpath(str(run_dir / "evidence"))
-    candidate = os.path.normpath(os.path.join(evidence_dir, f"{dim_id}_evidence.jsonl"))
-    if not candidate.startswith(evidence_dir + os.sep):
-        _logger.debug("Evidence path escapes run dir for %s/%s", run_dir.name, dim_id)
-        return None
-    jsonl = Path(candidate)
-    if evidence_file_size(jsonl) == 0:
+    jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
+    if jsonl is None or evidence_file_size(jsonl) == 0:
         return None
     compiled_dir, evaluators_dir = (standard_dirs_fn or standard_dirs)()
-    try:
-        evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
-            language="", repository="", date_str="",
-            source_file_count=source_file_count, files_read=files_read,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
-            req_map_reader=read_req_to_principle_map,
-            refs_reader=load_compiled_refs,
-            cwe_url_template=cwe_url_template(),
-            on_quarantine=log_quarantined_findings,
-            on_malformed_line=log_malformed_jsonl_line)
-    except (OSError, ValueError, KeyError) as exc:
-        _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
-        return None
+    evidence = _parse_evidence_jsonl(
+        jsonl, run_dir, dim_id, compiled_dir, evaluators_dir, source_file_count, files_read,
+    )
     if evidence is None:
         return None
 
-    for pe in evidence.principles.values():
-        pe.violations = [
-            v for v in pe.violations
-            if not is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
-                                file=v.get("file"), line=v.get("line"))
-            and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
-                               file=v.get("file"))
-        ]
-        # Same call shape as core/evidence/parser._build_principles so the
-        # recomputed metrics (confidence, compliance %) match scan time.
-        pe.compute_metrics(source_file_count=source_file_count)
+    _apply_suppressions_and_recompute(evidence, dim_id, dismissed, deleted, source_file_count)
 
     # Broad catch on purpose (mirrors mutation_rescore and the CLI print
     # guard): the engine can throw on edge-case evidence, and every consumer

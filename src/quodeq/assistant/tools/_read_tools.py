@@ -128,32 +128,33 @@ def _get_scores(ctx: ToolContext) -> dict:
     }
 
 
-def _get_report(ctx: ToolContext, dimension: str) -> dict:
-    _validate_dimension(dimension)
-    if _has_run(ctx):
-        path = ctx.run_dir / "evaluation" / f"{dimension}.json"
-        if not path.is_file():
-            raise ToolError(f"no report for dimension: {dimension}")
-        data = json.loads(path.read_text(encoding="utf-8"))
-        out = {k: data.get(k) for k in
-               ("dimension", "overallScore", "overallGrade", "principles",
-                "totals", "coveragePct")}
-        viols = data.get("violations") or []
-        scored = _scored_run_dims(ctx)
-        if scored is not None:
-            entry = next((d for d in scored if d.get("dimension") == dimension), None)
-            if entry is not None:
-                # Swap in the dismiss-adjusted fields; keep the raw report's
-                # shape (coveragePct etc.) untouched. Principles get the same
-                # "name" normalization as the accumulated branch below.
-                out["overallScore"] = entry.get("overallScore")
-                out["overallGrade"] = entry.get("overallGrade")
-                out["principles"] = [{**p, "name": p.get("name") or p.get("principle")}
-                                     for p in (entry.get("principles") or [])]
-                out["totals"] = entry.get("totals")
-                viols = entry.get("violations") or []
-        out["violations"] = [_trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]]
-        return out
+def _get_report_from_run(ctx: ToolContext, dimension: str) -> dict:
+    path = ctx.run_dir / "evaluation" / f"{dimension}.json"
+    if not path.is_file():
+        raise ToolError(f"no report for dimension: {dimension}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    out = {k: data.get(k) for k in
+           ("dimension", "overallScore", "overallGrade", "principles",
+            "totals", "coveragePct")}
+    viols = data.get("violations") or []
+    scored = _scored_run_dims(ctx)
+    if scored is not None:
+        entry = next((d for d in scored if d.get("dimension") == dimension), None)
+        if entry is not None:
+            # Swap in the dismiss-adjusted fields; keep the raw report's
+            # shape (coveragePct etc.) untouched. Principles get the same
+            # "name" normalization as the accumulated branch below.
+            out["overallScore"] = entry.get("overallScore")
+            out["overallGrade"] = entry.get("overallGrade")
+            out["principles"] = [{**p, "name": p.get("name") or p.get("principle")}
+                                 for p in (entry.get("principles") or [])]
+            out["totals"] = entry.get("totals")
+            viols = entry.get("violations") or []
+    out["violations"] = [_trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]]
+    return out
+
+
+def _get_report_from_accumulated(ctx: ToolContext, dimension: str) -> dict:
     dims = _accumulated_dims(ctx)
     if dims is None:
         raise _no_scope_error()
@@ -184,6 +185,13 @@ def _get_report(ctx: ToolContext, dimension: str) -> dict:
     }
 
 
+def _get_report(ctx: ToolContext, dimension: str) -> dict:
+    _validate_dimension(dimension)
+    if _has_run(ctx):
+        return _get_report_from_run(ctx, dimension)
+    return _get_report_from_accumulated(ctx, dimension)
+
+
 def _service(ctx: ToolContext) -> StandardsService:
     return StandardsService(ctx.evaluators_dir, ctx.compiled_dir, ctx.dimensions_file)
 
@@ -206,7 +214,7 @@ def _get_standard(ctx: ToolContext, standard_id: str) -> dict:
     return dataclasses.asdict(detail)
 
 
-def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
+def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
     registry.register(ToolSpec(
         "search_findings",
         "Full-text search the selected run's findings. Requires a selected run; "
@@ -217,6 +225,19 @@ def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
             "limit": {"type": "integer", "minimum": 1, "maximum": 50},
         }, "required": ["query"]},
         lambda **kw: _search_findings(ctx, **kw)))
+    registry.register(ToolSpec(
+        "get_violations",
+        "List violations for a dimension (or all dimensions if omitted), "
+        "severity-sorted with per-principle counts. Uses the selected run if "
+        "one is selected, otherwise the accumulated (per-dimension-latest) view.",
+        {"type": "object", "properties": {
+            "dimension": {"type": "string"},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        }},
+        lambda **kw: _get_violations(ctx, **kw)))
+
+
+def _register_score_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
     registry.register(ToolSpec(
         "get_scores",
         "Get all dimension scores and grades, as {scores: {dimension: "
@@ -235,16 +256,9 @@ def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         {"type": "object", "properties": {"dimension": {"type": "string"}},
          "required": ["dimension"]},
         lambda **kw: _get_report(ctx, **kw)))
-    registry.register(ToolSpec(
-        "get_violations",
-        "List violations for a dimension (or all dimensions if omitted), "
-        "severity-sorted with per-principle counts. Uses the selected run if "
-        "one is selected, otherwise the accumulated (per-dimension-latest) view.",
-        {"type": "object", "properties": {
-            "dimension": {"type": "string"},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
-        }},
-        lambda **kw: _get_violations(ctx, **kw)))
+
+
+def _register_standards_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
     registry.register(ToolSpec(
         "list_standards",
         "List the standards this project evaluates. Returns only the standards "
@@ -261,3 +275,9 @@ def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         {"type": "object", "properties": {"standard_id": {"type": "string"}},
          "required": ["standard_id"]},
         lambda **kw: _get_standard(ctx, **kw)))
+
+
+def register_read_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
+    _register_findings_tools(registry, ctx)
+    _register_score_tools(registry, ctx)
+    _register_standards_tools(registry, ctx)
