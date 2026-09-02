@@ -8,15 +8,16 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_
 from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
 
 
-def recompute_summary(
+def _accumulate_dimension_totals(
     dimensions: list[dict[str, Any]],
-    old_summary: dict[str, Any],
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, Any]:
-    """Recompute the accumulated summary from rescored camelCase dimension dicts.
+) -> tuple[list[tuple[str | None, float]], list[str], int, int, int, int, int]:
+    """Tally violations/compliance/severity and collect (dimension, score)
+    pairs + grades across all dimensions.
 
-    Honours *params*: the average is dimension-weighted when the formula
-    enables it, and the overall grade label uses the custom thresholds.
+    A failure_streak dimension carries a provisional, optimistic score (its
+    errored files contribute no findings). Its violations are still tallied
+    below, but it is kept out of the overall numeric average. Other
+    exit_reasons (time_limit, etc.) still count.
     """
     score_pairs: list[tuple[str | None, float]] = []
     grades: list[str] = []
@@ -26,10 +27,6 @@ def recompute_summary(
 
     for d in dimensions:
         score_str = d.get("overallScore")
-        # A failure_streak dimension carries a provisional, optimistic score
-        # (its errored files contribute no findings). Tally its violations
-        # below, but keep it out of the overall numeric average. Other
-        # exit_reasons (time_limit, etc.) still count.
         if score_str and d.get("exitReason") != "failure_streak":
             val = parse_numeric_score(score_str)
             if val is not None:
@@ -45,6 +42,22 @@ def recompute_summary(
         major += severity.get("major", 0)
         minor += severity.get("minor", 0)
 
+    return score_pairs, grades, total_violations, total_compliance, critical, major, minor
+
+
+def recompute_summary(
+    dimensions: list[dict[str, Any]],
+    old_summary: dict[str, Any],
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> dict[str, Any]:
+    """Recompute the accumulated summary from rescored camelCase dimension dicts.
+
+    Honours *params*: the average is dimension-weighted when the formula
+    enables it, and the overall grade label uses the custom thresholds.
+    """
+    score_pairs, grades, total_violations, total_compliance, critical, major, minor = (
+        _accumulate_dimension_totals(dimensions)
+    )
     avg = dimension_weighted_average(score_pairs, params)
     overall_grade = (
         score_to_grade_label(avg, params=params) if avg is not None

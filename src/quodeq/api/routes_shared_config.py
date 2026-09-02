@@ -1,0 +1,154 @@
+"""Config/status/lifecycle routes for the shared results repository.
+
+Split out of routes_shared.py (Task 9): status, config PUT/DELETE, refresh,
+and the local project-publish route.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from flask import Flask, Response, jsonify, request
+
+from quodeq.services.shared_connect import connect_shared_repo
+from quodeq.services.shared_publish import get_publish_status
+from quodeq.services.shared_repo import (
+    clone_lock,
+    last_synced_at,
+    read_state,
+    remove_clone_dir,
+    shared_cache_dir,
+)
+from quodeq.services.shared_settings import SharedSettings, read_settings, write_settings
+from quodeq.shared.validation import validate_path_segment
+
+from .routes_common import reports_dir
+
+
+def register_shared_config_routes(app: Flask) -> None:
+    # refresh_shared_clone and start_publish are looked up on the
+    # quodeq.api.routes_shared facade at call time (rather than imported
+    # directly here) so that tests patching
+    # "quodeq.api.routes_shared.refresh_shared_clone" /
+    # "...start_publish" keep working after the split.
+    from quodeq.api import routes_shared as _routes_shared
+
+    @app.get("/api/shared/status")
+    def shared_status() -> Response:
+        settings = read_settings()
+        synced = last_synced_at(settings.url) if settings.url else None
+        # The wire shape is camelCase throughout; the publish status dict is
+        # a service-internal snake_case structure, so rename at the boundary.
+        publish = get_publish_status()
+        publish["finishedAt"] = publish.pop("finished_at", None)
+        return jsonify(
+            {
+                "configured": settings.url is not None,
+                "url": settings.url,
+                "lastSynced": synced,
+                "syncing": False,
+                # Reserved for sync-level failures; always present so the UI
+                # can bind to it without existence checks.
+                "error": None,
+                "publish": publish,
+                # ok | empty | foreign | unsupported_version | missing | None
+                # (unconfigured) -- lets the UI distinguish "healthy but
+                # never published into" from the failure states instead of
+                # inferring clone health from configured+lastSynced alone.
+                "repoState": read_state(settings.url) if settings.url else None,
+            }
+        )
+
+    @app.put("/api/shared/config")
+    def shared_config_put() -> Response | tuple[Response, int]:
+        body = request.get_json(silent=True) or {}
+        url = str(body.get("url") or "").strip()
+        if not url:
+            return jsonify({"error": "url is required"}), 400
+        outcome = connect_shared_repo(url)
+        if outcome.status == "invalid_url":
+            return jsonify({"error": outcome.detail}), 400
+        if outcome.status == "clone_failed":
+            return (
+                jsonify(
+                    {"error": f"could not clone the repository, check that git can access {outcome.url}"}
+                ),
+                502,
+            )
+        if outcome.status == "foreign":
+            return (
+                jsonify(
+                    {"error": "the repository exists but does not look like a quodeq results repository"}
+                ),
+                400,
+            )
+        if outcome.status == "unsupported_version":
+            return (
+                jsonify({"error": "this shared repository requires a newer version of quodeq"}),
+                400,
+            )
+        return jsonify({"configured": True, "url": outcome.url})
+
+    @app.delete("/api/shared/config")
+    def shared_config_delete() -> Response:
+        # Audit finding A4: disconnecting must not leave the clone's cache
+        # dir (repo + index.db + score_cache.db, all under shared_cache_dir)
+        # behind on disk forever. Read the url BEFORE clearing settings (it's
+        # gone from settings after write_settings), then remove it AFTER --
+        # so a crash between the two leaves the (still-usable) clone in
+        # place rather than an orphaned dir with no settings pointing at it.
+        # remove_clone_dir handles git's read-only object files (plain
+        # rmtree leaves them behind on Windows, corrupting a later
+        # reconnect's adopted clone) and never raises: a half-removed or
+        # permission-denied cache dir must not turn a disconnect into a 500.
+        #
+        # Review finding: rmtree must run under clone_lock(url), same as
+        # every other clone mutator (ensure_shared_clone, refresh_shared_clone,
+        # publish_project) -- otherwise a concurrent publish/refresh holding
+        # the lock can have its clone directory removed mid-operation,
+        # potentially leaving a partially-deleted .git that doesn't self-heal.
+        settings = read_settings()
+        write_settings(SharedSettings(url=None))
+        if settings.url is not None:
+            with clone_lock(settings.url):
+                remove_clone_dir(shared_cache_dir(settings.url))
+        return jsonify({"configured": False})
+
+    @app.post("/api/shared/refresh")
+    def shared_refresh() -> Response | tuple[Response, int]:
+        settings = read_settings()
+        if not settings.url:
+            return jsonify({"error": "no shared repository configured"}), 400
+        ok, reason = _routes_shared.refresh_shared_clone(settings.url)
+        if not ok:
+            return (
+                jsonify(
+                    {
+                        "stale": True,
+                        "lastSynced": last_synced_at(settings.url),
+                        "error": reason,
+                    }
+                ),
+                502,
+            )
+        return jsonify({"stale": False, "lastSynced": last_synced_at(settings.url)})
+
+    @app.post("/api/projects/<project>/publish")
+    def shared_publish_start(project: str) -> tuple[Response, int]:
+        try:
+            validate_path_segment(project)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        settings = read_settings()
+        if not settings.url:
+            return jsonify({"error": "no shared repository configured"}), 400
+        outcome = _routes_shared.start_publish(
+            project, settings.url, evaluations_root=Path(reports_dir())
+        )
+        if outcome == "already_running":
+            return jsonify({"error": "a publish is already running"}), 409
+        if outcome != "started":
+            return (
+                jsonify({"error": "could not start the publish job, see server logs"}),
+                500,
+            )
+        return jsonify({"started": True}), 202

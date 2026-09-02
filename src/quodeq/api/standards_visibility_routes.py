@@ -27,32 +27,35 @@ from quodeq.shared.validation import validate_path_segment
 logger = logging.getLogger(__name__)
 
 
+def _repo_root(project_id: str) -> Path | None:
+    root = resolve_repo_root(project_id)
+    return Path(root) if root else None
+
+
+def _known_ids(app: Flask) -> set[str]:
+    service = StandardsService(
+        Path(app.config["STANDARDS_EVALUATORS_DIR"]),
+        Path(app.config["STANDARDS_COMPILED_DIR"]),
+        Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+    )
+    return {m.id.strip().lower() for m in service.list_standards()}
+
+
+def _payload(app: Flask, root: Path) -> dict:
+    ids = load_visible_standard_ids(root)
+    return {
+        "visibleStandardIds": list(ids),
+        "isDefault": visibility_is_default(root),
+        "knownStandardIds": sorted(_known_ids(app)),
+        # Additive: lets the UI's boot-time JS literal (constants.js)
+        # be reconciled against the server's own default set instead
+        # of duplicating it as a second source of truth.
+        "defaultStandardIds": list(DEFAULT_VISIBLE_STANDARDS),
+    }
+
+
 def register_visibility_routes(app: Flask) -> None:
     """Register GET/PUT endpoints for the per-project standards selection."""
-
-    def _repo_root(project_id: str) -> Path | None:
-        root = resolve_repo_root(project_id)
-        return Path(root) if root else None
-
-    def _known_ids() -> set[str]:
-        service = StandardsService(
-            Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-            Path(app.config["STANDARDS_COMPILED_DIR"]),
-            Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
-        )
-        return {m.id.strip().lower() for m in service.list_standards()}
-
-    def _payload(root: Path) -> dict:
-        ids = load_visible_standard_ids(root)
-        return {
-            "visibleStandardIds": list(ids),
-            "isDefault": visibility_is_default(root),
-            "knownStandardIds": sorted(_known_ids()),
-            # Additive: lets the UI's boot-time JS literal (constants.js)
-            # be reconciled against the server's own default set instead
-            # of duplicating it as a second source of truth.
-            "defaultStandardIds": list(DEFAULT_VISIBLE_STANDARDS),
-        }
 
     @app.get("/api/projects/<project_id>/standards-visibility")
     def get_standards_visibility(project_id: str) -> Response:
@@ -64,7 +67,7 @@ def register_visibility_routes(app: Flask) -> None:
         if root is None:
             return error_response("Project has no local repository",
                                   HTTPStatus.NOT_FOUND, "not_found")
-        return jsonify(_payload(root))
+        return jsonify(_payload(app, root))
 
     @app.put("/api/projects/<project_id>/standards-visibility")
     def put_standards_visibility(project_id: str) -> Response:
@@ -81,7 +84,7 @@ def register_visibility_routes(app: Flask) -> None:
         if raw is None:
             return error_response('Body must be {"visibleStandardIds": [...]}',
                                   HTTPStatus.BAD_REQUEST, "bad_request")
-        clean, errors = validate_visible_ids(raw, _known_ids())
+        clean, errors = validate_visible_ids(raw, _known_ids(app))
         if errors:
             resp = jsonify({"error": "Invalid visibility selection",
                             "code": "invalid_visibility", "details": errors})
@@ -90,4 +93,4 @@ def register_visibility_routes(app: Flask) -> None:
         save_visible_standard_ids(root, clean)
         logger.info("standards.visibility saved project=%s visible=%d",
                     project_id, len(clean))
-        return jsonify(_payload(root))
+        return jsonify(_payload(app, root))

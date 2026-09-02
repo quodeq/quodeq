@@ -1,21 +1,30 @@
-"""Request plumbing for assistant routes: repo/context construction, busy check."""
+"""Request plumbing for assistant routes: repo/context construction, busy check.
+
+Split (Task 10) into three modules plus this thin facade:
+  - _assistant_hygiene.py: ``run_assistant_hygiene``, ``_session_ttl_days``,
+    ``SharedSourceUnavailable``.
+  - _assistant_location.py: ``resolve_run_location``,
+    ``resolve_shared_run_location``, ``repo_attach_info``,
+    ``resolve_repo_root``.
+  - _assistant_events.py: ``event_frames``, ``_POLL_SECONDS``, ``_IDLE_LIMIT``.
+
+The moved names stay imported here (re-exported) so callers across the
+codebase and tests can keep patching/importing "quodeq.api._assistant_helpers.
+<name>" — the split modules look several of them up on this module at call
+time rather than binding their own copies, so a patch here still lands.
+"""
 from __future__ import annotations
 
-import logging
-import os
-import time
 from pathlib import Path
 from typing import Callable
 
 from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository, AssistantStore
-from quodeq.core.utils.io import resolve_child_dir
 from quodeq.assistant.tools import ToolContext, default_findings_repo_factory
 from quodeq.assistant.tools._actions import ActionContext
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
-from quodeq.services._fs_projects import get_project_info
 from quodeq.services.shared_repo import (
     read_state,
     shared_evaluations_root,
@@ -24,143 +33,22 @@ from quodeq.services.shared_repo import (
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared._env import get_evaluations_dir
 
-_logger = logging.getLogger(__name__)
-
-
-class SharedSourceUnavailable(RuntimeError):
-    """A shared-source session's clone is gone (repo disconnected)."""
-
-# ~/.quodeq/assistant.db is never pruned otherwise; a session older than this
-# is effectively dead (its worktree, if any, was reaped long before). 0
-# disables. Whole-session delete cascades to its messages/events/actions.
-_DEFAULT_SESSION_TTL_DAYS = 90
-
-
-def _session_ttl_days() -> int:
-    raw = os.environ.get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
-    if raw is None:
-        return _DEFAULT_SESSION_TTL_DAYS
-    try:
-        return max(0, int(raw))
-    except ValueError:
-        return _DEFAULT_SESSION_TTL_DAYS
-
-
-def run_assistant_hygiene(app: Flask) -> None:
-    """One-shot-per-process cleanup: reap leaked worktrees, prune old sessions.
-
-    Runs on the first assistant request. Worktrees are GC'd BEFORE the session
-    prune so a pruned session's on-disk worktree/branch is already gone.
-    Never raises — hygiene must not break the request that triggered it.
-    """
-    if getattr(app, "_assistant_hygiene_done", False):
-        return
-    app._assistant_hygiene_done = True
-    from quodeq.assistant.worktree import gc_worktrees  # noqa: PLC0415
-    repo = get_repository(app)
-    try:
-        gc_worktrees(repo)
-        removed = repo.prune_sessions_older_than(_session_ttl_days())
-        if removed:
-            _logger.info("Pruned %d old assistant session(s)", removed)
-    except Exception:  # noqa: BLE001 — hygiene is best-effort
-        _logger.warning("assistant hygiene failed", exc_info=True)
-
-_POLL_SECONDS = 0.25
-_IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s idle backstop. The stream now stays
-# open across turns (done/error no longer end event_frames), so this bounds a
-# session that sits idle with NO new frames for the whole window — a turn that
-# dies without emitting a terminal frame (e.g. a crashed daemon thread), or a
-# session left open with no further turns. On the backstop the generator
-# closes and the client reconnects on its next turn. Sized generously above
-# the slowest legitimate gap (a cold-loading local model or a CLI provider's
-# ~500s read timeout) so it never truncates a live turn.
-
-
-def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str | None]:
-    """Resolve ``(run_dir, repo_root)`` from a ``{projectId, runId}`` pair.
-
-    Reuses the same layout the run index and project routes already rely on
-    (see ``services/run_index.py``'s ``_walk_run_dirs`` and
-    ``services/_fs_projects.get_project_info``): a run lives at
-    ``<evaluations_root>/<project_id>/<run_id>`` where ``project_id`` is the
-    directory name under ``get_evaluations_dir()`` (Plan-1's "project_uuid"),
-    and the repo root is ``repository_info.json``'s ``path`` field, read via
-    the existing ``get_project_info`` helper. Returns ``(None, None)`` when
-    the run directory does not exist on disk.
-
-    This is only called when the UI selects a SPECIFIC run. On the overview
-    the UI sends no runId and the session stays run-unscoped; the assistant's
-    detail tools then read the accumulated (per-dimension-latest) composition
-    from ``project_id`` + ``reports_dir`` instead — matching the dashboard,
-    which picks each dimension's latest run independently rather than binding
-    one whole run.
-    """
-    evaluations_root = Path(get_evaluations_dir())
-    # Resolve both segments against the directory listing rather than joining
-    # and then jailing the result. A crafted project_id/run_id ("../..")
-    # matches no entry, so there is nothing to contain afterwards. This
-    # replaces the old resolve() + relative_to() + is_dir() sequence: those
-    # three steps existed to undo a join we no longer perform.
-    project_dir = resolve_child_dir(evaluations_root, project_id)
-    run_dir = resolve_child_dir(project_dir, run_id) if project_dir else None
-    if run_dir is None:
-        return None, None
-    return run_dir, resolve_repo_root(project_id)
-
-
-def resolve_shared_run_location(project_id: str, run_id: str) -> str | None:
-    """Shared-clone sibling of resolve_run_location: the run dir under the
-    shared repo's evaluations root, jailed the same way (a crafted
-    project_id/run_id must not escape the clone). Returns None when no shared
-    repo is configured or the directory does not exist. Shared sessions never
-    attach a repo root: the clone stores results, not a working copy, so
-    unlike the local resolver this returns only the run dir.
-    """
-    settings = read_settings()
-    if not settings.url:
-        return None
-    root = shared_evaluations_root(settings.url).resolve()
-    project_dir = resolve_child_dir(root, project_id)
-    run_dir = resolve_child_dir(project_dir, run_id) if project_dir else None
-    if run_dir is None:
-        return None
-    return str(run_dir)
-
-
-def repo_attach_info(project_id: str | None) -> tuple[str | None, str]:
-    """(repo_root, reason) for the UI's attachment chip and write gate.
-
-    Reasons: ok, no_project, unknown_project, no_recorded_path,
-    online_project, path_missing."""
-    if not project_id:
-        return None, "no_project"
-    info = get_project_info(get_evaluations_dir(), project_id)
-    if info is None:
-        return None, "unknown_project"
-    path = info.get("path")
-    if not path or not isinstance(path, str):
-        return None, "no_recorded_path"
-    if str(info.get("location", "")).lower() == "online" or "://" in path:
-        return None, "online_project"
-    if not Path(path).is_dir():
-        return None, "path_missing"
-    return path, "ok"
-
-
-def resolve_repo_root(project_id: str) -> str | None:
-    """Resolve the project's local working copy from ``project_id`` alone.
-
-    The repo root is a PROJECT-level fact (``repository_info.json``'s
-    ``path``), independent of any run: overview/accumulated sessions carry no
-    ``runId`` yet still need repo access for the code-reading tools. Returns
-    the path only when it is an existing local directory, so online projects
-    (whose ``path`` is a URL) and moved/deleted working copies stay detached
-    instead of carrying a bogus root. ``get_project_info`` jails the lookup
-    to the evaluations root; the stored ``path`` itself is server-side data
-    written at analysis time, never client input.
-    """
-    return repo_attach_info(project_id)[0]
+from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch target
+    SharedSourceUnavailable,
+    _session_ttl_days,
+    run_assistant_hygiene,
+)
+from quodeq.api._assistant_location import (  # noqa: F401 — re-export/patch target
+    repo_attach_info,
+    resolve_repo_root,
+    resolve_run_location,
+    resolve_shared_run_location,
+)
+from quodeq.api._assistant_events import (  # noqa: F401 — re-export/patch target
+    _IDLE_LIMIT,
+    _POLL_SECONDS,
+    event_frames,
+)
 
 
 def get_repository(app: Flask) -> AssistantStore:
@@ -187,6 +75,29 @@ def build_action_context(app: Flask) -> ActionContext:
     )
 
 
+def _resolve_shared_source(session: dict) -> tuple[Path, Path | None]:
+    """(reports_dir, score_cache_path) for the session's source.
+
+    Local sessions read the regular evaluations dir with no per-clone score
+    cache. Shared sessions resolve reports_dir against the shared clone and
+    carry the per-clone score-cache path; raises SharedSourceUnavailable when
+    no shared repository is configured or its local clone state is unusable
+    (the messages route maps this to a 409 rather than a 500). A
+    format-version bump or a foreign clone pulled in by a background refresh
+    must stop an already-open session's reads too, same as every
+    /api/shared/* route enforces at request time.
+    """
+    if (session.get("source") or "local") != "shared":
+        return Path(get_evaluations_dir()), None
+    settings = read_settings()
+    if not settings.url:
+        raise SharedSourceUnavailable("shared repository not configured")
+    state = read_state(settings.url)
+    if state not in ("ok", "empty"):
+        raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
+    return shared_evaluations_root(settings.url), shared_score_cache_path(settings.url)
+
+
 def build_tool_context(
     app: Flask, session: dict, *, repo_root_resolver: Callable[[str], str | None] = resolve_repo_root,
 ) -> ToolContext:
@@ -196,27 +107,10 @@ def build_tool_context(
     ``runDir`` and ``project_uuid`` holds the UI's ``repoRoot`` — the
     create-session route maps those request fields onto these columns.
     Plan 3 revisits this naming with a schema v2 if needed.
-    Shared-source sessions resolve reports_dir against the shared clone and
-    carry read_only + the per-clone score-cache path.
     """
     run_dir = session.get("run_id")
     source = session.get("source") or "local"
-    reports_dir = Path(get_evaluations_dir())
-    score_cache_path: Path | None = None
-    if source == "shared":
-        settings = read_settings()
-        if not settings.url:
-            # The session outlived the shared-repo connection; the messages
-            # route maps this to a 409 rather than a 500.
-            raise SharedSourceUnavailable("shared repository not configured")
-        # A format-version bump or a foreign clone pulled in by a background
-        # refresh must stop an already-open session's reads too, same as
-        # every /api/shared/* route enforces at request time.
-        state = read_state(settings.url)
-        if state not in ("ok", "empty"):
-            raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
-        reports_dir = shared_evaluations_root(settings.url)
-        score_cache_path = shared_score_cache_path(settings.url)
+    reports_dir, score_cache_path = _resolve_shared_source(session)
     repo_root = (
         Path(session["project_uuid"]) if session.get("project_uuid") else None)
     # Shared sessions never attach a local repo root (the clone has no
@@ -256,40 +150,3 @@ def local_provider_busy(provider_id: str) -> bool:
     if provider is None:
         return False
     return bool(provider.list_evaluations(limit=20, states={"running"}))
-
-
-def event_frames(repository: AssistantStore, session_id: str, after_seq: int):
-    """Generator of (seq, frame) tuples or ``None`` heartbeats.
-
-    Replays stored events after ``after_seq``, then polls indefinitely,
-    yielding new events (and ``None`` heartbeat sentinels while idle) so a
-    SINGLE SSE connection serves EVERY turn in the session, not just the
-    first. ``done``/``error`` frames are still yielded — the client uses them
-    as turn markers to clear its spinner and start a fresh answer bubble — but
-    they no longer end the generator, so a second (or third) turn's frames,
-    appended after the first turn's ``done``, still reach the browser.
-
-    Each idle tick with no new rows yields ``None`` (a heartbeat sentinel the
-    caller turns into an SSE comment / data frame) instead of sleeping
-    silently, so slow-starting local models and long gaps between frames — or
-    between turns — don't trip proxy/connection idle timeouts. The idle
-    counter resets on ANY new event (including across turns), so only a
-    genuinely idle session (no new frames for the whole ``_IDLE_LIMIT``
-    window) hits the backstop and closes; the client then reconnects on its
-    next turn. Termination is therefore either that idle backstop or the
-    client disconnecting (the generator is GC'd → ``GeneratorExit``). The
-    traversal stays ordered by seq with ``last`` advancing so no frame is
-    missed or duplicated.
-    """
-    last, idle = after_seq, 0
-    while idle < _IDLE_LIMIT:
-        rows = repository.events_after(session_id, last)
-        if not rows:
-            idle += 1
-            yield None
-            time.sleep(_POLL_SECONDS)
-            continue
-        idle = 0
-        for seq, frame in rows:
-            last = seq
-            yield seq, frame

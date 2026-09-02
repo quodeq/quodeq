@@ -1,20 +1,39 @@
-"""Metadata and detection helpers for the filesystem action provider."""
+"""Metadata and detection helpers for the filesystem action provider.
+
+Split (Task 13) into two sibling modules plus this orchestrator:
+  - _fs_project_primitives.py: leaf metadata reads (_read_scan_summary,
+    _check_path_exists, _extract_project_metadata, _read_repo_info,
+    _local_repo_root).
+  - _fs_discipline.py: language-stat and discipline-inference helpers
+    (_read_language_stats, _read_discipline_from_eval,
+    _find_discipline_in_run, _infer_discipline, _has_fingerprints).
+
+Both are re-exported here: _local_repo_root is used by compare.py, and
+_has_fingerprints/_infer_discipline are used by _fs_projects.py.
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
-from quodeq.services._wiring import (
-    RunInfo,
-    read_repository_info,
-    read_run_data,
-    read_scan_json,
-    safe_read_dir,
-    summarize_dimensions,
+from quodeq.services._wiring import RunInfo, read_run_data, summarize_dimensions
+from quodeq.services._fs_project_primitives import _local_repo_root
+from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
+    _check_path_exists,
+    _extract_project_metadata,
+    _read_repo_info,
+    _read_scan_summary,
+)
+from quodeq.services._fs_discipline import (  # noqa: F401 — re-export
+    _find_discipline_in_run,
+    _has_fingerprints,
+    _infer_discipline,
+    _read_discipline_from_eval,
+    _read_language_stats,
 )
 from quodeq.shared.validation import validate_path_segment
 
@@ -24,104 +43,86 @@ if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
 
 
-def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
-    """Read scan.json and return coverage fields, or empty dict if not available."""
-    data = read_scan_json(reports_root / entry_name)
-    if data is None:
-        return {}
-    return {"scanDate": data.get("scanned_at"), "totalFiles": data.get("total_files")}
+def _select_accumulated_dims(
+    reports_root: Path, entry_name: str, runs: list[RunInfo], visible_set: set[str],
+) -> tuple[dict[str, object], dict[str, Path], int | None]:
+    """Pick each dimension's latest valid result across the default view runs.
 
+    Same run-set selection as the accumulated Overview (complete-only,
+    cancelled fallback, never failed or in_progress). Iterating ALL runs
+    newest-first gave the card a different grade than the Overview whenever
+    the newest run was cancelled/failed/in_progress.
 
-def _check_path_exists(path: str | None, location: str | None) -> bool | None:
-    """Return whether a local path exists, or None if not applicable."""
-    if location == "local" and path:
-        return Path(path).exists()
-    return None
-
-
-def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str, Any]:
-    """Extract and normalize optional metadata fields from repository info."""
-    return {
-        "name": info.get("name") or entry_name,
-        "parent": info.get("parent") or None,
-        "displayName": info.get("displayName") or None,
-        "discipline": info.get("discipline") or None,
-        "path": info.get("path") or None,
-        "location": info.get("location") or None,
-        "scopePath": info.get("scopePath") or None,
-    }
-
-
-def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
-    """Read repository_info.json for a project, returning an empty dict on failure."""
-    return read_repository_info(reports_root / entry_name) or {}
-
-
-def _local_repo_root(reports_root: Path, entry_name: str) -> Path | None:
-    """The analyzed repo's local working copy, or None when there isn't one.
-
-    Same gate as the API's ``repo_attach_info``: a recorded path that is not
-    an online URL and still exists as a directory. Online projects and moved
-    working copies resolve to None, which downstream visibility lookups treat
-    as "use the default selection".
+    Each dimension may come from a DIFFERENT run (last valid run per
+    dimension), so ``run_dir_by_dim`` remembers the source run's directory
+    per dimension: the rescore in ``_compute_summary`` must use THAT run's
+    evidence, not the newest run's.
     """
-    info = _read_repo_info(reports_root, entry_name)
-    path = info.get("path")
-    if not path or not isinstance(path, str):
-        return None
-    if str(info.get("location", "")).lower() == "online" or "://" in path:
-        return None
-    root = Path(path)
-    return root if root.is_dir() else None
+    from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
+    from quodeq.services._accumulated_data import _has_valid_score  # noqa: PLC0415
+
+    project_dir = reports_root / entry_name
+    view_runs = select_default_view_runs(runs)
+    latest_by_dim: dict[str, object] = {}
+    run_dir_by_dim: dict[str, Path] = {}
+    files_count: int | None = None
+    for run in view_runs:
+        dims = read_run_data(reports_root, entry_name, run.run_id)
+        for d in dims:
+            # Same trust gate as the accumulated Overview (_has_valid_score):
+            # skip a coverage-0 stub so the card falls through to a real
+            # older run instead of showing the stub's inflated grade. Hidden
+            # standards are skipped entirely: the Overview headline excludes
+            # them, and a dimension the user cannot see must not move the
+            # grade.
+            if (d.dimension and d.dimension.lower() in visible_set
+                    and d.dimension not in latest_by_dim and _has_valid_score(d)):
+                latest_by_dim[d.dimension] = d
+                validate_path_segment(run.run_id)
+                run_dir_by_dim[d.dimension] = project_dir / run.run_id
+            if files_count is None and d.source_file_count:
+                files_count = d.source_file_count
+    return latest_by_dim, run_dir_by_dim, files_count
+
+
+def _apply_dismiss_delete_rescore(
+    latest_by_dim: dict[str, object], run_dir_by_dim: dict[str, Path],
+    dismissed: set, deleted: set, params: "ScoringParams",
+) -> list:
+    """Rescore each dimension from the run it was sourced from, if needed.
+
+    Applies the project-wide dismiss/delete rescore so the card agrees with
+    every other read path (detail/explorer/dashboard/trend all route through
+    ``scored_run_dimensions``, i.e. read_run_data + ``_rescore_dimension``).
+    ``read_run_data`` returns the raw scan; its SQL grade overlay reflects
+    dismisses only when the run is freshly projected, and NEVER reflects
+    deletions. Without this the project-card grade kept a stale, too-low
+    value for any project with deletions (or dismissals on a
+    not-yet-reprojected run) -- diverging from the score shown everywhere
+    else.
+    """
+    if not (dismissed or deleted):
+        return list(latest_by_dim.values())
+    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+
+    return [
+        _rescore_dimension(
+            d, dismissed, deleted, params=params,
+            run_dir=run_dir_by_dim.get(dim_name),
+        )
+        for dim_name, d in latest_by_dim.items()
+    ]
 
 
 def _compute_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
     params: "ScoringParams", visible_set: set[str],
 ) -> dict:
-    project_dir = reports_root / entry_name
     try:
-        # Same run-set selection as the accumulated Overview
-        # (complete-only, cancelled fallback, never failed or
-        # in_progress). Iterating ALL runs newest-first gave the card
-        # a different grade than the Overview whenever the newest run
-        # was cancelled/failed/in_progress.
-        from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
-        from quodeq.services._accumulated_data import _has_valid_score  # noqa: PLC0415
-        view_runs = select_default_view_runs(runs)
-        latest_by_dim: dict[str, object] = {}
-        # Each dimension may come from a DIFFERENT run (last valid run per
-        # dimension), so remember the source run's directory per dimension:
-        # the rescore below must use THAT run's evidence, not the newest
-        # run's.
-        run_dir_by_dim: dict[str, Path] = {}
-        files_count: int | None = None
-        for run in view_runs:
-            dims = read_run_data(reports_root, entry_name, run.run_id)
-            for d in dims:
-                # Same trust gate as the accumulated Overview
-                # (_has_valid_score): skip a coverage-0 stub so the card
-                # falls through to a real older run instead of showing
-                # the stub's inflated grade. Hidden standards are skipped
-                # entirely: the Overview headline excludes them, and a
-                # dimension the user cannot see must not move the grade.
-                if (d.dimension and d.dimension.lower() in visible_set
-                        and d.dimension not in latest_by_dim and _has_valid_score(d)):
-                    latest_by_dim[d.dimension] = d
-                    validate_path_segment(run.run_id)
-                    run_dir_by_dim[d.dimension] = project_dir / run.run_id
-                if files_count is None and d.source_file_count:
-                    files_count = d.source_file_count
+        latest_by_dim, run_dir_by_dim, files_count = _select_accumulated_dims(
+            reports_root, entry_name, runs, visible_set)
         acc_dims = list(latest_by_dim.values())
-        # Apply the project-wide dismiss/delete rescore so the card agrees
-        # with every other read path (detail/explorer/dashboard/trend all
-        # route through ``scored_run_dimensions``, i.e. read_run_data +
-        # ``_rescore_dimension``). ``read_run_data`` returns the raw scan;
-        # its SQL grade overlay reflects dismisses only when the run is
-        # freshly projected, and NEVER reflects deletions. Without this the
-        # project-card grade kept a stale, too-low value for any project
-        # with deletions (or dismissals on a not-yet-reprojected run) —
-        # diverging from the score shown everywhere else.
+        project_dir = reports_root / entry_name
         from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
         from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
         dismissed = dismissed_keys(project_dir)
@@ -133,17 +134,8 @@ def _compute_summary(
     # From here on it is business math over already-loaded data. It stays
     # OUTSIDE the try: a KeyError raised by a rescoring/summarising bug must
     # surface, not silently downgrade the card to {"grade": None}.
-    if dismissed or deleted:
-        from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
-        # Per-dimension run_dir: each dimension is rescored from the
-        # evidence of the run it was actually sourced from.
-        acc_dims = [
-            _rescore_dimension(
-                d, dismissed, deleted, params=params,
-                run_dir=run_dir_by_dim.get(dim_name),
-            )
-            for dim_name, d in latest_by_dim.items()
-        ]
+    acc_dims = _apply_dismiss_delete_rescore(
+        latest_by_dim, run_dir_by_dim, dismissed, deleted, params)
     if not acc_dims:
         return {"grade": None, "score": None, "files": files_count}
     summary = summarize_dimensions(acc_dims, params)
@@ -163,6 +155,53 @@ def _summary_version(
     version = accumulated_cache_version(
         project_dir, params, run_versions, as_of=None, visible_dims=visible)
     return version, visible_set
+
+
+def _compute_on_miss_summary(
+    reports_root: Path, entry_name: str, runs: list[RunInfo],
+    params: "ScoringParams", visible_set: set[str], version: str,
+) -> tuple[str | None, float | None, int | None, bool]:
+    """Compute-and-cache branch of ``_read_accumulated_summary``.
+
+    Reached when *compute_on_miss* controls what happens on a cache miss.
+    False (the default, used by the local projects-list path) never computes
+    inline here -- callers only reach this branch via True (the shared-repo
+    route, which has no warm-up engine, keeping the pre-warm-up behavior of
+    computing inline on a miss) or the kill switch
+    (``QUODEQ_DISABLE_SCORE_CACHE``), which always computes inline too since
+    a disabled cache can never be filled by the warm-up engine.
+    """
+    from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
+
+    payload = cached_project_summary(
+        entry_name, version,
+        lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+    )
+    return payload["grade"], payload["score"], payload["files"], False
+
+
+def _read_settled_or_pending_summary(
+    entry_name: str, runs: list[RunInfo], version: str,
+) -> tuple[str | None, float | None, int | None, bool]:
+    """Read-only branch of ``_read_accumulated_summary``.
+
+    Only a project with NO runs at all will never be picked up by the
+    warm-up engine (``warm_project_summary`` has the same empty-runs gate),
+    so a cache miss here would report pending forever -- report it settled
+    instead. A project whose runs are all cancelled/in-progress (no
+    "complete" run) is NOT special-cased here: ``warm_project_summary``
+    computes a fallback grade for it too (cancelled fallback via
+    ``select_default_view_runs``), so its cache must still be consulted
+    below rather than assumed empty forever.
+    """
+    from quodeq.services.score_cache import read_project_summary_cached  # noqa: PLC0415
+
+    if not runs:
+        return None, None, None, False
+    hit = read_project_summary_cached(entry_name, version)
+    if hit is not None:
+        return hit["grade"], hit["score"], hit["files"], False
+    return None, None, None, True
 
 
 def _read_accumulated_summary(
@@ -185,53 +224,18 @@ def _read_accumulated_summary(
     selection is folded into the cache version so toggling a standard
     invalidates the cached card.
 
-    *compute_on_miss* controls what happens on a cache miss. False (the
-    default, used by the local projects-list path) never computes inline: a
-    miss reports ``pending=True`` and leaves the warm-up engine to fill the
-    cache, so first paint after an upgrade never blocks on a full recompute.
-    True (used by the shared-repo route, which has no warm-up engine) keeps
-    the pre-warm-up behavior of computing inline on a miss. The kill switch
-    (``QUODEQ_DISABLE_SCORE_CACHE``) always computes inline too, since a
-    disabled cache can never be filled by the warm-up engine.
-
-    On the read-only path, only a project with NO runs at all is settled
-    (``pending=False`` without a cache lookup) -- ``warm_project_summary``
-    requires at least one run too, so such a project can never be warmed and
-    reporting it pending would be a lie. A project whose runs exist but
-    include no ``complete`` run (cancelled-only, in-progress-only) still gets
-    a cache lookup: ``warm_project_summary`` computes a fallback grade for it
-    via ``select_default_view_runs``' cancelled fallback, so a miss there is
-    genuinely pending, not settled.
+    See ``_compute_on_miss_summary`` and ``_read_settled_or_pending_summary``
+    for the two branches' cache-hit/miss rationale.
     """
     if params is None:
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.services.score_cache import (  # noqa: PLC0415
-        cached_project_summary, read_project_summary_cached,
-    )
     from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
     version, visible_set = _summary_version(reports_root, entry_name, runs, params)
     if compute_on_miss or score_cache_disabled():
-        payload = cached_project_summary(
-            entry_name, version,
-            lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
-        )
-        return payload["grade"], payload["score"], payload["files"], False
-    # Read-only branch only: a project with NO runs at all will never be
-    # picked up by the warm-up engine (warm_project_summary has the same
-    # empty-runs gate below), so a cache miss here would report pending
-    # forever -- report it settled instead. A project whose runs are all
-    # cancelled/in-progress (no "complete" run) is NOT special-cased here:
-    # warm_project_summary computes a fallback grade for it too (cancelled
-    # fallback via select_default_view_runs), so its cache must still be
-    # consulted below rather than assumed empty forever.
-    if not runs:
-        return None, None, None, False
-    hit = read_project_summary_cached(entry_name, version)
-    if hit is not None:
-        return hit["grade"], hit["score"], hit["files"], False
-    return None, None, None, True
+        return _compute_on_miss_summary(reports_root, entry_name, runs, params, visible_set, version)
+    return _read_settled_or_pending_summary(entry_name, runs, version)
 
 
 def warm_project_summary(reports_root: Path, entry_name: str) -> None:
@@ -257,63 +261,3 @@ def warm_project_summary(reports_root: Path, entry_name: str) -> None:
         entry_name, version,
         lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
     )
-
-
-def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:
-    """Read language_stats from the latest run's manifest.json."""
-    for run in runs:
-        manifest_path = reports_root / entry_name / run.run_id / "evidence" / "manifest.json"
-        try:
-            data = json.loads(manifest_path.read_text(encoding="utf-8"))
-            stats = data.get("language_stats") or {}
-            if stats:
-                return {k.lstrip("."): v for k, v in stats.items()}
-        except (json.JSONDecodeError, OSError):
-            continue
-    return {}
-
-
-def _read_discipline_from_eval(eval_path: Path) -> str | None:
-    """Try to read a discipline string from a single evidence JSON file."""
-    try:
-        return json.loads(eval_path.read_text(encoding="utf-8")).get("discipline") or None
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def _find_discipline_in_run(evidence_dir: Path) -> str | None:
-    """Search a single run's evidence directory for a discipline string."""
-    for ev in safe_read_dir(evidence_dir):
-        if ev.name.endswith("_evidence.json"):
-            found = _read_discipline_from_eval(Path(ev.path))
-            if found:
-                return found
-    return None
-
-
-def _infer_discipline(reports_root: Path, project: str) -> str | None:
-    """Infer discipline from the most recent evidence file."""
-    for run in sorted(safe_read_dir(reports_root / project), key=lambda e: e.name, reverse=True):
-        if not run.is_dir():
-            continue
-        found = _find_discipline_in_run(reports_root / project / run.name / "evidence")
-        if found:
-            return found
-    return None
-
-
-def _has_fingerprints(reports_root: Path, project: str) -> bool:
-    """Check if any evaluation run has fingerprint files for this project."""
-    project_dir = reports_root / project
-    if not project_dir.exists():
-        return False
-    try:
-        for run_dir in sorted(project_dir.iterdir(), reverse=True):
-            evidence_dir = run_dir / "evidence"
-            if not evidence_dir.is_dir():
-                continue
-            if any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir()):
-                return True
-    except OSError as e:
-        _logger.warning("Could not read fingerprint dir %s: %s", project_dir, e)
-    return False
