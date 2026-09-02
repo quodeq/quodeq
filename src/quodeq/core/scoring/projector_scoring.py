@@ -64,6 +64,36 @@ def _finding_to_dict(f: Finding) -> dict[str, Any]:
     return d
 
 
+def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: int) -> dict[str, Any]:
+    return {
+        "principle_id": principle_id,
+        "score": None,
+        "grade": "Insufficient",
+        "finding_count": finding_count,
+        "dismissed_count": dismissed_count,
+    }
+
+
+def _score_principle_math(vt_counts, ct_counts, params: ScoringParams) -> tuple[float, str]:
+    base = violation_base(vt_counts, params=params)
+    lift = compliance_lift(ct_counts, vt_counts, params=params)
+    ceil = violation_ceiling(vt_counts, params=params)
+    floor = severity_grade_floor(vt_counts, params=params)
+
+    raw = base + (10.0 - base) * lift
+    # Floor first, ceiling last. The two guards cross when a principle carries a
+    # LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
+    # above the volume ceiling. Clamping the other way round handed back the
+    # floor and discarded the ceiling -- the one guard that encodes volume -- so
+    # a principle with 269 findings read "Good". Algebraically identical whenever
+    # floor <= ceil, so only the contradictory case moves.
+    # Keep byte-identical with services/rescore.py.
+    final = min(ceil, max(floor, raw))
+    final = round(final, 1)
+    grade = score_to_grade_label(final, params=params)
+    return final, grade
+
+
 def compute_principle_grade(
     *,
     principle_id: str,
@@ -87,13 +117,7 @@ def compute_principle_grade(
     docstring).
     """
     if not findings and not compliance:
-        return {
-            "principle_id": principle_id,
-            "score": None,
-            "grade": "Insufficient",
-            "finding_count": 0,
-            "dismissed_count": dismissed_count,
-        }
+        return _insufficient_grade(principle_id, 0, dismissed_count)
 
     confidence_level = classify_confidence_level(
         len(findings), len(compliance),
@@ -101,43 +125,16 @@ def compute_principle_grade(
         source_file_count=source_file_count,
     )
     if confidence_level == "low":
-        return {
-            "principle_id": principle_id,
-            "score": None,
-            "grade": "Insufficient",
-            "finding_count": len(findings),
-            "dismissed_count": dismissed_count,
-        }
+        return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
     v_dicts = [_finding_to_dict(v) for v in findings]
     c_dicts = [_finding_to_dict(c) for c in compliance]
     vt_counts, ct_counts, _ = compute_tallies(v_dicts, c_dicts)
 
     if not any(vt_counts.values()) and not any(ct_counts.values()):
-        return {
-            "principle_id": principle_id,
-            "score": None,
-            "grade": "Insufficient",
-            "finding_count": len(findings),
-            "dismissed_count": dismissed_count,
-        }
+        return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
-    base = violation_base(vt_counts, params=params)
-    lift = compliance_lift(ct_counts, vt_counts, params=params)
-    ceil = violation_ceiling(vt_counts, params=params)
-    floor = severity_grade_floor(vt_counts, params=params)
-
-    raw = base + (10.0 - base) * lift
-    # Floor first, ceiling last. The two guards cross when a principle carries a
-    # LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
-    # above the volume ceiling. Clamping the other way round handed back the
-    # floor and discarded the ceiling -- the one guard that encodes volume -- so
-    # a principle with 269 findings read "Good". Algebraically identical whenever
-    # floor <= ceil, so only the contradictory case moves.
-    # Keep byte-identical with services/rescore.py.
-    final = min(ceil, max(floor, raw))
-    final = round(final, 1)
-    grade = score_to_grade_label(final, params=params)
+    final, grade = _score_principle_math(vt_counts, ct_counts, params)
 
     return {
         "principle_id": principle_id,

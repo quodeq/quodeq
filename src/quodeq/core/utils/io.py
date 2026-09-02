@@ -55,6 +55,30 @@ def validate_path_segment(*segments: str) -> None:
             )
 
 
+def _match_child_entry(entry: os.DirEntry, root: str | Path, name: str) -> str | None:
+    """Given a scandir *entry* whose name already matches *name*, return its
+    path if it is a real directory, else None (including the symlinked-dir
+    case, which logs a warning before returning None)."""
+    if entry.is_dir(follow_symlinks=False):
+        return entry.path
+    if entry.is_symlink() and entry.is_dir():
+        # The exact case a user hits after relocating a data dir
+        # and leaving a symlink behind: the name they asked for is
+        # right there in the listing, but resolution refuses it.
+        # Without this line the refusal is indistinguishable from
+        # "no such project/run" — the UI just renders empty.
+        _logger.warning(
+            "Not following symlinked directory %s -> %s: symlinks "
+            "are excluded from path resolution by policy. Replace "
+            "the symlink with a real directory (or move the data "
+            "back) to make %r visible again.",
+            os.path.join(str(root), name),
+            os.path.realpath(entry.path),
+            name,
+        )
+    return None
+
+
 def resolve_child_dir(root: str | Path, name: str) -> str | None:
     """Return the child directory of *root* called *name*, or None if absent.
 
@@ -89,25 +113,8 @@ def resolve_child_dir(root: str | Path, name: str) -> str | None:
             for entry in entries:
                 if entry.name != name:
                     continue
-                if entry.is_dir(follow_symlinks=False):
-                    return entry.path
-                if entry.is_symlink() and entry.is_dir():
-                    # The exact case a user hits after relocating a data dir
-                    # and leaving a symlink behind: the name they asked for is
-                    # right there in the listing, but resolution refuses it.
-                    # Without this line the refusal is indistinguishable from
-                    # "no such project/run" — the UI just renders empty.
-                    _logger.warning(
-                        "Not following symlinked directory %s -> %s: symlinks "
-                        "are excluded from path resolution by policy. Replace "
-                        "the symlink with a real directory (or move the data "
-                        "back) to make %r visible again.",
-                        os.path.join(str(root), name),
-                        os.path.realpath(entry.path),
-                        name,
-                    )
                 # Names are unique within a directory — nothing else can match.
-                return None
+                return _match_child_entry(entry, root, name)
     except OSError:
         return None
     return None
