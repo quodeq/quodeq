@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import threading
-from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,19 +30,45 @@ class _StalenessCheck:
 class EnsureLockRegistry:
     """Per-run-dir locks serializing ``ensure_projected``.
 
-    The default registry below is process-wide on purpose — concurrent
-    callers projecting the same run must share one lock. Tests inject a
-    fresh registry so lock state never leaks between them.
+    Entries are refcounted: a lock is created on first ``acquire()`` for a
+    run_dir and removed once the last concurrent caller for that run_dir
+    releases it. This bounds the registry to run_dirs CURRENTLY being
+    projected, instead of growing one entry per run_dir ever seen for the
+    life of a long-lived API/dashboard process. The default registry below
+    is process-wide on purpose — concurrent callers projecting the same run
+    must share one lock. Tests inject a fresh registry so lock state never
+    leaks between them.
     """
 
     def __init__(self) -> None:
-        self._locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+        self._locks: dict[Path, threading.Lock] = {}
+        self._refcounts: dict[Path, int] = {}
+        self._registry_lock = threading.Lock()
 
-    def lock_for(self, run_dir: Path) -> threading.Lock:
-        return self._locks[run_dir]
+    @contextmanager
+    def acquire(self, run_dir: Path) -> Iterator[None]:
+        with self._registry_lock:
+            lock = self._locks.get(run_dir)
+            if lock is None:
+                lock = threading.Lock()
+                self._locks[run_dir] = lock
+                self._refcounts[run_dir] = 0
+            self._refcounts[run_dir] += 1
+        lock.acquire()
+        try:
+            yield
+        finally:
+            lock.release()
+            with self._registry_lock:
+                self._refcounts[run_dir] -= 1
+                if self._refcounts[run_dir] == 0:
+                    del self._locks[run_dir]
+                    del self._refcounts[run_dir]
 
     def clear(self) -> None:
-        self._locks.clear()
+        with self._registry_lock:
+            self._locks.clear()
+            self._refcounts.clear()
 
 
 _DEFAULT_LOCKS = EnsureLockRegistry()
@@ -180,7 +206,7 @@ class Projector:
         if not events_path.is_file():
             raise FileNotFoundError(f"Event log not found: {events_path}")
 
-        with self._locks.lock_for(run_dir):
+        with self._locks.acquire(run_dir):
             if project_dir is not None:
                 from quodeq.data.migrations.dismissed_json_to_actions_log import (  # noqa: PLC0415
                     migrate_if_needed,
