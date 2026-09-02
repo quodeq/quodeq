@@ -16,17 +16,12 @@ function friendlyCloneError(err) {
  * RepoScanStep.jsx's scan/clone submission state and handlers (including the
  * 409-resume flow), extracted verbatim.
  */
-export function useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan }) {
-  const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
-  const [subStep, setSubStep] = useState('input'); // 'input' | 'cloneTarget'
-  const [cloneSubmitting, setCloneSubmitting] = useState(false);
-  const [cloneError, setCloneError] = useState(null);
-
-  // 409 + existingProjectId means a project was already registered for this
-  // repo. If it has no evaluations yet, silently resume into it — the user
-  // most likely abandoned an earlier onboarding attempt. If it does have
-  // evaluations, fall through to the normal error UI so the user can decide.
-  async function tryResumeExisting(existingProjectId) {
+// 409 + existingProjectId means a project was already registered for this
+// repo. If it has no evaluations yet, silently resume into it — the user
+// most likely abandoned an earlier onboarding attempt. If it does have
+// evaluations, fall through to the normal error UI so the user can decide.
+function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
+  return async function tryResumeExisting(existingProjectId) {
     try {
       const info = await getProjectInfo(existingProjectId);
       if (info.runsCount > 0) return false;
@@ -43,9 +38,11 @@ export function useRepoScanStep({ state, actions, createProject, getProjectInfo,
     } catch {
       return false;
     }
-  }
+  };
+}
 
-  async function handleSubmit() {
+function makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting }) {
+  return async function handleSubmit() {
     const repo = state.repo.value?.trim();
     if (!repo) return;
     if (URL_RE.test(repo)) {
@@ -66,9 +63,11 @@ export function useRepoScanStep({ state, actions, createProject, getProjectInfo,
       }
       actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId });
     }
-  }
+  };
+}
 
-  async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
+function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
+  return async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
     const repo = state.repo.value?.trim();
     setCloneSubmitting(true);
     setCloneError(null);
@@ -94,7 +93,20 @@ export function useRepoScanStep({ state, actions, createProject, getProjectInfo,
     } finally {
       setCloneSubmitting(false);
     }
-  }
+  };
+}
+
+export function useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan }) {
+  const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
+  const [subStep, setSubStep] = useState('input'); // 'input' | 'cloneTarget'
+  const [cloneSubmitting, setCloneSubmitting] = useState(false);
+  const [cloneError, setCloneError] = useState(null);
+
+  const tryResumeExisting = makeTryResumeExisting({ getProjectInfo, getProjectScan, actions });
+  const handleSubmit = makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting });
+  const handleCloneTargetSubmit = makeHandleCloneTargetSubmit({
+    state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting,
+  });
 
   function handleFolderSelect(path) {
     actions.setRepo({ value: path, source: 'local' });

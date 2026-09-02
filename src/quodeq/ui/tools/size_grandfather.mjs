@@ -12,8 +12,6 @@ export const SIZE_GRANDFATHER = [
   "src/features/assistant/useAssistantStream.js",
   "src/features/dashboard/components/DashboardPage.jsx",
   "src/features/map/viz/components/GalaxyView.jsx",
-  "src/features/onboarding/components/steps/StandardLaunchStep.jsx",
-  "src/features/onboarding/hooks/useRepoScanStep.js",
   "src/features/settings/components/CloudProviderTab.jsx",
   "src/features/settings/components/ModelSection.jsx",
   "src/features/settings/components/ServerSection.jsx",
