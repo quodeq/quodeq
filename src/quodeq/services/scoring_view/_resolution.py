@@ -77,6 +77,40 @@ def _trustworthy_dims_in_run(evaluation_dir: Path) -> set[str]:
 # resolve_latest_per_dim — the core resolver
 # ---------------------------------------------------------------------------
 
+def _dim_resolution_from_eval(eval_path: Path, dim_id: str, run: RunInfo) -> DimResolution | None:
+    data = _load_eval(eval_path)
+    if not _is_trustworthy_eval(data):
+        return None
+    return DimResolution(
+        dim_id=dim_id,
+        eval_path=eval_path,
+        run_id=run.run_id,
+        run_state=run.status,  # type: ignore[arg-type]
+        run_date_iso=run.date_iso,
+        files_read=int(data["filesRead"]),
+        overall_score=data.get("overallScore"),
+        overall_grade=data.get("overallGrade"),
+    )
+
+
+def _collect_run_dim_resolutions(
+    project_dir: Path, run: RunInfo, already_resolved: dict[str, DimResolution],
+) -> dict[str, DimResolution]:
+    """Resolve every dim in *run*'s eval dir not already in *already_resolved*."""
+    eval_dir = project_dir / run.run_id / "evaluation"
+    if not eval_dir.is_dir():
+        return {}
+    found: dict[str, DimResolution] = {}
+    for eval_path in eval_dir.glob(_EVAL_GLOB):
+        dim_id = eval_path.stem
+        if dim_id in already_resolved or dim_id in found:
+            continue  # already resolved from a newer run
+        resolution = _dim_resolution_from_eval(eval_path, dim_id, run)
+        if resolution is not None:
+            found[dim_id] = resolution
+    return found
+
+
 def resolve_latest_per_dim(
     reports_root: Path,
     project: str,
@@ -118,26 +152,7 @@ def resolve_latest_per_dim(
             # Run is newer than the requested cutoff — skip without
             # consuming any of its dims, regardless of eval contents.
             continue
-        eval_dir = project_dir / run.run_id / "evaluation"
-        if not eval_dir.is_dir():
-            continue
-        for eval_path in eval_dir.glob(_EVAL_GLOB):
-            dim_id = eval_path.stem
-            if dim_id in out:
-                continue  # already resolved from a newer run
-            data = _load_eval(eval_path)
-            if not _is_trustworthy_eval(data):
-                continue
-            out[dim_id] = DimResolution(
-                dim_id=dim_id,
-                eval_path=eval_path,
-                run_id=run.run_id,
-                run_state=run.status,  # type: ignore[arg-type]
-                run_date_iso=run.date_iso,
-                files_read=int(data["filesRead"]),
-                overall_score=data.get("overallScore"),
-                overall_grade=data.get("overallGrade"),
-            )
+        out.update(_collect_run_dim_resolutions(project_dir, run, out))
     return out
 
 

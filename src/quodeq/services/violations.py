@@ -176,6 +176,46 @@ def _apply_rescored_grades(
     return result
 
 
+def _accept_known_dimension(
+    dimension: str, compiled_dir: Path | None, evaluators_dir: Path | None,
+) -> bool:
+    """False (logged) when *dimension* isn't in the installed set and at
+    least one standards dir is configured to check against. See
+    resolve_dimension_eval's docstring for why an unknown dimension is
+    rejected here rather than left to fail file resolution below."""
+    if (compiled_dir or evaluators_dir) and not is_known_dimension(
+        dimension, compiled_dir, evaluators_dir,
+    ):
+        _logger.warning("Rejected unknown dimension for eval resolution: %r", dimension)
+        return False
+    return True
+
+
+def _resolve_from_json_eval(
+    eval_path: Path, base: Path, project: str, run_id: str, dimension: str,
+    compiled_dir: Path | None, dkeys: set[tuple], delkeys: set[tuple],
+) -> dict[str, Any] | None:
+    filtered = _filter_dismissed_from_result(
+        parse_eval_from_json(eval_path, project, run_id, dimension, compiled_dir=compiled_dir),
+        dkeys, delkeys, dimension,
+    )
+    return _apply_rescored_grades(filtered, base, project, run_id, dimension)
+
+
+def _resolve_from_markdown(
+    markdown_path: Path, project: str, run_id: str, dimension: str,
+    dkeys: set[tuple], delkeys: set[tuple],
+) -> ViolationResponse | dict[str, Any] | None:
+    try:
+        content = read_text(markdown_path)
+    except OSError:
+        return None
+    return _filter_dismissed_from_result(
+        parse_eval_markdown(content, project, run_id, dimension),
+        dkeys, delkeys, dimension,
+    )
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     options: _ResolveOptions | None = None,
@@ -200,32 +240,18 @@ def resolve_dimension_eval(
     _stat = opts.stat_fn
     compiled_dir = opts.compiled_dir
     evaluators_dir = opts.evaluators_dir
-    if (compiled_dir or evaluators_dir) and not is_known_dimension(
-        dimension, compiled_dir, evaluators_dir,
-    ):
-        _logger.warning("Rejected unknown dimension for eval resolution: %r", dimension)
+    if not _accept_known_dimension(dimension, compiled_dir, evaluators_dir):
         return None
     dkeys = _dismissed_keys(base.parent)
     delkeys = _deleted_keys(base.parent)
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):
-        filtered = _filter_dismissed_from_result(
-            parse_eval_from_json(eval_path, project, run_id, dimension, compiled_dir=compiled_dir),
-            dkeys, delkeys, dimension,
-        )
-        return _apply_rescored_grades(filtered, base, project, run_id, dimension)
+        return _resolve_from_json_eval(eval_path, base, project, run_id, dimension, compiled_dir, dkeys, delkeys)
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if _exists(markdown_path):
-        try:
-            content = read_text(markdown_path)
-        except OSError:
-            return None
-        return _filter_dismissed_from_result(
-            parse_eval_markdown(content, project, run_id, dimension),
-            dkeys, delkeys, dimension,
-        )
+        return _resolve_from_markdown(markdown_path, project, run_id, dimension, dkeys, delkeys)
 
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
     return _try_evidence_formats(base, dimension, ctx, _exists, _stat, compiled_dir, dkeys, delkeys)
