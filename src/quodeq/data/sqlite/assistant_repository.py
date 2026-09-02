@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -23,40 +24,64 @@ def _dict_row(cursor: sqlite3.Cursor, row: tuple) -> dict:
 class AssistantRepository:
     def __init__(self, db_path: Path) -> None:
         self._db_path = Path(db_path)
+        self._conn: sqlite3.Connection | None = None
+        self._conn_lock = threading.Lock()
 
     @property
     def db_path(self) -> Path:
         return self._db_path
 
+    def _open_connection(self) -> sqlite3.Connection:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode = WAL")
+        # NORMAL is durable against app crashes under WAL and skips the
+        # per-commit fsync. CLI streaming writes one event row per text
+        # delta, so a FULL fsync per commit would pace the reader thread.
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if version == 0:
+            conn.executescript(ASSISTANT_DDL)
+        elif version > ASSISTANT_SCHEMA_VERSION:
+            raise sqlite3.DatabaseError(
+                f"assistant.db schema v{version} is newer than supported "
+                f"v{ASSISTANT_SCHEMA_VERSION}"
+            )
+        elif version < ASSISTANT_SCHEMA_VERSION:
+            for target, sql in ASSISTANT_MIGRATIONS:
+                if version < target:
+                    conn.executescript(sql)
+        conn.row_factory = _dict_row
+        return conn
+
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self._db_path)
-        try:
-            conn.execute("PRAGMA journal_mode = WAL")
-            # NORMAL is durable against app crashes under WAL and skips the
-            # per-commit fsync. CLI streaming writes one event row per text
-            # delta, so a FULL fsync per commit would pace the reader thread.
-            conn.execute("PRAGMA synchronous = NORMAL")
-            conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
-            version = conn.execute("PRAGMA user_version").fetchone()[0]
-            if version == 0:
-                conn.executescript(ASSISTANT_DDL)
-            elif version > ASSISTANT_SCHEMA_VERSION:
-                raise sqlite3.DatabaseError(
-                    f"assistant.db schema v{version} is newer than supported "
-                    f"v{ASSISTANT_SCHEMA_VERSION}"
-                )
-            elif version < ASSISTANT_SCHEMA_VERSION:
-                for target, sql in ASSISTANT_MIGRATIONS:
-                    if version < target:
-                        conn.executescript(sql)
-            conn.row_factory = _dict_row
-            yield conn
-            conn.commit()
-        finally:
-            conn.close()
+        """Yield the pooled connection, opening + migrating it on first use.
+
+        ``check_same_thread=False`` plus this lock let the connection be
+        reused safely across the request threads that share one
+        AssistantRepository instance, instead of paying connect+PRAGMA+
+        migration-check overhead on every single call.
+        """
+        with self._conn_lock:
+            if self._conn is None:
+                self._conn = self._open_connection()
+            conn = self._conn
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    def close(self) -> None:
+        """Close the pooled connection, if open. Safe to call multiple times."""
+        with self._conn_lock:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None
 
     def create_session(self, *, session_id: str, provider: str,
                        model: str | None = None, project_uuid: str | None = None,
