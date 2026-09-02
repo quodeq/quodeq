@@ -38,6 +38,39 @@ function LibraryCard({ standard, onImport, importing }) {
   );
 }
 
+function LibraryModalHeader({ onClose }) {
+  return (
+    <div className="modal-header">
+      <h2 className="modal-title">{t('standards.libraryTitle')}</h2>
+      <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function LibraryGrid({ loading, error, libraryStandards, handleImport }) {
+  if (loading) return null;
+  if (!error && libraryStandards.length === 0) {
+    return <p className="library-empty">{t('standards.noCommunityStandards')}</p>;
+  }
+  if (libraryStandards.length === 0) return null;
+  return (
+    <div className="library-grid">
+      {libraryStandards.map((s) => (
+        <LibraryCard
+          key={s.id || s.file}
+          standard={s}
+          onImport={handleImport}
+          importing={false}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function LibraryBrowser({ onClose, onImported }) {
   const { libraryStandards, loading, error, importStandard } = useLibrary();
   const [importError, setImportError] = useState(null);
@@ -57,14 +90,7 @@ export default function LibraryBrowser({ onClose, onImported }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-dialog modal-dialog--wide" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{t('standards.libraryTitle')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        <LibraryModalHeader onClose={onClose} />
 
         <p className="library-browser-subtitle">
           {t('standards.librarySubtitle')}
@@ -73,22 +99,7 @@ export default function LibraryBrowser({ onClose, onImported }) {
         {loading && <div className="library-loading">{t('standards.loadingLibrary')}</div>}
         {(error || importError) && <p className="inline-error">{importError || error}</p>}
 
-        {!loading && !error && libraryStandards.length === 0 && (
-          <p className="library-empty">{t('standards.noCommunityStandards')}</p>
-        )}
-
-        {!loading && libraryStandards.length > 0 && (
-          <div className="library-grid">
-            {libraryStandards.map((s) => (
-              <LibraryCard
-                key={s.id || s.file}
-                standard={s}
-                onImport={handleImport}
-                importing={false}
-              />
-            ))}
-          </div>
-        )}
+        <LibraryGrid loading={loading} error={error} libraryStandards={libraryStandards} handleImport={handleImport} />
 
         <div className="modal-actions modal-actions--end">
           <button type="button" className="btn-secondary" onClick={onClose}>{t('common.close')}</button>
