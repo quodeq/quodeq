@@ -1,8 +1,6 @@
 """Project listing, mutation, and export routes."""
 from __future__ import annotations
 
-import dataclasses
-import json
 import logging
 import os
 from http import HTTPStatus
@@ -14,12 +12,8 @@ from quodeq.api.helpers import error_response, scan_target_error as _scan_target
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
+from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
-from quodeq.services._fs_project_helpers import (
-    project_record_exists,
-    read_project_record,
-)
-from quodeq.services._fs_scan import scan_project
 from quodeq.services._warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider, NewProjectSpec
 from quodeq.shared.validation import contained_path, validate_canonical_absolute, validate_path_segment, validate_relative_scope
@@ -65,6 +59,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
 
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project listing, mutation, and export routes."""
+    register_project_scan_routes(app)
 
     @app.get("/api/projects")
     def list_projects() -> Response:
@@ -139,97 +134,6 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(info)
-
-    @app.get("/api/projects/<project>/scan")
-    def project_scan(project: str) -> Response | tuple[Response, int]:
-        """Return scan data for a project. Triggers scan if needed for local projects."""
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
-
-        # Same containment shape as project_estimates below — the normpath +
-        # startswith form is the one CodeQL/Snyk recognize as a barrier.
-        root = os.path.realpath(reports_dir())
-        candidate = os.path.normpath(os.path.join(root, project))
-        if not candidate.startswith(root + os.sep):
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        project_dir = Path(candidate)
-        if not project_dir.is_dir():
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-
-        scan_path = project_dir / "scan.json"
-        if scan_path.exists():
-            try:
-                data = json.loads(scan_path.read_text(encoding="utf-8"))
-                return jsonify(data)
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        # Check if local — read the project's repository record (via the
-        # service layer; the route keeps no repository_info.json knowledge).
-        if not project_record_exists(project_dir):
-            body, status = error_response("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-
-        info = read_project_record(project_dir)
-        if info is None:
-            body, status = error_response("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
-            return jsonify(body), status
-
-        if info.get("location") != "local" or not info.get("path"):
-            body, status = error_response("Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
-            return jsonify(body), status
-
-        project_path = Path(info["path"])
-        if not project_path.is_dir():
-            body, status = error_response("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
-            return jsonify(body), status
-
-        result = scan_project(project_path, output_dir=project_dir)
-        return jsonify(dataclasses.asdict(result))
-
-    @app.get("/api/projects/<project>/estimates")
-    def project_estimates(project: str) -> Response | tuple[Response, int]:
-        """Return read-only pre-run per-dimension file estimates for a project.
-
-        Query params: ``dimensions`` = comma-separated dimension ids (omitted
-        or empty → all dimensions available for the project; unknown ids are
-        ignored), ``cleanScan`` = "true"/"false" (default false). With
-        cleanScan=true each dimension reports count=total and cached=0.
-        Never creates a run or writes to disk.
-        """
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
-
-        # Containment check in the exact normpath + startswith shape CodeQL
-        # recognizes as a path-injection barrier (pathlib's is_relative_to
-        # is not modeled and left the alerts open).
-        root = os.path.realpath(reports_dir())
-        candidate = os.path.normpath(os.path.join(root, project))
-        if not candidate.startswith(root + os.sep):
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        project_dir = Path(candidate)
-        if not project_dir.is_dir():
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-
-        # Lazy import: pulls in the analysis pipeline, which the API process
-        # should not pay for at startup. Layer exception is baselined — same
-        # seam as api/_evaluation_routes.py.
-        from quodeq.analysis.estimates import project_estimates_payload
-
-        raw_dims = request.args.get("dimensions", "")
-        requested = [d.strip() for d in raw_dims.split(",") if d.strip()] or None
-        clean_scan = request.args.get("cleanScan", "false").strip().lower() == "true"
-        return jsonify(project_estimates_payload(project_dir, requested, clean_scan))
 
     @app.post("/api/projects")
     def create_project() -> Response | tuple[Response, int]:
@@ -372,25 +276,3 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         # list as soon as it closes).
         provider.invalidate_projects_cache()
         return jsonify({"projectId": result.project_id, "scanData": result.scan_data})
-
-    @app.post("/api/scan")
-    def scan_path() -> Response | tuple[Response, int]:
-        """Scan a local directory path directly (no registered project required)."""
-        data = request.get_json(silent=True) or {}
-        target = data.get("path", "").strip()
-        if not target:
-            body, status = error_response("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
-            return jsonify(body), status
-
-        target_path = Path(target).resolve()
-        # Allowlist: only permit paths under user home or the evaluations directory
-        err = _scan_target_error(target_path, reports_dir())
-        if err is not None:
-            body, status = err
-            return jsonify(body), status
-        if not target_path.is_dir():
-            body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
-            return jsonify(body), status
-
-        result = scan_project(target_path)
-        return jsonify(dataclasses.asdict(result))

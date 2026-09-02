@@ -1,6 +1,8 @@
 """Log-stream routes — SSE live stream + plain JSON fallback for /api/jobs/<id>/logs."""
 from __future__ import annotations
 
+import functools
+import json
 import os
 from http import HTTPStatus
 from pathlib import Path
@@ -106,6 +108,43 @@ def _read_tail(log_path: Path, since: int) -> tuple[list[str], int]:
     return lines, since + consumed
 
 
+def _resolve_stream_log_path(provider, job_id: str) -> Path | None:
+    """Re-resolved each tick. A job that started in the "preparing" state (no
+    output_project yet) eventually emits the report_path marker; from then on
+    get_log_run_dir returns the real run dir and run.log appears.
+    """
+    if not hasattr(provider, "get_log_run_dir"):
+        return None
+    run_dir = provider.get_log_run_dir(job_id)
+    if run_dir is None or not run_dir.is_dir():
+        return None
+    return run_dir / "run.log"
+
+
+def _stream_terminal_state(provider, job_id: str) -> str:
+    # In-memory job (internal runs) carries the most up-to-date status
+    # before the runner has flushed status.json — prefer it.
+    if provider is not None and hasattr(provider, "_jobs"):
+        store = getattr(provider._jobs, "_store", None)
+        if store is not None:
+            job = store.get(job_id)
+            if job is not None and job.status in {"done", "failed", "cancelled"}:
+                return job.status
+    # Fall back to the on-disk status.json the runner writes on exit.
+    path = _resolve_stream_log_path(provider, job_id)
+    if path is None:
+        return "completed"
+    status_path = path.parent / "status.json"
+    if status_path.exists():
+        try:
+            data = json.loads(status_path.read_text(encoding="utf-8"))
+            state = data.get("state")
+            if isinstance(state, str):
+                return state
+        except (OSError, ValueError):
+            pass
+    return "completed"
+
 
 def register_log_stream_routes(app: Flask) -> None:
     """Register plain + SSE log-stream routes on *app*.
@@ -159,50 +198,13 @@ def register_log_stream_routes(app: Flask) -> None:
             )
         )
 
-        def resolve_log_path() -> Path | None:
-            # Re-resolved each tick. A job that started in the
-            # "preparing" state (no output_project yet) eventually emits
-            # the report_path marker; from then on get_log_run_dir
-            # returns the real run dir and run.log appears.
-            if not hasattr(provider, "get_log_run_dir"):
-                return None
-            run_dir = provider.get_log_run_dir(job_id)
-            if run_dir is None or not run_dir.is_dir():
-                return None
-            return run_dir / "run.log"
-
-        def terminal_state() -> str:
-            # In-memory job (internal runs) carries the most up-to-date status
-            # before the runner has flushed status.json — prefer it.
-            if provider is not None and hasattr(provider, "_jobs"):
-                store = getattr(provider._jobs, "_store", None)
-                if store is not None:
-                    job = store.get(job_id)
-                    if job is not None and job.status in {"done", "failed", "cancelled"}:
-                        return job.status
-            # Fall back to the on-disk status.json the runner writes on exit.
-            path = resolve_log_path()
-            if path is None:
-                return "completed"
-            status_path = path.parent / "status.json"
-            if status_path.exists():
-                try:
-                    import json
-                    data = json.loads(status_path.read_text(encoding="utf-8"))
-                    state = data.get("state")
-                    if isinstance(state, str):
-                        return state
-                except (OSError, ValueError):
-                    pass
-            return "completed"
-
         resp = Response(
             _sse_tail_generator(
-                resolve_log_path,
+                functools.partial(_resolve_stream_log_path, provider, job_id),
                 initial_offset,
                 is_done=is_done,
                 line_filter=_is_visible_log_line,
-                terminal_state=terminal_state,
+                terminal_state=functools.partial(_stream_terminal_state, provider, job_id),
             ),
             mimetype="text/event-stream",
         )

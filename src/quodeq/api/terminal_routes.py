@@ -15,6 +15,12 @@ import threading
 from flask import Flask, current_app, jsonify, request
 from flask_sock import Sock
 
+from quodeq.api._terminal_ws_helpers import (
+    pump_terminal_out,
+    resolve_ws_session,
+    setup_terminal_session,
+    terminal_read_loop,
+)
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.links import (
     build_open_argv,
@@ -55,7 +61,8 @@ def _gate_reason() -> str | None:
 # succeed, so it must not loop — only unexpected drops are retried.
 _WS_CLOSE_BUSY = 4002      # per-session connection lock held by another window
 _WS_CLOSE_REFUSED = 4003   # terminal gate refused the handshake
-_WS_CLOSE_NOT_FOUND = 4004  # unknown session id; client reconciles via /sessions
+# 4004 (unknown session id) lives in _terminal_ws_helpers.WS_CLOSE_NOT_FOUND —
+# it's returned from resolve_ws_session, not referenced directly here.
 
 
 def _coerce_int(value) -> int | None:
@@ -207,17 +214,10 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         if _gate_reason() is not None:
             ws.close(_WS_CLOSE_REFUSED)
             return
-        sid = request.args.get("session")
-        if sid:
-            session = registry.get(sid)
-            if session is None:
-                # Stale tab id (e.g. server restarted). The client must not
-                # retry this URL — it refetches /sessions and rebuilds tabs.
-                ws.close(_WS_CLOSE_NOT_FOUND)
-                return
-        else:
-            # Pre-multi-session clients connect without an id.
-            session = registry.get_or_create_default()
+        session, close_code = resolve_ws_session(registry, request.args.get("session"))
+        if session is None:
+            ws.close(close_code)
+            return
         manager = session.manager
         # Only one WS client may drain a session's PTY at a time; a second
         # concurrent reader would race the first and produce garbled/doubled
@@ -229,19 +229,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
                 ws.close(_WS_CLOSE_BUSY)
             return
         try:
-            try:
-                manager.ensure_session(cwd=os.path.expanduser("~"), cols=80, rows=24)
-                # Replay scrollback so a reattaching client sees recent history.
-                # Already text: the manager decodes incrementally, so the ring
-                # never holds a torn multi-byte character.
-                sb = manager.scrollback()
-                if sb:
-                    ws.send("0" + sb)
-            except Exception:
-                # Spawn failure or early disconnect must not propagate past
-                # flask-sock (would surface as a 500), but leave a trace for
-                # operators — the client only sees a silently closed terminal.
-                _logger.warning("terminal session setup failed", exc_info=True)
+            if not setup_terminal_session(manager, ws):
                 # Don't close here:
                 # flask-sock sends the close frame after this handler returns,
                 # i.e. after the outer finally has released _conn_lock, so a
@@ -250,34 +238,12 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
                 return
 
             stop = threading.Event()
-
-            def _pump_out():
-                while not stop.is_set():
-                    data = manager.read(65536)
-                    if not data:
-                        if not manager.alive:
-                            break
-                        continue
-                    try:
-                        ws.send("0" + data)
-                    except Exception:
-                        break
-                stop.set()
-
-            reader = threading.Thread(target=_pump_out, daemon=True)
+            reader = threading.Thread(
+                target=pump_terminal_out, args=(manager, ws, stop), daemon=True
+            )
             reader.start()
             try:
-                while not stop.is_set():
-                    msg = ws.receive(timeout=1)
-                    if msg is None:
-                        continue
-                    tag, payload = msg[:1], msg[1:]
-                    if tag == "0":
-                        manager.write(payload.encode("utf-8"))
-                    elif tag == "1":
-                        _apply_control(manager, payload)
-            except Exception:
-                pass
+                terminal_read_loop(ws, manager, stop, _apply_control)
             finally:
                 stop.set()
                 # Join the reader BEFORE releasing the conn lock: a reader still

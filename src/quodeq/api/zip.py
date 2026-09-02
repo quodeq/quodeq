@@ -69,6 +69,52 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
     }
 
 
+def _zip_size_errors(size_limit: int, uncompressed_limit: int) -> tuple[ValueError, ValueError]:
+    """Build the (compressed, uncompressed) over-limit errors for these caps."""
+    compressed_error = ValueError(
+        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
+        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
+    )
+    uncompressed_error = ValueError(
+        f"Project exceeds maximum uncompressed size of "
+        f"{uncompressed_limit // (1024 * 1024)} MB (it would be rejected on re-import). "
+        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
+    )
+    return compressed_error, uncompressed_error
+
+
+def _write_project_zip_entries(
+    zf: zipfile.ZipFile, fh, project_path: Path, size_limit: int, uncompressed_limit: int,
+    compressed_error: ValueError, uncompressed_error: ValueError,
+) -> None:
+    """Write every file under *project_path* plus the manifest into *zf*.
+
+    Raises *compressed_error*/*uncompressed_error* the moment either running
+    total crosses its cap, so a too-large project fails fast mid-write.
+    """
+    total_uncompressed = 0
+    for file_entry in project_path.rglob("*"):
+        if file_entry.is_symlink():
+            continue
+        if not file_entry.is_file():
+            continue
+        # Skip any prior manifest so the export-time one is authoritative.
+        if file_entry == project_path / _MANIFEST_FILENAME:
+            continue
+        zf.write(file_entry, file_entry.relative_to(project_path.parent))
+        total_uncompressed += file_entry.stat().st_size
+        if fh.tell() > size_limit:
+            raise compressed_error
+        if total_uncompressed > uncompressed_limit:
+            raise uncompressed_error
+    manifest_json = json.dumps(_build_manifest(project_path), indent=2)
+    manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
+    zf.writestr(manifest_arcname, manifest_json)
+    total_uncompressed += len(manifest_json.encode("utf-8"))
+    if total_uncompressed > uncompressed_limit:
+        raise uncompressed_error
+
+
 def _build_project_zip(project_path: Path) -> Path:
     """Create a temporary zip archive of a project directory and return its path.
 
@@ -80,39 +126,14 @@ def _build_project_zip(project_path: Path) -> Path:
     os.close(fd)
     size_limit = _max_zip_size_bytes()
     uncompressed_limit = size_limit * _EXTRACT_HEADROOM
-    compressed_error = ValueError(
-        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
-        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
-    )
-    uncompressed_error = ValueError(
-        f"Project exceeds maximum uncompressed size of "
-        f"{uncompressed_limit // (1024 * 1024)} MB (it would be rejected on re-import). "
-        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
-    )
+    compressed_error, uncompressed_error = _zip_size_errors(size_limit, uncompressed_limit)
     try:
         with open(tmp_path, "wb") as fh:
             with zipfile.ZipFile(fh, "w", zipfile.ZIP_DEFLATED) as zf:
-                total_uncompressed = 0
-                for file_entry in project_path.rglob("*"):
-                    if file_entry.is_symlink():
-                        continue
-                    if not file_entry.is_file():
-                        continue
-                    # Skip any prior manifest so the export-time one is authoritative.
-                    if file_entry == project_path / _MANIFEST_FILENAME:
-                        continue
-                    zf.write(file_entry, file_entry.relative_to(project_path.parent))
-                    total_uncompressed += file_entry.stat().st_size
-                    if fh.tell() > size_limit:
-                        raise compressed_error
-                    if total_uncompressed > uncompressed_limit:
-                        raise uncompressed_error
-                manifest_json = json.dumps(_build_manifest(project_path), indent=2)
-                manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
-                zf.writestr(manifest_arcname, manifest_json)
-                total_uncompressed += len(manifest_json.encode("utf-8"))
-                if total_uncompressed > uncompressed_limit:
-                    raise uncompressed_error
+                _write_project_zip_entries(
+                    zf, fh, project_path, size_limit, uncompressed_limit,
+                    compressed_error, uncompressed_error,
+                )
         # The central directory is written on close; re-check the final size.
         if os.path.getsize(tmp_path) > size_limit:
             raise compressed_error
