@@ -1,166 +1,19 @@
-"""Tests for dry-run mode — pipeline skips AI calls and produces minimal valid output."""
+"""Tests for dry-run mode — the pipeline skips AI calls and produces minimal
+valid output.
+
+Split from test_dry_run.py. Shared helpers live in
+tests/analysis/_dry_run_fixtures.py.
+"""
 from __future__ import annotations
 
-import argparse
-from dataclasses import dataclass, field
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.core.evidence.model import Evidence
 
+from tests.analysis._dry_run_fixtures import _make_dims_data
 
-# ---------------------------------------------------------------------------
-# Minimal helpers
-# ---------------------------------------------------------------------------
-
-def _make_dims_data(*dimension_ids: str) -> dict:
-    return {"applies": [{"id": d} for d in dimension_ids]}
-
-
-def _make_config(tmp_path: Path, *, dry_run: bool = False, dimensions: list[str] | None = None) -> RunConfig:
-    return RunConfig(
-        src=tmp_path / "src",
-        language="python",
-        work_dir=tmp_path / "evidence",
-        dimensions_data=_make_dims_data("security", "reliability"),
-        options=AnalysisOptions(
-            dry_run=dry_run,
-            dimensions=dimensions,
-        ),
-    )
-
-
-# ---------------------------------------------------------------------------
-# AnalysisOptions: dry_run field
-# ---------------------------------------------------------------------------
-
-class TestAnalysisOptionsDryRun:
-    def test_default_is_false(self):
-        opts = AnalysisOptions()
-        assert opts.dry_run is False
-
-    def test_can_be_set_true(self):
-        opts = AnalysisOptions(dry_run=True)
-        assert opts.dry_run is True
-
-    def test_other_fields_unaffected(self):
-        opts = AnalysisOptions(dry_run=True, incremental=True)
-        assert opts.incremental is True
-        assert opts.dry_run is True
-
-
-# ---------------------------------------------------------------------------
-# CLI wiring: dry_run propagates from args to AnalysisOptions
-# ---------------------------------------------------------------------------
-
-class TestCliWiring:
-    def test_dry_run_wired_from_args(self, tmp_path):
-        from quodeq._cli_evaluation import _build_run_config
-        from quodeq._cli_resolution import ResolvedInputs
-
-        args = argparse.Namespace(
-            dimensions=None,
-            max_turns=None,
-            max_duration=None,
-            n_subagents=1,
-            pool_budget=None,
-            incremental=False,
-            no_verify=False,
-            no_consolidated=False,
-            dry_run=True,
-        )
-
-        dims_data = _make_dims_data("security")
-        inputs = ResolvedInputs(
-            src=tmp_path,
-            language="python",
-            manifest=None,
-            dims_data=dims_data,
-        )
-
-        with patch("quodeq._cli_evaluation.default_paths") as mock_paths, \
-             patch("quodeq._cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq._cli_evaluation._subagent_model", return_value=None):
-            mock_paths.return_value.standards_dir = tmp_path / "standards"
-            mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
-            config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
-
-        assert config.options.dry_run is True
-
-    def test_dry_run_false_by_default(self, tmp_path):
-        from quodeq._cli_evaluation import _build_run_config
-        from quodeq._cli_resolution import ResolvedInputs
-
-        args = argparse.Namespace(
-            dimensions=None,
-            max_turns=None,
-            max_duration=None,
-            n_subagents=1,
-            pool_budget=None,
-            incremental=False,
-            no_verify=False,
-            no_consolidated=False,
-            dry_run=False,
-        )
-
-        dims_data = _make_dims_data("security")
-        inputs = ResolvedInputs(
-            src=tmp_path,
-            language="python",
-            manifest=None,
-            dims_data=dims_data,
-        )
-
-        with patch("quodeq._cli_evaluation.default_paths") as mock_paths, \
-             patch("quodeq._cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq._cli_evaluation._subagent_model", return_value=None):
-            mock_paths.return_value.standards_dir = tmp_path / "standards"
-            mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
-            config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
-
-        assert config.options.dry_run is False
-
-    def test_missing_dry_run_attr_defaults_false(self, tmp_path):
-        """getattr fallback: if args has no dry_run attribute, default to False."""
-        from quodeq._cli_evaluation import _build_run_config
-        from quodeq._cli_resolution import ResolvedInputs
-
-        args = argparse.Namespace(
-            dimensions=None,
-            max_turns=None,
-            max_duration=None,
-            n_subagents=1,
-            pool_budget=None,
-            incremental=False,
-            no_verify=False,
-            no_consolidated=False,
-            # no dry_run attribute at all
-        )
-
-        dims_data = _make_dims_data("security")
-        inputs = ResolvedInputs(
-            src=tmp_path,
-            language="python",
-            manifest=None,
-            dims_data=dims_data,
-        )
-
-        with patch("quodeq._cli_evaluation.default_paths") as mock_paths, \
-             patch("quodeq._cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq._cli_evaluation._subagent_model", return_value=None):
-            mock_paths.return_value.standards_dir = tmp_path / "standards"
-            mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
-            config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
-
-        assert config.options.dry_run is False
-
-
-# ---------------------------------------------------------------------------
-# Pipeline: dry-run skips AI calls
-# ---------------------------------------------------------------------------
 
 class TestDryRunPipeline:
     def _make_config(self, tmp_path: Path, *, dimensions: list[str] | None = None) -> RunConfig:
