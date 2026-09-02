@@ -17,6 +17,38 @@ _logger = logging.getLogger(__name__)
 _OVERALL_PRINCIPLE = "Overall"
 
 
+def _build_principle_grades(
+    data: dict[str, Any], canonical: Any,
+) -> list[dict[str, Any]]:
+    """Build the per-principle grade list plus the synthetic Overall entry.
+
+    Permissive when no standard is available (*canonical* empty): every
+    principle in *data* is kept.
+    """
+    def _in_standard(name: Any) -> bool:
+        return not canonical or name in canonical
+
+    principle_grades = [
+        {
+            "principle": p.get("name"),
+            "score": p.get("score"),
+            "grade": p.get("grade"),
+            "isOverall": False,
+        }
+        for p in data.get("principles", [])
+        if _in_standard(p.get("name"))
+    ]
+    principle_grades.append(
+        {
+            "principle": _OVERALL_PRINCIPLE,
+            "score": data.get("overallScore"),
+            "grade": data.get("overallGrade"),
+            "isOverall": True,
+        }
+    )
+    return principle_grades
+
+
 def parse_eval_from_json(
     json_path: Path, project: str, run_id: str, dimension: str,
     *, compiled_dir: Path | None = None,
@@ -39,28 +71,7 @@ def parse_eval_from_json(
     canonical = principle_names_for_dimension(dimension, compiled_dir=compiled_dir,
                                               req_map_reader=read_req_to_principle_map)
 
-    def _in_standard(name: Any) -> bool:
-        # Permissive when no standard is available (canonical empty).
-        return not canonical or name in canonical
-
-    principle_grades = [
-        {
-            "principle": p.get("name"),
-            "score": p.get("score"),
-            "grade": p.get("grade"),
-            "isOverall": False,
-        }
-        for p in data.get("principles", [])
-        if _in_standard(p.get("name"))
-    ]
-    principle_grades.append(
-        {
-            "principle": _OVERALL_PRINCIPLE,
-            "score": data.get("overallScore"),
-            "grade": data.get("overallGrade"),
-            "isOverall": True,
-        }
-    )
+    principle_grades = _build_principle_grades(data, canonical)
 
     principle_map = build_principle_map(data)
     if canonical:

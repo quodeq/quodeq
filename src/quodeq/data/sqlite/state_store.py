@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, Iterator
 
 if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
@@ -15,12 +14,12 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite._row_mappers import judgment_to_row
+from quodeq.data.sqlite._state_store_meta import _StateStoreMetaMixin
 
 _logger = logging.getLogger(__name__)
 _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
-_GRADES_ALGO_KEY = "grades_algo_version"
 
 _INSERT_FINDING = """
 INSERT OR IGNORE INTO findings (
@@ -37,7 +36,7 @@ INSERT OR IGNORE INTO findings (
 """
 
 
-class SQLiteStateStore:
+class SQLiteStateStore(_StateStoreMetaMixin):
     """Writes projected event state into evaluation.db."""
 
     def __init__(self, run_dir: Path) -> None:
@@ -83,40 +82,6 @@ class SQLiteStateStore:
             )
             conn.commit()
 
-    def get_checkpoint(self) -> Optional[datetime]:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_CHECKPOINT_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        return datetime.fromisoformat(row[0])
-
-    def save_checkpoint(self, ts: datetime) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_CHECKPOINT_KEY, ts.isoformat()),
-            )
-            conn.commit()
-
-    def get_projected_size(self) -> int | None:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_PROJECTED_SIZE_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        return int(row[0])
-
-    def save_projected_size(self, size: int) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_PROJECTED_SIZE_KEY, str(size)),
-            )
-            conn.commit()
-
     def update_verdict(self, *, req: str, file: str, line: int, verdict: str) -> int:
         """Update a finding's verdict by (requirement, file, line). Returns row count.
 
@@ -142,48 +107,6 @@ class SQLiteStateStore:
                 )
             conn.commit()
             return cur.rowcount
-
-    def get_actions_projected_size(self) -> int | None:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_ACTIONS_SIZE_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        return int(row[0])
-
-    def save_actions_projected_size(self, size: int) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_ACTIONS_SIZE_KEY, str(size)),
-            )
-            conn.commit()
-
-    def get_grades_algo_version(self) -> int | None:
-        """Version of the grade math the stored grade tables were computed with.
-
-        None means the tables predate the stamp (or were never computed);
-        callers treat that as stale so pre-stamp DBs heal on first contact.
-        """
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_GRADES_ALGO_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        try:
-            return int(row[0])
-        except (TypeError, ValueError):
-            return None
-
-    def save_grades_algo_version(self, version: int) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_GRADES_ALGO_KEY, str(version)),
-            )
-            conn.commit()
 
     # --- grade tables -----------------------------------------------------
 

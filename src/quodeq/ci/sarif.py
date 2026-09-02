@@ -162,6 +162,50 @@ def _rule(rule_id: str, principle: str, dimension: str, *, severity: str, cwe_ta
     }
 
 
+def _accumulate_rule(
+    rule_acc: dict[str, dict[str, Any]], dimension: str, violation: dict[str, Any],
+) -> None:
+    """Fold one violation into its rule's running (worst severity, CWE union)."""
+    rid = _rule_id(dimension, violation.get("principle"))
+    acc = rule_acc.setdefault(
+        rid,
+        {
+            "principle": violation.get("principle") or rid,
+            "dimension": dimension,
+            "worst_rank": -1,
+            "worst_sev": "unknown",
+            "cwe_tags": [],
+        },
+    )
+    rank = _severity_rank(violation.get("severity"))
+    if rank > acc["worst_rank"]:
+        acc["worst_rank"] = rank
+        acc["worst_sev"] = violation.get("severity") or "unknown"
+    for tag in _cwe_tags(violation.get("req_refs")):
+        if tag not in acc["cwe_tags"]:
+            acc["cwe_tags"].append(tag)
+
+
+def _sort_sarif_output(
+    rule_acc: dict[str, dict[str, Any]], results: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Build the rules list from *rule_acc*, then sort rules and results
+    into deterministic output order."""
+    rules = [
+        _rule(rid, acc["principle"], acc["dimension"], severity=acc["worst_sev"], cwe_tags=acc["cwe_tags"])
+        for rid, acc in rule_acc.items()
+    ]
+    rules.sort(key=lambda r: r["id"])
+    results.sort(
+        key=lambda r: (
+            (r.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "")),
+            (r.get("locations", [{}])[0].get("physicalLocation", {}).get("region", {}).get("startLine", 0)),
+            r["ruleId"],
+        )
+    )
+    return rules, results
+
+
 def build_sarif(
     reports: list[dict[str, Any]],
     *,
@@ -186,37 +230,9 @@ def build_sarif(
             if min_severity is not None and _severity_rank(violation.get("severity")) < _severity_rank(min_severity):
                 continue
             results.append(_result(violation, dimension, include_snippets=include_snippets))
-            rid = _rule_id(dimension, violation.get("principle"))
-            acc = rule_acc.setdefault(
-                rid,
-                {
-                    "principle": violation.get("principle") or rid,
-                    "dimension": dimension,
-                    "worst_rank": -1,
-                    "worst_sev": "unknown",
-                    "cwe_tags": [],
-                },
-            )
-            rank = _severity_rank(violation.get("severity"))
-            if rank > acc["worst_rank"]:
-                acc["worst_rank"] = rank
-                acc["worst_sev"] = violation.get("severity") or "unknown"
-            for tag in _cwe_tags(violation.get("req_refs")):
-                if tag not in acc["cwe_tags"]:
-                    acc["cwe_tags"].append(tag)
+            _accumulate_rule(rule_acc, dimension, violation)
 
-    rules = [
-        _rule(rid, acc["principle"], acc["dimension"], severity=acc["worst_sev"], cwe_tags=acc["cwe_tags"])
-        for rid, acc in rule_acc.items()
-    ]
-    rules.sort(key=lambda r: r["id"])
-    results.sort(
-        key=lambda r: (
-            (r.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "")),
-            (r.get("locations", [{}])[0].get("physicalLocation", {}).get("region", {}).get("startLine", 0)),
-            r["ruleId"],
-        )
-    )
+    rules, results = _sort_sarif_output(rule_acc, results)
 
     return {
         "$schema": _SCHEMA_URI,

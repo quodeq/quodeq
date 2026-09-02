@@ -41,6 +41,57 @@ class FindingTally:
         return self.violations + self.compliance
 
 
+def _classify_finding_row(
+    raw: str,
+    seen: "set[tuple]",
+    *,
+    suppressed: "Callable[[dict], bool] | None",
+    resolver: PrincipleResolver | None,
+) -> str:
+    """Classify one raw evidence line, updating *seen* in place.
+
+    Returns "skip" (blank/malformed/non-object/non-finding row),
+    "duplicate", "quarantined", "suppressed", "violation", or "compliance"
+    -- the caller increments the matching counter.
+
+    *resolver* classifies "quarantined" a finding whose principle is not in
+    the dimension's standard, matching the report path's
+    :func:`~quodeq.core.evidence._req_mapping._group_judgments`. *suppressed*
+    (see ``quodeq.services.suppression``, injected to keep this module free
+    of a services dependency) classifies "suppressed" a violation the user
+    already dismissed or deleted. Quarantine is checked first: a finding
+    with no principle in the standard has no valid delete key, so asking
+    whether it was suppressed is not meaningful. Without either argument,
+    every finding classifies as "violation"/"compliance".
+    """
+    stripped = raw.strip()
+    if not stripped:
+        return "skip"
+    try:
+        obj = json.loads(stripped)
+    except json.JSONDecodeError:
+        return "skip"
+    if not isinstance(obj, dict):
+        return "skip"  # valid JSON but not an object (a bare list/number)
+    t = obj.get("t")
+    key = (obj.get("p"), obj.get("file"), obj.get("line"), t)
+    if key in seen:
+        return "duplicate"
+    seen.add(key)
+    if t not in ("violation", "compliance"):
+        # Non-finding rows (e.g. the file_done markers the pool appends)
+        # still occupy a dedup key but classify as neither.
+        return "skip"
+    # Mirror parse_jsonl_line: `p` wins, `req` is the fallback.
+    if resolver is not None and resolver.resolve(obj.get("p") or obj.get("req")) is None:
+        return "quarantined"
+    if t == "violation":
+        if suppressed is not None and suppressed(obj):
+            return "suppressed"
+        return "violation"
+    return "compliance"
+
+
 def tally_unique_findings(
     jsonl_path: Path,
     suppressed: "Callable[[dict], bool] | None" = None,
@@ -54,23 +105,10 @@ def tally_unique_findings(
     at end of pool, the file holds raw appends from many parallel agents and
     contains overlapping findings.
 
-    Two independent exclusions bring this in line with the report, both applied
-    AFTER dedup so a row excluded three times counts once:
-
-    *resolver* drops findings whose principle is not in the dimension's standard,
-    counting them under ``quarantined``. This matches what the report path
-    quarantines in
-    :func:`~quodeq.core.evidence._req_mapping._group_judgments`.
-
-    *suppressed* is a predicate over a raw evidence row (see
-    ``quodeq.services.suppression``) for findings the user already dismissed or
-    deleted, counted under ``suppressed``. It is injected rather than imported to
-    keep this module free of a services dependency.
-
-    Quarantine is checked first: a finding with no principle in the standard has
-    no valid delete key (those are keyed on the principle), so asking whether it
-    was suppressed is not meaningful. Without either argument the tally stays
-    permissive and counts every finding.
+    Two independent exclusions (*resolver*, *suppressed*) bring this in line
+    with the report, both applied AFTER dedup so a row excluded three times
+    counts once -- see :func:`_classify_finding_row` for how each row is
+    classified and how the two exclusions interact.
 
     Tolerant: missing files, malformed lines, and OSError yield empty/partial
     tallies silently.
@@ -82,35 +120,18 @@ def tally_unique_findings(
     try:
         with open_text(jsonl_path) as f:
             for raw in f:
-                stripped = raw.strip()
-                if not stripped:
-                    continue
-                try:
-                    obj = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                if not isinstance(obj, dict):
-                    continue  # valid JSON but not an object (a bare list/number)
-                t = obj.get("t")
-                key = (obj.get("p"), obj.get("file"), obj.get("line"), t)
-                if key in seen:
+                kind = _classify_finding_row(
+                    raw, seen, suppressed=suppressed, resolver=resolver,
+                )
+                if kind == "duplicate":
                     duplicates += 1
-                    continue
-                seen.add(key)
-                if t not in ("violation", "compliance"):
-                    # Non-finding rows (e.g. the file_done markers the pool
-                    # appends) still occupy a dedup key but classify as neither.
-                    continue
-                # Mirror parse_jsonl_line: `p` wins, `req` is the fallback.
-                if resolver is not None and resolver.resolve(obj.get("p") or obj.get("req")) is None:
+                elif kind == "quarantined":
                     quarantined += 1
-                    continue
-                if t == "violation":
-                    if suppressed is not None and suppressed(obj):
-                        hidden += 1
-                    else:
-                        violations += 1
-                else:
+                elif kind == "suppressed":
+                    hidden += 1
+                elif kind == "violation":
+                    violations += 1
+                elif kind == "compliance":
                     compliance += 1
     except OSError:
         pass

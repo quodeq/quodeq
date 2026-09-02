@@ -1,16 +1,25 @@
 """Evaluation input resolution — repo, language, manifest, and scope helpers.
 
 Split from ``_cli_evaluation.py`` to keep each module under 300 lines.
+Worktree management lives in ``_cli_worktree.py``; re-exported here (and, in
+turn, from ``_cli_evaluation.py``) so ``quodeq._cli_resolution._create_worktree``
+and ``quodeq._cli_evaluation._cleanup_worktree`` stay valid patch targets.
+``import subprocess`` stays in this module even though the worktree
+functions moved out — ``_resolve_repo`` below still needs the exception
+types, and tests patch ``quodeq._cli_resolution.subprocess.run``, which
+requires this module to expose a ``subprocess`` attribute. ``_FETCH_TIMEOUT_S``
+also stays here (rather than moving with ``_fetch_branch``) because a test
+reloads this module with ``QUODEQ_GIT_CLONE_TIMEOUT_S`` set and reads the
+import-time constant back off it; ``_cli_worktree._fetch_branch`` reads it
+via a deferred facade lookup.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
-import tempfile as _tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,14 +34,19 @@ from quodeq.analysis.manifest_models import AnalysisTarget
 from quodeq.analysis.manifest_scope import _filter_manifest_by_scope  # noqa: F401
 from quodeq.analysis.runner import load_universal_dimensions
 from quodeq.shared.log_sink import SHARED_LOG
+# Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.
+# _cleanup_worktree is unused directly in this module but must stay imported
+# — it is a patch target (quodeq._cli_resolution._cleanup_worktree) and the
+# public re-export chain through quodeq._cli_evaluation depends on it.
+from quodeq._cli_worktree import _cleanup_worktree, _create_worktree  # noqa: F401
 
 import logging
 
 _logger = logging.getLogger(__name__)
 
-_WORKTREE_TIMEOUT_S = 30
-# Branch fetches go over the network; give them the clone budget, not the
-# local worktree one.
+# Branch fetches (_cli_worktree._fetch_branch) go over the network; give them
+# the clone budget, not the local worktree one. Stays an import-time constant
+# here — see the module docstring for why.
 _FETCH_TIMEOUT_S = git_clone_timeout_s()
 
 
@@ -50,70 +64,6 @@ class ResolvedInputs:
     worktree_origin: Path | None = None
     worktree_dir: Path | None = None
     single_file: bool = False
-
-
-# ---------------------------------------------------------------------------
-# Worktree management
-# ---------------------------------------------------------------------------
-
-def _fetch_branch(repo_dir: Path, branch: str) -> bool:
-    """Fetch *branch* from origin into a local branch of the same name.
-
-    Single-branch clones (online repos registered via run_git_clone) have no
-    refspec for other branches, so a plain ``fetch origin <branch>`` would
-    only update FETCH_HEAD; the explicit ``<branch>:<branch>`` refspec makes
-    it usable by ``worktree add``. Returns True when the fetch succeeded.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_FETCH_TIMEOUT_S,
-        )
-        return result.returncode == 0
-    except (subprocess.SubprocessError, OSError):
-        return False
-
-
-def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
-    """Create a temporary git worktree for the given branch.
-
-    Returns the worktree path, or None on failure. When the first attempt
-    fails, the branch is fetched from origin and the attempt repeated once:
-    single-branch clones (online repos) don't have other branches locally
-    until someone asks for them.
-    """
-    worktree_dir = Path(_tempfile.mkdtemp(prefix=f"quodeq-wt-{branch.replace('/', '-')}-"))
-    for retried in (False, True):
-        try:
-            subprocess.run(
-                ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), branch],
-                capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
-            )
-            return worktree_dir
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
-            if not retried and _fetch_branch(repo_dir, branch):
-                continue
-            print(f"Failed to create worktree for branch '{branch}': {exc}", file=sys.stderr)
-            _cleanup_worktree(repo_dir, worktree_dir)
-            shutil.rmtree(worktree_dir, ignore_errors=True)
-            return None
-    return None
-
-
-def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
-    """Remove a temporary git worktree."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_WORKTREE_TIMEOUT_S,
-        )
-        if result.returncode != 0:
-            _logger.warning(
-                "git worktree remove %s exited %d: %s",
-                worktree_dir, result.returncode, (result.stderr or "").strip(),
-            )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
-        _logger.debug("Failed to clean up worktree %s: %s", worktree_dir, exc)
 
 
 # ---------------------------------------------------------------------------

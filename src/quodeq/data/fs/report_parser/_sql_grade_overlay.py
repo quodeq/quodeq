@@ -59,6 +59,36 @@ def _overlay_principles(
     return overlaid
 
 
+def _read_sql_grade_tables(run_dir: Path) -> "tuple[list[dict], list[dict]] | None":
+    """Read dimension_scores/principle_grades from evaluation.db.
+
+    Returns None (and logs) when ``evaluation.db`` is unreadable, or when
+    the grade tables are empty (run not yet projected) -- either way the
+    caller falls back to keeping the eval-time grades.
+    """
+    import sqlite3  # noqa: PLC0415
+
+    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
+
+    store = SQLiteStateStore(run_dir)
+    try:
+        # Project any pending events first so a freshly-completed run has its
+        # grade tables baked before we read them (matches the explorer detail
+        # path). ensure_projected is a fast no-op once the log size is stable.
+        SqliteFindingsRepository(run_dir).ensure_projected()
+        dim_rows = store.read_dimension_scores()
+        principle_rows = store.read_principle_grades()
+    except sqlite3.DatabaseError:
+        _logger.warning(
+            "evaluation.db at %s is unreadable; keeping eval-time grades.", run_dir,
+        )
+        return None
+    if not dim_rows:
+        return None
+    return dim_rows, principle_rows
+
+
 def overlay_sql_grades(
     run_dir: Path, dimensions: list[DimensionResult],
 ) -> list[DimensionResult]:
@@ -80,26 +110,10 @@ def overlay_sql_grades(
     if not (run_dir / "events.jsonl").is_file():
         return dimensions
 
-    import sqlite3  # noqa: PLC0415
-
-    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-
-    store = SQLiteStateStore(run_dir)
-    try:
-        # Project any pending events first so a freshly-completed run has its
-        # grade tables baked before we read them (matches the explorer detail
-        # path). ensure_projected is a fast no-op once the log size is stable.
-        SqliteFindingsRepository(run_dir).ensure_projected()
-        dim_rows = store.read_dimension_scores()
-        principle_rows = store.read_principle_grades()
-    except sqlite3.DatabaseError:
-        _logger.warning(
-            "evaluation.db at %s is unreadable; keeping eval-time grades.", run_dir,
-        )
+    sql_result = _read_sql_grade_tables(run_dir)
+    if sql_result is None:
         return dimensions
-    if not dim_rows:
-        return dimensions
+    dim_rows, principle_rows = sql_result
 
     sql_by_dim = {r["dimension"]: r for r in dim_rows}
     principles_by_dim: dict[str, list[dict]] = {}

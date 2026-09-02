@@ -1,59 +1,22 @@
-"""Environment-based configuration accessors."""
+"""Environment-based configuration accessors.
+
+Numeric helpers and the ports/keys/urls accessors stay here; AI-provider,
+filesystem-path, sqlite-DB, and embedding accessors live in the four
+siblings below and are re-exported so every existing import path
+(``from quodeq.shared._env import <name>``, including this project-wide
+fan-in's many call sites) keeps working unchanged.
+
+``_sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
+defined here) so ``_env_paths.py``/``_env_db.py`` can import it without a
+cycle back through this module -- see that module's docstring.
+"""
 from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 
 from quodeq.shared._config import _get_config
-
-_DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
-
-
-def _sanitized_env_path(raw: str) -> str:
-    """Normalize an operator-supplied filesystem path from an env var.
-
-    Env vars are the operator's own trust domain, but expanduser + abspath
-    (which collapses '.' and '..' segments) keeps a stray relative or '~'
-    value from resolving somewhere surprising at use time, and gives every
-    consumer one canonical absolute form.
-    """
-    return os.path.abspath(os.path.expanduser(raw))
-
-
-def get_ai_provider(env: dict[str, str] | None = None) -> str:
-    """Return the AI provider from environment or default."""
-    return (env or os.environ).get("AI_PROVIDER", _get_config()["ai_provider_default"])
-
-
-def get_ai_cmd(env: dict[str, str] | None = None) -> str:
-    """Return the AI CLI command from environment or default.
-
-    Falls back to AI_PROVIDER when AI_CMD is not set, so that
-    ``AI_PROVIDER=ollama`` implies ``AI_CMD=ollama`` unless overridden.
-    """
-    _env = env or os.environ
-    if "AI_CMD" in _env:
-        return _env["AI_CMD"]
-    if "AI_PROVIDER" in _env:
-        return _env["AI_PROVIDER"]
-    return _get_config()["ai_cmd_default"]
-
-
-def get_ai_model(env: dict[str, str] | None = None) -> str | None:
-    """Return the AI model from environment, or None."""
-    return (env or os.environ).get("AI_MODEL") or None
-
-
-def get_ai_cmd_path(env: dict[str, str] | None = None) -> str | None:
-    """Return the binary override for the AI CLI (AI_CMD_PATH), or None.
-
-    When set, spawn sites use this as argv[0] instead of the provider id,
-    while the provider id (get_ai_cmd) keeps selecting the ai_providers.json
-    entry. Lets an alternate install or wrapper (e.g. a `claude-api` script
-    that switches CLAUDE_CONFIG_DIR) run with unchanged provider behavior.
-    """
-    return (env or os.environ).get("AI_CMD_PATH") or None
+from quodeq.shared._env_sanitize import _sanitized_env_path  # noqa: F401 — re-export
 
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
@@ -136,31 +99,6 @@ def get_dashboard_port(env: dict[str, str] | None = None) -> int:
     return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"], env=env)
 
 
-def get_static_dist(env: dict[str, str] | None = None) -> str | None:
-    """Return the static dist path from environment, or the user-level cache."""
-    from_env = (env or os.environ).get("QUODEQ_STATIC_DIST")
-    if from_env:
-        return from_env
-    # Check user-level cache (built on demand by `quodeq dashboard`)
-    cached = Path.home() / ".quodeq" / "static"
-    if cached.is_dir() and (cached / "index.html").exists():
-        return str(cached)
-    return None
-
-
-def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None = None) -> str:
-    """Return the evaluations directory from environment or user-level default.
-
-    Priority: QUODEQ_EVALUATIONS_DIR env var > explicit *default* > ~/.quodeq/evaluations
-    """
-    from_env = (env or os.environ).get("QUODEQ_EVALUATIONS_DIR")
-    if from_env:
-        return _sanitized_env_path(from_env)
-    if default is not None:
-        return default
-    return str(_DEFAULT_EVALUATIONS_DIR)
-
-
 def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     """Return the Anthropic API key from environment, or None."""
     return (env or os.environ).get("ANTHROPIC_API_KEY") or None
@@ -181,156 +119,44 @@ def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     return (env or os.environ).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
 
 
-def get_findings_file(env: dict[str, str] | None = None) -> str | None:
-    """Return the findings file path from environment, or None."""
-    return (env or os.environ).get("FINDINGS_FILE")
+# ---------------------------------------------------------------------------
+# Re-exports -- AI provider/CLI selection
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_ai import (  # noqa: F401 — re-export
+    get_ai_cmd,
+    get_ai_cmd_path,
+    get_ai_model,
+    get_ai_provider,
+)
 
+# ---------------------------------------------------------------------------
+# Re-exports -- filesystem paths
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_paths import (  # noqa: F401 — re-export
+    get_clones_dir,
+    get_evaluations_dir,
+    get_findings_file,
+    get_grade_formula_path,
+    get_quodeq_dir,
+    get_static_dist,
+)
 
-_DEFAULT_INDEX_DB_PATH = Path.home() / ".quodeq" / "index.db"
+# ---------------------------------------------------------------------------
+# Re-exports -- sqlite DB paths and kill switches
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_db import (  # noqa: F401 — re-export
+    get_index_db_path,
+    get_score_cache_path,
+    score_cache_disabled,
+    sqlite_disabled,
+)
 
-
-def get_index_db_path(default: str | None = None, env: dict[str, str] | None = None) -> str:
-    """Return the absolute path to the SQLite run index DB.
-
-    Resolution order: QUODEQ_INDEX_DB_PATH env var, then *default*, then
-    ~/.quodeq/index.db. Always returns a str for downstream Path/sqlite3 use.
-    """
-    environ = env if env is not None else os.environ
-    if "QUODEQ_INDEX_DB_PATH" in environ:
-        return _sanitized_env_path(environ["QUODEQ_INDEX_DB_PATH"])
-    return default or str(_DEFAULT_INDEX_DB_PATH)
-
-
-_DEFAULT_GRADE_FORMULA_PATH = Path.home() / ".quodeq" / "grade_formula.json"
-
-
-def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
-    """Return the path of the user-tuned grade-formula params file.
-
-    Resolution order: QUODEQ_GRADE_FORMULA_PATH env var, then
-    ~/.quodeq/grade_formula.json. Env override exists so the test suite can
-    sandbox the file (a developer's real custom formula must never leak into
-    score assertions).
-    """
-    environ = env if env is not None else os.environ
-    if "QUODEQ_GRADE_FORMULA_PATH" in environ:
-        return _sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
-    return str(_DEFAULT_GRADE_FORMULA_PATH)
-
-
-_DEFAULT_SCORE_CACHE_PATH = Path.home() / ".quodeq" / "score_cache.db"
-
-
-def get_score_cache_path(env: dict[str, str] | None = None) -> str:
-    """Return the absolute path to the rescored-score cache DB.
-
-    Resolution: QUODEQ_SCORE_CACHE_PATH env var, else next to the index DB
-    (so the test suite's QUODEQ_INDEX_DB_PATH override auto-isolates it), else
-    ~/.quodeq/score_cache.db. This cache is disposable -- deleting it is safe.
-    """
-    environ = env if env is not None else os.environ
-    if "QUODEQ_SCORE_CACHE_PATH" in environ:
-        return _sanitized_env_path(environ["QUODEQ_SCORE_CACHE_PATH"])
-    index_parent = Path(get_index_db_path(env=environ)).parent
-    if str(index_parent) not in ("", "."):
-        return str(index_parent / "score_cache.db")
-    return str(_DEFAULT_SCORE_CACHE_PATH)
-
-
-def score_cache_disabled(env: dict[str, str] | None = None) -> bool:
-    """Return True when QUODEQ_DISABLE_SCORE_CACHE is truthy (operator kill switch)."""
-    environ = env if env is not None else os.environ
-    return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in _SQLITE_DISABLE_TRUTHY
-
-
-def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
-    """Return the base Quodeq state directory.
-
-    Resolution order: QUODEQ_DIR env var, then ~/.quodeq. Recomputes the
-    default on each call so test monkeypatches of ``Path.home`` are honored.
-    """
-    from_env = (env or os.environ).get("QUODEQ_DIR")
-    if from_env:
-        return Path(_sanitized_env_path(from_env))
-    return Path.home() / ".quodeq"
-
-
-_DEFAULT_CLONES_DIR = Path.home() / ".quodeq" / "clones"
-
-
-def get_clones_dir(env: dict[str, str] | None = None) -> Path:
-    """Return the directory where ephemeral clones live.
-
-    Resolution order: QUODEQ_CLONES_DIR env var, then ~/.quodeq/clones.
-    Recomputes the default on each call so test monkeypatches of
-    ``Path.home`` are honored.
-    """
-    from_env = (env or os.environ).get("QUODEQ_CLONES_DIR")
-    if from_env:
-        return Path(_sanitized_env_path(from_env))
-    return Path.home() / ".quodeq" / "clones"
-
-
-_SQLITE_DISABLE_TRUTHY = {"1", "true", "yes", "on"}
-
-
-def sqlite_disabled() -> bool:
-    """Return True when QUODEQ_DISABLE_SQLITE is set to a truthy value.
-
-    Operator kill switch for the SQLite findings store. When True, the
-    analysis pipeline only writes JSONL and read paths only consult JSONL/JSON.
-    """
-    raw = os.environ.get("QUODEQ_DISABLE_SQLITE", "")
-    return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY
-
-
-_DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
-_DEFAULT_EMBEDDING_BASE_URL = "http://localhost:11434"
-_DEFAULT_PRECEDENT_SIMILARITY = 0.85
-
-
-def get_embedding_model(env: dict[str, str] | None = None) -> str:
-    """Embedding model for semantic precedent matching (QUODEQ_EMBEDDING_MODEL).
-
-    Independent of the chat provider: CLI providers have no HTTP endpoint and
-    llama.cpp serves one model per process, so embeddings get their own model.
-    """
-    return (env if env is not None else os.environ).get(
-        "QUODEQ_EMBEDDING_MODEL", _DEFAULT_EMBEDDING_MODEL
-    )
-
-
-def get_embedding_base_url(env: dict[str, str] | None = None) -> str:
-    """Base URL of the embeddings server.
-
-    Resolution: QUODEQ_EMBEDDING_BASE_URL, then OLLAMA_BASE_URL, then localhost.
-    """
-    environ = env if env is not None else os.environ
-    return (
-        environ.get("QUODEQ_EMBEDDING_BASE_URL")
-        or environ.get("OLLAMA_BASE_URL")
-        or _DEFAULT_EMBEDDING_BASE_URL
-    )
-
-
-def semantic_precedents_enabled(env: dict[str, str] | None = None) -> bool:
-    """True when QUODEQ_SEMANTIC_PRECEDENTS is truthy. Default OFF in v1."""
-    environ = env if env is not None else os.environ
-    raw = environ.get("QUODEQ_SEMANTIC_PRECEDENTS", "")
-    return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY
-
-
-def get_precedent_similarity_threshold(env: dict[str, str] | None = None) -> float:
-    """Cosine threshold for a semantic precedent match (QUODEQ_PRECEDENT_SIMILARITY).
-
-    Default 0.85 is a placeholder until Phase B golden-set calibration.
-    Out-of-range or unparsable values fall back to the default.
-    """
-    raw = (env if env is not None else os.environ).get("QUODEQ_PRECEDENT_SIMILARITY", "")
-    try:
-        val = float(raw)
-    except ValueError:
-        return _DEFAULT_PRECEDENT_SIMILARITY
-    if not 0.0 < val <= 1.0:
-        return _DEFAULT_PRECEDENT_SIMILARITY
-    return val
+# ---------------------------------------------------------------------------
+# Re-exports -- semantic precedent embeddings
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_embeddings import (  # noqa: F401 — re-export
+    get_embedding_base_url,
+    get_embedding_model,
+    get_precedent_similarity_threshold,
+    semantic_precedents_enabled,
+)

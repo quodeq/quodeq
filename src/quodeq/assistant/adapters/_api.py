@@ -154,6 +154,39 @@ def _stream_once(client, config, messages, registry, emit, cancel):
     return "".join(text_parts), [calls[i] for i in sorted(calls)]
 
 
+def _dispatch_tool_calls(
+    convo: list[dict],
+    tool_calls: list[dict],
+    text: str,
+    registry: ToolRegistry,
+    emit: Callable[[dict], None],
+) -> None:
+    """Append the assistant tool-call message, then dispatch each call in
+    order, appending its tool result. Mutates *convo* in place.
+
+    Order matters: the assistant message (declaring all tool_calls) must be
+    appended before any tool-result message, and each call's emit/convo-append
+    pair must land before the next call's is dispatched.
+    """
+    convo.append({"role": "assistant", "content": text or None,
+                  "tool_calls": [
+                      {"id": c["id"], "type": "function",
+                       "function": {"name": c["name"],
+                                    "arguments": c["arguments"] or "{}"}}
+                      for c in tool_calls]})
+    for call in tool_calls:
+        arguments = _parse_args(call["arguments"])
+        result = registry.dispatch(call["name"], arguments)
+        frame = {"type": "tool_call", "name": call["name"], "ok": result["ok"]}
+        if _args_summary(arguments):
+            frame["argsSummary"] = _args_summary(arguments)
+        emit(frame)
+        fenced, warnings = guard_tool_result(result, call["name"])
+        _emit_warnings(emit, warnings)
+        convo.append({"role": "tool", "tool_call_id": call["id"],
+                      "content": fenced})
+
+
 def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                  registry: ToolRegistry, emit: Callable[[dict], None],
                  client_factory=None, cancel: CancelToken | None = None) -> str:
@@ -195,23 +228,7 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                 continue
             if not tool_calls:
                 return text
-            convo.append({"role": "assistant", "content": text or None,
-                          "tool_calls": [
-                              {"id": c["id"], "type": "function",
-                               "function": {"name": c["name"],
-                                            "arguments": c["arguments"] or "{}"}}
-                              for c in tool_calls]})
-            for call in tool_calls:
-                arguments = _parse_args(call["arguments"])
-                result = registry.dispatch(call["name"], arguments)
-                frame = {"type": "tool_call", "name": call["name"], "ok": result["ok"]}
-                if _args_summary(arguments):
-                    frame["argsSummary"] = _args_summary(arguments)
-                emit(frame)
-                fenced, warnings = guard_tool_result(result, call["name"])
-                _emit_warnings(emit, warnings)
-                convo.append({"role": "tool", "tool_call_id": call["id"],
-                              "content": fenced})
+            _dispatch_tool_calls(convo, tool_calls, text, registry, emit)
     return text + _CAP_NOTE
 
 
