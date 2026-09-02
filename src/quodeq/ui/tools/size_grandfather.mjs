@@ -11,11 +11,6 @@
 export const SIZE_GRANDFATHER = [
   "src/App.jsx",
   "src/api/applyMutationDelta.js",
-  "src/components/ContextBlock.jsx",
-  "src/components/HeatGridCells.jsx",
-  "src/components/Sidebar.jsx",
-  "src/components/TopBar.jsx",
-  "src/components/terminal/SevBadge.jsx",
   "src/features/assistant/AssistantDrawerProvider.jsx",
   "src/features/assistant/AssistantHeader.jsx",
   "src/features/assistant/hooks/useSessionLifecycle.js",
