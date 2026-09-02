@@ -33,16 +33,49 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
 
 
 def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
-    """Return the UUID of any other project matching this identity, via the index.
+    """Return the UUID of any other project matching this identity.
 
-    O(1) index lookup instead of a directory walk + repository_info.json parse
-    per existing project (mirrors ``_update_index``'s use of the same index).
+    Fast path: O(1) index lookup instead of a directory walk + repository_info.json
+    parse per existing project (mirrors ``_update_index``'s use of the same index).
+
+    Fallback: the index is not guaranteed to have an entry for every project on
+    disk (legacy projects created before the index existed, or an imported
+    project whose best-effort index write failed). On a miss we fall back to
+    walking ``reports_root`` and reading each ``repository_info.json`` directly,
+    mirroring ``_scan_legacy_projects``'s self-healing pattern: a fallback hit
+    is written back into the index so subsequent lookups for that project take
+    the fast path.
     """
     index = load_index(reports_root)
     candidate = index.get(index_key(identity))
-    if candidate is None or candidate == ignore_uuid:
+    if candidate is not None:
+        return None if candidate == ignore_uuid else candidate
+
+    if not reports_root.is_dir():
         return None
-    return candidate
+    for child in reports_root.iterdir():
+        if not child.is_dir() or child.name == ignore_uuid:
+            continue
+        info_file = child / _REPO_INFO_FILENAME
+        if not info_file.exists():
+            continue
+        try:
+            data = json.loads(info_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if data.get("name") != identity.project_name:
+            continue
+        if data.get("path") != identity.repo_path:
+            continue
+        if (data.get("scopePath") or None) != (identity.scope_path or None):
+            continue
+        try:
+            index[index_key(identity)] = child.name
+            save_index(reports_root, index)
+        except OSError as exc:
+            _logger.warning("import: could not update project_index.json: %s", exc)
+        return child.name
+    return None
 
 
 def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:

@@ -14,7 +14,6 @@ import pytest
 
 from quodeq.api.app import create_app
 from quodeq.api.zip import _MANIFEST_FILENAME, _MANIFEST_KIND, _MANIFEST_SCHEMA
-from quodeq.services.project_index import ProjectIdentity, index_key, save_index
 
 _ORIGIN = {"Origin": "http://localhost"}
 
@@ -331,12 +330,6 @@ def test_import_same_identity_collision_returns_409(app_client):
     (existing / "repository_info.json").write_text(json.dumps({
         "uuid": existing_uuid, "name": "myrepo", "location": "local", "path": "/tmp/myrepo",
     }))
-    # Set up the index so _find_identity_collision can find the existing project.
-    existing_identity = ProjectIdentity(
-        project_name="myrepo", repo_path="/tmp/myrepo", location="local",
-        discipline=None, scope_path=None, remote_url=None,
-    )
-    save_index(eval_dir, {index_key(existing_identity): existing_uuid})
     data = _make_zip(project_uuid=incoming_uuid)
     with _patch_home(home):
         resp = _post_zip(c, data)
@@ -376,12 +369,6 @@ def test_import_same_identity_replace_is_refused(app_client):
     (existing / "repository_info.json").write_text(json.dumps({
         "uuid": existing_uuid, "name": "myrepo", "location": "local", "path": "/tmp/myrepo",
     }))
-    # Set up the index so _find_identity_collision can find the existing project.
-    existing_identity = ProjectIdentity(
-        project_name="myrepo", repo_path="/tmp/myrepo", location="local",
-        discipline=None, scope_path=None, remote_url=None,
-    )
-    save_index(eval_dir, {index_key(existing_identity): existing_uuid})
     data = _make_zip(project_uuid=incoming_uuid)
     with _patch_home(home):
         resp = _post_zip(c, data, action="replace")
