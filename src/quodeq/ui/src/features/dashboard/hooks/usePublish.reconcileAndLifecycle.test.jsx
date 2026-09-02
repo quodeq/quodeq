@@ -1,0 +1,250 @@
+import { describe, it, expect, vi } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { usePublish } from './usePublish.js';
+import { useSharedProjects } from './useSharedProjects.js';
+import { withQueryClient, withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
+import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { sharedKeys } from '../../../api/queryKeys.js';
+
+function makeFakeApi(overrides = {}) {
+  return {
+    getSharedStatus: vi.fn(async () => ({
+      configured: true,
+      url: 'https://github.com/team/results.git',
+      publish: { state: 'idle', project: null, runs: null, error: null, finishedAt: null },
+    })),
+    sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
+    publishProject: vi.fn(async () => ({ started: true })),
+    ...overrides,
+  };
+}
+
+// A promise the test controls the settlement of, so we can assert on
+// behaviour while a call is genuinely still in flight (the double-submit
+// window), rather than a promise that resolves on the same microtask tick.
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+function wrap(fakeApi, children) {
+  const QC = withQueryClient();
+  return (
+    <QC>
+      <ApiProvider value={fakeApi}>{children}</ApiProvider>
+    </QC>
+  );
+}
+
+// Rerender-safe wrapper. See withStableQueryApi's doc comment for why the
+// inline `({ children }) => wrap(fakeApi, children)` idiom above must not be
+// used by any test that rerenders.
+const makeStableWrapper = withStableQueryApi;
+
+// Split from usePublish.test.jsx: enable/disable reconciliation,
+// stale-error clearing, interval cleanup on unmount, and dedup with
+// useSharedProjects.
+
+describe('usePublish', () => {
+  it('reconciles publish state on re-enable after the job completed while disabled', async () => {
+    // Server reports a running job at first...
+    const getSharedStatus = vi.fn(async () => ({
+      configured: true,
+      publish: { state: 'running', project: 'p1' },
+    }));
+    const sharedListProjects = vi.fn(async () => ({
+      projects: [{ id: 'p1', name: 'demo', publishedAt: '2026-07-17T00:00:00Z' }],
+      lastSynced: '2026-07-17T00:00:00Z',
+      stale: false,
+    }));
+    const fakeApi = makeFakeApi({ getSharedStatus, sharedListProjects });
+    const { result, rerender } = renderHook(
+      ({ enabled }) => usePublish({ enabled }),
+      {
+        wrapper: makeStableWrapper(fakeApi),
+        initialProps: { enabled: true },
+      }
+    );
+
+    // Mount enabled: the fresh status shows the running job; it's adopted.
+    await waitFor(() => expect(result.current.publishState).toBe('running'));
+    expect(result.current.publishingProject).toBe('p1');
+
+    // User switches to the online tab: hook disabled, polling stops,
+    // local state stays as-is (stale by design while away).
+    await act(async () => {
+      rerender({ enabled: false });
+    });
+    expect(result.current.publishState).toBe('running');
+    expect(result.current.publishingProject).toBe('p1');
+
+    // The job completes server-side while the hook is disabled.
+    getSharedStatus.mockImplementation(async () => ({
+      configured: true,
+      publish: { state: 'done', project: 'p1' },
+    }));
+    await waitFor(() => expect(sharedListProjects.mock.calls.length).toBeGreaterThan(0));
+    const listCallsBefore = sharedListProjects.mock.calls.length;
+
+    // User returns to the local tab: hook re-enabled, status refetches.
+    await act(async () => {
+      rerender({ enabled: true });
+    });
+
+    // The wedge: without reconciliation, state stays 'running' forever.
+    await waitFor(() => expect(result.current.publishState).toBe('done'));
+    expect(result.current.publishingProject).toBeNull();
+    // The done transition triggered the shared-list re-fetch (on top of the
+    // configured-path fetch re-enabling the list query always does): exactly
+    // 2 new calls.
+    await waitFor(() => expect(sharedListProjects.mock.calls.length).toBe(listCallsBefore + 2));
+    expect(sharedListProjects).toHaveBeenCalledWith({ refresh: false });
+  });
+
+  it('reconciles to error and surfaces it when the job failed while disabled', async () => {
+    const getSharedStatus = vi.fn(async () => ({
+      configured: true,
+      publish: { state: 'running', project: 'p1' },
+    }));
+    const fakeApi = makeFakeApi({ getSharedStatus });
+    const { result, rerender } = renderHook(
+      ({ enabled }) => usePublish({ enabled }),
+      {
+        wrapper: makeStableWrapper(fakeApi),
+        initialProps: { enabled: true },
+      }
+    );
+
+    await waitFor(() => expect(result.current.publishState).toBe('running'));
+    expect(result.current.publishingProject).toBe('p1');
+
+    await act(async () => {
+      rerender({ enabled: false });
+    });
+
+    // The job fails server-side while the hook is disabled.
+    getSharedStatus.mockImplementation(async () => ({
+      configured: true,
+      publish: { state: 'error', project: 'p1', error: 'permission denied' },
+    }));
+
+    await act(async () => {
+      rerender({ enabled: true });
+    });
+
+    await waitFor(() => expect(result.current.publishState).toBe('error'));
+    expect(result.current.publishingProject).toBeNull();
+    expect(result.current.publishError).toBe('permission denied');
+    expect(result.current.publishErrorProject).toBe('p1');
+  });
+
+  // Minor 8 (final whole-branch review): CardFooter keys its inline error
+  // banner on publishErrorProject alone (see ProjectsPage.jsx's CardFooter),
+  // not on publishState. A rejected click on a DIFFERENT project (409, the
+  // single-job guard -- see "does not clobber a genuinely running job" above)
+  // leaves that project's card showing an error for as long as the tracked
+  // job keeps running. Once that job's poll reports 'done', the lock is free
+  // again and the stale error no longer describes reality -- it must clear.
+  it('clears a stale error from a different (rejected) project once a poll reaches "done" for the tracked job', async () => {
+    vi.useFakeTimers();
+    try {
+      const fakeApi = makeFakeApi();
+      const { result } = renderHook(() => usePublish({ enabled: false }), {
+        wrapper: ({ children }) => wrap(fakeApi, children),
+      });
+
+      // p1's publish genuinely starts and begins polling.
+      await act(async () => {
+        await result.current.publish('p1');
+      });
+      expect(result.current.publishState).toBe('running');
+
+      // p2's click hits the backend's single-job guard and gets rejected.
+      fakeApi.publishProject.mockRejectedValueOnce(new Error('a publish is already running'));
+      await act(async () => {
+        await result.current.publish('p2');
+      });
+      expect(result.current.publishError).toBe('a publish is already running');
+      expect(result.current.publishErrorProject).toBe('p2');
+      expect(result.current.publishState).toBe('running');
+
+      // p1's job finishes -- the poll reports done.
+      fakeApi.getSharedStatus.mockResolvedValue({ configured: true, publish: { state: 'done', project: 'p1', runs: 1 } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(result.current.publishState).toBe('done');
+      expect(result.current.publishError).toBeNull();
+      expect(result.current.publishErrorProject).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not leak an interval when unmounted while polling', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSharedStatus = vi.fn()
+        .mockResolvedValueOnce({ configured: true, publish: { state: 'running', project: 'p1' } });
+      const fakeApi = makeFakeApi({ getSharedStatus });
+      const { unmount } = renderHook(() => usePublish({ enabled: true }), {
+        wrapper: ({ children }) => wrap(fakeApi, children),
+      });
+
+      // Mount and start a publish (which starts polling).
+      await act(async () => {
+        // getSharedStatus was called once in loadStatus (sees running).
+        expect(getSharedStatus).toHaveBeenCalledTimes(1);
+      });
+
+      // Unmount before any poll tick fires.
+      unmount();
+
+      // Advance timers past when a poll would have fired.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4000);
+      });
+
+      // Must not have called getSharedStatus again after unmount.
+      expect(getSharedStatus).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Audit C6: useSharedProjects and usePublish used to each fetch status
+  // and list independently -- two of every request per Projects mount.
+  // Both hooks now read `sharedKeys.status()`/`sharedKeys.list()`, so
+  // react-query dedupes: mounting them together issues exactly one status
+  // fetch and one list fetch, not one pair per hook.
+  it('mounting alongside useSharedProjects issues exactly one status fetch and one list fetch (react-query dedup)', async () => {
+    // Held open so the background revalidate useSharedProjects fires after
+    // its own first successful list never completes during this test --
+    // otherwise its own re-list would add a second, legitimate list fetch
+    // and muddy the "exactly one" assertion this test is making.
+    const refreshShared = vi.fn(() => new Promise(() => {}));
+    const fakeApi = makeFakeApi({ refreshShared });
+
+    function BothHooks() {
+      useSharedProjects();
+      return usePublish({ enabled: true });
+    }
+
+    renderHook(() => BothHooks(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));
+    // Give a would-be duplicate fetch (the bug this locks in against) a
+    // chance to show up before asserting the counts hold steady.
+    await act(async () => {});
+    expect(fakeApi.getSharedStatus).toHaveBeenCalledTimes(1);
+    expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1);
+  });
+});
