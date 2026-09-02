@@ -158,6 +158,64 @@ class TestDeleteAllDismissed:
         assert len(load_deleted(project_dir)) == 1
 
 
+def test_sweep_emits_per_run_instead_of_accumulating_all_runs_first(tmp_path: Path):
+    from quodeq.services.deleted import _sweep_dismissed_matching
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir = tmp_path / "proj"
+    run_a = _seed_projected_run(project_dir, "run-a", req="M-MOD-1", file="a.py", line=1)
+    run_b = _seed_projected_run(project_dir, "run-b", req="M-MOD-1", file="a.py", line=1)
+    dismiss_finding(project_dir, _finding(req="M-MOD-1", file="a.py", line=1))
+    _apply_actions(project_dir, run_a)
+    _apply_actions(project_dir, run_b)
+
+    emitted_after_first_run = []
+
+    class _RecordingLog:
+        def emit(self, event):
+            emitted_after_first_run.append(event)
+
+    count = _sweep_dismissed_matching(
+        project_dir, ("maintainability", "Modularity", "a.py"),
+        writer=_RecordingLog(),
+    )
+    assert count == 2
+    assert len(emitted_after_first_run) == 2
+
+
+def test_sweep_never_holds_more_than_one_runs_matches_at_once(tmp_path: Path, monkeypatch):
+    from quodeq.services import deleted as deleted_mod
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir = tmp_path / "proj"
+    run_a = _seed_projected_run(project_dir, "run-a", req="M-MOD-1", file="a.py", line=1)
+    run_b = _seed_projected_run(project_dir, "run-b", req="M-MOD-1", file="a.py", line=2)
+
+    dismiss_finding(project_dir, _finding(req="M-MOD-1", file="a.py", line=1))
+    dismiss_finding(project_dir, _finding(req="M-MOD-1", file="a.py", line=2))
+    _apply_actions(project_dir, run_a)
+    _apply_actions(project_dir, run_b)
+
+    max_batch_seen = {"n": 0}
+    real_find = deleted_mod.find_dismissed_matching
+
+    def spying_find(run_dir, **kw):
+        result = real_find(run_dir, **kw)
+        max_batch_seen["n"] = max(max_batch_seen["n"], len(result))
+        return result
+
+    monkeypatch.setattr(deleted_mod, "find_dismissed_matching", spying_find)
+
+    class _NullLog:
+        def emit(self, event):
+            pass
+
+    deleted_mod._sweep_dismissed_matching(
+        project_dir, ("maintainability", "Modularity", "a.py"), writer=_NullLog(),
+    )
+    assert max_batch_seen["n"] == 1, "each run contributes only its own match, never accumulated across runs"
+
+
 class TestIsFindingDeleted:
     def test_empty_set_returns_false(self):
         assert is_finding_deleted(set(), dimension="x", principle="y", file="z") is False

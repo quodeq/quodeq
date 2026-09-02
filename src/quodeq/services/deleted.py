@@ -126,30 +126,27 @@ def _sweep_dismissed_matching(
 
     Reads from each run's evaluation.db (via the data layer's
     ``find_dismissed_matching``) to find dismissed findings that match the
-    deletion key, then appends FindingUndismissedEvent to actions.jsonl for each.
+    deletion key, emitting events per run as they're found instead of
+    accumulating every run's matches in memory before emitting any —
+    bounds peak memory to one run's matches at a time on projects with a
+    large run history.
     """
     dimension, principle, file = key
     if not project_dir.is_dir():
         return 0
 
-    matching: list[tuple[str, str, int]] = []
+    log = writer or ActionLogWriter(project_dir)
+    count = 0
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        matching.extend(
-            find_dismissed_matching(
-                run_dir, dimension=dimension, practice_id=principle, file=file,
-            )
-        )
-
-    if not matching:
-        return 0
-
-    log = writer or ActionLogWriter(project_dir)
-    for req, f, line in matching:
-        payload = FindingUndismissed(req=req, file=f, line=line)
-        log.emit(FindingUndismissedEvent(payload=payload))
-    return len(matching)
+        for req, f, line in find_dismissed_matching(
+            run_dir, dimension=dimension, practice_id=principle, file=file,
+        ):
+            payload = FindingUndismissed(req=req, file=f, line=line)
+            log.emit(FindingUndismissedEvent(payload=payload))
+            count += 1
+    return count
 
 
 def is_finding_deleted(
