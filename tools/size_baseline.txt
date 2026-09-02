@@ -8,8 +8,6 @@ src/quodeq/_cli_resolution.py:203:function
 src/quodeq/api/_import_validation.py:88:function
 src/quodeq/api/_log_stream_routes.py:110:function
 src/quodeq/api/_log_stream_routes.py:135:function
-src/quodeq/api/_run_event_stream.py:1:file
-src/quodeq/api/_run_event_stream.py:289:function
 src/quodeq/api/assistant_session_routes.py:58:function
 src/quodeq/api/assistant_turn_routes.py:95:function
 src/quodeq/api/assistant_workspace_routes.py:25:function
@@ -50,15 +48,7 @@ src/quodeq/core/scoring/projector_scoring.py:67:function
 src/quodeq/core/utils/io.py:58:function
 src/quodeq/dashboard/_server.py:138:function
 src/quodeq/dashboard/_server.py:84:function
-src/quodeq/dashboard/_webview_window.py:1049:function
-src/quodeq/dashboard/_webview_window.py:1110:function
-src/quodeq/dashboard/_webview_window.py:1:file
-src/quodeq/dashboard/_webview_window.py:332:function
-src/quodeq/dashboard/_webview_window.py:431:function
-src/quodeq/dashboard/_webview_window.py:703:function
-src/quodeq/dashboard/_webview_window.py:918:function
 src/quodeq/data/events/reader.py:27:function
-src/quodeq/data/fs/dimensions_state_store.py:39:function
 src/quodeq/data/fs/run_status_store.py:45:function
 src/quodeq/data/fs/shared_repo.py:162:function
 src/quodeq/data/fs/shared_repo.py:1:file
