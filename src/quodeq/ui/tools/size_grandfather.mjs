@@ -9,11 +9,7 @@
 // list may only shrink: split a file, then remove its entry here
 // (tools/check_size_grandfather.mjs enforces the ceiling).
 export const SIZE_GRANDFATHER = [
-  "src/features/assistant/AssistantDrawerProvider.jsx",
-  "src/features/assistant/AssistantHeader.jsx",
-  "src/features/assistant/hooks/useSessionLifecycle.js",
   "src/features/assistant/useAssistantStream.js",
-  "src/features/assistant/useDrawerPanels.js",
   "src/features/dashboard/components/AccumulatedOverviewPanel.jsx",
   "src/features/dashboard/components/DashboardPage.jsx",
   "src/features/dashboard/components/DimensionGaugeCard.jsx",

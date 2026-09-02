@@ -25,8 +25,10 @@ import { t } from '../../../strings/index.js';
 export function sessionKey(ctx) {
   return `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
 }
-export function useSessionLifecycle() {
-  const { createAssistantSession, fetchAssistantWorkspace } = useApi();
+// Groups useSessionLifecycle's own useState/useRef declarations so the outer
+// hook's body stays under the function-length cap; still called
+// unconditionally at the top of the outer hook, so hook-order is unaffected.
+function useSessionCoreFields() {
   const [sessionId, setSessionId] = useState(null);
   const [sessionCtxKey, setSessionCtxKey] = useState(null);
   // Provider/model of the active session, surfaced so the drawer header can
@@ -37,14 +39,32 @@ export function useSessionLifecycle() {
   // session-start or message POST. Rendered by the drawer alongside (and
   // taking precedence over) the stream's own error frames.
   const [localError, setLocalError] = useState(null);
+  // Tracks the most recently *requested* session context key, set
+  // synchronously at startSession call time. Because startSession awaits a
+  // network round-trip, a check-then-act guard on React state would let two
+  // rapid context switches both create sessions and let the older-context
+  // response win. We instead commit a resolved session only if its key is
+  // still the latest requested one.
+  const latestKeyRef = useRef(null);
+  const sessionIdRef = useRef(null);
+  sessionIdRef.current = sessionId;
+  // The last committed session context, kept so resetConversation can mint a
+  // fresh session for the SAME project/run/provider.
+  const lastCtxRef = useRef(null);
 
-  // Per-conversation web access. Default OFF and reset on every context
-  // switch: web access is opt-in per conversation, never sticky.
+  return {
+    sessionId, setSessionId, sessionCtxKey, setSessionCtxKey, sessionMeta, setSessionMeta,
+    userTurns, setUserTurns, localError, setLocalError, latestKeyRef, sessionIdRef, lastCtxRef,
+  };
+}
+
+// Per-conversation web/write access toggles (default OFF, reset on every
+// context switch — opt-in never sticky) plus the repo/workspace mirror of
+// the server's view and the in-flight-turn flag.
+function useSessionAccessFields() {
   const [webEnabled, setWebEnabled] = useState(false);
   const toggleWebEnabled = useCallback(() => setWebEnabled((prev) => !prev), []);
 
-  // Per-conversation write access: default OFF, reset on every context switch,
-  // mirrors the web toggle. repoInfo/workspace mirror the server's view.
   const [writeEnabled, setWriteEnabled] = useState(false);
   const toggleWriteEnabled = useCallback(() => setWriteEnabled((prev) => !prev), []);
   const writeEnabledRef = useRef(false);
@@ -55,45 +75,27 @@ export function useSessionLifecycle() {
   // create-session response. Reset on every context switch via commitSession,
   // same as repoInfo — never sticky across sessions.
   const [readOnly, setReadOnly] = useState(false);
-
-  // Tracks the most recently *requested* session context key, set
-  // synchronously at startSession call time. Because startSession awaits a
-  // network round-trip, a check-then-act guard on React state would let two
-  // rapid context switches both create sessions and let the older-context
-  // response win. We instead commit a resolved session only if its key is
-  // still the latest requested one.
-  const latestKeyRef = useRef(null);
-
   // Whether a turn is actually in flight (between sending a message and the
   // stream's terminal done/error frame). This — NOT the SSE connection state —
   // drives the drawer's loading indicator and input-disable. Merely opening a
   // session connects the event stream, which must not look like "loading".
   const [turnActive, setTurnActive] = useState(false);
 
-  const sessionIdRef = useRef(null);
-  sessionIdRef.current = sessionId;
-  const refreshWorkspace = useCallback(async () => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    try {
-      const ws = await fetchAssistantWorkspace(sid);
-      if (sessionIdRef.current !== sid) return;   // context switched mid-flight
-      setWorkspace(ws.worktree);
-    } catch { /* advisory only */ }
-  }, [fetchAssistantWorkspace]);
-  const stream = useAssistantStream(sessionId, { onDone: () => {
-    setTurnActive(false);
-    if (writeEnabledRef.current) refreshWorkspace();
-  } });
+  return {
+    webEnabled, setWebEnabled, toggleWebEnabled, writeEnabled, setWriteEnabled, toggleWriteEnabled, writeEnabledRef,
+    repoInfo, setRepoInfo, workspace, setWorkspace, readOnly, setReadOnly, turnActive, setTurnActive,
+  };
+}
 
-  // A fresh session (open, project/run switch) has no turn in flight.
-  useEffect(() => { setTurnActive(false); }, [sessionId]);
-
-  // The last committed session context, kept so resetConversation can mint a
-  // fresh session for the SAME project/run/provider.
-  const lastCtxRef = useRef(null);
-
-  const commitSession = useCallback(async (ctx, key) => {
+// commitSession resolves a session-create request and, if its key is still
+// the latest requested one, commits the fresh session state. Extracted as a
+// factory (called once, wrapped in useCallback below) purely to keep
+// useSessionLifecycle's own body under the function-length cap.
+function makeCommitSession({
+  createAssistantSession, latestKeyRef, setLocalError, setUserTurns, setWebEnabled, setWriteEnabled,
+  setRepoInfo, setReadOnly, setWorkspace, setSessionCtxKey, setSessionId, setSessionMeta, lastCtxRef,
+}) {
+  return async function commitSession(ctx, key) {
     // Record this as the latest requested context synchronously, before the
     // await, so a later call can invalidate this one's resolution.
     latestKeyRef.current = key;
@@ -124,9 +126,11 @@ export function useSessionLifecycle() {
     setSessionId(created.sessionId);
     setSessionMeta({ provider: ctx?.provider ?? null, model: ctx?.model ?? null });
     lastCtxRef.current = ctx;
-  }, [createAssistantSession]);
+  };
+}
 
-  const startSession = useCallback(async (ctx) => {
+function makeStartSession({ latestKeyRef, sessionCtxKey, sessionId, commitSession }) {
+  return async (ctx) => {
     const key = sessionKey(ctx);
     // Re-claim the latest-requested key even when deduping: a superseded
     // in-flight commit for a DIFFERENT context must not land after the user
@@ -134,13 +138,15 @@ export function useSessionLifecycle() {
     latestKeyRef.current = key;
     if (key === sessionCtxKey && sessionId) return;
     await commitSession(ctx, key);
-  }, [sessionCtxKey, sessionId, commitSession]);
+  };
+}
 
-  // Fresh session for the SAME context: each turn replays only its own
-  // session's messages server-side, so a new session id gives the model a
-  // clean history and the stream hook an empty transcript. No-op while a
-  // turn is in flight or before any session exists.
-  const resetConversation = useCallback(async () => {
+// Fresh session for the SAME context: each turn replays only its own
+// session's messages server-side, so a new session id gives the model a
+// clean history and the stream hook an empty transcript. No-op while a
+// turn is in flight or before any session exists.
+function makeResetConversation({ lastCtxRef, turnActive, commitSession }) {
+  return async () => {
     const ctx = lastCtxRef.current;
     if (!ctx || turnActive) return;
     // Must match startSession's key format exactly (sessionKey): sessionCtxKey
@@ -150,7 +156,60 @@ export function useSessionLifecycle() {
     // extra session.
     const key = sessionKey(ctx);
     await commitSession(ctx, key);
-  }, [turnActive, commitSession]);
+  };
+}
+
+function makeRefreshWorkspace({ sessionIdRef, fetchAssistantWorkspace, setWorkspace }) {
+  return async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      const ws = await fetchAssistantWorkspace(sid);
+      if (sessionIdRef.current !== sid) return;   // context switched mid-flight
+      setWorkspace(ws.worktree);
+    } catch { /* advisory only */ }
+  };
+}
+
+export function useSessionLifecycle() {
+  const { createAssistantSession, fetchAssistantWorkspace } = useApi();
+  const {
+    sessionId, setSessionId, sessionCtxKey, setSessionCtxKey, sessionMeta, setSessionMeta,
+    userTurns, setUserTurns, localError, setLocalError, latestKeyRef, sessionIdRef, lastCtxRef,
+  } = useSessionCoreFields();
+  const {
+    webEnabled, setWebEnabled, toggleWebEnabled, writeEnabled, setWriteEnabled, toggleWriteEnabled, writeEnabledRef,
+    repoInfo, setRepoInfo, workspace, setWorkspace, readOnly, setReadOnly, turnActive, setTurnActive,
+  } = useSessionAccessFields();
+  const refreshWorkspace = useCallback(
+    makeRefreshWorkspace({ sessionIdRef, fetchAssistantWorkspace, setWorkspace }),
+    [fetchAssistantWorkspace],
+  );
+  const stream = useAssistantStream(sessionId, { onDone: () => {
+    setTurnActive(false);
+    if (writeEnabledRef.current) refreshWorkspace();
+  } });
+
+  // A fresh session (open, project/run switch) has no turn in flight.
+  useEffect(() => { setTurnActive(false); }, [sessionId]);
+
+  const commitSession = useCallback(
+    makeCommitSession({
+      createAssistantSession, latestKeyRef, setLocalError, setUserTurns, setWebEnabled, setWriteEnabled,
+      setRepoInfo, setReadOnly, setWorkspace, setSessionCtxKey, setSessionId, setSessionMeta, lastCtxRef,
+    }),
+    [createAssistantSession],
+  );
+
+  const startSession = useCallback(
+    makeStartSession({ latestKeyRef, sessionCtxKey, sessionId, commitSession }),
+    [sessionCtxKey, sessionId, commitSession],
+  );
+
+  const resetConversation = useCallback(
+    makeResetConversation({ lastCtxRef, turnActive, commitSession }),
+    [turnActive, commitSession],
+  );
 
   return {
     sessionId, sessionMeta, userTurns, setUserTurns, localError, setLocalError,

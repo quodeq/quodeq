@@ -34,34 +34,20 @@ export function useAssistantDrawer() {
   return ctx;
 }
 
-export function AssistantDrawerProvider({ children }) {
-  const { enabled: assistantEnabled } = useAssistantProvider();
-  const { enabled: terminalEnabled } = useTerminalSettings();
-
-  // Each panel has an independent open/selected state. `openPanels` is the set
-  // of panels currently in the drawer (in selection order); the drawer is open
-  // iff it's non-empty, shows a tab per open panel, and `activeTab` is the one
-  // in front. The topbar launchers toggle a panel's membership; clicking a
-  // title-bar tab just changes which open panel is active.
-  const {
-    openPanels, activeTab, isOpen, openTab, selectTab, toggleTopbar,
-    open, close, toggle, closeActiveTab, closePanel,
-  } = useDrawerPanels({ assistantEnabled, terminalEnabled });
-
-  // Maximized = grow the drawer to (near) full height; toggling restores the
-  // previous drag height. Ephemeral (not persisted); reset when the drawer closes.
+// Maximized = grow the drawer to (near) full height; toggling restores the
+// previous drag height. Ephemeral (not persisted); reset when the drawer closes.
+function useDrawerMaximized(openPanelsLength) {
   const [maximized, setMaximized] = useState(false);
   const toggleMaximized = useCallback(() => setMaximized((m) => !m), []);
   // A closed drawer is never "maximized".
-  useEffect(() => { if (openPanels.length === 0 && maximized) setMaximized(false); }, [openPanels.length, maximized]);
+  useEffect(() => { if (openPanelsLength === 0 && maximized) setMaximized(false); }, [openPanelsLength, maximized]);
+  return { maximized, setMaximized, toggleMaximized };
+}
 
-  const { height, setHeight } = useDrawerHeight();
-
-  useDrawerHotkeys({ assistantEnabled, terminalEnabled, toggleTopbar });
-
-  // Command/skill catalog for the welcome panel, autocomplete, and
-  // meta-commands. Fetched once per app session on first drawer open;
-  // failures leave it null and the UI degrades to the built-in commands.
+// Command/skill catalog for the welcome panel, autocomplete, and
+// meta-commands. Fetched once per app session on first drawer open;
+// failures leave it null and the UI degrades to the built-in commands.
+function useAssistantCatalog(isOpen) {
   const [catalog, setCatalog] = useState(null);
   useEffect(() => {
     if (!isOpen || catalog !== null) return undefined;
@@ -71,6 +57,50 @@ export function AssistantDrawerProvider({ children }) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [isOpen, catalog]);
+  return catalog;
+}
+
+function buildDrawerContextValue({
+  isOpen, open, close, toggle, closeActiveTab, closePanel,
+  openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
+  height, setHeight, maximized, toggleMaximized, setMaximized,
+  messages, turnActive, localError, stream, sessionId, sessionMeta,
+  webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
+  repoInfo, readOnly, workspace, refreshWorkspace,
+  catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
+}) {
+  return {
+    isOpen, open, close, toggle, closeActiveTab, closePanel,
+    openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
+    height, setHeight, maximized, toggleMaximized, setMaximized,
+    messages, streaming: turnActive, error: localError || stream.error,
+    sessionReady: sessionId != null,
+    provider: sessionMeta.provider, model: sessionMeta.model,
+    webEnabled, toggleWebEnabled,
+    writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace,
+    sessionId,
+    catalog, addLocalExchange,
+    startSession, sendMessage, stopTurn, resetConversation,
+  };
+}
+
+export function AssistantDrawerProvider({ children }) {
+  const { enabled: assistantEnabled } = useAssistantProvider();
+  const { enabled: terminalEnabled } = useTerminalSettings();
+
+  // Each panel has an independent open/selected state — see useDrawerPanels.js.
+  const {
+    openPanels, activeTab, isOpen, openTab, selectTab, toggleTopbar,
+    open, close, toggle, closeActiveTab, closePanel,
+  } = useDrawerPanels({ assistantEnabled, terminalEnabled });
+
+  const { maximized, setMaximized, toggleMaximized } = useDrawerMaximized(openPanels.length);
+
+  const { height, setHeight } = useDrawerHeight();
+
+  useDrawerHotkeys({ assistantEnabled, terminalEnabled, toggleTopbar });
+
+  const catalog = useAssistantCatalog(isOpen);
 
   const session = useAssistantSession();
   const {
@@ -85,18 +115,14 @@ export function AssistantDrawerProvider({ children }) {
     [userTurns, stream.messages],
   );
 
-  const value = useMemo(() => ({
+  const value = useMemo(() => buildDrawerContextValue({
     isOpen, open, close, toggle, closeActiveTab, closePanel,
     openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
     height, setHeight, maximized, toggleMaximized, setMaximized,
-    messages, streaming: turnActive, error: localError || stream.error,
-    sessionReady: sessionId != null,
-    provider: sessionMeta.provider, model: sessionMeta.model,
-    webEnabled, toggleWebEnabled,
-    writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace,
-    sessionId,
-    catalog, addLocalExchange,
-    startSession, sendMessage, stopTurn, resetConversation,
+    messages, turnActive, localError, stream, sessionId, sessionMeta,
+    webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
+    repoInfo, readOnly, workspace, refreshWorkspace,
+    catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
   }), [isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
 
   return (
