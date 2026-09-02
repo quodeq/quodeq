@@ -24,7 +24,7 @@ const NOT_USER_FACING = [
 export default [
   {
     files: ['src/**/*.jsx'],
-    ignores: ['**/*.test.jsx'],
+    ignores: ['**/*.test.jsx', '**/*.fixtures.jsx'], // Fixtures modules are test-support data, not user-facing prose
     plugins: { react, i18n },
     languageOptions: {
       ecmaVersion: 'latest',
@@ -65,7 +65,7 @@ export default [
     // fallbacks. Separate block because jsx-no-literals has nothing to say
     // about .js and would only add noise here.
     files: ['src/**/*.js'],
-    ignores: ['**/*.test.js', ...NOT_USER_FACING],
+    ignores: ['**/*.test.js', '**/*.fixtures.js', ...NOT_USER_FACING], // Fixtures modules are test-support data, not user-facing prose
     plugins: { i18n },
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },
     rules: { 'i18n/no-prose-literals': 'error' },
