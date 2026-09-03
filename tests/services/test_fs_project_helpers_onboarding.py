@@ -10,9 +10,11 @@ shared-repo route (backfill=False) never writes.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+from unittest.mock import patch
 
-from quodeq.services._fs_project_helpers import _build_project_entry
+from quodeq.services._fs_project_helpers import _build_project_entry, find_existing_project
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 
@@ -94,3 +96,16 @@ def test_entry_backfill_false_never_writes(tmp_path):
 
     assert entry.onboarding_completed_at is None
     assert info_path.read_text() == before
+
+
+def test_find_existing_project_logs_malformed_repo_identifier(caplog, tmp_path):
+    """A repo identifier is_repo_url can't classify must not fail silently:
+    the duplicate check falls back to 'no match', but an operator needs a
+    trace to see which malformed identifier was rejected."""
+    with patch(
+        "quodeq.shared.utils.is_repo_url",
+        side_effect=ValueError("cannot classify repo identifier"),
+    ), caplog.at_level(logging.WARNING):
+        result = find_existing_project(str(tmp_path), "not a valid repo!!", None)
+    assert result is None
+    assert any("not a valid repo!!" in r.message for r in caplog.records)

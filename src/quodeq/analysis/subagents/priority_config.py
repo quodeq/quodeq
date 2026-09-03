@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 
 from quodeq.config.paths import default_paths
+
+_logger = logging.getLogger(__name__)
 
 _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
 
@@ -27,7 +30,8 @@ def load_priority_config() -> dict:
     config_path = default_paths().root / "config" / "file_priority.json"
     try:
         return json.loads(config_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, PermissionError, json.JSONDecodeError):
+    except (FileNotFoundError, PermissionError, json.JSONDecodeError) as exc:
+        _logger.warning("Failed to load file_priority.json, using defaults: %s", exc)
         return {}
 
 
