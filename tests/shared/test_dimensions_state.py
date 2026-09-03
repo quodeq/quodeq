@@ -93,3 +93,10 @@ class TestRead:
     def test_corrupt_file_returns_empty(self, tmp_path: Path):
         (tmp_path / "dimensions.json").write_text("{not json")
         assert read_dimensions(tmp_path) == {"schema_version": 1, "dimensions": {}}
+
+    def test_non_utf8_file_returns_empty(self, tmp_path: Path):
+        """Regression: a corrupt/non-UTF-8 dimensions.json must degrade the
+        same way a missing one does, not raise UnicodeDecodeError and crash
+        callers like build_job_snapshot."""
+        (tmp_path / "dimensions.json").write_bytes(b"\xff\xfe\x00\x01")
+        assert read_dimensions(tmp_path) == {"schema_version": 1, "dimensions": {}}
