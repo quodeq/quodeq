@@ -99,7 +99,15 @@ def run_git(
         )
         return proc.returncode == 0, (proc.stdout or "") + (proc.stderr or "")
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, str(exc)
+        # Unlike a failed git command (whose stdout/stderr is safe, expected
+        # user-facing text -- see refresh_shared_clone's docstring), this
+        # branch only fires for process-launch failures (git missing, a
+        # timeout). str(exc) there can include local details (the resolved
+        # command line, filesystem errno text) that callers surface straight
+        # into HTTP error responses, so keep it out of the returned reason
+        # and log it server-side instead.
+        logger.warning("run_git: %s failed to launch/complete: %s", args, exc)
+        return False, "git command failed to run"
 
 
 def _cache_base(env: dict | None = None) -> Path:
