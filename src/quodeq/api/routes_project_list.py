@@ -67,10 +67,9 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         projects = result.get("projects", [])
         offset = request.args.get("offset", 0, type=int)
         limit = request.args.get("limit", 0, type=int)
-        if offset > 0:
-            projects = projects[offset:]
-        if limit > 0:
-            projects = projects[:limit]
+        if offset > 0 or limit > 0:
+            end = offset + limit if limit > 0 else None
+            projects = projects[offset:end]
         # Self-healing warm-up: anything still pending on the page being
         # returned goes (back) on the queue, bounding this to page size
         # instead of the full project count.
