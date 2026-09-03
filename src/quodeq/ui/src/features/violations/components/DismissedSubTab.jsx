@@ -1,6 +1,7 @@
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 function dismissedLabel(d) {
   return d.principle || d.dimension || (d.req ?? '?');
@@ -70,7 +71,16 @@ export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll, on
               </button>
             )}
             {onDeleteAll && (
-              <button type="button" className="delete-btn" onClick={onDeleteAll}>
+              <button type="button" className="delete-btn"
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: t('violations.deleteAllConfirmTitle'),
+                    message: t('violations.deleteAllConfirmMessage'),
+                    variant: 'danger',
+                  });
+                  if (!ok) return;
+                  onDeleteAll();
+                }}>
                 {t('violations.deleteAll')}
               </button>
             )}

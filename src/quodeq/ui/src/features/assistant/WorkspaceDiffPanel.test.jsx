@@ -10,8 +10,10 @@ vi.mock('../../api/assistant.js', () => ({
   createAssistantWorkspacePr: vi.fn().mockResolvedValue({ prUrl: 'http://pr/1', branch: 'b', pushed: true, message: 'PR created' }),
   discardAssistantWorkspace: vi.fn().mockResolvedValue({ discarded: true }),
 }));
+vi.mock('../../utils/confirmDialog.js', () => ({ confirmDialog: vi.fn() }));
 
-import { applyAssistantWorkspace } from '../../api/assistant.js';
+import { applyAssistantWorkspace, discardAssistantWorkspace } from '../../api/assistant.js';
+import { confirmDialog } from '../../utils/confirmDialog.js';
 import { WorkspaceDiffPanel, classifyDiffLine } from './WorkspaceDiffPanel.jsx';
 
 describe('classifyDiffLine', () => {
@@ -71,5 +73,24 @@ describe('WorkspaceDiffPanel', () => {
     api.fetchAssistantWorkspaceDiff.mockResolvedValueOnce({ diff: '', truncated: false, stats: [] });
     render(<WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/No changes in this worktree/i)).toBeTruthy());
+  });
+
+  it('does not discard when the confirm dialog is cancelled', async () => {
+    confirmDialog.mockResolvedValueOnce(false);
+    render(<WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Discard')).toBeTruthy());
+    fireEvent.click(screen.getByText('Discard'));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'danger' }),
+    ));
+    expect(discardAssistantWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('discards when the confirm dialog is accepted', async () => {
+    confirmDialog.mockResolvedValueOnce(true);
+    render(<WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Discard')).toBeTruthy());
+    fireEvent.click(screen.getByText('Discard'));
+    await waitFor(() => expect(discardAssistantWorkspace).toHaveBeenCalledWith('s1'));
   });
 });

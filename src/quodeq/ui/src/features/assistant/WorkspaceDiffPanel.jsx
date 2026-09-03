@@ -3,6 +3,7 @@ import {
   applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace,
 } from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
+import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
 
 export function classifyDiffLine(line) {
@@ -66,7 +67,15 @@ function WorkspaceDiffActions({ sessionId, diff, empty, busy, prOpen, setPrOpen,
           {t('assistant.createPrEllipsis')}
         </button>
         <button type="button" disabled={busy}
-          onClick={() => act(() => discardAssistantWorkspace(sessionId), 'discarded')}>
+          onClick={async () => {
+            const ok = await confirmDialog({
+              title: t('assistant.discardConfirmTitle'),
+              message: t('assistant.discardConfirmMessage'),
+              variant: 'danger',
+            });
+            if (!ok) return;
+            act(() => discardAssistantWorkspace(sessionId), 'discarded');
+          }}>
           {t('assistant.discard')}
         </button>
       </div>

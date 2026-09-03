@@ -2,6 +2,7 @@ import useTerminalSettings from '../hooks/useTerminalSettings.js';
 import { killTerminal } from '../../../api/terminal.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
@@ -11,7 +12,13 @@ export default function TerminalSection() {
   // Only dispatch on kill SUCCESS: on failure the server keeps the live PTY and
   // a reconnect would reattach to the same shell — a fake restart — so we skip
   // the clear+reconnect and surface the failure instead.
-  const restart = () => {
+  const restart = async () => {
+    const ok = await confirmDialog({
+      title: t('settings.restartTerminalConfirmTitle'),
+      message: t('settings.restartTerminalConfirmMessage'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     killTerminal()
       .then(() => window.dispatchEvent(new Event('quodeq:terminal-restart')))
       .catch((err) => { console.warn('Terminal restart: kill failed, not reconnecting', err); });
