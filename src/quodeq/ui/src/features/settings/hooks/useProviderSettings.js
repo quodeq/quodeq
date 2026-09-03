@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { providerKey, notifyProviderSettingsChanged } from '../../../constants.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
+import { t } from '../../../strings/index.js';
 
 const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base', 'cmd-path'];
 const DEFAULTS = {
@@ -43,24 +45,30 @@ function loadProviderState(providerId, overrides, storage = localStorage) {
   return state;
 }
 
-function saveProviderSetting(providerId, key, value, storage = localStorage) {
+export function saveProviderSetting(providerId, key, value, storage = localStorage, { onPersistError } = {}) {
   try {
     storage.setItem(providerKey(providerId, key), String(value));
   } catch (err) {
     console.warn('[useProviderSettings] Could not persist setting to storage:', err);
+    onPersistError?.(err);
   }
 }
 
 export default function useProviderSettings(providerId, defaults, { storage = localStorage } = {}) {
+  const { showToast } = useSidePane();
   const [state, setState] = useState(() => loadProviderState(providerId, defaults, storage));
 
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));
-    saveProviderSetting(providerId, key, value, storage);
+    saveProviderSetting(providerId, key, value, storage, {
+      // A silent console.warn left the user believing their change was
+      // saved when storage rejected the write (quota, private browsing).
+      onPersistError: () => showToast(t('settings.persistError')),
+    });
     // Let the assistant gate re-read: in Default mode it mirrors the analysis
     // model, so a model change here must update its display live.
     notifyProviderSettingsChanged();
-  }, [providerId, storage]);
+  }, [providerId, storage, showToast]);
 
   return { state, update };
 }

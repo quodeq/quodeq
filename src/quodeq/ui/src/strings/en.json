@@ -1098,6 +1098,7 @@
   "settings.on": "On",
   "settings.openEditor": "open editor",
   "settings.perDimension": "Per-dimension",
+  "settings.persistError": "Setting could not be saved. Your browser storage may be full or restricted.",
   "settings.pickAModel": "Pick a model",
   "settings.pickModelToStart": "Pick a model to get started.",
   "settings.pickModelYouWant": "Pick the model you want to use.",
