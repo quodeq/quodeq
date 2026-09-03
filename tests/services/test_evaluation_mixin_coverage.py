@@ -209,11 +209,28 @@ class TestFsEvaluationMixinMethods:
 
     def test_score_failed_evaluation_success(self):
         mixin = self._make_mixin()
-        job = JobSnapshot(job_id="job-1", status="failed")
+        job = JobSnapshot(job_id="job-1", status="failed", output_project="proj", output_run_id="run1")
         mixin._jobs.get_job.return_value = job
-        with patch("quodeq.services.evaluation_mixin.score_completed_evidence"):
+        mock_score = MagicMock()
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence", mock_score):
             result = mixin.score_failed_evaluation("job-1", "/tmp/reports")
             assert result is True
+            # Verify score_completed_evidence was called with a dict, not the JobSnapshot
+            mock_score.assert_called_once_with("/tmp/reports", {
+                "outputProject": "proj",
+                "outputRunId": "run1",
+            })
+
+    def test_score_failed_evaluation_no_output_ids(self):
+        mixin = self._make_mixin()
+        job = JobSnapshot(job_id="job-1", status="failed")
+        mixin._jobs.get_job.return_value = job
+        mock_score = MagicMock()
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence", mock_score):
+            result = mixin.score_failed_evaluation("job-1", "/tmp/reports")
+            assert result is True
+            # Verify score_completed_evidence was NOT called when output_project/run_id are missing
+            mock_score.assert_not_called()
 
     def test_dispatcher_default(self):
         mixin = self._make_mixin()
