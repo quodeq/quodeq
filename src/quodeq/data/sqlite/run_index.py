@@ -70,7 +70,7 @@ def _walk_run_dirs(evaluations_root: Path):
 
 def _sync_status_backed_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
-    cached_mtimes: dict[str, int] | None = None,
+    cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
     disk_mtime = _status_mtime_ns(run_dir)
@@ -97,7 +97,7 @@ def _sync_status_backed_run(
 
 def _sync_one_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
-    cached_mtimes: dict[str, int] | None = None,
+    cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     status_path = run_dir / "status.json"
     if status_path.exists():
