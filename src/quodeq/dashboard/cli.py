@@ -85,6 +85,6 @@ def main(argv: list[str] | None = None) -> int:
     config = parse_args(argv)
     try:
         return run_dashboard(config)
-    except (RuntimeError, FileNotFoundError) as exc:
+    except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
