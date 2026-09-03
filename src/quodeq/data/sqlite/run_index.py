@@ -70,14 +70,19 @@ def _walk_run_dirs(evaluations_root: Path):
 
 def _sync_status_backed_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+    cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
     disk_mtime = _status_mtime_ns(run_dir)
     job_id = f"ext-{run_id}"
-    cached = db.execute(
-        "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
-    ).fetchone()
-    if cached is None or cached[0] != disk_mtime:
+    if cached_mtimes is not None:
+        cached_value = cached_mtimes.get(job_id)
+    else:
+        row = db.execute(
+            "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
+        ).fetchone()
+        cached_value = row[0] if row is not None else None
+    if cached_value is None or cached_value != disk_mtime:
         try:
             _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         except Exception as exc:
@@ -92,10 +97,14 @@ def _sync_status_backed_run(
 
 def _sync_one_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+    cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     status_path = run_dir / "status.json"
     if status_path.exists():
-        _sync_status_backed_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        _sync_status_backed_run(
+            db, run_dir, project_uuid=project_uuid, run_id=run_id,
+            cached_mtimes=cached_mtimes,
+        )
     else:
         try:
             _sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
@@ -114,8 +123,15 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
     gone — those can't be rescued by the heartbeat-based stale check.
     """
     with db:
+        cached_mtimes = {
+            job_id: status_mtime
+            for job_id, status_mtime in db.execute("SELECT job_id, status_mtime FROM runs")
+        }
         for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
-            _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            _sync_one_run(
+                db, run_dir, project_uuid=project_uuid, run_id=run_id,
+                cached_mtimes=cached_mtimes,
+            )
         _delete_orphan_non_terminal_rows(db)
 
 

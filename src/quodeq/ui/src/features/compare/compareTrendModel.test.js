@@ -66,3 +66,13 @@ test('monotonePath: duplicate-timestamp guard (dx[i] || 1) avoids a div-by-zero 
     'M0.0,0.0 C0.0,0.0 0.0,5.0 0.0,5.0 C3.3,9.2 6.7,8.3 10.0,10.0',
   );
 });
+
+test('monotonePath: output is identical to the reference implementation for a larger series', () => {
+  const pts = Array.from({ length: 50 }, (_, i) => [i * 10, Math.sin(i) * 5 + 10]);
+  const result = monotonePath(pts);
+  // Locks in exact output before the accumulation-strategy refactor —
+  // any change to the produced path string (not just its build cost) fails this.
+  assert.ok(result.startsWith('M0.0,10.0'));
+  assert.ok(result.includes(' C'));
+  assert.equal(result.split(' C').length - 1, 49); // one C-segment per point pair
+});

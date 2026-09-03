@@ -57,9 +57,10 @@ function aggregateUp(node, _depth = 0) {
   node.children.sort((a, b) => b.violations - a.violations);
 }
 
-function collapseSingleChildren(node) {
+function collapseSingleChildren(node, _depth = 0) {
   // Recursively collapse chains of single-child folders into one node
   // e.g. java/ -> app/ -> src/ becomes java/app/src/
+  if (_depth > _MAX_TREE_DEPTH) return;
   for (let i = 0; i < node.children.length; i++) {
     let child = node.children[i];
     while (!child.isFile && child.children.length === 1 && !child.children[0].isFile) {
@@ -69,7 +70,7 @@ function collapseSingleChildren(node) {
     }
     node.children[i] = child;
     if (child.children.length > 0) {
-      collapseSingleChildren(child);
+      collapseSingleChildren(child, _depth + 1);
     }
   }
 }

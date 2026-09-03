@@ -134,3 +134,26 @@ def test_edit_result_size_capped(wt_ctx):
     out = reg.dispatch("edit_repo_file", {"path": "app.py", "old_string": "a = 1",
                                           "new_string": "x" * 70_000})
     assert out["ok"] is False and "exceed" in out["error"]
+
+
+def test_edit_rejects_oversized_file_before_reading_it(wt_ctx):
+    from quodeq.assistant.tools._write_tools import _edit_repo_file, _MAX_CONTENT_BYTES
+    from quodeq.assistant.tools._registry import ToolError
+    from unittest.mock import patch
+
+    big_file = wt_ctx.worktree_dir / "big.txt"
+    big_file.write_bytes(b"x" * (_MAX_CONTENT_BYTES + 1))
+
+    read_calls = {"n": 0}
+    from pathlib import Path
+    real_read_bytes = Path.read_bytes
+
+    def counting_read_bytes(self, *a, **kw):
+        read_calls["n"] += 1
+        return real_read_bytes(self, *a, **kw)
+
+    with patch("pathlib.Path.read_bytes", counting_read_bytes), \
+         pytest.raises(ToolError, match="too large"):
+        _edit_repo_file(wt_ctx, "big.txt", "x", "y")
+
+    assert read_calls["n"] == 0, "must reject before reading the file"

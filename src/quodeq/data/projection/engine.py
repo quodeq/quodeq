@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -28,9 +29,22 @@ class ProjectionEngine:
         return self._project(event_log, store, since=None)
 
     def update(self, event_log: Path, run_dir: Path) -> int:
-        """Incremental: replay only events after the stored checkpoint."""
+        """Incremental: replay only events after the stored checkpoint.
+
+        Resumes from the stored byte offset (``get_projected_size``) so a
+        call with few new events doesn't re-parse the whole file; ``since``
+        stays as a belt-and-suspenders timestamp filter for the (rare) case
+        the offset predates the checkpoint, e.g. a first-ever call where no
+        offset was recorded yet.
+        """
         store = self._store_factory(run_dir)
-        return self._project(event_log, store, since=store.get_checkpoint())
+        current_size = event_log.stat().st_size if event_log.is_file() else 0
+        from_offset = min(store.get_projected_size() or 0, current_size)
+        return self._project(
+            event_log, store,
+            since=store.get_checkpoint(),
+            from_offset=from_offset,
+        )
 
     def update_actions(self, actions_log: Path, run_dir: Path, *, force: bool = False) -> int:
         """Replay actions.jsonl events into run_dir's state store.
@@ -79,24 +93,28 @@ class ProjectionEngine:
         store: SQLiteStateStore,
         *,
         since: Optional[datetime],
+        from_offset: int = 0,
     ) -> int:
+        size_before = event_log.stat().st_size
         reader = EventLogReader(event_log)
         count = 0
         last_ts = None
-        for event in reader.stream(since_timestamp=since):
-            try:
-                handle(event, store)
-                last_ts = event.timestamp
-                count += 1
-            except (ValueError, KeyError, TypeError):
-                _logger.error(
-                    "Handler failed for event %s (type=%s) - skipping",
-                    event.event_id,
-                    event.event_type,
-                    exc_info=True,
-                )
-        if last_ts is not None:
-            store.save_checkpoint(last_ts)
-            store.save_projected_size(event_log.stat().st_size)
+        conn_ctx = store.connection() if hasattr(store, "connection") else nullcontext()
+        with conn_ctx:
+            for event in reader.stream(since_timestamp=since, from_offset=from_offset):
+                try:
+                    handle(event, store)
+                    last_ts = event.timestamp
+                    count += 1
+                except (ValueError, KeyError, TypeError):
+                    _logger.error(
+                        "Handler failed for event %s (type=%s) - skipping",
+                        event.event_id,
+                        event.event_type,
+                        exc_info=True,
+                    )
+            if last_ts is not None:
+                store.save_checkpoint(last_ts)
+                store.save_projected_size(size_before)
         _logger.info("Projected %d events from %s", count, event_log)
         return count

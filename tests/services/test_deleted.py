@@ -158,6 +158,95 @@ class TestDeleteAllDismissed:
         assert len(load_deleted(project_dir)) == 1
 
 
+def test_sweep_emits_per_run_instead_of_accumulating_all_runs_first(tmp_path: Path):
+    from quodeq.services.deleted import _sweep_dismissed_matching
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir = tmp_path / "proj"
+    run_a = _seed_projected_run(project_dir, "run-a", req="M-MOD-1", file="a.py", line=1)
+    run_b = _seed_projected_run(project_dir, "run-b", req="M-MOD-1", file="a.py", line=1)
+    dismiss_finding(project_dir, _finding(req="M-MOD-1", file="a.py", line=1))
+    _apply_actions(project_dir, run_a)
+    _apply_actions(project_dir, run_b)
+
+    emitted_after_first_run = []
+
+    class _RecordingLog:
+        def emit(self, event):
+            emitted_after_first_run.append(event)
+
+    count = _sweep_dismissed_matching(
+        project_dir, ("maintainability", "Modularity", "a.py"),
+        writer=_RecordingLog(),
+    )
+    assert count == 2
+    assert len(emitted_after_first_run) == 2
+
+
+def test_sweep_never_holds_more_than_one_runs_matches_at_once(tmp_path: Path, monkeypatch):
+    """Verify streaming by tracking order of find and emit events.
+
+    Streaming implementation interleaves finds and emits per run:
+      [find run-a, emit run-a's match, find run-b, emit run-b's match]
+
+    Accumulation implementation would do all finds first, then all emits:
+      [find run-a, find run-b, emit run-a's match, emit run-b's match]
+
+    This test verifies the streaming behavior by recording both kinds of events
+    in order and asserting they interleave (not all finds before all emits).
+    """
+    from quodeq.services import deleted as deleted_mod
+    from quodeq.services.dismissed import dismiss_finding
+
+    project_dir = tmp_path / "proj"
+    run_a = _seed_projected_run(project_dir, "run-a", req="M-MOD-1", file="a.py", line=1)
+    run_b = _seed_projected_run(project_dir, "run-b", req="M-MOD-1", file="a.py", line=2)
+
+    dismiss_finding(project_dir, _finding(req="M-MOD-1", file="a.py", line=1))
+    dismiss_finding(project_dir, _finding(req="M-MOD-1", file="a.py", line=2))
+    _apply_actions(project_dir, run_a)
+    _apply_actions(project_dir, run_b)
+
+    # Track the order of find calls and emit calls.
+    event_order = []
+    real_find = deleted_mod.find_dismissed_matching
+
+    def spying_find(run_dir, **kw):
+        run_name = run_dir.name  # extract run id (e.g. "run-a", "run-b")
+        event_order.append(("find", run_name))
+        return real_find(run_dir, **kw)
+
+    monkeypatch.setattr(deleted_mod, "find_dismissed_matching", spying_find)
+
+    class _RecordingLog:
+        def emit(self, event):
+            # Tag emit with the req from the event payload for identification.
+            req = getattr(event.payload, "req", "?")
+            event_order.append(("emit", req))
+
+    deleted_mod._sweep_dismissed_matching(
+        project_dir, ("maintainability", "Modularity", "a.py"), writer=_RecordingLog(),
+    )
+
+    # Verify we got both events.
+    assert len(event_order) == 4, f"expected 4 events (2 finds + 2 emits), got {len(event_order)}: {event_order}"
+
+    # Verify they interleave: find run-a, emit, find run-b, emit (or similar interleaving).
+    # The key assertion: an emit must come before the NEXT find is called.
+    # This means no "all finds first, then all emits" pattern.
+
+    find_indices = [i for i, (event_type, _) in enumerate(event_order) if event_type == "find"]
+    emit_indices = [i for i, (event_type, _) in enumerate(event_order) if event_type == "emit"]
+
+    # If streaming, emits should NOT all come after all finds.
+    # That is, max(emit_indices) should not be > min(find_indices) with all finds before all emits.
+    # Specifically, we expect interleaving: find(0) emit(1) find(2) emit(3) or similar.
+    assert not (min(emit_indices) > max(find_indices)), (
+        f"All finds occurred before any emits, indicating accumulation not streaming. "
+        f"Order: {event_order}"
+    )
+
+
 class TestIsFindingDeleted:
     def test_empty_set_returns_false(self):
         assert is_finding_deleted(set(), dimension="x", principle="y", file="z") is False

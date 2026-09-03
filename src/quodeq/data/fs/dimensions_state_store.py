@@ -32,7 +32,7 @@ def read_dimensions(run_dir: Path) -> dict[str, Any]:
     path = run_dir / FILENAME
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, FileNotFoundError, json.JSONDecodeError):
+    except (OSError, FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
         return {"schema_version": SCHEMA_VERSION, "dimensions": {}}
 
 

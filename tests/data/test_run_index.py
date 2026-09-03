@@ -262,3 +262,47 @@ def test_rebuild_index_empties_and_repopulates(tmp_path: Path) -> None:
         assert rows == {"ext-rA", "ext-rB"}
     finally:
         db.close()
+
+
+def test_sync_index_issues_one_status_mtime_query_not_one_per_run(tmp_path: Path):
+    evaluations_root = tmp_path / "evaluations"
+    project_dir = evaluations_root / "proj-uuid"
+    for i in range(3):
+        run_dir = project_dir / f"run-{i}"
+        run_dir.mkdir(parents=True)
+        (run_dir / "status.json").write_text(
+            '{"state": "complete", "dimensions": ["security"]}', encoding="utf-8",
+        )
+
+    db = open_index(tmp_path / "index.db")
+
+    class ConnectionWrapper:
+        """Wrapper to count specific SQL queries."""
+        def __init__(self, wrapped_db):
+            self._db = wrapped_db
+            self.status_mtime_queries = 0
+
+        def execute(self, sql, *args, **kwargs):
+            if "SELECT status_mtime FROM runs WHERE job_id" in sql:
+                self.status_mtime_queries += 1
+            return self._db.execute(sql, *args, **kwargs)
+
+        def __enter__(self):
+            self._db.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self._db.__exit__(*args)
+
+        def close(self):
+            return self._db.close()
+
+    wrapped = ConnectionWrapper(db)
+    try:
+        sync_index(wrapped, evaluations_root)
+
+        assert wrapped.status_mtime_queries <= 1, (
+            f"expected at most 1 batched status_mtime SELECT, got {wrapped.status_mtime_queries}"
+        )
+    finally:
+        wrapped.close()

@@ -83,6 +83,25 @@ def test_projects_response_omits_warmup_when_engine_not_started(app, provider, m
     assert "warmup" not in resp.get_json()
 
 
+def test_list_projects_only_warms_up_the_returned_page(app, provider, monkeypatch):
+    from quodeq.core.types import ProjectEntry
+
+    provider.projects = [
+        ProjectEntry(id=f"p{i}", name=f"p{i}", summary_pending=True) for i in range(5)
+    ]
+    enqueued = []
+    monkeypatch.setattr("quodeq.api.routes_project_list.warmup_engine.enqueue", enqueued.append)
+    monkeypatch.setattr("quodeq.api.routes_project_list.warmup_engine.snapshot", lambda: None)
+
+    client = app.test_client()
+    resp = client.get("/api/projects?limit=2")
+
+    assert resp.status_code == 200
+    assert len(resp.get_json()["projects"]) == 2
+    assert len(enqueued) == 2
+    assert set(enqueued) == {"p0", "p1"}
+
+
 class TestDeleteProject:
     def test_delete_requires_confirm(self, client):
         resp = client.delete("/api/projects/my-proj")

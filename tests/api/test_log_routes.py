@@ -74,3 +74,28 @@ def test_logs_suppressed_by_default(logger_name):
     lgr = logging.getLogger(logger_name)
     assert len(lgr.handlers) == 1
     assert lgr.propagate is False
+
+
+def test_logs_assets_are_read_once_at_registration():
+    """logs.html/css/js are cached at import time, not re-read per request."""
+    from unittest.mock import patch
+    from quodeq.api._log_routes import _PAGES_DIR
+
+    app = create_app()
+    client = app.test_client()
+
+    real_read_text = type(_PAGES_DIR).read_text
+    call_count = {"n": 0}
+
+    def counting_read_text(self, *a, **kw):
+        if self.parent == _PAGES_DIR:
+            call_count["n"] += 1
+        return real_read_text(self, *a, **kw)
+
+    with patch("pathlib.Path.read_text", counting_read_text):
+        client.get("/logs")
+        client.get("/logs")
+        client.get("/logs.css")
+        client.get("/logs.js")
+
+    assert call_count["n"] == 0, "static assets must be cached, not re-read per request"

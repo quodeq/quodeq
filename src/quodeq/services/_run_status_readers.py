@@ -48,21 +48,21 @@ def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
     return [line.rstrip("\n") for line in tail]
 
 
-def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
-    """Read the `dimensions` list from status.json, or None if unavailable.
-
-    "All dimensions" runs record an empty list (the raw, unresolved CLI
-    filter is None). The UI fetches per-dim evals from this list, so an
-    empty one blanks the live findings feed for every full scan served via
-    the index. Recover the resolved list from the per-dim sidecars, the
-    same fallback scan_progress uses.
-    """
+def _load_status_json(run_dir: Path) -> dict | None:
+    """Load and parse status.json, or None if unavailable."""
     status_path = run_dir / "status.json"
     if not status_path.is_file():
         return None
     try:
         data = json.loads(status_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _dimensions_from_data(run_dir: Path, data: dict | None) -> list[str] | None:
+    """Extract dimensions from parsed status.json data."""
+    if data is None:
         return None
     dims = data.get("dimensions")
     if not isinstance(dims, list):
@@ -79,54 +79,25 @@ def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     return list(recovered) if recovered else dims
 
 
-def _read_time_limit_from_status(run_dir: Path) -> int | None:
-    """Read the run budget (`time_limit_s`) from status.json, or None."""
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+def _time_limit_from_data(data: dict | None) -> int | None:
+    """Extract time_limit_s from parsed status.json data."""
+    if data is None:
         return None
     raw = data.get("time_limit_s")
     return raw if isinstance(raw, int) else None
 
 
-def _read_deadline_from_status(run_dir: Path) -> str | None:
-    """Read the `deadline_at` ISO string from status.json, or None.
-
-    External (CLI) runs are not tracked by JobManager so they don't go
-    through the marker-parsing path that sets ``Job.deadline_at``. Reading
-    directly from status.json keeps the dashboard's countdown ticking.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict):
+def _deadline_from_data(data: dict | None) -> str | None:
+    """Extract deadline_at from parsed status.json data."""
+    if data is None:
         return None
     val = data.get("deadline_at")
     return val if isinstance(val, str) else None
 
 
-def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
-    """Read (ai_provider, ai_model) from status.json, or (None, None).
-
-    External (CLI) runs aren't tracked by JobManager, so they don't carry
-    provider/model on an in-memory Job. Reading directly from status.json
-    keeps the dashboard's in-progress card self-describing for ext- runs.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return (None, None)
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return (None, None)
-    if not isinstance(data, dict):
+def _provider_model_from_data(data: dict | None) -> tuple[str | None, str | None]:
+    """Extract (ai_provider, ai_model) from parsed status.json data."""
+    if data is None:
         return (None, None)
     provider = data.get("ai_provider")
     model = data.get("ai_model")
@@ -136,30 +107,63 @@ def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | N
     )
 
 
+def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
+    """Read the `dimensions` list from status.json, or None if unavailable.
+
+    "All dimensions" runs record an empty list (the raw, unresolved CLI
+    filter is None). The UI fetches per-dim evals from this list, so an
+    empty one blanks the live findings feed for every full scan served via
+    the index. Recover the resolved list from the per-dim sidecars, the
+    same fallback scan_progress uses.
+    """
+    return _dimensions_from_data(run_dir, _load_status_json(run_dir))
+
+
+def _read_time_limit_from_status(run_dir: Path) -> int | None:
+    """Read the run budget (`time_limit_s`) from status.json, or None."""
+    return _time_limit_from_data(_load_status_json(run_dir))
+
+
+def _read_deadline_from_status(run_dir: Path) -> str | None:
+    """Read the `deadline_at` ISO string from status.json, or None.
+
+    External (CLI) runs are not tracked by JobManager so they don't go
+    through the marker-parsing path that sets ``Job.deadline_at``. Reading
+    directly from status.json keeps the dashboard's countdown ticking.
+    """
+    return _deadline_from_data(_load_status_json(run_dir))
+
+
+def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
+    """Read (ai_provider, ai_model) from status.json, or (None, None).
+
+    External (CLI) runs aren't tracked by JobManager, so they don't carry
+    provider/model on an in-memory Job. Reading directly from status.json
+    keeps the dashboard's in-progress card self-describing for ext- runs.
+    """
+    return _provider_model_from_data(_load_status_json(run_dir))
+
+
 def _read_enriched_status_fields(
     run_dir: Path,
 ) -> tuple[list[str], list[str] | None, str | None, str | None, str | None, int | None]:
-    """Best-effort read of (logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s)."""
+    """Best-effort read of (logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s).
+
+    Reads and parses status.json once, deriving all four status-backed
+    fields from the same dict instead of four independent reads.
+    """
     try:
         logs = _tail_run_log(run_dir)
     except (OSError, ValueError):
         logs = []
     try:
-        dimensions = _read_dimensions_from_status(run_dir)
+        data = _load_status_json(run_dir)
     except (OSError, ValueError):
-        dimensions = None
-    try:
-        deadline_at = _read_deadline_from_status(run_dir)
-    except (OSError, ValueError):
-        deadline_at = None
-    try:
-        ai_provider, ai_model = _read_provider_model_from_status(run_dir)
-    except (OSError, ValueError):
-        ai_provider, ai_model = None, None
-    try:
-        time_limit_s = _read_time_limit_from_status(run_dir)
-    except (OSError, ValueError):
-        time_limit_s = None
+        data = None
+    dimensions = _dimensions_from_data(run_dir, data)
+    deadline_at = _deadline_from_data(data)
+    ai_provider, ai_model = _provider_model_from_data(data)
+    time_limit_s = _time_limit_from_data(data)
     return logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s
 
 

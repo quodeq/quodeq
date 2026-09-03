@@ -49,12 +49,14 @@ export function monotonePath(pts) {
     }
   }
   tangent.push(slope[n - 2]);
-  let d = `M${seg(pts[0])}`;
+  const parts = [`M${seg(pts[0])}`];
   for (let i = 0; i < n - 1; i += 1) {
     const h = dx[i] / 3;
-    d += ` C${(pts[i][0] + h).toFixed(1)},${(pts[i][1] + h * tangent[i]).toFixed(1)}`
+    parts.push(
+      ` C${(pts[i][0] + h).toFixed(1)},${(pts[i][1] + h * tangent[i]).toFixed(1)}`
       + ` ${(pts[i + 1][0] - h).toFixed(1)},${(pts[i + 1][1] - h * tangent[i + 1]).toFixed(1)}`
-      + ` ${seg(pts[i + 1])}`;
+      + ` ${seg(pts[i + 1])}`,
+    );
   }
-  return d;
+  return parts.join('');
 }

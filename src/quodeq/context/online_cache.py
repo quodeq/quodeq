@@ -29,6 +29,7 @@ _logger = logging.getLogger(__name__)
 _CACHE_ENV = "QUODEQ_CACHE_ROOT"  # override the cache root for tests / sandboxing
 _DISABLE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
 _DEFAULT_CLONE_TIMEOUT_S = 300
+_MAX_CACHED_REPOS = 20  # bounds ~/.quodeq/cache/online/ disk growth; wipe_cache() clears it fully
 
 
 def cache_root(env: dict[str, str] | None = None) -> Path:
@@ -110,6 +111,40 @@ def _refresh_existing(repo: Path) -> bool:
     return _git(["reset", "--hard", "FETCH_HEAD"], cwd=repo)
 
 
+def _touch(path: Path) -> None:
+    """Mark *path* as just-used for _prune_lru's LRU ordering.
+
+    A directory's own mtime only changes when entries are added/removed
+    directly inside it, NOT when content deeper inside changes (e.g. a git
+    fetch+reset inside repo/ never touches <hash>/'s own mtime) — so eviction
+    order must be driven by an explicit touch on every use, not by relying
+    on git's side effects.
+    """
+    try:
+        os.utime(path, None)
+    except OSError:
+        pass
+
+
+def _prune_lru(root: Path, *, keep: int) -> None:
+    """Remove the least-recently-used cache entries beyond *keep*.
+
+    "Recently used" = mtime of the entry directory itself, kept current by
+    an explicit ``_touch()`` on every successful ``ensure_clone`` use (see
+    ``_touch``). Note this doesn't track in-use state: if a concurrent
+    evaluation is actively reading a cache entry when this runs, that entry
+    can still be picked for eviction and ``rmtree``'d out from under it.
+    Accepted trade-off for this tool's usage pattern (evaluations are
+    normally sequential), not a hard guarantee.
+    """
+    entries = [e for e in root.iterdir() if e.is_dir()]
+    if len(entries) <= keep:
+        return
+    entries.sort(key=lambda e: e.stat().st_mtime)
+    for stale in entries[: len(entries) - keep]:
+        shutil.rmtree(stale, ignore_errors=True)
+
+
 def ensure_clone(url: str) -> Path | None:
     """Return a cached working copy of *url*, cloning or refreshing as needed.
 
@@ -123,8 +158,11 @@ def ensure_clone(url: str) -> Path | None:
 
     if (repo / ".git").exists():
         # Refresh failures don't invalidate the cache: stale code is
-        # better than a hard failure when the network is flaky.
+        # better than a hard failure when the network is flaky. Either way,
+        # this counts as "just used" for LRU purposes.
         _refresh_existing(repo)
+        _touch(cache_dir_for_url(url))
+        _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS)
         return repo
 
     # First-time clone — shallow, single-branch, default ref.
@@ -132,6 +170,8 @@ def ensure_clone(url: str) -> Path | None:
         # Clean up a half-clone so the next ensure_clone retries cleanly.
         shutil.rmtree(repo, ignore_errors=True)
         return None
+    _touch(cache_dir_for_url(url))
+    _prune_lru(cache_root(), keep=_MAX_CACHED_REPOS)
     return repo
 
 

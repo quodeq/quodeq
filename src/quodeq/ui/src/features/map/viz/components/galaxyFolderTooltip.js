@@ -3,6 +3,17 @@ import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { countDescendants } from './galaxyFolderScene.js';
 import { t } from '../../../../strings/index.js';
 
+const _descendantCountCache = new WeakMap();
+
+function _cachedDescendantCount(node) {
+  let count = _descendantCountCache.get(node);
+  if (count === undefined) {
+    count = countDescendants(node);
+    _descendantCountCache.set(node, count);
+  }
+  return count;
+}
+
 /**
  * Build the tooltip-update function bound to `refs`. Returns
  * `updateTooltip(cx, cy)`, which reads the currently hovered star (or
@@ -21,7 +32,7 @@ export function createTooltipUpdater(refs) {
     if (h.type === 'folder') {
       rows.push(row(t('map.compliance'), (d.complianceRate * 100).toFixed(0) + '%'));
       rows.push(row(t('map.violations'), d.violations));
-      rows.push(row(t('map.contents'), countDescendants(d._node)));
+      rows.push(row(t('map.contents'), _cachedDescendantCount(d._node)));
     } else {
       rows.push(row(t('map.violations'), d.violations));
       rows.push(row(t('map.compliance'), d.compliance));

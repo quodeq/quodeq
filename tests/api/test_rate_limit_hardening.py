@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.api._rate_limit_file_store import FileRateLimitStore
+from quodeq.api._rate_limit_store import InMemoryRateLimitStore
 from quodeq.api._rate_limit_factory import _validated_rate_limit_path, _DEFAULT_RATE_LIMIT_FILE
 
 _skip_no_symlink = pytest.mark.skipif(
@@ -121,3 +122,46 @@ def test_load_treats_scalar_json_as_empty(tmp_path: Path):
     target.write_text('"corrupt"', encoding="utf-8")
     store = FileRateLimitStore(path=target)
     assert store.check("1.2.3.4", 1000.0) is False
+
+
+def test_file_store_check_and_record_does_one_load_one_save(tmp_path: Path):
+    from unittest.mock import patch
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=5)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy, \
+         patch.object(store, "_save", wraps=store._save) as save_spy:
+        limited = store.check_and_record("1.2.3.4", 1000.0)
+
+    assert limited is False
+    assert load_spy.call_count == 1
+    assert save_spy.call_count == 1
+
+
+def test_file_store_check_and_record_does_not_record_when_limited(tmp_path: Path):
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=1)
+    assert store.check_and_record("1.2.3.4", 1000.0) is False  # 1st request: allowed
+    assert store.check_and_record("1.2.3.4", 1001.0) is True   # 2nd: limited, not recorded
+    assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)
+
+
+# ---------------------------------------------------------------------------
+# InMemoryRateLimitStore.check_and_record() regression tests
+# ---------------------------------------------------------------------------
+
+def test_in_memory_store_check_and_record_empty_ip_guard():
+    """Empty IP must not be recorded in the store."""
+    store = InMemoryRateLimitStore(window=60.0, max_requests=5)
+    # check_and_record with empty IP should return False but not record
+    result = store.check_and_record("", 1000.0)
+    assert result is False
+    # Store should remain empty; no entry for empty string should exist
+    assert "" not in store._store
+    assert len(store._store) == 0
+
+
+def test_in_memory_store_check_and_record_does_not_record_when_limited():
+    store = InMemoryRateLimitStore(window=60.0, max_requests=1)
+    assert store.check_and_record("1.2.3.4", 1000.0) is False  # 1st request: allowed
+    assert store.check_and_record("1.2.3.4", 1001.0) is True   # 2nd: limited, not recorded
+    assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)

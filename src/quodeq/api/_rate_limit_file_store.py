@@ -93,3 +93,17 @@ class FileRateLimitStore:
             data = self._load()
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
             return len(timestamps) >= self._max_requests
+
+    def check_and_record(self, ip: str, now: float) -> bool:
+        """Same contract as check()+record(), but one file load + one save."""
+        if not ip:
+            return False
+        with self._lock:
+            data = self._load()
+            timestamps = [t for t in data.get(ip, []) if now - t < self._window]
+            if len(timestamps) >= self._max_requests:
+                return True
+            timestamps.append(now)
+            data[ip] = timestamps
+            self._save(data)
+            return False

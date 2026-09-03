@@ -94,3 +94,23 @@ test('buildFileTree sorts children by violation count descending', () => {
   assert.equal(tree.children[0].name, 'a.py');
   assert.equal(tree.children[1].name, 'b.py');
 });
+
+test('buildFileTree does not stack-overflow on a deeply nested branching tree', () => {
+  // Create a tree with branching at every level (file + subdirectory),
+  // forcing collapseSingleChildren to recurse at each level, not just absorb via while-loop.
+  // Without the _depth guard (set to 64), this would stack-overflow at ~6895 levels.
+  // A 7000-level branching tree ensures we exceed the known crash threshold.
+  const violations = [];
+  for (let i = 0; i < 7000; i++) {
+    const path = Array.from({ length: i }, (_, j) => `d${j}`).join('/');
+    violations.push({
+      file: (path ? path + '/' : '') + `file${i}.py`,
+      severity: 'minor',
+    });
+  }
+  const dimensions = [{
+    dimension: 'Security',
+    violations,
+  }];
+  assert.doesNotThrow(() => buildFileTree(dimensions));
+});

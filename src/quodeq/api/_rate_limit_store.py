@@ -29,6 +29,11 @@ class RateLimitStore(Protocol):
         """Return True if *ip* has exceeded the rate limit at time *now*."""
         ...
 
+    def check_and_record(self, ip: str, now: float) -> bool:
+        """Check + record in one call. Return True if *ip* is already rate-limited
+        (request is NOT recorded); otherwise record this request and return False."""
+        ...
+
 
 class InMemoryRateLimitStore:
     """Process-local rate-limit store backed by an LRU OrderedDict.
@@ -106,3 +111,13 @@ class InMemoryRateLimitStore:
             self._store[ip] = timestamps
             self._store.move_to_end(ip)
         return len(timestamps) >= self._max_requests
+
+    def check_and_record(self, ip: str, now: float) -> bool:
+        """Same contract as check()+record(), but one lock acquisition."""
+        if not ip:
+            return False
+        with self._lock:
+            if self._check_unlocked(ip, now):
+                return True
+            self._record_unlocked(ip, now)
+            return False

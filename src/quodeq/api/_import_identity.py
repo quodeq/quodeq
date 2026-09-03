@@ -33,11 +33,24 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
 
 
 def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
-    """Walk existing projects to see if any other UUID matches this identity.
+    """Return the UUID of any other project matching this identity.
 
-    Mirrors ``services._fs_project_helpers.find_existing_project`` but takes a
-    ``ProjectIdentity`` directly and ignores the candidate UUID being imported.
+    Fast path: O(1) index lookup instead of a directory walk + repository_info.json
+    parse per existing project (mirrors ``_update_index``'s use of the same index).
+
+    Fallback: the index is not guaranteed to have an entry for every project on
+    disk (legacy projects created before the index existed, or an imported
+    project whose best-effort index write failed). On a miss we fall back to
+    walking ``reports_root`` and reading each ``repository_info.json`` directly,
+    mirroring ``_scan_legacy_projects``'s self-healing pattern: a fallback hit
+    is written back into the index so subsequent lookups for that project take
+    the fast path.
     """
+    index = load_index(reports_root)
+    candidate = index.get(index_key(identity))
+    if candidate is not None and candidate != ignore_uuid:
+        return candidate
+
     if not reports_root.is_dir():
         return None
     for child in reports_root.iterdir():
@@ -56,6 +69,11 @@ def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, i
             continue
         if (data.get("scopePath") or None) != (identity.scope_path or None):
             continue
+        try:
+            index[index_key(identity)] = child.name
+            save_index(reports_root, index)
+        except OSError as exc:
+            _logger.warning("import: could not update project_index.json: %s", exc)
         return child.name
     return None
 
