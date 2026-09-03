@@ -3,6 +3,7 @@ import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { countBySeverity } from '../../../utils/severity.js';
 import { useExplorerQueries } from './useExplorerQueries.js';
 import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../utils/evalPrincipal.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
@@ -98,7 +99,7 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
   // once cached data exists, so Back-navigation skips the LoadingScreen.
   const loading = evalQuery.isLoading || scoresQuery.isLoading;
   const isFetching = evalQuery.isFetching || scoresQuery.isFetching;
-  const error = evalQuery.isError ? (evalQuery.error?.message || String(evalQuery.error)) : null;
+  const error = evalQuery.isError ? apiErrorMessage(evalQuery.error, 'explorer.loadFailed') : null;
 
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
