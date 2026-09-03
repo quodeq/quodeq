@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from quodeq.api.app import create_app
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
@@ -58,6 +59,29 @@ def _scorable_violations(n: int = 5, *, practice: str = "P1", dimension: str = "
         )
         for i in range(n)
     ]
+
+
+# ---------------------------------------------------------------------------
+# Route-level error-contract tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "reports"))
+    app = create_app(test_config={"TESTING": True})
+    with app.test_client() as c:
+        yield c
+
+
+def test_project_run_scores_wraps_unexpected_error(client, monkeypatch):
+    monkeypatch.setattr(
+        "quodeq.api._scores_routes.get_scores_slim",
+        lambda *a, **kw: (_ for _ in ()).throw(ValueError("corrupt scores.json")),
+    )
+    resp = client.get("/api/projects/demo/scores/run123")
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["code"] == "SCORES_READ_FAILED"
 
 
 # ---------------------------------------------------------------------------
