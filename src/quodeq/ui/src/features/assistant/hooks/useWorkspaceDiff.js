@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  applyAssistantWorkspace, createAssistantWorkspacePr,
-  discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
-} from '../../../api/assistant.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 
 // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
@@ -22,6 +19,10 @@ function applyPrOutcome(res, setOutcome, setError) {
  * state. Extracted verbatim.
  */
 export function useWorkspaceDiff({ sessionId, onChanged }) {
+  const {
+    applyAssistantWorkspace, createAssistantWorkspacePr,
+    discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
+  } = useApi();
   const [diff, setDiff] = useState(null);
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState(null);

@@ -17,6 +17,7 @@ export { listStandards, getStandard, createStandard, updateStandard, deleteStand
 export {
   createAssistantSession, fetchAssistantWorkspace, postAssistantMessage, stopAssistantTurn,
   applyAssistantAction, rejectAssistantAction, assistantEventsUrl,
+  applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
 } from './assistant.js';
 export {
   getSharedStatus, connectShared, disconnectShared, refreshShared,
