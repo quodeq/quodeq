@@ -3,6 +3,7 @@ import { getHealth, getProviderConfigs } from '../../../api/index.js';
 import AboutSection from './AboutSection.jsx';
 import AppearanceSection from './AppearanceSection.jsx';
 import UpdatesSection from './UpdatesSection.jsx';
+import DesktopSection from './DesktopSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 import EvaluationSection from './EvaluationSection.jsx';
@@ -63,6 +64,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
           </div>
         </section>
         <AppearanceSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
+        <DesktopSection />
         <UpdatesSection />
         <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
       </div>

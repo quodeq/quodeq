@@ -62,3 +62,5 @@ export {
 export {
   getUpdateStatus, checkForUpdates, dismissUpdate, setUpdateAutoCheck, markUpdateDisclosed,
 } from './updates.js';
+
+export { getMenubar, setMenubar } from './menubar.js';
