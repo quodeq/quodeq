@@ -1,9 +1,13 @@
 """Verify the MCP findings server wires EventLogWriter into FindingsRouter."""
 import io
 import json
+import sys
 from pathlib import Path
 
-from quodeq.analysis.mcp.findings_server import _build_compiled_context, _build_router
+import pytest
+
+import quodeq.analysis.mcp.findings_server as findings_server_module
+from quodeq.analysis.mcp.findings_server import _build_compiled_context, _build_router, main
 from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.analysis.mcp.args import ServerArgs
 from quodeq.core.events.models import EventType
@@ -171,3 +175,30 @@ def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):
     events = EventLogReader(events_log).read_all()
     assert len(events) == 1
     assert events[0].event_type == EventType.JUDGMENT_CREATED
+
+
+def test_missing_cache_root_prints_clean_error_not_traceback(capsys, monkeypatch, tmp_path):
+    """_resolve_dimension_cache_writer raises a bare RuntimeError when
+    --dimension is set without --cache-root/--model-id. parse_args() already
+    rejects that combination at the CLI layer (args.py), so the only way to
+    reach _build_router with such a ServerArgs is a caller that builds one
+    directly -- which is exactly why _resolve_dimension_cache_writer's check
+    exists as defense-in-depth. main() must still turn that RuntimeError
+    into a clean exit instead of a raw traceback."""
+    sa = ServerArgs()
+    findings_path = tmp_path / "run-1" / "evidence" / "performance_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    sa.findings_file = str(findings_path)
+    sa.dimension = "performance"
+    # cache_root / model_id intentionally left unset.
+
+    monkeypatch.setattr(findings_server_module, "parse_args", lambda: sa)
+    monkeypatch.setattr(sys, "argv", ["findings_server"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 1
+    err = capsys.readouterr().err
+    assert "Traceback" not in err
+    assert "Error:" in err
