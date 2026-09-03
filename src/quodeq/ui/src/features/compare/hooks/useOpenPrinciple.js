@@ -5,7 +5,7 @@ import { projectKeys } from '../../../api/queryKeys.js';
 import {
   buildEvalPrincipalFn,
   computeComplianceByPrinciple,
-} from '../../explorer/components/explorerDataHooks.js';
+} from '../../../utils/evalPrincipal.js';
 
 /**
  * Open one project's own view of one principle: fetch that project's
