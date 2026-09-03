@@ -82,7 +82,7 @@ function SyncedIndicator({ configured, lastSynced, stale, error, refreshing, onR
         type="button"
         className="projects-page__import-btn"
         aria-label={t('projects.refreshAria')}
-        onClick={onRefresh}
+        onClick={() => { if (refreshing) return; onRefresh(); }}
         aria-disabled={refreshing || undefined}
       >
         ⟳

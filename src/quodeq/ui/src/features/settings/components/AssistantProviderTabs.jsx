@@ -52,7 +52,7 @@ function AssistantCustomProviderSection({ clients, activeProvider, setActiveProv
                 aria-disabled={!installed}
                 title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
                 className={`settings-pill${c.id === activeProvider ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
-                onClick={() => setActiveProvider(c.id)}
+                onClick={() => { if (!installed) return; setActiveProvider(c.id); }}
               >
                 {c.label}
               </button>

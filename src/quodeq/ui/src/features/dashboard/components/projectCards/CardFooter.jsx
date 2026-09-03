@@ -38,7 +38,7 @@ function PublishButton({ action, isThisPublishing, publishDisabled, onPublish, n
       type="button"
       className={`project-delete-btn project-delete-btn--accent${isThisPublishing ? ' project-delete-btn--pending' : ''}`}
       aria-disabled={publishDisabled || undefined}
-      onClick={(e) => { e.stopPropagation(); onPublish?.(name); }}
+      onClick={(e) => { e.stopPropagation(); if (publishDisabled) return; onPublish?.(name); }}
     >
       {isThisPublishing
         ? t('projects.publishing')
