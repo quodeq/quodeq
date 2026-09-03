@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
@@ -139,6 +140,24 @@ def _handed_off_to_running_instance(config: DashboardConfig) -> bool:
     return True
 
 
+def _prepare_frozen_macos_launch() -> bool:
+    """Packaged-app housekeeping before anything spawns. Fail-silent.
+
+    Cleans staging leftovers from an interrupted self-update, then offers the
+    move-to-Applications prompt when running from the DMG or a translocated
+    path. True means the app relaunched from /Applications: exit this process.
+    """
+    if not (getattr(sys, "frozen", False) and sys.platform == "darwin"):
+        return False
+    try:
+        from quodeq.update import first_launch, selfupdate
+
+        selfupdate.cleanup_stale_staging()
+        return first_launch.offer_move_to_applications()
+    except Exception:  # pragma: no cover - defensive
+        return False
+
+
 def _kick_update_check() -> None:
     """Fire a throttled, non-blocking update check. Fail-silent — never delays launch."""
     try:
@@ -172,6 +191,9 @@ def run_dashboard(
         environ = os.environ
     if config.build.verbose:
         environ["QUODEQ_VERBOSE"] = "1"
+
+    if _prepare_frozen_macos_launch():
+        return 0
 
     if _handed_off_to_running_instance(config):
         return 0

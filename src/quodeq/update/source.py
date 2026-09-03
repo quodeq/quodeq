@@ -3,6 +3,7 @@ any error so the caller can never be broken by the network."""
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 import httpx
@@ -35,16 +36,33 @@ def _is_security(release: dict) -> bool:
     return "security" in body or "security" in labels
 
 
-def _pick_download_url(release: dict) -> str | None:
-    assets = release.get("assets") or []
-    for asset in assets:
+# The dashboard app's own release artifact per platform. Deliberately excludes
+# QuodeqBar-*.dmg: first-asset ordering used to hand the menubar DMG (or the
+# Windows zip) to the macOS dashboard app's download button.
+_ASSET_PATTERNS = {
+    "darwin": ("Quodeq-", "-macOS.dmg"),
+    "win32": ("Quodeq-", "-Windows.zip"),
+}
+
+
+def _pick_download_url(release: dict, channel: str, platform: str) -> str | None:
+    if channel != "frozen":
+        return None
+    pattern = _ASSET_PATTERNS.get(platform)
+    if pattern is None:
+        return None
+    prefix, suffix = pattern
+    for asset in release.get("assets") or []:
+        name = str(asset.get("name") or "")
         url = asset.get("browser_download_url")
-        if url:
+        if url and name.startswith(prefix) and name.endswith(suffix):
             return url
     return None
 
 
-def fetch_latest(channel: str, etag: str | None = None) -> LatestInfo | None:
+def fetch_latest(
+    channel: str, etag: str | None = None, platform: str | None = None
+) -> LatestInfo | None:
     headers = {"User-Agent": _user_agent(), "Accept": "application/vnd.github+json"}
     if etag:
         headers["If-None-Match"] = etag
@@ -65,7 +83,7 @@ def fetch_latest(channel: str, etag: str | None = None) -> LatestInfo | None:
     info = LatestInfo(
         version=version,
         url=release.get("html_url"),
-        download_url=_pick_download_url(release),
+        download_url=_pick_download_url(release, channel, platform or sys.platform),
         is_security=_is_security(release),
         etag=new_etag,
     )
