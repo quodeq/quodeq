@@ -118,19 +118,18 @@ If the native window doesn't show up (common on Linux without GTK), run `quodeq 
 
 ### Desktop apps (beta)
 
-Every release attaches three prebuilt apps to [Releases](https://github.com/quodeq/quodeq/releases/latest). They bundle their own Python, so none of the prerequisites above apply.
+Every release attaches two prebuilt apps to [Releases](https://github.com/quodeq/quodeq/releases/latest). They bundle their own Python, so none of the prerequisites above apply.
 
 | Download | Platform | What it is |
 |---|---|---|
-| `Quodeq-<version>-macOS.dmg` | macOS | The dashboard in a native window |
-| `QuodeqBar-<version>-macOS.dmg` | macOS | Menu bar app that starts and stops the dashboard, with an icon that reflects whether a scan is running |
+| `Quodeq-<version>-macOS.dmg` | macOS | The dashboard in a native window, with an optional menu bar icon (Settings, "Show menu bar icon") that starts, stops, and monitors it |
 | `Quodeq-<version>-Windows.zip` | Windows | The dashboard in a native window (WebView2) |
 
 **macOS.** Open the `.dmg` and drag the app to Applications. The apps are unsigned, so
 the first launch needs one of:
 
 ```bash
-xattr -cr /Applications/Quodeq.app       # or /Applications/QuodeqBar.app
+xattr -cr /Applications/Quodeq.app
 ```
 
 Or right-click the app, select Open, then click Open in the dialog.
