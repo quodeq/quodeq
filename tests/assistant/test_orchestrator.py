@@ -90,7 +90,10 @@ def test_turn_exception_becomes_error_frame(setup):
              turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "error"
-    assert "connection refused" in frames[-1]["message"]
+    assert "connection refused" not in frames[-1]["message"]
+    assert frames[-1]["message"] == (
+        "The assistant hit an unexpected error. Check the server logs for details."
+    )
 
 
 def test_history_replayed_on_second_turn(setup):
@@ -142,7 +145,10 @@ def test_run_turn_cli_empty_output_emits_error(setup, monkeypatch):
     run_turn(req, repository=repo, tool_ctx=ctx)
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "error"
-    assert "no output" in frames[-1]["message"]
+    assert "no output" not in frames[-1]["message"]
+    assert frames[-1]["message"] == (
+        "The assistant hit an unexpected error. Check the server logs for details."
+    )
 
 
 def test_mcp_server_args_includes_run_and_repo(setup, tmp_path):
@@ -340,6 +346,23 @@ def test_cancelled_turn_without_partial_persists_no_assistant_message(setup):
     assert [m["role"] for m in repo.list_messages("s1")] == ["user"]
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "stopped"
+
+
+def test_turn_failure_emits_generic_message_not_raw_exception(setup):
+    repo, ctx = setup
+
+    def failing_turn(**_):
+        raise ValueError("api key file /home/x/.secret missing")
+
+    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=failing_turn,
+             capability_fn=lambda *a, **k: True)
+    frames = [f for _, f in repo.events_after("s1", 0)]
+    error_events = [f for f in frames if f["type"] == "error"]
+    assert len(error_events) == 1
+    assert error_events[0]["message"] == (
+        "The assistant hit an unexpected error. Check the server logs for details."
+    )
+    assert "/home/x/.secret" not in error_events[0]["message"]
 
 
 def test_run_turn_threads_cancel_token_to_adapter(setup):
