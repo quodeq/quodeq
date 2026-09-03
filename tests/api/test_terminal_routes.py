@@ -336,8 +336,13 @@ def test_ws_gate_refusal_close_uses_dedicated_code():
 def test_ws_spawn_failure_closes_cleanly_and_frees_lock():
     with _serve(_FlakyManager) as (port, _):
         with _connect(port) as first:       # ensure_session raises -> clean close
+            # The client must see why, not just a dropped connection: this is
+            # sent "0"-prefixed (data), same as the "already open" banner
+            # above, so the frontend actually renders it in the pane.
+            msg = first.receive(timeout=budget(_RECV_TIMEOUT))
+            assert msg is not None and "could not be started" in msg
             with contextlib.suppress(simple_websocket.ConnectionClosed):
-                first.receive(timeout=budget(_RECV_TIMEOUT))    # must not hang / must not 500
+                first.receive(timeout=budget(_RECV_TIMEOUT))    # then the close; must not hang / must not 500
         # the conn lock's finally released even though spawn failed -> reattach works
         with _connect(port) as second:
             assert second.receive(timeout=budget(_RECV_TIMEOUT)) == "0ready\n"

@@ -56,7 +56,7 @@ def pump_terminal_out(manager, ws, stop: threading.Event) -> None:
 
 def setup_terminal_session(manager, ws) -> bool:
     """Ensure the PTY exists and replay scrollback. Returns False on setup
-    failure (already logged)."""
+    failure (already logged and reported to the client)."""
     try:
         manager.ensure_session(cwd=os.path.expanduser("~"), cols=80, rows=24)
         # Replay scrollback so a reattaching client sees recent history.
@@ -69,8 +69,18 @@ def setup_terminal_session(manager, ws) -> bool:
     except Exception:
         # Spawn failure or early disconnect must not propagate past
         # flask-sock (would surface as a 500), but leave a trace for
-        # operators — the client only sees a silently closed terminal.
+        # operators.
         _logger.warning("terminal session setup failed", exc_info=True)
+        try:
+            # "0" (data), not "1": the client's WS handler only renders
+            # "0"-prefixed frames (useTerminalSocket.js's onmessage) — "1" is
+            # reserved for client->server control frames (resize) and is
+            # never read on messages the server sends, so it would be
+            # silently dropped. Matches terminal_routes.py's "already open
+            # in another window" banner, sent the same way.
+            ws.send("0\r\n[terminal could not be started; check server logs]\r\n")
+        except Exception:
+            pass  # client already disconnected; nothing more to do
         return False
 
 
