@@ -73,7 +73,11 @@ cp "$REPO_ROOT/src/quodeq/data/icons/icon.icns" "$APP/Contents/Resources/icon.ic
 
 echo "  Created $APP"
 
-# Strip quarantine attribute so users don't need xattr -cr
+# Strip extended attributes (build-machine detritus). codesign refuses
+# bundles carrying resource forks or Finder info, so this must run BEFORE
+# signing. It does not weaken end-user Gatekeeper: quarantine is applied by
+# the downloading browser to the DMG, and user trust comes from the
+# notarized signature, not from this build-side cleanup.
 xattr -cr "$APP"
 
 # Sign (no-op unless MACOS_SIGN_IDENTITY is set)

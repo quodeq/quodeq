@@ -58,7 +58,11 @@ fi
 
 echo "  Created $APP"
 
-# Step 3: Strip quarantine attribute so users don't need xattr -cr
+# Step 3: Strip extended attributes (build-machine detritus). codesign
+# refuses bundles carrying resource forks or Finder info, so this must run
+# BEFORE signing. It does not weaken end-user Gatekeeper: quarantine is
+# applied by the downloading browser to the DMG, and user trust comes from
+# the notarized signature, not from this build-side cleanup.
 xattr -cr "$APP"
 
 # Step 3b: Sign (no-op unless MACOS_SIGN_IDENTITY is set)
