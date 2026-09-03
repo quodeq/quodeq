@@ -98,6 +98,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
         """Export a project as a ZIP archive."""
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
         return export_project_zip(project, reports_dir())
 
     @app.post("/api/projects/import")

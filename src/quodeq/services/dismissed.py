@@ -34,10 +34,15 @@ def dismiss_finding(project_dir: Path, finding: dict) -> None:
     # migrated history rather than the migration appending stale dismissals on
     # top of this action later (see migrate_if_needed).
     migrate_if_needed(project_dir)
+    raw_line = finding.get("line", 0)
+    try:
+        line = int(raw_line)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"finding.line must be an integer, got {raw_line!r}") from exc
     payload = FindingDismissed(
         req=str(finding.get("req", "")),
         file=str(finding.get("file", "")),
-        line=int(finding.get("line", 0)),
+        line=line,
         reason=finding.get("dismissReason"),
     )
     ActionLogWriter(project_dir).emit(FindingDismissedEvent(payload=payload))
@@ -48,10 +53,15 @@ def restore_finding(project_dir: Path, finding: dict) -> None:
     # Fold legacy dismissals in before recording the restore, otherwise the
     # migration would re-dismiss this finding after the fact (ordering bug).
     migrate_if_needed(project_dir)
+    raw_line = finding.get("line", 0)
+    try:
+        line = int(raw_line)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"finding.line must be an integer, got {raw_line!r}") from exc
     payload = FindingUndismissed(
         req=str(finding.get("req", "")),
         file=str(finding.get("file", "")),
-        line=int(finding.get("line", 0)),
+        line=line,
     )
     ActionLogWriter(project_dir).emit(FindingUndismissedEvent(payload=payload))
 

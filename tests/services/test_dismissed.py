@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
@@ -117,3 +119,13 @@ def test_dismissed_keys_empty_when_no_runs(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     assert dismissed_keys(project_dir) == set()
+
+
+def test_dismiss_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="line must be an integer"):
+        dismiss_finding(tmp_path, {"req": "X", "file": "f.py", "line": "not-a-number"})
+
+
+def test_restore_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="line must be an integer"):
+        restore_finding(tmp_path, {"req": "X", "file": "f.py", "line": "not-a-number"})

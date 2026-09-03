@@ -59,3 +59,9 @@ def test_pagination_slices_the_project_list_exactly_once(client, provider):
     assert entries.getitem_calls == 1, (
         f"expected exactly one slice, got {entries.getitem_calls}"
     )
+
+
+def test_export_project_rejects_invalid_project_name(client):
+    resp = client.get("/api/projects/../export")
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_INPUT"
