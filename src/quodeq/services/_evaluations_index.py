@@ -215,18 +215,16 @@ class EvaluationsIndex:
         Returns ``(rows_written, elapsed_ms)``. Used by the
         ``/api/index/rebuild`` admin endpoint.
         """
-        if reports_root is None:
-            from quodeq.shared._env import get_evaluations_dir
-            reports_root = Path(get_evaluations_dir())
+        root = reports_root if reports_root is not None else self._reports_root
         db = self._open_index()
         try:
-            return _run_index.rebuild_index(db, reports_root)
+            return _run_index.rebuild_index(db, root)
         finally:
             db.close()
 
     @property
     def index_db_path(self) -> Path | None:
-        """The resolved path to the index DB (lazily set on first ``_open_index``)."""
+        """The path to the index DB, injected at construction."""
         return self._index_db_path
 
     def is_complete(self, job_id: str) -> bool:
@@ -253,27 +251,19 @@ class EvaluationsIndex:
     # -- internals ------------------------------------------------------
 
     def _resolve_reports_root(self) -> Path | None:
-        """Return the active reports directory, falling back to env."""
-        if self._reports_root is not None:
-            return Path(self._reports_root)
-        try:
-            from quodeq.shared.utils import get_evaluations_dir
-            return Path(get_evaluations_dir())
-        except Exception:
-            return None
+        """Return the active reports directory (injected at construction)."""
+        return Path(self._reports_root) if self._reports_root is not None else None
 
     def _coerce_reports_dir(self, reports_dir: Path | None) -> Path:
-        """Resolve *reports_dir* to a Path, falling back to the env var."""
+        """Resolve *reports_dir* to a Path, falling back to the injected reports_root."""
         if reports_dir is not None:
             return Path(reports_dir)
-        from quodeq.shared._env import get_evaluations_dir
-        return Path(get_evaluations_dir())
+        return Path(self._reports_root)
 
     def _open_index(self):
-        """Open (lazily) the index DB. Resolved from init kwarg or env."""
+        """Open the index DB at the injected path."""
         if self._index_db_path is None:
-            from quodeq.shared._env import get_index_db_path
-            self._index_db_path = Path(get_index_db_path())
+            raise ValueError("EvaluationsIndex requires index_db_path to be set")
         return _run_index.open_index(self._index_db_path)
 
     def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
