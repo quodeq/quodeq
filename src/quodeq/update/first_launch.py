@@ -31,7 +31,7 @@ def needs_move(bundle: Path | None) -> bool:
     """True when the app runs from the DMG or a translocated (read-only) path."""
     if bundle is None:
         return False
-    path = str(bundle)
+    path = str(bundle).replace("\\", "/")
     return path.startswith("/Volumes/") or "/AppTranslocation/" in path
 
 

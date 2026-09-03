@@ -75,6 +75,13 @@ def bundle_path(executable: str | None = None) -> Path | None:
     return None
 
 
+def _is_translocated(bundle: Path) -> bool:
+    """Running from the mounted DMG or an App Translocation (read-only) path."""
+    # Normalize separators so the check also behaves under Windows test runs.
+    path = str(bundle).replace("\\", "/")
+    return path.startswith("/Volumes/") or "/AppTranslocation/" in path
+
+
 def _asset_matches(download_url: str | None) -> bool:
     if not download_url:
         return False
@@ -104,7 +111,7 @@ def describe(
         reason = "no_team_id"
     elif bundle is None:
         reason = "no_bundle"
-    elif "/AppTranslocation/" in str(bundle) or str(bundle).startswith("/Volumes/"):
+    elif _is_translocated(bundle):
         reason = "translocated"
     elif not os.access(bundle.parent, os.W_OK):
         reason = "not_writable"
