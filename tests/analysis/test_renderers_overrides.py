@@ -1,6 +1,8 @@
 """Tests for per-project threshold overrides in prompt renderers."""
 import json
 
+import pytest
+
 from quodeq.analysis.prompts._renderers import (
     render_compact_standards,
     render_compiled_standards,
@@ -45,6 +47,20 @@ def test_compiled_renders_override(tmp_path):
         _write_dim(tmp_path), "maintainability",
         overrides={"M-ANA-2": {"max_lines": 60}})
     assert "- **M-ANA-2**: Functions MUST NOT exceed 60 lines" in out
+
+
+def test_render_raises_clear_error_for_principle_missing_name(tmp_path):
+    data = {"principles": [{"requirements": [{"id": "X-1"}]}]}  # no "name"
+    (tmp_path / "maintainability.json").write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="missing required 'name'"):
+        render_compiled_standards(tmp_path, "maintainability")
+
+
+def test_render_raises_clear_error_for_requirement_missing_id(tmp_path):
+    data = {"principles": [{"name": "P", "requirements": [{}]}]}  # no "id"
+    (tmp_path / "maintainability.json").write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="missing required 'id'"):
+        render_compiled_standards(tmp_path, "maintainability")
 
 
 def test_render_all_standards_applies_overrides(tmp_path):

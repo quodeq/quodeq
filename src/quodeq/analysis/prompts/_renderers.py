@@ -54,12 +54,22 @@ def render_compiled_standards(
         reqs = principle.get("requirements", [])
         if not reqs:
             continue
-        lines.append(f"### {principle['name']}")
+        name = principle.get("name")
+        if name is None:
+            raise ValueError(
+                f"Malformed standards file: a principle is missing required 'name': {principle!r}"
+            )
+        lines.append(f"### {name}")
         if principle.get("description"):
             lines.append(principle["description"])
         for req in reqs:
-            text = resolve_requirement_text(req, (overrides or {}).get(req["id"]))
-            req_line = f"- **{req['id']}**: {text}"
+            req_id = req.get("id")
+            if req_id is None:
+                raise ValueError(
+                    f"Malformed standards file: a requirement is missing required 'id': {req!r}"
+                )
+            text = resolve_requirement_text(req, (overrides or {}).get(req_id))
+            req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
                 req_line += f" — {req['description']}"
             lines.append(req_line)
