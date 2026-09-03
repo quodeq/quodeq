@@ -145,6 +145,46 @@ def test_file_store_check_and_record_does_not_record_when_limited(tmp_path: Path
     assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)
 
 
+def test_file_store_caches_within_ttl_window(tmp_path: Path):
+    from unittest.mock import patch
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy, \
+         patch.object(store, "_save", wraps=store._save) as save_spy:
+        for i in range(5):
+            limited = store.check_and_record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+            assert limited is False
+
+    assert load_spy.call_count == 1, f"expected 1 load for 5 calls inside the TTL window, got {load_spy.call_count}"
+    assert save_spy.call_count == 1, f"expected 1 save for 5 calls inside the TTL window, got {save_spy.call_count}"
+
+
+def test_file_store_still_enforces_limit_within_a_single_ttl_window(tmp_path: Path):
+    """Cache must not let a burst inside one TTL window slip past the limit --
+    correctness is enforced from the in-memory write, not just the flush."""
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=2)
+    assert store.check_and_record("1.2.3.4", 1000.0) is False   # 1st: allowed
+    assert store.check_and_record("1.2.3.4", 1000.1) is False   # 2nd: allowed
+    assert store.check_and_record("1.2.3.4", 1000.2) is True    # 3rd, same TTL window: limited
+
+
+def test_file_store_flushes_immediately_once_limited(tmp_path: Path):
+    """Once a client is actually rate-limited, that state must be durable right
+    away -- only the "still allowed" path is allowed to batch writes."""
+    import json
+
+    path = tmp_path / "rl.json"
+    store_a = FileRateLimitStore(path=path, window=60.0, max_requests=1)
+    assert store_a.check_and_record("1.2.3.4", 1000.0) is False  # 1st: allowed, recorded
+
+    # A second, independent store instance (simulating another worker process)
+    # must see the durable state immediately after the limiting request, not
+    # after waiting out the cache TTL.
+    store_b = FileRateLimitStore(path=path, window=60.0, max_requests=1)
+    assert store_b.check("1.2.3.4", 1000.05) is True
+
+
 # ---------------------------------------------------------------------------
 # InMemoryRateLimitStore.check_and_record() regression tests
 # ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ _DEFAULT_PATH = str(default_rate_limit_path())
 
 
 class FileRateLimitStore:
-    """Rate-limit store backed by a JSON file.
+    """Rate-limit store backed by a JSON file, with a short in-memory cache.
 
     Lets the workers of a single-machine deployment share rate-limit state
     through a common file without Redis. NOTE: the ``threading.Lock`` below
@@ -26,7 +26,18 @@ class FileRateLimitStore:
     limit) rather than strictly exact across processes. Not recommended for
     high-throughput production use; add OS-level file locking
     (``fcntl.flock``) if exact cross-process enforcement is required.
+
+    The in-memory cache (TTL ``_CACHE_TTL_S``) further widens that same
+    best-effort window: another process's write may take up to
+    ``_CACHE_TTL_S`` seconds to become visible here, and an allowed request
+    recorded in-memory but not yet flushed to disk is lost if this process
+    is killed before the next flush. Once a client is actually rate-limited
+    that state is flushed immediately, so the "already limited" guarantee
+    stays durable right away -- only the common allowed-request path batches
+    disk writes.
     """
+
+    _CACHE_TTL_S = 1.0
 
     def __init__(
         self,
@@ -38,6 +49,16 @@ class FileRateLimitStore:
         self._lock = threading.Lock()
         self._window = window if window is not None else _rate_limit_window()
         self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
+        self._cache: dict[str, list[float]] | None = None
+        self._cache_loaded_at = 0.0
+        # None means "never flushed yet" -- distinct from 0.0, which a caller
+        # legitimately passes as `now` (several tests use a t=0 baseline).
+        # Using 0.0 as the initial sentinel would make the first flush's
+        # due-check (`now - self._last_flush >= self._CACHE_TTL_S`) evaluate
+        # to False whenever the caller's first `now` is also near 0, silently
+        # skipping the "always flush on cold start" guarantee.
+        self._last_flush: float | None = None
+        self._dirty = False
 
     def _load(self) -> dict[str, list[float]]:
         try:
@@ -72,12 +93,42 @@ class FileRateLimitStore:
             except OSError:
                 pass
 
+    def _cache_for(self, now: float) -> dict[str, list[float]]:
+        """Return the in-memory cache, refilling from disk if stale. Caller
+        must hold self._lock."""
+        stale = self._cache is None or now - self._cache_loaded_at >= self._CACHE_TTL_S
+        if stale:
+            if self._cache is not None and self._dirty:
+                # A reload discards self._cache and replaces it wholesale.
+                # If it still holds writes from this process that were never
+                # flushed (the flush TTL hadn't elapsed yet), persist them
+                # first -- otherwise the reload silently drops them, even
+                # with no crash involved. This keeps the "within-process
+                # writes are never lost" guarantee independent of how the
+                # reload TTL and the flush TTL happen to line up.
+                self._save(self._cache)
+                self._last_flush = now
+                self._dirty = False
+            self._cache = self._load()
+            self._cache_loaded_at = now
+        return self._cache
+
+    def _flush(self, now: float, *, force: bool) -> None:
+        """Persist the in-memory cache if forced or the flush TTL elapsed.
+        Caller must hold self._lock."""
+        if not self._dirty:
+            return
+        if force or self._last_flush is None or now - self._last_flush >= self._CACHE_TTL_S:
+            self._save(self._cache)
+            self._last_flush = now
+            self._dirty = False
+
     def record(self, ip: str, now: float) -> None:
         """Record a request from *ip* at time *now*."""
         if not ip:
             return
         with self._lock:
-            data = self._load()
+            data = self._cache_for(now)
             timestamps = data.get(ip, [])
             timestamps.append(now)
             pruned = [t for t in timestamps if now - t < self._window]
@@ -85,25 +136,32 @@ class FileRateLimitStore:
                 data[ip] = pruned
             else:
                 data.pop(ip, None)
-            self._save(data)
+            self._dirty = True
+            self._flush(now, force=False)
 
     def check(self, ip: str, now: float) -> bool:
         """Return True if *ip* has exceeded the rate limit."""
         with self._lock:
-            data = self._load()
+            data = self._cache_for(now)
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
             return len(timestamps) >= self._max_requests
 
     def check_and_record(self, ip: str, now: float) -> bool:
-        """Same contract as check()+record(), but one file load + one save."""
+        """Same contract as check()+record(), but one cache read + at most
+        one disk round trip (fewer when the cache is warm)."""
         if not ip:
             return False
         with self._lock:
-            data = self._load()
+            data = self._cache_for(now)
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
             if len(timestamps) >= self._max_requests:
                 return True
             timestamps.append(now)
             data[ip] = timestamps
-            self._save(data)
+            self._dirty = True
+            # Force-flush the moment this IP becomes rate-limited so the
+            # "limited" state is durable across processes right away; the
+            # still-allowed path only flushes once the TTL elapses.
+            just_limited = len(timestamps) >= self._max_requests
+            self._flush(now, force=just_limited)
             return False
