@@ -25,13 +25,67 @@ def _resp(status=200, payload=None, etag='"abc"'):
 
 def test_frozen_reads_github() -> None:
     with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=_GH_RELEASE)):
-        info = fetch_latest("frozen")
+        info = fetch_latest("frozen", platform="darwin")
     assert info is not None
     assert info.version == "1.5.0"
     assert info.url == _GH_RELEASE["html_url"]
     assert info.download_url == "https://example.com/Quodeq-1.5.0-macOS.dmg"
     assert info.is_security is False
     assert info.etag == '"abc"'
+
+
+_MULTI_ASSET_RELEASE = {
+    "tag_name": "v1.11.0",
+    "html_url": "https://github.com/quodeq/quodeq/releases/tag/v1.11.0",
+    "body": "Routine bug fixes.",
+    "labels": [],
+    "assets": [
+        {"name": "QuodeqBar-1.11.0-macOS.dmg", "browser_download_url": "https://example.com/QuodeqBar-1.11.0-macOS.dmg"},
+        {"name": "Quodeq-1.11.0-macOS.dmg", "browser_download_url": "https://example.com/Quodeq-1.11.0-macOS.dmg"},
+        {"name": "Quodeq-1.11.0-Windows.zip", "browser_download_url": "https://example.com/Quodeq-1.11.0-Windows.zip"},
+    ],
+}
+
+
+def test_frozen_darwin_picks_dashboard_dmg_not_first_asset() -> None:
+    with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=_MULTI_ASSET_RELEASE)):
+        info = fetch_latest("frozen", platform="darwin")
+    assert info is not None
+    assert info.download_url == "https://example.com/Quodeq-1.11.0-macOS.dmg"
+
+
+def test_frozen_windows_picks_zip() -> None:
+    with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=_MULTI_ASSET_RELEASE)):
+        info = fetch_latest("frozen", platform="win32")
+    assert info is not None
+    assert info.download_url == "https://example.com/Quodeq-1.11.0-Windows.zip"
+
+
+def test_frozen_linux_has_no_download_url() -> None:
+    with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=_MULTI_ASSET_RELEASE)):
+        info = fetch_latest("frozen", platform="linux")
+    assert info is not None
+    assert info.download_url is None
+
+
+def test_wheel_has_no_download_url() -> None:
+    def fake_get(url, *a, **k):
+        if "pypi.org" in url:
+            return _resp(payload={"info": {"version": "1.11.0"}})
+        return _resp(payload=_MULTI_ASSET_RELEASE)
+
+    with patch("quodeq.update.source.httpx.get", side_effect=fake_get):
+        info = fetch_latest("wheel", platform="darwin")
+    assert info is not None
+    assert info.download_url is None
+
+
+def test_frozen_darwin_no_matching_asset_returns_none() -> None:
+    rel = {**_MULTI_ASSET_RELEASE, "assets": [_MULTI_ASSET_RELEASE["assets"][0]]}  # only QuodeqBar
+    with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=rel)):
+        info = fetch_latest("frozen", platform="darwin")
+    assert info is not None
+    assert info.download_url is None
 
 
 def test_security_flag_from_body() -> None:
