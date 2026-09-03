@@ -44,7 +44,7 @@ cd "$REPO_ROOT"
 echo "==> Building app bundle..."
 export QUODEQ_REPO_ROOT="$REPO_ROOT"
 export QUODEQ_VERSION="$VERSION"
-uv run --with pyinstaller --with pywebview --with flask --with jsonschema pyinstaller \
+uv run --with pyinstaller --with pywebview --with flask --with jsonschema --with rumps pyinstaller \
     "$SCRIPT_DIR/quodeq_dashboard.spec" \
     --distpath "$BUILD_DIR/dist" \
     --workpath "$BUILD_DIR/work"

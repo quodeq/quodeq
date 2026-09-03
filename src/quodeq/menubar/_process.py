@@ -1,26 +1,26 @@
-"""Dashboard process management helpers for the macOS menu bar app."""
+"""Dashboard process management for the built-in menu bar app.
+
+Ported from packaging/macos/_dashboard.py when the menu bar became a built-in
+feature; the dashboard command itself now comes from
+quodeq.shared.frozen.dashboard_cmd instead of probing a `quodeq` CLI.
+"""
 from __future__ import annotations
 
 import os
 import signal
 import subprocess
+import sys
 import tempfile
 import time
-from typing import TYPE_CHECKING
-
-from _helpers import health_check as _health_check
-
-if TYPE_CHECKING:
-    pass
-
 from typing import NamedTuple
+
+from quodeq.menubar._health import health_check as _health_check
 
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
 _STDERR_READ_MAX = 500
 _ERROR_DISPLAY_MAX = 200
-_SUBPROCESS_TIMEOUT_S = 5
 
 
 class DashboardCallbacks(NamedTuple):
@@ -57,23 +57,6 @@ def find_running_port(ports: tuple[int, ...], last_known: int | None, cache: dic
     return None
 
 
-def build_dashboard_cmd(quodeq_cmd: str, app_port: int) -> list[str]:
-    """Build the dashboard command, probing --help for supported flags."""
-    cmd = [quodeq_cmd, "dashboard"]
-    try:
-        help_out = subprocess.run(
-            [quodeq_cmd, "dashboard", "--help"],
-            capture_output=True, text=True, timeout=_SUBPROCESS_TIMEOUT_S,
-        ).stdout
-        if "--no-open" in help_out:
-            cmd.append("--no-open")
-        if "--port" in help_out:
-            cmd.extend(["--port", str(app_port)])
-    except (subprocess.TimeoutExpired, OSError):
-        pass
-    return cmd
-
-
 def cleanup_stderr_log(path: str | None) -> None:
     """Remove the stderr log tempfile if it exists."""
     if path:
@@ -87,12 +70,15 @@ def find_pids_on_port(port: int) -> list[int]:
     """Return PIDs listening on *port*.
 
     macOS-only: relies on ``lsof`` which is available on macOS by default.
-    This function lives under ``packaging/macos/`` and is not intended for
-    cross-platform use.
     """
+    if sys.platform != "darwin":
+        return []
     try:
+        # int() enforces the argv boundary: whatever the caller passed, only a
+        # plain integer ever reaches the lsof argument.
         result = subprocess.run(
-            ["lsof", f"-ti:{port}"], capture_output=True, text=True, timeout=5,
+            ["lsof", f"-ti:{int(port)}"], capture_output=True, text=True, encoding="utf-8",
+            timeout=5,
         )
         return [int(pid.strip()) for pid in result.stdout.strip().split("\n") if pid.strip()]
     except (subprocess.TimeoutExpired, OSError, ValueError):

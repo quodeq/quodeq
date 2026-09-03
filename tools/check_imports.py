@@ -18,9 +18,9 @@ LAYER_RULES = {
     # from the app (a leaf), and is consumed by api, dashboard, and the CLI.
     # Empty rule + the implicit self/cross-cutting allowances keep it a leaf.
     "update": set(),
-    "api": {"core", "services", "update", "assistant", "terminal", "llm_bridge"},
+    "api": {"core", "services", "update", "assistant", "terminal", "llm_bridge", "menubar"},
     "analysis": {"core", "data", "services", "context"},
-    "dashboard": {"services", "api", "update"},
+    "dashboard": {"services", "api", "update", "menubar"},
     "assistant": {"core", "data", "services", "llm_bridge"},
     "terminal": {"core"},
     # context/ compiles cross-run knowledge (precedents, project shape) for the
@@ -33,6 +33,12 @@ LAYER_RULES = {
     # llm_bridge talks to LLM providers only; app knowledge flows TO it, not
     # from it. Its one analysis import is grandfathered (burn-down: WS2/WS5).
     "llm_bridge": set(),
+    # menubar/ is the built-in macOS status item: a small delivery-adjacent
+    # leaf consumed by api (Settings toggle) and dashboard (spawn at launch).
+    # It may import only update (version notices) plus the implicit
+    # cross-cutting shared/config; it must NOT import dashboard or api, so
+    # the launch helpers it shares with dashboard live in shared/frozen.py.
+    "menubar": {"update"},
     # ci/ is a delivery mechanism (like api/): it may orchestrate services and
     # read evaluation output, but nothing imports ci/.
     "ci": {"core", "services", "analysis", "context"},

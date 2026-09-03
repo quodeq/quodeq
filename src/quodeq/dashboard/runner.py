@@ -140,6 +140,21 @@ def _handed_off_to_running_instance(config: DashboardConfig) -> bool:
     return True
 
 
+def _maybe_spawn_menubar() -> None:
+    """Launch the menu bar icon when the preference is on. Fail-soft.
+
+    Only a real dashboard launch calls this; direct --_api invocations and
+    the Settings toggle (PUT /api/menubar) have their own paths.
+    """
+    try:
+        from quodeq.menubar import control, state
+
+        if control.is_supported() and state.is_enabled():
+            control.spawn()
+    except Exception:
+        logging.getLogger(__name__).debug("menubar spawn skipped", exc_info=True)
+
+
 def _prepare_frozen_macos_launch() -> bool:
     """Packaged-app housekeeping before anything spawns. Fail-silent.
 
@@ -212,6 +227,7 @@ def run_dashboard(
     )
 
     _kick_update_check()
+    _maybe_spawn_menubar()
 
     _server_mod.serve_and_wait(action_api_url, action_api_process, config)
     return 0

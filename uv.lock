@@ -883,6 +883,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pywebview" },
     { name = "pywinpty", marker = "sys_platform == 'win32'" },
+    { name = "rumps", marker = "sys_platform == 'darwin'" },
 ]
 
 [package.dev-dependencies]
@@ -904,6 +905,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.13.4,<3" },
     { name = "pywebview", specifier = ">=6.2.1,<7" },
     { name = "pywinpty", marker = "sys_platform == 'win32'", specifier = ">=3.0.5,<4" },
+    { name = "rumps", marker = "sys_platform == 'darwin'", specifier = ">=0.4,<0.5" },
 ]
 
 [package.metadata.requires-dev]
@@ -1023,6 +1025,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ba/76/65002b08596c389105720a8c0d22298b8dc25a4baf89b2ce431343c8b1de/rpds_py-2026.6.3-cp315-cp315t-win32.whl", hash = "sha256:913ca42ccad3f8cc6e292b587ae8ae49c8c823e5dce51a736252fc7c7cdfa577", size = 201204, upload-time = "2026-06-30T07:17:30.193Z" },
     { url = "https://files.pythonhosted.org/packages/8c/97/d855d6b3c322d1f27e26f5241c42016b56cf01377ea8ed348285f54652f0/rpds_py-2026.6.3-cp315-cp315t-win_amd64.whl", hash = "sha256:ae3d4fe8c0b9213624fdce7279d70e3b148b682ca20719ebd193a23ebfa47324", size = 220719, upload-time = "2026-06-30T07:17:31.788Z" },
 ]
+
+[[package]]
+name = "rumps"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyobjc-framework-cocoa" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/e2/2e6a47951290bd1a2831dcc50aec4b25d104c0cf00e8b7868cbd29cf3bfe/rumps-0.4.0.tar.gz", hash = "sha256:17fb33c21b54b1e25db0d71d1d793dc19dc3c0b7d8c79dc6d833d0cffc8b1596", size = 39257, upload-time = "2022-10-15T05:15:10.386Z" }
 
 [[package]]
 name = "simple-websocket"

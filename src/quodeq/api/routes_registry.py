@@ -27,6 +27,7 @@ from quodeq.api.routes_findings import register_findings_routes
 from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
 from quodeq.api.routes_update import register_update_routes
+from quodeq.api.routes_menubar import register_menubar_routes
 from quodeq.api._scores_routes import register_scores_routes
 from quodeq.api.routes_compare import register_compare_routes
 from quodeq.api.routes_runs import register_runs_routes
@@ -71,5 +72,6 @@ def register_all_routes(
     if log_buffer:
         register_log_routes(app, log_buffer)
     register_update_routes(app)
+    register_menubar_routes(app)
     register_index_routes(app)
     register_static_routes(app, static_dist)
