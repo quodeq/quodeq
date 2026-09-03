@@ -1,7 +1,7 @@
 """Menu bar helpers — icon lookup, command discovery, and dashboard health checks.
 
 Ported from packaging/macos/_helpers.py when the menu bar became a built-in
-feature. PATH sourcing lives in quodeq.dashboard._frozen.source_user_path.
+feature. PATH sourcing lives in quodeq.shared.frozen.source_user_path.
 """
 from __future__ import annotations
 

@@ -108,9 +108,11 @@ def test_prereq_rows_exclude_quodeq() -> None:
 
 
 def test_start_uses_own_binary(monkeypatch) -> None:
-    module, _, app = _make_app()
+    from quodeq.menubar import _app_lifecycle
+
+    _, _, app = _make_app()
     popen = MagicMock()
-    monkeypatch.setattr(module.subprocess, "Popen", popen)
+    monkeypatch.setattr(_app_lifecycle.subprocess, "Popen", popen)
     stderr_log = MagicMock()
     assert app._launch_dashboard_process(stderr_log) is True
     cmd = popen.call_args.args[0]

@@ -2,7 +2,7 @@
 
 Ported from packaging/macos/_dashboard.py when the menu bar became a built-in
 feature; the dashboard command itself now comes from
-quodeq.dashboard._frozen.dashboard_cmd instead of probing a `quodeq` CLI.
+quodeq.shared.frozen.dashboard_cmd instead of probing a `quodeq` CLI.
 """
 from __future__ import annotations
 

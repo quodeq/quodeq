@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from unittest.mock import patch
 
-from quodeq.dashboard import _frozen
+from quodeq.shared import frozen as _frozen
 
 
 def test_subprocess_cmd_menubar_dev():

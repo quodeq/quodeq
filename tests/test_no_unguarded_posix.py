@@ -38,6 +38,14 @@ _ALLOWLIST: set[str] = {
     # runs it and a missing lsof degrades to None. Used to resolve clickable
     # terminal links against the shell's live cwd.
     "terminal/links.py:80",
+    # quodeq/menubar/ is darwin-only by construction: control.is_supported()
+    # gates every spawn on sys.platform == "darwin", and app/_app_lifecycle
+    # only run inside the rumps process that spawn starts. lsof/killpg/pkill
+    # are therefore never reached on Windows, and each call is wrapped to
+    # degrade gracefully anyway.
+    "menubar/_process.py:75",
+    "menubar/_app_lifecycle.py:150",
+    "menubar/_app_lifecycle.py:158",
 }
 
 

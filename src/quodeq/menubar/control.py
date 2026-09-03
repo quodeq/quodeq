@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from quodeq.dashboard._frozen import is_frozen, subprocess_cmd
+from quodeq.shared.frozen import is_frozen, subprocess_cmd
 
 _logger = logging.getLogger(__name__)
 _PIDFILE_NAME = "menubar.pid"
