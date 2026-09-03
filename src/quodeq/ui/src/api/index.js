@@ -61,4 +61,5 @@ export {
 
 export {
   getUpdateStatus, checkForUpdates, dismissUpdate, setUpdateAutoCheck, markUpdateDisclosed,
+  startSelfUpdate,
 } from './updates.js';
