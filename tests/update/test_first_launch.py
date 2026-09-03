@@ -65,9 +65,12 @@ def test_move_accepted_copies_and_relaunches(tmp_path: Path) -> None:
 
 def _spy_fs(runner, real_app: Path):
     # ditto's source arg is the /Volumes path; redirect it to the tmp copy so
-    # copytree works in tests.
+    # copytree works in tests. Compare normalized: Windows str(Path) backslashes.
     def run(argv, **kwargs):
-        argv = [str(real_app) if a == "/Volumes/Quodeq/Quodeq.app" else a for a in argv]
+        argv = [
+            str(real_app) if str(a).replace("\\", "/") == "/Volumes/Quodeq/Quodeq.app" else a
+            for a in argv
+        ]
         return runner(argv, **kwargs)
 
     run.calls = runner.calls
