@@ -90,11 +90,16 @@ a = Analysis(
         "quodeq.shared.prereqs",
         "quodeq.shared.utils",
         "quodeq.shared._env",
+        # quodeq — built-in menu bar icon
+        "quodeq.menubar",
+        "quodeq.menubar.app",
+        "quodeq.menubar.control",
         # dependencies
         "flask",
         "jsonschema",
         "webview",
         "webview.platforms.cocoa",
+        "rumps",
     ],
     noarchive=False,
 )

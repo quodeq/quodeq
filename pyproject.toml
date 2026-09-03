@@ -38,6 +38,9 @@ dependencies = [
     # because openai depends on it. Declared so it cannot vanish underneath us.
     "pydantic>=2.13.4,<3",
     'pywinpty>=3.0.5,<4 ; sys_platform == "win32"',
+    # Built-in menu bar icon (quodeq.menubar); pure Python over the
+    # pyobjc-Cocoa stack pywebview already pulls in on macOS.
+    'rumps>=0.4,<0.5 ; sys_platform == "darwin"',
 ]
 
 [project.urls]
