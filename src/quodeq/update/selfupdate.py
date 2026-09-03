@@ -258,12 +258,11 @@ def _swap_bundle(staging: Path, install_app: Path) -> None:
 
 def _spawn_relauncher(install_app: Path) -> None:
     """Detached helper that reopens the app once this process has exited."""
-    script = (
-        f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done; "
-        f'open -n "{install_app}"'
-    )
+    # The pid and app path are passed as positional parameters, never
+    # interpolated into the script, so path contents cannot become shell.
+    script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.3; done; open -n "$2"'
     subprocess.Popen(
-        ["/bin/sh", "-c", script],
+        ["/bin/sh", "-c", script, "_", str(os.getpid()), str(install_app)],
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
