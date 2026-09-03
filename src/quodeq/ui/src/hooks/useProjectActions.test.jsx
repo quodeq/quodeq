@@ -2,7 +2,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ApiProvider } from '../api/ApiContext.jsx';
-import { useProjectActions } from './useProjectActions.js';
+import { useProjectActions, makeHandleDeleteProject } from './useProjectActions.js';
+import { apiErrorMessage } from '../strings/apiErrors.js';
 
 const PROJECTS = [{ id: 'a', name: 'Alpha' }, { id: 'b', name: 'Beta' }];
 
@@ -55,6 +56,23 @@ describe('useProjectActions', () => {
       });
       expect(onError).toHaveBeenCalledWith('projects.deleteProjectFailed', { error: 'disk full' });
       expect(loadProjects).not.toHaveBeenCalled();
+    });
+
+    it('delete failure message is mapped through apiErrorMessage', async () => {
+      // FORBIDDEN is a mapped code, so its friendly text diverges from the
+      // raw backend message -- that divergence is what makes this test fail
+      // against the old `error: err.message` code.
+      const err = Object.assign(new Error('raw backend text'), { code: 'FORBIDDEN' });
+      const deleteProject = vi.fn().mockRejectedValue(err);
+      const fail = vi.fn((key, params) => ({ ok: false, key, params }));
+      const handler = makeHandleDeleteProject({
+        deleteProject, projects: [], selectedProject: null, handleProjectChange: vi.fn(), loadProjects: vi.fn(), fail,
+      });
+
+      await handler('p1');
+
+      expect(fail).toHaveBeenCalledWith('projects.deleteProjectFailed', { error: apiErrorMessage(err, 'projects.deleteProjectFailed') });
+      expect(fail.mock.calls[0][1].error).not.toBe(err.message);
     });
   });
 
