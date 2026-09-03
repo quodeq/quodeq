@@ -46,12 +46,12 @@ uv run --with pyinstaller --with rumps pyinstaller \
     --hidden-import rumps \
     --collect-all rumps \
     --add-data "$REPO_ROOT/src/quodeq/data/icons/icon.icns:." \
-    --add-data "$SCRIPT_DIR/menubar_iconTemplate.png:." \
-    --add-data "$SCRIPT_DIR/menubar_iconTemplate@2x.png:." \
-    --add-data "$SCRIPT_DIR/menubar_icon_running.png:." \
-    --add-data "$SCRIPT_DIR/menubar_icon_running@2x.png:." \
-    --add-data "$SCRIPT_DIR/menubar_icon_evaluating.png:." \
-    --add-data "$SCRIPT_DIR/menubar_icon_evaluating@2x.png:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/menubar/menubar_iconTemplate.png:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/menubar/menubar_iconTemplate@2x.png:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/menubar/menubar_icon_running.png:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/menubar/menubar_icon_running@2x.png:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/menubar/menubar_icon_evaluating.png:." \
+    --add-data "$REPO_ROOT/src/quodeq/data/icons/menubar/menubar_icon_evaluating@2x.png:." \
     "$SCRIPT_DIR/menubar.py"
 
 APP="$BUILD_DIR/dist/QuodeqBar.app"
