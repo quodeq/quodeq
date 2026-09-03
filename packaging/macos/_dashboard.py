@@ -99,9 +99,23 @@ def find_pids_on_port(port: int) -> list[int]:
         return []
 
 
+def _is_quodeq_process(pid: int) -> bool:
+    """Return True if *pid*'s command line looks like quodeq's own dashboard process."""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True, text=True, timeout=2,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return "quodeq" in result.stdout.lower()
+
+
 def kill_port_processes(port: int) -> None:
-    """Send SIGTERM to all processes listening on *port*."""
+    """Send SIGTERM to quodeq's own processes listening on *port*."""
     for pid in find_pids_on_port(port):
+        if not _is_quodeq_process(pid):
+            continue
         try:
             os.kill(pid, signal.SIGTERM)
         except (OSError, ValueError):
