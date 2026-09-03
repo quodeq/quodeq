@@ -47,6 +47,13 @@ def _read_pid() -> int | None:
 
 
 def _pid_alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        # os.kill(pid, 0) is NOT a liveness probe on Windows: signal 0 is
+        # CTRL_C_EVENT, and os.kill routes it through GenerateConsoleCtrlEvent,
+        # interrupting every process sharing the console (this aborted whole
+        # pytest runs on CI). The menu bar never runs on Windows, so any
+        # pidfile there is stale by definition.
+        return False
     try:
         os.kill(pid, 0)
         return True
