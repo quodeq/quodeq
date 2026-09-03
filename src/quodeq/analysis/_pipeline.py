@@ -23,7 +23,6 @@ from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
-from quodeq.shared.utils import get_ai_cmd
 
 _LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
 
@@ -41,7 +40,7 @@ def _warn_if_local_api_oversubscribed(config: RunConfig) -> None:
     """
     if config.options.max_subagents <= 1:
         return
-    ai_cmd = get_ai_cmd()
+    ai_cmd = config.ai_cmd
     if _get_provider_type(ai_cmd) != "api":
         return
     api_base = get_provider_configs().get(ai_cmd, {}).get("api_base", "")
@@ -176,7 +175,7 @@ def _try_consolidated_mode(
     Disabled for API providers — per-dimension gives better coverage since
     local models struggle with 8 dimensions in one prompt.
     """
-    _provider_type = _get_provider_type(get_ai_cmd())
+    _provider_type = _get_provider_type(config.ai_cmd)
     if not (config.options.consolidated
             and len(dimensions) > 1
             and config.options.max_subagents > 1
