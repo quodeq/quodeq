@@ -282,7 +282,7 @@ class QuodeqApp(rumps.App):
         """Report a crashed dashboard process and clean up."""
         stderr_log.close()
         try:
-            with open(stderr_log.name) as f:
+            with open(stderr_log.name, encoding="utf-8") as f:
                 err = f.read(_STDERR_READ_MAX).strip()
         except OSError:
             err = "unknown error"
