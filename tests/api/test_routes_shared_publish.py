@@ -47,6 +47,20 @@ def test_refresh_failure_body_carries_error_reason(client, tmp_path, monkeypatch
     assert body["error"] == "Could not resolve host github.com"
 
 
+def test_refresh_failure_has_code(client, tmp_path, monkeypatch):
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.refresh_shared_clone",
+        lambda url: (False, "Could not resolve host"),
+    )
+    resp = client.post("/api/shared/refresh", headers=_ORIGIN)
+    assert resp.status_code == 502
+    body = resp.get_json()
+    assert body["code"] == "REFRESH_FAILED"
+    assert body["stale"] is True
+    assert "lastSynced" in body
+
+
 def test_refresh_success_200(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     monkeypatch.setattr(
@@ -74,6 +88,16 @@ def test_publish_conflict_returns_409(client, tmp_path, monkeypatch):
     assert "already running" in resp.get_json()["error"]
 
 
+def test_publish_conflict_has_code(client, tmp_path, monkeypatch):
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared.start_publish", lambda *a, **kw: "already_running"
+    )
+    resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
+    assert resp.status_code == 409
+    assert resp.get_json()["code"] == "PUBLISH_IN_PROGRESS"
+
+
 def test_publish_thread_start_failure_returns_500_not_409(client, tmp_path, monkeypatch):
     """A thread-start failure is a server error, not "a publish is already running"."""
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
@@ -81,6 +105,14 @@ def test_publish_thread_start_failure_returns_500_not_409(client, tmp_path, monk
     resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
     assert resp.status_code == 500
     assert "already running" not in resp.get_json()["error"]
+
+
+def test_publish_start_failure_has_code(client, tmp_path, monkeypatch):
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    monkeypatch.setattr("quodeq.api.routes_shared.start_publish", lambda *a, **kw: "failed")
+    resp = client.post("/api/projects/some-proj/publish", headers=_ORIGIN)
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "PUBLISH_START_FAILED"
 
 
 def test_publish_started_returns_202(client, tmp_path, monkeypatch):
