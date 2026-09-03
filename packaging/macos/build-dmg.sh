@@ -76,6 +76,9 @@ echo "  Created $APP"
 # Strip quarantine attribute so users don't need xattr -cr
 xattr -cr "$APP"
 
+# Sign (no-op unless MACOS_SIGN_IDENTITY is set)
+bash "$SCRIPT_DIR/sign-and-notarize.sh" sign-app "$APP"
+
 # Step 2: Create DMG
 echo "==> Creating DMG..."
 DMG_PATH="$DMG_DIR/QuodeqBar-${VERSION}-macOS.dmg"
@@ -104,6 +107,8 @@ else
 fi
 
 if [ -f "$DMG_PATH" ]; then
+    # Notarize + staple (no-op unless notary credentials are set)
+    bash "$SCRIPT_DIR/sign-and-notarize.sh" notarize-dmg "$DMG_PATH"
     SIZE=$(du -h "$DMG_PATH" | cut -f1)
     echo ""
     echo "==> Done: $DMG_PATH ($SIZE)"
