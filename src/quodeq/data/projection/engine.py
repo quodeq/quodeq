@@ -38,10 +38,12 @@ class ProjectionEngine:
         offset was recorded yet.
         """
         store = self._store_factory(run_dir)
+        current_size = event_log.stat().st_size if event_log.is_file() else 0
+        from_offset = min(store.get_projected_size() or 0, current_size)
         return self._project(
             event_log, store,
             since=store.get_checkpoint(),
-            from_offset=store.get_projected_size() or 0,
+            from_offset=from_offset,
         )
 
     def update_actions(self, actions_log: Path, run_dir: Path, *, force: bool = False) -> int:
@@ -93,6 +95,7 @@ class ProjectionEngine:
         since: Optional[datetime],
         from_offset: int = 0,
     ) -> int:
+        size_before = event_log.stat().st_size
         reader = EventLogReader(event_log)
         count = 0
         last_ts = None
@@ -112,6 +115,6 @@ class ProjectionEngine:
                     )
             if last_ts is not None:
                 store.save_checkpoint(last_ts)
-                store.save_projected_size(event_log.stat().st_size)
+                store.save_projected_size(size_before)
         _logger.info("Projected %d events from %s", count, event_log)
         return count
