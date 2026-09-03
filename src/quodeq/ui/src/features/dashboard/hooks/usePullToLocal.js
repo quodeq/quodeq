@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { t } from '../../../strings/index.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 
 // Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
 // the 409 same-uuid collision case.
 export function usePullToLocal({ shared, onProjectsReload }) {
+  const { showToast } = useSidePane();
   const [pullConflictId, setPullConflictId] = useState(null);
   const [pulledIds, setPulledIds] = useState(() => new Set());
 
@@ -20,7 +22,7 @@ export function usePullToLocal({ shared, onProjectsReload }) {
       if (err?.status === 409) {
         setPullConflictId(id);
       } else {
-        alert(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
+        showToast(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
       }
     }
   }
@@ -31,7 +33,7 @@ export function usePullToLocal({ shared, onProjectsReload }) {
       setPulledIds((prev) => new Set(prev).add(id));
       await onProjectsReload?.();
     } catch (err) {
-      alert(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
+      showToast(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
     } finally {
       setPullConflictId(null);
     }
