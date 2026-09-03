@@ -168,7 +168,7 @@ export async function importProject(file, opts = {}) {
 export async function registerProject(payload) {
   let res;
   try {
-    res = await fetch('/api/projects', {
+    res = await fetch(`${BASE}/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
