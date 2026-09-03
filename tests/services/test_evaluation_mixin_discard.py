@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from quodeq.core.types.job import JobSnapshot
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     _discard_run_state,
@@ -74,7 +75,7 @@ class TestScoreFailedEvaluation:
     def test_returns_false_for_running_job(self):
         m = FsEvaluationMixin()
         m._jobs = MagicMock()
-        m._jobs.get_job.return_value = {"status": "running"}
+        m._jobs.get_job.return_value = JobSnapshot(job_id="j1", status="running")
         assert m.score_failed_evaluation("j1", "/reports") is False
 
     def test_returns_false_for_missing_job(self):

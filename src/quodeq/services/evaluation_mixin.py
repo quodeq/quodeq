@@ -186,7 +186,7 @@ class FsEvaluationMixin:
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
         """Score any completed dimensions from a failed evaluation."""
         job = self._jobs.get_job(job_id)
-        if not job or job.get("status") not in ("failed", "cancelled"):
+        if not job or job.status not in ("failed", "cancelled"):
             return False
         score_completed_evidence(reports_dir, job)
         return True
