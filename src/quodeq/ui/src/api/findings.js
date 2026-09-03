@@ -92,7 +92,10 @@ export async function deleteFinding(projectId, finding) {
  * @returns {Promise<{ok: boolean, deleted: number}>} Server response
  */
 export async function deleteAllFindings(projectId) {
-  return request('/findings/delete-all', {
+  // Caller (useDismissedFindings) already runs a confirmDialog before this
+  // is invoked, so confirm=true here just satisfies the API's own gate.
+  // Same pattern as deleteProject in ./projects.js.
+  return request('/findings/delete-all?confirm=true', {
     method: 'POST',
     body: JSON.stringify({ project: projectId }),
   });

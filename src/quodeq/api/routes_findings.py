@@ -11,11 +11,13 @@ sessions that ended in PRs #525-#528.)
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, abort, jsonify, request
 
+from quodeq.api.helpers import error_response
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
 from quodeq.services.mutation_rescore import (
@@ -188,6 +190,11 @@ def register_findings_routes(app: Flask) -> None:
 
     @app.post("/api/findings/delete-all")
     def delete_all() -> tuple[Response, int]:
+        if request.args.get("confirm") != "true":
+            err_body, status = error_response(
+                "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
+            )
+            return jsonify(err_body), status
         body = request.get_json(silent=True) or {}
         project = body.get("project", "")
         run_id = body.get("run_id") or body.get("runId")
