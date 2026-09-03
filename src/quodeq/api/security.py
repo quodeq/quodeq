@@ -84,7 +84,15 @@ def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] 
         return None
     ip = request.remote_addr or "unknown"
     now = time.monotonic()
-    if store.check_and_record(ip, now):
+    if hasattr(store, "check_and_record"):
+        limited = store.check_and_record(ip, now)
+    else:
+        # Back-compat: external RateLimitStore implementers written against
+        # the old check()/record() Protocol don't have check_and_record.
+        limited = store.check(ip, now)
+        if not limited:
+            store.record(ip, now)
+    if limited:
         return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
     return None
 
