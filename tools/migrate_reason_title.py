@@ -91,6 +91,7 @@ def migrate_file(path: Path, apply: bool) -> tuple[int, int]:
             path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {path}: {exc}")
+            return -1, -1
 
     return v_count, c_count
 
@@ -118,12 +119,17 @@ def main():
         total_v = 0
         total_c = 0
         files_changed = 0
+        had_errors = False
 
         for path in sorted(eval_files):
             try:
                 v, c = migrate_file(path, args.apply)
             except (OSError, json.JSONDecodeError) as exc:
                 print(f"  ERROR processing {path}: {exc}")
+                had_errors = True
+                continue
+            if v == -1 and c == -1:
+                had_errors = True
                 continue
             if v or c:
                 files_changed += 1
@@ -136,6 +142,8 @@ def main():
         print(f"\n{mode}: {files_changed} files, {total_v} violations, {total_c} compliance entries")
         if not args.apply and (total_v or total_c):
             print("Run with --apply to write changes.")
+        if had_errors:
+            sys.exit(1)
     except (OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
         print(f"Fatal error: {exc}", file=sys.stderr)
         sys.exit(1)
