@@ -138,7 +138,7 @@ def start(
 
 
 def _check(argv: list[str], message: str) -> None:
-    result = subprocess.run(argv, capture_output=True, text=True)
+    result = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8")
     if result.returncode != 0:
         _logger.warning("self-update command failed (%s): %s", argv[0], result.stderr)
         raise UpdateError(message)
@@ -171,6 +171,29 @@ def _request_app_exit() -> None:
     threading.Timer(0.5, lambda: os._exit(0)).start()
 
 
+def _verify_mounted_app(mnt: Path, app_name: str, team: str, target_version: str) -> Path:
+    """Locate and verify the new bundle on the mounted DMG; returns its path."""
+    app_src = Path(mnt) / app_name
+    if not app_src.exists():
+        raise UpdateError("The downloaded update does not contain the app")
+    _check(
+        ["codesign", "--verify", "--strict", "--deep", str(app_src)],
+        "The downloaded update has an invalid signature",
+    )
+    info = subprocess.run(
+        ["codesign", "-dvv", str(app_src)], capture_output=True, text=True, encoding="utf-8"
+    )
+    if f"TeamIdentifier={team}" not in (info.stderr or "") + (info.stdout or ""):
+        raise UpdateError("The downloaded update is signed by an unexpected developer")
+    plist = plistlib.loads((app_src / "Contents" / "Info.plist").read_bytes())
+    got_version = str(plist.get("CFBundleShortVersionString") or "")
+    if got_version != target_version:
+        raise UpdateError(
+            f"The downloaded update is version {got_version}, expected {target_version}"
+        )
+    return app_src
+
+
 def _run_update(download_url: str, target_version: str, install_app: Path, team: str) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="quodeq-selfupdate-"))
     mnt = _mountpoint_for_tests or (tmp / "mnt")
@@ -189,50 +212,18 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
             "Could not open the downloaded update",
         )
         mounted = True
-        app_src = Path(mnt) / install_app.name
-        if not app_src.exists():
-            raise UpdateError("The downloaded update does not contain the app")
-        _check(
-            ["codesign", "--verify", "--strict", "--deep", str(app_src)],
-            "The downloaded update has an invalid signature",
-        )
-        info = subprocess.run(["codesign", "-dvv", str(app_src)], capture_output=True, text=True)
-        if f"TeamIdentifier={team}" not in (info.stderr or "") + (info.stdout or ""):
-            raise UpdateError("The downloaded update is signed by an unexpected developer")
-        plist = plistlib.loads((app_src / "Contents" / "Info.plist").read_bytes())
-        got_version = str(plist.get("CFBundleShortVersionString") or "")
-        if got_version != target_version:
-            raise UpdateError(
-                f"The downloaded update is version {got_version}, expected {target_version}"
-            )
+        app_src = _verify_mounted_app(mnt, install_app.name, team, target_version)
 
         _set(phase="installing")
         staging = install_app.parent / f".{install_app.name}.new"
         shutil.rmtree(staging, ignore_errors=True)
         _check(["ditto", str(app_src), str(staging)], "Could not copy the update into place")
-        subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True)
+        subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
         mounted = False
 
-        old = install_app.parent / f".{install_app.name}.old-{os.getpid()}"
-        os.rename(install_app, old)
-        try:
-            os.rename(staging, install_app)
-        except Exception:
-            os.rename(old, install_app)  # roll back so the app stays launchable
-            raise
-        shutil.rmtree(old, ignore_errors=True)
-
+        _swap_bundle(staging, install_app)
         _set(phase="relaunching", percent=100)
-        script = (
-            f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done; "
-            f'open -n "{install_app}"'
-        )
-        subprocess.Popen(
-            ["/bin/sh", "-c", script],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        _spawn_relauncher(install_app)
         _request_app_exit()
     except UpdateError as exc:
         _logger.warning("self-update failed: %s", exc)
@@ -242,8 +233,34 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
         _set(phase="error", error="Automatic update failed")
     finally:
         if mounted:
-            subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True)
+            subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _swap_bundle(staging: Path, install_app: Path) -> None:
+    """Atomically replace the installed bundle with the staged copy."""
+    old = install_app.parent / f".{install_app.name}.old-{os.getpid()}"
+    os.rename(install_app, old)
+    try:
+        os.rename(staging, install_app)
+    except Exception:
+        os.rename(old, install_app)  # roll back so the app stays launchable
+        raise
+    shutil.rmtree(old, ignore_errors=True)
+
+
+def _spawn_relauncher(install_app: Path) -> None:
+    """Detached helper that reopens the app once this process has exited."""
+    script = (
+        f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done; "
+        f'open -n "{install_app}"'
+    )
+    subprocess.Popen(
+        ["/bin/sh", "-c", script],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def cleanup_stale_staging(install_app: Path | None = None) -> None:
