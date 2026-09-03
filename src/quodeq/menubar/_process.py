@@ -71,8 +71,10 @@ def find_pids_on_port(port: int) -> list[int]:
     macOS-only: relies on ``lsof`` which is available on macOS by default.
     """
     try:
+        # int() enforces the argv boundary: whatever the caller passed, only a
+        # plain integer ever reaches the lsof argument.
         result = subprocess.run(
-            ["lsof", f"-ti:{port}"], capture_output=True, text=True, encoding="utf-8",
+            ["lsof", f"-ti:{int(port)}"], capture_output=True, text=True, encoding="utf-8",
             timeout=5,
         )
         return [int(pid.strip()) for pid in result.stdout.strip().split("\n") if pid.strip()]

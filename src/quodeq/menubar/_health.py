@@ -29,7 +29,13 @@ def _icons_dir() -> Path:
 
 
 def find_icon(name: str) -> str | None:
-    """Find a menu bar icon by filename."""
+    """Find a menu bar icon by filename.
+
+    *name* must be a bare filename; anything containing a path separator or
+    parent reference is rejected so the lookup can never leave the icon dir.
+    """
+    if not name or Path(name).name != name:
+        return None
     path = _icons_dir() / name
     return str(path) if path.exists() else None
 

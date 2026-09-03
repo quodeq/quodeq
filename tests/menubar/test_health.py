@@ -18,6 +18,12 @@ def test_find_icon_missing_returns_none():
     assert _health.find_icon("no_such_icon.png") is None
 
 
+def test_find_icon_rejects_path_traversal():
+    assert _health.find_icon("../icon.icns") is None
+    assert _health.find_icon("sub/menubar_iconTemplate.png") is None
+    assert _health.find_icon("") is None
+
+
 def test_health_check_false_when_unreachable():
     with patch.object(_health.urllib.request, "urlopen", side_effect=OSError("refused")):
         assert _health.health_check(1) is False
