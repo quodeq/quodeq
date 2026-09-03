@@ -172,6 +172,40 @@ def test_apply_survives_remove_failure(app, client, repo, monkeypatch):
     assert store.get_worktree(sid)["status"] == "applied"    # status advanced, no 500
 
 
+def test_diff_fetch_failure_has_code(app, client, repo, monkeypatch):
+    sid, _, _ = _session_with_worktree(app, client, repo)
+    from quodeq.assistant.worktree import WorktreeError
+    monkeypatch.setattr(
+        "quodeq.api.assistant_workspace_routes.diff_text",
+        lambda path: (_ for _ in ()).throw(WorktreeError("boom")))
+    resp = client.get(f"/api/assistant/sessions/{sid}/workspace/diff")
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "WORKSPACE_DIFF_FAILED"
+
+
+def test_turn_in_progress_has_code(app, client, repo):
+    sid, _, _ = _session_with_worktree(app, client, repo)
+    state = app.extensions["assistant_turns"]
+    assert state.try_claim_turn(sid)
+    try:
+        resp = client.post(f"/api/assistant/sessions/{sid}/workspace/apply")
+        assert resp.status_code == 409
+        assert resp.get_json()["code"] == "TURN_IN_PROGRESS"
+    finally:
+        state.release_turn(sid)
+
+
+def test_discard_failure_has_code(app, client, repo, monkeypatch):
+    sid, _, _ = _session_with_worktree(app, client, repo)
+    from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+    monkeypatch.setattr(
+        WorktreeManager, "remove",
+        lambda self, delete_branch=True: (_ for _ in ()).throw(WorktreeError("boom")))
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "WORKSPACE_DISCARD_FAILED"
+
+
 def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):
     # These routes MUTATE the user's repo; confirm the app-wide security stack gates them.
     import quodeq.api.security as security
