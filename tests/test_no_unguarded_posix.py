@@ -43,7 +43,7 @@ _ALLOWLIST: set[str] = {
     # only run inside the rumps process that spawn starts. lsof/killpg/pkill
     # are therefore never reached on Windows, and each call is wrapped to
     # degrade gracefully anyway.
-    "menubar/_process.py:75",
+    "menubar/_process.py:80",
     "menubar/_app_lifecycle.py:150",
     "menubar/_app_lifecycle.py:158",
 }

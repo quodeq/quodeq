@@ -71,8 +71,11 @@ def test_spawn_launches_detached_menubar(run_dir):
 
 
 def test_spawn_noop_when_running(run_dir):
-    control.write_pidfile()
+    # is_running is patched (not driven by a real pidfile) so the no-op
+    # logic is exercised on every platform: on win32 _pid_alive is a hard
+    # False, so a live-pid pidfile could never make is_running True there.
     with patch.object(control, "is_supported", return_value=True), \
+         patch.object(control, "is_running", return_value=True), \
          patch.object(subprocess, "Popen") as popen:
         assert control.spawn() is False
     popen.assert_not_called()

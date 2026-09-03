@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from typing import NamedTuple
@@ -70,6 +71,8 @@ def find_pids_on_port(port: int) -> list[int]:
 
     macOS-only: relies on ``lsof`` which is available on macOS by default.
     """
+    if sys.platform != "darwin":
+        return []
     try:
         # int() enforces the argv boundary: whatever the caller passed, only a
         # plain integer ever reaches the lsof argument.
