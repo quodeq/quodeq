@@ -97,6 +97,6 @@ export function confirmDialog({
     cancelBtn.addEventListener('click', () => close(false));
     confirmBtn.addEventListener('click', () => close(true));
     shell.mount();
-    confirmBtn.focus();
+    (safeVariant === 'danger' ? cancelBtn : confirmBtn).focus();
   });
 }
