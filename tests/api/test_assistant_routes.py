@@ -809,6 +809,7 @@ def test_create_session_shared_409_when_unconfigured(client, monkeypatch):
     resp = client.post("/api/assistant/sessions",
                        json={"provider": "ollama", "source": "shared"})
     assert resp.status_code == 409
+    assert resp.get_json()["code"] == "NO_SHARED_REPO"
 
 
 def test_create_session_shared_409_when_clone_state_bad(client, monkeypatch):
@@ -820,6 +821,7 @@ def test_create_session_shared_409_when_clone_state_bad(client, monkeypatch):
                        json={"provider": "ollama", "source": "shared"})
     assert resp.status_code == 409
     assert "foreign" in resp.get_json()["error"]
+    assert resp.get_json()["code"] == "SHARED_REPO_UNAVAILABLE"
 
 
 def test_create_session_shared_persists_source_and_read_only(client, app, monkeypatch):
