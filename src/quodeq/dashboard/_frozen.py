@@ -10,6 +10,7 @@ _MODULE_MAP = {
     "api": "quodeq.api.app",
     "webview": "quodeq.dashboard._webview_window",
     "evaluate": "quodeq.cli",
+    "menubar": "quodeq.menubar",
 }
 
 _CMD_DISCOVERY_TIMEOUT_S = 5
@@ -39,6 +40,18 @@ def subprocess_cmd(mode: str, args: list[str] | None = None) -> list[str]:
     if is_frozen():
         return [sys.executable, f"--_{mode}"] + extra
     return [sys.executable, "-m", _MODULE_MAP[mode]] + extra
+
+
+def dashboard_cmd(args: list[str] | None = None) -> list[str]:
+    """Return the command that launches the full dashboard (not a --_ mode).
+
+    Frozen:   [sys.executable, ...args]   (entry falls through to the dashboard CLI)
+    Unfrozen: [sys.executable, "-m", "quodeq.dashboard", ...args]
+    """
+    extra = args or []
+    if is_frozen():
+        return [sys.executable] + extra
+    return [sys.executable, "-m", "quodeq.dashboard"] + extra
 
 
 def source_user_path() -> None:
