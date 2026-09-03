@@ -86,8 +86,13 @@ export default function UpdatesSection() {
   };
 
   const onToggle = async (enabled) => {
+    const previous = status?.auto_check_enabled;
     setStatus((s) => ({ ...(s || {}), auto_check_enabled: enabled }));
-    try { await setUpdateAutoCheck(enabled); } catch { /* fail-silent */ }
+    try {
+      await setUpdateAutoCheck(enabled);
+    } catch {
+      setStatus((s) => ({ ...(s || {}), auto_check_enabled: previous }));
+    }
   };
 
   const current = status?.current ?? '—';

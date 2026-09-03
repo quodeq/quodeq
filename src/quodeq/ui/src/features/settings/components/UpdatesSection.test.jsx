@@ -52,4 +52,17 @@ describe('UpdatesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /off/i }));
     await waitFor(() => expect(fakeApi.setUpdateAutoCheck).toHaveBeenCalledWith(false));
   });
+
+  it('rolls back the toggle when setUpdateAutoCheck fails, instead of leaving a false "success"', async () => {
+    fakeApi.setUpdateAutoCheck.mockRejectedValue(new Error('network'));
+    renderWithApi();
+    await waitFor(() => expect(fakeApi.getUpdateStatus).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: /off/i }));
+    await waitFor(() => expect(fakeApi.setUpdateAutoCheck).toHaveBeenCalledWith(false));
+
+    // Optimistic update flips "on" to inactive immediately; once the failed
+    // call resolves it should roll back to the previous (active) state.
+    await waitFor(() => expect(screen.getByRole('button', { name: /^on$/i })).toHaveClass('settings-pill--active'));
+  });
 });

@@ -934,6 +934,7 @@
   "projects.refreshAria": "refresh",
   "projects.relocate": "Relocate",
   "projects.relocateFailed": "Failed to relocate project: {error}. Check that the target path is writable and try again.",
+  "projects.relocatePathRequired": "Enter a path before saving.",
   "projects.replace": "Replace",
   "projects.reposEvaluatedMany": "{count} repositories evaluated",
   "projects.reposEvaluatedOne": "{count} repository evaluated",

@@ -3,13 +3,26 @@ import { ProjectCard } from './ProjectCard.jsx';
 import { CardFooter } from './CardFooter.jsx';
 import { ProjectPathContent } from './ProjectPathContent.jsx';
 import { ProjectChildren } from './ProjectChildren.jsx';
+import { t } from '../../../../strings/index.js';
 
 export function useRelocateDialog(onRelocate) {
   const [relocating, setRelocating] = useState(null);
   const [relocatePath, setRelocatePath] = useState('');
-  const startRelocate = (name, currentPath) => { setRelocating(name); setRelocatePath(currentPath || ''); };
-  const submitRelocate = (name) => { if (relocatePath.trim()) onRelocate?.(name, relocatePath.trim()); setRelocating(null); };
-  return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
+  const [relocateError, setRelocateError] = useState(null);
+  const startRelocate = (name, currentPath) => {
+    setRelocating(name);
+    setRelocatePath(currentPath || '');
+    setRelocateError(null);
+  };
+  const submitRelocate = (name) => {
+    if (!relocatePath.trim()) {
+      setRelocateError(t('projects.relocatePathRequired'));
+      return;
+    }
+    onRelocate?.(name, relocatePath.trim());
+    setRelocating(null);
+  };
+  return { relocating, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating, startRelocate };
 }
 
 // entryLookup (local id/name -> merged entry) lets both this root card and
