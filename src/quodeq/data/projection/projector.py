@@ -65,11 +65,6 @@ class EnsureLockRegistry:
                     del self._locks[run_dir]
                     del self._refcounts[run_dir]
 
-    def clear(self) -> None:
-        with self._registry_lock:
-            self._locks.clear()
-            self._refcounts.clear()
-
 
 _DEFAULT_LOCKS = EnsureLockRegistry()
 
