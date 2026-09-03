@@ -1,6 +1,8 @@
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from quodeq.data.sqlite.connection import (
     open_evaluation_db,
     EVALUATION_DB_FILENAME,
@@ -31,3 +33,13 @@ def test_open_evaluation_db_reopen_preserves_data(tmp_path: Path):
     with open_evaluation_db(tmp_path) as conn:
         n = conn.execute("SELECT COUNT(*) FROM findings").fetchone()[0]
         assert n == 1
+
+
+def test_open_evaluation_db_wraps_sqlite_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "quodeq.data.sqlite.connection.apply_evaluation_schema",
+        lambda conn: (_ for _ in ()).throw(sqlite3.OperationalError("disk I/O error")),
+    )
+    with pytest.raises(RuntimeError, match="Could not open evaluation database"):
+        with open_evaluation_db(tmp_path / "run1"):
+            pass
