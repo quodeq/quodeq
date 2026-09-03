@@ -151,23 +151,28 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
     Lighter than :func:`sync_index` / ``_sync_one_run``: refreshes only rows whose
     ``status.json`` mtime changed, and skips stale-promotion (the run date needs
     only the immutable ``started_at``). Runs without ``status.json`` are left to
-    the caller's ``parse_run_date`` fallback. The mtime cache is keyed by
-    ``(project_uuid, run_id)`` so it matches the row regardless of ``job_id``.
+    the caller's ``parse_run_date`` fallback. The mtime cache is prefetched for
+    the whole project in one query (mirrors :func:`sync_index`'s ``cached_mtimes``
+    at module scope), keyed by ``run_id`` since ``project_uuid`` is fixed here.
     """
     if not project_dir.is_dir():
         return
     with db:
+        cached_mtimes = {
+            run_id: status_mtime
+            for run_id, status_mtime in db.execute(
+                "SELECT run_id, status_mtime FROM runs WHERE project_uuid=?",
+                (project_uuid,),
+            )
+        }
         for run_dir in project_dir.iterdir():
             if not run_dir.is_dir() or run_dir.name.startswith("."):
                 continue
             if not (run_dir / "status.json").exists():
                 continue
             disk_mtime = _status_mtime_ns(run_dir)
-            cached = db.execute(
-                "SELECT status_mtime FROM runs WHERE project_uuid=? AND run_id=?",
-                (project_uuid, run_dir.name),
-            ).fetchone()
-            if cached is None or cached[0] != disk_mtime:
+            cached = cached_mtimes.get(run_dir.name)
+            if cached is None or cached != disk_mtime:
                 try:
                     _upsert_from_status(
                         db, run_dir, project_uuid=project_uuid, run_id=run_dir.name)
