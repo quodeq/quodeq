@@ -61,3 +61,32 @@ def apply_drafted_action(
         repo.set_action_status(action_id, "drafted")
         return ApplyOutcome("conflict", detail=str(exc))
     return ApplyOutcome("applied", result=result)
+
+
+@dataclass(frozen=True)
+class RejectOutcome:
+    """Result of a reject attempt; ``detail`` carries a state name."""
+    kind: Literal["unknown_action", "read_only", "already", "rejected"]
+    detail: str = ""
+
+
+def reject_drafted_action(repo: AssistantStore, action_id: str) -> RejectOutcome:
+    """Reject a drafted action, claiming the transition atomically."""
+    action = repo.get_action(action_id)
+    if action is None:
+        return RejectOutcome("unknown_action")
+    owner = repo.get_session(action["session_id"])
+    if owner is not None and (owner.get("source") or "local") == "shared":
+        # Defense in depth: read-only sessions never draft actions
+        # (draft_action is not registered), so nothing legitimate reaches
+        # here. Refuse rather than mutate the local store under a shared
+        # project id.
+        return RejectOutcome("read_only")
+    # Same replay guard as apply, made atomic: an applied action must not
+    # flip to rejected on a stale card click, SSE replay, or a race with a
+    # concurrent apply. The compare-and-set wins at most once.
+    if not repo.set_action_status(action_id, "rejected", expected="drafted"):
+        fresh = repo.get_action(action_id)
+        state = fresh["status"] if fresh else "gone"
+        return RejectOutcome("already", detail=state)
+    return RejectOutcome("rejected")

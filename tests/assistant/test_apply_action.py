@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.assistant.apply_action import ApplyOutcome, apply_drafted_action
+from quodeq.assistant.apply_action import (
+    ApplyOutcome, RejectOutcome, apply_drafted_action, reject_drafted_action,
+)
 from quodeq.assistant.tools._actions import ActionConflict, ActionContext, ActionSpec
 
 
@@ -131,3 +133,32 @@ class TestApplyDraftedAction:
             repo, "a1", _ctx(tmp_path), actions={"fake": _spec(apply_fn)})
         assert outcome == ApplyOutcome("conflict", detail="already dismissed")
         assert repo.action["status"] == "drafted"
+
+
+def test_reject_drafted_action_success():
+    repo = FakeRepo(action={"session_id": "s1", "status": "drafted"})
+    outcome = reject_drafted_action(repo, "a1")
+    assert outcome == RejectOutcome("rejected")
+    assert repo.action["status"] == "rejected"
+
+
+def test_reject_drafted_action_unknown():
+    repo = FakeRepo(action=None)
+    outcome = reject_drafted_action(repo, "a1")
+    assert outcome.kind == "unknown_action"
+
+
+def test_reject_drafted_action_read_only():
+    repo = FakeRepo(
+        action={"session_id": "s1", "status": "drafted"},
+        session={"source": "shared"},
+    )
+    outcome = reject_drafted_action(repo, "a1")
+    assert outcome.kind == "read_only"
+    assert repo.action["status"] == "drafted"
+
+
+def test_reject_drafted_action_conflict_when_already_applied():
+    repo = FakeRepo(action={"session_id": "s1", "status": "applied"})
+    outcome = reject_drafted_action(repo, "a1")
+    assert outcome == RejectOutcome("already", detail="applied")
