@@ -1,9 +1,12 @@
 import json
+import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from quodeq.assistant.mcp import _config
-from quodeq.assistant.mcp._config import write_mcp_config
+from quodeq.assistant.mcp._config import register_cli_mcp, write_mcp_config
 
 
 def test_write_mcp_config_shape(tmp_path):
@@ -56,3 +59,11 @@ def test_unregister_cli_mcp_acquires_lock_and_clears_key(monkeypatch):
     assert held["during"] is True  # lock held while removing
     assert "codex:quodeq-assistant" not in _config._registered
     assert calls == [["codex", "mcp", "remove", "quodeq-assistant"]]
+
+
+def test_register_cli_mcp_wraps_subprocess_failure(monkeypatch):
+    def _boom(*a, **kw):
+        raise subprocess.CalledProcessError(1, a[0])
+    monkeypatch.setattr(subprocess, "run", _boom)
+    with pytest.raises(RuntimeError, match="Could not register"):
+        register_cli_mcp("claude", [])
