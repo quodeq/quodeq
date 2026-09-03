@@ -48,8 +48,8 @@ def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, i
     """
     index = load_index(reports_root)
     candidate = index.get(index_key(identity))
-    if candidate is not None:
-        return None if candidate == ignore_uuid else candidate
+    if candidate is not None and candidate != ignore_uuid:
+        return candidate
 
     if not reports_root.is_dir():
         return None
