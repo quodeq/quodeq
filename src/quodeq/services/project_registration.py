@@ -9,7 +9,6 @@ Split (Task 12) into two sibling modules plus this orchestrator:
 """
 from __future__ import annotations
 
-import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +17,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._wiring import (
     ProjectIdentity,
     read_repository_info,
+    read_scan_json,
     resolve_project_uuid,
     validate_remote_url,
     write_repository_info,
@@ -256,11 +256,8 @@ def register_project_with_rollback(
         return _rollback_and_report(reports_dir, before, "internal_error")
 
     # scan.json is now always present after register_project succeeds.
-    scan_path = reports_root_path / project_uuid / "scan.json"
-    try:
-        scan_data = json.loads(scan_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError, FileNotFoundError):
-        scan_data = _zero_run_scan_fallback()
+    project_dir = reports_root_path / project_uuid
+    scan_data = read_scan_json(project_dir) or _zero_run_scan_fallback()
     return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
 
 
