@@ -72,7 +72,7 @@ def test_publish_thread_start_failure(tmp_path, monkeypatch, status):
     assert result == "failed"
     state = get_publish_status(status)
     assert state["state"] == "error"
-    assert "thread creation failed" in state["error"]
+    assert state["error"] == "Failed to start publish background job."
 
 
 def test_status_instances_are_independent():

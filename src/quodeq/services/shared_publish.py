@@ -140,7 +140,7 @@ def _run_publish(
         status.set(state="error", error=str(exc), finished_at=time.time())
     except Exception as exc:  # never leave the job stuck in "running"
         logger.exception("unexpected publish failure")
-        status.set(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error="An unexpected error occurred while publishing.", finished_at=time.time())
 
 
 def start_publish(
@@ -165,7 +165,7 @@ def start_publish(
         )
         thread.start()
     except Exception as exc:
-        status.set(state="error", error=str(exc), finished_at=time.time())
+        status.set(state="error", error="Failed to start publish background job.", finished_at=time.time())
         logger.exception("failed to start publish thread")
         return "failed"
     return "started"
