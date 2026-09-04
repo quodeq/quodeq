@@ -64,6 +64,7 @@ notarize_dmg() {
 
     local keyfile
     keyfile="$(mktemp -t notary-key.XXXXXX).p8"
+    chmod 600 "$keyfile"
     # shellcheck disable=SC2064  # expand keyfile now, not at trap time
     trap "rm -f '$keyfile'" EXIT
     printf '%s' "$NOTARY_KEY_P8_BASE64" | base64 -d > "$keyfile"
