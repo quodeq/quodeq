@@ -43,8 +43,26 @@ def unverify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | No
     log.emit(FindingUnverifiedEvent(payload=payload))
 
 
-def verified_entries(project_dir: Path) -> list[dict]:
-    """Net verified badges: replay of VERIFIED/UNVERIFIED events in order."""
+_MAX_VERIFIED_LIMIT = 5000
+
+
+def verified_entries(
+    project_dir: Path,
+    *,
+    offset: int = 0,
+    limit: int | None = None,
+) -> list[dict]:
+    """Net verified badges: replay of VERIFIED/UNVERIFIED events in order.
+
+    Args:
+        project_dir: The project directory.
+        offset: The number of entries to skip (default 0).
+        limit: The maximum number of entries to return. None means all entries
+               up to the hard limit. Clamped to [1, _MAX_VERIFIED_LIMIT].
+
+    Returns:
+        A list of verified badge dicts, sliced by offset/limit.
+    """
     if not project_dir.is_dir():
         return []
     entries: dict[tuple, dict] = {}
@@ -62,4 +80,10 @@ def verified_entries(project_dir: Path) -> list[dict]:
         elif event.event_type == EventType.FINDING_UNVERIFIED:
             p = event.payload
             entries.pop((str(p.req or ""), str(p.file or ""), int(p.line or 0)), None)
-    return list(entries.values())
+    items = list(entries.values())
+
+    if offset <= 0 and limit is None:
+        return items
+    start = max(0, offset)
+    end = start + limit if limit is not None and limit >= 0 else None
+    return items[start:end]

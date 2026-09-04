@@ -513,6 +513,37 @@ class TestVerifiedEndpoints:
         assert resp.status_code == 200
         assert client.get("/api/findings/verified?project=my-project").get_json() == []
 
+    def test_verified_list_with_limit_and_offset(self, client, tmp_path):
+        """Route handler accepts and passes limit/offset query params."""
+        from quodeq.services.verified import verify_finding
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        for i in range(10):
+            verify_finding(project_dir, {"req": f"r{i}", "file": "a.py", "line": i, "note": f"n{i}"})
+
+        # Test limit
+        resp = client.get("/api/findings/verified?project=my-project&limit=5")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body) == 5
+
+        # Test limit + offset
+        resp = client.get("/api/findings/verified?project=my-project&offset=3&limit=4")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body) == 4
+
+    def test_verified_list_out_of_range_offset(self, client, tmp_path):
+        """Out-of-range offset returns empty list."""
+        from quodeq.services.verified import verify_finding
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        verify_finding(project_dir, {"req": "r1", "file": "a.py", "line": 3, "note": "n"})
+
+        resp = client.get("/api/findings/verified?project=my-project&offset=100")
+        assert resp.status_code == 200
+        assert resp.get_json() == []
+
     def test_unverify_requires_key_fields(self, client):
         resp = client.post("/api/findings/unverify", json={"project": "p"})
         assert resp.status_code == 400
