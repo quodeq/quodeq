@@ -3,7 +3,7 @@
 # to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_sizes.py --update-baseline
 src/quodeq/api/_import_validation.py:88:function
-src/quodeq/api/_log_stream_routes.py:144:function
+src/quodeq/api/_log_stream_routes.py:54:function
 src/quodeq/api/assistant_session_routes.py:58:function
 src/quodeq/api/assistant_turn_routes.py:95:function
 src/quodeq/api/assistant_workspace_routes.py:26:function
