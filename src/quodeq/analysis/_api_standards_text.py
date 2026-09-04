@@ -84,14 +84,14 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
 _DEFAULT_MAX_API_PROMPT_CHARS = 30000  # Target inlined-file budget for local models (~8K tokens)
 
 
-def _api_prompt_char_budget() -> int:
+def _api_prompt_char_budget(env: dict[str, str] | None = None) -> int:
     """Max bytes of file content to inline per model call.
 
-    Read per call (not at import) so QUODEQ_MAX_API_PROMPT_CHARS can be
-    raised together with QUODEQ_MAX_API_FILE_SIZE / QUODEQ_CONTEXT_SIZE
-    when running larger-context models.
+    *env* lets subprocess.py pass the process environment explicitly so
+    this analysis-layer function doesn't read os.environ unprompted; also
+    raised together with QUODEQ_MAX_API_FILE_SIZE for larger-context models.
     """
-    raw = os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "")
+    raw = (env or os.environ).get("QUODEQ_MAX_API_PROMPT_CHARS", "")
     try:
         return int(raw) if raw else _DEFAULT_MAX_API_PROMPT_CHARS
     except ValueError:
