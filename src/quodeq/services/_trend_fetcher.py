@@ -125,15 +125,10 @@ def _make_heavy_trend_fetcher(
         base_fetcher=base_fetcher_factory(reports_root, project),
         dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
     )
-    from quodeq.services.score_cache import load_run_keys, open_score_cache  # noqa: PLC0415
+    from quodeq.services.score_cache import load_run_keys_or_empty, open_score_cache  # noqa: PLC0415
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
-    try:
-        with open_score_cache() as _conn:
-            keys_cache = load_run_keys(_conn, project)
-    except (OSError, sqlite3.Error):
-        _logger.debug("Could not load run keys from score cache for %s", project, exc_info=True)
-        keys_cache = {}
+    keys_cache = load_run_keys_or_empty(project)
 
     version_for = _make_version_for(
         project_dir, project, params, dismissed, deleted, keys_cache, cacheable_run_ids,
