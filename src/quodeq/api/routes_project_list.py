@@ -62,14 +62,16 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects")
     def list_projects() -> Response:
-        """Return all projects with optional ``?limit=N&offset=M`` pagination."""
-        result = provider.list_projects(reports_dir())
-        projects = result.get("projects", [])
+        """Return all projects with optional ``?limit=N&offset=M`` pagination.
+
+        Pagination is pushed into the provider (``offset``/``limit``) so a
+        paginated request only pays for hydrating its own window instead of
+        the whole project set (see ``ProjectsCache._list_page``).
+        """
         offset = request.args.get("offset", 0, type=int)
         limit = request.args.get("limit", 0, type=int)
-        if offset > 0 or limit > 0:
-            end = offset + limit if limit > 0 else None
-            projects = projects[offset:end]
+        result = provider.list_projects(reports_dir(), offset=offset, limit=limit)
+        projects = result.get("projects", [])
         # Self-healing warm-up: anything still pending on the page being
         # returned goes (back) on the queue, bounding this to page size
         # instead of the full project count.

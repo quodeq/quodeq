@@ -107,7 +107,7 @@ def test_route_serializes_entities_to_camel_case(tmp_path):
     from quodeq.api.routes_project_list import register_project_list_routes
 
     class _Provider:
-        def list_projects(self, reports_dir):
+        def list_projects(self, reports_dir, *, offset=0, limit=0):
             return {"projects": [_entry()]}
 
     app = Flask(__name__)

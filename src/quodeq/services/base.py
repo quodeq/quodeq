@@ -68,8 +68,13 @@ class CreateProjectResult:
 class ProjectActions(Protocol):
     """Methods for project listing and metadata."""
 
-    def list_projects(self, reports_dir: str) -> dict:
-        """Return a dict with a 'projects' list for the given reports directory."""
+    def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict:
+        """Return a dict with a 'projects' list for the given reports directory.
+
+        *offset*/*limit* (both default 0, meaning "no pagination") request a
+        single page; implementations may hydrate only that page's projects
+        instead of the whole set (see ``ProjectsCache``).
+        """
         ...
 
     def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:

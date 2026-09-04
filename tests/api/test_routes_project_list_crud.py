@@ -6,12 +6,14 @@ tests/api/_routes_project_list_fixtures.py.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from quodeq.api.routes_project_list import register_project_list_routes
 from tests.api._routes_project_list_fixtures import (  # noqa: F401 -- app/client/provider are pytest fixtures
     app,
     client,
@@ -54,6 +56,50 @@ class TestListProjects:
         data = resp.get_json()["projects"]
         assert len(data) == 1
         assert data[0]["name"] == "b"
+
+    def test_pagination_hydrates_only_the_sliced_window(self, tmp_path, monkeypatch):
+        """A5: pagination must not fully hydrate the whole project set.
+
+        Wires the real FilesystemActionProvider (the fake provider above
+        can't exercise hydration -- it just hands back pre-built objects)
+        against 5 registered projects on disk, then asserts a 2-item page
+        only triggers 2 calls to the expensive per-project hydration.
+        """
+        from flask import Flask
+
+        from quodeq.services import _fs_projects
+        from quodeq.services.filesystem import FilesystemActionProvider
+
+        for name in ["proj-a", "proj-b", "proj-c", "proj-d", "proj-e"]:
+            proj = tmp_path / name
+            proj.mkdir()
+            (proj / "repository_info.json").write_text(json.dumps({
+                "name": name, "path": str(tmp_path), "location": "local",
+                "onboardingCompletedAt": "2026-01-01T00:00:00+00:00",
+            }))
+
+        calls: list[str] = []
+        original = _fs_projects._build_project_entry
+
+        def _counting_build(reports_root, entry_name, runs, **kwargs):
+            calls.append(entry_name)
+            return original(reports_root, entry_name, runs, **kwargs)
+
+        monkeypatch.setattr(_fs_projects, "_build_project_entry", _counting_build)
+
+        flask_app = Flask(__name__)
+        flask_app.config["TESTING"] = True
+        provider = FilesystemActionProvider(reports_root=tmp_path)
+        with patch("quodeq.api.routes_project_list.reports_dir", return_value=str(tmp_path)):
+            register_project_list_routes(flask_app, provider)
+            resp = flask_app.test_client().get("/api/projects?offset=1&limit=2")
+
+        assert resp.status_code == 200
+        data = resp.get_json()["projects"]
+        assert [p["name"] for p in data] == ["proj-b", "proj-c"]
+        assert sorted(calls) == ["proj-b", "proj-c"], (
+            f"expected hydration for only the sliced window, got {sorted(calls)}"
+        )
 
 
 def test_projects_response_carries_warmup_snapshot(app, provider, monkeypatch):

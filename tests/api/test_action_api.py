@@ -13,7 +13,7 @@ def _disable_auth(monkeypatch):
 
 
 class StubProvider(ActionProvider):
-    def list_projects(self, reports_dir: str):
+    def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0):
         return {"projects": [{"name": "demo", "runsCount": 1, "latestRunId": "20260101", "latestDate": "2026-01-01"}]}
 
     def get_project_info(self, reports_dir: str, project: str):
