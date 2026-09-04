@@ -62,4 +62,7 @@ export {
 
 export {
   getUpdateStatus, checkForUpdates, dismissUpdate, setUpdateAutoCheck, markUpdateDisclosed,
+  startSelfUpdate,
 } from './updates.js';
+
+export { getMenubar, setMenubar } from './menubar.js';

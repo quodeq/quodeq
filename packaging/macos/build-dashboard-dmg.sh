@@ -44,7 +44,7 @@ cd "$REPO_ROOT"
 echo "==> Building app bundle..."
 export QUODEQ_REPO_ROOT="$REPO_ROOT"
 export QUODEQ_VERSION="$VERSION"
-uv run --with pyinstaller --with pywebview --with flask --with jsonschema pyinstaller \
+uv run --with pyinstaller --with pywebview --with flask --with jsonschema --with rumps pyinstaller \
     "$SCRIPT_DIR/quodeq_dashboard.spec" \
     --distpath "$BUILD_DIR/dist" \
     --workpath "$BUILD_DIR/work"
@@ -58,8 +58,15 @@ fi
 
 echo "  Created $APP"
 
-# Step 3: Strip quarantine attribute so users don't need xattr -cr
+# Step 3: Strip extended attributes (build-machine detritus). codesign
+# refuses bundles carrying resource forks or Finder info, so this must run
+# BEFORE signing. It does not weaken end-user Gatekeeper: quarantine is
+# applied by the downloading browser to the DMG, and user trust comes from
+# the notarized signature, not from this build-side cleanup.
 xattr -cr "$APP"
+
+# Step 3b: Sign (no-op unless MACOS_SIGN_IDENTITY is set)
+bash "$SCRIPT_DIR/sign-and-notarize.sh" sign-app "$APP"
 
 # Step 4: Create DMG
 echo "==> Creating DMG..."
@@ -89,6 +96,8 @@ else
 fi
 
 if [ -f "$DMG_PATH" ]; then
+    # Notarize + staple (no-op unless notary credentials are set)
+    bash "$SCRIPT_DIR/sign-and-notarize.sh" notarize-dmg "$DMG_PATH"
     SIZE=$(du -h "$DMG_PATH" | cut -f1)
     echo ""
     echo "==> Done: $DMG_PATH ($SIZE)"

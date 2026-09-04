@@ -59,6 +59,18 @@ def test_get_status_update_available(tmp_path) -> None:
     assert status["update_available"] is True
 
 
+def test_get_status_includes_self_update(tmp_path) -> None:
+    env = _env(tmp_path)
+    write_state(UpdateState(latest_version="9.9.9", download_url="d"), env)
+    with patch(
+        "quodeq.update.selfupdate.describe",
+        return_value={"supported": False, "reason": "not_frozen", "phase": "idle"},
+    ) as describe:
+        status = checker.get_status(env)
+    describe.assert_called_once_with("d")
+    assert status["self_update"]["reason"] == "not_frozen"
+
+
 def test_get_status_suppresses_dismissed(tmp_path) -> None:
     env = _env(tmp_path)
     write_state(UpdateState(latest_version="9.9.9", dismissed_version="9.9.9"), env)

@@ -46,7 +46,7 @@ def test_fixture_pattern_wins_over_tests_pattern():
 
 
 @pytest.mark.parametrize("path,expected", [
-    ("packaging/macos/build-dmg.sh", Role.PACKAGING),
+    ("packaging/macos/build-dashboard-dmg.sh", Role.PACKAGING),
     ("Dockerfile", Role.PACKAGING),
     ("docker/Dockerfile.dev", Role.PACKAGING),
     (".github/workflows/ci.yml", Role.PACKAGING),

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from quodeq import __version__
 from quodeq.update import channel as _channel
+from quodeq.update import selfupdate as _selfupdate
 from quodeq.update.compare import is_newer
 from quodeq.update.source import fetch_latest
 from quodeq.update.state import UpdateState, read_state, write_state
@@ -99,6 +100,7 @@ def get_status(env: dict[str, str] | None = None) -> dict:
         "disclosed": state.disclosed,
         "auto_check_enabled": state.auto_check_enabled,
         "last_check_ts": state.last_check_ts,
+        "self_update": _selfupdate.describe(state.download_url),
     }
 
 

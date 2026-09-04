@@ -2,6 +2,7 @@ import { useState } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
+import { useSelfUpdate } from '../../updates/useSelfUpdate.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
 
@@ -25,22 +26,45 @@ function VersionRow({ available, status, current, checking, onCheck }) {
   );
 }
 
-function UpdateAvailableRow({ status }) {
+const PHASE_STRINGS = {
+  downloading: 'updates.downloading',
+  verifying: 'updates.verifying',
+  installing: 'updates.installing',
+  relaunching: 'updates.relaunching',
+};
+
+function UpdateAvailableRow({ status, selfUpdate }) {
+  const description = selfUpdate.active
+    ? t(PHASE_STRINGS[selfUpdate.phase], { percent: selfUpdate.percent })
+    : selfUpdate.failed
+      ? t('updates.selfUpdateFailed', { version: status.latest })
+      : status.action_command
+        ? status.action_command
+        : t('settings.downloadNewBuild');
   return (
     <div className="settings-row">
       <div className="settings-row-label">
         <span className="settings-label">{t('settings.getTheUpdate')}</span>
-        <span className="settings-description">
-          {status.action_command ? status.action_command : t('settings.downloadNewBuild')}
-        </span>
+        <span className="settings-description">{description}</span>
       </div>
-      <button
-        type="button"
-        className="settings-pill"
-        onClick={() => openExternal(status.latest_url || status.download_url)}
-      >
-        {status.action_command ? t('settings.whatsNew') : t('settings.download')}
-      </button>
+      {selfUpdate.supported && !selfUpdate.failed ? (
+        <button
+          type="button"
+          className="settings-pill"
+          disabled={selfUpdate.active || selfUpdate.starting}
+          onClick={selfUpdate.begin}
+        >
+          {t('updates.updateAndRelaunch')}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="settings-pill"
+          onClick={() => openExternal(status.latest_url || status.download_url)}
+        >
+          {status.action_command ? t('settings.whatsNew') : t('settings.download')}
+        </button>
+      )}
     </div>
   );
 }
@@ -77,6 +101,7 @@ function AutoCheckRow({ auto, onToggle }) {
 export default function UpdatesSection() {
   const { checkForUpdates, setUpdateAutoCheck } = useApi();
   const { status, setStatus } = useUpdateStatus();
+  const selfUpdate = useSelfUpdate(status, setStatus);
   const [checking, setChecking] = useState(false);
 
   const onCheck = async () => {
@@ -107,7 +132,7 @@ export default function UpdatesSection() {
 
       <VersionRow available={available} status={status} current={current} checking={checking} onCheck={onCheck} />
 
-      {available && <UpdateAvailableRow status={status} />}
+      {available && <UpdateAvailableRow status={status} selfUpdate={selfUpdate} />}
 
       <AutoCheckRow auto={auto} onToggle={onToggle} />
     </section>
