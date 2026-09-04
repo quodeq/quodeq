@@ -45,50 +45,41 @@ def test_post_dismiss_ok(client) -> None:
     dis.assert_called_once_with("1.5.0")
 
 
-def _status_with_self_update(supported: bool, **extra) -> dict:
-    return {
-        **_STATUS,
-        "download_url": "https://example.com/Quodeq-1.5.0-macOS.dmg",
-        "self_update": {"supported": supported, "reason": None if supported else "no_team_id"},
-        **extra,
-    }
-
-
 def test_post_selfupdate_starts(client) -> None:
-    with patch(
-        "quodeq.api.routes_update.get_status",
-        return_value=_status_with_self_update(True),
-    ), patch("quodeq.api.routes_update.start_self_update", return_value=True) as start:
+    result = {"ok": True, "status": _STATUS}
+    with patch("quodeq.api.routes_update.begin_self_update", return_value=result):
         resp = client.post("/api/update/selfupdate")
     assert resp.status_code == 200
-    assert resp.get_json()["ok"] is True
-    start.assert_called_once_with("https://example.com/Quodeq-1.5.0-macOS.dmg", "1.5.0")
+    assert resp.get_json() == {"ok": True, "status": _STATUS}
 
 
 def test_post_selfupdate_unsupported_409(client) -> None:
-    with patch(
-        "quodeq.api.routes_update.get_status",
-        return_value=_status_with_self_update(False),
-    ):
+    result = {
+        "ok": False,
+        "code": "UNSUPPORTED",
+        "error": "self-update is not supported here",
+        "reason": "no_team_id",
+    }
+    with patch("quodeq.api.routes_update.begin_self_update", return_value=result):
         resp = client.post("/api/update/selfupdate")
     assert resp.status_code == 409
     assert resp.get_json()["reason"] == "no_team_id"
 
 
 def test_post_selfupdate_no_update_409(client) -> None:
-    status = _status_with_self_update(True, update_available=False)
-    with patch("quodeq.api.routes_update.get_status", return_value=status):
+    result = {"ok": False, "code": "NO_UPDATE", "error": "no update available"}
+    with patch("quodeq.api.routes_update.begin_self_update", return_value=result):
         resp = client.post("/api/update/selfupdate")
     assert resp.status_code == 409
+    assert resp.get_json()["code"] == "NO_UPDATE"
 
 
 def test_post_selfupdate_busy_409(client) -> None:
-    with patch(
-        "quodeq.api.routes_update.get_status",
-        return_value=_status_with_self_update(True),
-    ), patch("quodeq.api.routes_update.start_self_update", return_value=False):
+    result = {"ok": False, "code": "BUSY", "error": "self-update already running"}
+    with patch("quodeq.api.routes_update.begin_self_update", return_value=result):
         resp = client.post("/api/update/selfupdate")
     assert resp.status_code == 409
+    assert resp.get_json()["code"] == "BUSY"
 
 
 def test_post_settings_toggles(client) -> None:

@@ -104,6 +104,30 @@ def get_status(env: dict[str, str] | None = None) -> dict:
     }
 
 
+def begin_self_update(env: dict[str, str] | None = None) -> dict:
+    """Precondition-check and kick off a self-update.
+
+    Returns ``{"ok": True, "status": ...}`` on success, or
+    ``{"ok": False, "code": ..., "error": ..., "reason": ...}`` on failure
+    ("reason" is present only for the UNSUPPORTED code). Never raises for
+    ordinary precondition failures; the caller translates the result to HTTP.
+    """
+    status = get_status(env)
+    self_update = status.get("self_update") or {}
+    if not status.get("update_available"):
+        return {"ok": False, "code": "NO_UPDATE", "error": "no update available"}
+    if not self_update.get("supported"):
+        return {
+            "ok": False,
+            "code": "UNSUPPORTED",
+            "error": "self-update is not supported here",
+            "reason": self_update.get("reason"),
+        }
+    if not _selfupdate.start(status.get("download_url"), status.get("latest")):
+        return {"ok": False, "code": "BUSY", "error": "self-update already running"}
+    return {"ok": True, "status": get_status(env)}
+
+
 def dismiss(version: str, env: dict[str, str] | None = None) -> None:
     state = read_state(env)
     state.dismissed_version = version
