@@ -82,6 +82,8 @@ const CODE_KEYS = {
   WORKSPACE_DIFF_FAILED: 'apiError.workspaceDiffFailed',
   TURN_IN_PROGRESS: 'apiError.turnInProgress',
   WORKSPACE_DISCARD_FAILED: 'apiError.workspaceDiscardFailed',
+  WORKSPACE_APPLY_FAILED: 'apiError.workspaceApplyFailed',
+  WORKSPACE_PR_FAILED: 'apiError.workspacePrFailed',
 
   // Scores (_scores_routes.py).
   SCORES_READ_FAILED: 'apiError.scoresReadFailed',

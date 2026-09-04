@@ -69,7 +69,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return jsonify({"diff": text[:2_000_000], "truncated": truncated,
                             "stats": diff_stats(Path(row["path"]))})
         except WorktreeError as exc:
-            body, status = error_response(str(exc), 500, "WORKSPACE_DIFF_FAILED")
+            _logger.warning("workspace diff failed for %s: %s", sid, exc)
+            body, status = error_response(
+                "failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
             return jsonify(body), status
 
     @app.post("/api/assistant/sessions/<sid>/workspace/apply")
@@ -94,7 +96,10 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             try:
                 stats = manager.apply_to_repo()
             except WorktreeError as exc:
-                return jsonify({"error": str(exc)}), 409
+                _logger.warning("workspace apply failed for %s: %s", sid, exc)
+                body, status = error_response(
+                    "failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
+                return jsonify(body), status
             repo.set_worktree_status(sid, "applied")
             try:
                 manager.remove()
@@ -120,13 +125,16 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             if row is None or row["status"] != "active":
                 return jsonify({"error": "worktree already "
                                 f"{row['status'] if row else 'gone'}"}), 409
-            body = request.get_json(silent=True) or {}
+            req_body = request.get_json(silent=True) or {}
             manager = _manager(row)
             try:
-                result = manager.create_pr(str(body.get("title", "")),
-                                           str(body.get("body", "")))
+                result = manager.create_pr(str(req_body.get("title", "")),
+                                           str(req_body.get("body", "")))
             except WorktreeError as exc:
-                return jsonify({"error": str(exc)}), 500
+                _logger.warning("workspace pr creation failed for %s: %s", sid, exc)
+                resp_body, status = error_response(
+                    "failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
+                return jsonify(resp_body), status
             if result.get("prUrl"):
                 repo.set_worktree_status(sid, "pr_created")
                 try:
@@ -161,7 +169,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             try:
                 _manager(row).remove()
             except WorktreeError as exc:
-                body, status = error_response(str(exc), 500, "WORKSPACE_DISCARD_FAILED")
+                _logger.warning("workspace discard failed for %s: %s", sid, exc)
+                body, status = error_response(
+                    "failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
                 return jsonify(body), status
             repo.set_worktree_status(sid, "discarded")
             return jsonify({"discarded": True})
