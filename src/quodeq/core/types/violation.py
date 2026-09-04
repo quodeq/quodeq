@@ -4,6 +4,13 @@ from dataclasses import dataclass, field
 
 from .finding import Finding
 
+# Bumped when the persisted shape of ViolationResponse/ViolationSummary
+# changes in a way a reader needs to know about. Follows the schema_version
+# convention used elsewhere for persisted JSON (see e.g.
+# quodeq.core.run.state.SCHEMA_VERSION). Defaulted so old on-disk payloads
+# that predate this field still deserialize.
+VIOLATION_SCHEMA_VERSION = 1
+
 
 @dataclass(frozen=True, slots=True)
 class ProgressInfo:
@@ -25,6 +32,7 @@ class ViolationResponse:
     compliance: list[Finding] = field(default_factory=list)
     partial: bool = False
     progress: ProgressInfo | None = None
+    schema_version: int = VIOLATION_SCHEMA_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,3 +55,4 @@ class ViolationSummary:
     major: int = 0
     minor: int = 0
     files: list[ViolationFileEntry] = field(default_factory=list)
+    schema_version: int = VIOLATION_SCHEMA_VERSION

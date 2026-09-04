@@ -30,8 +30,9 @@ from quodeq.data.mappers import (
     parse_project_entry,
     parse_trend_point,
     parse_violation_response,
+    parse_violation_summary,
 )
-from quodeq.core.types.violation import ProgressInfo, ViolationFileEntry
+from quodeq.core.types.violation import VIOLATION_SCHEMA_VERSION, ProgressInfo, ViolationFileEntry
 from quodeq.shared.serialization import to_camel_dict
 
 
@@ -245,3 +246,41 @@ class TestMissingRequiredFields:
         assert result.severity == "minor"
         assert result.practice_id is None
         assert result.req_refs == []
+
+
+# ---------------------------------------------------------------------------
+# schema_version defaulting — legacy (pre-version-field) payload compatibility
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaVersionDefaulting:
+    def test_violation_response_defaults_schema_version(self) -> None:
+        """Constructing without schema_version (as every existing call site does) still works."""
+        assert VIOLATION_RESPONSE.schema_version == VIOLATION_SCHEMA_VERSION
+
+    def test_violation_summary_defaults_schema_version(self) -> None:
+        assert VIOLATION_SUMMARY.schema_version == VIOLATION_SCHEMA_VERSION
+
+    def test_parse_violation_response_legacy_payload_missing_schema_version(self) -> None:
+        """Raw dicts persisted before this field existed still deserialize, defaulting to 1."""
+        legacy_raw = {
+            "dimension": "security",
+            "runId": "run-005",
+            "project": "my-project",
+            "violations": [],
+            "compliance": [],
+            "partial": False,
+        }
+        result = parse_violation_response(legacy_raw)
+        assert result.schema_version == VIOLATION_SCHEMA_VERSION
+
+    def test_parse_violation_response_honors_explicit_schema_version(self) -> None:
+        raw = {"dimension": "security", "runId": "r", "project": "p", "schemaVersion": 2}
+        result = parse_violation_response(raw)
+        assert result.schema_version == 2
+
+    def test_parse_violation_summary_legacy_payload_missing_schema_version(self) -> None:
+        """Raw dicts persisted before this field existed still deserialize, defaulting to 1."""
+        legacy_raw = {"total": 10, "critical": 2, "major": 4, "minor": 4, "files": []}
+        result = parse_violation_summary(legacy_raw)
+        assert result.schema_version == VIOLATION_SCHEMA_VERSION

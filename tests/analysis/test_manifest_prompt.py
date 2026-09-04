@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.manifest_render import render_manifest_prompt_context
-from quodeq.analysis.manifest_serialization import manifest_to_dict
+from quodeq.analysis.manifest_serialization import MANIFEST_SCHEMA_VERSION, manifest_to_dict
 
 
 def test_to_prompt_context() -> None:
@@ -42,6 +42,7 @@ def test_to_dict() -> None:
     assert d["total_files"] == 10
     assert d["source_files_count"] == 2
     assert len(d["targets"]) == 1
+    assert d["schema_version"] == MANIFEST_SCHEMA_VERSION
 
 
 def test_multi_target_prompt_context() -> None:
