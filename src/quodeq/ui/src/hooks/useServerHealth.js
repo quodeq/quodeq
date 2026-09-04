@@ -13,7 +13,7 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getHealth } from '../api/index.js';
-import { SERVER_BASE_URL } from '../config.js';
+import { SERVER_BASE_URL, DASHBOARD_BASE_PORT } from '../config.js';
 import { systemKeys } from '../api/queryKeys.js';
 
 // Where the server can have moved to. The dashboard walks *upward* from its
@@ -22,7 +22,6 @@ import { systemKeys } from '../api/queryKeys.js';
 // window must follow it there. The previous list (4180-4183) predates the
 // current port scheme, so it probed ports quodeq never binds and this recovery
 // could not fire at all.
-const DASHBOARD_BASE_PORT = 7863; // shared/defaults.json -> dashboard_port
 const PORT_SCAN_SPAN = 5; // enough for a few stacked relaunches, not all 20 scan tries
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const HEALTH_POLL_INTERVAL_MS = 5000;
