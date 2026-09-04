@@ -235,7 +235,13 @@ describe('useDismissedFindings — handleDeleteAll', () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('reports a delete-specific error if deleteAllFindings fails after confirmation', async () => {
+  // Task E5: routed through apiErrorMessage now (see useDismissedFindings.js),
+  // matching the same map-through-apiErrorMessage pattern already applied to
+  // the delete-project/publish/session-start call sites. An unmapped code (or
+  // no code at all, as here) still surfaces the backend's own specific
+  // message rather than the vague fixed fallback the old code always showed
+  // -- apiErrorMessage's documented precedence (see strings/apiErrors.js).
+  it('reports the backend message if deleteAllFindings fails after confirmation with no mapped code', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     confirmDialog.mockResolvedValueOnce(true);
     deleteAllFindings.mockRejectedValueOnce(new Error('boom'));
@@ -246,8 +252,28 @@ describe('useDismissedFindings — handleDeleteAll', () => {
 
     await act(async () => { await result.current.handleDeleteAll(); });
 
-    expect(setRestoreError).toHaveBeenCalledWith('Failed to delete all findings. Please try again.');
+    expect(setRestoreError).toHaveBeenCalledWith('boom');
     expect(result.current.dismissed).toEqual([sampleA]);
     expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  // The delete-all route's own confirm gate (CONFIRMATION_REQUIRED, see
+  // routes_findings.py) -- unreachable through this hook in practice since
+  // api/findings.js's deleteAllFindings always sends ?confirm=true, but the
+  // mapping must still work correctly for any error that does carry the code
+  // (a future direct caller, a race, or a backend change).
+  it('maps a CONFIRMATION_REQUIRED failure to its translated copy', async () => {
+    listDismissedFindings.mockResolvedValueOnce([sampleA]);
+    confirmDialog.mockResolvedValueOnce(true);
+    const err = new Error('Use ?confirm=true to confirm deletion');
+    err.code = 'CONFIRMATION_REQUIRED';
+    deleteAllFindings.mockRejectedValueOnce(err);
+    const setRestoreError = vi.fn();
+    const { result } = renderHook(() => useDismissedFindings('proj', vi.fn(), setRestoreError), withQueryClient());
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleDeleteAll(); });
+
+    expect(setRestoreError).toHaveBeenCalledWith('Confirm the deletion and try again.');
   });
 });

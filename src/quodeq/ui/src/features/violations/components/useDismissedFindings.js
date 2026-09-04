@@ -11,6 +11,7 @@ import {
 import { applyMutationDelta } from '../../../api/applyMutationDelta.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 /**
  * @param {string} selectedProject
@@ -118,7 +119,10 @@ function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyD
       onReconcile?.();
     } catch (err) {
       console.error('Failed to delete all findings:', err);
-      setRestoreError?.(t('violations.deleteAllFailed'));
+      // CONFIRMATION_REQUIRED carries a `code` (see routes_findings.py) --
+      // route through apiErrorMessage so a mapped code shows its translated
+      // copy instead of always falling back to the generic fixed message.
+      setRestoreError?.(apiErrorMessage(err, 'violations.deleteAllFailed'));
     }
   };
 }
