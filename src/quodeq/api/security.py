@@ -38,11 +38,17 @@ _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 # tests/dashboard/test_native_chrome.py).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
 
-# Host header must look like a bare hostname/IP with an optional port before
-# it's trusted enough to interpolate into the CSP connect-src directive.
-# Rejects quotes, whitespace, and other characters that could inject extra
-# CSP directives or sources via a spoofed Host header.
-_VALID_HOST_RE = re.compile(r"^[A-Za-z0-9.-]+(:\d+)?$")
+# Host header must look like a bare hostname/IPv4 or a bracketed IPv6
+# literal (RFC 3986 host syntax, e.g. "[::1]:4180"), with an optional port,
+# before it's trusted enough to interpolate into the CSP connect-src
+# directive. Rejects quotes, whitespace, and other characters that could
+# inject extra CSP directives or sources via a spoofed Host header.
+# The IPv6 branch matters here: ::1 is a first-class local address elsewhere
+# in this app (_LOCALHOST_ADDRS below, dashboard/_networking.py,
+# dashboard/_webview_window_native_ops.py's reload allowlist), so a client
+# reaching this dashboard over IPv6 loopback is a real access path, not a
+# hypothetical.
+_VALID_HOST_RE = re.compile(r"^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d+)?$")
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:

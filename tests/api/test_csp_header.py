@@ -203,3 +203,33 @@ def test_csp_omits_same_origin_ws_for_malicious_host_header():
     assert "'self'" in connect_src
     for origin in _ALT_PORT_ORIGINS:
         assert origin in connect_src
+
+
+def test_csp_same_origin_ws_uses_bracketed_ipv6_host_with_port():
+    """A bracketed IPv6-literal Host header (RFC 3986 syntax) with a port
+    still gets an explicit same-origin ws/wss entry.
+
+    ::1 is a first-class local address elsewhere in this app
+    (_LOCALHOST_ADDRS, dashboard/_networking.py's _DEFAULT_LOCAL_HOSTS,
+    dashboard/_webview_window_native_ops.py's reload allowlist), so a
+    client reaching the dashboard over IPv6 loopback is a real access
+    path — the same-origin entry must not be silently dropped for it.
+    """
+    connect_src = _directive(_csp_for_host("[::1]:4180"), "connect-src")
+    assert connect_src is not None
+    tokens = connect_src.split()
+    assert "ws://[::1]:4180" in tokens
+    assert "wss://[::1]:4180" in tokens
+
+
+def test_csp_same_origin_ws_uses_bracketed_ipv6_host_without_port():
+    """A bracketed IPv6-literal Host header with no port also validates.
+
+    Werkzeug/Flask preserve the Host header verbatim on request.host, so a
+    bare "[::1]" (no ":port") is a value it can actually take.
+    """
+    connect_src = _directive(_csp_for_host("[::1]"), "connect-src")
+    assert connect_src is not None
+    tokens = connect_src.split()
+    assert "ws://[::1]" in tokens
+    assert "wss://[::1]" in tokens
