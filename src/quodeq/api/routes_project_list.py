@@ -13,7 +13,7 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.api.routes_project_create import _create_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
-from quodeq.services._warmup import engine as warmup_engine
+from quodeq.services._warmup import WarmupEngine, engine as warmup_engine
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment
 
@@ -56,7 +56,9 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     return jsonify({"updated": project, "path": new_path})
 
 
-def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
+def register_project_list_routes(
+    app: Flask, provider: ActionProvider, warmup_engine: WarmupEngine = warmup_engine
+) -> None:
     """Register project listing, mutation, and export routes."""
     register_project_scan_routes(app)
 

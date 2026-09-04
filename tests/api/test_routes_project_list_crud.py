@@ -192,6 +192,39 @@ def test_list_projects_only_warms_up_the_returned_page(app, provider, monkeypatc
     assert set(enqueued) == {"p0", "p1"}
 
 
+def test_list_projects_uses_injected_warmup_engine_not_the_singleton(monkeypatch):
+    """C11: `warmup_engine` is an injected parameter, not a module-level
+    singleton reference baked into the closure -- a caller-supplied engine
+    must be the one the route actually calls."""
+    from flask import Flask
+
+    from quodeq.core.types import ProjectEntry
+    from quodeq.services._warmup import WarmupEngine
+    from tests.api._routes_project_list_fixtures import _FakeProvider
+
+    fake_engine = WarmupEngine(warm_fn=lambda *_: None, list_fn=lambda _rd: [])
+    enqueued = []
+    monkeypatch.setattr(fake_engine, "enqueue", enqueued.append)
+    monkeypatch.setattr(fake_engine, "snapshot", lambda: {"active": False, "projectsDone": 0, "projectsTotal": 0, "currentProjectName": None})
+
+    # The real module-level singleton must NOT be touched by this request.
+    singleton_enqueued = []
+    monkeypatch.setattr("quodeq.api.routes_project_list.warmup_engine.enqueue", singleton_enqueued.append)
+
+    provider = _FakeProvider()
+    provider.projects = [ProjectEntry(id="a", name="a", summary_pending=True)]
+    flask_app = Flask(__name__)
+    flask_app.config["TESTING"] = True
+    with patch("quodeq.api.routes_project_list.reports_dir", return_value="/tmp"):
+        register_project_list_routes(flask_app, provider, fake_engine)
+        resp = flask_app.test_client().get("/api/projects")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["warmup"]["active"] is False
+    assert enqueued == ["a"]
+    assert singleton_enqueued == []
+
+
 class TestDeleteProject:
     def test_delete_requires_confirm(self, client):
         resp = client.delete("/api/projects/my-proj")
