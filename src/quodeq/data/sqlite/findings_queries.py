@@ -83,7 +83,7 @@ def read_finding_details(run_dir: Path, keys: set[tuple]) -> dict[tuple, dict]:
                     "snippet": row[8] or "", "context": row[9] or "", "scope": row[10] or "",
                     "endLine": row[11] or 0, "reqRefs": req_refs,
                 }
-    except sqlite3.DatabaseError:
+    except (sqlite3.DatabaseError, RuntimeError):
         return out
     return out
 
@@ -108,7 +108,7 @@ def read_run_key_sets(run_dir: Path) -> tuple[set[tuple], set[tuple]]:
             ):
                 dismiss.add((str(req or ""), str(file or ""), int(line or 0)))
                 cls.add((str(dim or ""), str(pid or ""), str(file or "")))
-    except sqlite3.DatabaseError:
+    except (sqlite3.DatabaseError, RuntimeError):
         return set(), set()
     return dismiss, cls
 
@@ -180,7 +180,7 @@ def find_dismissed_matching(
                     (dimension, practice_id, file),
                 )
             ]
-    except (sqlite3.Error, OSError):
+    except (sqlite3.Error, OSError, RuntimeError):
         _logger.warning(
             "Skipping unreadable evaluation.db in %s", run_dir, exc_info=True,
         )
