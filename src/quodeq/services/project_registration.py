@@ -27,6 +27,7 @@ from quodeq.services._fs_project_helpers import find_existing_project
 from quodeq.services._fs_scan import scan_project
 from quodeq.services._registration_scan import _scan_parent_project, _zero_run_scan_fallback
 from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
+from quodeq.services._repo_index import add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
@@ -155,7 +156,20 @@ def register_project(
     if scope_path:
         _scan_parent_project(project_dir, reports_path, target_path)
 
+    _sync_repo_index_on_create(reports_path, project_name, repo_resolved, scope_path, project_uuid)
     return project_uuid
+
+
+def _sync_repo_index_on_create(
+    reports_path: Path, project_name: str, repo_resolved: str, scope_path: str | None, project_uuid: str,
+) -> None:
+    """Register this identity in find_existing_project's duplicate-check index.
+
+    Called only once creation has fully succeeded: a failure above is rolled
+    back by the caller via plain directory removal, which would leave a
+    dangling index entry if this ran any earlier.
+    """
+    add_repo_index_entry(reports_path, project_name, repo_resolved, scope_path, project_uuid)
 
 
 def _ensure_onboarding_field(project_dir: Path) -> None:

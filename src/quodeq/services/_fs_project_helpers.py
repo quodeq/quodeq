@@ -29,6 +29,7 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     _max_projects_listed,
 )
 from quodeq.data.fs.report_parser.runs import RunInfo
+from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
 
 _logger = logging.getLogger(__name__)
 
@@ -142,10 +143,16 @@ def _build_project_entry(
 def find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
     """Return an existing project UUID matching the given repo identity, or None.
 
-    Walks the reports directory looking for a project whose repository
-    record matches the resolved repo path/url, project name and (optional)
-    scope_path. Pure read-only check — never mutates state. Used by the
-    create-project route as its duplicate pre-flight.
+    Index-first: ``.repo_index.json`` maps (name, path, scopePath) to uuid
+    for an O(1) lookup instead of reading every project's
+    repository_info.json. Falls back to walking reports_root when the index
+    has no entry for this identity (a project created before the index
+    existed, or an index write that failed) — a fallback hit self-heals the
+    index so the next lookup for the same identity takes the fast path.
+    Index staleness therefore never produces a false negative. From the
+    caller's perspective this is still a pure read-only check (the self-heal
+    write is an internal cache repair). Used by the create-project route as
+    its duplicate pre-flight.
     """
     from quodeq.shared.utils import is_repo_url, project_name_from_repo  # noqa: PLC0415
 
@@ -159,6 +166,13 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     reports_path = Path(reports_root)
     if not reports_path.is_dir():
         return None
+
+    key = _repo_index_key(expected_name, repo_resolved, scope_path)
+    index = _load_repo_index(reports_path)
+    candidate = index.get(key)
+    if candidate is not None:
+        return candidate
+
     for child in reports_path.iterdir():
         if not child.is_dir():
             continue
@@ -171,6 +185,8 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
             continue
         if (data.get("scopePath") or None) != (scope_path or None):
             continue
+        index[key] = child.name
+        _save_repo_index(reports_path, index)
         return child.name
     return None
 

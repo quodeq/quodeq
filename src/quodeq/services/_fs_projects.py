@@ -19,6 +19,7 @@ from quodeq.services._fs_project_helpers import (
     _build_project_entry,
     _max_projects_listed,
 )
+from quodeq.services._repo_index import remove_repo_index_entries
 from quodeq.services._wiring import (
     find_children,
     is_valid_repo_url,
@@ -217,7 +218,8 @@ def delete_project(reports_dir: str, project: str) -> bool:
 
     # Cascade: find and delete children first
     children_removed = True
-    for child_id in find_children(reports_root, project):
+    child_ids = find_children(reports_root, project)
+    for child_id in child_ids:
         child_path = reports_root / child_id
         if not remove_project_dir(child_path):
             _logger.warning("Could not remove child project directory %s", child_path)
@@ -225,6 +227,11 @@ def delete_project(reports_dir: str, project: str) -> bool:
 
     if not remove_project_dir(project_path):
         return False
+
+    # Keep find_existing_project's duplicate-check index in sync: a stale
+    # entry pointing at a deleted uuid would let it wrongly report a
+    # "duplicate" for a repo identity that's actually free again.
+    remove_repo_index_entries(reports_root, {project, *child_ids})
     return children_removed
 
 

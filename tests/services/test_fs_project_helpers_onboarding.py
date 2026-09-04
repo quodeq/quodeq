@@ -15,6 +15,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.services._fs_project_helpers import _build_project_entry, find_existing_project
+from quodeq.services._repo_index import _load_repo_index
+from quodeq.services.project_registration import register_project
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 
@@ -96,6 +98,47 @@ def test_entry_backfill_false_never_writes(tmp_path):
 
     assert entry.onboarding_completed_at is None
     assert info_path.read_text() == before
+
+
+def _make_repo(base: Path, name: str) -> Path:
+    repo_dir = base / "repos" / name
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "file.py").write_text("x = 1\n")
+    return repo_dir
+
+
+def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_path, monkeypatch):
+    """The happy path must hit .repo_index.json, not read every project's
+    repository_info.json. Deleting the index must not cause a false
+    negative: the directory-walk fallback still finds every project and
+    repairs the index for the next lookup."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    repos = [_make_repo(tmp_path, name) for name in ("alpha", "beta", "gamma")]
+    uuids = [register_project(str(repo), None, str(reports)) for repo in repos]
+
+    index_path = reports / ".repo_index.json"
+    assert index_path.exists()
+    assert set(_load_repo_index(reports).values()) == set(uuids)
+
+    def _must_not_read(*_args, **_kwargs):
+        raise AssertionError("index hit must not fall back to reading repository_info.json")
+
+    monkeypatch.setattr(
+        "quodeq.services._fs_project_helpers.read_repository_info", _must_not_read,
+    )
+    for repo, uuid in zip(repos, uuids):
+        assert find_existing_project(str(reports), str(repo), None) == uuid
+    monkeypatch.undo()
+
+    # Blow away the index entirely: every lookup must still resolve via the
+    # directory-walk fallback, and self-heal the index as it goes.
+    index_path.unlink()
+    for repo, uuid in zip(repos, uuids):
+        assert find_existing_project(str(reports), str(repo), None) == uuid
+
+    assert index_path.exists()
+    assert set(_load_repo_index(reports).values()) == set(uuids)
 
 
 def test_find_existing_project_logs_malformed_repo_identifier(caplog, tmp_path):
