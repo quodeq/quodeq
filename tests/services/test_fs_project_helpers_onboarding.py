@@ -193,6 +193,38 @@ def test_find_existing_project_drops_an_index_hit_its_record_contradicts(tmp_pat
     assert find_existing_project(str(reports), str(repo), None) == uuid
 
 
+def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
+    """A URL-registered project must still be found by its URL.
+
+    The index key holds the URL, but registration rewrites the record's
+    ``path`` to the local clone directory, so verifying an index hit against
+    that record can never succeed for a URL identity. Doing it anyway purged
+    the valid entry on every lookup, so re-registering an already-cloned
+    remote reported "created" instead of "duplicate" and re-cloned it.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    clone_dest = tmp_path / "code"
+    clone_dest.mkdir()
+    url = "https://github.com/example/repo.git"
+
+    def fake_clone(_url, dest):
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        (Path(dest) / "README.md").write_text("# fake\n")
+        (Path(dest) / ".git").mkdir()
+
+    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+        uuid = register_project(url, None, str(reports), clone_dest=str(clone_dest))
+
+    key = _repo_index_key("repo", url, None)
+    assert _load_repo_index(reports).get(key) == uuid
+
+    # Both the lookup and the index entry survive repeated duplicate checks.
+    assert find_existing_project(str(reports), url, None) == uuid
+    assert find_existing_project(str(reports), url, None) == uuid
+    assert _load_repo_index(reports).get(key) == uuid
+
+
 def test_find_existing_project_survives_a_corrupt_index_file(tmp_path):
     """Unparseable index bytes are treated as an empty index: the walk still
     finds the project and rewrites a usable index."""
