@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import re
 from pathlib import Path
 
@@ -25,6 +24,10 @@ from quodeq.assistant.tools._read_tools_violations import (
 )
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
+from quodeq.data.fs.report_parser.finding_details import (
+    iter_eval_reports,
+    read_eval_report,
+)
 from quodeq.data.ports.findings import FindingsRepository
 # Imported for its module identity, not called directly here: tests patch
 # `quodeq.assistant.tools._read_tools._fs_reports.get_accumulated`, which
@@ -66,9 +69,8 @@ def _raw_run_dims(eval_dir: Path) -> list[dict]:
     report that omits the field is named after its file rather than dropped.
     """
     out: list[dict] = []
-    for path in sorted(eval_dir.glob("*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        data.setdefault("dimension", path.stem)
+    for dimension, data in iter_eval_reports(eval_dir):
+        data.setdefault("dimension", dimension)
         out.append(data)
     return out
 
@@ -129,10 +131,9 @@ def _get_scores(ctx: ToolContext) -> dict:
 
 
 def _get_report_from_run(ctx: ToolContext, dimension: str) -> dict:
-    path = ctx.run_dir / "evaluation" / f"{dimension}.json"
-    if not path.is_file():
+    data = read_eval_report(ctx.run_dir / "evaluation", dimension)
+    if data is None:
         raise ToolError(f"no report for dimension: {dimension}")
-    data = json.loads(path.read_text(encoding="utf-8"))
     out = {k: data.get(k) for k in
            ("dimension", "overallScore", "overallGrade", "principles",
             "totals", "coveragePct")}

@@ -8,7 +8,28 @@ services/dismissed.py used to walk and parse these files inline.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
+
+
+def iter_eval_reports(eval_dir: Path) -> Iterator[tuple[str, dict]]:
+    """Yield ``(dimension, data)`` for every ``<dim>.json`` file in
+    *eval_dir*, in filename order. ``dimension`` is the filename stem.
+
+    Malformed JSON propagates -- a corrupt evaluation report is a bug in the
+    run, not something callers should silently skip over.
+    """
+    for path in sorted(eval_dir.glob("*.json")):
+        yield path.stem, json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_eval_report(eval_dir: Path, dimension: str) -> dict | None:
+    """Read the single ``<dimension>.json`` report from *eval_dir*, or
+    ``None`` if it doesn't exist. Malformed JSON propagates."""
+    path = eval_dir / f"{dimension}.json"
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def read_finding_details_from_json_eval(
