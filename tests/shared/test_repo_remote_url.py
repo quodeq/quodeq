@@ -45,3 +45,21 @@ def test_normalize_empty_returns_none():
     from quodeq.shared._repo import normalize_remote_url
     assert normalize_remote_url("") is None
     assert normalize_remote_url("   ") is None
+
+
+def test_normalize_strips_https_userinfo_with_password():
+    """HTTPS URLs with embedded user:token@host should strip the userinfo."""
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("https://user:token@github.com/org/repo.git") == "github.com/org/repo"
+
+
+def test_normalize_strips_https_userinfo_token_only():
+    """HTTPS URLs with embedded token@host should strip the token."""
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("https://token@github.com/org/repo.git") == "github.com/org/repo"
+
+
+def test_normalize_ssh_colon_form_still_works():
+    """Confirm that git@host:path normalization is unchanged by userinfo stripping."""
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("git@github.com:quodeq/quodeq.git") == "github.com/quodeq/quodeq"

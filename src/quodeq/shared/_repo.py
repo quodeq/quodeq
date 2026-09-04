@@ -52,8 +52,13 @@ def normalize_remote_url(url: str) -> str | None:
         url = url[len("https://"):]
     elif url.startswith("ssh://"):
         url = url[len("ssh://"):]
-    if url.startswith("git@"):
-        url = url[len("git@"):]
+
+    # Strip any embedded userinfo (e.g. user:token@host or git@host)
+    # that appears before the first /
+    at_pos = url.find("@")
+    slash_pos = url.find("/")
+    if at_pos != -1 and (slash_pos == -1 or at_pos < slash_pos):
+        url = url[at_pos + 1 :]
 
     # Convert git@host:path form to host/path.
     # First colon splits host from path when path isn't numeric (port).
