@@ -101,6 +101,50 @@ class TestListProjects:
             f"expected hydration for only the sliced window, got {sorted(calls)}"
         )
 
+    def test_pagination_preserves_auto_detected_parent(self, tmp_path):
+        """Critical #1 regression (code review): a paginated page must carry
+        the same auto-detected ``.parent`` an unpaginated listing computes.
+
+        ``repository_info.json`` only ever gets an explicit "parent" field
+        from the scope_path/subproject creation flow -- two independently
+        registered local projects that merely share a path prefix rely
+        entirely on ``_auto_detect_parents`` running at read time. The
+        fixture below uses two *genuinely different* paths (one a real
+        subdirectory of the other) so ``_find_best_parent``'s
+        startswith-prefix check actually fires, unlike a fixture where every
+        project shares one identical path.
+        """
+        from flask import Flask
+
+        from quodeq.services.filesystem import FilesystemActionProvider
+
+        (tmp_path / "parent-proj").mkdir()
+        (tmp_path / "parent-proj" / "repository_info.json").write_text(json.dumps({
+            "name": "parent-proj", "path": "/some/root/parent", "location": "local",
+        }))
+        (tmp_path / "child-proj").mkdir()
+        (tmp_path / "child-proj" / "repository_info.json").write_text(json.dumps({
+            "name": "child-proj", "path": "/some/root/parent/child", "location": "local",
+        }))
+
+        def _projects_by_name(query: str) -> dict:
+            flask_app = Flask(__name__)
+            flask_app.config["TESTING"] = True
+            provider = FilesystemActionProvider(reports_root=tmp_path)
+            with patch("quodeq.api.routes_project_list.reports_dir", return_value=str(tmp_path)):
+                register_project_list_routes(flask_app, provider)
+                resp = flask_app.test_client().get(f"/api/projects{query}")
+            return {p["name"]: p for p in resp.get_json()["projects"]}
+
+        unpaginated = _projects_by_name("")
+        paginated = _projects_by_name("?offset=0&limit=10")
+
+        assert unpaginated["child-proj"]["parent"] == "parent-proj"
+        assert paginated["child-proj"]["parent"] == "parent-proj", (
+            "paginated hydration must propagate the index's auto-detected "
+            "parent, not the raw (unenriched) repository_info.json value"
+        )
+
 
 def test_projects_response_carries_warmup_snapshot(app, provider, monkeypatch):
     from quodeq.core.types import ProjectEntry

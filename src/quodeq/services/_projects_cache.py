@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -94,7 +95,12 @@ class ProjectsCache:
             self._index_stamp = time.monotonic()
             # A regenerated index may have dropped or renamed ids -- a stale
             # hydrated entry for a since-deleted project must not linger.
-            self._hydrated = {}
+            # _hydrated is otherwise only ever touched under _hydrate_lock
+            # (see _hydrate/_fill_hydrated/invalidate) -- take it here too so
+            # a concurrent request's fill-then-read in _hydrate can never
+            # observe (or clobber) a reset that landed mid-read.
+            with self._hydrate_lock:
+                self._hydrated = {}
             return self._index
 
     def _hydrate(self, reports_dir: str, window: list[ProjectEntry]) -> list[ProjectEntry]:
@@ -104,9 +110,26 @@ class ProjectsCache:
             missing = [p.id for p in window if p.id not in self._hydrated]
             if missing:
                 self._fill_hydrated(reports_dir, missing)
-        return [self._hydrated[p.id] for p in window if p.id in self._hydrated]
+            # The read that builds the response must happen under the same
+            # lock as the write above -- otherwise a concurrent invalidate()
+            # or index refresh landing between "fill" and "read" can return a
+            # truncated or empty page with no error signal (a real race under
+            # Flask's default threaded=True).
+            #
+            # The index already ran _auto_detect_parents over the WHOLE
+            # project set (a windowed re-run couldn't see out-of-window
+            # sibling candidates for the path-prefix match), so its .parent
+            # is authoritative. _build_project_entry, which built the cached
+            # entry, only ever reads the raw, unenriched "parent" field off
+            # repository_info.json -- propagate the index's value onto each
+            # hydrated result rather than silently returning that raw one.
+            return [
+                replace(self._hydrated[p.id], parent=p.parent)
+                for p in window if p.id in self._hydrated
+            ]
 
     def _fill_hydrated(self, reports_dir: str, missing: list[str]) -> None:
+        """Build and cache *missing* ids. Caller holds ``_hydrate_lock``."""
         built = _fs_project_index.build_project_entries(Path(reports_dir), missing)
         for entry in built:
             self._hydrated[entry.id] = entry
@@ -119,12 +142,15 @@ class ProjectsCache:
 
     def invalidate(self) -> None:
         """Drop all cached data; next ``list`` call re-reads from disk."""
-        self._payload = None
-        self._stamp = 0.0
-        self._index = None
-        self._index_stamp = 0.0
-        self._hydrated = {}
-        self._hydrated_stamp = 0.0
+        with self._lock:
+            self._payload = None
+            self._stamp = 0.0
+        with self._index_lock:
+            self._index = None
+            self._index_stamp = 0.0
+        with self._hydrate_lock:
+            self._hydrated = {}
+            self._hydrated_stamp = 0.0
 
     def _is_fresh(self) -> bool:
         return self._payload is not None and (time.monotonic() - self._stamp) < self._ttl_s
