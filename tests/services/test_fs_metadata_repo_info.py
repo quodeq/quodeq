@@ -116,6 +116,29 @@ class TestReadLanguageStats:
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
         assert _read_language_stats(tmp_path, "proj", runs) == {}
 
+    def test_reads_legacy_manifest_without_schema_version(self, tmp_path: Path):
+        """manifest.json written before the schema_version field existed must
+        still deserialize correctly (no schema_version key, full pre-existing
+        shape)."""
+        from quodeq.data.fs.report_parser.runs import RunInfo
+        proj = tmp_path / "proj" / "run1" / "evidence"
+        proj.mkdir(parents=True)
+        legacy_manifest = {
+            "language": "python",
+            "category": "backend",
+            "frameworks": ["Django"],
+            "project_description": "Backend service",
+            "total_files": 42,
+            "source_files_count": 42,
+            "language_stats": {".py": 42},
+            "targets": [],
+        }
+        assert "schema_version" not in legacy_manifest
+        (proj / "manifest.json").write_text(json.dumps(legacy_manifest))
+        runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
+        result = _read_language_stats(tmp_path, "proj", runs)
+        assert result == {"py": 42}
+
     def test_skips_empty_stats(self, tmp_path: Path):
         from quodeq.data.fs.report_parser.runs import RunInfo
         proj = tmp_path / "proj" / "run1" / "evidence"

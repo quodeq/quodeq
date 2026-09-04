@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
+from quodeq.data.fs.report_parser._evidence_sqlite import _load_run_metadata
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 
@@ -70,6 +71,30 @@ def test_sqlite_path_handles_missing_manifest_gracefully(tmp_path: Path):
     result = load_evidence_map(evidence_dir)
     assert result["timeliness"]["sourceFileCount"] is None
     assert result["timeliness"]["discipline"] is None
+
+
+def test_load_run_metadata_legacy_manifest_without_schema_version(tmp_path: Path):
+    """manifest.json written before the schema_version field existed must still
+    deserialize correctly (no schema_version key, full pre-existing shape)."""
+    run_dir = tmp_path
+    evidence_dir = run_dir / "evidence"
+    evidence_dir.mkdir()
+    legacy_manifest = {
+        "language": "python",
+        "category": "backend",
+        "frameworks": ["Django"],
+        "project_description": "Backend service",
+        "total_files": 42,
+        "source_files_count": 42,
+        "language_stats": {".py": 42},
+        "targets": [],
+    }
+    assert "schema_version" not in legacy_manifest
+    (evidence_dir / "manifest.json").write_text(json.dumps(legacy_manifest))
+
+    metadata = _load_run_metadata(run_dir)
+    assert metadata["sourceFileCount"] == 42
+    assert metadata["discipline"] == "python"
 
 
 def test_read_run_data_dimension_result_has_metadata_for_sqlite_run(tmp_path: Path):
