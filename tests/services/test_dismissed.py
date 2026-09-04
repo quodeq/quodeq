@@ -3,16 +3,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
-from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.models import (
+    JudgmentCreatedEvent,
+    JudgmentPayload,
+)
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.services.dismissed import (
     dismiss_finding,
     dismissed_keys,
     restore_finding,
+    restore_all_findings,
 )
 
 
@@ -129,3 +134,58 @@ def test_dismiss_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path)
 def test_restore_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="line must be an integer"):
         restore_finding(tmp_path, {"req": "X", "file": "f.py", "line": "not-a-number"})
+
+
+def test_dismiss_finding_uses_injected_writer(tmp_path: Path) -> None:
+    """Verify that dismiss_finding uses the injected writer instead of creating its own."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    mock_writer = Mock()
+    finding = {"req": "R1", "file": "a.py", "line": 10}
+    dismiss_finding(project_dir, finding, writer=mock_writer)
+
+    # Verify the mock writer's emit method was called
+    assert mock_writer.emit.called
+    assert mock_writer.emit.call_count == 1
+    # Verify the event was called with the right type
+    event = mock_writer.emit.call_args[0][0]
+    assert "FindingDismissedEvent" in str(type(event))
+
+
+def test_restore_finding_uses_injected_writer(tmp_path: Path) -> None:
+    """Verify that restore_finding uses the injected writer instead of creating its own."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    mock_writer = Mock()
+    finding = {"req": "R1", "file": "a.py", "line": 10}
+    restore_finding(project_dir, finding, writer=mock_writer)
+
+    # Verify the mock writer's emit method was called
+    assert mock_writer.emit.called
+    assert mock_writer.emit.call_count == 1
+    # Verify the event was called with the right type
+    event = mock_writer.emit.call_args[0][0]
+    assert "FindingUndismissedEvent" in str(type(event))
+
+
+def test_restore_all_findings_uses_injected_writer(tmp_path: Path) -> None:
+    """Verify that restore_all_findings uses the injected writer instead of creating its own."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    # First, create some dismissed findings using the default writer
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+    dismiss_finding(project_dir, {"req": "R2", "file": "b.py", "line": 20})
+
+    mock_writer = Mock()
+    count = restore_all_findings(project_dir, writer=mock_writer)
+
+    # Verify the mock writer's emit method was called for each dismissed finding
+    assert count == 2
+    assert mock_writer.emit.call_count == 2
+    # Verify all events were called with the right type
+    for call in mock_writer.emit.call_args_list:
+        event = call[0][0]
+        assert "FindingUndismissedEvent" in str(type(event))
