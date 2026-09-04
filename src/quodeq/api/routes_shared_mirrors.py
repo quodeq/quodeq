@@ -254,4 +254,8 @@ def register_shared_mirror_routes(app: Flask) -> None:
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
             return jsonify([])
-        return jsonify(verified_entries(project_dir))
+        raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
+        limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
+        offset = max(0, request.args.get("offset", 0, type=int))
+        items = verified_entries(project_dir, offset=offset, limit=limit)
+        return jsonify(items)

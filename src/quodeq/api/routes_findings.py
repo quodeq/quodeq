@@ -34,7 +34,6 @@ from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 _logger = logging.getLogger(__name__)
 _MAX_DISMISSED_LIMIT = 5000
-_MAX_VERIFIED_LIMIT = 5000
 
 def _invalid_body_fields(
     body: dict[str, Any],
@@ -212,9 +211,9 @@ def register_findings_routes(app: Flask) -> None:
         if not project:
             return jsonify([])
         # No limit param → return everything (capped at the hard maximum).
-        # An explicit limit is clamped to [1, _MAX_VERIFIED_LIMIT].
-        raw_limit = request.args.get("limit", _MAX_VERIFIED_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_VERIFIED_LIMIT))
+        # An explicit limit is clamped to [1, _MAX_DISMISSED_LIMIT].
+        raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
+        limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
         offset = max(0, request.args.get("offset", 0, type=int))
         project_dir = _project_dir_or_none(_eval_dir(), project)
         if project_dir is None:

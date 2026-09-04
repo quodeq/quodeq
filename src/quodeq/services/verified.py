@@ -43,9 +43,6 @@ def unverify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | No
     log.emit(FindingUnverifiedEvent(payload=payload))
 
 
-_MAX_VERIFIED_LIMIT = 5000
-
-
 def verified_entries(
     project_dir: Path,
     *,
@@ -56,9 +53,11 @@ def verified_entries(
 
     Args:
         project_dir: The project directory.
-        offset: The number of entries to skip (default 0).
-        limit: The maximum number of entries to return. None means all entries
-               up to the hard limit. Clamped to [1, _MAX_VERIFIED_LIMIT].
+        offset: The number of entries to skip (default 0, clamped to >= 0).
+        limit: The maximum number of entries to return. None means all entries.
+               If provided, limit is not clamped by this function; the caller
+               is responsible for enforcing any hard maximum (e.g., via the API
+               route handler).
 
     Returns:
         A list of verified badge dicts, sliced by offset/limit.
