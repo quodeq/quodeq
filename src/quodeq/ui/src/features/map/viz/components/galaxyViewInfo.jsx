@@ -32,9 +32,9 @@ export function LevelInfoPanel({ levelInfo }) {
 /** Shared critical/major/minor line-items, omitting zero counts. */
 function buildSevLines(sev) {
   const lines = [];
-  if (sev.critical > 0) lines.push({ label: 'Critical', value: sev.critical, color: 'var(--color-sev-critical-text)' });
-  if (sev.major > 0) lines.push({ label: 'Major', value: sev.major, color: 'var(--color-sev-major-text)' });
-  if (sev.minor > 0) lines.push({ label: 'Minor', value: sev.minor, color: 'var(--color-sev-minor-text)' });
+  if (sev.critical > 0) lines.push({ label: t('map.critical'), value: sev.critical, color: 'var(--color-sev-critical-text)' });
+  if (sev.major > 0) lines.push({ label: t('map.major'), value: sev.major, color: 'var(--color-sev-major-text)' });
+  if (sev.minor > 0) lines.push({ label: t('map.minor'), value: sev.minor, color: 'var(--color-sev-minor-text)' });
   return lines;
 }
 
@@ -57,12 +57,12 @@ function computeSystemLevelInfo(scene, nav, projectName) {
     });
   });
   const lines = [
-    { label: 'Score', value: avgScore.toFixed(1) },
-    { label: 'Dimensions', value: clusterStars.length },
-    { label: 'Violations', value: totalV },
+    { label: t('map.score'), value: avgScore.toFixed(1) },
+    { label: t('map.dimensions'), value: clusterStars.length },
+    { label: t('map.violations'), value: totalV },
   ];
   if (totalV > 0) lines.push(...buildSevLines(sevCounts));
-  lines.push({ label: 'Compliance', value: totalC });
+  lines.push({ label: t('map.compliance'), value: totalC });
   return {
     title: clusterCon?.label || (projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.projectSystem')),
     lines, hint: t('map.clickDimension'), detailAction: null,
@@ -80,12 +80,12 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
     if (dimSev[sev] != null) dimSev[sev]++;
   });
   const dimLines = [
-    { label: 'Score', value: dim.score.toFixed(1) },
-    { label: 'Principles', value: prins.length },
-    { label: 'Violations', value: dim.violations },
+    { label: t('map.score'), value: dim.score.toFixed(1) },
+    { label: t('map.principles'), value: prins.length },
+    { label: t('map.violations'), value: dim.violations },
   ];
   if (dim.violations > 0) dimLines.push(...buildSevLines(dimSev));
-  dimLines.push({ label: 'Compliance', value: dim.compliance });
+  dimLines.push({ label: t('map.compliance'), value: dim.compliance });
   return {
     title: dim.name, lines: dimLines, hint: t('map.clickPrinciple'),
     detailAction: () => {
@@ -100,13 +100,13 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
 function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
   const prin = scene.principles[nav.dim][nav.prin];
   const prinLines = [
-    { label: 'Score', value: prin.score.toFixed(1) },
-    { label: 'Violations', value: prin.violations },
+    { label: t('map.score'), value: prin.score.toFixed(1) },
+    { label: t('map.violations'), value: prin.violations },
   ];
   if (prin.violations > 0) {
     prinLines.push(...buildSevLines({ critical: prin.critical, major: prin.major, minor: prin.minor }));
   }
-  prinLines.push({ label: 'Compliance', value: prin.compliance });
+  prinLines.push({ label: t('map.compliance'), value: prin.compliance });
   return {
     title: prin.name, lines: prinLines, hint: null,
     detailAction: () => {
@@ -160,7 +160,7 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
  * @returns {Array} Breadcrumb parts with { label, depth, action? }
  */
 export function buildBreadcrumb(scene, nav, projectName) {
-  const parts = [{ label: projectName ? `${projectName} System` : 'System', depth: 0, action: () => { nav.clusterCx = null; nav.clusterCy = null; } }];
+  const parts = [{ label: projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.breadcrumbSystem'), depth: 0, action: () => { nav.clusterCx = null; nav.clusterCy = null; } }];
   const star = nav.dim !== null ? scene?.stars[nav.dim] : null;
   const clusterCx = nav.clusterCx ?? star?._clusterCx;
   const clusterCy = nav.clusterCy ?? star?._clusterCy;

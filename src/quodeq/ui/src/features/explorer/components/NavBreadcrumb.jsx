@@ -7,16 +7,16 @@ import NavBreadcrumbSegmentMenu from './NavBreadcrumbSegmentMenu.jsx';
 import { t } from '../../../strings/index.js';
 
 const PAGE_LABELS = {
-  overview: 'overview',
-  violations: 'violations',
-  map: 'map',
-  history: 'history',
-  evaluate: 'evaluate',
-  standards: 'standards',
-  settings: 'settings',
+  overview: t('explorer.overviewCrumb'),
+  violations: t('explorer.violationsCrumb'),
+  map: t('explorer.mapCrumb'),
+  history: t('explorer.historyCrumb'),
+  evaluate: t('explorer.evaluateCrumb'),
+  standards: t('explorer.standardsCrumb'),
+  settings: t('explorer.settingsCrumb'),
   'grade-formula': t('explorer.crumbGradeFormula'),
-  projects: 'repositories',
-  help: 'help',
+  projects: t('explorer.projectsCrumb'),
+  help: t('explorer.helpCrumb'),
 };
 
 export function labelFor(entry) {
@@ -25,26 +25,26 @@ export function labelFor(entry) {
   // map / src / components. The root map entry (no path) falls through to
   // its tab label.
   if (entry.page === 'map' && entry.path) {
-    return entry.path.split('/').filter(Boolean).pop() || 'map';
+    return entry.path.split('/').filter(Boolean).pop() || t('explorer.mapCrumb');
   }
   if (PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
   switch (entry.page) {
-    case 'run':           return entry.label || entry.runId || 'run';
-    case 'history-run':   return entry.dateLabel || entry.runId || 'run';
+    case 'run':           return entry.label || entry.runId || t('explorer.runFallback');
+    case 'history-run':   return entry.dateLabel || entry.runId || t('explorer.runFallback');
     case 'explorer':      return entry.dimension
       ? entry.dimension.toLowerCase()
-      : 'dimension';
-    case 'violation':     return entry.label || entry.principle?.name || 'violation';
-    case 'file':          return entry.label || entry.file?.path || 'file';
-    case 'principle':     return entry.label || 'principle';
-    case 'evalprinciple': return entry.label || entry.principleName || 'principle';
-    case 'finding':       return entry.label || 'finding';
+      : t('explorer.dimensionFallback');
+    case 'violation':     return entry.label || entry.principle?.name || t('explorer.violationFallback');
+    case 'file':          return entry.label || entry.file?.path || t('explorer.fileFallback');
+    case 'principle':     return entry.label || t('explorer.principleFallback');
+    case 'evalprinciple': return entry.label || entry.principleName || t('explorer.principleFallback');
+    case 'finding':       return entry.label || t('explorer.findingFallback');
     // Fleet entry reads "compare"; a drill-down entry carries its dimension
     // so the crumb trail reads compare › security, and a head-to-head entry
     // reads compare › duel.
     case 'compare':       return entry.duel
       ? t('compare.crumbDuel')
-      : entry.dimension ? entry.dimension.toLowerCase() : 'compare';
+      : entry.dimension ? entry.dimension.toLowerCase() : t('explorer.compareFallback');
     default:              return entry.label || entry.page;
   }
 }
