@@ -13,13 +13,15 @@ import pytest
 from quodeq.services._job_model import (
     Job,
     InMemoryJobStore,
+    _MAX_LOG_LINES,
+    REPORT_PATH_RE,
+)
+from quodeq.services._job_file_store import (
     FileJobStore,
     _default_persist_dir,
     _job_to_json,
     _job_from_json,
-    _MAX_LOG_LINES,
     _STALE_JOB_AGE_S,
-    REPORT_PATH_RE,
 )
 
 

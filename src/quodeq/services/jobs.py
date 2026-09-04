@@ -20,10 +20,12 @@ from quodeq.services._job_model import (
     Job,
     JobStore,
     InMemoryJobStore,
-    FileJobStore,
-    create_job_store,
     REPORT_PATH_RE,
     _MAX_COMPLETED_JOBS,  # noqa: F401 — re-export (patch/import target)
+)
+from quodeq.services._job_file_store import (
+    FileJobStore,
+    create_job_store,
 )
 
 if TYPE_CHECKING:
