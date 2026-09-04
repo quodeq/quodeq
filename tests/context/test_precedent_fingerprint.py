@@ -11,14 +11,10 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from quodeq.context.precedent_fingerprint import load_precedent_fingerprints
 
 
-def test_locked_db_is_skipped_not_raised(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_locked_db_is_skipped_not_raised(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     run_dir = project_dir / "r1"
     run_dir.mkdir(parents=True)
@@ -26,10 +22,6 @@ def test_locked_db_is_skipped_not_raised(
     def _boom(run_dir: Path) -> list[tuple[str | None, str | None]]:
         raise sqlite3.OperationalError("database is locked")
 
-    monkeypatch.setattr(
-        "quodeq.data.sqlite.findings_queries.read_dismissed_snippets", _boom,
-    )
-
-    result = load_precedent_fingerprints(project_dir)
+    result = load_precedent_fingerprints(project_dir, read_dismissed=_boom)
 
     assert result == set()  # degrades gracefully, doesn't raise
