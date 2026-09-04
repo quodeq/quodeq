@@ -19,6 +19,8 @@ from pathlib import Path
 from quodeq.services._job_model import (
     InMemoryJobStore,
     Job,
+)
+from quodeq.services._job_file_store import (
     _job_from_json,
     _job_to_json,
 )
