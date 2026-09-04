@@ -96,12 +96,20 @@ def render_compact_standards(
         reqs = principle.get("requirements", [])
         if not reqs:
             continue
+        requirements = []
+        for r in reqs:
+            req_id = r.get("id")
+            if req_id is None:
+                raise ValueError(
+                    f"Malformed standards file: a requirement is missing required 'id': {r!r}"
+                )
+            requirements.append({
+                "id": req_id,
+                "rule": resolve_requirement_text(r, (overrides or {}).get(req_id)),
+            })
         checklist.append({
             "principle": principle.get("name", "Unknown"),
-            "requirements": [
-                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
-                for r in reqs
-            ],
+            "requirements": requirements,
         })
     return json.dumps(checklist, separators=(",", ":"))
 
