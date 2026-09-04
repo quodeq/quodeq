@@ -127,9 +127,10 @@ def _compute_summary(
         from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
         dismissed = dismissed_keys(project_dir)
         deleted = deleted_keys(project_dir)
-    except (OSError, json.JSONDecodeError, KeyError):
+    except (OSError, json.JSONDecodeError, KeyError) as exc:
         # Adapter errors only: a run/triage file that is missing, unreadable,
         # or malformed genuinely means "no data for the card".
+        _logger.warning("Unreadable/malformed run metadata for card: %s", exc)
         return {"grade": None, "score": None, "files": None}
     # From here on it is business math over already-loaded data. It stays
     # OUTSIDE the try: a KeyError raised by a rescoring/summarising bug must

@@ -1,5 +1,8 @@
+import argparse
 import io
 import json
+
+import pytest
 
 from quodeq.assistant.mcp import server
 from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
@@ -118,3 +121,39 @@ def test_dispatch_exception_answers_with_error_frame():
     # must not leak to MCP callers, but is still written to stderr for ops.
     assert "kaboom" not in frames[0]["error"]["message"]
     assert "kaboom" in stderr.getvalue()
+
+
+def test_all_cli_arguments_have_help_text():
+    parser = argparse.ArgumentParser()
+    server._build_arg_parser(parser)
+    for action in parser._actions:
+        if action.dest == "help":
+            continue
+        assert action.help, f"--{action.dest} has no help text"
+
+
+def test_help_output_includes_argument_descriptions(capsys):
+    parser = argparse.ArgumentParser(prog="server")
+    server._build_arg_parser(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--help"])
+    # argparse wraps help text to the terminal width, so normalize
+    # whitespace before checking for each description.
+    out = " ".join(capsys.readouterr().out.split())
+    expected_snippets = [
+        "Path to the assistant session SQLite database.",
+        "Assistant session ID this server instance serves.",
+        "Evaluation run directory to scope findings/report reads to.",
+        "Repository root for resolving relative file paths in findings.",
+        "Directory containing evaluator standard definitions.",
+        "Directory containing compiled standard/dimension data.",
+        "Path to the dimensions.json describing available evaluation dimensions.",
+        "Project ID to scope findings/report operations to.",
+        "Root directory where evaluation reports are stored.",
+        "Allow write-capable tools (dismiss/restore findings); default is read-only.",
+        "Assistant worktree directory, if this session has one checked out.",
+        "Force read-only mode even if --enable-write is also passed.",
+        "Override path for the score cache, used by tests and isolated runs.",
+    ]
+    for snippet in expected_snippets:
+        assert snippet in out, f"missing from --help output: {snippet!r}"

@@ -7,7 +7,10 @@ them and no longer carry any database dependency at runtime.
 """
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
+
+import pytest
 
 from quodeq.core.events.models import Judgment
 from quodeq.data.sqlite.state_store import SQLiteStateStore
@@ -20,6 +23,16 @@ def _seed(run_dir: Path, **kw) -> None:
         title="t", snippet="s",
     )
     SQLiteStateStore(run_dir).record_finding(Judgment(**{**defaults, **kw}))
+
+
+def _break_reopen_with_operational_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """After this, the next open_evaluation_db() call raises RuntimeError
+    (wrapping sqlite3.OperationalError), mirroring a locked/IO-erroring DB.
+    Mirrors the technique in tests/data/sqlite/test_connection.py."""
+    monkeypatch.setattr(
+        "quodeq.data.sqlite.connection.apply_evaluation_schema",
+        lambda conn: (_ for _ in ()).throw(sqlite3.OperationalError("disk I/O error")),
+    )
 
 
 class TestReadFindingDetails:
@@ -42,6 +55,17 @@ class TestReadFindingDetails:
 
         assert read_finding_details(tmp_path, {("X", "f", 1)}) == {}
 
+    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch):
+        """open_evaluation_db wraps a locked/IO-erroring DB as RuntimeError
+        (Task D10); the best-effort contract this docstring describes must
+        still hold for that failure mode, not just sqlite3.DatabaseError."""
+        from quodeq.data.sqlite.findings_queries import read_finding_details
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10)
+        _break_reopen_with_operational_error(monkeypatch)
+
+        assert read_finding_details(tmp_path, {("X-1", "src/a.py", 10)}) == {}
+
 
 class TestReadRunKeySets:
     def test_returns_dismiss_and_class_keys(self, tmp_path):
@@ -55,6 +79,14 @@ class TestReadRunKeySets:
 
     def test_missing_db_returns_empty_sets(self, tmp_path):
         from quodeq.data.sqlite.findings_queries import read_run_key_sets
+
+        assert read_run_key_sets(tmp_path) == (set(), set())
+
+    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch):
+        from quodeq.data.sqlite.findings_queries import read_run_key_sets
+
+        _seed(tmp_path)
+        _break_reopen_with_operational_error(monkeypatch)
 
         assert read_run_key_sets(tmp_path) == (set(), set())
 
@@ -79,6 +111,18 @@ class TestFindDismissedMatching:
 
         assert find_dismissed_matching(
             tmp_path, dimension="d", practice_id="p", file="f",
+        ) == []
+
+    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch):
+        from quodeq.data.sqlite.findings_queries import find_dismissed_matching
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10)
+        store = SQLiteStateStore(tmp_path)
+        store.update_verdict(req="X-1", file="src/a.py", line=10, verdict="dismissed")
+        _break_reopen_with_operational_error(monkeypatch)
+
+        assert find_dismissed_matching(
+            tmp_path, dimension="clean-architecture", practice_id="P1", file="src/a.py",
         ) == []
 
 

@@ -70,7 +70,11 @@ def reset_plugin_cache() -> None:
 
 def _discover_from_detection(detection_file: Path, dimensions_file: Path) -> list[PluginInfo]:
     """Build plugin info from universal detection.json + dimensions.json."""
-    detection = read_json(detection_file)
+    try:
+        detection = read_json(detection_file)
+    except (OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
+        _logger.warning("Could not read detection.json at %s: %s", detection_file, exc)
+        return []
     ext_map: dict[str, str] = detection.get("extensions", {})
 
     # Group extensions by language

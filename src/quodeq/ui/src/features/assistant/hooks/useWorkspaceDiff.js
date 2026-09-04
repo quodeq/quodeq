@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  applyAssistantWorkspace, createAssistantWorkspacePr,
-  discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
-} from '../../../api/assistant.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
 // surface the message and let the user retry, apply, or discard.
@@ -17,11 +15,32 @@ function applyPrOutcome(res, setOutcome, setError) {
   }
 }
 
+async function runWorkspaceAction(fn, kind, { setOutcome, setError, onChanged }) {
+  try {
+    const res = await fn();
+    if (kind === 'pr' && !res.prUrl) {
+      applyPrOutcome(res, setOutcome, setError);
+    } else {
+      setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
+    }
+    onChanged?.();
+  } catch (err) {
+    // TURN_IN_PROGRESS / WORKSPACE_DISCARD_FAILED carry a `code` (see
+    // assistant_workspace_routes.py) -- route through apiErrorMessage
+    // instead of always showing the raw text.
+    setError(apiErrorMessage(err, 'assistant.workspaceActionFailed'));
+  }
+}
+
 /**
  * WorkspaceDiffPanel.jsx's diff-loading, action (apply/PR/discard) and PR-form
  * state. Extracted verbatim.
  */
 export function useWorkspaceDiff({ sessionId, onChanged }) {
+  const {
+    applyAssistantWorkspace, createAssistantWorkspacePr,
+    discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
+  } = useApi();
   const [diff, setDiff] = useState(null);
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState(null);
@@ -36,7 +55,9 @@ export function useWorkspaceDiff({ sessionId, onChanged }) {
     setDiff(null); setError(null);
     fetchAssistantWorkspaceDiff(sessionId)
       .then((d) => { if (!cancelled) { setDiff(d.diff ?? ''); setTruncated(!!d.truncated); } })
-      .catch((err) => { if (!cancelled) setError(err?.message || String(err)); });
+      // WORKSPACE_DIFF_FAILED carries a `code` (see assistant_workspace_routes.py) --
+      // route it through apiErrorMessage instead of always showing the raw text.
+      .catch((err) => { if (!cancelled) setError(apiErrorMessage(err, 'assistant.diffLoadFailed')); });
     return () => { cancelled = true; };
   }, [sessionId]);
 
@@ -44,20 +65,8 @@ export function useWorkspaceDiff({ sessionId, onChanged }) {
 
   const act = useCallback(async (fn, kind) => {
     setBusy(true); setError(null);
-    try {
-      const res = await fn();
-      if (kind === 'pr' && !res.prUrl) {
-        applyPrOutcome(res, setOutcome, setError);
-        onChanged?.();
-        return;
-      }
-      setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
-      onChanged?.();
-    } catch (err) {
-      setError(err?.message || String(err));
-    } finally {
-      setBusy(false);
-    }
+    await runWorkspaceAction(fn, kind, { setOutcome, setError, onChanged });
+    setBusy(false);
   }, [onChanged]);
 
   return {

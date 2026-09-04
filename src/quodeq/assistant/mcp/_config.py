@@ -48,7 +48,10 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
         if separator:
             register_cmd.append("--")
         register_cmd.extend(_server_argv(server_args))
-        subprocess.run(register_cmd, check=True, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
+        try:
+            subprocess.run(register_cmd, check=True, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f"Could not register the quodeq assistant MCP server with {cmd}: {exc}") from exc
         _registered.add(key)
 
 

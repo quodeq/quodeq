@@ -165,7 +165,7 @@ class JobManager(_JobMonitorMixin):
             with self._lock:
                 self._store.put(job)
             result = job.to_dict()
-            return replace(result, error=str(exc))
+            return replace(result, error="Failed to start the evaluation process. Check the server logs for details.")
 
         with self._lock:
             self._store.put(job)

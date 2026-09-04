@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
-import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -52,7 +52,14 @@ function useCheckStatus({ getSharedStatus, mountedRef, stopPolling, applyOptimis
     const finishedProject = publish.project ?? publishingProjectRef.current;
     if (publish.state === 'error') {
       setPublishState('error');
-      setPublishError(publish.error || t('projects.publishFailed'));
+      // No `code` on the polled payload yet -- services/shared_publish.py's
+      // PublishStatus only ever sets {state, project, runs, error,
+      // finished_at}, so apiErrorMessage falls back to the raw message here
+      // exactly like the old `publish.error || t(...)` did. Routing it
+      // through the shared mapper anyway keeps this call site consistent
+      // with the rest of the app and makes it forward-compatible the moment
+      // the backend starts emitting a discriminating code.
+      setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
       setPublishErrorProject(finishedProject);
     } else {
       // 'done' (or an unexpected 'idle') -- refresh the shared list once so

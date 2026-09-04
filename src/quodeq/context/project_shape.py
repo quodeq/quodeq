@@ -29,12 +29,15 @@ for the private signal functions, imported and called) from here.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from quodeq.context._project_shape_types import Deployment, ProjectShape  # noqa: F401 - re-export
 from quodeq.context._project_shape_signals import (
     _detect_runtime_langs, _go_signals, _node_signals, _python_signals, _rust_signals,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def detect_shape(repo_path: Path) -> ProjectShape:
@@ -48,10 +51,16 @@ def detect_shape(repo_path: Path) -> ProjectShape:
     if not repo.is_dir():
         return ProjectShape()
 
-    py_dep, py_web, _ = _python_signals(repo)
-    js_dep, js_web, _, ui_lang = _node_signals(repo)
-    rust_dep = _rust_signals(repo)
-    go_dep = _go_signals(repo)
+    try:
+        py_dep, py_web, _ = _python_signals(repo)
+        js_dep, js_web, _, ui_lang = _node_signals(repo)
+        rust_dep = _rust_signals(repo)
+        go_dep = _go_signals(repo)
+    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+        _logger.warning(
+            "Manifest signal detection failed for %s, degrading to UNKNOWN: %s", repo, exc,
+        )
+        return ProjectShape()
 
     # Priority: explicit desktop/mobile signals beat web signals beat library
     # beat cli, since desktop hints come from very specific dep names while

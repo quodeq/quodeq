@@ -177,20 +177,16 @@ def test_sse_waits_for_preparing_internal_job(tmp_path, app) -> None:
         def __init__(self, status: str) -> None:
             self.status = status
 
-    class FakeStore:
+    class JobsHolder:
         def __init__(self, job: FakeJob) -> None:
             self._job = job
 
-        def get(self, _job_id: str) -> FakeJob:
+        def get_job(self, _job_id: str) -> FakeJob:
             return self._job
-
-    class JobsHolder:
-        def __init__(self, store: FakeStore) -> None:
-            self._store = store
 
     job = FakeJob("running")
     provider = app.config["_provider"]
-    provider._jobs = JobsHolder(FakeStore(job))
+    provider._jobs = JobsHolder(job)
 
     # Flip the job to "done" on the second is_job_complete call so the
     # generator first sees an active preparing job (path None, not done)
@@ -228,12 +224,9 @@ def test_sse_streams_log_after_it_appears(tmp_path, app) -> None:
     class FakeJob:
         status = "running"
 
-    class FakeStore:
-        def get(self, _job_id):
-            return FakeJob()
-
     class JobsHolder:
-        _store = FakeStore()
+        def get_job(self, _job_id):
+            return FakeJob()
 
     provider = app.config["_provider"]
     provider._jobs = JobsHolder()
@@ -308,3 +301,38 @@ def test_stream_logs_rejects_traversal_job_id(tmp_path, app) -> None:
     resp = client.get("/api/jobs/../logs/stream")
     assert resp.status_code == HTTPStatus.BAD_REQUEST
     assert resp.get_json()["code"] == "INVALID_INPUT"
+
+
+def test_is_preparing_job_uses_public_get_job_not_private_store():
+    """_is_preparing_job must work via JobManager.get_job(), not provider._jobs._store."""
+    from quodeq.api._log_stream_routes import _is_preparing_job
+    from quodeq.core.types.job import JobSnapshot
+
+    class FakeJobs:
+        def get_job(self, job_id):
+            return JobSnapshot(job_id=job_id, status="running", output_project=None)
+        # Deliberately no _store attribute — proves the route doesn't reach for it.
+
+    class FakeProvider:
+        _jobs = FakeJobs()
+
+    assert _is_preparing_job(FakeProvider(), "job-1") is True
+
+
+def test_stream_terminal_state_uses_public_get_job_not_private_store():
+    """_stream_terminal_state must work via JobManager.get_job(), not provider._jobs._store."""
+    from quodeq.api._log_stream_routes import _stream_terminal_state
+    from quodeq.core.types.job import JobSnapshot
+
+    class FakeJobs:
+        def get_job(self, job_id):
+            return JobSnapshot(job_id=job_id, status="done", output_project=None)
+        # Deliberately no _store attribute — proves the route doesn't reach for it.
+
+    class FakeProvider:
+        _jobs = FakeJobs()
+
+        def get_log_run_dir(self, job_id):
+            return None
+
+    assert _stream_terminal_state(FakeProvider(), "job-1") == "done"

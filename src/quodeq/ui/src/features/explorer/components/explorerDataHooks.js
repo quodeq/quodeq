@@ -2,6 +2,10 @@ import { useState, useMemo, useCallback } from 'react';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { countBySeverity } from '../../../utils/severity.js';
 import { useExplorerQueries } from './useExplorerQueries.js';
+import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../utils/evalPrincipal.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
+
+export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -19,31 +23,6 @@ export function computeAllViolations(evalData) {
 
 export function computeSeverityCounts(allViolations) {
   return countBySeverity(allViolations);
-}
-
-export function computeComplianceByPrinciple(evalData) {
-  const map = new Map();
-  for (const c of (evalData?.compliance || [])) {
-    if (!map.has(c.principle)) map.set(c.principle, []);
-    map.get(c.principle).push(c);
-  }
-  return map;
-}
-
-export function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId, dateLabel = '') {
-  const principlesByName = new Map((evalData.principles || []).map((p) => [p.name, p]));
-  const gradesByPrinciple = new Map((evalData.principleGrades || []).map((p) => [p.principle, p]));
-  return function buildEvalPrincipal(principleId) {
-    const principleData = principlesByName.get(principleId);
-    const pg = gradesByPrinciple.get(principleId);
-    return {
-      principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
-      dimension: evalData.dimension || '',
-      project: project || '', runId: runId || '', dateLabel: dateLabel || '',
-      principleData, dimViolations: principleData?.violations || [],
-      dimCompliance: complianceByPrinciple.get(principleId) || [],
-    };
-  };
 }
 
 function useDerivedExplorerStats(evalData, allViolations) {
@@ -120,7 +99,7 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
   // once cached data exists, so Back-navigation skips the LoadingScreen.
   const loading = evalQuery.isLoading || scoresQuery.isLoading;
   const isFetching = evalQuery.isFetching || scoresQuery.isFetching;
-  const error = evalQuery.isError ? (evalQuery.error?.message || String(evalQuery.error)) : null;
+  const error = evalQuery.isError ? apiErrorMessage(evalQuery.error, 'explorer.loadFailed') : null;
 
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);

@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
 import { usePrincipleData, useExplorerData } from './explorerDataHooks.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -228,6 +229,26 @@ describe('useExplorerData response handling', () => {
     const second = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper });
     expect(second.result.current.loading).toBe(false);
     expect(second.result.current.evalData).toBeTruthy();
+  });
+
+  it('eval query error is mapped through apiErrorMessage', async () => {
+    // AUTH_REQUIRED is a mapped code, so its friendly text diverges from the
+    // raw backend message -- that divergence is what makes this test fail
+    // against the old `evalQuery.error?.message` code.
+    const err = Object.assign(new Error('raw fetch failure'), { code: 'AUTH_REQUIRED' });
+    const fakeApi = {
+      getDimensionEval: vi.fn().mockRejectedValue(err),
+      getRunScores: vi.fn(async () => null),
+      sharedGetDimensionEval: vi.fn(),
+      sharedGetRunScores: vi.fn(),
+    };
+    const { result } = renderHook(
+      () => useExplorerData('proj', 'security', 'r1', null),
+      { wrapper: withStableQueryApi(fakeApi) },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe(apiErrorMessage(err, 'explorer.loadFailed'));
+    expect(result.current.error).not.toBe(err.message);
   });
 
   it('merges the rescored per-dimension grades over the raw eval payload', async () => {

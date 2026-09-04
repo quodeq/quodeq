@@ -14,12 +14,14 @@ renaming a variable produces legitimately different code.
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from pathlib import Path
 
 from quodeq.data.ports.precedents import DismissedSnippetsReader
 
 _WS_RE = re.compile(r"\s+")
+_logger = logging.getLogger(__name__)
 
 
 def _normalize_snippet(snippet: str | None) -> str:
@@ -93,7 +95,12 @@ def load_precedent_fingerprints(
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        for req, snippet in read_dismissed(run_dir):
+        try:
+            entries = list(read_dismissed(run_dir))
+        except Exception as exc:  # noqa: BLE001 - missing/locked DBs must not fail a scan
+            _logger.warning("Skipping precedent read for %s: %s", run_dir, exc)
+            continue
+        for req, snippet in entries:
             fp = fingerprint(req, snippet)
             if fp is not None:
                 out.add(fp)

@@ -40,3 +40,30 @@ def test_syncs_started_at_and_is_mtime_gated(tmp_path, monkeypatch):
         assert calls["n"] == 0, "unchanged runs must not be re-read/upserted"
     finally:
         db.close()
+
+
+def test_sync_project_dates_batches_the_mtime_lookup(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "idx.db"))
+    proj = tmp_path / "evaluations" / "proj"
+    for i in range(5):
+        _write_status(proj / f"run-{i}", "2026-05-25T22:19:50+00:00")
+
+    db = open_index(tmp_path / "idx.db")
+    try:
+        sync_project_dates(db, proj, "proj")  # first call: populate all 5 rows
+
+        # sqlite3.Connection is a C type with no instance/class __dict__, so
+        # `db.execute` can't be monkeypatched directly (setattr raises
+        # AttributeError: object attribute is read-only). Use sqlite3's own
+        # SQL tracing hook to observe every statement actually executed.
+        executed = []
+        db.set_trace_callback(executed.append)
+
+        sync_project_dates(db, proj, "proj")  # second call: nothing changed on disk
+
+        mtime_selects = [s for s in executed if "status_mtime" in s and s.strip().upper().startswith("SELECT")]
+        assert len(mtime_selects) == 1, (
+            f"expected exactly one batched SELECT for 5 runs, got {len(mtime_selects)}: {mtime_selects}"
+        )
+    finally:
+        db.close()

@@ -298,7 +298,7 @@ class TestDeleteAllEndpoint:
     def test_delete_all_returns_delta_envelope(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()
-        resp = client.post("/api/findings/delete-all", json={
+        resp = client.post("/api/findings/delete-all?confirm=true", json={
             "project": "my-project", "run_id": "run-1",
         })
         assert resp.status_code == 200
@@ -313,8 +313,25 @@ class TestDeleteAllEndpoint:
         assert "accumulated" in delta
 
     def test_delete_all_missing_project_returns_400(self, client):
-        resp = client.post("/api/findings/delete-all", json={})
+        resp = client.post("/api/findings/delete-all?confirm=true", json={})
         assert resp.status_code == 400
+
+    def test_delete_all_without_confirm_returns_400(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        resp = client.post("/api/findings/delete-all", json={"project": "my-project"})
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "CONFIRMATION_REQUIRED"
+
+    def test_delete_all_with_confirm_true_deletes(self, client, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+        resp = client.post(
+            "/api/findings/delete-all?confirm=true", json={"project": "my-project"},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
 
 
 class TestListDismissedEndpoint:

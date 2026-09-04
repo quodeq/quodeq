@@ -2,17 +2,23 @@
 
 Split (Task 14) out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
-does not add a new logging import, so ``_rescore_run``'s failure log goes
-through an injected ``LogSink`` instead.
+originally avoided a new logging import, routing ``_rescore_run``'s failure
+log through an injected ``LogSink`` instead. Task C6 (usability sweep) added
+a stdlib ``_logger`` for ``_resolve_default_run_id``'s previously-silent
+``list_runs`` failure -- this module is now its own DECLARED_LOGGING_SITES
+entry too (see ``tests/tools/test_logging_boundary.py``).
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._wiring import list_runs
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 
 def _slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
@@ -99,7 +105,8 @@ def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     reports_root = Path(evaluations_dir).resolve()
     try:
         runs = list_runs(reports_root, project)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("Failed to resolve default run for %s: %s", project, exc)
         return None
     if not runs:
         return None

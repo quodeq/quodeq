@@ -93,6 +93,9 @@ def main() -> None:
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
         sys.exit(1)
+    except RuntimeError as exc:
+        sys.stderr.write(f"Error: {exc}\n")
+        sys.exit(1)
 
 
 def _resolve_dimension_cache_writer(server_args: ServerArgs):

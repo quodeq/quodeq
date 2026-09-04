@@ -194,6 +194,6 @@ def run_turn(request: TurnRequest, *, repository: AssistantStore,
         if exc.partial:
             repository.add_message(request.session_id, "assistant", exc.partial)
         emit({"type": "stopped"})
-    except Exception as exc:  # noqa: BLE001 - turn thread must never die silently
+    except Exception:  # noqa: BLE001 - turn thread must never die silently
         _logger.exception("assistant turn failed for session %s", request.session_id)
-        emit({"type": "error", "message": str(exc)})
+        emit({"type": "error", "message": "The assistant hit an unexpected error. Check the server logs for details."})

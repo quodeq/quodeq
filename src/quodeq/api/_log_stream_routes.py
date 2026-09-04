@@ -71,12 +71,9 @@ def _is_preparing_job(provider, job_id: str) -> bool:
     # returns None — without this check the route would 404 the moment the
     # frontend opens the stream after Start.
     jobs = getattr(provider, "_jobs", None)
-    store = getattr(jobs, "_store", None) if jobs is not None else None
-    if store is not None:
-        job = store.get(job_id)
-        if job is not None and getattr(job, "status", None) not in {
-            "done", "failed", "cancelled",
-        }:
+    if jobs is not None:
+        job = jobs.get_job(job_id)
+        if job is not None and job.status not in {"done", "failed", "cancelled"}:
             return True
     # External job: the CLI creates the run directory before opening the
     # ``run.log`` writer, so there is a brief window where the directory
@@ -125,11 +122,9 @@ def _stream_terminal_state(provider, job_id: str) -> str:
     # In-memory job (internal runs) carries the most up-to-date status
     # before the runner has flushed status.json — prefer it.
     if provider is not None and hasattr(provider, "_jobs"):
-        store = getattr(provider._jobs, "_store", None)
-        if store is not None:
-            job = store.get(job_id)
-            if job is not None and job.status in {"done", "failed", "cancelled"}:
-                return job.status
+        job = provider._jobs.get_job(job_id)
+        if job is not None and job.status in {"done", "failed", "cancelled"}:
+            return job.status
     # Fall back to the on-disk status.json the runner writes on exit.
     path = _resolve_stream_log_path(provider, job_id)
     if path is None:

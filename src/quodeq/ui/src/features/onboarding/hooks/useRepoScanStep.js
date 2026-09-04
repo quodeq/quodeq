@@ -41,7 +41,7 @@ function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
   };
 }
 
-function makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting }) {
+export function makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting }) {
   return async function handleSubmit() {
     const repo = state.repo.value?.trim();
     if (!repo) return;
@@ -61,12 +61,16 @@ function makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneE
         const resumed = await tryResumeExisting(err.existingProjectId);
         if (resumed) return;
       }
-      actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId });
+      actions.failScan({
+        message: apiErrorMessage(err, 'onboarding.scanFailed'),
+        status: err.status,
+        existingProjectId: err.existingProjectId,
+      });
     }
   };
 }
 
-function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
+export function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
   return async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
     const repo = state.repo.value?.trim();
     setCloneSubmitting(true);
@@ -88,8 +92,9 @@ function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep
           return;
         }
       }
-      setCloneError(friendlyCloneError(err));
-      actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId, code: err.code });
+      const message = friendlyCloneError(err);
+      setCloneError(message);
+      actions.failScan({ message, status: err.status, existingProjectId: err.existingProjectId, code: err.code });
     } finally {
       setCloneSubmitting(false);
     }

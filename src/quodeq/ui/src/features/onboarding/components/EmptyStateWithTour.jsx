@@ -30,7 +30,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
         <button
           type="button"
           className={`${onBrowseRemote ? 'term-btn--secondary' : 'term-btn--primary'}${isEvaluating ? ' is-disabled' : ''}`}
-          onClick={() => { clearSkip(); onAdd(); }}
+          onClick={() => { if (isEvaluating) return; clearSkip(); onAdd(); }}
           aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
@@ -39,7 +39,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
         <button
           type="button"
           className={`term-btn--secondary${isEvaluating ? ' is-disabled' : ''}`}
-          onClick={() => { clearSkip(); onTour(); }}
+          onClick={() => { if (isEvaluating) return; clearSkip(); onTour(); }}
           aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >

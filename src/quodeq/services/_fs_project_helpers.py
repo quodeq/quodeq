@@ -6,6 +6,7 @@ _fs_project_parents.py, re-exported here for _fs_projects.py's import.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,6 +29,8 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     _max_projects_listed,
 )
 from quodeq.data.fs.report_parser.runs import RunInfo
+
+_logger = logging.getLogger(__name__)
 
 
 def _backfill_onboarding_field(
@@ -148,7 +151,8 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
 
     try:
         is_url = is_repo_url(repo)
-    except ValueError:
+    except ValueError as exc:
+        _logger.warning("Rejecting malformed repo identifier %r in duplicate check: %s", repo, exc)
         return None
     repo_resolved = repo if is_url else str(Path(repo).resolve())
     expected_name = project_name_from_repo(repo)

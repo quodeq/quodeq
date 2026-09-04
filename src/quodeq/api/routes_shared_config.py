@@ -21,6 +21,7 @@ from quodeq.services.shared_repo import (
 from quodeq.services.shared_settings import SharedSettings, read_settings, write_settings
 from quodeq.shared.validation import validate_path_segment
 
+from .helpers import error_response
 from .routes_common import reports_dir
 
 
@@ -63,29 +64,32 @@ def register_shared_config_routes(app: Flask) -> None:
         body = request.get_json(silent=True) or {}
         url = str(body.get("url") or "").strip()
         if not url:
-            return jsonify({"error": "url is required"}), 400
+            body, status = error_response("url is required", 400, "URL_REQUIRED")
+            return jsonify(body), status
         outcome = connect_shared_repo(url)
         if outcome.status == "invalid_url":
             return jsonify({"error": outcome.detail}), 400
         if outcome.status == "clone_failed":
-            return (
-                jsonify(
-                    {"error": f"could not clone the repository, check that git can access {outcome.url}"}
-                ),
+            body, status = error_response(
+                f"could not clone the repository, check that git can access {outcome.url}",
                 502,
+                "CLONE_FAILED",
             )
+            return jsonify(body), status
         if outcome.status == "foreign":
-            return (
-                jsonify(
-                    {"error": "the repository exists but does not look like a quodeq results repository"}
-                ),
+            body, status = error_response(
+                "the repository exists but does not look like a quodeq results repository",
                 400,
+                "FOREIGN_REPO",
             )
+            return jsonify(body), status
         if outcome.status == "unsupported_version":
-            return (
-                jsonify({"error": "this shared repository requires a newer version of quodeq"}),
+            body, status = error_response(
+                "this shared repository requires a newer version of quodeq",
                 400,
+                "UNSUPPORTED_VERSION",
             )
+            return jsonify(body), status
         return jsonify({"configured": True, "url": outcome.url})
 
     @app.delete("/api/shared/config")
@@ -126,6 +130,7 @@ def register_shared_config_routes(app: Flask) -> None:
                         "stale": True,
                         "lastSynced": last_synced_at(settings.url),
                         "error": reason,
+                        "code": "REFRESH_FAILED",
                     }
                 ),
                 502,
@@ -145,10 +150,11 @@ def register_shared_config_routes(app: Flask) -> None:
             project, settings.url, evaluations_root=Path(reports_dir())
         )
         if outcome == "already_running":
-            return jsonify({"error": "a publish is already running"}), 409
+            body, status = error_response("a publish is already running", 409, "PUBLISH_IN_PROGRESS")
+            return jsonify(body), status
         if outcome != "started":
-            return (
-                jsonify({"error": "could not start the publish job, see server logs"}),
-                500,
+            body, status = error_response(
+                "could not start the publish job, see server logs", 500, "PUBLISH_START_FAILED"
             )
+            return jsonify(body), status
         return jsonify({"started": True}), 202

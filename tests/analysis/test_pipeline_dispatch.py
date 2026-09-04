@@ -53,9 +53,8 @@ def test_default_run_uses_incremental_loop(
 @patch("quodeq.analysis._pipeline._persist_dim_estimates")
 @patch("quodeq.analysis._pipeline.emit_marker")
 @patch("quodeq.analysis._pipeline._get_provider_type")
-@patch("quodeq.analysis._pipeline.get_ai_cmd")
 def test_clean_scan_skips_incremental_loop(
-    get_ai, get_prov, emit, persist, load_ctx, consolidated, per_dim, incr,
+    get_prov, emit, persist, load_ctx, consolidated, per_dim, incr,
 ):
     """Clean scan (incremental=False) skips run_incremental_loop."""
     load_ctx.return_value = (["security"], MagicMock())

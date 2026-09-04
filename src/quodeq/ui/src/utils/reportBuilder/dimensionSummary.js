@@ -1,5 +1,6 @@
 // src/quodeq/ui/src/utils/reportBuilder/dimensionSummary.js
 import { formatViolationEntry } from './shared.js';
+import { complianceRatio } from '../textFormatting.js';
 
 const MAX_TOP_FILES = 15;
 
@@ -81,9 +82,7 @@ export function buildOverviewSummarySection(summary, accumulatedDimensions) {
   lines.push(`- **${accumulatedDimensions.length}** dimensions evaluated`);
   lines.push(`- **${summary.totalViolations || 0}** total violations (${sev.critical || 0} critical, ${sev.major || 0} major, ${sev.minor || 0} minor)`);
   lines.push(`- **${summary.totalCompliance || 0}** compliance findings`);
-  const ratio = (summary.totalViolations && summary.totalCompliance)
-    ? `1:${Math.round(summary.totalCompliance / summary.totalViolations)}`
-    : '—';
+  const ratio = complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0);
   lines.push(`- **Ratio:** ${ratio}`);
   lines.push('');
   return lines;

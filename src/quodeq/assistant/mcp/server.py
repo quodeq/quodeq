@@ -100,21 +100,40 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
     return registry
 
 
+def _build_arg_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register the assistant MCP server's CLI arguments, with help text, on `parser`."""
+    parser.add_argument("--db-path", required=True,
+                        help="Path to the assistant session SQLite database.")
+    parser.add_argument("--session-id", required=True,
+                        help="Assistant session ID this server instance serves.")
+    parser.add_argument("--run-dir", default="",
+                        help="Evaluation run directory to scope findings/report reads to.")
+    parser.add_argument("--repo-root", default="",
+                        help="Repository root for resolving relative file paths in findings.")
+    parser.add_argument("--evaluators-dir", required=True,
+                        help="Directory containing evaluator standard definitions.")
+    parser.add_argument("--compiled-dir", required=True,
+                        help="Directory containing compiled standard/dimension data.")
+    parser.add_argument("--dimensions-file", required=True,
+                        help="Path to the dimensions.json describing available evaluation dimensions.")
+    parser.add_argument("--project-id", default="",
+                        help="Project ID to scope findings/report operations to.")
+    parser.add_argument("--reports-dir", default="",
+                        help="Root directory where evaluation reports are stored.")
+    parser.add_argument("--enable-write", action="store_true",
+                        help="Allow write-capable tools (dismiss/restore findings); default is read-only.")
+    parser.add_argument("--worktree-dir", default="",
+                        help="Assistant worktree directory, if this session has one checked out.")
+    parser.add_argument("--read-only", action="store_true",
+                        help="Force read-only mode even if --enable-write is also passed.")
+    parser.add_argument("--score-cache-override", default="",
+                        help="Override path for the score cache, used by tests and isolated runs.")
+    return parser
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--db-path", required=True)
-    parser.add_argument("--session-id", required=True)
-    parser.add_argument("--run-dir", default="")
-    parser.add_argument("--repo-root", default="")
-    parser.add_argument("--evaluators-dir", required=True)
-    parser.add_argument("--compiled-dir", required=True)
-    parser.add_argument("--dimensions-file", required=True)
-    parser.add_argument("--project-id", default="")
-    parser.add_argument("--reports-dir", default="")
-    parser.add_argument("--enable-write", action="store_true")
-    parser.add_argument("--worktree-dir", default="")
-    parser.add_argument("--read-only", action="store_true")
-    parser.add_argument("--score-cache-override", default="")
+    _build_arg_parser(parser)
     ns = parser.parse_args(argv)
     registry = _build_registry_from_args(ns)
     if ns.score_cache_override:

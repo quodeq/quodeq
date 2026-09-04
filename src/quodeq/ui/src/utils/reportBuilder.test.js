@@ -234,3 +234,30 @@ test('existing buildOverviewReport and buildDimensionReport still produce output
   });
   assert.match(md2, /^# performance report/);
 });
+
+test('buildRunReport ratio matches complianceRatio when compliance is zero but violations exist', () => {
+  const dashboard = { dimensions, selectedRun: { runId: 'abc12345', dateLabel: '21 Apr 2025' } };
+  const md = buildRunReport({ dashboard, runSummary: { totalViolations: 3, totalCompliance: 0, severity: {} }, projectName: 'MyApp' });
+  assert.match(md, /- \*\*Ratio:\*\* 1:0/);
+});
+
+test('buildFileReport ratio matches complianceRatio when compliance is zero but violations exist', () => {
+  const file = {
+    file: 'src/foo/bar.js',
+    total: 3,
+    critical: 0,
+    major: 0,
+    minor: 3,
+    dimensionsCount: 1,
+    compliance: [],
+    violationsBySeverity: {
+      minor: [
+        { severity: 'minor', principle: 'Style', title: 'Format', file: 'src/foo/bar.js' },
+        { severity: 'minor', principle: 'Style', title: 'Format', file: 'src/foo/bar.js' },
+        { severity: 'minor', principle: 'Style', title: 'Format', file: 'src/foo/bar.js' },
+      ],
+    },
+  };
+  const md = buildFileReport(file);
+  assert.match(md, /- \*\*Ratio:\*\* 1:0/);
+});

@@ -70,7 +70,6 @@ class TestStartJobSpawnFailure:
         assert snap.status == STATUS_FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
         assert snap.error is not None
-        assert "No such file" in snap.error
 
     def test_returns_failed_snapshot_on_subprocess_error(self):
         def bad_spawn(*args, **kwargs):
@@ -80,6 +79,30 @@ class TestStartJobSpawnFailure:
         snap = mgr.start_job(["bad"])
         assert snap.status == STATUS_FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
+
+    def test_spawn_failure_returns_friendly_error_not_raw_exception(self):
+        def bad_spawn(*args, **kwargs):
+            raise OSError(2, "No such file or directory", "/some/internal/path")
+
+        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        snap = mgr.start_job(["nonexistent"])
+
+        assert snap.error == "Failed to start the evaluation process. Check the server logs for details."
+        assert "/some/internal/path" not in snap.error
+
+    def test_spawn_failure_still_logs_raw_detail_server_side(self):
+        store = InMemoryJobStore()
+        log = MagicMock()
+
+        def bad_spawn(*args, **kwargs):
+            raise OSError(2, "No such file or directory", "/some/internal/path")
+
+        mgr = JobManager(spawn_impl=bad_spawn, job_store=store, log=log)
+        snap = mgr.start_job(["nonexistent"])
+
+        job = store.get(snap.job_id)
+        assert any("/some/internal/path" in line for line in job.logs)
+        assert any("/some/internal/path" in call.args[0] for call in log.error.call_args_list)
 
 
 # ---------------------------------------------------------------------------

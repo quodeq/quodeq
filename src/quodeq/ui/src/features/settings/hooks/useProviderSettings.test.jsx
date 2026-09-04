@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import useProviderSettings from './useProviderSettings.js';
+import useProviderSettings, { saveProviderSetting } from './useProviderSettings.js';
+
+const showToast = vi.fn();
+vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
+  useSidePane: () => ({ showToast }),
+}));
 
 describe('useProviderSettings', () => {
   let mockStorage;
@@ -11,6 +16,7 @@ describe('useProviderSettings', () => {
       setItem: vi.fn(),
       removeItem: vi.fn(),
     };
+    showToast.mockClear();
   });
 
   afterEach(() => {
@@ -82,6 +88,46 @@ describe('useProviderSettings', () => {
 
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+
+  it('storage failure is surfaced via onPersistError, not only console.warn', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const storage = { setItem: () => { throw new DOMException('quota exceeded'); } };
+    const onPersistError = vi.fn();
+
+    saveProviderSetting('claude', 'model', 'sonnet', storage, { onPersistError });
+
+    expect(onPersistError).toHaveBeenCalledWith(expect.any(DOMException));
+  });
+
+  it('update shows a toast (not just console.warn) when persistence fails', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockStorage.setItem.mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+
+    const { result } = renderHook(() =>
+      useProviderSettings('ollama', {}, { storage: mockStorage })
+    );
+
+    act(() => {
+      result.current.update('model', 'llama3');
+    });
+
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('update does not show a toast when persistence succeeds', () => {
+    const { result } = renderHook(() =>
+      useProviderSettings('ollama', {}, { storage: mockStorage })
+    );
+
+    act(() => {
+      result.current.update('model', 'llama3');
+    });
+
+    expect(showToast).not.toHaveBeenCalled();
   });
 });
 

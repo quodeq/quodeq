@@ -29,6 +29,9 @@ export function useProviderDetection() {
         const top = ranked[0];
         setPreselection({ id: top.id, classification: top.classification, model: top.defaultModel || null });
       }
+    }).catch(() => {
+      if (cancelled) return;
+      setStatus('error');
     });
     return () => { cancelled = true; };
   }, []);

@@ -199,6 +199,36 @@ def test_unknown_deployment_is_single_user() -> None:
     assert shape.is_single_user is True
 
 
+def test_malformed_manifest_degrades_to_unknown(tmp_path: Path) -> None:
+    """A signal detector raising anything the per-manifest guards miss must
+    still degrade to UNKNOWN, not fail the run. detect_shape's own docstring
+    says nothing here may raise; this is the last-resort net around the
+    signal-detection calls, not a substitute for the per-manifest guards in
+    ``_project_shape_io.py``.
+    """
+    (tmp_path / "package.json").write_text("{not valid json")
+    shape = detect_shape(tmp_path)
+    assert shape.deployment is Deployment.UNKNOWN
+
+
+def test_signal_detector_exception_degrades_to_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-manifest readers already guard every known pathological input
+    (see ``TestPathologicalManifestsDegrade`` below), so this exercises the
+    top-level backstop directly: something unanticipated escaping a signal
+    detector must still degrade the whole verdict to UNKNOWN rather than
+    raise, per detect_shape's own "nothing in this module may raise"
+    contract.
+    """
+    def _boom(repo: Path) -> None:
+        raise RuntimeError("unexpected failure in signal detection")
+
+    monkeypatch.setattr("quodeq.context.project_shape._python_signals", _boom)
+    shape = detect_shape(tmp_path)
+    assert shape == ProjectShape()
+
+
 class TestPathologicalManifestsDegrade:
     """detect_shape must never fail a scan over a manifest it cannot read.
 

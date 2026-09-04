@@ -54,6 +54,12 @@ class FilesystemActionProvider(ActionProvider):
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
     ) -> None:
+        if reports_root is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_root = Path(get_evaluations_dir())
+        if index_db_path is None:
+            from quodeq.shared._env import get_index_db_path
+            index_db_path = Path(get_index_db_path())
         self._reports_root = reports_root
         self._compiled_dir = compiled_dir
 

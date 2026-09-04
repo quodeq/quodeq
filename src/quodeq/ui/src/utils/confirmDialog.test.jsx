@@ -40,6 +40,20 @@ describe('confirmDialog', () => {
     expect(await promise).toBe(false);
   });
 
+  it('focuses Confirm by default for a non-danger dialog', async () => {
+    const promise = confirmDialog({ title: 't', message: 'm' });
+    expect(document.activeElement).toBe(document.querySelector('.qd-confirm-btn--confirm'));
+    document.querySelector('.qd-confirm-btn--confirm').click();
+    await promise;
+  });
+
+  it('focuses Cancel by default for a danger-variant dialog', async () => {
+    const promise = confirmDialog({ variant: 'danger', title: 'Delete?', message: '...' });
+    expect(document.activeElement).toBe(document.querySelector('.qd-confirm-btn--cancel'));
+    document.querySelector('.qd-confirm-btn--cancel').click();
+    await promise;
+  });
+
 });
 
 describe('confirmDialog checkbox + shell reuse', () => {

@@ -45,6 +45,7 @@ def _default_api_base(env: dict[str, str] | None = None) -> str:
     value = (env if env is not None else os.environ).get("CWE_API_BASE", _CWE_API_URL)
     if not value.startswith(("http://", "https://")):
         # Env var contains an invalid scheme; fall back to the known-good default.
+        print(f"  WARNING: CWE_API_BASE={value!r} has no http(s):// scheme, ignoring and using {_CWE_API_URL}")
         return _CWE_API_URL
     return value
 

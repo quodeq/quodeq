@@ -11,6 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
+from quodeq.api.helpers import error_response
 from quodeq.assistant.worktree import (
     WorktreeError, WorktreeManager, diff_stats, diff_text)
 
@@ -68,7 +69,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return jsonify({"diff": text[:2_000_000], "truncated": truncated,
                             "stats": diff_stats(Path(row["path"]))})
         except WorktreeError as exc:
-            return jsonify({"error": str(exc)}), 500
+            body, status = error_response(str(exc), 500, "WORKSPACE_DIFF_FAILED")
+            return jsonify(body), status
 
     @app.post("/api/assistant/sessions/<sid>/workspace/apply")
     def assistant_workspace_apply(sid: str):
@@ -79,8 +81,10 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return jsonify({"error": "no worktree"}), 404
         from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
         if not _try_claim_turn(sid):
-            return jsonify({"error": "a turn or workspace action is in progress;"
-                            " wait for it to finish"}), 409
+            body, status = error_response(
+                "a turn or workspace action is in progress; wait for it to finish",
+                409, "TURN_IN_PROGRESS")
+            return jsonify(body), status
         try:
             row = repo.get_worktree(sid)  # re-read under the claim
             if row is None or row["status"] != "active":
@@ -157,7 +161,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             try:
                 _manager(row).remove()
             except WorktreeError as exc:
-                return jsonify({"error": str(exc)}), 500
+                body, status = error_response(str(exc), 500, "WORKSPACE_DISCARD_FAILED")
+                return jsonify(body), status
             repo.set_worktree_status(sid, "discarded")
             return jsonify({"discarded": True})
         finally:

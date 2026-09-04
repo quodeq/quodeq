@@ -112,6 +112,11 @@ class RunConfig:
         return self.dispatch or default_dispatch_policy()
 
     @property
+    def ai_cmd(self) -> str:
+        """The active AI provider id for this run (resolved dispatch policy)."""
+        return self._policy().ai_cmd
+
+    @property
     def source_file_count(self) -> int:
         """Files the active provider can actually analyze.
 

@@ -1,8 +1,12 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+vi.mock('../../../utils/confirmDialog.js', () => ({ confirmDialog: vi.fn() }));
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 import DismissedSubTab from './DismissedSubTab.jsx';
+
+beforeEach(() => { confirmDialog.mockReset(); confirmDialog.mockResolvedValue(true); });
 
 const sampleA = { req: 'A1', file: 'a.py', line: 10, severity: 'minor', principle: 'P1' };
 const sampleB = { req: 'B1', file: 'b.py', line: 20, severity: 'major', principle: 'P2' };
@@ -48,10 +52,23 @@ describe('DismissedSubTab', () => {
     expect(handlers.onDelete).toHaveBeenCalledWith(sampleA);
   });
 
-  it('clicking Delete all invokes onDeleteAll once', () => {
+  it('clicking Delete all invokes onDeleteAll once after confirming', async () => {
     const handlers = setup([sampleA, sampleB]);
     fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
-    expect(handlers.onDeleteAll).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'danger' }),
+    ));
+    await waitFor(() => expect(handlers.onDeleteAll).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not invoke onDeleteAll when the confirm dialog is cancelled', async () => {
+    confirmDialog.mockResolvedValueOnce(false);
+    const handlers = setup([sampleA, sampleB]);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'danger' }),
+    ));
+    expect(handlers.onDeleteAll).not.toHaveBeenCalled();
   });
 
   it('omits Restore/Delete per-card when onRestore/onDelete are undefined (shared, read-only)', () => {

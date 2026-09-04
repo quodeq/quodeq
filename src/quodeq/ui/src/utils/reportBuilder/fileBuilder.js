@@ -1,6 +1,7 @@
 // src/quodeq/ui/src/utils/reportBuilder/fileBuilder.js
 import { SEVERITY_ORDER } from '../formatters.js';
 import { formatDate, formatViolationEntry, buildComplianceSection } from './shared.js';
+import { complianceRatio } from '../textFormatting.js';
 
 function buildFileSummarySection(file, totalViolations, totalCompliance) {
   const lines = [];
@@ -9,9 +10,7 @@ function buildFileSummarySection(file, totalViolations, totalCompliance) {
   lines.push(`- **${totalViolations}** total violations (${file.critical || 0} critical, ${file.major || 0} major, ${file.minor || 0} minor)`);
   lines.push(`- **${totalCompliance}** compliance findings`);
   lines.push(`- **${file.dimensionsCount || 0}** dimension${file.dimensionsCount === 1 ? '' : 's'}`);
-  if (totalViolations && totalCompliance) {
-    lines.push(`- **Ratio:** 1:${Math.round(totalCompliance / totalViolations)}`);
-  }
+  lines.push(`- **Ratio:** ${complianceRatio(totalViolations, totalCompliance)}`);
   lines.push('');
   return lines;
 }

@@ -225,6 +225,14 @@ def test_get_evaluation_status_external_surfaces_deadline_at(tmp_path: Path) -> 
     assert snapshot.source == "external"
 
 
+def test_default_provider_resolves_reports_root_from_env_once_at_construction(monkeypatch, tmp_path):
+    """reports_root env fallback happens in FilesystemActionProvider.__init__,
+    not lazily inside EvaluationsIndex on first use."""
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "envreports"))
+    provider = FilesystemActionProvider(index_db_path=tmp_path / "idx.db")
+    assert provider._evaluations._reports_root == tmp_path / "envreports"
+
+
 def test_get_evaluation_status_external_handles_missing_deadline(tmp_path: Path) -> None:
     """Snapshot builder must tolerate runs that have no deadline (unlimited budget)."""
     reports = tmp_path / "reports"

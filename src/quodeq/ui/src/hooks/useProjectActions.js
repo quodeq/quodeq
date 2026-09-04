@@ -16,6 +16,7 @@
 import { useApi } from '../api/ApiContext.jsx';
 import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
+import { apiErrorMessage } from '../strings/apiErrors.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
@@ -33,12 +34,12 @@ function makeFail(onError) {
   };
 }
 
-function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
+export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
   return async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);
     } catch (err) {
-      return fail('projects.deleteProjectFailed', { error: err.message });
+      return fail('projects.deleteProjectFailed', { error: apiErrorMessage(err, 'projects.deleteProjectFailed') });
     }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();

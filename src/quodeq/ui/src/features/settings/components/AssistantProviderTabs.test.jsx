@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, waitFor, act } from '@testing-library/react';
+import { render, waitFor, act, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
@@ -8,6 +8,11 @@ import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 const CLIENTS = [
   { id: 'claude', label: 'Claude', type: 'cli', installed: true },
   { id: 'ollama', label: 'Ollama', type: 'local-api', installed: true },
+];
+
+const CLIENTS_WITH_UNINSTALLED = [
+  { id: 'claude', label: 'Claude', type: 'cli', installed: true },
+  { id: 'ollama', label: 'Ollama', type: 'local-api', installed: false },
 ];
 
 const fakeApi = {
@@ -98,5 +103,17 @@ describe('AssistantProviderTabs', () => {
       expect([...opts].some((o) => o.value === 'gemma4:26b')).toBe(true);
     });
     expect(fakeApi.getOllamaModels).toHaveBeenCalled();
+  });
+
+  it('clicking an uninstalled provider pill does not switch the active provider', async () => {
+    fakeApi.getAiClients.mockResolvedValueOnce({ clients: CLIENTS_WITH_UNINSTALLED });
+    localStorage.setItem('cc-assistant-mode', 'custom');
+    const { findByText } = await renderPanel();
+    const ollamaPill = await findByText('Ollama');
+    fireEvent.click(ollamaPill);
+    // Still on the originally active provider (claude) — the pill for
+    // ollama never becomes selected since it's not installed.
+    expect(ollamaPill.closest('button')).toHaveAttribute('aria-selected', 'false');
+    expect(localStorage.getItem('cc-assistant-active-provider')).not.toBe('ollama');
   });
 });

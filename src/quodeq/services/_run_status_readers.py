@@ -35,17 +35,43 @@ def _status_json_terminal(run_dir: Path) -> bool:
 
 
 def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
-    """Return the last *max_lines* lines from run.log."""
+    """Return the last *max_lines* lines from run.log.
+
+    Reads backward from the end in growing chunks instead of the whole file,
+    so a multi-MB in-progress log costs O(tail size) per call, not O(file
+    size). ``run.log`` is append-only in practice (no in-place rewrites), so
+    a stale byte count from a concurrent writer only risks re-reading a few
+    extra bytes on the next call, never corrupting output.
+    """
     log_path = run_dir / "run.log"
     if not log_path.is_file():
         return []
     try:
-        with log_path.open("r", encoding="utf-8", errors="replace") as fp:
-            lines = fp.readlines()
+        file_size = log_path.stat().st_size
+        chunk = 8192
+        data = b""
+        with log_path.open("rb") as fp:
+            read_to = file_size
+            while read_to > 0:
+                read_from = max(0, read_to - chunk)
+                fp.seek(read_from)
+                data = fp.read(read_to - read_from) + data
+                read_to = read_from
+                # +1: need max_lines *complete* lines, i.e. max_lines newlines
+                # before the final one (or we've hit the start of the file).
+                if data.count(b"\n") > max_lines or read_from == 0:
+                    break
+                chunk *= 2
+        text = data.decode("utf-8", errors="replace")
     except OSError:
         return []
-    tail = lines[-max_lines:] if len(lines) > max_lines else lines
-    return [line.rstrip("\n") for line in tail]
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines = lines[:-1]  # trailing newline produces one empty split segment
+    # Text-mode writers on Windows produce CRLF; the old text-mode reader's
+    # universal newlines absorbed the \r, the byte-level split must drop it.
+    lines = [line.removesuffix("\r") for line in lines]
+    return lines[-max_lines:] if len(lines) > max_lines else lines
 
 
 def _load_status_json(run_dir: Path) -> dict | None:

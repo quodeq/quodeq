@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 from quodeq.data.fs.shared_repo import FORMAT_NAME
+from quodeq.services.shared_connect import ConnectOutcome
 from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_publish_status are pytest fixtures
     _ORIGIN,
     _clean_publish_status,
@@ -36,6 +37,48 @@ def test_put_config_rejects_private_host(client, monkeypatch, tmp_path):
 def test_put_config_requires_url(client):
     resp = client.put("/api/shared/config", json={}, headers=_ORIGIN)
     assert resp.status_code == 400
+
+
+def test_put_shared_config_missing_url_has_code(client):
+    resp = client.put("/api/shared/config", json={}, headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "URL_REQUIRED"
+
+
+def test_put_shared_config_clone_failed_has_code(client, monkeypatch):
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared_config.connect_shared_repo",
+        lambda url: ConnectOutcome(status="clone_failed", url=url),
+    )
+    resp = client.put(
+        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
+    )
+    assert resp.status_code == 502
+    assert resp.get_json()["code"] == "CLONE_FAILED"
+
+
+def test_put_shared_config_foreign_repo_has_code(client, monkeypatch):
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared_config.connect_shared_repo",
+        lambda url: ConnectOutcome(status="foreign", url=url),
+    )
+    resp = client.put(
+        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "FOREIGN_REPO"
+
+
+def test_put_shared_config_unsupported_version_has_code(client, monkeypatch):
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared_config.connect_shared_repo",
+        lambda url: ConnectOutcome(status="unsupported_version", url=url),
+    )
+    resp = client.put(
+        "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "UNSUPPORTED_VERSION"
 
 
 def test_put_config_rejects_non_string_url(client, monkeypatch, tmp_path):

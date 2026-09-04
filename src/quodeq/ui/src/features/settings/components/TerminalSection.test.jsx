@@ -4,9 +4,11 @@ import '@testing-library/jest-dom/vitest';
 
 const killTerminal = vi.fn(() => Promise.resolve({ ok: true }));
 vi.mock('../../../api/terminal.js', () => ({ killTerminal: (...a) => killTerminal(...a) }));
+vi.mock('../../../utils/confirmDialog.js', () => ({ confirmDialog: vi.fn() }));
 import TerminalSection from './TerminalSection.jsx';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); confirmDialog.mockResolvedValue(true); });
 
 it('toggles the terminal on and off', () => {
   render(<TerminalSection />);
@@ -20,7 +22,10 @@ it('Restart terminal kills the server session and signals the pane to reconnect'
   window.addEventListener('quodeq:terminal-restart', onRestart);
   render(<TerminalSection />);
   fireEvent.click(screen.getByRole('button', { name: /restart terminal/i }));
-  expect(killTerminal).toHaveBeenCalled();
+  await waitFor(() => expect(confirmDialog).toHaveBeenCalledWith(
+    expect.objectContaining({ variant: 'danger' }),
+  ));
+  await waitFor(() => expect(killTerminal).toHaveBeenCalled());
   await waitFor(() => expect(onRestart).toHaveBeenCalled());  // dispatched after kill resolves
   window.removeEventListener('quodeq:terminal-restart', onRestart);
 });
@@ -37,4 +42,15 @@ it('does not signal a reconnect when the kill fails (avoids restarting onto the 
   expect(onRestart).not.toHaveBeenCalled();
   window.removeEventListener('quodeq:terminal-restart', onRestart);
   warn.mockRestore();
+});
+
+it('does not kill the terminal when the confirm dialog is cancelled', async () => {
+  localStorage.setItem('cc-terminal-enabled', 'true');
+  confirmDialog.mockResolvedValueOnce(false);
+  render(<TerminalSection />);
+  fireEvent.click(screen.getByRole('button', { name: /restart terminal/i }));
+  await waitFor(() => expect(confirmDialog).toHaveBeenCalledWith(
+    expect.objectContaining({ variant: 'danger' }),
+  ));
+  expect(killTerminal).not.toHaveBeenCalled();
 });

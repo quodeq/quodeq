@@ -33,6 +33,7 @@ from quodeq.api.assistant_turn_state import (  # noqa: F401 — re-export/patch 
 from quodeq.api._assistant_helpers import _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
 from quodeq.api._assistant_helpers import build_tool_context  # noqa: F401 — re-export/patch target
 from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
+from quodeq.api.helpers import error_response
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import run_turn  # noqa: F401 — re-export/patch target
 from quodeq.services.shared_repo import read_state
@@ -60,10 +61,12 @@ def _shared_source_error() -> tuple[Response, int] | None:
     repository is configured or its local clone state is unusable, else None."""
     settings = read_settings()
     if not settings.url:
-        return jsonify({"error": "no shared repository configured"}), 409
+        body, status = error_response("no shared repository configured", 409, "NO_SHARED_REPO")
+        return jsonify(body), status
     state = read_state(settings.url)
     if state not in ("ok", "empty"):
-        return jsonify({"error": f"shared repository unavailable: {state}"}), 409
+        body, status = error_response(f"shared repository unavailable: {state}", 409, "SHARED_REPO_UNAVAILABLE")
+        return jsonify(body), status
     return None
 
 

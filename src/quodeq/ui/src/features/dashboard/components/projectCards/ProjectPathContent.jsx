@@ -3,22 +3,23 @@ import Badge from '../../../../components/Badge.jsx';
 import { t } from '../../../../strings/index.js';
 import { formatPath } from './projectDisplayHelpers.js';
 
-function RelocateRow({ id, relocatePath, setRelocatePath, submitRelocate, setRelocating }) {
+function RelocateRow({ id, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating }) {
   return (
     <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
       <input className="project-relocate-input" value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }} placeholder="/new/path/to/repo" autoFocus />
       <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>{t('projects.save')}</button>
       <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>{t('common.cancel')}</button>
+      {relocateError && <span className="project-relocate-error">{relocateError}</span>}
     </div>
   );
 }
 
 export function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
-  const { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
+  const { relocating, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
   const path = formatPath(p.path);
   const pathMissing = p.location === 'local' && p.pathExists === false;
   if (relocating === id) {
-    return <RelocateRow id={id} relocatePath={relocatePath} setRelocatePath={setRelocatePath} submitRelocate={submitRelocate} setRelocating={setRelocating} />;
+    return <RelocateRow id={id} relocatePath={relocatePath} relocateError={relocateError} setRelocatePath={setRelocatePath} submitRelocate={submitRelocate} setRelocating={setRelocating} />;
   }
   return (
     <div className="project-path-row">

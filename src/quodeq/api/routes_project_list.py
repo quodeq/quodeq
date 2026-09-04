@@ -67,10 +67,9 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         projects = result.get("projects", [])
         offset = request.args.get("offset", 0, type=int)
         limit = request.args.get("limit", 0, type=int)
-        if offset > 0:
-            projects = projects[offset:]
-        if limit > 0:
-            projects = projects[:limit]
+        if offset > 0 or limit > 0:
+            end = offset + limit if limit > 0 else None
+            projects = projects[offset:end]
         # Self-healing warm-up: anything still pending on the page being
         # returned goes (back) on the queue, bounding this to page size
         # instead of the full project count.
@@ -99,6 +98,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
         """Export a project as a ZIP archive."""
+        try:
+            validate_path_segment(project)
+        except ValueError:
+            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
         return export_project_zip(project, reports_dir())
 
     @app.post("/api/projects/import")

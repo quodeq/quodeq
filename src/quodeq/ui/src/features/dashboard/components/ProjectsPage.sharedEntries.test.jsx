@@ -6,6 +6,7 @@ import React from 'react';
 import ProjectsPage from './ProjectsPage.jsx';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { SidePaneProvider } from '../../side-pane/index.js';
 
 // Task 7: one merged local+shared list, no tabs. The local list renders
 // unconditionally; the shared list layers in once useSharedProjects resolves
@@ -27,7 +28,9 @@ function renderWithApi(ui, fakeApi) {
   const QC = withQueryClient();
   return render(
     <QC>
-      <ApiProvider value={fakeApi}>{ui}</ApiProvider>
+      <ApiProvider value={fakeApi}>
+        <SidePaneProvider>{ui}</SidePaneProvider>
+      </ApiProvider>
     </QC>
   );
 }

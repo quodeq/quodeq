@@ -96,6 +96,7 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
             eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {eval_path}: {exc}")
+            return -1, -1
 
     return v_count, c_count
 
@@ -117,12 +118,16 @@ def main() -> None:
         sys.exit(0)
 
     total_v = total_c = files_changed = files_skipped = 0
+    had_errors = False
 
     for path in eval_files:
         result = migrate_file(path, args.apply)
         if result is None:
             files_skipped += 1
             print(f"  skip     {path.relative_to(root)}  (no JSONL found)")
+            continue
+        if result == (-1, -1):
+            had_errors = True
             continue
         v, c = result
         rel = path.relative_to(root)
@@ -138,6 +143,8 @@ def main() -> None:
     print(f"\n{mode}: {files_changed} files patched, {total_v} violations, {total_c} compliance entries, {files_skipped} skipped")
     if not args.apply and (total_v or total_c):
         print("Run with --apply to write changes.")
+    if had_errors:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
