@@ -64,6 +64,30 @@ const CODE_KEYS = {
   RATE_LIMITED: 'apiError.rateLimited',
   UNAUTHORIZED: 'apiError.unauthorized',
   FORBIDDEN: 'apiError.forbidden',
+
+  // Shared results repository: connect (PUT /api/shared/config), refresh,
+  // publish (routes_shared_config.py), and the assistant's own gate for
+  // starting a session against it (assistant_routes.py's _shared_source_error).
+  NO_SHARED_REPO: 'apiError.noSharedRepo',
+  SHARED_REPO_UNAVAILABLE: 'apiError.sharedRepoUnavailable',
+  URL_REQUIRED: 'apiError.urlRequired',
+  CLONE_FAILED: 'apiError.sharedRepoCloneFailed',
+  UNSUPPORTED_VERSION: 'apiError.sharedRepoUnsupportedVersion',
+  REFRESH_FAILED: 'apiError.sharedRepoRefreshFailed',
+  PUBLISH_IN_PROGRESS: 'apiError.publishInProgress',
+  PUBLISH_START_FAILED: 'apiError.publishStartFailed',
+
+  // Assistant workspace: diff/apply/discard on the isolated write worktree
+  // (assistant_workspace_routes.py).
+  WORKSPACE_DIFF_FAILED: 'apiError.workspaceDiffFailed',
+  TURN_IN_PROGRESS: 'apiError.turnInProgress',
+  WORKSPACE_DISCARD_FAILED: 'apiError.workspaceDiscardFailed',
+
+  // Scores (_scores_routes.py).
+  SCORES_READ_FAILED: 'apiError.scoresReadFailed',
+
+  // Confirmation gates: delete-all findings, delete project.
+  CONFIRMATION_REQUIRED: 'apiError.confirmationRequired',
 };
 
 /** The catalog key for a backend code, or null when the code is unmapped. */

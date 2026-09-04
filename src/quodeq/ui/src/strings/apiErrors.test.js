@@ -39,6 +39,37 @@ test('a mapped code wins over the backend message, and is translated', () => {
   assert.notEqual(msg, 'repo missing');
 });
 
+// The 13 Group D codes (D1-D4): error_response(message, status, code) calls
+// added across assistant_routes.py, assistant_workspace_routes.py,
+// routes_shared_config.py and _scores_routes.py, but never mapped here until
+// now -- so every one of them fell through to the raw backend sentence. Each
+// assertion proves the code now resolves to its own translated key instead.
+test('every Group D code maps to a translated key distinct from its raw backend message', () => {
+  const cases = [
+    ['NO_SHARED_REPO', 'no shared repository configured', 'apiError.noSharedRepo'],
+    ['SHARED_REPO_UNAVAILABLE', 'shared repository unavailable: missing', 'apiError.sharedRepoUnavailable'],
+    ['WORKSPACE_DIFF_FAILED', 'diff failed', 'apiError.workspaceDiffFailed'],
+    ['TURN_IN_PROGRESS', 'a turn or workspace action is in progress; wait for it to finish', 'apiError.turnInProgress'],
+    ['WORKSPACE_DISCARD_FAILED', 'discard failed', 'apiError.workspaceDiscardFailed'],
+    ['URL_REQUIRED', 'url is required', 'apiError.urlRequired'],
+    ['CLONE_FAILED', 'could not clone the repository, check that git can access <url>', 'apiError.sharedRepoCloneFailed'],
+    ['UNSUPPORTED_VERSION', 'this shared repository requires a newer version of quodeq', 'apiError.sharedRepoUnsupportedVersion'],
+    ['REFRESH_FAILED', 'some refresh failure reason', 'apiError.sharedRepoRefreshFailed'],
+    ['PUBLISH_IN_PROGRESS', 'a publish is already running', 'apiError.publishInProgress'],
+    ['PUBLISH_START_FAILED', 'could not start the publish job, see server logs', 'apiError.publishStartFailed'],
+    ['SCORES_READ_FAILED', 'could not read run scores', 'apiError.scoresReadFailed'],
+    ['CONFIRMATION_REQUIRED', 'Use ?confirm=true to confirm deletion', 'apiError.confirmationRequired'],
+  ];
+  for (const [code, rawMessage, expectedKey] of cases) {
+    const key = apiErrorKey(code);
+    assert.equal(key, expectedKey, `${code} should map to ${expectedKey}`);
+    assert.ok(key in catalog, `${key} missing from en.json`);
+    const msg = apiErrorMessage({ code, message: rawMessage }, 'x.y');
+    assert.equal(msg, catalog[expectedKey], `${code} should render its mapped copy`);
+    assert.notEqual(msg, rawMessage, `${code} must not fall through to the raw backend message`);
+  }
+});
+
 // The specificity trade-off, pinned: an unmapped code must keep showing the
 // backend's own sentence. Several screens have tests asserting that message
 // reaches the user verbatim, and dropping it to a vague translated string
