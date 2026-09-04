@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
 // surface the message and let the user retry, apply, or discard.
@@ -37,7 +38,9 @@ export function useWorkspaceDiff({ sessionId, onChanged }) {
     setDiff(null); setError(null);
     fetchAssistantWorkspaceDiff(sessionId)
       .then((d) => { if (!cancelled) { setDiff(d.diff ?? ''); setTruncated(!!d.truncated); } })
-      .catch((err) => { if (!cancelled) setError(err?.message || String(err)); });
+      // WORKSPACE_DIFF_FAILED carries a `code` (see assistant_workspace_routes.py) --
+      // route it through apiErrorMessage instead of always showing the raw text.
+      .catch((err) => { if (!cancelled) setError(apiErrorMessage(err, 'assistant.diffLoadFailed')); });
     return () => { cancelled = true; };
   }, [sessionId]);
 
@@ -55,7 +58,10 @@ export function useWorkspaceDiff({ sessionId, onChanged }) {
       setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
       onChanged?.();
     } catch (err) {
-      setError(err?.message || String(err));
+      // TURN_IN_PROGRESS / WORKSPACE_DISCARD_FAILED carry a `code` (see
+      // assistant_workspace_routes.py) -- route through apiErrorMessage
+      // instead of always showing the raw text.
+      setError(apiErrorMessage(err, 'assistant.workspaceActionFailed'));
     } finally {
       setBusy(false);
     }
