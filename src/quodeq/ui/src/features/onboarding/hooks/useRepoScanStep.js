@@ -70,7 +70,7 @@ export function makeHandleSubmit({ state, actions, createProject, setSubStep, se
   };
 }
 
-function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
+export function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
   return async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
     const repo = state.repo.value?.trim();
     setCloneSubmitting(true);
@@ -92,8 +92,9 @@ function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep
           return;
         }
       }
-      setCloneError(friendlyCloneError(err));
-      actions.failScan({ message: err.message, status: err.status, existingProjectId: err.existingProjectId, code: err.code });
+      const message = friendlyCloneError(err);
+      setCloneError(message);
+      actions.failScan({ message, status: err.status, existingProjectId: err.existingProjectId, code: err.code });
     } finally {
       setCloneSubmitting(false);
     }

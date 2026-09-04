@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { makeHandleSubmit } from './useRepoScanStep.js';
+import { makeHandleSubmit, makeHandleCloneTargetSubmit } from './useRepoScanStep.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 // The direct path (a local path, or a repo already registered under a
@@ -48,6 +48,58 @@ describe('makeHandleSubmit', () => {
     });
 
     await handleSubmit();
+
+    expect(actions.failScan.mock.calls[0][0].message).toBe('Project not found');
+  });
+});
+
+describe('makeHandleCloneTargetSubmit', () => {
+  it('clone-target scan failure runs the error through apiErrorMessage', async () => {
+    // AUTH_REQUIRED is a mapped code (see apiErrors.js CODE_KEYS), so its
+    // friendly text diverges from the raw backend message -- that divergence
+    // is what makes this test fail against the old `message: err.message`
+    // code, which forwarded err.message straight to failScan even though
+    // setCloneError right above it already ran the same err through
+    // apiErrorMessage.
+    const err = Object.assign(new Error('raw internal detail'), { code: 'AUTH_REQUIRED' });
+    const createProject = vi.fn().mockRejectedValue(err);
+    const actions = { startScan: vi.fn(), failScan: vi.fn(), succeedScan: vi.fn() };
+    const handleCloneTargetSubmit = makeHandleCloneTargetSubmit({
+      state: { repo: { value: 'https://example.com/org/repo.git' } },
+      actions,
+      createProject,
+      setSubStep: vi.fn(),
+      setCloneError: vi.fn(),
+      setCloneSubmitting: vi.fn(),
+      tryResumeExisting: vi.fn().mockResolvedValue(false),
+    });
+
+    await handleCloneTargetSubmit({ cloneDest: '/tmp/repo', ephemeral: false });
+
+    expect(actions.failScan).toHaveBeenCalledWith(
+      expect.objectContaining({ message: apiErrorMessage(err, 'onboarding.cloneFailed') }),
+    );
+    expect(actions.failScan.mock.calls[0][0].message).not.toBe(err.message);
+    // code forwarding for downstream consumers (e.g. existingProjectId flows)
+    // is unrelated to the message mapping and must survive the fix.
+    expect(actions.failScan.mock.calls[0][0].code).toBe('AUTH_REQUIRED');
+  });
+
+  it('an unmapped code keeps showing the backend message, unchanged', async () => {
+    const err = Object.assign(new Error('Project not found'), { code: 'NOT_FOUND' });
+    const createProject = vi.fn().mockRejectedValue(err);
+    const actions = { startScan: vi.fn(), failScan: vi.fn(), succeedScan: vi.fn() };
+    const handleCloneTargetSubmit = makeHandleCloneTargetSubmit({
+      state: { repo: { value: 'https://example.com/org/repo.git' } },
+      actions,
+      createProject,
+      setSubStep: vi.fn(),
+      setCloneError: vi.fn(),
+      setCloneSubmitting: vi.fn(),
+      tryResumeExisting: vi.fn().mockResolvedValue(false),
+    });
+
+    await handleCloneTargetSubmit({ cloneDest: '/tmp/repo', ephemeral: false });
 
     expect(actions.failScan.mock.calls[0][0].message).toBe('Project not found');
   });
