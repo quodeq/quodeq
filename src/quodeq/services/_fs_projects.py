@@ -218,20 +218,27 @@ def delete_project(reports_dir: str, project: str) -> bool:
 
     # Cascade: find and delete children first
     children_removed = True
-    child_ids = find_children(reports_root, project)
-    for child_id in child_ids:
+    removed_ids: set[str] = set()
+    for child_id in find_children(reports_root, project):
         child_path = reports_root / child_id
-        if not remove_project_dir(child_path):
+        if remove_project_dir(child_path):
+            removed_ids.add(child_id)
+        else:
             _logger.warning("Could not remove child project directory %s", child_path)
             children_removed = False
 
-    if not remove_project_dir(project_path):
-        return False
-
     # Keep find_existing_project's duplicate-check index in sync: a stale
     # entry pointing at a deleted uuid would let it wrongly report a
-    # "duplicate" for a repo identity that's actually free again.
-    remove_repo_index_entries(reports_root, {project, *child_ids})
+    # "duplicate" for a repo identity that's actually free again. Purge
+    # whatever was actually removed regardless of the parent's own removal
+    # outcome below -- a child gone from disk must not leave a dangling
+    # index entry just because the parent dir removal then fails.
+    if not remove_project_dir(project_path):
+        remove_repo_index_entries(reports_root, removed_ids)
+        return False
+
+    removed_ids.add(project)
+    remove_repo_index_entries(reports_root, removed_ids)
     return children_removed
 
 
