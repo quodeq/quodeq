@@ -15,6 +15,23 @@ function applyPrOutcome(res, setOutcome, setError) {
   }
 }
 
+async function runWorkspaceAction(fn, kind, { setOutcome, setError, onChanged }) {
+  try {
+    const res = await fn();
+    if (kind === 'pr' && !res.prUrl) {
+      applyPrOutcome(res, setOutcome, setError);
+    } else {
+      setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
+    }
+    onChanged?.();
+  } catch (err) {
+    // TURN_IN_PROGRESS / WORKSPACE_DISCARD_FAILED carry a `code` (see
+    // assistant_workspace_routes.py) -- route through apiErrorMessage
+    // instead of always showing the raw text.
+    setError(apiErrorMessage(err, 'assistant.workspaceActionFailed'));
+  }
+}
+
 /**
  * WorkspaceDiffPanel.jsx's diff-loading, action (apply/PR/discard) and PR-form
  * state. Extracted verbatim.
@@ -48,23 +65,8 @@ export function useWorkspaceDiff({ sessionId, onChanged }) {
 
   const act = useCallback(async (fn, kind) => {
     setBusy(true); setError(null);
-    try {
-      const res = await fn();
-      if (kind === 'pr' && !res.prUrl) {
-        applyPrOutcome(res, setOutcome, setError);
-        onChanged?.();
-        return;
-      }
-      setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
-      onChanged?.();
-    } catch (err) {
-      // TURN_IN_PROGRESS / WORKSPACE_DISCARD_FAILED carry a `code` (see
-      // assistant_workspace_routes.py) -- route through apiErrorMessage
-      // instead of always showing the raw text.
-      setError(apiErrorMessage(err, 'assistant.workspaceActionFailed'));
-    } finally {
-      setBusy(false);
-    }
+    await runWorkspaceAction(fn, kind, { setOutcome, setError, onChanged });
+    setBusy(false);
   }, [onChanged]);
 
   return {
