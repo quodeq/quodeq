@@ -68,6 +68,9 @@ def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines = lines[:-1]  # trailing newline produces one empty split segment
+    # Text-mode writers on Windows produce CRLF; the old text-mode reader's
+    # universal newlines absorbed the \r, the byte-level split must drop it.
+    lines = [line.removesuffix("\r") for line in lines]
     return lines[-max_lines:] if len(lines) > max_lines else lines
 
 

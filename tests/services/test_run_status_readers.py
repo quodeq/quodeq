@@ -170,6 +170,20 @@ def test_tail_run_log_no_trailing_newline(tmp_path: Path):
     assert tail == [f"line-{i}" for i in range(5)]
 
 
+def test_tail_run_log_crlf_line_endings(tmp_path: Path):
+    from quodeq.services._run_status_readers import _tail_run_log
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    log_path = run_dir / "run.log"
+    # Text-mode writers on Windows produce CRLF; write bytes so this is
+    # exercised on every platform, not just Windows CI.
+    log_path.write_bytes(b"".join(f"line-{i}\r\n".encode() for i in range(5)))
+
+    tail = _tail_run_log(run_dir, max_lines=500)
+    assert tail == [f"line-{i}" for i in range(5)]
+
+
 def test_tail_run_log_missing_file(tmp_path: Path):
     from quodeq.services._run_status_readers import _tail_run_log
 
