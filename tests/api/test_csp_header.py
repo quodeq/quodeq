@@ -156,3 +156,50 @@ def test_non_webview_ua_stays_strict():
     script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)"), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" not in script_src
+
+
+# --- Host header validation before CSP interpolation (Task 9) --------------
+
+
+def _csp_for_host(host: str) -> str:
+    app = create_app()
+    with app.test_client() as client:
+        return client.get(
+            "/api/health", headers={"Host": host}
+        ).headers["Content-Security-Policy"]
+
+
+def test_csp_same_origin_ws_uses_valid_host():
+    """A well-formed Host header still gets an explicit same-origin ws/wss entry."""
+    connect_src = _directive(_csp_for_host("example.com:8080"), "connect-src")
+    assert connect_src is not None
+    tokens = connect_src.split()
+    assert "ws://example.com:8080" in tokens
+    assert "wss://example.com:8080" in tokens
+
+
+def test_csp_omits_same_origin_ws_for_malicious_host_header():
+    """A malicious Host header must not be interpolated raw into the CSP.
+
+    Regression for the finding: connect-src was built from the raw,
+    unvalidated Host header, so a Host containing a quote/space could inject
+    extra CSP sources or directives. Invalid hosts must have the same-origin
+    ws:/wss: entry omitted entirely rather than reflected into the header.
+    """
+    malicious_host = 'evil.example" ws://attacker.evil'
+    csp = _csp_for_host(malicious_host)
+
+    # The raw malicious host must never appear verbatim in the header.
+    assert malicious_host not in csp
+    assert '"' not in csp
+    assert "attacker.evil" not in csp
+
+    connect_src = _directive(csp, "connect-src")
+    assert connect_src is not None
+    # Same-origin ws/wss entries for the bogus host must be absent.
+    assert "evil.example" not in connect_src
+    # The rest of connect-src (alt-port origins) must still be present —
+    # omission of the same-origin entry must not break the whole directive.
+    assert "'self'" in connect_src
+    for origin in _ALT_PORT_ORIGINS:
+        assert origin in connect_src
