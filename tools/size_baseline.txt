@@ -13,7 +13,7 @@ src/quodeq/api/routes_evaluations_list.py:55:function
 src/quodeq/api/routes_findings.py:92:function
 src/quodeq/api/routes_project_data.py:24:function
 src/quodeq/api/routes_project_list.py:59:function
-src/quodeq/api/routes_shared_config.py:28:function
+src/quodeq/api/routes_shared_config.py:22:function
 src/quodeq/api/routes_shared_mirrors.py:41:function
 src/quodeq/api/standards_overrides_routes.py:29:function
 src/quodeq/api/terminal_routes.py:97:function
