@@ -6,7 +6,7 @@ src/quodeq/api/_import_validation.py:88:function
 src/quodeq/api/_log_stream_routes.py:54:function
 src/quodeq/api/assistant_session_routes.py:58:function
 src/quodeq/api/assistant_turn_routes.py:95:function
-src/quodeq/api/assistant_workspace_routes.py:26:function
+src/quodeq/api/assistant_workspace_routes.py:22:function
 src/quodeq/api/llm_bridge_routes.py:54:function
 src/quodeq/api/routes_evaluations_item.py:98:function
 src/quodeq/api/routes_evaluations_list.py:55:function

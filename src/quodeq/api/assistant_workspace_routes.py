@@ -12,15 +12,11 @@ from flask import Flask, jsonify, request
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.api.helpers import error_response
-from quodeq.assistant.worktree import (
-    WorktreeError, WorktreeManager, diff_stats, diff_text)
+from quodeq.assistant.workspace_actions import (
+    apply_workspace, create_workspace_pr, discard_workspace)
+from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
 _logger = logging.getLogger(__name__)
-
-
-def _manager(row: dict) -> WorktreeManager:
-    return WorktreeManager(repo_root=Path(row["repo_root"]),
-                           path=Path(row["path"]), branch=row["branch"])
 
 
 def register_assistant_workspace_routes(app: Flask) -> None:
@@ -82,32 +78,21 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if row is None:
             return jsonify({"error": "no worktree"}), 404
         from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
-        if not _try_claim_turn(sid):
+        outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
+                                  release_turn=_release_turn)
+        if outcome.kind == "turn_busy":
             body, status = error_response(
                 "a turn or workspace action is in progress; wait for it to finish",
                 409, "TURN_IN_PROGRESS")
             return jsonify(body), status
-        try:
-            row = repo.get_worktree(sid)  # re-read under the claim
-            if row is None or row["status"] != "active":
-                return jsonify({"error": "worktree already "
-                                f"{row['status'] if row else 'gone'}"}), 409
-            manager = _manager(row)
-            try:
-                stats = manager.apply_to_repo()
-            except WorktreeError as exc:
-                _logger.warning("workspace apply failed for %s: %s", sid, exc)
-                body, status = error_response(
-                    "failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
-                return jsonify(body), status
-            repo.set_worktree_status(sid, "applied")
-            try:
-                manager.remove()
-            except WorktreeError:
-                _logger.warning("worktree remove failed after apply for %s", sid)
-            return jsonify({"applied": True, "stats": stats})
-        finally:
-            _release_turn(sid)
+        if outcome.kind == "not_active":
+            return jsonify({"error": f"worktree already {outcome.detail}"}), 409
+        if outcome.kind == "failed":
+            _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
+            body, status = error_response(
+                "failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
+            return jsonify(body), status
+        return jsonify({"applied": True, "stats": outcome.stats})
 
     @app.post("/api/assistant/sessions/<sid>/workspace/pr")
     def assistant_workspace_pr(sid: str):
@@ -117,33 +102,21 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if row is None:
             return jsonify({"error": "no worktree"}), 404
         from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
-        if not _try_claim_turn(sid):
+        req_body = request.get_json(silent=True) or {}
+        outcome = create_workspace_pr(
+            repo, sid, str(req_body.get("title", "")), str(req_body.get("body", "")),
+            claim_turn=_try_claim_turn, release_turn=_release_turn)
+        if outcome.kind == "turn_busy":
             return jsonify({"error": "a turn or workspace action is in progress;"
                             " wait for it to finish"}), 409
-        try:
-            row = repo.get_worktree(sid)  # re-read under the claim
-            if row is None or row["status"] != "active":
-                return jsonify({"error": "worktree already "
-                                f"{row['status'] if row else 'gone'}"}), 409
-            req_body = request.get_json(silent=True) or {}
-            manager = _manager(row)
-            try:
-                result = manager.create_pr(str(req_body.get("title", "")),
-                                           str(req_body.get("body", "")))
-            except WorktreeError as exc:
-                _logger.warning("workspace pr creation failed for %s: %s", sid, exc)
-                resp_body, status = error_response(
-                    "failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
-                return jsonify(resp_body), status
-            if result.get("prUrl"):
-                repo.set_worktree_status(sid, "pr_created")
-                try:
-                    manager.remove(delete_branch=False)  # branch lives on the remote PR
-                except WorktreeError:
-                    _logger.warning("worktree remove failed after pr for %s", sid)
-            return jsonify(result)
-        finally:
-            _release_turn(sid)
+        if outcome.kind == "not_active":
+            return jsonify({"error": f"worktree already {outcome.detail}"}), 409
+        if outcome.kind == "failed":
+            _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
+            resp_body, status = error_response(
+                "failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
+            return jsonify(resp_body), status
+        return jsonify(outcome.result)
 
     @app.post("/api/assistant/sessions/<sid>/workspace/discard")
     def assistant_workspace_discard(sid: str):
@@ -157,23 +130,18 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         # in-flight apply (overwriting "applied" with "discarded" while the
         # changes sat in the user's real tree) and pulled the worktree out
         # from under a running write turn.
-        if not _try_claim_turn(sid):
+        outcome = discard_workspace(repo, sid, claim_turn=_try_claim_turn,
+                                    release_turn=_release_turn)
+        if outcome.kind == "turn_busy":
             return jsonify({"error": "a turn or workspace action is in progress;"
                             " wait for it to finish"}), 409
-        try:
-            row = repo.get_worktree(sid)  # re-read under the claim
-            if row is None:
-                return jsonify({"error": "no worktree"}), 404
-            if row["status"] not in ("active", "stale"):
-                return jsonify({"error": f"worktree already {row['status']}"}), 409
-            try:
-                _manager(row).remove()
-            except WorktreeError as exc:
-                _logger.warning("workspace discard failed for %s: %s", sid, exc)
-                body, status = error_response(
-                    "failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
-                return jsonify(body), status
-            repo.set_worktree_status(sid, "discarded")
-            return jsonify({"discarded": True})
-        finally:
-            _release_turn(sid)
+        if outcome.kind == "gone":
+            return jsonify({"error": "no worktree"}), 404
+        if outcome.kind == "not_active":
+            return jsonify({"error": f"worktree already {outcome.detail}"}), 409
+        if outcome.kind == "failed":
+            _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
+            body, status = error_response(
+                "failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
+            return jsonify(body), status
+        return jsonify({"discarded": True})
