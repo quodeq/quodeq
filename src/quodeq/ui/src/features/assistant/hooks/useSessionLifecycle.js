@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { useAssistantStream } from '../useAssistantStream.js';
 import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 /**
  * Assistant session lifecycle: create/reset sessions (with the latest-wins
@@ -106,7 +107,14 @@ function makeCommitSession({
       // Only surface the failure if this is still the context the user wants;
       // a superseded stale request shouldn't clobber a newer session's UI.
       if (latestKeyRef.current === key) {
-        setLocalError(t('assistant.startSessionFailed', { error: err?.message || err }));
+        // The shared-repo gate (source: 'shared') rejects with a `code`
+        // (NO_SHARED_REPO / SHARED_REPO_UNAVAILABLE, see api/request.js and
+        // strings/apiErrors.js) that this used to ignore, always showing the
+        // raw backend sentence. Same reused-key fallback pattern as
+        // useProjectActions.js's handleDeleteProject: an unmapped code (or
+        // no code at all) still renders byte-identical to the old
+        // `err?.message || err` behavior.
+        setLocalError(t('assistant.startSessionFailed', { error: apiErrorMessage(err, 'assistant.startSessionFailed') }));
       }
       return;
     }
