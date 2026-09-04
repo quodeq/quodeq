@@ -78,6 +78,27 @@ def add_repo_index_entry(
     _save_repo_index(reports_root, index, log=log)
 
 
+def rekey_repo_index_entry(
+    reports_root: Path, project_uuid: str, name: str, path: str, scope_path: str | None,
+    *, log: LogSink = NULL_LOG,
+) -> None:
+    """Re-point a project's index entry at its changed repo identity.
+
+    ``path`` is one third of the key, so a project whose stored path moves
+    leaves the old key still mapped to its uuid. Drop every key pointing at
+    the uuid, then register the new identity — one read-modify-write.
+
+    Best-effort like the rest of this module: ``find_existing_project``
+    verifies an index hit against the project's own record, so a failure
+    here costs a directory walk, never a wrong answer.
+    """
+    index = _load_repo_index(reports_root)
+    updated = {key: value for key, value in index.items() if value != project_uuid}
+    updated[_repo_index_key(name, path, scope_path)] = project_uuid
+    if updated != index:
+        _save_repo_index(reports_root, updated, log=log)
+
+
 def remove_repo_index_entries(
     reports_root: Path, project_uuids: set[str], *, log: LogSink = NULL_LOG,
 ) -> None:

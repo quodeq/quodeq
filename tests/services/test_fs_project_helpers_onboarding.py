@@ -14,8 +14,10 @@ import logging
 from pathlib import Path
 from unittest.mock import patch
 
+from quodeq.services import _fs_project_helpers as helpers
 from quodeq.services._fs_project_helpers import _build_project_entry, find_existing_project
-from quodeq.services._repo_index import _load_repo_index
+from quodeq.services._fs_projects import update_project_path
+from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
 from quodeq.services.project_registration import register_project
 from quodeq.data.fs.report_parser.runs import RunInfo
 
@@ -121,14 +123,21 @@ def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_
     assert index_path.exists()
     assert set(_load_repo_index(reports).values()) == set(uuids)
 
-    def _must_not_read(*_args, **_kwargs):
-        raise AssertionError("index hit must not fall back to reading repository_info.json")
+    # An index hit reads exactly one record — the candidate it is about to
+    # return, to confirm the entry isn't stale. It must never read the other
+    # projects: that O(n) sweep is what the index exists to avoid.
+    reads: list[str] = []
+    real_read = helpers.read_repository_info
 
-    monkeypatch.setattr(
-        "quodeq.services._fs_project_helpers.read_repository_info", _must_not_read,
-    )
+    def _counting_read(project_dir):
+        reads.append(Path(project_dir).name)
+        return real_read(project_dir)
+
+    monkeypatch.setattr(helpers, "read_repository_info", _counting_read)
     for repo, uuid in zip(repos, uuids):
+        reads.clear()
         assert find_existing_project(str(reports), str(repo), None) == uuid
+        assert reads == [uuid], reads
     monkeypatch.undo()
 
     # Blow away the index entirely: every lookup must still resolve via the
@@ -139,6 +148,65 @@ def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_
 
     assert index_path.exists()
     assert set(_load_repo_index(reports).values()) == set(uuids)
+
+
+def test_find_existing_project_ignores_index_entry_left_by_a_path_move(tmp_path):
+    """A project that moved must stop claiming the path it left behind.
+
+    ``path`` is one third of the index key, so a ``PUT /api/projects/<id>/path``
+    used to leave the old (name, path, scopePath) key mapped at the project's
+    uuid. Registering a different repo at the freed path then hit that entry
+    and got refused as a "duplicate" of a project that isn't there any more.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    repo = _make_repo(tmp_path, "alpha")
+    uuid = register_project(str(repo), None, str(reports))
+
+    moved_to = tmp_path / "moved" / "alpha"
+    moved_to.mkdir(parents=True)
+    assert update_project_path(str(reports), uuid, str(moved_to)) is True
+
+    assert find_existing_project(str(reports), str(repo), None) is None
+    assert find_existing_project(str(reports), str(moved_to), None) == uuid
+
+
+def test_find_existing_project_drops_an_index_hit_its_record_contradicts(tmp_path):
+    """Any stale index entry — an out-of-band path rewrite, a corrupt file, a
+    concurrent create/delete — must degrade to the walk, not to a wrong uuid.
+    The bad entry is purged so it can't mislead the next lookup either."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    repo = _make_repo(tmp_path, "alpha")
+    uuid = register_project(str(repo), None, str(reports))
+
+    unclaimed = tmp_path / "repos" / "unclaimed"
+    unclaimed.mkdir(parents=True)
+    stale_key = _repo_index_key("unclaimed", str(unclaimed.resolve()), None)
+    index = _load_repo_index(reports)
+    index[stale_key] = uuid
+    _save_repo_index(reports, index)
+
+    assert find_existing_project(str(reports), str(unclaimed), None) is None
+    assert stale_key not in _load_repo_index(reports)
+    # The project's genuine identity is untouched by the purge.
+    assert find_existing_project(str(reports), str(repo), None) == uuid
+
+
+def test_find_existing_project_survives_a_corrupt_index_file(tmp_path):
+    """Unparseable index bytes are treated as an empty index: the walk still
+    finds the project and rewrites a usable index."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    repo = _make_repo(tmp_path, "alpha")
+    uuid = register_project(str(repo), None, str(reports))
+
+    (reports / ".repo_index.json").write_text("{ this is not json", encoding="utf-8")
+
+    assert find_existing_project(str(reports), str(repo), None) == uuid
+    assert _load_repo_index(reports) == {
+        _repo_index_key("alpha", str(repo.resolve()), None): uuid,
+    }
 
 
 def test_find_existing_project_logs_malformed_repo_identifier(caplog, tmp_path):

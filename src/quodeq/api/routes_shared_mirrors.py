@@ -33,9 +33,9 @@ from quodeq.shared.serialization import to_camel_dict
 
 from .routes_shared_common import _logger, _shared_project_dir, _validate_segment, _with_shared_root
 
-# Mirrors quodeq.api.routes_findings._MAX_DISMISSED_LIMIT — the shared
-# dismissed-findings mirror clamps to the same hard cap as the local route.
-_MAX_DISMISSED_LIMIT = 5000
+# Mirrors quodeq.api.routes_findings._MAX_FINDINGS_LIST_LIMIT — the shared
+# findings mirrors clamp to the same hard cap as the local routes.
+_MAX_FINDINGS_LIST_LIMIT = 5000
 
 
 def register_shared_mirror_routes(app: Flask) -> None:
@@ -239,8 +239,8 @@ def register_shared_mirror_routes(app: Flask) -> None:
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
             return jsonify([])
-        raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
+        raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
+        limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
         offset = max(0, request.args.get("offset", 0, type=int))
         items = load_dismissed(project_dir, offset=offset, limit=limit)
         return jsonify(items)
@@ -254,8 +254,8 @@ def register_shared_mirror_routes(app: Flask) -> None:
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
             return jsonify([])
-        raw_limit = request.args.get("limit", _MAX_DISMISSED_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_DISMISSED_LIMIT))
+        raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
+        limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
         offset = max(0, request.args.get("offset", 0, type=int))
         items = verified_entries(project_dir, offset=offset, limit=limit)
         return jsonify(items)

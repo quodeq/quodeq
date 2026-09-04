@@ -140,19 +140,38 @@ def _build_project_entry(
     )
 
 
+def _repo_identity_matches(
+    project_dir: Path, expected_name: str, repo_resolved: str, scope_path: str | None,
+) -> bool:
+    """True when this project's record still carries that repo identity.
+
+    The (name, path, scopePath) triple is exactly the repo-identity index
+    key, so this is the authoritative check the index only caches.
+    """
+    data = read_repository_info(project_dir)
+    return (
+        data is not None
+        and data.get("name") == expected_name
+        and data.get("path") == repo_resolved
+        and (data.get("scopePath") or None) == (scope_path or None)
+    )
+
+
 def find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
     """Return an existing project UUID matching the given repo identity, or None.
 
     Index-first: ``.repo_index.json`` maps (name, path, scopePath) to uuid
     for an O(1) lookup instead of reading every project's
-    repository_info.json. Falls back to walking reports_root when the index
-    has no entry for this identity (a project created before the index
-    existed, or an index write that failed) — a fallback hit self-heals the
-    index so the next lookup for the same identity takes the fast path.
-    Index staleness therefore never produces a false negative. From the
-    caller's perspective this is still a pure read-only check (the self-heal
-    write is an internal cache repair). Used by the create-project route as
-    its duplicate pre-flight.
+    repository_info.json. Both directions of staleness resolve to the walk,
+    never to a wrong answer: a miss falls through to it (and a hit there
+    self-heals the index for next time), and a hit is verified against the
+    candidate's own record before it is trusted, so an entry left behind by
+    a path change, a corrupt index file, or a concurrent create/delete gets
+    dropped and the walk decides.
+
+    From the caller's perspective this is still a read-only check (both index
+    writes are cache repair). Used by the create-project route as its
+    duplicate pre-flight.
     """
     from quodeq.shared.utils import is_repo_url, project_name_from_repo  # noqa: PLC0415
 
@@ -171,19 +190,17 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     index = _load_repo_index(reports_path)
     candidate = index.get(key)
     if candidate is not None:
-        return candidate
+        if _repo_identity_matches(
+            reports_path / candidate, expected_name, repo_resolved, scope_path,
+        ):
+            return candidate
+        index.pop(key, None)
+        _save_repo_index(reports_path, index)
 
     for child in reports_path.iterdir():
         if not child.is_dir():
             continue
-        data = read_repository_info(child)
-        if data is None:
-            continue
-        if data.get("name") != expected_name:
-            continue
-        if data.get("path") != repo_resolved:
-            continue
-        if (data.get("scopePath") or None) != (scope_path or None):
+        if not _repo_identity_matches(child, expected_name, repo_resolved, scope_path):
             continue
         index[key] = child.name
         _save_repo_index(reports_path, index)

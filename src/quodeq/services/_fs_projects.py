@@ -19,7 +19,7 @@ from quodeq.services._fs_project_helpers import (
     _build_project_entry,
     _max_projects_listed,
 )
-from quodeq.services._repo_index import remove_repo_index_entries
+from quodeq.services._repo_index import rekey_repo_index_entry, remove_repo_index_entries
 from quodeq.services._wiring import (
     find_children,
     is_valid_repo_url,
@@ -201,7 +201,17 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         return False
     info["path"] = resolved_path
     info["location"] = location
-    return write_repository_info(project_dir, info)
+    if not write_repository_info(project_dir, info):
+        return False
+    # ``path`` is part of find_existing_project's index key, so the old key
+    # would keep pointing here and make a fresh repo registered at the
+    # now-freed path look like a duplicate. (That lookup re-verifies its hit
+    # anyway; this just keeps it on the fast path.)
+    rekey_repo_index_entry(
+        reports_root, project_dir.name, info.get("name", ""), resolved_path,
+        info.get("scopePath"),
+    )
+    return True
 
 
 def delete_project(reports_dir: str, project: str) -> bool:

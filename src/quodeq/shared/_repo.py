@@ -53,11 +53,15 @@ def normalize_remote_url(url: str) -> str | None:
     elif url.startswith("ssh://"):
         url = url[len("ssh://"):]
 
-    # Strip any embedded userinfo (e.g. user:token@host or git@host)
-    # that appears before the first /
-    at_pos = url.find("@")
+    # Strip any embedded userinfo (e.g. user:token@host or git@host) from the
+    # authority component -- everything up to the first /. RFC 3986 ends
+    # userinfo at the LAST "@" in the authority, not the first: a password
+    # containing "@" ("user:p@ss@host") would otherwise leave the tail of the
+    # credential ("ss@host") in the normalized value.
     slash_pos = url.find("/")
-    if at_pos != -1 and (slash_pos == -1 or at_pos < slash_pos):
+    authority_end = slash_pos if slash_pos != -1 else len(url)
+    at_pos = url.rfind("@", 0, authority_end)
+    if at_pos != -1:
         url = url[at_pos + 1 :]
 
     # Convert git@host:path form to host/path.

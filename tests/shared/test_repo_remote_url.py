@@ -59,6 +59,28 @@ def test_normalize_strips_https_userinfo_token_only():
     assert normalize_remote_url("https://token@github.com/org/repo.git") == "github.com/org/repo"
 
 
+def test_normalize_strips_userinfo_containing_an_at_sign():
+    """userinfo ends at the LAST @ of the authority (RFC 3986), not the first.
+
+    Splitting on the first @ left the tail of a password ("ss@github.com")
+    in the normalized value — the credential leak this stripping exists to
+    prevent — and made the same repo compare unequal to its clean form.
+    """
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("https://user:p@ss@github.com/org/repo.git") == (
+        normalize_remote_url("https://github.com/org/repo.git")
+    )
+    assert normalize_remote_url("https://user:p@ss@github.com/org/repo.git") == "github.com/org/repo"
+
+
+def test_normalize_at_sign_in_path_is_not_userinfo():
+    """An @ after the authority (a path segment) must not be stripped."""
+    from quodeq.shared._repo import normalize_remote_url
+    assert normalize_remote_url("https://git.example.com/~user@host/repo.git") == (
+        "git.example.com/~user@host/repo"
+    )
+
+
 def test_normalize_ssh_colon_form_still_works():
     """Confirm that git@host:path normalization is unchanged by userinfo stripping."""
     from quodeq.shared._repo import normalize_remote_url

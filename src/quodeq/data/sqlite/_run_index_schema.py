@@ -21,6 +21,10 @@ _BUSY_TIMEOUT_MS = 3000
 # see _connect_retrying. The writer being waited on is a schema DDL that takes
 # milliseconds, so this ceiling is never approached in practice; it is kept
 # short so a wedged peer degrades the caller rather than stalling it.
+# It bounds when the *next* retry starts, not total wall time: a peer holding
+# a SHARED lock sends the attempt through busy_timeout instead of failing
+# fast, so the worst case is this deadline plus one full _BUSY_TIMEOUT_MS
+# (~5.3s) before the raise.
 _WAL_SWITCH_DEADLINE_S = 2.0
 _WAL_SWITCH_SLEEP_S = 0.02
 
@@ -118,7 +122,7 @@ def _recreate_index_db(db_path: Path) -> sqlite3.Connection:
     """
     for path in (db_path, Path(f"{db_path}-wal"), Path(f"{db_path}-shm")):
         path.unlink(missing_ok=True)
-    return _connect_with_pragmas(db_path)
+    return _connect_retrying(db_path)
 
 
 # Serializes open/create/rebuild per index file. Concurrent first-opens of a
