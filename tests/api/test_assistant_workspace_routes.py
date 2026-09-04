@@ -212,6 +212,35 @@ def test_discard_failure_has_code(app, client, repo, monkeypatch):
     assert "/Users/marche000/secret-repo" not in body["error"]
 
 
+def test_apply_failure_has_code(app, client, repo, monkeypatch):
+    sid, _, _ = _session_with_worktree(app, client, repo)
+    from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+    monkeypatch.setattr(
+        WorktreeManager, "apply_to_repo",
+        lambda self: (_ for _ in ()).throw(
+            WorktreeError("fatal: /Users/marche000/secret-repo: permission denied")))
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/apply")
+    assert resp.status_code == 409
+    body = resp.get_json()
+    assert body["code"] == "WORKSPACE_APPLY_FAILED"
+    assert "/Users/marche000/secret-repo" not in body["error"]
+
+
+def test_pr_failure_has_code(app, client, repo, monkeypatch):
+    sid, _, _ = _session_with_worktree(app, client, repo)
+    from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+    monkeypatch.setattr(
+        WorktreeManager, "create_pr",
+        lambda self, title, body: (_ for _ in ()).throw(
+            WorktreeError("fatal: /Users/marche000/secret-repo: permission denied")))
+    resp = client.post(f"/api/assistant/sessions/{sid}/workspace/pr",
+                       json={"title": "t", "body": "b"})
+    assert resp.status_code == 500
+    data = resp.get_json()
+    assert data["code"] == "WORKSPACE_PR_FAILED"
+    assert "/Users/marche000/secret-repo" not in data["error"]
+
+
 def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):
     # These routes MUTATE the user's repo; confirm the app-wide security stack gates them.
     import quodeq.api.security as security
