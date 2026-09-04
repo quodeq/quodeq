@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { usePublishQueries } from './usePublishQueries.js';
 import { usePublishPolling } from './usePublishPolling.js';
@@ -117,7 +116,12 @@ function useReconcilePublishStatus({ statusQueryData, setPublishState, setPublis
       stopPolling();
       if (publish.state === 'error') {
         setPublishState('error');
-        setPublishError(publish.error || t('projects.publishFailed'));
+        // No `code` on this payload either -- see usePublishPolling.js's
+        // checkStatus for the full explanation (services/shared_publish.py's
+        // PublishStatus never sets one). Routed through apiErrorMessage for
+        // the same reason: consistency with the rest of the app, and
+        // forward-compatible the moment the backend starts emitting one.
+        setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
         setPublishErrorProject(publish.project ?? publishingProjectRef.current);
       } else {
         setPublishState('done');
