@@ -71,8 +71,11 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
     # Use `npm ci` to enforce lockfile-pinned installs (refuses to mutate
     # package-lock.json, errors if it's out of sync). `_SYNC_ITEMS` in
     # `_build_hash.py` copies package-lock.json into the workdir before this
-    # runs, so a lockfile is always present.
-    subprocess.run([npm, "ci"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
+    # runs, so a lockfile is always present. `--no-audit` skips the live,
+    # uncached POST to the npm advisories endpoint, which is purely
+    # informational here (it never fails the install) but can single-handedly
+    # blow past the timeout on slow networks.
+    subprocess.run([npm, "ci", "--no-audit"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
 
     log_info("Building web UI...")
     env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}
