@@ -151,6 +151,10 @@ def _pom_coords(content: str) -> set[str]:
     ``<groupId>`` or ``<artifactId>`` element appears. Commentary and free text
     in ``<description>`` / ``<comment>`` are not collected.
     """
+    # Guard against XML entity-expansion (billion-laughs / XXE) attacks:
+    # reject DOCTYPE and ENTITY declarations before parsing.
+    if re.search(r"<!(DOCTYPE|ENTITY)", content, re.IGNORECASE):
+        return set()
     try:
         root = ET.fromstring(content)
     except ET.ParseError:
