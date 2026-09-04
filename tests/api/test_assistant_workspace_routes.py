@@ -177,10 +177,13 @@ def test_diff_fetch_failure_has_code(app, client, repo, monkeypatch):
     from quodeq.assistant.worktree import WorktreeError
     monkeypatch.setattr(
         "quodeq.api.assistant_workspace_routes.diff_text",
-        lambda path: (_ for _ in ()).throw(WorktreeError("boom")))
+        lambda path: (_ for _ in ()).throw(
+            WorktreeError("fatal: /Users/marche000/secret-repo: permission denied")))
     resp = client.get(f"/api/assistant/sessions/{sid}/workspace/diff")
     assert resp.status_code == 500
-    assert resp.get_json()["code"] == "WORKSPACE_DIFF_FAILED"
+    body = resp.get_json()
+    assert body["code"] == "WORKSPACE_DIFF_FAILED"
+    assert "/Users/marche000/secret-repo" not in body["error"]
 
 
 def test_turn_in_progress_has_code(app, client, repo):
@@ -200,10 +203,13 @@ def test_discard_failure_has_code(app, client, repo, monkeypatch):
     from quodeq.assistant.worktree import WorktreeError, WorktreeManager
     monkeypatch.setattr(
         WorktreeManager, "remove",
-        lambda self, delete_branch=True: (_ for _ in ()).throw(WorktreeError("boom")))
+        lambda self, delete_branch=True: (_ for _ in ()).throw(
+            WorktreeError("fatal: /Users/marche000/secret-repo: permission denied")))
     resp = client.post(f"/api/assistant/sessions/{sid}/workspace/discard")
     assert resp.status_code == 500
-    assert resp.get_json()["code"] == "WORKSPACE_DISCARD_FAILED"
+    body = resp.get_json()
+    assert body["code"] == "WORKSPACE_DISCARD_FAILED"
+    assert "/Users/marche000/secret-repo" not in body["error"]
 
 
 def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):

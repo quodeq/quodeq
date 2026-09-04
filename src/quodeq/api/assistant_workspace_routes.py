@@ -69,7 +69,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return jsonify({"diff": text[:2_000_000], "truncated": truncated,
                             "stats": diff_stats(Path(row["path"]))})
         except WorktreeError as exc:
-            body, status = error_response(str(exc), 500, "WORKSPACE_DIFF_FAILED")
+            _logger.warning("workspace diff failed for %s: %s", sid, exc)
+            body, status = error_response(
+                "failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
             return jsonify(body), status
 
     @app.post("/api/assistant/sessions/<sid>/workspace/apply")
@@ -161,7 +163,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             try:
                 _manager(row).remove()
             except WorktreeError as exc:
-                body, status = error_response(str(exc), 500, "WORKSPACE_DISCARD_FAILED")
+                _logger.warning("workspace discard failed for %s: %s", sid, exc)
+                body, status = error_response(
+                    "failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
                 return jsonify(body), status
             repo.set_worktree_status(sid, "discarded")
             return jsonify({"discarded": True})
