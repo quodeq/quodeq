@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 EVALUATION_DDL = """
-PRAGMA user_version = 7;
+PRAGMA user_version = 8;
 
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +51,7 @@ CREATE INDEX idx_findings_verdict     ON findings(verdict);
 CREATE INDEX idx_findings_file        ON findings(file);
 CREATE INDEX idx_findings_requirement ON findings(requirement);
 CREATE INDEX idx_findings_practice    ON findings(practice_id);
+CREATE INDEX idx_findings_req_file_line ON findings(requirement, file, line);
 
 CREATE VIRTUAL TABLE findings_fts USING fts5(
     reason, snippet,
@@ -103,4 +104,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8

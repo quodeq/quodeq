@@ -66,6 +66,44 @@ class TestReadFindingDetails:
 
         assert read_finding_details(tmp_path, {("X-1", "src/a.py", 10)}) == {}
 
+    def test_matches_requirement_less_findings_via_null_or_empty(self, tmp_path):
+        """A finding with no requirement id is stored with requirement NULL;
+        callers key it as "" (see services/dismissed.py's key-building), so
+        the lookup must match NULL rows on an empty-requirement key without
+        also picking up an unrelated req-bearing finding at the same key."""
+        from quodeq.data.sqlite.findings_queries import read_finding_details
+
+        _seed(tmp_path, req=None, file="src/a.py", line=10)
+        _seed(tmp_path, req="X-2", file="src/b.py", line=20, practice_id="P2")
+
+        out = read_finding_details(
+            tmp_path, {("", "src/a.py", 10), ("X-2", "src/b.py", 20)},
+        )
+
+        assert set(out) == {("", "src/a.py", 10), ("X-2", "src/b.py", 20)}
+        assert out[("", "src/a.py", 10)]["req"] == ""
+
+    def test_chunking_across_multiple_batches_drops_nothing_and_dedupes(self, tmp_path):
+        """Regression for the SQL-side rewrite: keys are split into chunks to
+        stay under SQLite's ~999 bind-parameter limit. 350 keys forces 2+
+        chunks at the 300-per-batch size; every key must still come back
+        exactly once."""
+        from quodeq.data.sqlite.findings_queries import read_finding_details
+
+        total = 350
+        keys: set[tuple] = set()
+        for i in range(total):
+            req, file, line = f"REQ-{i}", f"src/f{i}.py", i + 1
+            _seed(tmp_path, req=req, file=file, line=line, practice_id="P1")
+            keys.add((req, file, line))
+
+        out = read_finding_details(tmp_path, keys)
+
+        assert set(out) == keys
+        assert len(out) == total
+        assert out[("REQ-0", "src/f0.py", 1)]["req"] == "REQ-0"
+        assert out[("REQ-349", "src/f349.py", 350)]["req"] == "REQ-349"
+
 
 class TestReadRunKeySets:
     def test_returns_dismiss_and_class_keys(self, tmp_path):
