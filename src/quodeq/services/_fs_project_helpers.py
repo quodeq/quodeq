@@ -145,15 +145,18 @@ def _repo_identity_matches(
 ) -> bool:
     """True when this project's record still carries that repo identity.
 
-    For a LOCAL-path registration the (name, path, scopePath) triple is
+    For a LOCAL, UNSCOPED registration the (name, path, scopePath) triple is
     exactly the repo-identity index key, so this is the authoritative check
     the index only caches.
 
     It does NOT hold for a URL registration: the index key carries the URL,
     but ``_persist_repository_info`` rewrites the record's ``path`` to the
     local clone directory (the URL survives only as ``originUrl``), so the
-    two can never compare equal. Callers must only use this for local-path
-    identities (see ``find_existing_project``).
+    two can never compare equal. It does NOT hold for a SCOPED registration
+    either: the index key carries the bare project name, but the scoped
+    child's record is written under the compound ``"<name>/<scope>"`` name.
+    Callers must only use this for local-unscoped identities (see
+    ``find_existing_project``).
     """
     data = read_repository_info(project_dir)
     return (
@@ -170,12 +173,12 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     Index-first: ``.repo_index.json`` maps (name, path, scopePath) to uuid
     for an O(1) lookup instead of reading every project's
     repository_info.json. A miss falls through to a directory walk, and a
-    hit there self-heals the index for next time. A local-path hit is also
-    verified against the candidate's own record before it is trusted, so an
-    entry left behind by a path change, a corrupt index file, or a
-    concurrent create/delete gets dropped and the walk decides. A URL hit
-    cannot be verified that way (see ``_repo_identity_matches``): it stays
-    trusted, and a URL identity was never exposed to the path-move
+    hit there self-heals the index for next time. A local-unscoped hit is
+    also verified against the candidate's own record before it is trusted,
+    so an entry left behind by a path change, a corrupt index file, or a
+    concurrent create/delete gets dropped and the walk decides. URL and
+    scoped hits cannot be verified that way (see ``_repo_identity_matches``):
+    they stay trusted, and neither was ever exposed to the path-move
     staleness that check exists for.
 
     Still read-only to the caller (both index writes are cache repair).
@@ -198,7 +201,7 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     index = _load_repo_index(reports_path)
     candidate = index.get(key)
     if candidate is not None:
-        if is_url or _repo_identity_matches(
+        if is_url or scope_path or _repo_identity_matches(
             reports_path / candidate, expected_name, repo_resolved, scope_path,
         ):
             return candidate

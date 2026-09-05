@@ -206,7 +206,8 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
     # ``path`` is part of find_existing_project's index key, so the old key
     # would keep pointing here and make a fresh repo registered at the
     # now-freed path look like a duplicate. (That lookup re-verifies its hit
-    # anyway; this just keeps it on the fast path.)
+    # for a local-unscoped identity, but URL and scoped identities trust the
+    # index outright, so this rekey is what keeps them correct.)
     rekey_repo_index_entry(
         reports_root, project_dir.name, info.get("name", ""), resolved_path,
         info.get("scopePath"),

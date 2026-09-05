@@ -88,9 +88,12 @@ def rekey_repo_index_entry(
     leaves the old key still mapped to its uuid. Drop every key pointing at
     the uuid, then register the new identity — one read-modify-write.
 
-    Best-effort like the rest of this module: ``find_existing_project``
-    verifies an index hit against the project's own record, so a failure
-    here costs a directory walk, never a wrong answer.
+    Best-effort like the rest of this module, but only up to a point:
+    ``find_existing_project`` re-verifies an index hit against the project's
+    own record for a local-unscoped identity, so a failure here costs a
+    directory walk, never a wrong answer. URL and scoped identities skip
+    that verification (their key and record disagree by construction) and
+    trust the index, so for those a failure here can cost a wrong answer.
     """
     index = _load_repo_index(reports_root)
     updated = {key: value for key, value in index.items() if value != project_uuid}

@@ -225,6 +225,33 @@ def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
     assert _load_repo_index(reports).get(key) == uuid
 
 
+def test_find_existing_project_resolves_a_scoped_registration(tmp_path):
+    """A scoped project must still be found by (name, path, scopePath).
+
+    The index key carries the BARE project name, but the scoped child's
+    record is written under the compound ``"<name>/<scope>"`` name, so
+    verifying an index hit against that record can never succeed for a
+    scoped identity. Doing it anyway purged the valid entry on every lookup
+    and returned None, so re-registering an existing scope reported
+    "created" instead of "duplicate".
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    repo = _make_repo(tmp_path, "alpha")
+    (repo / "src").mkdir()
+    (repo / "src" / "mod.py").write_text("y = 2\n")
+
+    uuid = register_project(str(repo), None, str(reports), "src")
+
+    key = _repo_index_key("alpha", str(repo.resolve()), "src")
+    assert _load_repo_index(reports).get(key) == uuid
+
+    # Both the lookup and the index entry survive repeated duplicate checks.
+    assert find_existing_project(str(reports), str(repo), "src") == uuid
+    assert find_existing_project(str(reports), str(repo), "src") == uuid
+    assert _load_repo_index(reports).get(key) == uuid
+
+
 def test_find_existing_project_survives_a_corrupt_index_file(tmp_path):
     """Unparseable index bytes are treated as an empty index: the walk still
     finds the project and rewrites a usable index."""
