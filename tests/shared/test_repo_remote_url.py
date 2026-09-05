@@ -81,6 +81,31 @@ def test_normalize_at_sign_in_path_is_not_userinfo():
     )
 
 
+def test_normalize_strips_userinfo_containing_a_slash():
+    """A "/" inside the credential must not truncate the userinfo search window.
+
+    Bounding the "@" search by the FIRST "/" in the string put the boundary
+    inside the credential itself (tokens are commonly base64/JWT-derived and
+    contain "/"), so no "@" was found in the window and the whole
+    unredacted credential passed through into repository_info.json.
+    """
+    from quodeq.shared._repo import normalize_remote_url
+    for leaky in (
+        "https://user:pa/ss@github.com/org/repo.git",
+        "https://x-access-token:gh_p/xyz@github.com/foo/bar.git",
+        "https://token/with/slashes@github.com/org/repo.git",
+    ):
+        normalized = normalize_remote_url(leaky)
+        assert "@" not in normalized
+        assert "pa" not in normalized and "gh_p" not in normalized
+        assert "token" not in normalized and "slashes" not in normalized
+
+    assert normalize_remote_url("https://user:pa/ss@github.com/org/repo.git") == "github.com/org/repo"
+    assert normalize_remote_url("https://x-access-token:gh_p/xyz@github.com/foo/bar.git") == (
+        "github.com/foo/bar"
+    )
+
+
 def test_normalize_ssh_colon_form_still_works():
     """Confirm that git@host:path normalization is unchanged by userinfo stripping."""
     from quodeq.shared._repo import normalize_remote_url
