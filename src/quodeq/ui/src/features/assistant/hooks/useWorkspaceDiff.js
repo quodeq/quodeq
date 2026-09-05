@@ -32,6 +32,29 @@ async function runWorkspaceAction(fn, kind, { setOutcome, setError, onChanged })
   }
 }
 
+// Bound apply/discard/createPr callbacks, closing over `act` and the
+// DI'd API functions so the Panel never imports them directly.
+function useBoundWorkspaceActions(act, sessionId, api) {
+  const { applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace } = api;
+
+  const applyToRepo = useCallback(
+    () => act(() => applyAssistantWorkspace(sessionId), 'applied'),
+    [act, applyAssistantWorkspace, sessionId],
+  );
+
+  const discard = useCallback(
+    () => act(() => discardAssistantWorkspace(sessionId), 'discarded'),
+    [act, discardAssistantWorkspace, sessionId],
+  );
+
+  const createPr = useCallback(
+    (title, body) => act(() => createAssistantWorkspacePr(sessionId, { title, body }), 'pr'),
+    [act, createAssistantWorkspacePr, sessionId],
+  );
+
+  return { applyToRepo, discard, createPr };
+}
+
 /**
  * WorkspaceDiffPanel.jsx's diff-loading, action (apply/PR/discard) and PR-form
  * state. Extracted verbatim.
@@ -69,9 +92,13 @@ export function useWorkspaceDiff({ sessionId, onChanged }) {
     setBusy(false);
   }, [onChanged]);
 
+  const { applyToRepo, discard, createPr } = useBoundWorkspaceActions(act, sessionId, {
+    applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace,
+  });
+
   return {
     diff, truncated, error, busy, outcome,
     prOpen, setPrOpen, prTitle, setPrTitle, prBody, setPrBody,
-    loadDiff, act,
+    loadDiff, act, applyToRepo, discard, createPr,
   };
 }

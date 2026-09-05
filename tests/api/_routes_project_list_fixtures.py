@@ -21,8 +21,12 @@ class _FakeProvider:
         self.updated_paths: dict[str, str] = {}
         self.project_info: dict | None = None
 
-    def list_projects(self, reports_dir: str) -> dict:
-        return {"projects": self.projects}
+    def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict:
+        projects = self.projects
+        if offset > 0 or limit > 0:
+            end = offset + limit if limit > 0 else None
+            projects = projects[offset:end]
+        return {"projects": projects}
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         if project in self.deleted:

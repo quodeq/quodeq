@@ -9,7 +9,6 @@ Split (Task 12) into two sibling modules plus this orchestrator:
 """
 from __future__ import annotations
 
-import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +17,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._wiring import (
     ProjectIdentity,
     read_repository_info,
+    read_scan_json,
     resolve_project_uuid,
     validate_remote_url,
     write_repository_info,
@@ -27,6 +27,7 @@ from quodeq.services._fs_project_helpers import find_existing_project
 from quodeq.services._fs_scan import scan_project
 from quodeq.services._registration_scan import _scan_parent_project, _zero_run_scan_fallback
 from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
+from quodeq.services._repo_index import add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
@@ -155,7 +156,20 @@ def register_project(
     if scope_path:
         _scan_parent_project(project_dir, reports_path, target_path)
 
+    _sync_repo_index_on_create(reports_path, project_name, repo_resolved, scope_path, project_uuid)
     return project_uuid
+
+
+def _sync_repo_index_on_create(
+    reports_path: Path, project_name: str, repo_resolved: str, scope_path: str | None, project_uuid: str,
+) -> None:
+    """Register this identity in find_existing_project's duplicate-check index.
+
+    Called only once creation has fully succeeded: a failure above is rolled
+    back by the caller via plain directory removal, which would leave a
+    dangling index entry if this ran any earlier.
+    """
+    add_repo_index_entry(reports_path, project_name, repo_resolved, scope_path, project_uuid)
 
 
 def _ensure_onboarding_field(project_dir: Path) -> None:
@@ -242,11 +256,8 @@ def register_project_with_rollback(
         return _rollback_and_report(reports_dir, before, "internal_error")
 
     # scan.json is now always present after register_project succeeds.
-    scan_path = reports_root_path / project_uuid / "scan.json"
-    try:
-        scan_data = json.loads(scan_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError, FileNotFoundError):
-        scan_data = _zero_run_scan_fallback()
+    project_dir = reports_root_path / project_uuid
+    scan_data = read_scan_json(project_dir) or _zero_run_scan_fallback()
     return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
 
 

@@ -3,17 +3,17 @@
 # to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_sizes.py --update-baseline
 src/quodeq/api/_import_validation.py:88:function
-src/quodeq/api/_log_stream_routes.py:144:function
+src/quodeq/api/_log_stream_routes.py:54:function
 src/quodeq/api/assistant_session_routes.py:58:function
 src/quodeq/api/assistant_turn_routes.py:95:function
-src/quodeq/api/assistant_workspace_routes.py:26:function
+src/quodeq/api/assistant_workspace_routes.py:22:function
 src/quodeq/api/llm_bridge_routes.py:54:function
 src/quodeq/api/routes_evaluations_item.py:98:function
 src/quodeq/api/routes_evaluations_list.py:55:function
 src/quodeq/api/routes_findings.py:92:function
 src/quodeq/api/routes_project_data.py:24:function
 src/quodeq/api/routes_project_list.py:59:function
-src/quodeq/api/routes_shared_config.py:28:function
+src/quodeq/api/routes_shared_config.py:22:function
 src/quodeq/api/routes_shared_mirrors.py:41:function
 src/quodeq/api/standards_overrides_routes.py:29:function
 src/quodeq/api/terminal_routes.py:97:function

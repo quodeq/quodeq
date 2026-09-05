@@ -4,6 +4,11 @@ from __future__ import annotations
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.manifest_render import describe_target
 
+# Bumped when the manifest.json shape changes in a way a reader needs to know
+# about. Follows the schema_version convention used elsewhere for persisted
+# JSON (see e.g. quodeq.core.run.state.SCHEMA_VERSION).
+MANIFEST_SCHEMA_VERSION = 1
+
 
 def target_to_dict(target: AnalysisTarget) -> dict:
     """Serialize for JSON debugging output."""
@@ -27,6 +32,7 @@ def manifest_to_dict(manifest: SourceManifest) -> dict:
     # "project_description" KEY is part of the manifest.json shape.
     primary = manifest._primary
     return {
+        "schema_version": MANIFEST_SCHEMA_VERSION,
         "language": manifest.language,
         "category": manifest.category,
         "frameworks": manifest.frameworks,

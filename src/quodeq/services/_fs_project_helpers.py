@@ -29,6 +29,7 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     _max_projects_listed,
 )
 from quodeq.data.fs.report_parser.runs import RunInfo
+from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
 
 _logger = logging.getLogger(__name__)
 
@@ -139,13 +140,49 @@ def _build_project_entry(
     )
 
 
+def _repo_identity_matches(
+    project_dir: Path, expected_name: str, repo_resolved: str, scope_path: str | None,
+) -> bool:
+    """True when this project's record still carries that repo identity.
+
+    For a LOCAL, UNSCOPED registration the (name, path, scopePath) triple is
+    exactly the repo-identity index key, so this is the authoritative check
+    the index only caches.
+
+    It does NOT hold for a URL registration: the index key carries the URL,
+    but ``_persist_repository_info`` rewrites the record's ``path`` to the
+    local clone directory (the URL survives only as ``originUrl``), so the
+    two can never compare equal. It does NOT hold for a SCOPED registration
+    either: the index key carries the bare project name, but the scoped
+    child's record is written under the compound ``"<name>/<scope>"`` name.
+    Callers must only use this for local-unscoped identities (see
+    ``find_existing_project``).
+    """
+    data = read_repository_info(project_dir)
+    return (
+        data is not None
+        and data.get("name") == expected_name
+        and data.get("path") == repo_resolved
+        and (data.get("scopePath") or None) == (scope_path or None)
+    )
+
+
 def find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:
     """Return an existing project UUID matching the given repo identity, or None.
 
-    Walks the reports directory looking for a project whose repository
-    record matches the resolved repo path/url, project name and (optional)
-    scope_path. Pure read-only check — never mutates state. Used by the
-    create-project route as its duplicate pre-flight.
+    Index-first: ``.repo_index.json`` maps (name, path, scopePath) to uuid
+    for an O(1) lookup instead of reading every project's
+    repository_info.json. A miss falls through to a directory walk, and a
+    hit there self-heals the index for next time. A local-unscoped hit is
+    also verified against the candidate's own record before it is trusted,
+    so an entry left behind by a path change, a corrupt index file, or a
+    concurrent create/delete gets dropped and the walk decides. URL and
+    scoped hits cannot be verified that way (see ``_repo_identity_matches``):
+    they stay trusted, and neither was ever exposed to the path-move
+    staleness that check exists for.
+
+    Still read-only to the caller (both index writes are cache repair).
+    Used by the create-project route as its duplicate pre-flight.
     """
     from quodeq.shared.utils import is_repo_url, project_name_from_repo  # noqa: PLC0415
 
@@ -159,18 +196,25 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     reports_path = Path(reports_root)
     if not reports_path.is_dir():
         return None
+
+    key = _repo_index_key(expected_name, repo_resolved, scope_path)
+    index = _load_repo_index(reports_path)
+    candidate = index.get(key)
+    if candidate is not None:
+        if is_url or scope_path or _repo_identity_matches(
+            reports_path / candidate, expected_name, repo_resolved, scope_path,
+        ):
+            return candidate
+        index.pop(key, None)
+        _save_repo_index(reports_path, index)
+
     for child in reports_path.iterdir():
         if not child.is_dir():
             continue
-        data = read_repository_info(child)
-        if data is None:
+        if not _repo_identity_matches(child, expected_name, repo_resolved, scope_path):
             continue
-        if data.get("name") != expected_name:
-            continue
-        if data.get("path") != repo_resolved:
-            continue
-        if (data.get("scopePath") or None) != (scope_path or None):
-            continue
+        index[key] = child.name
+        _save_repo_index(reports_path, index)
         return child.name
     return None
 

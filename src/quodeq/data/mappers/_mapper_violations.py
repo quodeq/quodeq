@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from quodeq.core.types.dashboard import TrendPoint
 from quodeq.core.types.finding import Finding
-from quodeq.core.types.violation import ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
+from quodeq.core.types.violation import (
+    VIOLATION_SCHEMA_VERSION,
+    ProgressInfo,
+    ViolationFileEntry,
+    ViolationResponse,
+    ViolationSummary,
+)
 
 from ._mapper_findings import parse_finding
 from ._mapper_helpers import (
@@ -52,6 +58,7 @@ def parse_violation_response(raw: dict[str, object]) -> ViolationResponse:
         compliance=compliance,
         partial=_bool(raw, "partial"),
         progress=progress,
+        schema_version=_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
     )
 
 
@@ -78,6 +85,7 @@ def parse_violation_summary(raw: dict[str, object]) -> ViolationSummary:
         major=_int(raw, "major"),
         minor=_int(raw, "minor"),
         files=files,
+        schema_version=_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
     )
 
 

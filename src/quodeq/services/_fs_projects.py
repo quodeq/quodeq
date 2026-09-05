@@ -19,6 +19,7 @@ from quodeq.services._fs_project_helpers import (
     _build_project_entry,
     _max_projects_listed,
 )
+from quodeq.services._repo_index import rekey_repo_index_entry, remove_repo_index_entries
 from quodeq.services._wiring import (
     find_children,
     is_valid_repo_url,
@@ -29,7 +30,7 @@ from quodeq.services._wiring import (
     safe_read_dir,
     write_repository_info,
 )
-from quodeq.shared.utils import is_repo_url
+from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 _logger = logging.getLogger(__name__)
 
@@ -200,7 +201,22 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         return False
     info["path"] = resolved_path
     info["location"] = location
-    return write_repository_info(project_dir, info)
+    if not write_repository_info(project_dir, info):
+        return False
+    # ``path`` is part of find_existing_project's index key, so the old key
+    # would keep pointing here and make a fresh repo registered at the
+    # now-freed path look like a duplicate. Key the new entry on the BARE
+    # name derived from the path -- the identity find_existing_project
+    # actually computes -- never on the record's own ``name``, which for a
+    # scoped project is the compound "<name>/<scope>" and would install a key
+    # no lookup can ever reach. URL and scoped hits are trusted unverified
+    # once found, so a wrongly-keyed rekey is exactly as damaging as the
+    # staleness it replaces.
+    rekey_repo_index_entry(
+        reports_root, project_dir.name, project_name_from_repo(resolved_path),
+        resolved_path, info.get("scopePath"),
+    )
+    return True
 
 
 def delete_project(reports_dir: str, project: str) -> bool:
@@ -217,14 +233,27 @@ def delete_project(reports_dir: str, project: str) -> bool:
 
     # Cascade: find and delete children first
     children_removed = True
+    removed_ids: set[str] = set()
     for child_id in find_children(reports_root, project):
         child_path = reports_root / child_id
-        if not remove_project_dir(child_path):
+        if remove_project_dir(child_path):
+            removed_ids.add(child_id)
+        else:
             _logger.warning("Could not remove child project directory %s", child_path)
             children_removed = False
 
+    # Keep find_existing_project's duplicate-check index in sync: a stale
+    # entry pointing at a deleted uuid would let it wrongly report a
+    # "duplicate" for a repo identity that's actually free again. Purge
+    # whatever was actually removed regardless of the parent's own removal
+    # outcome below -- a child gone from disk must not leave a dangling
+    # index entry just because the parent dir removal then fails.
     if not remove_project_dir(project_path):
+        remove_repo_index_entries(reports_root, removed_ids)
         return False
+
+    removed_ids.add(project)
+    remove_repo_index_entries(reports_root, removed_ids)
     return children_removed
 
 

@@ -58,19 +58,34 @@ class EvaluationsIndex:
         reports_dir: Path | None = None,
         states: set[str] | None = None,
     ) -> list[JobSnapshot]:
-        """Return runs from the SQLite index merged with in-memory jobs."""
+        """Return runs from the SQLite index merged with in-memory jobs.
+
+        *limit* is a cap on returned entries, never a cap on how far back the
+        search reaches: with *states* set, up to *limit* matching runs are
+        returned however deep in the index they sit.
+        """
         reports_dir = self._coerce_reports_dir(reports_dir)
-        db = self._open_index()
-        try:
-            _run_index.sync_index(db, reports_dir)
-            rows = _run_index.list_runs(db, limit=0)  # fetch all, merge, then limit
-        finally:
-            db.close()
-        snapshots = [self._run_row_to_snapshot(r) for r in rows]
         try:
             internal_jobs = self._jobs.list_jobs(reports_root=None)
         except (AttributeError, TypeError):
             internal_jobs = []
+        # limit>0: over-fetch by len(internal_jobs) so that even if every
+        # in-memory job dedupes against (and removes) a fetched DB row, the
+        # fetch still leaves >= limit usable DB rows to fill the merge.
+        # limit<=0 means "fetch all" — leave that path untouched.
+        # A *states* filter is applied after the merge, so any finite fetch
+        # can starve it: rows matching the filter may sit past the fetched
+        # window, silently returning fewer than *limit* matches. The filter
+        # is not pushed into SQL (in-memory jobs have no row), so drop the
+        # pushdown entirely and fetch all whenever a filter is in play.
+        db_limit = limit + len(internal_jobs) if limit and limit > 0 and not states else 0
+        db = self._open_index()
+        try:
+            _run_index.sync_index(db, reports_dir)
+            rows = _run_index.list_runs(db, limit=db_limit)
+        finally:
+            db.close()
+        snapshots = [self._run_row_to_snapshot(r) for r in rows]
         merged = _merge_internal_jobs(snapshots, internal_jobs)
         if states:
             merged = [s for s in merged if s.status in states]

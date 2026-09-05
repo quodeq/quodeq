@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 import urllib.error
@@ -18,10 +19,19 @@ from quodeq.ci.review_builder import (
 
 _logger = logging.getLogger(__name__)
 
-_GITHUB_API = "https://api.github.com"
+_DEFAULT_GITHUB_API = "https://api.github.com"
 _FILES_PAGE_SIZE = 100
 _HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 _REQUEST_TIMEOUT_SECONDS = 30.0
+
+
+def _github_api_base(env: dict[str, str] | None = None) -> str:
+    """GitHub API base URL, overridable for GitHub Enterprise Server.
+
+    Defaults to github.com's API. Set QUODEQ_GITHUB_API_BASE (e.g.
+    ``https://github.example.com/api/v3``) to point at a GHES instance.
+    """
+    return (env or os.environ).get("QUODEQ_GITHUB_API_BASE") or _DEFAULT_GITHUB_API
 
 
 def _parse_hunks(patch: str | None) -> set[int]:
@@ -105,7 +115,7 @@ def fetch_pr_changed_lines(
     page = 1
     while True:
         url = (
-            f"{_GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}/files"
+            f"{_github_api_base()}/repos/{owner}/{repo}/pulls/{pr_number}/files"
             f"?per_page={_FILES_PAGE_SIZE}&page={page}"
         )
         data = _github_get(url, token)
@@ -267,7 +277,7 @@ def post_review(
     token: str,
 ) -> dict:
     """Post a pull request review to GitHub."""
-    url = f"{_GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
+    url = f"{_github_api_base()}/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
     return _github_request(url, payload, token)
 
 

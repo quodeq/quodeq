@@ -1,7 +1,4 @@
 import React from 'react';
-import {
-  applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace,
-} from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
@@ -51,7 +48,7 @@ function WorkspaceDiffBody({ diff, truncated, error, empty }) {
   );
 }
 
-function WorkspaceDiffActions({ sessionId, diff, empty, busy, prOpen, setPrOpen, prTitle, setPrTitle, prBody, setPrBody, loadDiff, act }) {
+function WorkspaceDiffActions({ diff, empty, busy, prOpen, setPrOpen, prTitle, setPrTitle, prBody, setPrBody, loadDiff, applyToRepo, discard, createPr }) {
   return (
     <>
       <div className="workspace-diff-actions">
@@ -59,7 +56,7 @@ function WorkspaceDiffActions({ sessionId, diff, empty, busy, prOpen, setPrOpen,
           {t('assistant.refresh')}
         </button>
         <button type="button" disabled={busy || !diff || empty}
-          onClick={() => act(() => applyAssistantWorkspace(sessionId), 'applied')}>
+          onClick={() => applyToRepo()}>
           {t('assistant.applyToRepo')}
         </button>
         <button type="button" disabled={busy || !diff || empty}
@@ -74,7 +71,7 @@ function WorkspaceDiffActions({ sessionId, diff, empty, busy, prOpen, setPrOpen,
               variant: 'danger',
             });
             if (!ok) return;
-            act(() => discardAssistantWorkspace(sessionId), 'discarded');
+            discard();
           }}>
           {t('assistant.discard')}
         </button>
@@ -86,8 +83,7 @@ function WorkspaceDiffActions({ sessionId, diff, empty, busy, prOpen, setPrOpen,
           <textarea value={prBody} placeholder={t('assistant.prBodyPlaceholder')} aria-label={t('assistant.prBodyPlaceholder')}
             onChange={(e) => setPrBody(e.target.value)} rows={4} />
           <button type="button" disabled={busy || !prTitle.trim()}
-            onClick={() => act(() => createAssistantWorkspacePr(sessionId,
-              { title: prTitle, body: prBody }), 'pr')}>
+            onClick={() => createPr(prTitle, prBody)}>
             {t('assistant.createPr')}
           </button>
         </div>
@@ -100,7 +96,7 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
   const {
     diff, truncated, error, busy, outcome,
     prOpen, setPrOpen, prTitle, setPrTitle, prBody, setPrBody,
-    loadDiff, act,
+    loadDiff, applyToRepo, discard, createPr,
   } = useWorkspaceDiff({ sessionId, onChanged });
 
   if (outcome) return <WorkspaceDiffOutcome outcome={outcome} />;
@@ -111,9 +107,10 @@ export function WorkspaceDiffPanel({ sessionId, onChanged }) {
     <div className="workspace-diff">
       <WorkspaceDiffBody diff={diff} truncated={truncated} error={error} empty={empty} />
       <WorkspaceDiffActions
-        sessionId={sessionId} diff={diff} empty={empty} busy={busy}
+        diff={diff} empty={empty} busy={busy}
         prOpen={prOpen} setPrOpen={setPrOpen} prTitle={prTitle} setPrTitle={setPrTitle}
-        prBody={prBody} setPrBody={setPrBody} loadDiff={loadDiff} act={act}
+        prBody={prBody} setPrBody={setPrBody} loadDiff={loadDiff}
+        applyToRepo={applyToRepo} discard={discard} createPr={createPr}
       />
     </div>
   );

@@ -224,6 +224,40 @@ def test_pom_xml(body: str, needle: str, expected: bool) -> None:
     assert has_pom_xml_dependency(body, needle) is expected
 
 
+def test_pom_xml_entity_expansion_attack_rejected() -> None:
+    """Crafted billion-laughs / XXE payload is safely rejected."""
+    # Billion-laughs style payload: nested entity expansion.
+    payload = (
+        '<?xml version="1.0"?>'
+        '<!DOCTYPE project ['
+        '<!ENTITY lol "lol">'
+        '<!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">'
+        '<!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">'
+        ']>'
+        '<project>'
+        '<description>&lol3;</description>'
+        '</project>'
+    )
+    # Guard should reject DOCTYPE, returning empty set (no dependencies matched).
+    assert has_pom_xml_dependency(payload, "anything") is False
+
+
+def test_pom_xml_normal_without_doctype_parses() -> None:
+    """Normal pom.xml without DOCTYPE should parse correctly (no false-positive rejection)."""
+    normal_pom = (
+        '<?xml version="1.0"?>'
+        '<project>'
+        '<dependencies><dependency>'
+        '<groupId>org.springframework.boot</groupId>'
+        '<artifactId>spring-boot-starter-web</artifactId>'
+        '</dependency></dependencies>'
+        '</project>'
+    )
+    # Should find spring-boot dependency normally.
+    assert has_pom_xml_dependency(normal_pom, "spring-boot") is True
+    assert has_pom_xml_dependency(normal_pom, "nonexistent") is False
+
+
 # --- Gradle (Groovy / Kotlin DSL) -------------------------------------------
 
 

@@ -63,7 +63,7 @@ def precedent_text(req: str | None, snippet: str | None) -> str | None:
 
 
 def load_precedent_fingerprints(
-    project_dir: Path, *, read_dismissed: DismissedSnippetsReader | None = None,
+    project_dir: Path, *, read_dismissed: DismissedSnippetsReader,
 ) -> set[str]:
     """Load fingerprints for every dismissed finding in *project_dir*.
 
@@ -71,12 +71,13 @@ def load_precedent_fingerprints(
     or locked DBs are skipped -- precedent matching degrades gracefully and
     never breaks a scan.
 
-    *read_dismissed* is a test seam (see ``data/ports/precedents.py``);
-    production callers should inject
-    ``quodeq.data.sqlite.findings_queries.read_dismissed_snippets``
-    explicitly. Left unset, it's resolved lazily below -- the local import
-    avoids a cycle (``data.fs.repo_clone`` -> ``context`` -> here ->
-    ``data.sqlite`` would close a loop if this were a top-level import).
+    *read_dismissed* is the injected Protocol seam (see
+    ``data/ports/precedents.py``); this module never imports the concrete
+    SQLite adapter itself. Composition roots wire the production default --
+    ``quodeq.data.sqlite.findings_queries.read_dismissed_snippets`` -- at
+    their own call sites (``analysis/_api_runner.py::_build_router_context``,
+    ``analysis/mcp/findings_server.py::_build_router``); tests inject a fake
+    reader directly.
 
     Legacy note: prior to PR 1 (live-grades), dismissals were stored in
     ``<project_dir>/dismissed.json``. The migration in
@@ -86,10 +87,6 @@ def load_precedent_fingerprints(
     """
     if not project_dir or not project_dir.is_dir():
         return set()
-
-    if read_dismissed is None:
-        from quodeq.data.sqlite.findings_queries import read_dismissed_snippets  # noqa: PLC0415
-        read_dismissed = read_dismissed_snippets
 
     out: set[str] = set()
     for run_dir in project_dir.iterdir():

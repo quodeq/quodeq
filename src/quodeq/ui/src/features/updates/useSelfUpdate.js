@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUpdateStatus, startSelfUpdate } from '../../api/index.js';
+import { useApi } from '../../api/ApiContext.jsx';
 
 const ACTIVE_PHASES = new Set(['downloading', 'verifying', 'installing', 'relaunching']);
 
@@ -9,6 +9,7 @@ const ACTIVE_PHASES = new Set(['downloading', 'verifying', 'installing', 'relaun
  * render live progress.
  */
 export function useSelfUpdate(status, setStatus) {
+  const { getUpdateStatus, startSelfUpdate } = useApi();
   const [starting, setStarting] = useState(false);
   const selfUpdate = status?.self_update || null;
   const phase = selfUpdate?.phase || 'idle';
@@ -20,7 +21,7 @@ export function useSelfUpdate(status, setStatus) {
       getUpdateStatus().then(setStatus).catch(() => {});
     }, 1000);
     return () => clearInterval(id);
-  }, [active, setStatus]);
+  }, [active, setStatus, getUpdateStatus]);
 
   const begin = useCallback(() => {
     setStarting(true);
@@ -28,7 +29,7 @@ export function useSelfUpdate(status, setStatus) {
       .then(() => getUpdateStatus().then(setStatus))
       .catch((e) => console.warn('self-update start failed:', e))
       .finally(() => setStarting(false));
-  }, [setStatus]);
+  }, [setStatus, getUpdateStatus, startSelfUpdate]);
 
   return {
     supported: Boolean(selfUpdate?.supported),

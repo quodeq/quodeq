@@ -33,6 +33,7 @@ from quodeq.api.routes_compare import register_compare_routes
 from quodeq.api.routes_runs import register_runs_routes
 from quodeq.api.routes_shared import register_shared_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
+from quodeq.services._warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
 
 
@@ -49,7 +50,7 @@ def register_all_routes(
         eval_store: Rate-limit store for evaluation requests.
         static_dist: Optional path to the static assets directory.
     """
-    register_project_list_routes(app, provider)
+    register_project_list_routes(app, provider, warmup_engine)
     register_project_data_routes(app, provider)
     register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)

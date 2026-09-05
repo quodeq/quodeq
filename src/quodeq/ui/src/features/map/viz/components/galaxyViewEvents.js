@@ -21,9 +21,9 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
   // escape — but is still wrapped in a fixed style attribute.
   const row = (label, value, color) =>
     `<div style="display:flex;justify-content:space-between;gap:12px;color:${color || 'var(--color-text-muted)'}"><span>${escapeHtml(String(label))}</span><span style="color:${color || 'var(--color-text)'};font-weight:500">${escapeHtml(String(value))}</span></div>`;
-  const rows = [row('Score', d.score.toFixed(1))];
-  if (hovered.type === 'dim') rows.push(row('Principles', d.principleCount));
-  rows.push(row('Violations', d.violations));
+  const rows = [row(t('map.score'), d.score.toFixed(1))];
+  if (hovered.type === 'dim') rows.push(row(t('map.principles'), d.principleCount));
+  rows.push(row(t('map.violations'), d.violations));
   if (d.violations > 0) {
     // For dimensions: compute severity from raw violations; for principles: use stored counts
     let sc = d.critical, sm = d.major, sn = d.minor;
@@ -36,14 +36,14 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
         else sn++;
       });
     }
-    if (sc > 0) rows.push(row('Critical', sc, 'var(--color-sev-critical-text)'));
-    if (sm > 0) rows.push(row('Major', sm, 'var(--color-sev-major-text)'));
-    if (sn > 0) rows.push(row('Minor', sn, 'var(--color-sev-minor-text)'));
+    if (sc > 0) rows.push(row(t('map.critical'), sc, 'var(--color-sev-critical-text)'));
+    if (sm > 0) rows.push(row(t('map.major'), sm, 'var(--color-sev-major-text)'));
+    if (sn > 0) rows.push(row(t('map.minor'), sn, 'var(--color-sev-minor-text)'));
   }
-  rows.push(row('Compliance', d.compliance));
+  rows.push(row(t('map.compliance'), d.compliance));
   el.innerHTML = `<div style="font-weight:600;color:${rgb(d.col)};margin-bottom:4px">${escapeHtml(d.name)}</div>
     ${rows.join('')}
-    <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">Click to explore</div>`;
+    <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(t('map.clickToExplore'))}</div>`;
   el.style.display = 'block';
   el.style.left = Math.min(cx + 16, window.innerWidth - 200) + 'px';
   el.style.top = Math.min(cy + 16, window.innerHeight - 160) + 'px';

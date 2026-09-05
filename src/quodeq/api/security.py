@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import re
 import time
 from http import HTTPStatus
 
@@ -36,6 +37,18 @@ _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 # _webview_window._WEBVIEW_UA_MARKER (drift-guarded by
 # tests/dashboard/test_native_chrome.py).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
+
+# Host header must look like a bare hostname/IPv4 or a bracketed IPv6
+# literal (RFC 3986 host syntax, e.g. "[::1]:4180"), with an optional port,
+# before it's trusted enough to interpolate into the CSP connect-src
+# directive. Rejects quotes, whitespace, and other characters that could
+# inject extra CSP directives or sources via a spoofed Host header.
+# The IPv6 branch matters here: ::1 is a first-class local address elsewhere
+# in this app (_LOCALHOST_ADDRS below, dashboard/_networking.py,
+# dashboard/_webview_window_native_ops.py's reload allowlist), so a client
+# reaching this dashboard over IPv6 loopback is a real access path, not a
+# hypothetical.
+_VALID_HOST_RE = re.compile(r"^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d+)?$")
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
@@ -97,6 +110,21 @@ def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] 
     return None
 
 
+def _same_origin_ws_sources(host: str) -> str:
+    """Build the same-origin ``ws:``/``wss:`` connect-src entry for *host*.
+
+    *host* is the raw, attacker-controlled Host header (``request.host``).
+    It's only interpolated into the CSP when it matches a bare
+    ``hostname[:port]`` shape; otherwise the same-origin entry is omitted
+    (the alt-port origins already in connect-src still cover local
+    dev/desktop use) rather than reflecting attacker-controlled bytes into
+    a security header.
+    """
+    if not _VALID_HOST_RE.match(host):
+        return ""
+    return f"ws://{host} wss://{host}"
+
+
 def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
     """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
 
@@ -131,7 +159,7 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
         _self_ws = ""
         try:
             from flask import request as _req
-            _self_ws = f"ws://{_req.host} wss://{_req.host}"
+            _self_ws = _same_origin_ws_sources(_req.host)
         except Exception:
             _self_ws = ""
         is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")

@@ -29,6 +29,46 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).resolve().name
 
 
+def _looks_like_authority(candidate: str) -> bool:
+    """Return True if ``candidate`` is a plausible ``host[:port]`` authority.
+
+    Deliberately strict: a bare single-label name is rejected so that an
+    ambiguous URL falls to the credential-stripping branch rather than the
+    leaking one.
+    """
+    host, sep, port = candidate.partition(":")
+    if sep and not port.isdigit():
+        return False
+    if not all(c.isalnum() or c in "-._~[]" for c in host):
+        return False
+    return "." in host or host.startswith("[") or host == "localhost"
+
+
+def _strip_userinfo(url: str) -> str:
+    """Drop any embedded userinfo (``user:token@host``, ``git@host``) from ``url``.
+
+    ``url`` has already had its scheme stripped, so the authority starts at
+    position 0. RFC 3986 ends userinfo at the LAST "@" of the authority, so
+    the search runs from the right: a password containing "@"
+    ("user:p@ss@host") would otherwise leave the tail of the credential in
+    the normalized value.
+
+    A "/" before that "@" usually means the authority already ended and the
+    "@" belongs to a path segment ("host/~user@host/repo") -- but only when
+    the text before that "/" is itself a plausible host. Real credentials
+    (base64-derived tokens, JWTs, CI PATs) often contain a literal "/", and
+    bounding the search by the first "/" then hides the real "@" and lets
+    the whole credential through unstripped.
+    """
+    at_pos = url.rfind("@")
+    if at_pos == -1:
+        return url
+    slash_pos = url.find("/")
+    if -1 < slash_pos < at_pos and _looks_like_authority(url[:slash_pos]):
+        return url
+    return url[at_pos + 1 :]
+
+
 def normalize_remote_url(url: str) -> str | None:
     """Fold equivalent git remote URL forms into one canonical form.
 
@@ -52,8 +92,8 @@ def normalize_remote_url(url: str) -> str | None:
         url = url[len("https://"):]
     elif url.startswith("ssh://"):
         url = url[len("ssh://"):]
-    if url.startswith("git@"):
-        url = url[len("git@"):]
+
+    url = _strip_userinfo(url)
 
     # Convert git@host:path form to host/path.
     # First colon splits host from path when path isn't numeric (port).

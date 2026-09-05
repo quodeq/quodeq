@@ -28,6 +28,7 @@ from quodeq.analysis._api_standards_text import (
     _api_prompt_char_budget,
     _gather_source_files,  # noqa: F401 -- re-export
     _load_standards_text,
+    _max_standards_chars,
     _render_standards_grouped,  # noqa: F401 -- re-export
     _SKIP_DIRS,  # noqa: F401 -- re-export
 )
@@ -235,14 +236,20 @@ def _run_api_analysis_bridge(
     from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
 
     overrides = load_project_overrides(work_dir)
-    standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension, overrides=overrides)
+    # env is the resolved process environment (composition-root-adjacent:
+    # run_analysis defaults it to os.environ), passed explicitly here so
+    # these two char-budget lookups don't read os.environ themselves.
+    standards_text = _load_standards_text(
+        cfg.compiled_dir, cfg.dimension, overrides=overrides,
+        max_chars=_max_standards_chars(env),
+    )
     # Resolved once per dimension, not per batch: same declared-then-detected
     # trust model the finding sink applies (quodeq.context.trust_model),
     # briefed here so the model generates fewer out-of-scope findings for the
     # sink to have to claw back.
     trust_model = resolve_trust_model(work_dir)
 
-    for batch in _batch_files_by_size(source_files, _api_prompt_char_budget()):
+    for batch in _batch_files_by_size(source_files, _api_prompt_char_budget(env)):
         # A cancelled run (signal, breaker, fatal provider error) must not
         # keep burning model calls on the remaining batches.
         if cancellation.is_cancelled():

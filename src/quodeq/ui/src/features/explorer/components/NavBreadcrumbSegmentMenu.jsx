@@ -1,9 +1,11 @@
+import { t } from '../../../strings/index.js';
+
 /** The sibling-choice menu shared by both segment shapes below: a plain
  * list of radio-style items, current one marked, styled as a choice (not a
  * path — that's the ellipsis menu). */
 function SiblingMenu({ siblings, seg, onGoTo, setOpenKey }) {
   return (
-    <div className="nav-breadcrumb__menu nav-breadcrumb__menu--siblings" role="menu" aria-label={`Switch ${seg.label}`}>
+    <div className="nav-breadcrumb__menu nav-breadcrumb__menu--siblings" role="menu" aria-label={t('explorer.switchSegmentAria', { segment: seg.label })}>
       {siblings.map((item) => (
         <button
           key={item.key}
@@ -60,7 +62,7 @@ function EarlierSegmentMenu({ seg, sep, crumbClass, open, menu, toggleMenu, menu
         <button
           type="button"
           className="nav-breadcrumb__caret-btn"
-          aria-label={`Switch ${seg.label}`}
+          aria-label={t('explorer.switchSegmentAria', { segment: seg.label })}
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={toggleMenu}

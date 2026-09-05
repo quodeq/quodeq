@@ -162,13 +162,3 @@ class InMemoryJobStore:
 
 
 _logger = logging.getLogger(__name__)
-
-# Re-exported: JSON (de)serialization and the disk-backed store moved to
-# _job_file_store.py. Placed at the bottom (not the top) of this file so Job
-# and _MAX_LOG_LINES -- which _job_file_store.py imports back from here --
-# are already defined on this (still-initializing) module by the time that
-# import runs; no true cycle.
-from quodeq.services._job_file_store import (  # noqa: F401, E402
-    FileJobStore, _STALE_JOB_AGE_S, _default_persist_dir,
-    _job_from_json, _job_to_json, create_job_store,
-)

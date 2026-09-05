@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services._wiring import (
     ActionLogWriter,
     load_suppression_rules,
@@ -28,7 +29,7 @@ from quodeq.core.events.models import (
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 
 
-def dismiss_finding(project_dir: Path, finding: dict) -> None:
+def dismiss_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingDismissed event to project_dir/actions.jsonl."""
     # Fold any legacy dismissed.json in FIRST, so the new event lands after the
     # migrated history rather than the migration appending stale dismissals on
@@ -45,10 +46,11 @@ def dismiss_finding(project_dir: Path, finding: dict) -> None:
         line=line,
         reason=finding.get("dismissReason"),
     )
-    ActionLogWriter(project_dir).emit(FindingDismissedEvent(payload=payload))
+    log = writer or ActionLogWriter(project_dir)
+    log.emit(FindingDismissedEvent(payload=payload))
 
 
-def restore_finding(project_dir: Path, finding: dict) -> None:
+def restore_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingUndismissed event to project_dir/actions.jsonl."""
     # Fold legacy dismissals in before recording the restore, otherwise the
     # migration would re-dismiss this finding after the fact (ordering bug).
@@ -63,7 +65,8 @@ def restore_finding(project_dir: Path, finding: dict) -> None:
         file=str(finding.get("file", "")),
         line=line,
     )
-    ActionLogWriter(project_dir).emit(FindingUndismissedEvent(payload=payload))
+    log = writer or ActionLogWriter(project_dir)
+    log.emit(FindingUndismissedEvent(payload=payload))
 
 
 def dismissed_keys(project_dir: Path) -> set[tuple]:
@@ -196,7 +199,7 @@ def load_dismissed(
     return items[start:end]
 
 
-def restore_all_findings(project_dir: Path) -> int:
+def restore_all_findings(project_dir: Path, *, writer: ActionLog | None = None) -> int:
     """Append FindingUndismissed events for all currently-dismissed findings.
 
     Returns the count of restored items.
@@ -205,10 +208,10 @@ def restore_all_findings(project_dir: Path) -> int:
     count = len(keys)
     if count == 0:
         return 0
-    writer = ActionLogWriter(project_dir)
+    log = writer or ActionLogWriter(project_dir)
     for req, file, line in keys:
         payload = FindingUndismissed(req=req, file=file, line=line)
-        writer.emit(FindingUndismissedEvent(payload=payload))
+        log.emit(FindingUndismissedEvent(payload=payload))
     return count
 
 

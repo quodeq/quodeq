@@ -13,7 +13,7 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.api.routes_project_create import _create_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
-from quodeq.services._warmup import engine as warmup_engine
+from quodeq.services._warmup import WarmupEngine, engine as warmup_engine
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment
 
@@ -56,20 +56,24 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     return jsonify({"updated": project, "path": new_path})
 
 
-def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
+def register_project_list_routes(
+    app: Flask, provider: ActionProvider, warmup_engine: WarmupEngine = warmup_engine
+) -> None:
     """Register project listing, mutation, and export routes."""
     register_project_scan_routes(app)
 
     @app.get("/api/projects")
     def list_projects() -> Response:
-        """Return all projects with optional ``?limit=N&offset=M`` pagination."""
-        result = provider.list_projects(reports_dir())
-        projects = result.get("projects", [])
+        """Return all projects with optional ``?limit=N&offset=M`` pagination.
+
+        Pagination is pushed into the provider (``offset``/``limit``) so a
+        paginated request only pays for hydrating its own window instead of
+        the whole project set (see ``ProjectsCache._list_page``).
+        """
         offset = request.args.get("offset", 0, type=int)
         limit = request.args.get("limit", 0, type=int)
-        if offset > 0 or limit > 0:
-            end = offset + limit if limit > 0 else None
-            projects = projects[offset:end]
+        result = provider.list_projects(reports_dir(), offset=offset, limit=limit)
+        projects = result.get("projects", [])
         # Self-healing warm-up: anything still pending on the page being
         # returned goes (back) on the queue, bounding this to page size
         # instead of the full project count.

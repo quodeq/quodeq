@@ -14,7 +14,22 @@ vi.mock('../../utils/confirmDialog.js', () => ({ confirmDialog: vi.fn() }));
 
 import { applyAssistantWorkspace, discardAssistantWorkspace } from '../../api/assistant.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
+import { ApiProvider } from '../../api/ApiContext.jsx';
 import { WorkspaceDiffPanel, classifyDiffLine } from './WorkspaceDiffPanel.jsx';
+
+function makeFakeApi(overrides = {}) {
+  return {
+    fetchAssistantWorkspaceDiff: vi.fn().mockResolvedValue({
+      diff: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b\n', truncated: false, stats: [],
+    }),
+    applyAssistantWorkspace: vi.fn().mockResolvedValue({ applied: true, stats: [] }),
+    createAssistantWorkspacePr: vi.fn().mockResolvedValue({
+      prUrl: 'http://pr/1', branch: 'b', pushed: true, message: 'PR created',
+    }),
+    discardAssistantWorkspace: vi.fn().mockResolvedValue({ discarded: true }),
+    ...overrides,
+  };
+}
 
 describe('classifyDiffLine', () => {
   it('classifies diff lines', () => {
@@ -92,5 +107,56 @@ describe('WorkspaceDiffPanel', () => {
     await waitFor(() => expect(screen.getByText('Discard')).toBeTruthy());
     fireEvent.click(screen.getByText('Discard'));
     await waitFor(() => expect(discardAssistantWorkspace).toHaveBeenCalledWith('s1'));
+  });
+});
+
+// Discriminating regression test for "Panel imports concrete API functions
+// directly, bypassing the hook's DI": these tests supply the API functions
+// only via a custom ApiProvider value (never via the module-level vi.mock
+// above), so they can only pass if the Panel's Apply/Create PR/Discard
+// buttons actually route through useWorkspaceDiff's useApi() resolution.
+// Pre-fix, the Panel called the statically-imported functions from
+// '../../api/assistant.js' and these fake ApiProvider functions would never
+// be invoked.
+describe('WorkspaceDiffPanel API injection', () => {
+  it('routes "Apply to repo" through the injected ApiProvider', async () => {
+    const fakeApi = makeFakeApi();
+    render(
+      <ApiProvider value={fakeApi}>
+        <WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />
+      </ApiProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('+b')).toBeTruthy());
+    fireEvent.click(screen.getByText('Apply to repo'));
+    await waitFor(() => expect(fakeApi.applyAssistantWorkspace).toHaveBeenCalledWith('s1'));
+    await waitFor(() => expect(screen.getByText(/applied to your working tree/i)).toBeTruthy());
+  });
+
+  it('routes "Create PR" through the injected ApiProvider', async () => {
+    const fakeApi = makeFakeApi();
+    render(
+      <ApiProvider value={fakeApi}>
+        <WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />
+      </ApiProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Apply to repo')).toBeTruthy());
+    fireEvent.click(screen.getByText('Create PR...'));
+    fireEvent.click(screen.getByText('Create PR'));
+    await waitFor(() => expect(fakeApi.createAssistantWorkspacePr).toHaveBeenCalledWith(
+      's1', expect.objectContaining({ title: expect.any(String), body: '' }),
+    ));
+  });
+
+  it('routes "Discard" (after confirm) through the injected ApiProvider', async () => {
+    confirmDialog.mockResolvedValueOnce(true);
+    const fakeApi = makeFakeApi();
+    render(
+      <ApiProvider value={fakeApi}>
+        <WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />
+      </ApiProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Discard')).toBeTruthy());
+    fireEvent.click(screen.getByText('Discard'));
+    await waitFor(() => expect(fakeApi.discardAssistantWorkspace).toHaveBeenCalledWith('s1'));
   });
 });

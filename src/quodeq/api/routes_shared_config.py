@@ -11,14 +11,8 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.services.shared_connect import connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status
-from quodeq.services.shared_repo import (
-    clone_lock,
-    last_synced_at,
-    read_state,
-    remove_clone_dir,
-    shared_cache_dir,
-)
-from quodeq.services.shared_settings import SharedSettings, read_settings, write_settings
+from quodeq.services.shared_repo import disconnect_shared_repo, last_synced_at, read_state
+from quodeq.services.shared_settings import read_settings
 from quodeq.shared.validation import validate_path_segment
 
 from .helpers import error_response
@@ -94,27 +88,9 @@ def register_shared_config_routes(app: Flask) -> None:
 
     @app.delete("/api/shared/config")
     def shared_config_delete() -> Response:
-        # Audit finding A4: disconnecting must not leave the clone's cache
-        # dir (repo + index.db + score_cache.db, all under shared_cache_dir)
-        # behind on disk forever. Read the url BEFORE clearing settings (it's
-        # gone from settings after write_settings), then remove it AFTER --
-        # so a crash between the two leaves the (still-usable) clone in
-        # place rather than an orphaned dir with no settings pointing at it.
-        # remove_clone_dir handles git's read-only object files (plain
-        # rmtree leaves them behind on Windows, corrupting a later
-        # reconnect's adopted clone) and never raises: a half-removed or
-        # permission-denied cache dir must not turn a disconnect into a 500.
-        #
-        # Review finding: rmtree must run under clone_lock(url), same as
-        # every other clone mutator (ensure_shared_clone, refresh_shared_clone,
-        # publish_project) -- otherwise a concurrent publish/refresh holding
-        # the lock can have its clone directory removed mid-operation,
-        # potentially leaving a partially-deleted .git that doesn't self-heal.
-        settings = read_settings()
-        write_settings(SharedSettings(url=None))
-        if settings.url is not None:
-            with clone_lock(settings.url):
-                remove_clone_dir(shared_cache_dir(settings.url))
+        # Ordering + locking business rule lives in
+        # services/shared_repo.disconnect_shared_repo (Task 20).
+        disconnect_shared_repo()
         return jsonify({"configured": False})
 
     @app.post("/api/shared/refresh")

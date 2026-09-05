@@ -107,7 +107,7 @@ def test_route_serializes_entities_to_camel_case(tmp_path):
     from quodeq.api.routes_project_list import register_project_list_routes
 
     class _Provider:
-        def list_projects(self, reports_dir):
+        def list_projects(self, reports_dir, *, offset=0, limit=0):
             return {"projects": [_entry()]}
 
     app = Flask(__name__)
@@ -151,3 +151,79 @@ def test_summary_pending_serializes_camelcase():
     from quodeq.shared.serialization import to_camel_dict
     entry = ProjectEntry(id="p", name="p", summary_pending=True)
     assert to_camel_dict(entry)["summaryPending"] is True
+
+
+def test_paginated_hydration_gets_the_index_auto_detected_parent():
+    """Critical #1 regression (code review): _hydrate() must not silently
+    return the raw, unenriched .parent that build_project_entries()/
+    _build_project_entry() read straight off repository_info.json -- it
+    must use the value build_project_index() already auto-detected.
+    """
+    index = [ProjectEntry(id="child", name="child", parent="parent")]
+    raw_hydrated = [ProjectEntry(id="child", name="child", parent=None, runs_count=3)]
+    with patch(
+        "quodeq.services._projects_cache._fs_project_index.build_project_index",
+        return_value=index,
+    ), patch(
+        "quodeq.services._projects_cache._fs_project_index.build_project_entries",
+        return_value=raw_hydrated,
+    ):
+        out = ProjectsCache().list("/reports", offset=0, limit=10)
+
+    entry = out["projects"][0]
+    assert entry.parent == "parent"
+    assert entry.runs_count == 3, "the rest of the hydrated entry must be untouched"
+
+
+def test_hydrate_read_cannot_observe_a_concurrent_invalidate_mid_fill():
+    """Critical #2 regression (code review): before the fix, the list
+    comprehension that builds a paginated page read ``self._hydrated``
+    *outside* ``_hydrate_lock`` -- a concurrent ``invalidate()`` (which took
+    no lock at all) landing between "fill" and "read" could return a
+    truncated or empty page with no error signal. Flask serves this app
+    threaded by default, so this is a real, not theoretical, race.
+
+    This pins down the fixed invariant: once a hydrate call has entered its
+    critical section, ``invalidate()`` cannot interleave with it -- it can
+    only run entirely before or entirely after. A pause is injected inside
+    the (locked) build step and ``invalidate()`` is fired while that pause
+    holds, from another thread; the page must still come back complete.
+    """
+    import threading
+
+    index = [ProjectEntry(id=f"p{i}", name=f"p{i}") for i in range(3)]
+    entered_build = threading.Event()
+    release_build = threading.Event()
+
+    def slow_build(_root, ids, **kwargs):
+        entered_build.set()
+        release_build.wait(timeout=2)
+        return [ProjectEntry(id=i, name=i) for i in ids]
+
+    with patch(
+        "quodeq.services._projects_cache._fs_project_index.build_project_index",
+        return_value=index,
+    ), patch(
+        "quodeq.services._projects_cache._fs_project_index.build_project_entries",
+        side_effect=slow_build,
+    ):
+        cache = ProjectsCache()
+        page: dict = {}
+
+        def hit():
+            page["result"] = cache.list("/reports", offset=0, limit=10)
+
+        hydrate_thread = threading.Thread(target=hit)
+        hydrate_thread.start()
+        assert entered_build.wait(timeout=2), "build never started"
+
+        invalidate_thread = threading.Thread(target=cache.invalidate)
+        invalidate_thread.start()
+        release_build.set()
+
+        hydrate_thread.join(timeout=2)
+        invalidate_thread.join(timeout=2)
+
+    assert len(page["result"]["projects"]) == 3, (
+        "a concurrent invalidate() must not truncate an in-flight page"
+    )

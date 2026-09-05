@@ -165,8 +165,8 @@ class FilesystemActionProvider(ActionProvider):
 
     # -- projects (delegate to ProjectsCache + _fs_projects) ------------
 
-    def list_projects(self, reports_dir: str) -> dict[str, Any]:
-        return self._projects.list(reports_dir)
+    def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict[str, Any]:
+        return self._projects.list(reports_dir, offset=offset, limit=limit)
 
     def invalidate_projects_cache(self) -> None:
         self._projects.invalidate()
