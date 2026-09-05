@@ -30,7 +30,7 @@ from quodeq.services._wiring import (
     safe_read_dir,
     write_repository_info,
 )
-from quodeq.shared.utils import is_repo_url
+from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 _logger = logging.getLogger(__name__)
 
@@ -205,12 +205,16 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         return False
     # ``path`` is part of find_existing_project's index key, so the old key
     # would keep pointing here and make a fresh repo registered at the
-    # now-freed path look like a duplicate. (That lookup re-verifies its hit
-    # for a local-unscoped identity, but URL and scoped identities trust the
-    # index outright, so this rekey is what keeps them correct.)
+    # now-freed path look like a duplicate. Key the new entry on the BARE
+    # name derived from the path -- the identity find_existing_project
+    # actually computes -- never on the record's own ``name``, which for a
+    # scoped project is the compound "<name>/<scope>" and would install a key
+    # no lookup can ever reach. URL and scoped hits are trusted unverified
+    # once found, so a wrongly-keyed rekey is exactly as damaging as the
+    # staleness it replaces.
     rekey_repo_index_entry(
-        reports_root, project_dir.name, info.get("name", ""), resolved_path,
-        info.get("scopePath"),
+        reports_root, project_dir.name, project_name_from_repo(resolved_path),
+        resolved_path, info.get("scopePath"),
     )
     return True
 

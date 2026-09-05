@@ -252,6 +252,32 @@ def test_find_existing_project_resolves_a_scoped_registration(tmp_path):
     assert _load_repo_index(reports).get(key) == uuid
 
 
+def test_scoped_project_stays_findable_after_a_path_move(tmp_path):
+    """A scoped project must survive ``PUT /api/projects/<id>/path``.
+
+    The index key carries the BARE project name, but the scoped child's
+    record is written under the compound ``"<name>/<scope>"`` name. Rekeying
+    on the record's own ``name`` installed ``"alpha/src"`` as the key, which
+    find_existing_project (which computes ``"alpha"``) can never look up, so
+    the moved project went unfindable by its own identity.
+    """
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    repo = _make_repo(tmp_path, "alpha")
+    (repo / "src").mkdir()
+    (repo / "src" / "mod.py").write_text("y = 2\n")
+
+    uuid = register_project(str(repo), None, str(reports), "src")
+
+    moved_to = tmp_path / "moved" / "alpha"
+    moved_to.mkdir(parents=True)
+    assert update_project_path(str(reports), uuid, str(moved_to)) is True
+
+    moved_key = _repo_index_key("alpha", str(moved_to.resolve()), "src")
+    assert _load_repo_index(reports).get(moved_key) == uuid
+    assert find_existing_project(str(reports), str(moved_to), "src") == uuid
+
+
 def test_find_existing_project_survives_a_corrupt_index_file(tmp_path):
     """Unparseable index bytes are treated as an empty index: the walk still
     finds the project and rewrites a usable index."""
