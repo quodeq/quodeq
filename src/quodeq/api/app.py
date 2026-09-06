@@ -184,12 +184,16 @@ def main(env: dict[str, str] | None = None) -> None:
     signal.signal(signal.SIGINT, _handle_shutdown)
 
     # Warm the score caches in the background so the first requests after an
-    # upgrade hit warm or warming caches instead of recomputing inline.
+    # upgrade hit warm or warming caches instead of recomputing inline. Also
+    # migrate and index the result cache once, off the request path, so
+    # estimates stop undercounting cached files after an upgrade.
     # main() only: create_app callers (tests, embedding) stay thread-free.
     try:
         from quodeq.api.routes_common import reports_dir  # noqa: PLC0415
         from quodeq.services._warmup import engine as warmup_engine  # noqa: PLC0415
+        from quodeq.services.cache_maintenance import start_cache_maintenance  # noqa: PLC0415
         warmup_engine.start(reports_dir())
+        start_cache_maintenance()
     except Exception:  # pragma: no cover - warm-up must never block serving
         logging.getLogger(__name__).warning("warm-up start failed", exc_info=True)
 
