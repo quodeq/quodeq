@@ -1,16 +1,22 @@
 """Content-addressed cache for analysis results.
 
 A successful (file, dimension) analysis is keyed by the SHA-256 of its real
-per-unit inputs (file content, path, dimension, language) and stored as one
-atomic, self-describing JSON entry. The next run computes the same key and
-either serves the recorded result or dispatches the work and writes the new
-entry.
+per-unit inputs (file content, path, dimension, non-default params) and
+stored as one atomic, self-describing JSON entry. The next run computes the
+same key and either serves the recorded result or dispatches the work and
+writes the new entry.
 
 The key is permissive (cost-first): volatile inputs (model, prompts,
 standards, sampling) are NOT keyed — switching them reuses prior work. Each
 entry records those in its ``provenance`` block, so reuse across a model /
 prompts / standards boundary is surfaced, not silent; the user refreshes on
 demand with ``--clean-scan``.
+
+Since schema 4 the project ``language`` is provenance too, so a
+language-detection flip reuses prior work. A file moved inside the repo with
+unchanged content is recovered by adoption (``_adoption.py``) through the
+content index kept beside the entries (``data/cache_store/index.py``); the
+cache log line reports the count as ``adopted``.
 
 This is the canonical incremental layer. Half-computed work never gets a
 key, so there is no partial state to recover from.

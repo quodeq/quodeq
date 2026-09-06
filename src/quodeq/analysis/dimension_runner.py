@@ -40,8 +40,8 @@ class DimensionRunner:
 
     ``cache`` is the composition root's shared cache backend for the whole
     run; left ``None``, ``process_dimension_with_cache`` defaults to its own
-    ``LocalFileBackend()`` (and runs the once-per-process legacy-entry GC) --
-    see ``_pipeline.py`` for the production wiring.
+    ``LocalFileBackend()`` (and runs the once-per-process cache maintenance)
+    -- see ``_pipeline.py`` for the production wiring.
 
     ``log`` defaults to the silent :data:`NULL_LOG`; the composition root
     (``_pipeline.py``) injects ``SHARED_LOG`` so production keeps the colored

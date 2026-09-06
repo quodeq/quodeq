@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+- **Cached results follow files that move**: when a file's content is unchanged and only its directory changed (same file name, same test/production role), the previous evaluation is adopted instead of re-run. A repo restructure that moves a top-level folder no longer costs a full re-evaluation. The cache log line and the `cache_stats` event report the count as `adopted`.
+- **Content index beside the cache**: a small sqlite index (`~/.quodeq/cache/results/.index.db`) maps file content to cached results. It is rebuilt automatically if missing or corrupt.
+
+### Changes
+- **Cache key schema 4**: the detected project language is no longer part of the evaluation cache key. A language-detection change (for example `build.gradle` replaced by `build.gradle.kts`) reuses all cached results instead of re-evaluating the repo. Existing entries are migrated in place, once, on the first evaluation or dashboard start after upgrading; on very large caches the one-time pass can take a few minutes.
+
 ## [1.10.1] - 2026-08-28
 
 ### Fixes
