@@ -87,7 +87,6 @@ def _key_for(unit: WorkUnit, schema_version: int) -> str:
         file_content_hash=unit.file_content_hash,
         file_path=unit.file_path,
         dimension=unit.dimension,
-        language=unit.language,
         params_hash=unit.params_hash,
     ))
 

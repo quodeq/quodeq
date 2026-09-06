@@ -174,12 +174,12 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
 
 
 def test_entry_is_self_describing_for_future_key_migration(tmp_path):
-    """The schema-3 self-describing guarantee: an entry stores EVERY field its
-    key was computed from (content hash, path, dimension, language), so a
-    future key change can be recomputed losslessly from the entry alone — no
-    re-evaluation. This is what makes the 2->3 change the last one that costs
-    a re-eval. Regressing it (e.g. dropping language from the entry) silently
-    breaks future migratability, so pin it."""
+    """The self-describing guarantee: an entry stores EVERY field its key was
+    computed from (content hash, path, dimension, params hash), so a future
+    key change can be recomputed losslessly from the entry alone — no
+    re-evaluation. This is what let the 3->4 change (language left the key)
+    migrate in place. Regressing it silently breaks future migratability, so
+    pin it."""
     from quodeq.analysis.cache.cache_writer import build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.key import CacheKey, compute_key
@@ -209,7 +209,6 @@ def test_entry_is_self_describing_for_future_key_migration(tmp_path):
         file_content_hash=entry.file_content_hash,
         file_path=entry.file_path,
         dimension=entry.dimension,
-        language=entry.language,
     ))
     assert recomputed == key
 

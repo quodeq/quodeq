@@ -18,6 +18,7 @@ from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache.entry import quodeq_version
+from quodeq.analysis.cache.key import SCHEMA_VERSION as _SCHEMA_VERSION
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.fingerprint import (
     _hash_file,
@@ -26,18 +27,9 @@ from quodeq.analysis.fingerprint import (
     dimension_params_state,
 )
 
-# Bumped on any breaking change to key composition or entry format.
-# v1 -> v2: file_done marker contract; entries written without marker
-# filtering are no longer trusted, so old entries naturally invalidate
-# on the next input change.
-# v2 -> v3: permissive key — model/prompts/standards/sampling left the key
-# (now provenance on the entry). The formula change re-keys every entry, so
-# schema-2 entries land in a different namespace that schema-3 lookups never
-# reach; the one-time GC (cache/gc.py) then reclaims them. This is the LAST
-# key change that costs a re-eval: entries are now self-describing
-# (file_content_hash stored), so any future key change is losslessly
-# migratable.
-_SCHEMA_VERSION = 3
+# The schema constant and its history live with the key formula in
+# ``data/cache_store/key.py``; ``_SCHEMA_VERSION`` is re-exported here for the
+# call sites and tests that import it from this module.
 
 
 # Provenance fields compared at classify time, in display order.
@@ -128,28 +120,36 @@ def _model_id_from(config: RunConfig) -> str:
     return opts.subagent_model or opts.ai_model or "unknown"
 
 
-def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) -> str:
-    """Compute the cache key for a (file, dimension) pair under ``config``.
+def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) -> CacheKey:
+    """The ``CacheKey`` for a (file, dimension) pair under ``config``.
 
-    Returns a 64-char hex SHA-256. The key is permissive: it depends only on
-    the real per-unit inputs (file content, path, dimension, language, and
-    non-default threshold params), so a model switch or a quodeq/standards
-    update reuses the cached result. The volatile context is recorded on the
-    entry's provenance at write time.
+    Exposed as a struct (not only the hash) so classify can reuse the
+    content hash and params hash for adoption lookups without hashing the
+    file twice. The key is permissive: it depends only on the real per-unit
+    inputs (file content, path, dimension, non-default threshold params), so
+    a model switch, a language-detection flip or a quodeq/standards update
+    reuses the cached result. The volatile context is recorded on the entry's
+    provenance at write time.
 
-    MUST stay byte-for-byte identical to the key built in
-    ``cache_writer.build_cache_writer`` and ``cache.runner._key_for`` —
+    MUST stay byte-for-byte identical to the keys built in
+    ``cache_writer._write_cache_entry`` and ``cache.runner._key_for`` --
     ``CacheKey`` is the single source of truth and all three populate exactly
     its fields.
     """
     content_hash = _hash_file(config.src / file_path) or ""
     params_hash, _ = dimension_params_state(config.standards_dir, dimension, config.src)
-    key = CacheKey(
+    return CacheKey(
         schema_version=_SCHEMA_VERSION,
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=dimension,
-        language=config.language or "",
         params_hash=params_hash,
     )
-    return compute_key(key)
+
+
+def build_cache_key_for_file(config: RunConfig, file_path: str, dimension: str) -> str:
+    """Compute the cache key for a (file, dimension) pair under ``config``.
+
+    Returns a 64-char hex SHA-256. See ``build_cache_key_struct``.
+    """
+    return compute_key(build_cache_key_struct(config, file_path, dimension))

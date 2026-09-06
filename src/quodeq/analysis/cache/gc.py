@@ -29,11 +29,8 @@ _collected: set[tuple[str, int]] = set()
 
 
 def _current_schema() -> int:
-    # Lazy import: dimension_helpers is a heavier module (pulls RunConfig,
-    # fingerprint, etc.) and imports this package's other cache modules.
-    # Deferring keeps gc import-cheap and the dependency one-directional.
-    from quodeq.analysis.cache.dimension_helpers import _SCHEMA_VERSION  # noqa: PLC0415
-    return _SCHEMA_VERSION
+    from quodeq.data.cache_store.key import SCHEMA_VERSION  # noqa: PLC0415
+    return SCHEMA_VERSION
 
 
 def collect_legacy_entries(root: Path, *, min_schema: int) -> int:

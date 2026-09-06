@@ -78,7 +78,7 @@ def test_maybe_collect_runs_once_per_process(tmp_path: Path):
 
     maybe_collect_legacy_entries(root)
     assert not (root / "aa" / ("0" * 62) / "entry.json").exists()  # collected
-    assert (root / ".gc_schema_3").exists()  # marker written
+    assert (root / ".gc_schema_4").exists()  # marker written
 
     # A legacy entry seeded after the one-time pass is NOT collected again.
     _write_entry(root, "dd" + "3" * 62, schema=2)

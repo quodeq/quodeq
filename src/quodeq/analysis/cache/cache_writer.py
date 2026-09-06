@@ -83,7 +83,6 @@ def _write_cache_entry(
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=dimension,
-        language=language,
         params_hash=params_hash,
     )
     key = compute_key(key_struct)
