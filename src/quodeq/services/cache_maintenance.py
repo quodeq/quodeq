@@ -9,15 +9,13 @@ request.
 """
 from __future__ import annotations
 
-import logging
 import threading
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.cache_store.local import default_cache_root
 from quodeq.data.cache_store.migrate import ensure_cache_ready
-
-_logger = logging.getLogger(__name__)
 
 
 def _default_standards_dir() -> Path | None:
@@ -30,6 +28,7 @@ def _default_standards_dir() -> Path | None:
 
 def start_cache_maintenance(
     root: Path | None = None, *, standards_dir: Path | None = None,
+    log: LogSink = NULL_LOG,
 ) -> threading.Thread:
     """Start ``ensure_cache_ready`` on a daemon thread and return it."""
     target_root = root if root is not None else default_cache_root()
@@ -38,8 +37,8 @@ def start_cache_maintenance(
     def _run() -> None:
         try:
             ensure_cache_ready(target_root, standards_dir=std)
-        except Exception:  # noqa: BLE001 - never propagate out of a daemon thread
-            _logger.warning("cache maintenance failed", exc_info=True)
+        except Exception as exc:  # noqa: BLE001 - never propagate out of a daemon thread
+            log.warning(f"cache maintenance failed: {exc!r}")
 
     thread = threading.Thread(target=_run, name="cache-maintenance", daemon=True)
     thread.start()

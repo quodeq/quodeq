@@ -339,12 +339,13 @@ def test_cli_path_and_api_path_agree_with_standards_dir_and_override(tmp_path):
     assert entry.provenance["effective_params"]["M-ANA-2"]["max_lines"] == 60
 
 
-def test_cli_path_key_diverges_when_language_missing(tmp_path):
-    """Counter-test: when ServerArgs.language is None, the CLI-path's cache
-    writer falls back to "" -- which MUST diverge from the API-path key for
-    a project where RunConfig.language is set. This pins that the regression
-    fixed here cannot silently come back by anyone re-introducing the
-    getattr(ctx, "language", None) pattern.
+def test_cli_path_key_matches_api_path_when_language_missing(tmp_path):
+    """Schema 4: language is provenance, not key. When ServerArgs.language is
+    None the CLI-path writer records "" on the entry, and that MUST still
+    land on the same key the API path computes for a project whose
+    RunConfig.language is set. The old regression (a language mismatch
+    between the two paths silently missing every entry) is structurally
+    impossible now, and this pins that it stays so.
     """
     from quodeq.analysis._types import AnalysisOptions, RunConfig
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
@@ -387,9 +388,10 @@ def test_cli_path_key_diverges_when_language_missing(tmp_path):
     router.mark_file_done(file="Foo.kt", status="ok")
 
     cache = LocalFileBackend(root=cache_root)
-    # Parent key MUST miss when CLI side didn't get the language flag.
-    assert cache.get(parent_key) is None, (
-        "Expected divergence: when CLI side has no --language, its key must "
-        "NOT collide with the API-path key. If this fails, language is no "
-        "longer load-bearing in the key composition."
+    # Parent key MUST hit even though the CLI side had no language flag.
+    entry = cache.get(parent_key)
+    assert entry is not None, (
+        "Expected convergence: with language out of the key (schema 4), the "
+        "CLI-path key must equal the API-path key regardless of --language."
     )
+    assert entry.language == ""  # recorded as information, not keyed

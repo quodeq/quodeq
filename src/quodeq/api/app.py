@@ -192,8 +192,9 @@ def main(env: dict[str, str] | None = None) -> None:
         from quodeq.api.routes_common import reports_dir  # noqa: PLC0415
         from quodeq.services._warmup import engine as warmup_engine  # noqa: PLC0415
         from quodeq.services.cache_maintenance import start_cache_maintenance  # noqa: PLC0415
+        from quodeq.shared.log_sink import SHARED_LOG  # noqa: PLC0415
         warmup_engine.start(reports_dir())
-        start_cache_maintenance()
+        start_cache_maintenance(log=SHARED_LOG)
     except Exception:  # pragma: no cover - warm-up must never block serving
         logging.getLogger(__name__).warning("warm-up start failed", exc_info=True)
 

@@ -111,15 +111,12 @@ def _classify_and_log(
     )
     n_hits = len(files) - len(classify.misses)
     drift_note = format_provenance_drift(classify.provenance_drift, reused=n_hits)
-    adopted_note = (
-        f" - {classify.adopted} adopted from moved files" if classify.adopted else ""
-    )
+    adopted_note = f" - {classify.adopted} adopted from moved files" if classify.adopted else ""
     _logger.info(
         "[%s] cache: %d hits / %d misses (%d total)%s%s%s",
         dim_id, n_hits, len(classify.misses), len(files),
         " - clean-scan invalidated" if bypass_reads else "",
-        f" - reused {drift_note}" if drift_note else "",
-        adopted_note,
+        f" - reused {drift_note}" if drift_note else "", adopted_note,
     )
     emit_marker(
         "cache_stats", dimension=dim_id, hits=n_hits, misses=len(classify.misses),
