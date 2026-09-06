@@ -28,6 +28,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 from quodeq.analysis.cache.entry import CacheEntry
 from quodeq.analysis.cache.gc import (
     collect_legacy_entries,
+    ensure_cache_ready,
     maybe_collect_legacy_entries,
 )
 from quodeq.analysis.cache.key import CacheKey, compute_key
@@ -59,6 +60,7 @@ __all__ = [
     "collect_legacy_entries",
     "compute_key",
     "default_cache_root",
+    "ensure_cache_ready",
     "format_provenance_drift",
     "maybe_collect_legacy_entries",
     "persist_dispatch_results",

@@ -60,7 +60,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     format_provenance_drift,
     persist_dispatch_results,
 )
-from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
+from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
@@ -262,7 +262,7 @@ def process_dimension_with_cache(
     list to classify (matches V1's no-files fallback)."""
     if cache is None:
         cache = LocalFileBackend()
-        maybe_collect_legacy_entries(cache.root)
+        ensure_cache_ready(cache.root)
     trust_model = resolve_trust_model(config.src) if config.src is not None else None
     files, _ext, _excluded = _list_source_files(config, dim_id)
     if not files:
