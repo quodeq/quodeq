@@ -138,3 +138,46 @@ class TestCacheRoot:
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", "   ")
         root = default_cache_root()
         assert ".quodeq" in root.parts
+
+
+class TestContentIndexWiring:
+    def _entry(self, key: str, *, path: str, hash_: str = "aa" * 32) -> CacheEntry:
+        return CacheEntry(
+            key=key, schema_version=4, findings=[], files_read=1, file_path=path,
+            dimension="security", model_id="m", file_content_hash=hash_,
+            created_at="2026-01-01T00:00:00+00:00",
+        )
+
+    def test_put_records_and_find_by_content_returns_row(self, backend: LocalFileBackend):
+        backend.put("k1" * 32, self._entry("k1" * 32, path="ios/A.swift"))
+        rows = backend.find_by_content("aa" * 32, "security", "")
+        assert [(r.key, r.file_path) for r in rows] == [("k1" * 32, "ios/A.swift")]
+
+    def test_delete_forgets(self, backend: LocalFileBackend):
+        backend.put("k1" * 32, self._entry("k1" * 32, path="A.swift"))
+        backend.delete("k1" * 32)
+        assert backend.find_by_content("aa" * 32, "security", "") == []
+
+    def test_put_with_index_false_skips_indexing(self, backend: LocalFileBackend):
+        backend.put("k1" * 32, self._entry("k1" * 32, path="A.swift"), index=False)
+        assert backend.get("k1" * 32) is not None
+        assert backend.find_by_content("aa" * 32, "security", "") == []
+
+    def test_index_file_lives_inside_root(self, backend: LocalFileBackend):
+        from quodeq.data.cache_store.index import INDEX_FILENAME
+        backend.put("k1" * 32, self._entry("k1" * 32, path="A.swift"))
+        assert (backend.root / INDEX_FILENAME).exists()
+
+    def test_index_can_be_disabled(self, tmp_path: Path):
+        b = LocalFileBackend(root=tmp_path / "c", enable_index=False)
+        b.put("k1" * 32, self._entry("k1" * 32, path="A.swift"))
+        assert b.index is None
+        assert b.find_by_content("aa" * 32, "security", "") == []
+
+    def test_blank_hash_never_indexed(self, backend: LocalFileBackend):
+        backend.put("k1" * 32, self._entry("k1" * 32, path="A.swift", hash_=""))
+        assert backend.find_by_content("", "security", "") == []
+
+    def test_stats_ignore_the_index_file(self, backend: LocalFileBackend):
+        backend.put("k1" * 32, self._entry("k1" * 32, path="A.swift"))
+        assert backend.stats().entries == 1
