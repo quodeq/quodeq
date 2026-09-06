@@ -203,7 +203,7 @@ def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], se
 def _build_cache_entry_for_file(
     config: RunConfig, dimension: str, f: str, key: str, grouped: dict[str, list[dict]],
     *, model_id: str, standards_hash: str, prompts_hash: str, effective_params: dict,
-    version: str,
+    version: str, params_hash: str = "",
 ) -> CacheEntry:
     """Build the CacheEntry for one dispatched file's persisted result."""
     return CacheEntry(
@@ -216,6 +216,7 @@ def _build_cache_entry_for_file(
         model_id=model_id,
         file_content_hash=_hash_file(config.src / f) or "",
         language=config.language or "",
+        params_hash=params_hash,
         provenance=build_provenance(
             model_id=model_id, prompts_hash=prompts_hash,
             standards_hash=standards_hash, version=version,
@@ -255,7 +256,7 @@ def persist_dispatch_results(
         _hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
-    _, effective_params = dimension_params_state(
+    params_hash, effective_params = dimension_params_state(
         config.standards_dir, dimension, config.src,
     )
     prompts_hash = _hash_prompts_combined(config.prompts_dir)
@@ -270,6 +271,6 @@ def persist_dispatch_results(
         entry = _build_cache_entry_for_file(
             config, dimension, f, key, grouped,
             model_id=model_id, standards_hash=standards_hash, prompts_hash=prompts_hash,
-            effective_params=effective_params, version=version,
+            effective_params=effective_params, version=version, params_hash=params_hash,
         )
         cache.put(key, entry)

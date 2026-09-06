@@ -209,6 +209,7 @@ def test_entry_is_self_describing_for_future_key_migration(tmp_path):
         file_content_hash=entry.file_content_hash,
         file_path=entry.file_path,
         dimension=entry.dimension,
+        params_hash=entry.params_hash,
     ))
     assert recomputed == key
 
@@ -344,6 +345,12 @@ def test_written_entry_records_effective_params(tmp_path):
     entry = LocalFileBackend(root=cache_root).get(key)
     assert entry is not None
     assert entry.provenance["effective_params"]["M-ANA-2"]["max_lines"] == 60
+    # Format 3: the non-default params hash the key was computed under is
+    # stored on the entry, so a future key change never has to derive it.
+    from quodeq.analysis.cache._key_provenance import build_cache_key_struct
+    expected_params_hash = build_cache_key_struct(config, "auth.py", "maintainability").params_hash
+    assert expected_params_hash != ""
+    assert entry.params_hash == expected_params_hash
 
 
 def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):

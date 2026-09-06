@@ -122,6 +122,7 @@ def analyze_unit(
         model_id=unit.model_id,
         file_content_hash=unit.file_content_hash,
         language=unit.language,
+        params_hash=unit.params_hash,
         provenance=build_provenance(
             model_id=unit.model_id, prompts_hash=unit.prompts_hash,
             standards_hash=unit.standards_hash,

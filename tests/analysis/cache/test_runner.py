@@ -281,3 +281,10 @@ def test_analyze_unit_preserves_consolidated_on_a_hit(cache: LocalFileBackend):
     second = analyze_unit(unit, cache=cache, dispatcher=dispatcher)
     assert second.cache_hit is True
     assert second.entry.consolidated is True
+
+
+def test_analyze_unit_stores_params_hash(cache: LocalFileBackend):
+    unit = _unit(params_hash="ee" * 32)
+    result = analyze_unit(unit, cache=cache, dispatcher=_RecordingDispatcher())
+    assert result.entry.params_hash == "ee" * 32
+    assert cache.get(result.entry.key).params_hash == "ee" * 32

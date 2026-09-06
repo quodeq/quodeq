@@ -461,6 +461,9 @@ class TestPersist:
         assert "prompts_hash" in entry.provenance
         assert "standards_hash" in entry.provenance
         assert "quodeq_version" in entry.provenance
+        from quodeq.analysis.cache._key_provenance import build_cache_key_struct
+        assert entry.params_hash == build_cache_key_struct(config, "a.py", "security").params_hash
+        assert entry.cache_format_version == 3
 
     def test_persisted_provenance_folds_project_overrides(
         self, tmp_path: Path, cache: LocalFileBackend,
