@@ -174,12 +174,12 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
 
 
 def test_entry_is_self_describing_for_future_key_migration(tmp_path):
-    """The schema-3 self-describing guarantee: an entry stores EVERY field its
-    key was computed from (content hash, path, dimension, language), so a
-    future key change can be recomputed losslessly from the entry alone — no
-    re-evaluation. This is what makes the 2->3 change the last one that costs
-    a re-eval. Regressing it (e.g. dropping language from the entry) silently
-    breaks future migratability, so pin it."""
+    """The self-describing guarantee: an entry stores EVERY field its key was
+    computed from (content hash, path, dimension, params hash), so a future
+    key change can be recomputed losslessly from the entry alone — no
+    re-evaluation. This is what let the 3->4 change (language left the key)
+    migrate in place. Regressing it silently breaks future migratability, so
+    pin it."""
     from quodeq.analysis.cache.cache_writer import build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.key import CacheKey, compute_key
@@ -209,7 +209,7 @@ def test_entry_is_self_describing_for_future_key_migration(tmp_path):
         file_content_hash=entry.file_content_hash,
         file_path=entry.file_path,
         dimension=entry.dimension,
-        language=entry.language,
+        params_hash=entry.params_hash,
     ))
     assert recomputed == key
 
@@ -345,6 +345,12 @@ def test_written_entry_records_effective_params(tmp_path):
     entry = LocalFileBackend(root=cache_root).get(key)
     assert entry is not None
     assert entry.provenance["effective_params"]["M-ANA-2"]["max_lines"] == 60
+    # Format 3: the non-default params hash the key was computed under is
+    # stored on the entry, so a future key change never has to derive it.
+    from quodeq.analysis.cache._key_provenance import build_cache_key_struct
+    expected_params_hash = build_cache_key_struct(config, "auth.py", "maintainability").params_hash
+    assert expected_params_hash != ""
+    assert entry.params_hash == expected_params_hash
 
 
 def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):

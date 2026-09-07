@@ -13,9 +13,12 @@ import json
 import logging
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from quodeq.analysis.cache import CacheEntry, build_cache_key_for_file
+from quodeq.analysis.cache._key_provenance import build_cache_key_struct
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.key import compute_key
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
     _ListHandler,
@@ -262,4 +265,38 @@ class TestNoSourceFiles:
         )
         # Dispatcher was called (even with no files — same as V1 behaviour).
         assert len(dispatcher.calls) == 1
+
+
+class TestAdoptedReporting:
+    def test_cache_line_and_marker_report_adopted_count(self, tmp_path: Path, cache):
+        config, src = _setup(tmp_path, {"new/a.py": "print(1)"})
+        struct = build_cache_key_struct(config, "new/a.py", "security")
+        old_key = compute_key(replace(struct, file_path="old/a.py"))
+        cache.put(old_key, CacheEntry(
+            key=old_key, schema_version=struct.schema_version,
+            findings=[{"file": "old/a.py", "line": 1, "t": "violation", "w": "v"}],
+            files_read=1, file_path="old/a.py", dimension="security", model_id="test-model",
+            file_content_hash=struct.file_content_hash,
+        ))
+        handler = _ListHandler()
+        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger.addHandler(handler)
+        dispatcher = FakeDispatcher(src)
+        try:
+            with patch("quodeq.analysis.cache.dimension_runner.emit_marker") as marker:
+                process_dimension_with_cache(
+                    config, "security", idx=1, ctx=_make_ctx(), callbacks=_make_callbacks(),
+                    cache=cache, dispatcher=dispatcher,
+                )
+        finally:
+            logger.removeHandler(handler)
+
+        assert dispatcher.calls == []  # adopted, nothing dispatched
+        line = next(m for m in handler.messages if "cache:" in m and "hits" in m)
+        assert "1 hits / 0 misses (1 total)" in line
+        assert "1 adopted from moved files" in line
+        stats_call = next(
+            c for c in marker.call_args_list if c.args and c.args[0] == "cache_stats"
+        )
+        assert stats_call.kwargs["adopted"] == 1
 

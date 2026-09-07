@@ -10,7 +10,7 @@ from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import _run_dir_for, _safe_write_dim_state
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
-from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
+from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
@@ -133,11 +133,12 @@ def _prepare_run_context(
 
     Cache is constructed here (composition root) rather than left for
     process_dimension_with_cache to default lazily, so every dimension in
-    this run shares one LocalFileBackend. The legacy-entry GC that used to
-    ride along with the lazy default is called explicitly here instead --
-    it's still once-per-(root, schema)-per-process (see
-    maybe_collect_legacy_entries's own memo), just triggered at runner
-    construction instead of on the first cache-is-None dimension call.
+    this run shares one LocalFileBackend. The cache maintenance (schema
+    migration, content-index build, legacy GC) that used to ride along with
+    the lazy default is called explicitly here instead -- it's still
+    once-per-(root, schema)-per-process (see ensure_cache_ready's own memo),
+    just triggered at runner construction instead of on the first
+    cache-is-None dimension call.
     """
     dimensions, ctx = load_analysis_context(config)
     if config._classify_cache is None:
@@ -145,7 +146,7 @@ def _prepare_run_context(
     _persist_dim_estimates(config, dimensions)
 
     cache = LocalFileBackend()
-    maybe_collect_legacy_entries(cache.root)
+    ensure_cache_ready(cache.root)
     runner = DimensionRunner(cache=cache, log=SHARED_LOG)
     return dimensions, ctx, runner
 

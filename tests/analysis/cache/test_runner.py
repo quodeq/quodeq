@@ -130,7 +130,6 @@ class TestInvalidation:
         {"file_content_hash": "00" * 32},
         {"file_path": "src/other.py"},
         {"dimension": "documentation"},
-        {"language": "typescript"},
     ])
     def test_each_real_change_misses(self, cache: LocalFileBackend, override: dict):
         dispatcher = _RecordingDispatcher()
@@ -146,6 +145,7 @@ class TestInvalidation:
         {"model_id": "claude-sonnet-4-6"},
         {"temperature": 0.7},
         {"max_tokens": 4096},
+        {"language": "typescript"},  # schema 4: language is provenance, not key
     ])
     def test_volatile_change_reuses(self, cache: LocalFileBackend, override: dict):
         # Permissive key: changing model / prompts / standards / sampling
@@ -281,3 +281,10 @@ def test_analyze_unit_preserves_consolidated_on_a_hit(cache: LocalFileBackend):
     second = analyze_unit(unit, cache=cache, dispatcher=dispatcher)
     assert second.cache_hit is True
     assert second.entry.consolidated is True
+
+
+def test_analyze_unit_stores_params_hash(cache: LocalFileBackend):
+    unit = _unit(params_hash="ee" * 32)
+    result = analyze_unit(unit, cache=cache, dispatcher=_RecordingDispatcher())
+    assert result.entry.params_hash == "ee" * 32
+    assert cache.get(result.entry.key).params_hash == "ee" * 32

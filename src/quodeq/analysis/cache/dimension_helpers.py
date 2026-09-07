@@ -5,14 +5,14 @@ These are pure functions used by the V2 dimension processor (Phase B5):
 
   - ``build_cache_key_for_file``: derive a deterministic cache key from
     the current ``RunConfig`` and a target file. The key composition
-    matches ``CacheKey``: file content, dimension, standards, prompts,
-    model, language. Sampling params are not yet plumbed through
-    ``AnalysisOptions``; once they are, add them to the key.
+    matches ``CacheKey``: file content, path, dimension, non-default
+    params. Model, prompts, standards and language are provenance, not key.
 
   - ``classify_files_via_cache``: split a file list into cache hits
-    (with findings) and misses (need dispatch). The miss-key mapping is
-    returned so the caller can write entries after dispatch without
-    recomputing keys.
+    (with findings) and misses (need dispatch). A miss with a real content
+    hash first tries adoption from an identical file under another path
+    (``_adoption.py``). The miss-key mapping is returned so the caller can
+    write entries after dispatch without recomputing keys.
 
   - ``persist_dispatch_results``: after a dispatch run writes its JSONL,
     group its findings by file and write per-file cache entries for the
@@ -33,17 +33,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
+from quodeq.analysis.cache._adoption import try_adopt
 from quodeq.analysis.cache._key_provenance import (
     _SCHEMA_VERSION,
     _accumulate_drift,
     _current_provenance,
     _hash_prompts_combined,
     _model_id_from,
-    build_cache_key_for_file,
+    build_cache_key_for_file,  # noqa: F401 -- re-export
+    build_cache_key_struct,
     format_provenance_drift,  # noqa: F401 -- re-export
 )
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
+from quodeq.analysis.cache.key import compute_key
 from quodeq.analysis.fingerprint import (
     _hash_file,
     _hash_standards,
@@ -76,20 +79,30 @@ class ClassifyResult:
     # file -> cache key for those same entries, so a run that reaches done
     # can flip them to consolidated.
     unconsolidated_hit_keys: dict[str, str] = field(default_factory=dict)
+    # Hits served by adopting an entry with identical content from another
+    # path (a directory move). Counted so the cache log line and the
+    # cache_stats marker can surface the reuse.
+    adopted: int = 0
 
 
 def _classify_one_file(
     config: RunConfig, dimension: str, f: str, cache: CacheBackend, *, bypass_reads: bool,
     current_prov: dict | None,
-) -> tuple[str, CacheEntry | None, dict | None]:
-    """Classify one file against the cache. Returns (key, hit, current_prov),
-    where hit is None on a miss and current_prov is lazily computed on the
-    first hit (passed through so the caller only pays for it once)."""
-    key = build_cache_key_for_file(config, f, dimension)
+) -> tuple[str, CacheEntry | None, dict | None, bool]:
+    """Classify one file against the cache. Returns (key, hit, current_prov,
+    adopted), where hit is None on a miss, current_prov is lazily computed on
+    the first hit (passed through so the caller only pays for it once), and
+    adopted says the hit came from ``try_adopt`` rather than a direct get."""
+    struct = build_cache_key_struct(config, f, dimension)
+    key = compute_key(struct)
     hit = None if bypass_reads else cache.get(key)
+    adopted = False
+    if hit is None and not bypass_reads:
+        hit = try_adopt(cache, struct, key, language=config.language or "")
+        adopted = hit is not None
     if hit is not None and current_prov is None:
         current_prov = _current_provenance(config, dimension)
-    return key, hit, current_prov
+    return key, hit, current_prov, adopted
 
 
 def _partition_files_by_cache(
@@ -103,15 +116,17 @@ def _partition_files_by_cache(
     provenance_drift: dict = {}
     unconsolidated_findings: list[dict] = []
     unconsolidated_hit_keys: dict[str, str] = {}
+    adopted = 0
     current_prov: dict | None = None  # computed lazily, only if there are hits
     for f in files:
-        key, hit, current_prov = _classify_one_file(
+        key, hit, current_prov, was_adopted = _classify_one_file(
             config, dimension, f, cache, bypass_reads=bypass_reads, current_prov=current_prov,
         )
         if hit is None:
             misses.append(f)
             miss_keys[f] = key
         else:
+            adopted += int(was_adopted)
             if hit.consolidated:
                 cached_findings.extend(hit.findings)
             else:
@@ -126,6 +141,7 @@ def _partition_files_by_cache(
         provenance_drift=provenance_drift,
         unconsolidated_findings=unconsolidated_findings,
         unconsolidated_hit_keys=unconsolidated_hit_keys,
+        adopted=adopted,
     )
 
 
@@ -203,7 +219,7 @@ def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], se
 def _build_cache_entry_for_file(
     config: RunConfig, dimension: str, f: str, key: str, grouped: dict[str, list[dict]],
     *, model_id: str, standards_hash: str, prompts_hash: str, effective_params: dict,
-    version: str,
+    version: str, params_hash: str = "",
 ) -> CacheEntry:
     """Build the CacheEntry for one dispatched file's persisted result."""
     return CacheEntry(
@@ -216,6 +232,7 @@ def _build_cache_entry_for_file(
         model_id=model_id,
         file_content_hash=_hash_file(config.src / f) or "",
         language=config.language or "",
+        params_hash=params_hash,
         provenance=build_provenance(
             model_id=model_id, prompts_hash=prompts_hash,
             standards_hash=standards_hash, version=version,
@@ -255,7 +272,7 @@ def persist_dispatch_results(
         _hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
-    _, effective_params = dimension_params_state(
+    params_hash, effective_params = dimension_params_state(
         config.standards_dir, dimension, config.src,
     )
     prompts_hash = _hash_prompts_combined(config.prompts_dir)
@@ -270,6 +287,6 @@ def persist_dispatch_results(
         entry = _build_cache_entry_for_file(
             config, dimension, f, key, grouped,
             model_id=model_id, standards_hash=standards_hash, prompts_hash=prompts_hash,
-            effective_params=effective_params, version=version,
+            effective_params=effective_params, version=version, params_hash=params_hash,
         )
         cache.put(key, entry)

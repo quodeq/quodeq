@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from quodeq.data.cache_store.index import close_all_for_tests
 from quodeq.data.fs._index_cache import clear_index_cache
 
 # Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
@@ -94,6 +95,23 @@ def _fresh_index_cache() -> None:
     """
     clear_index_cache()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _close_content_indexes() -> None:
+    """Close every ``ContentIndex`` sqlite connection opened during the test.
+
+    ``QUODEQ_CACHE_ROOT`` points at a fresh tmp dir per test (see
+    ``_isolate_quodeq_home``), so most tests that touch cache code open a
+    distinct ``.index.db`` connection that nothing explicitly closes --
+    production code relies on the process exiting to release it. In one
+    long single-process test run those connections pile up faster than GC
+    reclaims them (worse under coverage instrumentation), and file
+    descriptor numbers climb past 1024, which breaks unrelated
+    ``select()``-based PTY tests. Close them all after each test instead.
+    """
+    yield
+    close_all_for_tests()
 
 
 class DummyProcess:

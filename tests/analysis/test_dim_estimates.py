@@ -100,6 +100,32 @@ class TestComputeDimEstimates:
             result = compute_dim_estimates(config, ["security"])
         assert result["security"] == {"count": 2, "reason": "first-run", "total": 2, "cached": 0, "excluded": 0}
 
+    def test_estimate_counts_adopted_files_as_cached(self, tmp_path: Path):
+        # The estimate shares classify_files_via_cache with the run, so a
+        # file that moved directory with unchanged content shows as cached
+        # in the dashboard preview rather than "from scratch".
+        from dataclasses import replace
+        from quodeq.analysis.cache._key_provenance import build_cache_key_struct
+        from quodeq.analysis.cache.key import compute_key
+        src = tmp_path / "src"
+        (src / "new").mkdir(parents=True)
+        _write_files(src, ["new/a.py"])
+        config = _make_config(src, ["new/a.py"], incremental=True)
+        cache = LocalFileBackend(root=tmp_path / "fresh-cache")
+        struct = build_cache_key_struct(config, "new/a.py", "security")
+        old_key = compute_key(replace(struct, file_path="old/a.py"))
+        cache.put(old_key, CacheEntry(
+            key=old_key, schema_version=struct.schema_version, findings=[], files_read=1,
+            file_path="old/a.py", dimension="security", model_id="test-model",
+            file_content_hash=struct.file_content_hash,
+        ))
+
+        with patch("quodeq.analysis._dim_estimates.LocalFileBackend", return_value=cache):
+            result = compute_dim_estimates(config, ["security"])
+        assert result["security"] == {
+            "count": 0, "reason": "incremental", "total": 1, "cached": 1, "excluded": 0,
+        }
+
     def test_incremental_partial_cache_marks_incremental(self, tmp_path: Path):
         src = tmp_path / "src"
         _write_files(src, ["a.py", "b.py", "c.py"])

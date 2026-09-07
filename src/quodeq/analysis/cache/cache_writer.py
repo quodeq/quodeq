@@ -83,7 +83,6 @@ def _write_cache_entry(
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=dimension,
-        language=language,
         params_hash=params_hash,
     )
     key = compute_key(key_struct)
@@ -97,6 +96,7 @@ def _write_cache_entry(
         model_id=model_id,
         file_content_hash=content_hash,
         language=language,
+        params_hash=params_hash,
         provenance=build_provenance(
             model_id=model_id, prompts_hash=prompts_hash,
             standards_hash=standards_hash, version=version,

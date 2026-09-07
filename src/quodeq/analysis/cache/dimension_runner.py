@@ -60,7 +60,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     format_provenance_drift,
     persist_dispatch_results,
 )
-from quodeq.analysis.cache.gc import maybe_collect_legacy_entries
+from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis.subagents.runner import (
@@ -111,15 +111,16 @@ def _classify_and_log(
     )
     n_hits = len(files) - len(classify.misses)
     drift_note = format_provenance_drift(classify.provenance_drift, reused=n_hits)
+    adopted_note = f" - {classify.adopted} adopted from moved files" if classify.adopted else ""
     _logger.info(
-        "[%s] cache: %d hits / %d misses (%d total)%s%s",
+        "[%s] cache: %d hits / %d misses (%d total)%s%s%s",
         dim_id, n_hits, len(classify.misses), len(files),
         " - clean-scan invalidated" if bypass_reads else "",
-        f" - reused {drift_note}" if drift_note else "",
+        f" - reused {drift_note}" if drift_note else "", adopted_note,
     )
     emit_marker(
         "cache_stats", dimension=dim_id, hits=n_hits, misses=len(classify.misses),
-        total=len(files),
+        total=len(files), adopted=classify.adopted,
         mode="clean-scan-invalidated" if bypass_reads else "incremental",
     )
     return classify
@@ -262,7 +263,7 @@ def process_dimension_with_cache(
     list to classify (matches V1's no-files fallback)."""
     if cache is None:
         cache = LocalFileBackend()
-        maybe_collect_legacy_entries(cache.root)
+        ensure_cache_ready(cache.root)
     trust_model = resolve_trust_model(config.src) if config.src is not None else None
     files, _ext, _excluded = _list_source_files(config, dim_id)
     if not files:

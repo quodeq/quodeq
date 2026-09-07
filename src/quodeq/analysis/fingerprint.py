@@ -19,6 +19,7 @@ from pathlib import Path
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
     dimension_params,
+    hash_non_default_params,
 )
 from quodeq.data.fs.standards_prefs import load_project_overrides
 
@@ -83,8 +84,7 @@ def _compute_dimension_params(compiled: Path, project_root: Path | None) -> tupl
         return "", {}
     if not non_default:
         return "", effective
-    canonical = json.dumps(non_default, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest(), effective
+    return hash_non_default_params(non_default), effective
 
 
 class HashCache:

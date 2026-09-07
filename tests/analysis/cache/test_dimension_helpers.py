@@ -109,13 +109,16 @@ class TestKeyComposition:
             == build_cache_key_for_file(c2, "a.py", "security")
         )
 
-    def test_language_change_invalidates(self, tmp_path: Path):
+    def test_language_change_does_not_invalidate(self, tmp_path: Path):
+        # Schema 4: language left the key. It only ever reached the prompt
+        # as a heading word, so a detect_language() flip must not re-key
+        # the whole repo (freemium-app-android, java -> kotlin, Sep 2026).
         _write_files(tmp_path / "src", {"a.py": "x"})
         c1 = _make_config(tmp_path / "src", language="python")
         c2 = _make_config(tmp_path / "src", language="typescript")
         assert (
             build_cache_key_for_file(c1, "a.py", "security")
-            != build_cache_key_for_file(c2, "a.py", "security")
+            == build_cache_key_for_file(c2, "a.py", "security")
         )
 
     def test_standards_change_does_not_invalidate(self, tmp_path: Path):
@@ -458,6 +461,9 @@ class TestPersist:
         assert "prompts_hash" in entry.provenance
         assert "standards_hash" in entry.provenance
         assert "quodeq_version" in entry.provenance
+        from quodeq.analysis.cache._key_provenance import build_cache_key_struct
+        assert entry.params_hash == build_cache_key_struct(config, "a.py", "security").params_hash
+        assert entry.cache_format_version == 3
 
     def test_persisted_provenance_folds_project_overrides(
         self, tmp_path: Path, cache: LocalFileBackend,

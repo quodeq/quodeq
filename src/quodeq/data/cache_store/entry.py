@@ -16,7 +16,10 @@ from datetime import datetime, timezone
 # ``file_content_hash`` it was keyed under plus a ``provenance`` block, so
 # any future key change can be migrated losslessly by recomputing the key
 # from stored fields instead of re-evaluating.
-ENTRY_FORMAT_VERSION = 2
+# v2 -> v3: ``params_hash`` stored explicitly. It was the one key input not
+# recoverable from the entry alone (derivable only via the compiled
+# standards), which the schema-3 -> 4 migration had to work around.
+ENTRY_FORMAT_VERSION = 3
 
 
 def _utc_now() -> str:
@@ -67,17 +70,22 @@ class CacheEntry:
     file_path: str
     dimension: str
     model_id: str
-    # Self-describing fields (format v2). ``file_content_hash`` and
-    # ``language`` are the key fields not otherwise stored (``file_path`` and
-    # ``dimension`` already are); together with them, an entry records EVERY
-    # input its key was computed from, so any future cache-key change is
+    # Self-describing fields (format v2+). ``file_content_hash`` and
+    # ``params_hash`` are the key fields not otherwise stored (``file_path``
+    # and ``dimension`` already are); together with them, an entry records
+    # EVERY input its key was computed from, so any future cache-key change is
     # losslessly migratable (recompute from stored fields, no re-eval).
+    # ``language`` left the key in schema 4 and is kept as information.
     # ``provenance`` records the volatile context the findings were produced
     # under (model, prompts, standards, quodeq version) so reuse across those
-    # boundaries is never silent. All defaulted so format-1 entries still load.
+    # boundaries is never silent. All defaulted so older entries still load.
     file_content_hash: str = ""
     language: str = ""
     provenance: dict = field(default_factory=dict)
+    # The non-default threshold params hash the key was computed under ("" for
+    # default config). Format v3; older entries load as "" and the migration
+    # derives the real value from ``provenance.effective_params``.
+    params_hash: str = ""
     created_at: str = field(default_factory=_utc_now)
     cache_format_version: int = ENTRY_FORMAT_VERSION
     # Whether a COMPLETED run has consolidated these findings into its

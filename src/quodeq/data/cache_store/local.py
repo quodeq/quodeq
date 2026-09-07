@@ -3,6 +3,7 @@
 Layout (git-style two-char sharding to keep each directory bounded):
 
     <root>/<sha[:2]>/<sha[2:]>/entry.json
+    <root>/.index.db          content index sidecar (see ``index.py``)
 
 Writes go via temp file + ``os.rename``, which is atomic on POSIX and on
 NTFS for same-volume renames. A reader either sees the previous contents
@@ -24,6 +25,7 @@ from pathlib import Path
 
 from quodeq.data.cache_store.backend import CacheStats
 from quodeq.data.cache_store.entry import CacheEntry
+from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexRow
 
 _logger = logging.getLogger(__name__)
 
@@ -51,12 +53,26 @@ def default_cache_root() -> Path:
 class LocalFileBackend:
     """Sharded filesystem cache with atomic writes."""
 
-    def __init__(self, root: Path | None = None) -> None:
+    def __init__(
+        self, root: Path | None = None, *,
+        index: ContentIndex | None = None, enable_index: bool = True,
+    ) -> None:
         self._root = root if root is not None else default_cache_root()
+        if index is not None:
+            self._index: ContentIndex | None = index
+        elif enable_index:
+            self._index = ContentIndex(self._root / INDEX_FILENAME)
+        else:
+            self._index = None
 
     @property
     def root(self) -> Path:
         return self._root
+
+    @property
+    def index(self) -> ContentIndex | None:
+        """The content index beside this root, or None when disabled."""
+        return self._index
 
     def _dir_for(self, key: str) -> Path:
         if len(key) < 3:
@@ -88,7 +104,12 @@ class LocalFileBackend:
                 pass
             return None
 
-    def put(self, key: str, entry: CacheEntry) -> None:
+    def put(self, key: str, entry: CacheEntry, *, index: bool = True) -> None:
+        """Write *entry* atomically and record it in the content index.
+
+        ``index=False`` skips the index write; the schema migration uses it to
+        batch rows itself instead of committing one per entry.
+        """
         target_dir = self._dir_for(key)
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / _ENTRY_FILENAME
@@ -96,6 +117,12 @@ class LocalFileBackend:
         try:
             tmp.write_text(entry.to_json(), encoding="utf-8")
             os.replace(tmp, target)
+            if index and self._index is not None:
+                self._index.record(
+                    key, content_hash=entry.file_content_hash, dimension=entry.dimension,
+                    params_hash=entry.params_hash, file_path=entry.file_path,
+                    created_at=entry.created_at,
+                )
         except OSError as exc:
             _logger.warning("cache write failed for %s: %s", key, exc)
             try:
@@ -114,6 +141,21 @@ class LocalFileBackend:
             shutil.rmtree(target_dir)
         except OSError as exc:
             _logger.warning("cache delete failed for %s: %s", key, exc)
+            return
+        if self._index is not None:
+            self._index.forget(key)
+
+    def find_by_content(
+        self, content_hash: str, dimension: str, params_hash: str,
+    ) -> list[IndexRow]:
+        """Index rows for entries written with these inputs, newest first.
+
+        Empty when the index is disabled, unavailable, or the hash is blank.
+        Rows are hints: callers must verify the entry they point at.
+        """
+        if self._index is None or not content_hash:
+            return []
+        return self._index.find(content_hash, dimension, params_hash)
 
     def stats(self) -> CacheStats:
         if not self._root.exists():
