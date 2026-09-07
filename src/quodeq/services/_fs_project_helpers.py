@@ -35,7 +35,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _backfill_onboarding_field(
-    project_dir: Path, *, heal_completed_at: str | None = None,
+    project_dir: Path, *, pre_read_data: dict | None = None, heal_completed_at: str | None = None,
 ) -> dict | None:
     """Normalize ``onboardingCompletedAt`` in ``repository_info.json``.
 
@@ -44,12 +44,13 @@ def _backfill_onboarding_field(
     happens. Treats absence of the field as already-onboarded — backfills to
     the project's existing ``createdAt`` timestamp, falling back to "now".
 
+    *pre_read_data*: when provided, uses this dict instead of reading from disk.
     *heal_completed_at*: when set and the field is present but null, stamp it
     with this value. Callers pass a timestamp only for projects that have
     evaluation runs — running an evaluation IS completing setup, so a null
     left behind by a pre-stamp wizard must not show 'Resume setup' forever.
     """
-    data = read_repository_info(project_dir)
+    data = pre_read_data if pre_read_data is not None else read_repository_info(project_dir)
     if data is None:
         return None
     if "onboardingCompletedAt" in data:
@@ -77,6 +78,7 @@ def _derive_latest_done_run_id(runs: list[RunInfo]) -> str | None:
 
 def _backfill_and_read_meta(
     reports_root: Path, entry_name: str, runs: list[RunInfo], *, backfill: bool,
+    pre_read_info: dict | None = None,
 ) -> tuple[dict, dict]:
     """Lazy-backfill the project record, then extract its display metadata.
 
@@ -91,17 +93,23 @@ def _backfill_and_read_meta(
     *backfill* mirrors ``build_project_list``'s parameter of the same name:
     when False, the record is read read-only and never rewritten (used by
     the shared-repo route so listing a clone never dirties its worktree).
+    *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
     project_dir = reports_root / entry_name
     heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
-    backfilled = _backfill_onboarding_field(project_dir, heal_completed_at=heal_at) if backfill else None
-    info = backfilled if backfilled is not None else _read_repo_info(reports_root, entry_name)
+    backfilled = _backfill_onboarding_field(
+        project_dir, pre_read_data=pre_read_info, heal_completed_at=heal_at,
+    ) if backfill else None
+    info = backfilled if backfilled is not None else (
+        pre_read_info if pre_read_info is not None else _read_repo_info(reports_root, entry_name)
+    )
     return info, _extract_project_metadata(info, entry_name)
 
 
 def _build_project_entry(
     reports_root: Path, entry_name: str, runs: list[RunInfo], *,
     backfill: bool = True, inline_summaries: bool = False,
+    pre_read_info: dict | None = None,
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
@@ -110,8 +118,11 @@ def _build_project_entry(
     the shared-repo route has no warm-up engine, so it keeps computing a
     missing summary inline instead of reporting it pending. See
     ``_backfill_and_read_meta`` for the *backfill* rationale.
+    *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
-    info, meta = _backfill_and_read_meta(reports_root, entry_name, runs, backfill=backfill)
+    info, meta = _backfill_and_read_meta(
+        reports_root, entry_name, runs, backfill=backfill, pre_read_info=pre_read_info,
+    )
     latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=inline_summaries,
     )

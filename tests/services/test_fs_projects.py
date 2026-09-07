@@ -75,21 +75,26 @@ class TestBuildParentChildSets:
         (tmp_path / "standalone" / "repository_info.json").write_text(
             json.dumps({"name": "standalone"})
         )
-        parents, subs = _build_parent_child_sets(tmp_path, ["child1", "standalone"])
+        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, ["child1", "standalone"])
         assert parents == {"parent-uuid"}
         assert subs == {"child1"}
+        assert "child1" in info_by_name
+        assert "standalone" in info_by_name
+        assert info_by_name["child1"]["parent"] == "parent-uuid"
 
     def test_empty_dirs(self, tmp_path: Path):
-        parents, subs = _build_parent_child_sets(tmp_path, [])
+        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, [])
         assert parents == set()
         assert subs == set()
+        assert info_by_name == {}
 
     def test_corrupt_json_skipped(self, tmp_path: Path):
         (tmp_path / "bad").mkdir()
         (tmp_path / "bad" / "repository_info.json").write_text("{{{")
-        parents, subs = _build_parent_child_sets(tmp_path, ["bad"])
+        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, ["bad"])
         assert parents == set()
         assert subs == set()
+        assert "bad" not in info_by_name
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +125,51 @@ class TestBuildProjectList:
     def test_excludes_dir_without_repo_info_or_runs(self, tmp_path: Path):
         (tmp_path / "junk-dir").mkdir()
         assert build_project_list(tmp_path) == []
+
+    def test_reads_repository_info_once_per_directory(self, tmp_path: Path):
+        # Regression test: ensure build_project_list() reads repository_info.json
+        # at most once per directory, not multiple times (deduplication).
+        proj1 = tmp_path / "proj1-uuid"
+        proj1.mkdir()
+        (proj1 / "repository_info.json").write_text(json.dumps({
+            "name": "proj1",
+            "path": str(tmp_path),
+            "location": "local",
+        }))
+        proj2 = tmp_path / "proj2-uuid"
+        proj2.mkdir()
+        (proj2 / "repository_info.json").write_text(json.dumps({
+            "name": "proj2",
+            "path": str(tmp_path),
+            "location": "local",
+            "parent": "parent-uuid",
+        }))
+
+        call_count: dict[str, int] = {}
+
+        def counting_read_repository_info(path):
+            dir_name = path.name
+            call_count[dir_name] = call_count.get(dir_name, 0) + 1
+            # Call the original function
+            return original_read_repository_info(path)
+
+        original_read_repository_info = None
+        with patch("quodeq.services._fs_projects.read_repository_info") as mock_read:
+            with patch("quodeq.services._fs_project_helpers.read_repository_info") as mock_read_helpers:
+                def side_effect(path):
+                    dir_name = path.name
+                    call_count[dir_name] = call_count.get(dir_name, 0) + 1
+                    if path.is_dir() and (path / "repository_info.json").exists():
+                        return json.loads((path / "repository_info.json").read_text())
+                    return None
+
+                mock_read.side_effect = side_effect
+                mock_read_helpers.side_effect = side_effect
+                build_project_list(tmp_path)
+
+        # Each directory should be read at most once
+        assert call_count.get("proj1-uuid", 0) <= 1, f"proj1-uuid read {call_count.get('proj1-uuid', 0)} times"
+        assert call_count.get("proj2-uuid", 0) <= 1, f"proj2-uuid read {call_count.get('proj2-uuid', 0)} times"
 
 
 # ---------------------------------------------------------------------------

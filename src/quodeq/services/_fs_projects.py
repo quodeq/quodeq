@@ -61,19 +61,21 @@ def _is_evaluable(repo_path: str | None) -> bool:
     return Path(repo_path).is_dir()
 
 
-def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str]]:
-    """Single pass: return (parent_ids, subproject_ids) from repo info files."""
+def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str], dict[str, dict]]:
+    """Single pass: return (parent_ids, subproject_ids, info_by_name) from repo info files."""
     parent_ids: set[str] = set()
     subproject_ids: set[str] = set()
+    info_by_name: dict[str, dict] = {}
     for name in dir_names:
         info = read_repository_info(reports_root / name)
         if info is None:
             continue
+        info_by_name[name] = info
         parent = info.get("parent")
         if parent:
             parent_ids.add(parent)
             subproject_ids.add(name)
-    return parent_ids, subproject_ids
+    return parent_ids, subproject_ids, info_by_name
 
 
 def _collect_candidate_dirs(reports_root: Path, max_listed: int) -> list[str]:
@@ -92,6 +94,7 @@ def _build_project_entries_threaded(
     reports_root: Path, dir_names: list[str],
     registered_ids: set[str], parent_ids: set[str], subproject_ids: set[str],
     *, backfill: bool, inline_summaries: bool,
+    info_by_name: dict[str, dict] | None = None,
 ) -> list[ProjectEntry]:
     """Build a ProjectEntry per candidate dir in parallel, dropping stray dirs.
 
@@ -100,12 +103,16 @@ def _build_project_entries_threaded(
     exists and the UI shows an empty state for them. Only dirs with neither
     runs nor a project record (stray non-project dirs) are dropped.
     """
+    if info_by_name is None:
+        info_by_name = {}
+
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
         if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
             return None
         return _build_project_entry(
             reports_root, name, runs, backfill=backfill, inline_summaries=inline_summaries,
+            pre_read_info=info_by_name.get(name),
         )
 
     # contextvars do NOT propagate into ThreadPoolExecutor worker threads --
@@ -145,23 +152,18 @@ def build_project_list(
     """
     dir_names = _collect_candidate_dirs(reports_root, _max_projects_listed())
 
-    # Lazy backfill: ensure legacy project records have an
-    # ``onboardingCompletedAt`` field. Run before the parent/child sweep so
-    # any subsequent reads see the updated file. Idempotent — no-op for
-    # records that already have the field. Failures are silently ignored.
+    parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
     if backfill:
         for name in dir_names:
-            _backfill_onboarding_field(reports_root / name)
-
-    parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
+            _backfill_onboarding_field(reports_root / name, pre_read_data=info_by_name.get(name))
     registered_ids = {
         name for name in dir_names
         if repository_info_exists(reports_root / name)
     }
-
     projects = _build_project_entries_threaded(
         reports_root, dir_names, registered_ids, parent_ids, subproject_ids,
         backfill=backfill, inline_summaries=inline_summaries,
+        info_by_name=info_by_name,
     )
     projects.sort(key=lambda p: p.name)
     return _auto_detect_parents(projects)
