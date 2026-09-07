@@ -192,6 +192,31 @@ class TestMigrateEntries:
     def test_missing_root_is_empty_stats(self, tmp_path: Path):
         assert migrate_entries(tmp_path / "nope", standards_dir=None) == MigrationStats()
 
+    def test_compiled_standards_cached_per_dimension(self, tmp_path: Path):
+        from unittest.mock import patch
+        root = tmp_path / "cache"
+        std = tmp_path / "standards"
+        dim_data = {"principles": [{"requirements": [
+            {"id": "M-1", "params": {"max_lines": {"default": 50}}},
+        ]}]}
+        _write_compiled(std, "security", dim_data)
+        _write_v3(root, path="A.py", dim="security", effective={"M-1": {"max_lines": 60}})
+        _write_v3(root, path="B.py", dim="security", effective={"M-1": {"max_lines": 70}})
+        _write_v3(root, path="C.py", dim="security", effective={"M-1": {"max_lines": 80}})
+
+        original_read_text = Path.read_text
+        security_json_reads = [0]
+
+        def tracking_read(path_self, *args, **kwargs):
+            if "security.json" in str(path_self):
+                security_json_reads[0] += 1
+            return original_read_text(path_self, *args, **kwargs)
+
+        with patch.object(Path, "read_text", tracking_read):
+            migrate_entries(root, standards_dir=std)
+
+        assert security_json_reads[0] == 1
+
 
 class TestEnsureCacheReady:
     def setup_method(self):
