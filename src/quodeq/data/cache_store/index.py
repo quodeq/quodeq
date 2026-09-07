@@ -15,12 +15,21 @@ rows.
 
 One connection per instance, guarded by a lock (``check_same_thread=False``
 because the dimension runner's persist watcher writes from its own thread).
+
+Every instance registers itself in ``_live_instances`` (weakly, so this
+never keeps one alive on its own) purely so ``close_all_for_tests`` can
+reclaim connections deterministically. A long-lived process (the CLI run,
+the dashboard) holds one instance for its lifetime and closing on process
+exit is moot; a test suite creates thousands of short-lived instances in a
+single process, and relying on GC to close each one lets open file
+descriptors pile up under coverage instrumentation, which delays that GC.
 """
 from __future__ import annotations
 
 import logging
 import sqlite3
 import threading
+import weakref
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +37,7 @@ from pathlib import Path
 _logger = logging.getLogger(__name__)
 
 INDEX_FILENAME = ".index.db"
+_live_instances: "weakref.WeakSet[ContentIndex]" = weakref.WeakSet()
 _BUSY_TIMEOUT_MS = 5000
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS entries (
@@ -60,6 +70,7 @@ class ContentIndex:
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
         self._broken = False
+        _live_instances.add(self)
 
     # -- connection -------------------------------------------------------
 
@@ -205,3 +216,14 @@ class ContentIndex:
                     )
             except sqlite3.Error as exc:
                 _logger.debug("content index meta write failed: %s", exc)
+
+
+def close_all_for_tests() -> None:
+    """Close every live ``ContentIndex`` connection. Test teardown only.
+
+    Production processes hold one instance for their own lifetime; a test
+    suite creates one per test (see ``_live_instances``' docstring above)
+    and must reclaim the fd deterministically rather than waiting on GC.
+    """
+    for index in list(_live_instances):
+        index.close()
