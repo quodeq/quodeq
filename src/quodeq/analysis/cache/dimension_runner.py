@@ -1,27 +1,24 @@
 """V2 cache-aware dimension processor — composes B4 helpers with the
 existing dispatcher boundary.
 
-Flow: list source files -> classify via cache (hits return findings
-directly, misses go to the dispatcher) -> all-hits short-circuits
-straight to JSONL + Evidence -> otherwise dispatch misses via
-process_dimension_with_subagents (file filter restricted to misses) ->
-persist new findings per-file -> if there were also hits, append cached
-findings to the JSONL and re-parse for the final Evidence.
+Flow: list source files -> classify via cache (hits return findings directly, misses go to
+the dispatcher) -> all-hits short-circuits straight to JSONL + Evidence -> otherwise
+dispatch misses via process_dimension_with_subagents (file filter restricted to misses) ->
+persist new findings per-file -> if there were also hits, append cached findings to the
+JSONL and re-parse for the final Evidence.
 
-This sits *above* the existing dispatcher — V1's machinery (carry-
-forward, fingerprint, queue salvage) still runs for dispatched files.
-The cache supersedes V1's incrementality decisions but keeps the proven
-dispatch path intact.
+This sits *above* the existing dispatcher — V1's machinery (carry-forward, fingerprint,
+queue salvage) still runs for dispatched files. The cache supersedes V1's incrementality
+decisions but keeps the proven dispatch path intact.
 
-Known limitation: V1 carry-forward can duplicate findings V2 has
-already cached, when migrating a long-lived V1 install to V2; B6
-cleanup removes V1's carry-forward once the V1 path is deleted.
+Known limitation: V1 carry-forward can duplicate findings V2 has already
+cached, when migrating a long-lived V1 install to V2; B6 cleanup removes
+V1's carry-forward once the V1 path is deleted.
 
-Cache-replay lives in ``_replay.py``; the persist-watcher body lives in
-``_persist_watcher.py``. ``emit_marker`` and the
-``threading.Thread``/``threading.Event()`` constructions stay in helpers
-defined here, since a ``mock.patch`` target resolves where a name is
-used, not where it is implemented.
+Cache-replay lives in ``_replay.py``; the persist-watcher body and its
+hoisted provenance-hash computation live in ``_persist_watcher.py``.
+``emit_marker``/``threading.Thread``/``threading.Event()`` stay in
+helpers defined here, since ``mock.patch`` resolves where a name is used.
 """
 from __future__ import annotations
 
@@ -41,6 +38,7 @@ from quodeq.analysis.cache._failure_streak import (
 )
 from quodeq.analysis.cache._persist_watcher import (
     _PERSIST_INTERVAL_S,
+    _compute_persist_hash_inputs,
     _periodic_persist,
     _resolve_failure_streak_threshold,
 )
@@ -178,10 +176,12 @@ def _start_watchers(
     already persists synchronously) and the failure-streak breaker.
     Creates the evidence JSONL up front, when absent, so the breaker's
     first poll doesn't warn about a missing file."""
+    hash_inputs = _compute_persist_hash_inputs(config, dim_id)
+
     def _persist_now() -> None:
         persist_dispatch_results(
-            config, dim_id, miss_files=classify.misses,
-            jsonl_path=jsonl, miss_keys=classify.miss_keys, cache=cache,
+            config, dim_id, miss_files=classify.misses, cache=cache,
+            jsonl_path=jsonl, miss_keys=classify.miss_keys, **hash_inputs,
         )
 
     stop_event = threading.Event()

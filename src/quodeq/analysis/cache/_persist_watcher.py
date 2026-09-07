@@ -16,13 +16,36 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 
-from quodeq.analysis._types import AnalysisOptions
+from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
+from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
 
 # How often the watcher thread persists in-flight cache entries during
 # dispatch. Smaller = less work lost on cancel; larger = less I/O during
 # normal runs. 30s is a pragmatic default -- at typical model dispatch
 # speeds (~10-30s per file), each tick covers a handful of completed files.
 _PERSIST_INTERVAL_S = 30.0
+
+
+def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> dict:
+    """Provenance hash inputs for persist_dispatch_results, as kwargs.
+
+    standards_dir/prompts_dir/dimension are constant for a whole dispatch,
+    so the caller computes these once (at watcher start) instead of
+    persist_dispatch_results recomputing them on every tick.
+    """
+    standards_hash = (
+        _hash_standards(config.standards_dir, dimension, config.src)
+        if config.standards_dir else ""
+    ) or ""
+    params_hash, effective_params = dimension_params_state(
+        config.standards_dir, dimension, config.src,
+    )
+    return {
+        "standards_hash": standards_hash, "params_hash": params_hash,
+        "effective_params": effective_params,
+        "prompts_hash": _hash_prompts_combined(config.prompts_dir),
+    }
 
 
 def _resolve_failure_streak_threshold(

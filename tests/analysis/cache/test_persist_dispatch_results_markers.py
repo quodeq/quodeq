@@ -21,6 +21,26 @@ def _write_jsonl(path: Path, lines: list[dict]) -> None:
     path.write_text("".join(json.dumps(l) + "\n" for l in lines))
 
 
+def _hash_inputs(config: RunConfig, dimension: str) -> dict:
+    """Compute the provenance hash inputs persist_dispatch_results now
+    expects the caller to hoist and pass in."""
+    from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
+    from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
+
+    standards_hash = (
+        _hash_standards(config.standards_dir, dimension, config.src)
+        if config.standards_dir else ""
+    ) or ""
+    params_hash, effective_params = dimension_params_state(
+        config.standards_dir, dimension, config.src,
+    )
+    prompts_hash = _hash_prompts_combined(config.prompts_dir)
+    return {
+        "standards_hash": standards_hash, "params_hash": params_hash,
+        "effective_params": effective_params, "prompts_hash": prompts_hash,
+    }
+
+
 @pytest.fixture
 def cache(tmp_path: Path) -> LocalFileBackend:
     return LocalFileBackend(root=tmp_path / "cache")
@@ -44,6 +64,7 @@ class TestPersistFiltersByOkMarker:
         persist_dispatch_results(
             config, "security", miss_files=["a.py", "b.py", "c.py"],
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
         assert cache.get("key-a-py") is not None
         assert cache.get("key-b-py") is None
@@ -62,6 +83,7 @@ class TestPersistFiltersByOkMarker:
         persist_dispatch_results(
             config, "security", miss_files=["clean.py"],
             jsonl_path=jsonl, miss_keys={"clean.py": "key-clean"}, cache=cache,
+            **_hash_inputs(config, "security"),
         )
         entry = cache.get("key-clean")
         assert entry is not None
@@ -81,6 +103,7 @@ class TestPersistFiltersByOkMarker:
         persist_dispatch_results(
             config, "security", miss_files=["x.py"],
             jsonl_path=jsonl, miss_keys={"x.py": "key-x"}, cache=cache,
+            **_hash_inputs(config, "security"),
         )
         assert cache.get("key-x") is None
 
@@ -93,5 +116,6 @@ class TestPersistFiltersByOkMarker:
             config, "security", miss_files=["a.py"],
             jsonl_path=tmp_path / "missing.jsonl",
             miss_keys={"a.py": "key-a"}, cache=cache,
+            **_hash_inputs(config, "security"),
         )
         assert cache.get("key-a") is None

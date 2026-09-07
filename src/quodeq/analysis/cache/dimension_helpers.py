@@ -38,7 +38,7 @@ from quodeq.analysis.cache._key_provenance import (
     _SCHEMA_VERSION,
     _accumulate_drift,
     _current_provenance,
-    _hash_prompts_combined,
+    _hash_prompts_combined,  # noqa: F401 -- re-export
     _model_id_from,
     build_cache_key_for_file,  # noqa: F401 -- re-export
     build_cache_key_struct,
@@ -47,11 +47,7 @@ from quodeq.analysis.cache._key_provenance import (
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import compute_key
-from quodeq.analysis.fingerprint import (
-    _hash_file,
-    _hash_standards,
-    dimension_params_state,
-)
+from quodeq.analysis.fingerprint import _hash_file
 
 _logger = logging.getLogger(__name__)
 
@@ -256,26 +252,25 @@ def _build_cache_entry_for_file(
 def persist_dispatch_results(
     config: RunConfig, dimension: str, *, miss_files: list[str],
     jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
+    standards_hash: str, params_hash: str, effective_params: dict,
+    prompts_hash: str,
 ) -> None:
     """Write per-file cache entries for files with a file_done='ok' marker.
 
     Files in *miss_files* that lack an ok marker (worker crashed, token-out,
     abandoned) are NOT cached, so the next run re-dispatches them.
+
+    *standards_hash*/*params_hash*/*effective_params*/*prompts_hash* are
+    provenance context that's constant for the whole dispatch (same
+    standards_dir/prompts_dir/dimension throughout). Callers compute them
+    once and pass them in, rather than this function recomputing them on
+    every call — this is invoked on a fixed interval by the periodic-persist
+    watcher for the life of one dispatch.
     """
     if not jsonl_path.is_file():
         return
     grouped, ok_files = _group_findings_by_file(jsonl_path)
     model_id = _model_id_from(config)
-    # Provenance context — run-constant, computed once. These left the cache
-    # key in schema 3; recording them keeps each entry self-describing.
-    standards_hash = (
-        _hash_standards(config.standards_dir, dimension, config.src)
-        if config.standards_dir else ""
-    ) or ""
-    params_hash, effective_params = dimension_params_state(
-        config.standards_dir, dimension, config.src,
-    )
-    prompts_hash = _hash_prompts_combined(config.prompts_dir)
     version = quodeq_version()
     for f in miss_files:
         if f not in ok_files:

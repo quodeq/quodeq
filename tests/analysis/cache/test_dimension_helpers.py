@@ -63,6 +63,26 @@ def _write_project_overrides(src: Path, payload: str) -> None:
     path.write_text(payload)
 
 
+def _hash_inputs(config: RunConfig, dimension: str) -> dict:
+    """Compute the provenance hash inputs persist_dispatch_results now
+    expects the caller to hoist and pass in."""
+    from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
+    from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
+
+    standards_hash = (
+        _hash_standards(config.standards_dir, dimension, config.src)
+        if config.standards_dir else ""
+    ) or ""
+    params_hash, effective_params = dimension_params_state(
+        config.standards_dir, dimension, config.src,
+    )
+    prompts_hash = _hash_prompts_combined(config.prompts_dir)
+    return {
+        "standards_hash": standards_hash, "params_hash": params_hash,
+        "effective_params": effective_params, "prompts_hash": prompts_hash,
+    }
+
+
 @pytest.fixture
 def cache(tmp_path: Path) -> LocalFileBackend:
     return LocalFileBackend(root=tmp_path / "cache")
@@ -377,6 +397,7 @@ class TestPersist:
         persist_dispatch_results(
             config, "security", miss_files=files,
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         a_entry = cache.get(miss_keys["a.py"])
@@ -404,6 +425,7 @@ class TestPersist:
         persist_dispatch_results(
             config, "security", miss_files=files,
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         entry = cache.get(miss_keys["clean.py"])
@@ -429,6 +451,7 @@ class TestPersist:
         persist_dispatch_results(
             config, "security", miss_files=["a.py"],
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         # Only a.py's key is in the cache; carried.py was never dispatched here.
@@ -452,6 +475,7 @@ class TestPersist:
         persist_dispatch_results(
             config, "security", miss_files=files,
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         entry = cache.get(miss_keys["a.py"])
@@ -491,6 +515,7 @@ class TestPersist:
         persist_dispatch_results(
             config, "security", miss_files=files,
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         entry = cache.get(miss_keys["a.py"])
@@ -511,6 +536,7 @@ class TestPersist:
             config, "security", miss_files=["a.py"],
             jsonl_path=tmp_path / "work" / "missing.jsonl",
             miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         # No entry written — we don't fabricate "no findings" when we
@@ -547,6 +573,7 @@ class TestRoundTrip:
         persist_dispatch_results(
             config, "security", miss_files=first.misses,
             jsonl_path=jsonl, miss_keys=first.miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         # Second call: cache should be fully populated → all hits. The
@@ -586,6 +613,7 @@ def test_persist_dispatch_results_marks_entries_unconsolidated(tmp_path):
     persist_dispatch_results(
         config, "security", miss_files=["a.py"],
         jsonl_path=jsonl, miss_keys={"a.py": key}, cache=cache,
+        **_hash_inputs(config, "security"),
     )
 
     assert cache.get(key).consolidated is False
@@ -736,6 +764,7 @@ class TestPromptsDirProvenance:
         persist_dispatch_results(
             config, "security", miss_files=files,
             jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
+            **_hash_inputs(config, "security"),
         )
 
         entry = cache.get(miss_keys["a.py"])
