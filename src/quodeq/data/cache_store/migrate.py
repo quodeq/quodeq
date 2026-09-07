@@ -38,6 +38,7 @@ from quodeq.core.standards.overrides import (
     non_default_from_effective,
 )
 from quodeq.data.cache_store.entry import ENTRY_FORMAT_VERSION, CacheEntry
+from quodeq.data.cache_store.index import ContentIndex
 from quodeq.data.cache_store.key import SCHEMA_VERSION, CacheKey, compute_key
 from quodeq.data.cache_store.local import LocalFileBackend
 
@@ -235,13 +236,36 @@ def _release_lock(lock: Path) -> None:
         pass
 
 
+def _migrate_locked(
+    root: Path, *, standards_dir: Path | None, backend: LocalFileBackend,
+    index: ContentIndex | None, memo_key: tuple[str, int],
+) -> None:
+    """Run one migration pass under the lock and record the result."""
+    t0 = time.monotonic()
+    stats = migrate_entries(root, standards_dir=standards_dir, backend=backend)
+    if index is not None:
+        index.mark_built(SCHEMA_VERSION)
+    ready_marker(root).write_text("", encoding="utf-8")
+    _ready_memo.add(memo_key)
+    if stats.migrated or stats.removed or stats.indexed:
+        _logger.info(
+            "cache: schema %d ready in %.1fs (migrated %d, deduplicated %d, "
+            "indexed %d, reclaimed %d, skipped %d)",
+            SCHEMA_VERSION, time.monotonic() - t0, stats.migrated,
+            stats.deduplicated, stats.indexed, stats.removed, stats.skipped,
+        )
+
+
 def ensure_cache_ready(
     root: Path, *, standards_dir: Path | None, backend: LocalFileBackend | None = None,
 ) -> None:
     """Bring *root* to the current schema with a built index, once.
 
     Cheap after the first call: an in-process memo, then the on-disk marker
-    plus the index's built flag. Never raises.
+    plus the index's built flag. Never raises. A backend created here (no
+    *backend* argument) is local to this call, so its index connection is
+    closed before returning rather than left to GC (Windows can't delete an
+    open sqlite file out from under a lingering handle).
     """
     memo_key = (str(root), SCHEMA_VERSION)
     if memo_key in _ready_memo:
@@ -249,32 +273,28 @@ def ensure_cache_ready(
     if not root.exists():
         _ready_memo.add(memo_key)
         return
+    owns_backend = backend is None
     try:
         backend = backend or LocalFileBackend(root=root)
         index = backend.index
-        marker = ready_marker(root)
-        if marker.exists() and (index is None or index.built_for_schema() == SCHEMA_VERSION):
-            _ready_memo.add(memo_key)
-            return
-        lock = root / LOCK_FILENAME
-        if not _acquire_lock(lock):
-            _logger.debug("cache maintenance: %s locked by another process; skipping", root)
-            return
         try:
-            t0 = time.monotonic()
-            stats = migrate_entries(root, standards_dir=standards_dir, backend=backend)
-            if index is not None:
-                index.mark_built(SCHEMA_VERSION)
-            marker.write_text("", encoding="utf-8")
-            _ready_memo.add(memo_key)
-            if stats.migrated or stats.removed or stats.indexed:
-                _logger.info(
-                    "cache: schema %d ready in %.1fs (migrated %d, deduplicated %d, "
-                    "indexed %d, reclaimed %d, skipped %d)",
-                    SCHEMA_VERSION, time.monotonic() - t0, stats.migrated,
-                    stats.deduplicated, stats.indexed, stats.removed, stats.skipped,
+            marker = ready_marker(root)
+            if marker.exists() and (index is None or index.built_for_schema() == SCHEMA_VERSION):
+                _ready_memo.add(memo_key)
+                return
+            lock = root / LOCK_FILENAME
+            if not _acquire_lock(lock):
+                _logger.debug("cache maintenance: %s locked by another process; skipping", root)
+                return
+            try:
+                _migrate_locked(
+                    root, standards_dir=standards_dir, backend=backend,
+                    index=index, memo_key=memo_key,
                 )
+            finally:
+                _release_lock(lock)
         finally:
-            _release_lock(lock)
+            if owns_backend and index is not None:
+                index.close()
     except OSError as exc:
         _logger.debug("cache maintenance: best-effort pass failed for %s: %s", root, exc)
