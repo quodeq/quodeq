@@ -147,13 +147,6 @@ class TestBuildProjectList:
 
         call_count: dict[str, int] = {}
 
-        def counting_read_repository_info(path):
-            dir_name = path.name
-            call_count[dir_name] = call_count.get(dir_name, 0) + 1
-            # Call the original function
-            return original_read_repository_info(path)
-
-        original_read_repository_info = None
         with patch("quodeq.services._fs_projects.read_repository_info") as mock_read:
             with patch("quodeq.services._fs_project_helpers.read_repository_info") as mock_read_helpers:
                 def side_effect(path):
