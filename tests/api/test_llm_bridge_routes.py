@@ -269,3 +269,108 @@ class TestOmlxBaseUrlValidation:
             resp = self._get(client, "/api/omlx/status", "http://127.0.0.1:10240")
         assert resp.status_code == 200
         mock.assert_called_once_with(base_url="http://127.0.0.1:10240")
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — backend secure storage for provider API keys.
+# ---------------------------------------------------------------------------
+
+class TestProviderKeyRoutes:
+    def test_store_reports_stored_and_secure(self, client):
+        with patch("quodeq.api.llm_bridge_routes._store_api_key") as mock:
+            mock.return_value = (True, True)
+            resp = client.post(
+                "/api/provider/key",
+                json={"provider": "claude", "apiKey": _TEST_API_KEY},
+                headers={"Origin": "http://localhost"},
+            )
+        assert resp.status_code == 200
+        assert resp.get_json() == {"stored": True, "secure": True}
+        mock.assert_called_once_with("claude", _TEST_API_KEY)
+
+    def test_store_reports_cleartext_fallback_used(self, client):
+        with patch("quodeq.api.llm_bridge_routes._store_api_key") as mock:
+            mock.return_value = (True, False)
+            resp = client.post(
+                "/api/provider/key",
+                json={"provider": "claude", "apiKey": _TEST_API_KEY},
+                headers={"Origin": "http://localhost"},
+            )
+        assert resp.status_code == 200
+        assert resp.get_json() == {"stored": True, "secure": False}
+
+    def test_store_missing_provider_returns_400(self, client):
+        resp = client.post(
+            "/api/provider/key",
+            json={"apiKey": _TEST_API_KEY},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "MISSING_PARAM"
+
+    def test_store_missing_api_key_returns_400(self, client):
+        resp = client.post(
+            "/api/provider/key",
+            json={"provider": "claude"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "MISSING_PARAM"
+
+    def test_store_non_object_body_returns_400(self, client):
+        resp = client.post("/api/provider/key", json=[1], headers={"Origin": "http://localhost"})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_key_status_never_echoes_raw_key(self, client):
+        with patch("quodeq.api.llm_bridge_routes.get_api_key_secure") as mock:
+            mock.return_value = "sk-should-never-appear-in-response"
+            resp = client.get("/api/provider/key-status?provider=claude")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data == {"configured": True}
+        assert "sk-should-never-appear-in-response" not in resp.get_data(as_text=True)
+
+    def test_key_status_missing_provider_returns_400(self, client):
+        resp = client.get("/api/provider/key-status")
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "MISSING_PARAM"
+
+    def test_key_status_not_configured(self, client):
+        with patch("quodeq.api.llm_bridge_routes.get_api_key_secure") as mock:
+            mock.return_value = None
+            resp = client.get("/api/provider/key-status?provider=claude")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"configured": False}
+
+    def test_store_then_status_round_trip_via_cleartext_fallback(self, client, tmp_path, monkeypatch):
+        """End-to-end round trip, forcing the keyring-failure fallback so the
+        real cleartext path (not just a mock) gets exercised."""
+        import keyring.errors
+
+        from quodeq.config import ai_provider
+        from quodeq.config.paths import ConfigPaths
+
+        cfg_paths = ConfigPaths.from_root(tmp_path)
+        monkeypatch.setattr(ai_provider, "default_paths", lambda: cfg_paths)
+
+        def raise_keyring_error(*args, **kwargs):
+            raise keyring.errors.KeyringError("no backend available")
+
+        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
+        monkeypatch.setattr(ai_provider.keyring, "get_password", raise_keyring_error)
+
+        store_resp = client.post(
+            "/api/provider/key",
+            json={"provider": "gemini", "apiKey": "sk-roundtrip"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert store_resp.status_code == 200
+        assert store_resp.get_json() == {"stored": True, "secure": False}
+
+        status_resp = client.get("/api/provider/key-status?provider=gemini")
+        assert status_resp.status_code == 200
+        assert status_resp.get_json() == {"configured": True}
+
+        # The raw key must never leak back through key-status.
+        assert "sk-roundtrip" not in status_resp.get_data(as_text=True)

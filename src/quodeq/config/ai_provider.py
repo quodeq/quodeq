@@ -5,9 +5,13 @@ from __future__ import annotations
 import os
 import tempfile
 
-from quodeq.config.paths import ConfigPaths
-from quodeq.shared.logging import log_error, log_info, log_success, log_warning
+import keyring
+
+from quodeq.config.paths import ConfigPaths, default_paths
+from quodeq.shared.logging import log_debug, log_error, log_info, log_success, log_warning
 from quodeq.shared.utils import get_ai_provider
+
+_KEYRING_SERVICE = "quodeq"
 
 _AI_PROVIDER_EXPORT_PREFIX = "export AI_PROVIDER="
 _OWNER_RW_PERMS = 0o600
@@ -130,3 +134,57 @@ def configure_provider_noninteractive(provider: str, paths: ConfigPaths) -> int:
     _ensure_gitignore(paths)
     log_success(f"Provider set to '{provider}'. Config saved to .quodeq.env")
     return 0
+
+
+def _api_key_var_for(provider: str) -> str:
+    """Return the env var name used to persist *provider*'s key in cleartext."""
+    api_key_var, _ = PROVIDERS.get(provider, (f"{provider.upper()}_API_KEY", provider))
+    return api_key_var
+
+
+def _store_api_key(provider: str, api_key: str) -> tuple[bool, bool]:
+    """Store *provider*'s key and report how. Returns (stored, secure)."""
+    try:
+        keyring.set_password(_KEYRING_SERVICE, provider, api_key)
+        return True, True
+    except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
+        log_debug(f"keyring unavailable for '{provider}', falling back to cleartext: {exc}")
+
+    paths = default_paths()
+    try:
+        _write_env(paths, provider, _api_key_var_for(provider), api_key)
+        _ensure_gitignore(paths)
+        return True, False
+    except Exception as exc:
+        log_error(f"Failed to store API key for '{provider}': {exc}")
+        return False, False
+
+
+def store_api_key_secure(provider: str, api_key: str) -> bool:
+    """Persist *provider*'s API key, preferring the OS keyring over cleartext.
+
+    Tries the platform keyring first; on failure falls back to the existing
+    cleartext `.quodeq.env` write path. Returns True if either succeeded.
+    """
+    stored, _secure = _store_api_key(provider, api_key)
+    return stored
+
+
+def get_api_key_secure(provider: str) -> str | None:
+    """Return *provider*'s stored API key, checking the keyring then the
+    cleartext `.quodeq.env` fallback. None if stored nowhere."""
+    try:
+        value = keyring.get_password(_KEYRING_SERVICE, provider)
+        if value:
+            return value
+    except Exception as exc:
+        log_debug(f"keyring lookup failed for '{provider}': {exc}")
+
+    paths = default_paths()
+    if paths.env_file is None or not paths.env_file.exists():
+        return None
+    prefix = f"export {_api_key_var_for(provider)}="
+    for line in paths.env_file.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith(prefix):
+            return line.split("=", 1)[1]
+    return None
