@@ -14,7 +14,10 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
@@ -87,66 +90,83 @@ def _compute_dimension_params(compiled: Path, project_root: Path | None) -> tupl
     return hash_non_default_params(non_default), effective
 
 
+_K = TypeVar("_K")
+_V = TypeVar("_V")
+_StatKey = tuple[Path, int, int]
+
+
+class _LRUDict(OrderedDict[_K, _V]):
+    """``OrderedDict`` capped at *capacity* entries. ``put`` evicts the least
+    recently used; callers ``move_to_end`` on hits, under their own lock."""
+
+    def __init__(self, capacity: int) -> None:
+        super().__init__()
+        self.capacity = capacity
+
+    def put(self, key: _K, value: _V) -> None:
+        self[key] = value
+        if len(self) > self.capacity:
+            self.popitem(last=False)
+
+
 class HashCache:
-    """Lock-guarded, unbounded cache backing the fingerprint hash memoizers.
+    """Lock-guarded, bounded LRU cache backing the fingerprint hash memoizers.
 
-    Three independent maps -- file hashes, override hashes, per-dimension
-    params state -- each keyed by a ``(path, size, mtime_ns)`` stat tuple
-    (the dimension-params key extends that shape with a second file's
-    stat). Standard make/pyc-style invalidation: hashing/parsing is the
-    expensive part, but ``os.stat`` is cheap, and inside one
-    ``quodeq evaluate`` process the inputs don't change, so the same key is
-    hit thousands of times on a large repo -- exactly the case we want to
-    short-circuit. A single process never rewrites its inputs mid-run (or
-    if a user does, the changed ``mtime_ns`` produces a fresh key
-    automatically), so staying unbounded for the run's lifetime is safe.
+    Three independent maps -- file hashes (compiled standards, prompts),
+    override hashes, per-dimension params state -- each keyed by a
+    ``(path, size, mtime_ns)`` stat tuple (the dimension-params key adds a
+    second file's stat), so an edited input misses on its own. The
+    module-default instance below is shared by the long-lived dashboard/API
+    server (cache maintenance, ``dimension_params_state``), not just one
+    ``quodeq evaluate`` process, so every map is a capped LRU: a run's hot
+    working set stays resident while stale keys from past runs age out.
 
-    Instantiable so tests get isolated caches; production shares the
-    module-default instance below.
+    Instantiable so tests get isolated caches with small capacities.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *, file_capacity: int = 4096,
+        override_capacity: int = 1024, params_capacity: int = 1024,
+    ) -> None:
         self._lock = threading.Lock()
-        self._file_hashes: dict[tuple[Path, int, int], str | None] = {}
-        self._override_hashes: dict[tuple[Path, int, int], str] = {}
-        self._dimension_params: dict[tuple, tuple[str, dict]] = {}
+        self._file_hashes: _LRUDict[_StatKey, str | None] = _LRUDict(file_capacity)
+        self._override_hashes: _LRUDict[_StatKey, str] = _LRUDict(override_capacity)
+        self._dimension_params: _LRUDict[
+            tuple[Path, int, int, Path | None, int, int], tuple[str, dict]
+        ] = _LRUDict(params_capacity)
+
+    def _memo(self, table: _LRUDict[_K, _V], key: _K, compute: Callable[[], _V]) -> _V:
+        """Cached value for *key*; on a miss, *compute* outside the lock, then store."""
+        with self._lock:
+            if key in table:
+                table.move_to_end(key)
+                return table[key]
+        value = compute()
+        with self._lock:
+            table.put(key, value)
+        return value
 
     def file_hash(self, path: Path, size: int, mtime_ns: int) -> str | None:
         """Memoized :func:`_hash_file`, keyed by (path, size, mtime_ns)."""
-        key = (path, size, mtime_ns)
-        with self._lock:
-            if key in self._file_hashes:
-                return self._file_hashes[key]
-        value = _hash_file(path)
-        with self._lock:
-            self._file_hashes[key] = value
-        return value
+        return self._memo(self._file_hashes, (path, size, mtime_ns), lambda: _hash_file(path))
 
     def override_hash(self, project_root: Path, size: int, mtime_ns: int) -> str:
         """Memoized :func:`_compute_override_hash`, keyed by (path, size, mtime_ns)."""
-        key = (project_root, size, mtime_ns)
-        with self._lock:
-            if key in self._override_hashes:
-                return self._override_hashes[key]
-        value = _compute_override_hash(project_root)
-        with self._lock:
-            self._override_hashes[key] = value
-        return value
+        return self._memo(
+            self._override_hashes, (project_root, size, mtime_ns),
+            lambda: _compute_override_hash(project_root),
+        )
 
     def dimension_params_state(
         self, compiled: Path, c_size: int, c_mtime_ns: int,
         project_root: Path | None, o_size: int, o_mtime_ns: int,
     ) -> tuple[str, dict]:
-        """Memoized :func:`_compute_dimension_params`, keyed by the stats of
-        the compiled dimension JSON and the overrides file."""
+        """Memoized :func:`_compute_dimension_params`, keyed by both files' stats."""
         key = (compiled, c_size, c_mtime_ns, project_root, o_size, o_mtime_ns)
-        with self._lock:
-            if key in self._dimension_params:
-                return self._dimension_params[key]
-        value = _compute_dimension_params(compiled, project_root)
-        with self._lock:
-            self._dimension_params[key] = value
-        return value
+        return self._memo(
+            self._dimension_params, key,
+            lambda: _compute_dimension_params(compiled, project_root),
+        )
 
     def reset(self) -> None:
         """Drop all cached entries. Test-isolation / mid-run hygiene seam."""
@@ -215,11 +235,9 @@ def _hash_standards(
     hashes byte-identically to the plain compiled JSON, keeping entries
     written before overrides existed quiet.
 
-    Memoized via *cache* (defaulting to the module-wide instance production
-    shares): inside one ``quodeq evaluate`` process the inputs are
-    rewritten only if the user edits them mid-run, in which case the new
-    ``mtime_ns`` invalidates the cache automatically. Without this cache a
-    3 K-file dim re-hashes the same JSON 3 K times.
+    Memoized via *cache* (defaulting to the module-wide instance): an
+    edited compiled file changes its ``mtime_ns`` and misses on its own.
+    Without this cache a 3 K-file dim re-hashes the same JSON 3 K times.
     """
     cache = cache or _hash_cache
     compiled = standards_dir / "compiled" / f"{dimension}.json"
