@@ -67,9 +67,15 @@ def _remove_run_directory(
     ``reports_dir`` for a ``run_uuid`` match.
     """
     removed_dir = False
+    resolved_reports = reports_dir.resolve() if reports_dir.is_dir() else None
     if output_project and reports_dir.is_dir():
         candidate = reports_dir / output_project / run_uuid
-        if candidate.is_dir():
+        try:
+            if resolved_reports and not candidate.resolve().is_relative_to(resolved_reports):
+                candidate = None
+        except (OSError, ValueError):
+            candidate = None
+        if candidate and candidate.is_dir():
             shutil.rmtree(candidate, ignore_errors=True)
             removed_dir = not candidate.exists()
             if not removed_dir:
@@ -77,6 +83,11 @@ def _remove_run_directory(
     if not removed_dir and reports_dir.is_dir():
         for project_dir in reports_dir.iterdir():
             candidate = project_dir / run_uuid
+            try:
+                if resolved_reports and not candidate.resolve().is_relative_to(resolved_reports):
+                    continue
+            except (OSError, ValueError):
+                continue
             if candidate.is_dir():
                 shutil.rmtree(candidate, ignore_errors=True)
                 removed_dir = not candidate.exists()

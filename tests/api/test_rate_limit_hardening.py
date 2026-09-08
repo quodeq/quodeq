@@ -145,7 +145,10 @@ def test_file_store_check_and_record_does_not_record_when_limited(tmp_path: Path
     assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)
 
 
-def test_file_store_caches_within_ttl_window(tmp_path: Path):
+def test_record_and_check_cache_within_ttl_window(tmp_path: Path):
+    """record()/check() are not on the enforcement path and keep the old
+    TTL-cached behavior; check_and_record() no longer does (see the test
+    below) since it must reload fresh from disk under the OS lock."""
     from unittest.mock import patch
 
     store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
@@ -153,11 +156,28 @@ def test_file_store_caches_within_ttl_window(tmp_path: Path):
     with patch.object(store, "_load", wraps=store._load) as load_spy, \
          patch.object(store, "_save", wraps=store._save) as save_spy:
         for i in range(5):
-            limited = store.check_and_record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
-            assert limited is False
+            store.record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+        assert store.check("1.2.3.4", 1000.4) is False
 
     assert load_spy.call_count == 1, f"expected 1 load for 5 calls inside the TTL window, got {load_spy.call_count}"
     assert save_spy.call_count == 1, f"expected 1 save for 5 calls inside the TTL window, got {save_spy.call_count}"
+
+
+def test_check_and_record_bypasses_cache_and_reloads_every_call(tmp_path: Path):
+    """check_and_record() is the enforcement path: it must reload fresh from
+    disk every call rather than trust the TTL cache, even inside one TTL
+    window, since two processes could otherwise each act on their own stale
+    in-memory snapshot within the same lock-free window."""
+    from unittest.mock import patch
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy:
+        for i in range(5):
+            limited = store.check_and_record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+            assert limited is False
+
+    assert load_spy.call_count == 5
 
 
 def test_file_store_still_enforces_limit_within_a_single_ttl_window(tmp_path: Path):

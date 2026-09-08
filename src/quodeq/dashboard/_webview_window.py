@@ -243,6 +243,7 @@ def main() -> None:
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
+    webview_token = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] else None
 
     instance = InstanceController(sock_path)
     api = _WindowApi()
@@ -271,7 +272,7 @@ def main() -> None:
 
     try:
         webview.start(private_mode=False, storage_path=storage_dir,
-                      user_agent=_webview_user_agent(),
+                      user_agent=_webview_user_agent(webview_token),
                       menu=_non_macos_menu(window) or [])
     finally:
         instance.shutdown()

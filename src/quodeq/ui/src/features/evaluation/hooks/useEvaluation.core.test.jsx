@@ -4,6 +4,7 @@ import React from "react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
+import { PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
@@ -48,6 +49,9 @@ describe("useEvaluation", () => {
     // preparePayload reads localStorage; seed a working provider+model.
     localStorage.setItem("cc-active-provider", "ollama");
     localStorage.setItem("cc-ollama-model", "llama3.1");
+    // localStorage is shared across tests in this file; the api-key cases
+    // below would otherwise leak a stored key into every later test.
+    localStorage.removeItem("cc-ollama-api-key");
   });
 
   it("returns the documented public shape", () => {
@@ -143,5 +147,45 @@ describe("useEvaluation", () => {
         aiModel: "llama3.1",
       }),
     );
+  });
+
+  it("startEvaluation never forwards the 'configured' sentinel as an api key", async () => {
+    // A key saved through the current flow leaves only the sentinel here
+    // (see useProviderSettings.js). Sending it would hand the provider a
+    // bogus credential and skip the backend's own get_api_key_secure
+    // lookup, which is what actually holds the real key.
+    localStorage.setItem("cc-ollama-api-key", PROVIDER_CONFIGURED_MARKER);
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j4", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: ["security"] });
+    });
+    const [payload] = fakeApi.startEvaluation.mock.calls.at(-1);
+    expect(payload.apiKey).toBeUndefined();
+  });
+
+  it("startEvaluation still forwards a genuine legacy raw api key", async () => {
+    // Installs that saved a key through the (since-deleted) Settings input
+    // still have the raw value in this browser's localStorage and nothing
+    // migrated it. Dropping it outright silently sent no key at all for
+    // them — a live regression, not just dead code.
+    localStorage.setItem("cc-ollama-api-key", "sk-legacy-raw-value");
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j5", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: ["security"] });
+    });
+    const [payload] = fakeApi.startEvaluation.mock.calls.at(-1);
+    expect(payload.apiKey).toBe("sk-legacy-raw-value");
+  });
+
+  it("startEvaluation sends no api key when nothing is stored", async () => {
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j6", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: ["security"] });
+    });
+    const [payload] = fakeApi.startEvaluation.mock.calls.at(-1);
+    expect(payload).not.toHaveProperty("apiKey");
   });
 });

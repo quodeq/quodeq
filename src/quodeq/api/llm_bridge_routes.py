@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.config.ai_provider import _store_api_key, get_api_key_secure
 from quodeq.llm_bridge import (
     get_ollama_status,
     list_ollama_models,
@@ -209,6 +210,42 @@ def register_llm_bridge_routes(app: Flask) -> None:
             if env_name:
                 seen[pid] = bool(key.strip())
         return jsonify(seen)
+
+    @app.post("/api/provider/key")
+    def provider_store_key() -> Response:
+        data = _json_body()
+        if data is None:
+            return jsonify(_BODY_NOT_OBJECT), 400
+        provider = data.get("provider", "")
+        api_key = data.get("apiKey", "")
+        if not provider or not isinstance(provider, str):
+            return jsonify({"error": "provider is required", "code": "MISSING_PARAM"}), 400
+        if not api_key or not isinstance(api_key, str):
+            return jsonify({"error": "apiKey is required", "code": "MISSING_PARAM"}), 400
+        try:
+            stored, secure = _store_api_key(provider, api_key)
+        except ValueError:
+            # Provider names are interpolated into `.quodeq.env` lines, so a
+            # name with control characters is rejected outright rather than
+            # being allowed to inject extra `export …` lines.
+            #
+            # A fixed message, not str(exc): echoing exception text back to a
+            # client is the shape of an information-disclosure bug even when
+            # every reachable message here happens to be a constant today,
+            # and CodeQL flags it as one. Nothing is lost -- the only
+            # ValueError that reaches this handler already says exactly this.
+            return jsonify({
+                "error": "Provider name must contain only letters, digits, '-' and '_'",
+                "code": "INVALID_PARAM",
+            }), 400
+        return jsonify({"stored": stored, "secure": secure})
+
+    @app.get("/api/provider/key-status")
+    def provider_key_status() -> Response:
+        provider = request.args.get("provider", "")
+        if not provider:
+            return jsonify({"error": "provider is required", "code": "MISSING_PARAM"}), 400
+        return jsonify({"configured": get_api_key_secure(provider) is not None})
 
     @app.get("/api/known-models")
     def known_models() -> Response:

@@ -51,6 +51,16 @@ def _resolve_target_path(
         else:
             target_path = Path(clone_dest).resolve() / project_name
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        # Re-validate immediately before the clone dispatch: the project-uuid
+        # resolution between _validate_clone_target's check and here (index
+        # load, legacy directory scan, project creation) does real disk I/O and
+        # can take enough wall-clock time for a DNS-rebinding attacker to flip
+        # the host from a public to a private IP. This narrows, but does not
+        # close, the race -- git clone re-resolves DNS again itself, independently,
+        # inside the subprocess below; only pinning the resolved IP through git's
+        # own connection (a hosts-file override or proxy layer) would close it,
+        # and that's out of scope here.
+        validate_remote_url(repo)
         # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
         run_git_clone(repo, target_path)
         return target_path

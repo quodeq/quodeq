@@ -62,7 +62,7 @@ def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
     for retried in (False, True):
         try:
             subprocess.run(
-                ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), branch],
+                ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), "--", branch],
                 capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
             )
             return worktree_dir

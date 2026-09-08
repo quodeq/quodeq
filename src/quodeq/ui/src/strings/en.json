@@ -964,7 +964,7 @@
   "projects.published": "published {time}",
   "projects.publishedBy": "published by {name}",
   "projects.publishing": "publishing...",
-  "projects.pullFailed": "Failed to pull project: {message}",
+  "projects.pullFailed": "Failed to pull project",
   "projects.pullLocalCopy": "pull local copy",
   "projects.pulledToLocal": "pulled to local",
   "projects.refreshAria": "refresh",
