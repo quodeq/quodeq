@@ -7,10 +7,87 @@ from unittest.mock import patch, MagicMock
 from quodeq.llm_bridge._omlx import (
     _normalize_base,
     _list_model_dirs,
+    _read_omlx_api_key,
     get_omlx_status,
     list_omlx_models,
     run_concurrency_test,
 )
+
+
+class TestReadOmlxApiKey:
+    def test_returns_env_var_when_set(self):
+        with patch.dict("os.environ", {"OMLX_API_KEY": "env-key"}):
+            result = _read_omlx_api_key()
+        assert result == "env-key"
+
+    def test_no_warning_when_env_var_set(self):
+        with patch.dict("os.environ", {"OMLX_API_KEY": "env-key"}), \
+             patch("quodeq.llm_bridge._omlx._log") as mock_log:
+            _read_omlx_api_key()
+        mock_log.warning.assert_not_called()
+
+    def test_warning_when_file_fallback_with_key(self, tmp_path):
+        omlx_dir = tmp_path / ".omlx"
+        omlx_dir.mkdir()
+        settings_file = omlx_dir / "settings.json"
+        settings_file.write_text(json.dumps({"auth": {"api_key": "file-key"}}))
+
+        with patch.dict("os.environ", {"OMLX_API_KEY": ""}, clear=True), \
+             patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls, \
+             patch("quodeq.llm_bridge._omlx._log") as mock_log:
+            mock_path_cls.home.return_value = tmp_path
+
+            result = _read_omlx_api_key()
+
+        assert result == "file-key"
+        mock_log.warning.assert_called_once()
+        warning_msg = mock_log.warning.call_args[0][0]
+        assert "cleartext" in warning_msg
+        assert "~/.omlx/settings.json" in warning_msg
+        assert "OMLX_API_KEY" in warning_msg
+
+    def test_no_warning_when_file_fallback_no_key(self, tmp_path):
+        omlx_dir = tmp_path / ".omlx"
+        omlx_dir.mkdir()
+        settings_file = omlx_dir / "settings.json"
+        settings_file.write_text(json.dumps({"auth": {}}))
+
+        with patch.dict("os.environ", {"OMLX_API_KEY": ""}, clear=True), \
+             patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls, \
+             patch("quodeq.llm_bridge._omlx._log") as mock_log:
+            mock_path_cls.home.return_value = tmp_path
+
+            result = _read_omlx_api_key()
+
+        assert result == ""
+        mock_log.warning.assert_not_called()
+
+    def test_no_warning_when_file_not_found(self, tmp_path):
+        with patch.dict("os.environ", {"OMLX_API_KEY": ""}, clear=True), \
+             patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls, \
+             patch("quodeq.llm_bridge._omlx._log") as mock_log:
+            mock_path_cls.home.return_value = tmp_path
+
+            result = _read_omlx_api_key()
+
+        assert result == ""
+        mock_log.warning.assert_not_called()
+
+    def test_no_warning_when_invalid_json(self, tmp_path):
+        omlx_dir = tmp_path / ".omlx"
+        omlx_dir.mkdir()
+        settings_file = omlx_dir / "settings.json"
+        settings_file.write_text("invalid json")
+
+        with patch.dict("os.environ", {"OMLX_API_KEY": ""}, clear=True), \
+             patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls, \
+             patch("quodeq.llm_bridge._omlx._log") as mock_log:
+            mock_path_cls.home.return_value = tmp_path
+
+            result = _read_omlx_api_key()
+
+        assert result == ""
+        mock_log.warning.assert_not_called()
 
 
 class TestNormalizeBase:
