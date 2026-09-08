@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from quodeq.assistant.adapters._cli_config import CliChatConfig
 from quodeq.shared._models import normalize_model_id
@@ -41,6 +41,13 @@ class CliTurnSpec:
     needs_id_parse: bool
 
 
+class McpConfigRef(NamedTuple):
+    """Exactly one of the two is ever set (or neither, for cli-register);
+    named so `path` and `arg` cannot be swapped silently at a call site."""
+    path: str | None
+    arg: str | None
+
+
 @dataclass(frozen=True)
 class TurnArgvRequest:
     prompt: str
@@ -54,16 +61,15 @@ class TurnArgvRequest:
 
     @classmethod
     def from_turn_config(cls, cfg: "CliTurnConfig", *, prompt: str,
-                        mcp_config: tuple[str | None, str | None],
+                        mcp_config: McpConfigRef,
                         prior_session_id: str | None, new_session_id: str
                         ) -> "TurnArgvRequest":
-        # mcp_config is the (mcp_config_path, mcp_config_arg) pair _setup_mcp_config
-        # returns; exactly one of the two is ever set, so callers thread it through
-        # as one value rather than two individually-optional ones (param-count ratchet).
-        mcp_config_path, mcp_config_arg = mcp_config
+        # mcp_config is the McpConfigRef _setup_mcp_config returns, threaded
+        # through as one value rather than two individually-optional ones
+        # (param-count ratchet).
         return cls(prompt=prompt, model=cfg.model, web_enabled=cfg.web_enabled,
-                  system_prompt=cfg.system_prompt, mcp_config_path=mcp_config_path,
-                  mcp_config_arg=mcp_config_arg, prior_session_id=prior_session_id,
+                  system_prompt=cfg.system_prompt, mcp_config_path=mcp_config.path,
+                  mcp_config_arg=mcp_config.arg, prior_session_id=prior_session_id,
                   new_session_id=new_session_id)
 
 

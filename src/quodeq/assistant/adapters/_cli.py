@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.assistant.adapters import _stream
-from quodeq.assistant.adapters._cli_command import TurnArgvRequest, build_turn_argv
+from quodeq.assistant.adapters._cli_command import (
+    McpConfigRef, TurnArgvRequest, build_turn_argv)
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
@@ -75,10 +76,10 @@ def _raw_error_line(line: str) -> str | None:
     return text
 
 
-def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> tuple[str | None, str | None]:
+def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     """Wire the MCP server into the CLI invocation, per provider style.
 
-    Returns ``(mcp_config_path, mcp_config_arg)``; exactly one is set (or
+    Returns an ``McpConfigRef``; exactly one of ``path``/``arg`` is set (or
     neither, for ``cli-register``). Runs OUTSIDE ``_run_once``'s try/finally:
     a failure here precedes any resource that needs cleanup.
     """
@@ -86,13 +87,13 @@ def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> tuple[str | None, str | No
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         tmp.close()
         mcp_config.write_mcp_config(cfg.mcp_server_args, Path(tmp.name))
-        return tmp.name, None
+        return McpConfigRef(tmp.name, None)
     if cli_cfg.mcp_style == "config-arg":
         # codex: define the server inline per invocation; no global state to clean up.
-        return None, mcp_config.codex_mcp_config_arg(cfg.mcp_server_args)
+        return McpConfigRef(None, mcp_config.codex_mcp_config_arg(cfg.mcp_server_args))
     mcp_config.register_cli_mcp(cli_cfg.cmd, cfg.mcp_server_args,
                                 separator=cli_cfg.mcp_add_separator)
-    return None, None
+    return McpConfigRef(None, None)
 
 
 def _consume_stream_events(stdout, emit: Callable[[dict], None], parsed_sid: str | None):
@@ -209,7 +210,7 @@ def _finalize_turn_result(proc, stream_result, *, repository: AssistantStore, se
 
 def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
               new_session_id: str) -> tuple[str, str | None, int, str | None, str | None]:
-    mcp_config_path, mcp_config_arg = _setup_mcp_config(cfg, cli_cfg)
+    mcp_config_ref = _setup_mcp_config(cfg, cli_cfg)
     proc = None
     timer = None
     cwd = None
@@ -219,7 +220,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
         # rebuild-replay path the transcript also carries a [system] block,
         # a rare accepted duplication.
         request = TurnArgvRequest.from_turn_config(
-            cfg, prompt=prompt, mcp_config=(mcp_config_path, mcp_config_arg),
+            cfg, prompt=prompt, mcp_config=mcp_config_ref,
             prior_session_id=session.prior_session_id, new_session_id=new_session_id)
         spec = build_turn_argv(cli_cfg, request)
         cwd, proc, timer, sandbox_cleanup, stream_result = _spawn_and_stream(
@@ -232,8 +233,8 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
             timer.cancel()
         if proc is not None and proc.poll() is None:
             _kill_proc_tree(proc)
-        if mcp_config_path:
-            Path(mcp_config_path).unlink(missing_ok=True)
+        if mcp_config_ref.path:
+            Path(mcp_config_ref.path).unlink(missing_ok=True)
         if sandbox_cleanup is not None:
             sandbox_cleanup()
         if cli_cfg.mcp_style == "cli-register":

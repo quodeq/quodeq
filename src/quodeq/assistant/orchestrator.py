@@ -115,8 +115,9 @@ def _resolve_write_grant(request: TurnRequest, repository: AssistantStore,
     """Server-derived write grant, mirror of web_tools_on: the client flag
     alone is never enough. Requires an attached LOCAL git repo and a
     provider whose tool wiring is per-invocation isolated. When granted,
-    ensures the session worktree exists and returns a tool_ctx pointed at
-    it."""
+    ensures the session worktree exists and points tool_ctx at it. Returns
+    a _TurnGrants bundling that tool_ctx, write_on, and the caller-supplied
+    web_tools_on."""
     write_on = (request.write_enabled and not tool_ctx.read_only
                 and tool_ctx.repo_root is not None
                 and (tool_ctx.repo_root / ".git").exists()
