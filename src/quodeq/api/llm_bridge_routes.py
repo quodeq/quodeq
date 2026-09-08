@@ -51,6 +51,16 @@ def _invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
     return None
 
 
+def _invalid_model_name(model: str) -> tuple[Response, int] | None:
+    """Return a 400 response when *model* contains invalid characters, else None.
+
+    Prevents path traversal and null-byte injection.
+    """
+    if "\\" in model or ".." in model or "\0" in model:
+        return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+    return None
+
+
 def register_llm_bridge_routes(app: Flask) -> None:
     """Register all llm_bridge API routes."""
 
@@ -70,8 +80,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
         model = data.get("model", "")
         if not model or not isinstance(model, str):
             return jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400
-        if "\\" in model or ".." in model or "\0" in model:
-            return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        err = _invalid_model_name(model)
+        if err is not None:
+            return err
         result = run_concurrency_test(model)
         return jsonify(result)
 
@@ -104,8 +115,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
         model = data.get("model", "")
         if not isinstance(model, str):
             return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
-        if "\\" in model or ".." in model or "\0" in model:
-            return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        err = _invalid_model_name(model)
+        if err is not None:
+            return err
         result = run_llamacpp_concurrency_test(model)
         return jsonify(result)
 
@@ -136,8 +148,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
         model = data.get("model", "")
         if not isinstance(model, str):
             return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
-        if "\\" in model or ".." in model or "\0" in model:
-            return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        err = _invalid_model_name(model)
+        if err is not None:
+            return err
         base_url = data.get("base_url") or ""
         api_key = data.get("api_key") or ""
         if not isinstance(base_url, str) or not isinstance(api_key, str):
