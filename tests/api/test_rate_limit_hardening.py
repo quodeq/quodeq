@@ -262,6 +262,63 @@ def test_check_and_record_serializes_across_store_instances(tmp_path: Path):
     )
 
 
+def test_cross_process_lock_does_not_unlock_or_leak_fd_on_timeout(tmp_path: Path):
+    """If lock_file() times out (raises TimeoutError, having never acquired
+    the lock), _cross_process_lock() must not call unlock_file() on the
+    un-locked fd -- mirroring _queue_state.locked()'s locked_ok guard -- and
+    must still close the fd so the timeout doesn't leak it.
+    """
+    from unittest.mock import patch
+
+    import quodeq.api._rate_limit_file_store as store_mod
+
+    path = tmp_path / "rl.json"
+    store = FileRateLimitStore(path=path, window=60.0, max_requests=5)
+
+    with patch.object(store_mod, "lock_file", side_effect=TimeoutError("locked out")) as lock_mock, \
+         patch.object(store_mod, "unlock_file") as unlock_mock, \
+         patch.object(store_mod.os, "close", wraps=store_mod.os.close) as close_mock:
+        with pytest.raises(TimeoutError):
+            with store._cross_process_lock():
+                pytest.fail("must not yield when the lock was never acquired")
+
+    lock_mock.assert_called_once()
+    unlock_mock.assert_not_called()  # never locked -- must not unlock
+    close_mock.assert_called_once()  # fd must still be closed, not leaked
+
+
+def test_check_and_record_flushes_dirty_cache_before_reload(tmp_path: Path):
+    """check_and_record() must not silently drop writes buffered by a prior
+    record() call on the same instance that hadn't reached their flush TTL
+    yet.
+
+    Sequence: record("A", t0) does the first-ever flush (immediate, since
+    _last_flush starts as None). record("A", t0+0.1), same TTL window,
+    appends a second timestamp to the in-memory cache only -- dirty, not
+    flushed. check_and_record("B", t0+0.15) on the SAME instance must flush
+    that dirty cache before reloading from disk for its own decision;
+    otherwise it reloads stale state (missing A's second timestamp), saves
+    over it, and overwrites self._cache -- permanently losing A's second
+    record from both disk and memory.
+    """
+    path = tmp_path / "rl.json"
+    store = FileRateLimitStore(path=path, window=60.0, max_requests=100)
+
+    store.record("A", 1000.0)
+    store.record("A", 1000.1)  # same TTL window as above: buffered, not flushed
+    assert store._dirty is True, "precondition: second record() must still be unflushed"
+
+    limited = store.check_and_record("B", 1000.15)
+    assert limited is False
+
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert on_disk["A"] == [1000.0, 1000.1], "A's buffered second record must survive on disk"
+    assert on_disk["B"] == [1000.15]
+
+    assert store._cache["A"] == [1000.0, 1000.1], "A's buffered second record must survive in memory"
+    assert store._cache["B"] == [1000.15]
+
+
 # ---------------------------------------------------------------------------
 # InMemoryRateLimitStore.check_and_record() regression tests
 # ---------------------------------------------------------------------------

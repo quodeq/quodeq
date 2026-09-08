@@ -159,11 +159,14 @@ class FileRateLimitStore:
         except OSError:
             _logger.warning("Failed to create rate-limit dir %s", lock_path.parent)
         fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+        locked_ok = False
         try:
             lock_file(fd)
+            locked_ok = True
             yield
         finally:
-            unlock_file(fd)
+            if locked_ok:
+                unlock_file(fd)
             os.close(fd)
 
     def check_and_record(self, ip: str, now: float) -> bool:
@@ -175,6 +178,15 @@ class FileRateLimitStore:
         if not ip:
             return False
         with self._lock, self._cross_process_lock():
+            if self._cache is not None and self._dirty:
+                # Mirror _cache_for()'s protection: this instance may hold
+                # writes from a prior record() call that were buffered in
+                # memory but not yet flushed (the flush TTL hadn't elapsed).
+                # Reloading from disk and then overwriting it below would
+                # silently discard them from both disk and memory.
+                self._save(self._cache)
+                self._last_flush = now
+                self._dirty = False
             data = self._load()
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
             limited = len(timestamps) >= self._max_requests
