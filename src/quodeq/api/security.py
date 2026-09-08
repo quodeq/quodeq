@@ -174,17 +174,16 @@ def _same_origin_ws_sources(host: str) -> str:
     return f"ws://{host} wss://{host}"
 
 
+def _actor(api_key: str | None) -> str:
+    if api_key:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer ") and len(auth) > 11:
+            return f" (actor=key:***{auth[-4:]})"
+    return ""
+
+
 def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
     """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
-
-    @app.before_request
-    def _audit_log() -> None:
-        actor = ""
-        if api_key:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer ") and len(auth) > 11:
-                actor = f" (actor=key:***{auth[-4:]})"
-        _logger.info("API: %s %s%s", request.method, request.path, actor)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -192,6 +191,9 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:
+        _logger.info(
+            "API: %s %s%s -> %d", request.method, request.path, _actor(api_key), response.status_code
+        )
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
         # The primary bind port isn't known here; add same-origin ws explicitly.
