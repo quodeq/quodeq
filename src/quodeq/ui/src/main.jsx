@@ -35,6 +35,12 @@ const LEGACY_FAMILY_MAP = {
   cyber: THEME_FAMILIES.DECKARD,
 };
 
+function isMacPlatform() {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  return /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
+}
+
 function applyInitialTheme(storage = localStorage, mediaQuery = window.matchMedia) {
   const oldTheme = storage.getItem(LS_THEME);
   if (oldTheme !== null) {
@@ -63,10 +69,7 @@ applyInitialTheme();
 // every platform, so nothing in-page reserves space for window controls;
 // these classes remain for platform/shell-conditional styling.
 try {
-  const ua = navigator.userAgent || '';
-  const platform = navigator.platform || '';
-  const isMac = /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
-  if (isMac) document.documentElement.classList.add('platform-mac');
+  if (isMacPlatform()) document.documentElement.classList.add('platform-mac');
 } catch {
   // ignore — platform detection is a progressive enhancement
 }
@@ -85,8 +88,7 @@ window.addEventListener('pywebviewready', markWebview);
 // Only inside the native shell — in a browser these are already native.
 document.addEventListener('keydown', (e) => {
   if (!window.pywebview) return;
-  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-  const mod = isMac ? e.metaKey : e.ctrlKey;
+  const mod = isMacPlatform() ? e.metaKey : e.ctrlKey;
   if (mod && e.key === '[') { e.preventDefault(); history.back(); }
   if (mod && e.key === ']') { e.preventDefault(); history.forward(); }
 });

@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -116,6 +117,62 @@ class TestWatcherStartsAndStops:
         entry = cache.get(key)
         assert entry is not None
         assert any(f.get("w") == "found" for f in entry.findings)
+
+
+class TestHashInputsHoistedOncePerDispatch:
+    def test_hash_functions_called_once_not_per_tick(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """standards_hash/params_hash/prompts_hash are dispatch-constant and
+        must be computed once at watcher start, not recomputed on every
+        persist tick — regression test for the redundant per-tick hashing
+        hoisted out of persist_dispatch_results."""
+        config = _setup(tmp_path, {"a.py": "x"})
+        config = replace(config, standards_dir=tmp_path / "standards")
+        from quodeq.core.evidence.model import Evidence
+
+        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
+            jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            jsonl.write_text(
+                '{"file": "a.py", "line": 1, "t": "violation", "w": "found"}\n'
+                + '{"_marker": "file_done", "file": "a.py", "status": "ok"}\n'
+            )
+            time.sleep(0.3)  # several persist ticks at the tiny interval below
+            return Evidence(
+                repository="", language="python", date="2026-01-01",
+                source_file_count=1, files_read=1, coverage_pct=100.0,
+                principles={},
+            )
+
+        mock_hash_standards = MagicMock(return_value="std-hash")
+        mock_params_state = MagicMock(return_value=("params-hash", {}))
+        mock_hash_prompts = MagicMock(return_value="prompts-hash")
+
+        with (
+            patch(
+                "quodeq.analysis.cache._persist_watcher._hash_standards",
+                mock_hash_standards,
+            ),
+            patch(
+                "quodeq.analysis.cache._persist_watcher.dimension_params_state",
+                mock_params_state,
+            ),
+            patch(
+                "quodeq.analysis.cache._persist_watcher._hash_prompts_combined",
+                mock_hash_prompts,
+            ),
+        ):
+            process_dimension_with_cache(
+                config, "security", 1, _make_ctx(), _make_callbacks(),
+                cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05,
+            )
+
+        # Multiple ticks (~0.3s / 0.05s interval) plus the final persist all
+        # reuse the same precomputed values — one call each for the dispatch.
+        assert mock_hash_standards.call_count == 1
+        assert mock_params_state.call_count == 1
+        assert mock_hash_prompts.call_count == 1
 
 
 class TestWatcherSurvivesDispatchException:

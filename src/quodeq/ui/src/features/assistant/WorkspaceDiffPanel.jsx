@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
@@ -26,6 +26,16 @@ function WorkspaceDiffOutcome({ outcome }) {
 }
 
 function WorkspaceDiffBody({ diff, truncated, error, empty }) {
+  const diffLines = useMemo(() => {
+    if (diff === null) {
+      return [];
+    }
+    return diff.split('\n').map((line, i) => (
+      // eslint-disable-next-line react/no-array-index-key
+      <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
+    ));
+  }, [diff]);
+
   return (
     <>
       {truncated && (
@@ -38,10 +48,7 @@ function WorkspaceDiffBody({ diff, truncated, error, empty }) {
       {empty && <p className="workspace-diff-empty">{t('assistant.noChanges')}</p>}
       {diff !== null && !empty && (
         <pre className="workspace-diff-body">
-          {diff.split('\n').map((line, i) => (
-            // eslint-disable-next-line react/no-array-index-key
-            <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
-          ))}
+          {diffLines}
         </pre>
       )}
     </>

@@ -53,7 +53,7 @@ def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:
 
 
 def _collect_lightweight_entries(reports_root: Path, dir_names: list[str]) -> list[ProjectEntry]:
-    parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
+    parent_ids, subproject_ids, _ = _build_parent_child_sets(reports_root, dir_names)
     registered_ids = {n for n in dir_names if repository_info_exists(reports_root / n)}
     included = [n for n in dir_names if n in registered_ids or n in parent_ids or n in subproject_ids]
     return [

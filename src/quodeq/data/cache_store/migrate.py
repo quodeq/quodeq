@@ -68,6 +68,7 @@ class MigrationStats:
 
 def derive_params_hash(
     dimension: str, effective_params: dict, standards_dir: Path | None,
+    _cache: dict[tuple[str, str], dict] | None = None,
 ) -> str:
     """Rebuild a schema-3 entry's ``params_hash`` from its stored effective params.
 
@@ -80,23 +81,25 @@ def derive_params_hash(
     """
     if not effective_params or standards_dir is None:
         return ""
-    compiled = Path(standards_dir) / "compiled" / f"{dimension}.json"
+    if _cache is None:
+        _cache = {}
+    k = (str(standards_dir), dimension)
+    if k not in _cache:
+        c = Path(standards_dir) / "compiled" / f"{dimension}.json"
+        try:
+            _cache[k] = json.loads(c.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001 - same rationale as the writer: never abort
+            return ""
     try:
-        data = json.loads(compiled.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 - same rationale as the writer: never abort
-        return ""
-    try:
-        return hash_non_default_params(non_default_from_effective(data, effective_params))
+        return hash_non_default_params(non_default_from_effective(_cache[k], effective_params))
     except (AttributeError, TypeError):
         return ""
-
 
 def _index_row(entry: CacheEntry) -> tuple[str, str, str, str, str, str]:
     return (
         entry.key, entry.file_content_hash, entry.dimension, entry.params_hash,
         entry.file_path, entry.created_at,
     )
-
 
 def _remove_dir(entry_dir: Path) -> bool:
     try:
@@ -106,7 +109,6 @@ def _remove_dir(entry_dir: Path) -> bool:
         _logger.debug("cache maintenance: failed to remove %s: %s", entry_dir, exc)
         return False
 
-
 def _read_entry(entry_path: Path) -> CacheEntry | None:
     try:
         return CacheEntry.from_json(entry_path.read_text(encoding="utf-8"))
@@ -114,14 +116,15 @@ def _read_entry(entry_path: Path) -> CacheEntry | None:
         _logger.debug("cache maintenance: skipping unreadable entry %s: %s", entry_path, exc)
         return None
 
-
 def _migrate_v3(
     entry: CacheEntry, entry_dir: Path, backend: LocalFileBackend,
     standards_dir: Path | None, batch: list[tuple],
+    _cache: dict[tuple[str, str], dict] | None = None,
 ) -> tuple[int, int]:
     """Re-key one schema-3 entry. Returns (migrated, deduplicated) as 0/1."""
     params_hash = entry.params_hash or derive_params_hash(
         entry.dimension, (entry.provenance or {}).get("effective_params") or {}, standards_dir,
+        _cache=_cache,
     )
     new_key = compute_key(CacheKey(
         schema_version=SCHEMA_VERSION, file_content_hash=entry.file_content_hash,
@@ -141,7 +144,6 @@ def _migrate_v3(
     _remove_dir(entry_dir)
     return 1, 0
 
-
 def migrate_entries(
     root: Path, *, standards_dir: Path | None, backend: LocalFileBackend | None = None,
 ) -> MigrationStats:
@@ -152,6 +154,7 @@ def migrate_entries(
     index = backend.index
     migrated = deduplicated = indexed = removed = skipped = 0
     batch: list[tuple] = []
+    cache: dict[tuple[str, str], dict] = {}
 
     def _flush() -> None:
         if batch and index is not None:
@@ -167,7 +170,7 @@ def migrate_entries(
             batch.append(_index_row(entry))
             indexed += 1
         elif entry.schema_version == SCHEMA_VERSION - 1:
-            m, d = _migrate_v3(entry, entry_path.parent, backend, standards_dir, batch)
+            m, d = _migrate_v3(entry, entry_path.parent, backend, standards_dir, batch, _cache=cache)
             migrated += m
             deduplicated += d
         elif _remove_dir(entry_path.parent):
@@ -179,7 +182,6 @@ def migrate_entries(
         migrated=migrated, deduplicated=deduplicated, indexed=indexed,
         removed=removed, skipped=skipped,
     )
-
 
 def collect_legacy_entries(root: Path, *, min_schema: int) -> int:
     """Delete every entry whose ``schema_version`` is below *min_schema*.
@@ -199,7 +201,6 @@ def collect_legacy_entries(root: Path, *, min_schema: int) -> int:
         if isinstance(schema, int) and schema < min_schema and _remove_dir(entry_path.parent):
             removed += 1
     return removed
-
 
 def _acquire_lock(lock: Path) -> bool:
     """Create *lock* exclusively. A lock older than STALE_LOCK_S is taken over."""
@@ -227,7 +228,6 @@ def _acquire_lock(lock: Path) -> bool:
             fh.write(str(os.getpid()))
         return True
     return False
-
 
 def _release_lock(lock: Path) -> None:
     try:

@@ -8,7 +8,9 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project as _register_project
+from quodeq.services.project_registration import register_project_with_rollback
 
 
 def _read_info(reports_root: Path, uuid: str) -> dict:
@@ -130,3 +132,30 @@ def test_register_local_repo_without_remote_omits_origin_url(tmp_path):
     uuid = _register_project(str(repo), None, str(reports))
 
     assert "originUrl" not in _read_info(reports, uuid)
+
+
+def test_register_project_with_rollback_strips_credentials_from_error_log(tmp_path, recording_log):
+    """The generic-exception fallback in register_project_with_rollback logs
+    the raw repo string; a credentialed repo (including one with a "/"
+    inside the credential) must never reach that log line unstripped."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    clone_dest = tmp_path / "code"
+    clone_dest.mkdir()
+    repo = "https://user:pa/ss@github.com/org/repo.git"
+    spec = NewProjectSpec(
+        repo=repo, discipline=None, scope_path=None, clone_dest=str(clone_dest), ephemeral=False,
+    )
+
+    with (
+        patch("quodeq.services.project_registration.validate_remote_url", return_value=None),
+        patch("quodeq.services.project_registration.run_git_clone", side_effect=RuntimeError("boom")),
+    ):
+        result = register_project_with_rollback(str(reports), spec, log=recording_log)
+
+    assert result.status == "internal_error"
+    assert len(recording_log.error_messages) == 1
+    logged = recording_log.error_messages[0]
+    assert "pa/ss" not in logged
+    assert "user:" not in logged
+    assert "https://github.com/org/repo.git" in logged
