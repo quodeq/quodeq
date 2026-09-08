@@ -23,6 +23,7 @@ key, so there is no partial state to recover from.
 """
 from __future__ import annotations
 
+from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
 from quodeq.analysis.cache.backend import CacheBackend, CacheStats
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
@@ -52,6 +53,8 @@ __all__ = [
     "CacheBackend",
     "CacheEntry",
     "CacheKey",
+    "CachePersistProvenance",
+    "CachePersistTarget",
     "CacheStats",
     "ClassifyResult",
     "DispatchResult",

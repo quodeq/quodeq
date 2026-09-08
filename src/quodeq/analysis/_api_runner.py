@@ -144,21 +144,13 @@ def _build_cache_writer(
     """
     if run_config is None or dim_id is None:
         return None
-    from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
-    model_id = (
-        run_config.options.subagent_model
-        or run_config.options.ai_model
-        or "unknown"
+    from quodeq.analysis.cache.cache_writer import (  # noqa: PLC0415
+        CacheWriterSpec,
+        build_cache_writer,
     )
     from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
     return build_cache_writer(
-        cache_root=_dcr(),
-        src_root=run_config.src,
-        standards_dir=run_config.standards_dir,
-        dimension=dim_id,
-        model_id=model_id,
-        language=run_config.language or "",
-        prompts_dir=run_config.prompts_dir,
+        CacheWriterSpec.from_run_config(run_config, dim_id, _dcr()),
     )
 
 

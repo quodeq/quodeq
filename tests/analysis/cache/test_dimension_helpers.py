@@ -21,6 +21,7 @@ import pytest
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend, CacheEntry
+from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
     build_cache_key_for_file,
@@ -63,7 +64,7 @@ def _write_project_overrides(src: Path, payload: str) -> None:
     path.write_text(payload)
 
 
-def _hash_inputs(config: RunConfig, dimension: str) -> dict:
+def _hash_inputs(config: RunConfig, dimension: str) -> CachePersistProvenance:
     """Compute the provenance hash inputs persist_dispatch_results now
     expects the caller to hoist and pass in."""
     from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
@@ -77,10 +78,10 @@ def _hash_inputs(config: RunConfig, dimension: str) -> dict:
         config.standards_dir, dimension, config.src,
     )
     prompts_hash = _hash_prompts_combined(config.prompts_dir)
-    return {
-        "standards_hash": standards_hash, "params_hash": params_hash,
-        "effective_params": effective_params, "prompts_hash": prompts_hash,
-    }
+    return CachePersistProvenance(
+        standards_hash=standards_hash, params_hash=params_hash,
+        effective_params=effective_params, prompts_hash=prompts_hash,
+    )
 
 
 @pytest.fixture
@@ -395,9 +396,10 @@ class TestPersist:
         )
 
         persist_dispatch_results(
-            config, "security", miss_files=files,
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=files, miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         a_entry = cache.get(miss_keys["a.py"])
@@ -423,9 +425,10 @@ class TestPersist:
         )
 
         persist_dispatch_results(
-            config, "security", miss_files=files,
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=files, miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         entry = cache.get(miss_keys["clean.py"])
@@ -449,9 +452,10 @@ class TestPersist:
         )
 
         persist_dispatch_results(
-            config, "security", miss_files=["a.py"],
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=["a.py"], miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         # Only a.py's key is in the cache; carried.py was never dispatched here.
@@ -473,9 +477,10 @@ class TestPersist:
         )
 
         persist_dispatch_results(
-            config, "security", miss_files=files,
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=files, miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         entry = cache.get(miss_keys["a.py"])
@@ -513,9 +518,10 @@ class TestPersist:
             json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
         )
         persist_dispatch_results(
-            config, "security", miss_files=files,
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=files, miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         entry = cache.get(miss_keys["a.py"])
@@ -533,10 +539,10 @@ class TestPersist:
 
         # JSONL doesn't exist (e.g. dispatch failed before writing).
         persist_dispatch_results(
-            config, "security", miss_files=["a.py"],
-            jsonl_path=tmp_path / "work" / "missing.jsonl",
-            miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=["a.py"], miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=tmp_path / "work" / "missing.jsonl", cache=cache),
         )
 
         # No entry written — we don't fabricate "no findings" when we
@@ -571,9 +577,9 @@ class TestRoundTrip:
 
         # Persist results.
         persist_dispatch_results(
-            config, "security", miss_files=first.misses,
-            jsonl_path=jsonl, miss_keys=first.miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security", classify=first,
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         # Second call: cache should be fully populated → all hits. The
@@ -611,9 +617,10 @@ def test_persist_dispatch_results_marks_entries_unconsolidated(tmp_path):
     cache = LocalFileBackend(root=tmp_path / "cache")
     key = build_cache_key_for_file(config, "a.py", "security")
     persist_dispatch_results(
-        config, "security", miss_files=["a.py"],
-        jsonl_path=jsonl, miss_keys={"a.py": key}, cache=cache,
-        **_hash_inputs(config, "security"),
+        config, "security",
+        classify=ClassifyResult(misses=["a.py"], miss_keys={"a.py": key}),
+        provenance=_hash_inputs(config, "security"),
+        target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
     )
 
     assert cache.get(key).consolidated is False
@@ -762,9 +769,10 @@ class TestPromptsDirProvenance:
         )
 
         persist_dispatch_results(
-            config, "security", miss_files=files,
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=files, miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
 
         entry = cache.get(miss_keys["a.py"])
@@ -775,7 +783,7 @@ class TestPromptsDirProvenance:
         """The synchronous cache writer and classify's _current_provenance
         must stamp the SAME prompts_hash for the same prompts_dir, or reused
         entries report phantom prompts drift."""
-        from quodeq.analysis.cache.cache_writer import build_cache_writer
+        from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
         from quodeq.analysis.cache.dimension_helpers import _current_provenance
         from quodeq.analysis.cache.local import LocalFileBackend
 
@@ -784,7 +792,7 @@ class TestPromptsDirProvenance:
         config = replace(_make_config(tmp_path / "src"), prompts_dir=prompts)
 
         cache_root = tmp_path / "cache"
-        write = build_cache_writer(
+        write = build_cache_writer(CacheWriterSpec(
             cache_root=cache_root,
             src_root=tmp_path / "src",
             standards_dir=None,
@@ -792,7 +800,7 @@ class TestPromptsDirProvenance:
             model_id="test-model",
             language="python",
             prompts_dir=config.prompts_dir,
-        )
+        ))
         write("a.py", [])
 
         key = build_cache_key_for_file(config, "a.py", "security")

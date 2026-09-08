@@ -35,14 +35,14 @@ def _make_config(
 
 def test_cache_writer_writes_entry_via_local_backend(tmp_path):
     """build_cache_writer returns a closure that writes a per-file cache entry."""
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
 
     src_root = tmp_path / "src"
     src_root.mkdir()
     (src_root / "Foo.kt").write_text("class Foo")
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=None,
@@ -50,7 +50,7 @@ def test_cache_writer_writes_entry_via_local_backend(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
 
     findings = [{"file": "Foo.kt", "line": 10, "p": "Adaptability", "t": "violation", "req": "F-ADP-1"}]
     write("Foo.kt", findings)
@@ -65,14 +65,14 @@ def test_cache_writer_writes_entry_via_local_backend(tmp_path):
 def test_cache_writer_writes_empty_findings_entry(tmp_path):
     """A file with no findings is still cached -- empty list is a valid result.
     This is what makes cache hits work on 'nothing-to-find' files."""
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
 
     src_root = tmp_path / "src"
     src_root.mkdir()
     (src_root / "Empty.kt").write_text("// empty")
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=None,
@@ -80,7 +80,7 @@ def test_cache_writer_writes_empty_findings_entry(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
 
     write("Empty.kt", [])
 
@@ -93,7 +93,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     it was keyed under and a provenance block (model / prompts / standards /
     quodeq version) recording the volatile context it was produced under."""
     import quodeq
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import (
         _hash_prompts_combined,
         build_cache_key_for_file,
@@ -107,7 +107,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     (src_root / "Foo.kt").write_text("class Foo")
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=None,
@@ -115,7 +115,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
     write("Foo.kt", [])
 
     config = _make_config(src_root, model="sonnet", language="kotlin")
@@ -135,7 +135,7 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
     .quodeq/standards-overrides.json under src_root), matching what
     classify-time provenance computes — otherwise every later run would
     report phantom standards drift on entries this writer produced."""
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
     from quodeq.analysis.fingerprint import _hash_standards
@@ -151,7 +151,7 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
     (standards_dir / "compiled" / "flexibility.json").write_text('{"rule": "v1"}')
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=standards_dir,
@@ -159,7 +159,7 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
     write("Foo.kt", [])
 
     config = _make_config(src_root, standards_dir=standards_dir, model="sonnet")
@@ -180,7 +180,7 @@ def test_entry_is_self_describing_for_future_key_migration(tmp_path):
     re-evaluation. This is what let the 3->4 change (language left the key)
     migrate in place. Regressing it silently breaks future migratability, so
     pin it."""
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.key import CacheKey, compute_key
     from quodeq.analysis.cache.local import LocalFileBackend
@@ -190,11 +190,11 @@ def test_entry_is_self_describing_for_future_key_migration(tmp_path):
     (src_root / "Foo.kt").write_text("class Foo")
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root, src_root=src_root, standards_dir=None,
         dimension="flexibility", model_id="sonnet", language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
     write("Foo.kt", [])
 
     config = _make_config(src_root, model="sonnet", language="kotlin")
@@ -222,7 +222,7 @@ def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
 
     Verifies the fingerprint contract: same inputs -> same key -> same finding.
     """
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
 
@@ -236,7 +236,7 @@ def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
 
     expected_key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
 
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=None,
@@ -244,7 +244,7 @@ def test_cache_writer_key_matches_classify_files_via_cache(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
     write("Foo.kt", [{"file": "Foo.kt", "line": 1, "p": "X", "t": "violation", "req": "R-1"}])
 
     cache = LocalFileBackend(root=cache_root)
@@ -263,7 +263,7 @@ def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
     be empty, not a real hash of the escaped file."""
     import json
 
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
 
     # Create a sentinel file OUTSIDE src_root with known content.
     outside_dir = tmp_path / "outside"
@@ -275,7 +275,7 @@ def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
     src_root.mkdir()
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=None,
@@ -283,7 +283,7 @@ def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
 
     # Craft a traversal path that resolves to the sentinel outside src_root.
     traversal_path = "../outside/secret.txt"
@@ -308,7 +308,7 @@ def test_written_entry_records_effective_params(tmp_path):
     under. Mirrors test_cache_writer_provenance_folds_project_overrides's
     override fixture, but for a param'd requirement rather than max_lines
     on the standards JSON shape alone."""
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
 
@@ -329,7 +329,7 @@ def test_written_entry_records_effective_params(tmp_path):
     }))
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=standards_dir,
@@ -337,7 +337,7 @@ def test_written_entry_records_effective_params(tmp_path):
         model_id="m",
         language="python",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
     write("auth.py", [])
 
     config = _make_config(src_root, standards_dir=standards_dir, model="m", language="python")
@@ -357,7 +357,7 @@ def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):
     """A freshly produced finding has not reached any completed run's report
     yet. The entry is born unconsolidated and stays that way until the run
     that produced it reaches done."""
-    from quodeq.analysis.cache.cache_writer import build_cache_writer
+    from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.local import LocalFileBackend
 
     src_root = tmp_path / "src"
@@ -365,7 +365,7 @@ def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):
     (src_root / "Foo.kt").write_text("class Foo")
 
     cache_root = tmp_path / "cache"
-    write = build_cache_writer(
+    write = build_cache_writer(CacheWriterSpec(
         cache_root=cache_root,
         src_root=src_root,
         standards_dir=None,
@@ -373,7 +373,7 @@ def test_cache_writer_marks_the_entry_unconsolidated(tmp_path):
         model_id="sonnet",
         language="kotlin",
         prompts_dir=default_paths().prompts_dir,
-    )
+    ))
     write("Foo.kt", [{"file": "Foo.kt", "line": 1, "t": "violation"}])
 
     backend = LocalFileBackend(root=cache_root)

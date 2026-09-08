@@ -16,11 +16,7 @@ src/quodeq/analysis/_run_lifecycle_support.py:_run_signal_shutdown
 src/quodeq/analysis/api_prompt_assembly.py:assemble_api_prompt
 src/quodeq/analysis/cache/_persist_watcher.py:_make_persist_fn
 src/quodeq/analysis/cache/_replay.py:_write_findings
-src/quodeq/analysis/cache/cache_writer.py:_write_cache_entry
-src/quodeq/analysis/cache/cache_writer.py:build_cache_writer
-src/quodeq/analysis/cache/dimension_helpers.py:_build_cache_entry_for_file
 src/quodeq/analysis/cache/dimension_helpers.py:_classify_one_file
-src/quodeq/analysis/cache/dimension_helpers.py:persist_dispatch_results
 src/quodeq/analysis/cache/dimension_runner.py:_handle_all_hits
 src/quodeq/analysis/cache/dimension_runner.py:_handle_breaker_trip
 src/quodeq/analysis/cache/dimension_runner.py:_handle_dispatch_result

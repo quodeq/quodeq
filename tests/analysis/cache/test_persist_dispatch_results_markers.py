@@ -6,7 +6,8 @@ import pytest
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
-from quodeq.analysis.cache.dimension_helpers import persist_dispatch_results
+from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
+from quodeq.analysis.cache.dimension_helpers import ClassifyResult, persist_dispatch_results
 
 
 def _make_config(src: Path) -> RunConfig:
@@ -21,7 +22,7 @@ def _write_jsonl(path: Path, lines: list[dict]) -> None:
     path.write_text("".join(json.dumps(l) + "\n" for l in lines))
 
 
-def _hash_inputs(config: RunConfig, dimension: str) -> dict:
+def _hash_inputs(config: RunConfig, dimension: str) -> CachePersistProvenance:
     """Compute the provenance hash inputs persist_dispatch_results now
     expects the caller to hoist and pass in."""
     from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
@@ -35,10 +36,10 @@ def _hash_inputs(config: RunConfig, dimension: str) -> dict:
         config.standards_dir, dimension, config.src,
     )
     prompts_hash = _hash_prompts_combined(config.prompts_dir)
-    return {
-        "standards_hash": standards_hash, "params_hash": params_hash,
-        "effective_params": effective_params, "prompts_hash": prompts_hash,
-    }
+    return CachePersistProvenance(
+        standards_hash=standards_hash, params_hash=params_hash,
+        effective_params=effective_params, prompts_hash=prompts_hash,
+    )
 
 
 @pytest.fixture
@@ -62,9 +63,10 @@ class TestPersistFiltersByOkMarker:
         ])
         miss_keys = {f: f"key-{f}".replace(".", "-") for f in ("a.py", "b.py", "c.py")}
         persist_dispatch_results(
-            config, "security", miss_files=["a.py", "b.py", "c.py"],
-            jsonl_path=jsonl, miss_keys=miss_keys, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=["a.py", "b.py", "c.py"], miss_keys=miss_keys),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
         assert cache.get("key-a-py") is not None
         assert cache.get("key-b-py") is None
@@ -81,9 +83,10 @@ class TestPersistFiltersByOkMarker:
             {"_marker": "file_done", "file": "clean.py", "status": "ok"},
         ])
         persist_dispatch_results(
-            config, "security", miss_files=["clean.py"],
-            jsonl_path=jsonl, miss_keys={"clean.py": "key-clean"}, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=["clean.py"], miss_keys={"clean.py": "key-clean"}),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
         entry = cache.get("key-clean")
         assert entry is not None
@@ -101,9 +104,10 @@ class TestPersistFiltersByOkMarker:
             {"file": "x.py", "req": "X-1", "t": "violation", "line": 1, "severity": "minor", "w": "w", "reason": "r"},
         ])
         persist_dispatch_results(
-            config, "security", miss_files=["x.py"],
-            jsonl_path=jsonl, miss_keys={"x.py": "key-x"}, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=["x.py"], miss_keys={"x.py": "key-x"}),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=jsonl, cache=cache),
         )
         assert cache.get("key-x") is None
 
@@ -113,9 +117,9 @@ class TestPersistFiltersByOkMarker:
         src = tmp_path / "src"; src.mkdir()
         config = _make_config(src)
         persist_dispatch_results(
-            config, "security", miss_files=["a.py"],
-            jsonl_path=tmp_path / "missing.jsonl",
-            miss_keys={"a.py": "key-a"}, cache=cache,
-            **_hash_inputs(config, "security"),
+            config, "security",
+            classify=ClassifyResult(misses=["a.py"], miss_keys={"a.py": "key-a"}),
+            provenance=_hash_inputs(config, "security"),
+            target=CachePersistTarget(jsonl_path=tmp_path / "missing.jsonl", cache=cache),
         )
         assert cache.get("key-a") is None
