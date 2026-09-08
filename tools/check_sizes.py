@@ -6,12 +6,13 @@ gate runs green in CI today while preventing NEW violations. Regenerate the
 baseline (only with justification) via:
     python tools/check_sizes.py --update-baseline
 
-Scans src/quodeq/**/*.py with `ast` for both file- and function-level
-violations (a "function" here means any FunctionDef/AsyncFunctionDef,
-including methods). Scans src/quodeq/ui/src/**/*.{js,jsx} for file-level
-violations only -- JS function length is enforced separately by
-src/quodeq/ui/eslint.size.config.js, which can see arrow functions and
-other JS-only function shapes that `ast` does not.
+Scans src/quodeq/**/*.py (vendored/generated dirs excluded) with `ast` for
+both file- and function-level violations (a "function" here means any
+FunctionDef/AsyncFunctionDef, including methods), tests/**/*.py (same
+exclusion) at file level only (test functions are long by nature; test
+files still must stay under 300 lines), and src/quodeq/ui/src/**/*.{js,jsx}
+for file-level violations only -- JS function length is enforced separately
+by src/quodeq/ui/eslint.size.config.js.
 """
 from __future__ import annotations
 
@@ -19,26 +20,21 @@ import ast
 import sys
 from pathlib import Path
 
+import _ratchet
+from _ratchet import read_text as _read_text
+
 MAX_FILE_LINES = 300
 MAX_FUNCTION_LINES = 50
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PY_ROOT = REPO_ROOT / "src" / "quodeq"
+TESTS_ROOT = REPO_ROOT / "tests"
 JS_ROOT = REPO_ROOT / "src" / "quodeq" / "ui" / "src"
 BASELINE_PATH = Path(__file__).resolve().parent / "size_baseline.txt"
 
 # Directories under JS_ROOT that hold generated or vendored output rather
 # than hand-written source.
 JS_EXCLUDE_DIRS = {"node_modules", "dist", "generated"}
-
-
-def _read_text(path: Path) -> str | None:
-    """Return a file's text, or None (after a warning) if it can't be read."""
-    try:
-        return path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as e:
-        print(f"warning: skipping {path}: {e}", file=sys.stderr)
-        return None
 
 
 def _line_count(text: str) -> int:
@@ -67,7 +63,7 @@ def _relpath(path: Path) -> str:
 def _scan_python() -> list[tuple[str, int, str, int]]:
     """Return (relpath, lineno, kind, size) violations for src/quodeq/**/*.py."""
     found: list[tuple[str, int, str, int]] = []
-    for py in sorted(PY_ROOT.rglob("*.py")):
+    for py in _ratchet.iter_python_files(PY_ROOT):
         text = _read_text(py)
         if text is None:
             continue
@@ -82,6 +78,19 @@ def _scan_python() -> list[tuple[str, int, str, int]]:
             continue
         for lineno, fn_size in _function_violations(tree):
             found.append((rel, lineno, "function", fn_size))
+    return found
+
+
+def _scan_tests() -> list[tuple[str, int, str, int]]:
+    """Return (relpath, 1, "file", size) violations for tests/**/*.py."""
+    found: list[tuple[str, int, str, int]] = []
+    for py in _ratchet.iter_python_files(TESTS_ROOT):
+        text = _read_text(py)
+        if text is None:
+            continue
+        size = _line_count(text)
+        if size > MAX_FILE_LINES:
+            found.append((_relpath(py), 1, "file", size))
     return found
 
 
@@ -109,7 +118,7 @@ def _scan_js() -> list[tuple[str, int, str, int]]:
 
 def _scan() -> list[tuple[str, int, str, int]]:
     """Return all (relpath, lineno, kind, size) size violations, sorted."""
-    return sorted(_scan_python() + _scan_js())
+    return sorted(_scan_python() + _scan_tests() + _scan_js())
 
 
 def violation_key(v: tuple[str, int, str, int]) -> str:
@@ -130,51 +139,31 @@ def collect_violations() -> list[str]:
 
 def load_baseline(path: Path = BASELINE_PATH) -> set[str]:
     """Return the set of grandfathered violation keys (empty if no baseline)."""
-    if not path.exists():
-        return set()
-    return {
-        stripped
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if (stripped := line.strip()) and not stripped.startswith("#")
-    }
+    return _ratchet.load_baseline(path)
 
 
 def write_baseline(path: Path = BASELINE_PATH) -> int:
     """Write current violations to the baseline file; return the count."""
-    keys = collect_violations()
     header = (
         "# Grandfathered size violations (files > 300 lines, functions > 50\n"
         "# lines). Do NOT add entries without justification -- the goal is\n"
         "# to burn this list down, not grow it.\n"
         "# Regenerate intentionally: python tools/check_sizes.py --update-baseline\n"
     )
-    path.write_text(header + "\n".join(keys) + ("\n" if keys else ""), encoding="utf-8")
-    return len(keys)
+    return _ratchet.write_baseline(path, header, collect_violations())
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = argv if argv is not None else sys.argv[1:]
-    unknown = [a for a in args if a != "--update-baseline"]
-    if unknown:
-        print(f"Unknown argument(s): {' '.join(unknown)}. Usage: check_sizes.py [--update-baseline]")
-        return 2
-    if "--update-baseline" in args:
-        n = write_baseline()
-        print(f"Wrote {n} violation(s) to {BASELINE_PATH}")
-        return 0
-
-    baseline = load_baseline()
-    all_violations = _scan()
-    new = [v for v in all_violations if violation_key(v) not in baseline]
-    grandfathered = len(all_violations) - len(new)
-
-    if not new:
-        print(f"OK: no new size violations ({grandfathered} grandfathered).")
-        return 0
-    print(f"Found {len(new)} NEW size violation(s) ({grandfathered} grandfathered):\n")
-    for relpath, lineno, kind, size in new:
-        print(f"  {relpath}:{lineno}:{kind}:{size}")
-    return 1
+    return _ratchet.run_cli(
+        argv,
+        script_name="check_sizes.py",
+        baseline_path=BASELINE_PATH,
+        scan=_scan,
+        violation_key=violation_key,
+        update_baseline=write_baseline,
+        describe=lambda v: f"{v[0]}:{v[1]}:{v[2]}:{v[3]}",
+        noun="size",
+    )
 
 
 if __name__ == "__main__":

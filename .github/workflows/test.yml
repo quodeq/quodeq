@@ -132,3 +132,11 @@ jobs:
         # list in tools/size_grandfather.mjs, or a grandfather list that grew
         # past its committed ceiling.
         run: npm run lint:size
+
+      - name: Check UI unused bindings and parameter counts (hygiene ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on unused imports/variables or functions with more than 5
+        # parameters beyond the per-file counts in tools/hygiene_baseline.json,
+        # or a baseline total above its committed ceiling. Shrunk counts are
+        # locked in with `npm run lint:hygiene:update`.
+        run: npm run lint:hygiene
