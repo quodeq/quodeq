@@ -1,6 +1,7 @@
 """Extended tests for dismissed findings -- restore_all, recount_totals, filter_dismissed."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,7 @@ def _seed_projected_run(
     req: str,
     file: str,
     line: int,
+    reason: str = "r",
 ) -> Path:
     """Create a run with one violation finding projected into evaluation.db."""
     run_dir = project_dir / run_id
@@ -34,7 +36,7 @@ def _seed_projected_run(
     log = run_dir / "events.jsonl"
     EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
         practice_id="P1", verdict="violation", dimension="Security",
-        file=file, line=line, reason="r", req=req,
+        file=file, line=line, reason=reason, req=req,
     )))
     Projector().project(log, run_dir)
     return run_dir
@@ -79,6 +81,54 @@ class TestLoadDismissedEdgeCases:
         project_dir.mkdir()
         result = load_dismissed(project_dir)
         assert result == []
+
+
+class TestCollectDismissedDetails:
+    """Detail lookup walks runs newest-first and narrows each run's query."""
+
+    @staticmethod
+    def _started(run_dir: Path, started_at: str) -> None:
+        (run_dir / "status.json").write_text(
+            json.dumps({"started_at": started_at}), encoding="utf-8",
+        )
+
+    def test_newest_run_wins_when_several_know_the_key(self, tmp_path):
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        old = _seed_projected_run(project_dir, "old", req="A", file="a.py", line=1, reason="old")
+        new = _seed_projected_run(project_dir, "new", req="A", file="a.py", line=1, reason="new")
+        self._started(old, "2026-01-01T00:00:00")
+        self._started(new, "2026-02-01T00:00:00")
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
+
+        (item,) = load_dismissed(project_dir)
+
+        assert item["reason"] == "new"
+
+    def test_each_run_is_asked_only_for_still_missing_keys(self, tmp_path, monkeypatch):
+        from quodeq.services import dismissed as mod
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1)
+        _seed_projected_run(project_dir, "r2", req="B", file="b.py", line=2)
+        (project_dir / "empty").mkdir()  # no DB and no evaluation/: never queried
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
+        dismiss_finding(project_dir, {"req": "B", "file": "b.py", "line": 2})
+        seen: list[tuple[str, int]] = []
+        real = mod.read_finding_details
+
+        def spy(run_dir, keys):
+            seen.append((run_dir.name, len(keys)))
+            return real(run_dir, keys)
+
+        monkeypatch.setattr(mod, "read_finding_details", spy)
+
+        items = load_dismissed(project_dir)
+
+        assert {i["req"] for i in items} == {"A", "B"}
+        assert "empty" not in {name for name, _ in seen}
+        assert [n for _, n in seen] == [2, 1]  # the second run only gets the leftover key
 
 
 class TestRecountTotals:

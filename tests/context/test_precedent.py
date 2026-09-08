@@ -1,8 +1,11 @@
+from collections import OrderedDict
 from pathlib import Path
 
 from quodeq.context.precedent import fingerprint, load_precedent_fingerprints
-from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
+from quodeq.data.sqlite.findings_queries import dismissed_source_stamp, read_dismissed_snippets
 from tests.context.conftest import seed_dismissed
+
+_PROD_SEAMS = dict(read_dismissed=read_dismissed_snippets, source_stamp=dismissed_source_stamp)
 
 # ---------------------------------------------------------------------------
 # New SQL-based test (was the failing regression)
@@ -21,7 +24,7 @@ def test_load_reads_dismissed_from_sql(tmp_path: Path) -> None:
     # No dismissed.json exists; the fingerprint must still be found via SQL.
     assert not (project_dir / "dismissed.json").exists()
 
-    out = load_precedent_fingerprints(project_dir, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
 
     assert fingerprint("S-CON-1", "password = 'secret'") in out
 
@@ -32,7 +35,7 @@ def test_load_aggregates_across_multiple_runs(tmp_path: Path) -> None:
     seed_dismissed(project_dir, "r1", req="R1", snippet="x = 1", file="a.py", line=1)
     seed_dismissed(project_dir, "r2", req="R2", snippet="y = 2", file="b.py", line=2)
 
-    out = load_precedent_fingerprints(project_dir, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
 
     assert fingerprint("R1", "x = 1") in out
     assert fingerprint("R2", "y = 2") in out
@@ -89,19 +92,19 @@ def test_fingerprint_strips_trailing_punctuation():
 
 def test_load_returns_empty_for_missing_dir(tmp_path: Path):
     missing = tmp_path / "missing"
-    assert load_precedent_fingerprints(missing, read_dismissed=read_dismissed_snippets) == set()
+    assert load_precedent_fingerprints(missing, **_PROD_SEAMS) == set()
 
 
 def test_load_returns_empty_for_project_with_no_runs(tmp_path: Path):
     """Project dir with no run sub-directories returns an empty set."""
-    out = load_precedent_fingerprints(tmp_path, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(tmp_path, **_PROD_SEAMS)
     assert out == set()
 
 
 def test_load_skips_subdirs_without_db(tmp_path: Path):
     """Subdirectories without an evaluation.db are silently skipped."""
     (tmp_path / "r_no_db").mkdir()
-    out = load_precedent_fingerprints(tmp_path, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(tmp_path, **_PROD_SEAMS)
     assert out == set()
 
 
@@ -114,7 +117,7 @@ def test_load_returns_fingerprints_from_sql(tmp_path: Path):
     seed_dismissed(project_dir, "r2", req="M-MOD-2", snippet="def foo(): pass",
                     file="y.py", line=5)
 
-    out = load_precedent_fingerprints(project_dir, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
 
     assert len(out) == 2
     assert fingerprint("S-CON-1", "password = 'secret'") in out
@@ -128,7 +131,7 @@ def test_load_skips_run_dirs_without_db(tmp_path: Path):
     # Only a real dismissed run seeds the expected fingerprint.
     seed_dismissed(project_dir, "r_real", req="X", snippet="s", file="f.py", line=1)
 
-    out = load_precedent_fingerprints(project_dir, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
 
     assert fingerprint("X", "s") in out
 
@@ -140,8 +143,28 @@ def test_load_skips_findings_with_blank_req_and_snippet(tmp_path: Path):
     # Seed a real finding to ensure the DB exists with *some* rows.
     seed_dismissed(project_dir, "r1", req="REAL", snippet="code()", file="a.py", line=1)
 
-    out = load_precedent_fingerprints(project_dir, read_dismissed=read_dismissed_snippets)
+    out = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
 
     # Only the real fingerprint is present.
     assert fingerprint("REAL", "code()") in out
     assert fingerprint("", "") not in out
+
+
+def test_new_dismissal_is_visible_on_the_next_load(tmp_path: Path):
+    """The production stamp must refresh the per-run memo when the DB changes.
+
+    Guards the stamp's WAL/mtime assumptions end to end: a dismissal written
+    after one load has to show up in the next one, not be served stale.
+    """
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    seed_dismissed(project_dir, "r1", req="R1", snippet="x = 1", file="a.py", line=1)
+    cache: OrderedDict = OrderedDict()
+
+    first = load_precedent_fingerprints(project_dir, cache=cache, **_PROD_SEAMS)
+    seed_dismissed(project_dir, "r1", req="R2", snippet="y = 2", file="b.py", line=2)
+    second = load_precedent_fingerprints(project_dir, cache=cache, **_PROD_SEAMS)
+
+    assert fingerprint("R1", "x = 1") in first
+    assert fingerprint("R2", "y = 2") not in first
+    assert fingerprint("R2", "y = 2") in second

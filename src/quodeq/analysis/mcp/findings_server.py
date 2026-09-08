@@ -22,7 +22,7 @@ from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
 from quodeq.data.fs.standards_prefs import load_project_overrides
-from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
+from quodeq.data.sqlite.findings_queries import dismissed_source_stamp, read_dismissed_snippets
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
@@ -156,6 +156,7 @@ def _build_router(
     project_dir = run_dir.parent
     ctx.precedent_fingerprints = load_precedent_fingerprints(
         project_dir, read_dismissed=read_dismissed_snippets,
+        source_stamp=dismissed_source_stamp,
     )
     ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
     from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415

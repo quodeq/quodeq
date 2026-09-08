@@ -12,9 +12,10 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 
-from quodeq.data.sqlite.connection import open_evaluation_db
+from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME, open_evaluation_db
 
 _logger = logging.getLogger(__name__)
 
@@ -32,19 +33,27 @@ def _dict_row(cursor, row):  # noqa: ANN001
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
 
 
-def read_active_findings(run_dir: Path) -> list[dict]:
-    """Every non-dismissed finding row in *run_dir*, as column-keyed dicts.
+def read_active_findings(run_dir: Path, *, limit: int | None = None) -> Iterator[dict]:
+    """Every non-dismissed finding row in *run_dir*, as column-keyed dicts, in id order.
 
     Feeds the SQL-backed scores response (services.scoring). Rows keep the
     raw column names/values; mapping to ``Finding`` is the caller's concern
-    (``row_to_finding``). Unlike the best-effort readers above, this opens
-    the database unconditionally (creating an empty one when absent) —
-    callers only reach it after the grade tables answered, so the database
-    already exists on every production path.
+    (``row_to_finding``). Rows stream off the cursor while the connection is
+    held open, so the only copy in memory is whatever the caller keeps; the
+    connection closes once the generator is exhausted or dropped. *limit*
+    caps the rows read (SQL ``LIMIT``); the scores builder passes none, it
+    needs every row for the per-dimension totals. Unlike the best-effort
+    readers in this module, this opens the database unconditionally
+    (creating an empty one when absent): callers only reach it after the
+    grade tables answered, so the database already exists on every
+    production path.
     """
+    sql, params = _SELECT_ACTIVE, ()
+    if limit is not None:
+        sql, params = f"{_SELECT_ACTIVE} LIMIT ?", (limit,)
     with open_evaluation_db(run_dir) as conn:
         conn.row_factory = _dict_row
-        return conn.execute(_SELECT_ACTIVE).fetchall()
+        yield from conn.execute(sql, params)
 
 
 # SQLite's compiled-in bind-parameter limit (SQLITE_MAX_VARIABLE_NUMBER)
@@ -185,6 +194,30 @@ def read_dismissed_snippets(run_dir: Path) -> list[tuple[str | None, str | None]
     except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
         _logger.warning("Could not read dismissed snippets from %s: %s", run_dir, exc)
         return []
+
+
+def dismissed_source_stamp(run_dir: Path) -> tuple[int, ...] | None:
+    """Freshness stamp of *run_dir*'s dismissed findings, or None without a DB.
+
+    ``(size, mtime_ns)`` of ``evaluation.db`` followed by the same for its
+    ``-wal`` file when present: connections run in WAL mode, so a dismissal
+    committed while another process still holds the database open sits in
+    the WAL and leaves the main file's stat untouched until the next
+    checkpoint. Keys the per-run memo in ``context.precedent_fingerprint``;
+    two stats are far cheaper than the open-plus-query they let it skip.
+    """
+    db_path = run_dir / EVALUATION_DB_FILENAME
+    try:
+        st = db_path.stat()
+    except OSError:
+        return None
+    parts = [st.st_size, st.st_mtime_ns]
+    try:
+        wal = db_path.with_name(db_path.name + "-wal").stat()
+        parts += [wal.st_size, wal.st_mtime_ns]
+    except OSError:
+        pass
+    return tuple(parts)
 
 
 def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, str | None]]:

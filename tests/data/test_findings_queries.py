@@ -228,10 +228,33 @@ class TestReadActiveFindings:
         store = SQLiteStateStore(tmp_path)
         store.update_verdict(req="X-3", file="src/c.py", line=30, verdict="dismissed")
 
-        rows = read_active_findings(tmp_path)
+        rows = list(read_active_findings(tmp_path))
 
         assert [r["requirement"] for r in rows] == ["X-1", "X-2"]
         assert [r["verdict"] for r in rows] == ["violation", "compliance"]
+
+    def test_limit_caps_rows_in_sql(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_active_findings
+
+        for i in (1, 2, 3):
+            _seed(tmp_path, req=f"X-{i}", file=f"src/{i}.py", line=i)
+
+        rows = list(read_active_findings(tmp_path, limit=2))
+
+        assert [r["requirement"] for r in rows] == ["X-1", "X-2"]
+
+    def test_streams_rows_instead_of_materializing_a_list(self, tmp_path):
+        """The scores builder folds rows as they arrive; a big run must not
+        be loaded into a second full copy before that fold starts."""
+        import inspect
+
+        from quodeq.data.sqlite.findings_queries import read_active_findings
+
+        _seed(tmp_path)
+        rows = read_active_findings(tmp_path)
+
+        assert inspect.isgenerator(rows)
+        assert [r["requirement"] for r in rows] == ["X-1"]
 
     def test_row_shape_matches_row_to_finding_contract(self, tmp_path):
         from quodeq.data.sqlite._row_mappers import row_to_finding
@@ -253,7 +276,37 @@ class TestReadActiveFindings:
     def test_empty_db_returns_no_rows(self, tmp_path):
         from quodeq.data.sqlite.findings_queries import read_active_findings
 
-        assert read_active_findings(tmp_path) == []
+        assert list(read_active_findings(tmp_path)) == []
+
+
+class TestDismissedSourceStamp:
+    """Freshness key for the per-run precedent memo (context.precedent_fingerprint)."""
+
+    def test_none_without_a_database(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import dismissed_source_stamp
+
+        assert dismissed_source_stamp(tmp_path) is None
+
+    def test_changes_when_the_database_is_written(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import dismissed_source_stamp
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10)
+        before = dismissed_source_stamp(tmp_path)
+        _seed(tmp_path, req="X-2", file="src/b.py", line=20, practice_id="P2")
+
+        assert before is not None
+        assert dismissed_source_stamp(tmp_path) != before
+
+    def test_covers_the_wal_file(self, tmp_path):
+        """Connections run in WAL mode: a write held in the WAL by another
+        open connection leaves the main file's stat untouched."""
+        from quodeq.data.sqlite.findings_queries import dismissed_source_stamp
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10)
+        before = dismissed_source_stamp(tmp_path)
+        (tmp_path / "evaluation.db-wal").write_bytes(b"pending frames")
+
+        assert dismissed_source_stamp(tmp_path) != before
 
 
 def test_precedent_carries_no_database_dependency():
