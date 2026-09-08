@@ -109,7 +109,9 @@ def _download_via_dialog(window: object, base_url: str, path: str, filename: str
     if not save_path:
         return False
     try:
-        url = base_url + path
+        url = urllib.parse.urljoin(base_url, path)
+        if not _is_safe_reload_url(url):
+            return False
         with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
             Path(save_path).write_bytes(resp.read())
         return True
