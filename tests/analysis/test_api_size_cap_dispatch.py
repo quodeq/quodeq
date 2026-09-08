@@ -352,7 +352,7 @@ class TestSizeAwareBatching:
             return_value=("m", "http://localhost:1", ""),
         ), mpatch(
             "quodeq.analysis._api_runner.run_api_analysis",
-            side_effect=lambda **kw: calls.append(kw["source_file_paths"]),
+            side_effect=lambda **kw: calls.append(kw["request"].source_file_paths),
         ):
             _run_api_analysis_bridge(src, "prompt", tmp_path / "a1.stream", cfg, {})
 

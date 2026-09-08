@@ -17,7 +17,9 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.analysis._api_source_gathering import (
     _batch_files_by_size,
@@ -46,6 +48,9 @@ from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.shared import cancellation
 from quodeq.shared.utils import get_ai_cmd
+
+if TYPE_CHECKING:
+    from quodeq.analysis._api_call import ApiRunnerConfig
 
 
 def _safe_int(value: str, default: int = 0) -> int:
@@ -163,9 +168,20 @@ def _resolve_provider_config(
     return model, api_base, api_key
 
 
+@dataclass(frozen=True)
+class _BatchContext:
+    """Per-dimension inputs shared by every batch, built once in
+    ``_run_api_analysis_bridge`` and reused by ``_dispatch_one_batch``.
+    """
+
+    work_dir: Path
+    jsonl_file: Path
+    standards_text: str
+    trust_model: TrustModel | None
+
+
 def _dispatch_one_batch(
-    batch: list[Path], work_dir: Path, jsonl_file: Path, standards_text: str,
-    trust_model: TrustModel, cfg: AnalysisConfig, model: str, api_base: str, api_key: str,
+    batch: list[Path], ctx: _BatchContext, cfg: AnalysisConfig, api_config: ApiRunnerConfig,
 ) -> None:
     """Assemble the API prompt for one size-budgeted batch and dispatch it.
 
@@ -176,39 +192,42 @@ def _dispatch_one_batch(
 
     api_prompt = assemble_api_prompt(
         source_files=batch,
-        standards_text=standards_text,
+        standards_text=ctx.standards_text,
         dimension=cfg.dimension or "general",
-        repo_name=str(work_dir.name),
-        repo_root=work_dir,
-        trust_model=trust_model,
+        repo_name=str(ctx.work_dir.name),
+        repo_root=ctx.work_dir,
+        trust_model=ctx.trust_model,
     )
 
-    # POSIX-style separators: paths flow into findings (file fields,
-    # downstream JSONL projection) and into the prompt; the rest of the
-    # pipeline assumes forward slashes (path-role classifier, enrichment,
-    # SQLite store). Backslashes on Windows would break those joins.
-    rel_paths = [f.relative_to(work_dir).as_posix() for f in batch]
+    # POSIX-style separators: the rest of the pipeline assumes forward
+    # slashes; backslashes on Windows would break those joins.
+    rel_paths = [f.relative_to(ctx.work_dir).as_posix() for f in batch]
     _api_runner.run_api_analysis(
-        prompt=api_prompt,
-        jsonl_file=jsonl_file,
-        config=_api_runner.ApiRunnerConfig(
-            model=model,
-            api_base=api_base,
-            api_key=api_key,
-            context_size=cfg.context_size,
-            n_subagents=max(
-                1, getattr(getattr(cfg.run_config, "options", None), "max_subagents", 1),
-            ),
+        request=_api_runner.ApiAnalysisRequest(
+            prompt=api_prompt,
+            jsonl_file=ctx.jsonl_file,
+            compiled_dir=cfg.compiled_dir,
+            dimension=cfg.dimension,
+            work_dir=ctx.work_dir,
+            source_file_paths=rel_paths,
+            # None run_config (legacy callers) -> the API runner skips the cache write.
+            run_config=cfg.run_config,
+            dim_id=cfg.dimension,
         ),
-        compiled_dir=cfg.compiled_dir,
-        dimension=cfg.dimension,
-        work_dir=work_dir,
-        source_file_paths=rel_paths,
-        # Wire the synchronous cache-write closure when the pool layer
-        # supplied a RunConfig carrier. Legacy callers pass nothing and
-        # the API runner simply skips the cache write.
-        run_config=cfg.run_config,
-        dim_id=cfg.dimension,
+        config=api_config,
+    )
+
+
+def _build_batch_api_config(
+    cfg: AnalysisConfig, model: str, api_base: str, api_key: str,
+) -> ApiRunnerConfig:
+    """Build the one ApiRunnerConfig shared by every batch in a dimension."""
+    from quodeq.analysis._api_runner import ApiRunnerConfig  # noqa: PLC0415
+
+    max_subagents = getattr(getattr(cfg.run_config, "options", None), "max_subagents", 1)
+    return ApiRunnerConfig(
+        model=model, api_base=api_base, api_key=api_key,
+        context_size=cfg.context_size, n_subagents=max(1, max_subagents),
     )
 
 
@@ -236,18 +255,17 @@ def _run_api_analysis_bridge(
     from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
 
     overrides = load_project_overrides(work_dir)
-    # env is the resolved process environment (composition-root-adjacent:
-    # run_analysis defaults it to os.environ), passed explicitly here so
-    # these two char-budget lookups don't read os.environ themselves.
+    # env is the resolved process environment (run_analysis defaults it to
+    # os.environ), passed explicitly so these lookups skip os.environ itself.
     standards_text = _load_standards_text(
         cfg.compiled_dir, cfg.dimension, overrides=overrides,
         max_chars=_max_standards_chars(env),
     )
-    # Resolved once per dimension, not per batch: same declared-then-detected
-    # trust model the finding sink applies (quodeq.context.trust_model),
-    # briefed here so the model generates fewer out-of-scope findings for the
-    # sink to have to claw back.
+    # Resolved once per dimension: the same declared-then-detected trust
+    # model the finding sink applies, briefed here to cut out-of-scope findings.
     trust_model = resolve_trust_model(work_dir)
+    ctx = _BatchContext(work_dir, jsonl_file, standards_text, trust_model)
+    api_config = _build_batch_api_config(cfg, model, api_base, api_key)
 
     for batch in _batch_files_by_size(source_files, _api_prompt_char_budget(env)):
         # A cancelled run (signal, breaker, fatal provider error) must not
@@ -255,10 +273,7 @@ def _run_api_analysis_bridge(
         if cancellation.is_cancelled():
             _log.info("Cancellation requested -- stopping API batch dispatch")
             break
-        _dispatch_one_batch(
-            batch, work_dir, jsonl_file, standards_text, trust_model,
-            cfg, model, api_base, api_key,
-        )
+        _dispatch_one_batch(batch, ctx, cfg, api_config)
 
     stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
     _log.debug("API analysis complete, evidence written to %s", jsonl_file)

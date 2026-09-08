@@ -4,8 +4,6 @@
 # Regenerate intentionally: python tools/check_params.py --update-baseline
 src/quodeq/_cli_lifecycle.py:_run_lifecycle_body
 src/quodeq/analysis/_api_call.py:_log_call_outcome
-src/quodeq/analysis/_api_runner.py:_run_call_and_enrich
-src/quodeq/analysis/_api_runner.py:run_api_analysis
 src/quodeq/analysis/_loop_state.py:_safe_write_dim_state
 src/quodeq/analysis/_loops.py:_dispatch_incremental_dim
 src/quodeq/analysis/_loops.py:_dispatch_per_dim
@@ -32,7 +30,6 @@ src/quodeq/analysis/manifest_build_scope.py:_walk_and_partition_by_scope
 src/quodeq/analysis/mcp/router.py:FindingsRouter.__init__
 src/quodeq/analysis/run_lifecycle.py:RunLifecycleContext.__init__
 src/quodeq/analysis/subagents/runner.py:process_dimension_with_subagents
-src/quodeq/analysis/subprocess.py:_dispatch_one_batch
 src/quodeq/api/assistant_turn_routes.py:_start_turn_worker
 src/quodeq/api/import_project.py:_stage_and_commit
 src/quodeq/api/zip.py:_write_project_zip_entries

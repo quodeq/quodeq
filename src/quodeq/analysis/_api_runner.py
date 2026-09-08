@@ -16,6 +16,7 @@ Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -197,14 +198,41 @@ def _mark_source_files_done(
         router.mark_file_done(file=path, status=status, reason=reason)
 
 
+@dataclass(frozen=True)
+class ApiAnalysisRequest:
+    """Per-call inputs to ``run_api_analysis``: the prompt, its evidence sink,
+    and the enrichment/cache-key context.
+
+    ``dim_id`` and ``dimension`` stay separate fields even though the one
+    production caller (``subprocess.py``) always passes ``cfg.dimension`` to
+    both -- tests exercise them independently (``dim_id`` keys the cache
+    write, ``dimension`` selects compiled standards for enrichment).
+    """
+
+    prompt: str
+    jsonl_file: Path
+    compiled_dir: Path | None = None
+    dimension: str | None = None
+    work_dir: Path | None = None
+    source_file_paths: list[str] | None = None
+    run_config: RunConfig | None = None
+    dim_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ApiRunnerSeams:
+    """Test-injection seams for ``run_api_analysis``: event log, cache
+    writer, and the ``FindingsRouter`` factory. ``cache_writer=None`` keeps
+    meaning "no cache" (``_resolve_run_collaborators`` checks it via ``is None``).
+    """
+
+    event_log: EventLogWriter | None = None
+    cache_writer: Callable | None = None
+    router_factory: Callable[..., FindingsRouter] = FindingsRouter
+
+
 def _run_call_and_enrich(
-    prompt: str,
-    config: ApiRunnerConfig,
-    jsonl_file: Path,
-    compiled_dir: Path | None,
-    dimension: str | None,
-    work_dir: Path | None,
-    source_file_paths: list[str] | None,
+    request: ApiAnalysisRequest, config: ApiRunnerConfig,
 ) -> tuple[list[dict], bool, FatalProviderError | None, CompiledContext | None]:
     """Call the model, resolve/enrich its findings, and build the router context.
 
@@ -214,33 +242,26 @@ def _run_call_and_enrich(
     """
     fatal_exc: FatalProviderError | None = None
     try:
-        findings, was_lossy = _call_api(prompt, config)
+        findings, was_lossy = _call_api(request.prompt, config)
     except FatalProviderError as exc:
         fatal_exc, findings, was_lossy = exc, [], True
 
-    if source_file_paths:
-        findings = _resolve_file_paths(findings, source_file_paths)
+    if request.source_file_paths:
+        findings = _resolve_file_paths(findings, request.source_file_paths)
     _infer_end_line(findings)
 
-    project_dir, run_dir = _derive_run_paths(jsonl_file)
-    ctx = _build_router_context(compiled_dir, dimension, work_dir, project_dir, run_dir)
+    project_dir, run_dir = _derive_run_paths(request.jsonl_file)
+    ctx = _build_router_context(
+        request.compiled_dir, request.dimension, request.work_dir, project_dir, run_dir,
+    )
     return findings, was_lossy, fatal_exc, ctx
 
 
 def run_api_analysis(
     *,
-    prompt: str,
-    jsonl_file: Path,
+    request: ApiAnalysisRequest,
     config: ApiRunnerConfig,
-    compiled_dir: Path | None = None,
-    dimension: str | None = None,
-    work_dir: Path | None = None,
-    source_file_paths: list[str] | None = None,
-    run_config: RunConfig | None = None,
-    dim_id: str | None = None,
-    event_log: EventLogWriter | None = None,
-    cache_writer: Callable | None = None,
-    router_factory: Callable[..., FindingsRouter] = FindingsRouter,
+    seams: ApiRunnerSeams = ApiRunnerSeams(),
 ) -> None:
     """Call the LLM and write findings as JSONL evidence through ``FindingsRouter``.
 
@@ -250,29 +271,28 @@ def run_api_analysis(
     ``_mark_source_files_done`` for the marker contract and
     ``_run_call_and_enrich`` for the fatal-provider-error capture.
 
-    *run_config*/*dim_id* enable the cache-write path via
-    ``FindingsRouter(on_file_done=...)``. *event_log*, *cache_writer* and
-    *router_factory* are test injection seams; ``cache_writer`` uses an
-    explicit ``is None`` check since ``None`` is also its "no cache" result.
+    ``request.run_config``/``request.dim_id`` enable the cache-write path via
+    ``FindingsRouter(on_file_done=...)``. ``seams`` groups the three test
+    injection points -- see ``ApiRunnerSeams`` for the ``cache_writer=None``
+    contract.
     """
-    findings, was_lossy, fatal_exc, ctx = _run_call_and_enrich(
-        prompt, config, jsonl_file, compiled_dir, dimension, work_dir, source_file_paths,
-    )
+    findings, was_lossy, fatal_exc, ctx = _run_call_and_enrich(request, config)
     _log.debug(
         "API runner: %d findings, lossy=%s, marking %d file(s) as %s",
         len(findings), was_lossy,
-        len(source_file_paths) if source_file_paths else 0,
+        len(request.source_file_paths) if request.source_file_paths else 0,
         "error" if was_lossy else "ok",
     )
     event_log, cache_writer = _resolve_run_collaborators(
-        jsonl_file, run_config, dim_id, event_log, cache_writer,
+        request.jsonl_file, request.run_config, request.dim_id,
+        seams.event_log, seams.cache_writer,
     )
-    with open(jsonl_file, "a", encoding="utf-8") as fh:
-        router = router_factory(
+    with open(request.jsonl_file, "a", encoding="utf-8") as fh:
+        router = seams.router_factory(
             fh, context=ctx, event_log=event_log, on_file_done=cache_writer,
         )
         for f in findings:
             router.receive(f)
-        _mark_source_files_done(router, source_file_paths, was_lossy, fatal_exc)
+        _mark_source_files_done(router, request.source_file_paths, was_lossy, fatal_exc)
     if fatal_exc is not None:
         raise fatal_exc
