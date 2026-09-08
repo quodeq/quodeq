@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 import tomllib
+from functools import lru_cache
 from typing import Callable
 
 from quodeq.config._dependency_parsers_python import (  # noqa: F401 - re-export
@@ -37,6 +38,11 @@ from quodeq.config._dependency_parsers_compiled import (  # noqa: F401 - re-expo
     has_package_json_dependency,
     has_pom_xml_dependency,
 )
+
+# Discipline rules probe the same manifest once per rule, so each parser below
+# is memoized per file text. Bounded so a long-lived dashboard does not pin
+# every manifest it ever read.
+_PARSE_CACHE_MAX = 64
 
 # --- Gemfile (Ruby DSL) ------------------------------------------------------
 
@@ -53,9 +59,10 @@ def _strip_hash_comments(content: str) -> str:
     return "\n".join(out)
 
 
-def _gemfile_gems(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _gemfile_gems(content: str) -> frozenset[str]:
     body = _strip_hash_comments(content)
-    return {m.group(1).lower() for m in _GEMFILE_GEM.finditer(body)}
+    return frozenset(m.group(1).lower() for m in _GEMFILE_GEM.finditer(body))
 
 
 def has_gemfile_gem(content: str, needle: str) -> bool:
@@ -74,9 +81,10 @@ def has_gemfile_gem(content: str, needle: str) -> bool:
 _MIX_DEP = re.compile(r"\{:(\w+)\s*,")
 
 
-def _mix_deps(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _mix_deps(content: str) -> frozenset[str]:
     body = _strip_hash_comments(content)
-    return {m.group(1).lower() for m in _MIX_DEP.finditer(body)}
+    return frozenset(m.group(1).lower() for m in _MIX_DEP.finditer(body))
 
 
 def has_mix_dep(content: str, needle: str) -> bool:
@@ -91,7 +99,8 @@ def has_mix_dep(content: str, needle: str) -> bool:
 # --- pubspec.yaml (Dart) -----------------------------------------------------
 
 
-def _pubspec_deps(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _pubspec_deps(content: str) -> frozenset[str]:
     """First-level keys under ``dependencies:`` / ``dev_dependencies:``.
 
     Hand-rolled rather than pulled in via PyYAML — pubspec layout is shallow,
@@ -119,7 +128,7 @@ def _pubspec_deps(content: str) -> set[str]:
             key = stripped.split(":", 1)[0].strip()
             if key:
                 deps.add(key.lower())
-    return deps
+    return frozenset(deps)
 
 
 def has_pubspec_dependency(content: str, needle: str) -> bool:
@@ -134,17 +143,18 @@ def has_pubspec_dependency(content: str, needle: str) -> bool:
 # --- Project.toml (Julia) ----------------------------------------------------
 
 
-def _julia_deps(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _julia_deps(content: str) -> frozenset[str]:
     try:
         data = tomllib.loads(content)
     except tomllib.TOMLDecodeError:
-        return set()
+        return frozenset()
     names: set[str] = set()
     for key in ("deps", "weakdeps", "extras"):
         v = data.get(key)
         if isinstance(v, dict):
             names.update(k.lower() for k in v if isinstance(k, str))
-    return names
+    return frozenset(names)
 
 
 def has_julia_dependency(content: str, needle: str) -> bool:

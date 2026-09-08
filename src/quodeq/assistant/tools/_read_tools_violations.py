@@ -5,6 +5,7 @@ get_violations' scope routing.
 """
 from __future__ import annotations
 
+import heapq
 import json
 
 from quodeq.assistant.tools import _read_tools as _facade
@@ -117,8 +118,10 @@ def _get_violations(ctx: ToolContext, dimension: str | None = None,
         key = _principle_of(v) or "(unknown)"
         by_principle[key] = by_principle.get(key, 0) + 1
 
-    ordered = sorted(raw, key=_severity_key)
-    trimmed = [_trim_violation(v) for v in ordered[:limit]]
+    # nsmallest keeps sorted()'s stable tie order but skips ordering the
+    # entries past `limit` that the page drops anyway.
+    page = heapq.nsmallest(limit, raw, key=_severity_key)
+    trimmed = [_trim_violation(v) for v in page]
     return {"dimension": dim_out, "count": len(raw), "violations": trimmed,
             "by_principle": by_principle, "hiddenStandardIds": hidden}
 

@@ -22,7 +22,10 @@ from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
 from quodeq.data.fs.standards_prefs import load_project_overrides
-from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
+from quodeq.data.sqlite.findings_queries import (
+    dismissed_source_stamp,
+    read_dismissed_snippets_strict,
+)
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
@@ -154,8 +157,11 @@ def _build_router(
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
+    # The strict reader raises on a failed open, so the per-run memo skips the
+    # run instead of remembering it as having no dismissals.
     ctx.precedent_fingerprints = load_precedent_fingerprints(
-        project_dir, read_dismissed=read_dismissed_snippets,
+        project_dir, read_dismissed=read_dismissed_snippets_strict,
+        source_stamp=dismissed_source_stamp,
     )
     ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
     from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415

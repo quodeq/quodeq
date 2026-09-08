@@ -15,8 +15,9 @@ Known limitation: V1 carry-forward can duplicate findings V2 has already
 cached, when migrating a long-lived V1 install to V2; B6 cleanup removes
 V1's carry-forward once the V1 path is deleted.
 
-Cache-replay lives in ``_replay.py``; the persist-watcher body and its
-hoisted provenance-hash computation live in ``_persist_watcher.py``.
+Cache-replay lives in ``_replay.py``; the persist-watcher body, its persist
+callable and the hoisted provenance-hash computation live in
+``_persist_watcher.py``.
 ``emit_marker``/``threading.Thread``/``threading.Event()`` stay in
 helpers defined here, since ``mock.patch`` resolves where a name is used.
 """
@@ -38,7 +39,7 @@ from quodeq.analysis.cache._failure_streak import (
 )
 from quodeq.analysis.cache._persist_watcher import (
     _PERSIST_INTERVAL_S,
-    _compute_persist_hash_inputs,
+    _make_persist_fn,
     _periodic_persist,
     _resolve_failure_streak_threshold,
 )
@@ -56,7 +57,6 @@ from quodeq.analysis.cache.dimension_helpers import (
     build_cache_key_for_file,
     classify_files_via_cache,
     format_provenance_drift,
-    persist_dispatch_results,
 )
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
@@ -176,18 +176,11 @@ def _start_watchers(
     already persists synchronously) and the failure-streak breaker.
     Creates the evidence JSONL up front, when absent, so the breaker's
     first poll doesn't warn about a missing file."""
-    hash_inputs = _compute_persist_hash_inputs(config, dim_id)
-
-    def _persist_now() -> None:
-        persist_dispatch_results(
-            config, dim_id, miss_files=classify.misses, cache=cache,
-            jsonl_path=jsonl, miss_keys=classify.miss_keys, **hash_inputs,
-        )
-
     stop_event = threading.Event()
+    persist_fn = _make_persist_fn(config, dim_id, jsonl, classify, cache, stop_event)
     watcher = threading.Thread(
         target=_periodic_persist,
-        args=(stop_event, _persist_now, persist_interval_s, _logger.warning),
+        args=(stop_event, persist_fn, persist_interval_s, _logger.warning),
         daemon=True,
         name=f"v2-cache-persist-{dim_id}",
     )

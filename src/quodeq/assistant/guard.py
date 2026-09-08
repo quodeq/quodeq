@@ -31,6 +31,10 @@ def fence(payload: str, label: str) -> str:
 
 
 def guard_tool_result(result: dict, label: str) -> tuple[str, list[str]]:
+    # Serialize once, then cut. json.dumps uses the C encoder; an iterencode
+    # that stops at the cap runs the pure-Python one and measured 3.7-4.9x
+    # slower below ~70 KB, the only range tool results reach (pages cap at
+    # 100 items, file/diff/web text at 12,000 chars; see assistant/tools).
     text = json.dumps(result, ensure_ascii=False)
     if len(text) > MAX_TOOL_RESULT_CHARS:
         text = text[:MAX_TOOL_RESULT_CHARS] + " ...[truncated]"

@@ -88,18 +88,27 @@ function _summarizeSeverity(standings) {
 
 function _buildPrincipleBoard(standings) {
   const principleKeys = new Map();
-  for (const s of standings) {
+  // Walking the standings in order leaves each principle's perProject in
+  // STANDINGS order, not per-principle rank: the same slot means the same
+  // project in every card, and each bar carries its standings rank so it
+  // ties back to the numbered list on screen. No re-sort needed below.
+  standings.forEach((s, idx) => {
     for (const p of s.principles) {
       if (p.score == null) continue;
       let entry = principleKeys.get(p.key);
       if (!entry) {
-        entry = { key: p.key, label: p.label, perProject: [] };
+        entry = { key: p.key, label: p.label, perProject: [], seen: new Set() };
         principleKeys.set(p.key, entry);
       }
+      // Two spellings collapsing to one key ('Error Handling' and 'error
+      // handling' in a custom standard) get one bar per project: first wins.
+      if (entry.seen.has(s.row.id)) continue;
+      entry.seen.add(s.row.id);
       entry.perProject.push({
         id: s.row.id,
         name: s.row.name,
         score: p.score,
+        rank: idx + 1,
         // Everything a click needs to open THIS project's view of THIS
         // principle: the run the number came from and the raw spellings.
         // Remote rows can't deep-link into local project pages; the click
@@ -111,26 +120,17 @@ function _buildPrincipleBoard(standings) {
         dateLabel: s.dateLabel,
       });
     }
-  }
+  });
   return Array.from(principleKeys.values())
     .map((entry) => {
       const byScore = entry.perProject.slice().sort((a, b) => b.score - a.score);
-      // Bars render in the STANDINGS order, not per-principle rank: the same
-      // slot means the same project in every card, and each bar carries its
-      // standings rank so it ties back to the numbered list on screen.
-      const inStandingsOrder = standings
-        .map((s, idx) => {
-          const p = entry.perProject.find((x) => x.id === s.row.id);
-          return p ? { ...p, rank: idx + 1 } : null;
-        })
-        .filter(Boolean);
       return {
         key: entry.key,
         label: entry.label,
         avg: mean(byScore.map((p) => p.score)),
         lead: byScore[0] ?? null,
         trail: byScore.length > 1 ? byScore[byScore.length - 1] : null,
-        perProject: inStandingsOrder,
+        perProject: entry.perProject,
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));

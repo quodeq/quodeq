@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections import deque
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -256,10 +257,10 @@ class DisciplineRegistry:
         """
         files, globs = self._manifest_basenames()
         roots: list[Path] = [repo]
-        queue: list[tuple[Path, int]] = [(repo, 0)]
+        queue: deque[tuple[Path, int]] = deque([(repo, 0)])
         seen: set[Path] = {repo}
         while queue:
-            current, depth = queue.pop(0)
+            current, depth = queue.popleft()
             if depth >= max_depth:
                 continue
             try:

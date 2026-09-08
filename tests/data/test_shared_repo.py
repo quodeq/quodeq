@@ -573,6 +573,92 @@ def test_published_meta_legacy_fallback_correct_per_path_author_with_full_histor
     assert meta["proj-b"]["publishedBy"] == "bob"
 
 
+def test_published_meta_legacy_fallback_uses_one_git_call_for_all_dirs(tmp_path, monkeypatch):
+    """Legacy dirs (no published.json) are attributed from ONE git log walk.
+
+    Before, every such dir spawned its own `git log -1 -- <path>` on every
+    /api/shared/projects request. The batched walk must still attribute
+    each dir to its own author and skip a dir with no committed history.
+    """
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+
+    for project_id, author in (("proj-a", "alice"), ("proj-b", "bob"), ("proj-c", "carol")):
+        _make_minimal_project(root, project_id)
+        _publish_project_as(monkeypatch, url, root, project_id, author)
+    for project_id in ("proj-a", "proj-b", "proj-c"):
+        (shared_evaluations_root(url) / project_id / "published.json").unlink()
+    (shared_evaluations_root(url) / "proj-uncommitted").mkdir()
+
+    import quodeq.data.fs.shared_repo_meta as meta_mod
+    calls: list[list[str]] = []
+    real_run_git = meta_mod.run_git
+
+    def _spy(args, **kwargs):
+        calls.append(args)
+        return real_run_git(args, **kwargs)
+
+    monkeypatch.setattr(meta_mod, "run_git", _spy)
+    meta = published_meta(url)
+
+    assert {k: v["publishedBy"] for k, v in meta.items()} == {
+        "proj-a": "alice", "proj-b": "bob", "proj-c": "carol",
+    }
+    assert all(isinstance(v["publishedAt"], int) for v in meta.values())
+    assert len(calls) == 1
+
+
+def _fake_git_log(calls: list[list[str]], *, fail_call: int | None = None):
+    """run_git stand-in: one commit per pathspec, authored after its dir name.
+    Call number *fail_call* (1-based) reports failure instead."""
+
+    def _run(args, **kwargs):
+        calls.append(args)
+        if fail_call is not None and len(calls) == fail_call:
+            return False, ""
+        names = [p.removeprefix("evaluations/") for p in args[args.index("--") + 1:]]
+        out = "".join(
+            f"\x1f{n}-author|{i}\x00\nevaluations/{n}/status.json\x00"
+            for i, n in enumerate(names, 1)
+        )
+        return True, out
+
+    return _run
+
+
+def test_legacy_git_attribution_chunks_pathspecs_and_merges(monkeypatch):
+    """One argv with every legacy dir as a pathspec overflows the OS limit
+    past a few thousand dirs, and the OSError dropped attribution for all of
+    them. Pathspecs go 100 per git call; the results merge."""
+    import quodeq.data.fs.shared_repo_meta as meta_mod
+    calls: list[list[str]] = []
+    monkeypatch.setattr(meta_mod, "run_git", _fake_git_log(calls))
+    names = [f"proj-{i:03d}" for i in range(150)]
+
+    meta = meta_mod._legacy_git_attribution(Path("/repo"), names)
+
+    assert len(calls) == 2
+    assert [len(c) - c.index("--") - 1 for c in calls] == [100, 50]
+    assert set(meta) == set(names)
+    assert meta["proj-000"] == {"publishedBy": "proj-000-author", "publishedAt": 1}
+    assert meta["proj-149"] == {"publishedBy": "proj-149-author", "publishedAt": 50}
+
+
+def test_legacy_git_attribution_failed_chunk_drops_only_its_names(monkeypatch):
+    import quodeq.data.fs.shared_repo_meta as meta_mod
+    calls: list[list[str]] = []
+    monkeypatch.setattr(meta_mod, "run_git", _fake_git_log(calls, fail_call=2))
+    names = [f"proj-{i:03d}" for i in range(150)]
+
+    meta = meta_mod._legacy_git_attribution(Path("/repo"), names)
+
+    assert len(calls) == 2
+    assert set(meta) == set(names[:100])
+
+
 def test_refresh_shared_clone_unshallows_legacy_cache(tmp_path, monkeypatch):
     """Review finding on commit 09c3dd71: unshallowing only helps NEW clones
     (ensure_shared_clone's `--depth 1` removal). A shared-clone cache

@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from quodeq.data.ports.actions_log import ActionLog
+from quodeq.services._run_recency import run_dirs_newest_first
 from quodeq.services._wiring import (
     ActionLogWriter,
     load_suppression_rules,
@@ -109,8 +110,8 @@ def _enrich_from_sql(run_dir: Path, keys: set[tuple], out: dict[tuple, dict]) ->
 
     Modern runs (those with an ``events.jsonl`` projected into ``findings``)
     expose the full Judgment row here. The lookup and its schema knowledge
-    live in the data layer (``findings_queries``); ``setdefault`` preserves
-    the first-run-wins merge across runs.
+    live in the data layer (``findings_queries``); ``setdefault`` keeps the
+    first hit, and the caller walks runs newest-first, so the newest wins.
     """
     for key, detail in read_finding_details(run_dir, keys).items():
         out.setdefault(key, detail)
@@ -125,24 +126,29 @@ def _enrich_from_json_eval(run_dir: Path, keys: set[tuple], out: dict[tuple, dic
     snippet, context, req_refs); ``dimension`` comes from the filename so
     the entry stays linked to its standard for the restore/delete flows.
     The walk and field mapping live in the data layer beside the SQL twin;
-    ``setdefault`` preserves the first-run-wins merge across runs.
+    ``setdefault`` keeps the first hit, so the newest run wins (see caller).
     """
     for key, detail in read_finding_details_from_json_eval(run_dir, keys).items():
         out.setdefault(key, detail)
 
 
 def _collect_dismissed_details(project_dir: Path, keys: set[tuple]) -> dict[tuple, dict]:
-    """Look up finding detail for every dismissed key, across all runs."""
+    """Look up finding detail for every dismissed key, newest run first.
+
+    Each run is asked only for the keys still missing, so older runs do less
+    work and the walk stops once every key has detail. Newest-first plus
+    ``setdefault`` in the enrichers makes the merge deterministic: the detail
+    shown is always the most recent run's.
+    """
     details: dict[tuple, dict] = {}
-    for run_dir in project_dir.iterdir():
-        if not run_dir.is_dir():
-            continue
-        if len(details) >= len(keys):
+    for run_dir in run_dirs_newest_first(project_dir):
+        missing = keys.difference(details)
+        if not missing:
             break
-        _enrich_from_sql(run_dir, keys, details)
-        if len(details) >= len(keys):
-            break
-        _enrich_from_json_eval(run_dir, keys, details)
+        _enrich_from_sql(run_dir, missing, details)
+        missing = keys.difference(details)
+        if missing:
+            _enrich_from_json_eval(run_dir, missing, details)
     return details
 
 

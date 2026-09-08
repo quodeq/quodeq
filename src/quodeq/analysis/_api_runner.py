@@ -64,7 +64,10 @@ from quodeq.context.precedent import load_precedent_corpus, load_precedent_finge
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
-from quodeq.data.sqlite.findings_queries import read_dismissed_snippets
+from quodeq.data.sqlite.findings_queries import (
+    dismissed_source_stamp,
+    read_dismissed_snippets_strict,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -91,8 +94,13 @@ def _build_router_context(
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         project_shape = detect_shape(work_dir) if work_dir is not None else None
         trust_model = resolve_trust_model(work_dir) if work_dir is not None else None
+        # The strict reader raises on a failed open, so the per-run memo skips
+        # the run instead of remembering it as having no dismissals.
         precedents = (
-            load_precedent_fingerprints(project_dir, read_dismissed=read_dismissed_snippets)
+            load_precedent_fingerprints(
+                project_dir, read_dismissed=read_dismissed_snippets_strict,
+                source_stamp=dismissed_source_stamp,
+            )
             if project_dir else set()
         )
         corpus = (

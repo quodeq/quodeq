@@ -195,3 +195,27 @@ class _SlowPutCache:
 
     def stats(self):
         return self._inner.stats()
+
+
+class _CountingCache:
+    """Wraps a real cache backend and counts ``put`` calls."""
+
+    def __init__(self, inner: LocalFileBackend) -> None:
+        self._inner = inner
+        self.put_count = 0
+
+    def get(self, key):
+        return self._inner.get(key)
+
+    def put(self, key, entry) -> None:
+        self.put_count += 1
+        self._inner.put(key, entry)
+
+    def has(self, key) -> bool:
+        return self._inner.has(key)
+
+    def delete(self, key) -> None:
+        self._inner.delete(key)
+
+    def stats(self):
+        return self._inner.stats()

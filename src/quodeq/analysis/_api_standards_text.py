@@ -51,13 +51,16 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
         except OSError:
             pass
 
+    # Env-derived caps: read once per call, not once per candidate file.
+    size_cap = dispatch_policy.api_file_size_cap()
+    char_budget = _api_prompt_char_budget()
     # Filter out non-source dirs, dotdirs, empty files, and oversized files
     filtered = [
         f for f in all_files
         if f in stat_cache
         and not any(p in f.parts for p in _SKIP_DIRS)
         and not any(p.startswith(".") for p in f.relative_to(work_dir).parts)
-        and 0 < stat_cache[f] < dispatch_policy.api_file_size_cap()
+        and 0 < stat_cache[f] < size_cap
     ]
     # Prioritize code files over markup
     code_files = [f for f in filtered if f.suffix in _CODE_EXTS]
@@ -71,7 +74,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     total_chars = 0
     for f in code_files + markup_files:
         size = stat_cache[f]
-        if total_chars + size > _api_prompt_char_budget():
+        if total_chars + size > char_budget:
             continue
         selected.append(f)
         total_chars += size

@@ -99,3 +99,27 @@ def test_batch_rewrite_succeeds_replaces_all_grades(tmp_path: Path):
     dim_scores = store.read_dimension_scores()
     assert len(dim_scores) == 1
     assert dim_scores[0]["dimension"] == "Maintainability"
+
+
+def test_batch_rewrite_writes_every_row_with_all_columns(tmp_path: Path):
+    """Batched inserts must carry every row and column, exit_reason included."""
+    store = SQLiteStateStore(tmp_path)
+    principle_rows = [
+        ("Security", {"principle_id": "P2", "score": 6.0, "grade": "Adequate",
+                      "finding_count": 2, "dismissed_count": 1}),
+        ("Security", {"principle_id": "P1", "score": 8.0, "grade": "Good",
+                      "finding_count": 1, "dismissed_count": 0}),
+    ]
+    dimension_rows = [
+        {"dimension": "Security", "score": 7.0, "grade": "Good", "exit_reason": "budget"},
+        {"dimension": "Maintainability", "score": 9.0, "grade": "Exemplary"},
+    ]
+
+    store.batch_rewrite_grades(principle_rows, dimension_rows)
+
+    grades = store.read_principle_grades()
+    assert [(g["principle_id"], g["finding_count"], g["dismissed_count"]) for g in grades] == [
+        ("P1", 1, 0), ("P2", 2, 1),
+    ]
+    scores = {s["dimension"]: (s["score"], s["exit_reason"]) for s in store.read_dimension_scores()}
+    assert scores == {"Security": (7.0, "budget"), "Maintainability": (9.0, None)}

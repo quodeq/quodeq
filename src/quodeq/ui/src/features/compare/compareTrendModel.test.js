@@ -22,6 +22,19 @@ test('trendDomain: time bounds span the min/max timestamp across both series', (
   assert.equal(t1, Date.parse('2024-06-01'));
 });
 
+test('trendDomain: flattens the series once, deriving times and values from one pass', () => {
+  // Both axes come from the same flattened list; a second flat() would redo
+  // the allocation on every render of the duel trend.
+  let flatCalls = 0;
+  const a = [{ dateISO: '2024-01-01', value: 6 }];
+  const b = [{ dateISO: '2024-02-01', value: 8 }];
+  const series = { flat: () => { flatCalls += 1; return [...a, ...b]; } };
+  const { t0, t1, v0, v1 } = trendDomain(series);
+  assert.equal(flatCalls, 1);
+  assert.deepEqual([t0, t1], [Date.parse('2024-01-01'), Date.parse('2024-02-01')]);
+  assert.deepEqual([v0, v1], scoreDomain([6, 8]));
+});
+
 // ---------------------------------------------------------------------------
 // monotonePath — exact `d`-string (rounding + spline math frozen)
 // ---------------------------------------------------------------------------

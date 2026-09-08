@@ -15,8 +15,9 @@ The cache must be:
    must be the same regardless of whether the caller passes the path as
    a string or a ``Path``.
 
-A single process never swaps the underlying files (each ``quodeq evaluate``
-is fresh), so unbounded caching is safe within a run.
+Entries key on ``(path, size, mtime_ns)``, so an edited file misses on its
+own. The maps are bounded LRUs (see ``HashCache``): the module instance
+outlives a single run inside the server process.
 """
 from __future__ import annotations
 

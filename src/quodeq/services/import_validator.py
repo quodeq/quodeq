@@ -125,8 +125,6 @@ def scan_injection(data: dict) -> list[str]:
     warnings: list[str] = []
 
     def _check(text: str, location: str) -> None:
-        if not scan_text(text):
-            return
         for pattern in _INJECTION_PATTERNS:
             m = pattern.search(text)
             if m:

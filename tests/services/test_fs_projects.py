@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from quodeq.services._fs_project_index import build_project_index
 from quodeq.services._fs_projects import (
     _build_parent_child_sets,
     build_project_list,
@@ -163,6 +164,46 @@ class TestBuildProjectList:
         # Each directory should be read at most once
         assert call_count.get("proj1-uuid", 0) <= 1, f"proj1-uuid read {call_count.get('proj1-uuid', 0)} times"
         assert call_count.get("proj2-uuid", 0) <= 1, f"proj2-uuid read {call_count.get('proj2-uuid', 0)} times"
+
+
+# ---------------------------------------------------------------------------
+# build_project_index
+# ---------------------------------------------------------------------------
+
+
+class TestBuildProjectIndex:
+    def test_reads_repository_info_once_per_directory(self, tmp_path: Path, monkeypatch):
+        # The parent/child pass already parses every record; the entry pass
+        # must reuse it instead of re-reading the same file (finding 5451).
+        for name, extra in (("proj1-uuid", {}), ("proj2-uuid", {"parent": "parent-uuid"})):
+            proj = tmp_path / name
+            proj.mkdir()
+            (proj / "repository_info.json").write_text(json.dumps({
+                "name": name, "path": str(tmp_path), "location": "local", **extra,
+            }))
+
+        reads: dict[str, int] = {}
+        real_read_text = Path.read_text
+
+        def counting_read_text(self, *args, **kwargs):
+            if self.name == "repository_info.json":
+                reads[self.parent.name] = reads.get(self.parent.name, 0) + 1
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", counting_read_text)
+        entries = build_project_index(tmp_path)
+
+        assert {e.id for e in entries} == {"proj1-uuid", "proj2-uuid"}
+        assert reads == {"proj1-uuid": 1, "proj2-uuid": 1}
+
+    def test_registered_dir_with_corrupt_record_is_still_listed(self, tmp_path: Path):
+        # A corrupt repository_info.json still marks a registered project;
+        # the index lists it with fallback metadata rather than dropping it.
+        proj = tmp_path / "bad-uuid"
+        proj.mkdir()
+        (proj / "repository_info.json").write_text("{not json")
+        entries = build_project_index(tmp_path)
+        assert [e.id for e in entries] == ["bad-uuid"]
 
 
 # ---------------------------------------------------------------------------

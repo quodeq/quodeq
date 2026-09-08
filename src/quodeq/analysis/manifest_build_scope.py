@@ -10,11 +10,38 @@ from __future__ import annotations
 
 import os
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.analysis._ignore import is_ignored
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.config.discipline_registry import DisciplineRegistry
+
+
+def _scope_resolver(scope_paths: list[str]) -> Callable[[str], str | None]:
+    """Build the "deepest owning scope" lookup for one walk over *scope_paths*.
+
+    The walk resolves every file, so a per-file scan over all scopes made it
+    O(files * scopes). Instead, each lookup climbs the file's ancestors from
+    the deepest up and stops at the first that is a scope: O(path depth) set
+    probes, independent of how many scopes there are. The deepest ancestor is
+    the unique max-depth match, so the result equals the old linear scan.
+    ``"."`` is the depth-0 fallback for files no other scope covers.
+    """
+    scopes = frozenset(s for s in scope_paths if s != ".")
+    fallback = "." if "." in scope_paths else None
+
+    def resolve(rel_path: str) -> str | None:
+        path = rel_path
+        while True:
+            if path in scopes:
+                return path
+            cut = path.rfind("/")
+            if cut < 0:
+                return fallback
+            path = path[:cut]
+
+    return resolve
 
 
 def _deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
@@ -23,21 +50,9 @@ def _deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
     Used when partitioning files across subprojects in a monorepo. ``"."`` matches
     any file as a fallback. Returns ``None`` only when *scope_paths* is empty or
     contains no scope that covers the file (i.e. no ``"."`` and no ancestor scope).
+    One-off form of :func:`_scope_resolver`; the walk builds the resolver once.
     """
-    best: str | None = None
-    best_depth = -1
-    for scope in scope_paths:
-        if scope == ".":
-            depth = 0
-        else:
-            prefix = scope + "/"
-            if rel_path != scope and not rel_path.startswith(prefix):
-                continue
-            depth = scope.count("/") + 1
-        if depth > best_depth:
-            best = scope
-            best_depth = depth
-    return best
+    return _scope_resolver(scope_paths)(rel_path)
 
 
 def _walk_and_partition_by_scope(
@@ -66,14 +81,14 @@ def _walk_and_partition_by_scope(
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
     ext_counts_overall: Counter[str] = Counter()
     ext_counts_by_scope_lang: dict[str, dict[str, Counter]] = {s: {} for s in scope_paths}
-    all_extensions = set(ext_map.keys())
+    resolve_scope = _scope_resolver(scope_paths)
     for dirpath, dirnames, filenames in os.walk(src):
         dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
         if ignore_patterns:
             _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
-            if suffix not in all_extensions:
+            if suffix not in ext_map:
                 continue
             # Match the POSIX-style scope_paths from detect_matches_recursive
             # so prefix matching works on Windows.
@@ -82,7 +97,7 @@ def _walk_and_partition_by_scope(
                 continue
             if ignore_patterns and is_ignored(rel, ignore_patterns):
                 continue
-            owner = _deepest_scope(rel, scope_paths)
+            owner = resolve_scope(rel)
             if owner is None:
                 continue
             lang = ext_map.get(suffix, _UNKNOWN_LANG)

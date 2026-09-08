@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -164,6 +165,32 @@ class TestSalvagePartialFindings:
         assert len(findings) == 1
         assert findings[0]["req"] == "A-1"
         assert dropped == 0
+
+    _VALID = (
+        '{"req":"A-1","t":"violation","file":"a.py","line":1,'
+        '"severity":"minor","w":"w","snippet":"x","reason":"r"}'
+    )
+
+    def test_parse_findings_survives_interleaved_stray_openers(self):
+        # Local models sometimes wrap output in unbalanced brackets. Every
+        # stray opener is a failed decode the walk must step past without
+        # losing the real findings behind it.
+        raw = "{[" * 500 + self._VALID + " " + "]}" * 500 + self._VALID
+        findings, dropped = _parse_findings(raw)
+        assert [f["req"] for f in findings] == ["A-1", "A-1"]
+        assert dropped == 0
+
+    def test_parse_findings_stray_openers_scan_stays_linear(self):
+        # Thousands of stray "{" ahead of a long bracket-free tail. Re-scanning
+        # the tail for the far "[" after every failed decode made this take
+        # seconds; one forward search per hop keeps the walk linear.
+        raw = "{" * 16_000 + "x" * 8_000_000 + "[" + self._VALID + "]"
+        t0 = time.perf_counter()
+        findings, dropped = _parse_findings(raw)
+        elapsed = time.perf_counter() - t0
+        assert [f["req"] for f in findings] == ["A-1"]
+        assert dropped == 0
+        assert elapsed < 5.0, f"stray-opener walk took {elapsed:.2f}s (budget 5s; the old rescan needed seconds more)"
 
 
 # ---------------------------------------------------------------------------

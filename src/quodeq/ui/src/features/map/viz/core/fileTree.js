@@ -50,11 +50,23 @@ function aggregateUp(node, _depth = 0) {
       node.dimensions[dim].violations += counts.violations;
       node.dimensions[dim].compliance += counts.compliance;
     }
-    node.items.push(...child.items);
   }
   const total = node.violations + node.compliance;
   node.complianceRate = total > 0 ? node.compliance / total : 0;
   node.children.sort((a, b) => b.violations - a.violations);
+}
+
+/** Every finding under `node`, gathered on demand. Only leaves hold items:
+ *  copying them into each ancestor at build time cost O(items x depth) for
+ *  the one node the user eventually clicks. Walks _childMap, not children,
+ *  because children are re-sorted by violations and rewired by
+ *  collapseSingleChildren; _childMap keeps the payload order the eager copy
+ *  had, which is the order FileDetailPage lists. */
+function collectItems(node, out = [], _depth = 0) {
+  if (_depth > _MAX_TREE_DEPTH) return out;
+  for (const item of node.items) out.push(item);
+  for (const child of node._childMap.values()) collectItems(child, out, _depth + 1);
+  return out;
 }
 
 function collapseSingleChildren(node, _depth = 0) {
@@ -78,8 +90,9 @@ function collapseSingleChildren(node, _depth = 0) {
 /** Convert a tree node into a file object, optionally filtered by severity.
  *  severity: null = all violations, 'critical'|'major'|'minor' = filtered, 'all' = violations + compliance */
 export function treeNodeToFileObj(node, { severity } = {}) {
-  let violations = node.items.filter((i) => i.type === 'violation');
-  let compliance = node.items.filter((i) => i.type === 'compliance');
+  const items = collectItems(node);
+  let violations = items.filter((i) => i.type === 'violation');
+  let compliance = items.filter((i) => i.type === 'compliance');
   if (severity && severity !== 'all') {
     violations = violations.filter((v) => (v.severity || 'minor') === severity);
     compliance = []; // severity filter shows only violations

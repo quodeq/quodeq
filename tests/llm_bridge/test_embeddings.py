@@ -6,6 +6,7 @@ import pytest
 from quodeq.llm_bridge._embeddings import (
     BATCH_TIMEOUT,
     QUERY_TIMEOUT,
+    EmbeddingAvailabilityCache,
     _client_kwargs,
     _v1_base,
     embed_texts,
@@ -88,6 +89,22 @@ def test_availability_missing_model() -> None:
 
 def test_availability_permissive_for_non_ollama_base() -> None:
     assert embedding_model_available("anything", "http://lan-box:8080")
+
+
+def test_availability_cache_is_bounded_and_treats_false_as_a_hit() -> None:
+    """Capacity is wired through to the shared LRU (whose eviction order is
+    pinned in tests/shared/test_lru.py); a cached False is a hit, not a miss."""
+    cache = EmbeddingAvailabilityCache(max_entries=1)
+    cache.set(("m1", "u"), False)
+    assert cache.get(("m1", "u")) is False
+    cache.set(("m2", "u"), True)
+    assert cache.get(("m1", "u")) is None    # evicted at capacity
+    assert cache.get(("m2", "u")) is True
+
+
+def test_availability_cache_rejects_zero_capacity() -> None:
+    with pytest.raises(ValueError):
+        EmbeddingAvailabilityCache(max_entries=0)
 
 
 def test_timeout_profiles_are_short() -> None:

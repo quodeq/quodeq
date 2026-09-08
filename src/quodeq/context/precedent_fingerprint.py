@@ -16,12 +16,23 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import threading
 from pathlib import Path
 
-from quodeq.data.ports.precedents import DismissedSnippetsReader
+from quodeq.data.ports.precedents import DismissedSnippetsReader, DismissedSourceStamp
+from quodeq.shared.lru import LRUDict
 
 _WS_RE = re.compile(r"\s+")
 _logger = logging.getLogger(__name__)
+
+# Per-run memo: run_dir -> (source stamp, fingerprints read under that stamp).
+# Every scan used to open and query every run's DB again; keying the read on
+# a cheap stamp makes a settled history cost one stat per run, not one query.
+# Bounded LRU so a long-lived server never grows without limit across projects.
+PrecedentMemo = LRUDict[Path, tuple[object, frozenset[str]]]
+_MEMO_MAX_RUNS = 4096
+_memo: PrecedentMemo = LRUDict(_MEMO_MAX_RUNS)
+_memo_lock = threading.Lock()
 
 
 def _normalize_snippet(snippet: str | None) -> str:
@@ -62,8 +73,43 @@ def precedent_text(req: str | None, snippet: str | None) -> str | None:
     return f"{req_part}\n\n{norm}"
 
 
+def _memo_get(cache: PrecedentMemo, run_dir: Path, stamp: object) -> frozenset[str] | None:
+    """Fingerprints memoized for *run_dir* under exactly *stamp*, else None."""
+    with _memo_lock:
+        hit = cache.get(run_dir)
+    if hit is None or hit[0] != stamp:
+        return None
+    return hit[1]
+
+
+def _memo_put(cache: PrecedentMemo, run_dir: Path, stamp: object, fps: frozenset[str]) -> None:
+    with _memo_lock:
+        cache.put(run_dir, (stamp, fps))
+
+
+def _read_run_fingerprints(
+    run_dir: Path, read_dismissed: DismissedSnippetsReader,
+) -> frozenset[str] | None:
+    """Fingerprints of *run_dir*'s dismissals, or None when the read failed.
+
+    None rather than an empty set so a locked DB is retried on the next scan
+    instead of being remembered as having no precedents.
+    """
+    try:
+        entries = list(read_dismissed(run_dir))
+    except Exception as exc:  # noqa: BLE001 - missing/locked DBs must not fail a scan
+        _logger.warning("Skipping precedent read for %s: %s", run_dir, exc)
+        return None
+    fps = (fingerprint(req, snippet) for req, snippet in entries)
+    return frozenset(fp for fp in fps if fp is not None)
+
+
 def load_precedent_fingerprints(
-    project_dir: Path, *, read_dismissed: DismissedSnippetsReader,
+    project_dir: Path,
+    *,
+    read_dismissed: DismissedSnippetsReader,
+    source_stamp: DismissedSourceStamp,
+    cache: PrecedentMemo | None = None,
 ) -> set[str]:
     """Load fingerprints for every dismissed finding in *project_dir*.
 
@@ -71,34 +117,37 @@ def load_precedent_fingerprints(
     or locked DBs are skipped -- precedent matching degrades gracefully and
     never breaks a scan.
 
-    *read_dismissed* is the injected Protocol seam (see
-    ``data/ports/precedents.py``); this module never imports the concrete
-    SQLite adapter itself. Composition roots wire the production default --
-    ``quodeq.data.sqlite.findings_queries.read_dismissed_snippets`` -- at
-    their own call sites (``analysis/_api_runner.py::_build_router_context``,
-    ``analysis/mcp/findings_server.py::_build_router``); tests inject a fake
-    reader directly.
+    Each run is read at most once per *source_stamp* value (None means the
+    run has no source and is skipped outright); the fingerprints read under
+    a stamp live in a bounded module-level memo, so a settled history costs
+    one stat per run on later scans instead of one DB open and query. Failed
+    reads are not memoized. Tests may pass their own *cache* for isolation.
 
-    Legacy note: prior to PR 1 (live-grades), dismissals were stored in
-    ``<project_dir>/dismissed.json``. The migration in
-    ``data/migrations/dismissed_json_to_actions_log.py`` folds those legacy
-    entries into ``actions.jsonl`` on first projection, so once a project has
-    been opened post-deploy the SQL rows also capture the historical data.
+    *read_dismissed* and *source_stamp* are the injected seams (see
+    ``data/ports/precedents.py``); this module never imports the concrete
+    SQLite adapter. Composition roots wire the production defaults from
+    ``quodeq.data.sqlite.findings_queries`` (``read_dismissed_snippets_strict``,
+    ``dismissed_source_stamp``) at ``analysis/_api_runner.py::
+    _build_router_context`` and ``analysis/mcp/findings_server.py::
+    _build_router``. Legacy ``<project_dir>/dismissed.json`` entries reach
+    the SQL rows via ``data/migrations/dismissed_json_to_actions_log.py``.
     """
     if not project_dir or not project_dir.is_dir():
         return set()
 
+    memo = _memo if cache is None else cache
     out: set[str] = set()
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        try:
-            entries = list(read_dismissed(run_dir))
-        except Exception as exc:  # noqa: BLE001 - missing/locked DBs must not fail a scan
-            _logger.warning("Skipping precedent read for %s: %s", run_dir, exc)
+        stamp = source_stamp(run_dir)
+        if stamp is None:
             continue
-        for req, snippet in entries:
-            fp = fingerprint(req, snippet)
-            if fp is not None:
-                out.add(fp)
+        fps = _memo_get(memo, run_dir, stamp)
+        if fps is None:
+            fps = _read_run_fingerprints(run_dir, read_dismissed)
+            if fps is None:
+                continue
+            _memo_put(memo, run_dir, stamp, fps)
+        out |= fps
     return out

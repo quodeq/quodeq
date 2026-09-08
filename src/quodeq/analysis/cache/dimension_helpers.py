@@ -17,7 +17,10 @@ These are pure functions used by the V2 dimension processor (Phase B5):
   - ``persist_dispatch_results``: after a dispatch run writes its JSONL,
     group its findings by file and write per-file cache entries for the
     files that were actually dispatched. Empty-finding files get an
-    empty entry — a clean analysis is still a hit, not a miss.
+    empty entry — a clean analysis is still a hit, not a miss. The
+    periodic-persist watcher passes a ``DispatchJsonlState``
+    (``_jsonl_state.py``) so each tick reads only appended lines and
+    rewrites only the files they touched.
 
 These helpers compose into the canonical V2 dimension processor in
 ``cache/dimension_runner.py``.
@@ -27,13 +30,13 @@ Cache-key composition and provenance-drift tracking live in
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache._adoption import try_adopt
+from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import (
     _SCHEMA_VERSION,
     _accumulate_drift,
@@ -177,39 +180,29 @@ def classify_files_via_cache(
 def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
     """Read a JSONL of findings + markers and return (grouped_findings, ok_files).
 
+    One-shot form of ``DispatchJsonlState`` for callers that read a finished
+    file once (replay, tests); the watcher keeps one state across ticks.
     Marker lines are recognised by the ``_marker`` key and excluded from the
     grouped findings. ``ok_files`` contains the set of files whose *most
     recent* file_done marker has status='ok'. Files whose latest marker is
     'error' (or have no marker at all) are not in the set.
     """
-    grouped: dict[str, list[dict]] = {}
-    last_status: dict[str, str] = {}
-    if not jsonl_path.is_file():
-        return grouped, set()
+    state = DispatchJsonlState()
+    if not _advance_or_warn(state, jsonl_path, include_tail=True):
+        return {}, set()
+    return state.grouped, state.ok_files()
+
+
+def _advance_or_warn(
+    state: DispatchJsonlState, jsonl_path: Path, *, include_tail: bool,
+) -> bool:
+    """Advance *state*; an unreadable JSONL is logged here and yields False."""
     try:
-        text = jsonl_path.read_text(encoding="utf-8")
+        state.advance(jsonl_path, include_tail=include_tail)
     except OSError as exc:
         _logger.warning("failed to read JSONL %s: %s", jsonl_path, exc)
-        return grouped, set()
-    for raw in text.splitlines():
-        raw = raw.strip()
-        if not raw:
-            continue
-        try:
-            entry = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        if entry.get("_marker") == "file_done":
-            f = entry.get("file")
-            status = entry.get("status")
-            if isinstance(f, str) and status in ("ok", "error"):
-                last_status[f] = status
-            continue
-        f = entry.get("file")
-        if isinstance(f, str) and f:
-            grouped.setdefault(f, []).append(entry)
-    ok_files = {f for f, s in last_status.items() if s == "ok"}
-    return grouped, ok_files
+        return False
+    return True
 
 
 def _build_cache_entry_for_file(
@@ -253,7 +246,7 @@ def persist_dispatch_results(
     config: RunConfig, dimension: str, *, miss_files: list[str],
     jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
     standards_hash: str, params_hash: str, effective_params: dict,
-    prompts_hash: str,
+    prompts_hash: str, state: DispatchJsonlState | None = None,
 ) -> None:
     """Write per-file cache entries for files with a file_done='ok' marker.
 
@@ -266,22 +259,35 @@ def persist_dispatch_results(
     once and pass them in, rather than this function recomputing them on
     every call — this is invoked on a fixed interval by the periodic-persist
     watcher for the life of one dispatch.
+
+    For the same reason the watcher passes one *state* per dispatch: a tick
+    then reads only the lines appended since the previous one and rewrites
+    only the ok files those lines touched. Without *state* the call is
+    one-shot and persists every ok file in the JSONL.
     """
     if not jsonl_path.is_file():
         return
-    grouped, ok_files = _group_findings_by_file(jsonl_path)
+    one_shot = state is None
+    if state is None:
+        state = DispatchJsonlState()
+    if not _advance_or_warn(state, jsonl_path, include_tail=one_shot):
+        return
+    ok_files = state.ok_files()
     model_id = _model_id_from(config)
     version = quodeq_version()
     for f in miss_files:
-        if f not in ok_files:
+        if f not in ok_files or f not in state.dirty:
             continue
         key = miss_keys.get(f)
         if key is None:
             _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
             continue
         entry = _build_cache_entry_for_file(
-            config, dimension, f, key, grouped,
+            config, dimension, f, key, state.grouped,
             model_id=model_id, standards_hash=standards_hash, prompts_hash=prompts_hash,
             effective_params=effective_params, version=version, params_hash=params_hash,
         )
         cache.put(key, entry)
+    # A raising put keeps dirty for the next tick. A put that fails silently
+    # (LocalFileBackend swallows OSError) is redone by the final full re-read.
+    state.dirty.clear()

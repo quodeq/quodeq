@@ -10,14 +10,23 @@ where this module happens to live.
 ``_periodic_persist`` takes a ``log_warning`` callable rather than owning
 its own logger, so this module has no logging import of its own -- the
 caller threads its module logger's ``.warning`` method through.
+
+``_make_persist_fn`` builds the callable the thread runs. It binds the
+dispatch-constant provenance hashes and one ``DispatchJsonlState``. Ticks
+read the JSONL incrementally through that state; the final persist (once
+``stop_event`` is set) resets it first and re-reads the whole file.
 """
 from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from pathlib import Path
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
+from quodeq.analysis.cache.backend import CacheBackend
+from quodeq.analysis.cache.dimension_helpers import ClassifyResult, persist_dispatch_results
 from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
 
 # How often the watcher thread persists in-flight cache entries during
@@ -48,6 +57,38 @@ def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> dict:
     }
 
 
+def _make_persist_fn(
+    config: RunConfig, dim_id: str, jsonl: Path, classify: ClassifyResult,
+    cache: CacheBackend, stop_event: threading.Event,
+) -> Callable[[], None]:
+    """Build the watcher's persist callable for one dispatch.
+
+    One ``DispatchJsonlState`` for the whole dispatch means each tick reads
+    only the JSONL lines appended since the previous call and rewrites only
+    the files those lines touched, instead of re-parsing and re-putting
+    everything every interval.
+
+    The final persist, the call made after *stop_event* is set, does not
+    trust that state: the pool rewrites the JSONL in place (dedup) before
+    the watcher is joined, and ``LocalFileBackend.put`` swallows OSError, so
+    a tick may have cleared ``dirty`` for a file whose entry never landed.
+    Resetting first marks every ok file dirty again, so the final persist
+    re-puts all of them, as the pre-incremental one did.
+    """
+    hash_inputs = _compute_persist_hash_inputs(config, dim_id)
+    state = DispatchJsonlState()
+
+    def _persist_now() -> None:
+        if stop_event.is_set():
+            state.reset()
+        persist_dispatch_results(
+            config, dim_id, miss_files=classify.misses, cache=cache,
+            jsonl_path=jsonl, miss_keys=classify.miss_keys, state=state, **hash_inputs,
+        )
+
+    return _persist_now
+
+
 def _resolve_failure_streak_threshold(
     opts: AnalysisOptions, *, override: int | None = None,
 ) -> int:
@@ -68,8 +109,8 @@ def _periodic_persist(
     """Background thread: call persist_fn() until stop_event is set.
 
     Each tick is best-effort -- exceptions never propagate to the caller
-    and never kill the watcher. Final persist happens on stop signal so
-    the watcher's last-known state is also written to cache.
+    and never kill the watcher. Final persist happens on stop signal;
+    persist_fn sees the event set and re-reads the JSONL in full.
     """
     while not stop_event.wait(timeout=interval):
         try:

@@ -79,10 +79,10 @@ def _backfill_missing(
     """Embed still-missing fingerprints up to the time/size budget.
 
     Called only while holding the exclusive backfill claim (single writer),
-    so it reads the stored set once and tracks inserts locally instead of
-    re-querying the whole (growing) table on every chunk -- that was an N+1
-    scan whose cost climbed with the corpus size. Returns how many were
-    newly embedded.
+    so it reads the stored set once and computes the missing list once, then
+    slices each chunk off that list. Re-querying the table per chunk was an
+    N+1 scan, and rescanning ``texts`` per chunk made the loop quadratic in
+    the corpus size. Returns how many were newly embedded.
 
     ``_BACKFILL_CHUNK`` is read off the facade module (``context.precedent``)
     rather than this module's own global, so a test's
@@ -94,11 +94,12 @@ def _backfill_missing(
     embedded_new = 0
     deadline = time.monotonic() + _BACKFILL_BUDGET_S
     stored = store.stored_fingerprints(conn)
-    while time.monotonic() < deadline:
-        missing = [fp for fp in texts if fp not in stored]
-        if not missing:
+    missing = [fp for fp in texts if fp not in stored]
+    chunk_size = _facade._BACKFILL_CHUNK
+    for start in range(0, len(missing), chunk_size):
+        if time.monotonic() >= deadline:
             break
-        chunk = missing[:_facade._BACKFILL_CHUNK]
+        chunk = missing[start:start + chunk_size]
         try:
             vecs = embed_fn([texts[fp] for fp in chunk], timeout=batch_timeout)
         except Exception as exc:  # noqa: BLE001 -- partial corpus is fine
@@ -106,7 +107,6 @@ def _backfill_missing(
             break
         if not store.insert_vectors(conn, model, list(zip(chunk, vecs))):
             break
-        stored.update(chunk)
         embedded_new += len(chunk)
     return embedded_new
 

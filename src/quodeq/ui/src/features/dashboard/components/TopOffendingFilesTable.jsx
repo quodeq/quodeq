@@ -7,16 +7,13 @@ import { memo } from 'react';
 import { GridTable, GridRow, GridCell, SevBadge } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 
-function basenameOf(filepath) {
-  if (!filepath) return '';
+/** Basename and directory from a single lastIndexOf, computed once per row. */
+function splitPath(filepath) {
+  if (!filepath) return { name: '', dir: '' };
   const idx = filepath.lastIndexOf('/');
-  return idx >= 0 ? filepath.slice(idx + 1) : filepath;
-}
-
-function dirnameOf(filepath) {
-  if (!filepath) return '';
-  const idx = filepath.lastIndexOf('/');
-  return idx >= 0 ? filepath.slice(0, idx) : '';
+  return idx >= 0
+    ? { name: filepath.slice(idx + 1), dir: filepath.slice(0, idx) }
+    : { name: filepath, dir: '' };
 }
 
 const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick }) {
@@ -31,29 +28,30 @@ const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onF
         <GridCell>{t('overview.sevCol')}</GridCell>
       </GridRow>
 
-      {list.map((f, idx) => (
-        <GridRow
-          key={idx}
-          onClick={onFileClick ? () => onFileClick(f) : undefined}
-        >
-          <GridCell>
-            <div className="offending-file-cell">
-              <span className="offending-file-name">{basenameOf(f.file)}</span>
-              {dirnameOf(f.file) && (
-                <span className="offending-file-path">{dirnameOf(f.file)}</span>
-              )}
-            </div>
-          </GridCell>
-          <GridCell numeric>{f.total}</GridCell>
-          <GridCell>
-            <span className="offending-file-tags">
-              {f.critical > 0 && <SevBadge level="critical" count={f.critical} format="count-abbr" />}
-              {f.major    > 0 && <SevBadge level="major"    count={f.major}    format="count-abbr" />}
-              {f.minor    > 0 && <SevBadge level="minor"    count={f.minor}    format="count-abbr" />}
-            </span>
-          </GridCell>
-        </GridRow>
-      ))}
+      {list.map((f, idx) => {
+        const { name, dir } = splitPath(f.file);
+        return (
+          <GridRow
+            key={idx}
+            onClick={onFileClick ? () => onFileClick(f) : undefined}
+          >
+            <GridCell>
+              <div className="offending-file-cell">
+                <span className="offending-file-name">{name}</span>
+                {dir && <span className="offending-file-path">{dir}</span>}
+              </div>
+            </GridCell>
+            <GridCell numeric>{f.total}</GridCell>
+            <GridCell>
+              <span className="offending-file-tags">
+                {f.critical > 0 && <SevBadge level="critical" count={f.critical} format="count-abbr" />}
+                {f.major    > 0 && <SevBadge level="major"    count={f.major}    format="count-abbr" />}
+                {f.minor    > 0 && <SevBadge level="minor"    count={f.minor}    format="count-abbr" />}
+              </span>
+            </GridCell>
+          </GridRow>
+        );
+      })}
     </GridTable>
   );
 });

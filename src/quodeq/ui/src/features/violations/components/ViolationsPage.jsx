@@ -8,6 +8,8 @@ import { useViolationsPageState } from '../hooks/useViolationsPageState.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 
+// buildFileTree nests one node per path segment with no cap, so every walker
+// below guards its own recursion depth; past it the path is treated as absent.
 const MAX_TREE_DEPTH = 64;
 
 function findSubtree(root, path) {
@@ -24,11 +26,14 @@ function findSubtree(root, path) {
   return walk(root) || root;
 }
 
-function findParentPath(root, currentPath) {
-  function walk(node, parentPath) {
+// findParentPath and buildBreadcrumbPath are exported for
+// ViolationsPage.treeWalk.test.jsx.
+export function findParentPath(root, currentPath) {
+  function walk(node, parentPath, depth = 0) {
+    if (depth > MAX_TREE_DEPTH) return null;
     if (node.path === currentPath) return parentPath;
     for (const child of node.children) {
-      const found = walk(child, node.path);
+      const found = walk(child, node.path, depth + 1);
       if (found !== null) return found;
     }
     return null;
@@ -36,13 +41,14 @@ function findParentPath(root, currentPath) {
   return walk(root, '') || '';
 }
 
-function buildBreadcrumbPath(root, path) {
+export function buildBreadcrumbPath(root, path) {
   if (!path) return [];
   const segments = [];
-  function walk(node) {
+  function walk(node, depth = 0) {
+    if (depth > MAX_TREE_DEPTH) return false;
     if (node.path === path) { segments.push({ name: node.name, path: node.path }); return true; }
     for (const child of node.children) {
-      if (walk(child)) { segments.unshift({ name: node.name, path: node.path }); return true; }
+      if (walk(child, depth + 1)) { segments.unshift({ name: node.name, path: node.path }); return true; }
     }
     return false;
   }

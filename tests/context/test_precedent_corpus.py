@@ -20,6 +20,51 @@ def _unit(vec: list[float]) -> list[float]:
     return [x / n for x in vec]
 
 
+def test_backfill_scans_the_corpus_once_not_per_chunk(monkeypatch) -> None:
+    """The missing list is computed once and each chunk sliced off it.
+
+    Rescanning every fingerprint per chunk made the backfill quadratic in
+    the corpus size. A dict that counts its own iterations proves one pass.
+    """
+    from quodeq.context.precedent_store import _backfill_missing
+
+    monkeypatch.setattr("quodeq.context.precedent._BACKFILL_CHUNK", 1)
+    iterations = [0]
+
+    class CountingTexts(dict):
+        def __iter__(self):
+            iterations[0] += 1
+            return super().__iter__()
+
+    texts = CountingTexts({"fp1": "t1", "fp2": "t2", "fp3": "t3"})
+    inserted: list[str] = []
+    batches: list[list[str]] = []
+
+    def insert(conn, model, pairs) -> bool:
+        inserted.extend(fp for fp, _ in pairs)
+        return True
+
+    def embed(batch, **kwargs):
+        batches.append(list(batch))
+        return [[1.0, 0.0] for _ in batch]
+
+    store = VectorStoreFns(
+        open_vector_store=lambda project_dir, model: None,
+        load_vectors=lambda conn: [],
+        insert_vectors=insert,
+        stored_fingerprints=lambda conn: set(),
+        try_claim_backfill=lambda conn: True,
+        release_backfill_claim=lambda conn: None,
+    )
+
+    n = _backfill_missing(store, object(), "m", texts, embed, batch_timeout=None)
+
+    assert n == 3
+    assert batches == [["t1"], ["t2"], ["t3"]]
+    assert inserted == ["fp1", "fp2", "fp3"]
+    assert iterations[0] == 1
+
+
 def _corpus(tmp_path: Path, vectors, embed, threshold=0.85) -> PrecedentCorpus:
     return PrecedentCorpus(
         vectors=vectors, embed=embed, threshold=threshold,

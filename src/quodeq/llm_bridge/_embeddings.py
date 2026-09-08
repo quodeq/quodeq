@@ -18,6 +18,8 @@ try:
 except ImportError:
     openai = None  # type: ignore[assignment]
 
+from quodeq.shared.lru import LRUDict
+
 BATCH_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
 QUERY_TIMEOUT = httpx.Timeout(connect=10.0, read=10.0, write=30.0, pool=10.0)
 
@@ -78,15 +80,18 @@ def embed_texts(
 
 
 class EmbeddingAvailabilityCache:
-    """Lock-guarded per-process cache of (model, base_url) -> availability.
+    """Lock-guarded per-process LRU of (model, base_url) -> availability.
 
-    Instantiable so tests get isolated caches; production shares the
-    module-default instance below.
+    Bounded so a caller cycling through base URLs (misconfiguration, or a
+    bug) cannot grow it for the process lifetime. Real deployments touch a
+    handful of keys, so the default capacity is never reached and behaves
+    like the plain dict it replaces. Instantiable so tests get isolated
+    caches; production shares the module-default instance below.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_entries: int = 64) -> None:
         self._lock = threading.Lock()
-        self._cache: dict[tuple[str, str], bool] = {}
+        self._cache: LRUDict[tuple[str, str], bool] = LRUDict(max_entries)
 
     def get(self, key: tuple[str, str]) -> bool | None:
         with self._lock:
@@ -94,7 +99,7 @@ class EmbeddingAvailabilityCache:
 
     def set(self, key: tuple[str, str], value: bool) -> None:
         with self._lock:
-            self._cache[key] = value
+            self._cache.put(key, value)
 
     def clear(self) -> None:
         with self._lock:

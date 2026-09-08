@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFileTree } from '../viz/core/fileTree.js';
+import { buildFileTree, treeNodeToFileObj } from '../viz/core/fileTree.js';
 
 test('buildFileTree returns root node with empty dimensions', () => {
   const tree = buildFileTree([]);
@@ -113,4 +113,45 @@ test('buildFileTree does not stack-overflow on a deeply nested branching tree', 
     violations,
   }];
   assert.doesNotThrow(() => buildFileTree(dimensions));
+});
+
+test('folders do not eagerly copy descendant items; treeNodeToFileObj still aggregates the subtree', () => {
+  const dimensions = [{
+    dimension: 'Security',
+    violations: [
+      { file: 'src/api/routes.py', severity: 'minor', principle: 'P1' },
+      { file: 'src/auth/login.py', severity: 'critical', principle: 'P2' },
+      { file: 'src/auth/login.py', severity: 'minor', principle: 'P3' },
+    ],
+    compliance: [{ file: 'src/auth/login.py', principle: 'P4' }],
+  }];
+  const tree = buildFileTree(dimensions);
+  const src = tree.children[0];
+  // Each leaf's items used to be copied into every ancestor at build time.
+  assert.equal(tree.items.length, 0);
+  assert.equal(src.items.length, 0);
+  const obj = treeNodeToFileObj(src);
+  assert.equal(obj.total, 3);
+  assert.equal(obj.critical, 1);
+  assert.equal(obj.minor, 2);
+  assert.equal(obj.compliance.length, 1);
+  assert.deepEqual(obj.dimensions, ['Security']);
+  assert.equal(obj.principlesCount, 3);
+  // Payload order is kept even though children are re-sorted by violations
+  // (login.py first): FileDetailPage lists findings in this order.
+  assert.deepEqual(obj.violationsBySeverity.minor.map((v) => v.principle), ['P1', 'P3']);
+  assert.equal(treeNodeToFileObj(src, { severity: 'critical' }).total, 1);
+});
+
+test('treeNodeToFileObj aggregates through collapsed single-child folders', () => {
+  const dimensions = [{
+    dimension: 'Security',
+    violations: [{ file: 'java/app/src/Main.java', severity: 'major', principle: 'P1' }],
+    compliance: [],
+  }];
+  const tree = buildFileTree(dimensions);
+  const collapsed = tree.children[0];
+  assert.equal(collapsed.name, 'java/app/src');
+  assert.equal(treeNodeToFileObj(collapsed).total, 1);
+  assert.equal(treeNodeToFileObj(tree).total, 1);
 });

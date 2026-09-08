@@ -113,37 +113,81 @@ def _read_published_json(entry: Path) -> dict | None:
     return {"publishedBy": by, "publishedAt": at}
 
 
+# Pathspecs per ``git log`` call. One argv naming every legacy dir hits the
+# OS command-line limit past a few thousand entries, and that OSError used
+# to drop attribution for all of them at once.
+_GIT_LOG_PATHSPEC_BATCH = 100
+
+
+def _legacy_git_attribution(repo: Path, names: list[str]) -> dict[str, dict]:
+    """Author and commit time of the newest commit touching each
+    ``evaluations/<name>``, from one ``git log`` walk per batch of *names*.
+
+    Commits come newest first, so the first one listing a file under a dir
+    is the commit ``git log -1 -- evaluations/<name>`` would report, without
+    a subprocess per dir. ``-z`` keeps paths unquoted and NUL-terminated so
+    a non-ASCII dir name still matches ``entry.name``. Merge commits list no
+    files and so never win; that only differs from ``-1`` on a merge that
+    itself changed a project dir, which the shared clone's linear history
+    (commit + push, fetch + reset) does not produce. A failed batch drops
+    attribution for its own names only.
+    """
+    result: dict[str, dict] = {}
+    for start in range(0, len(names), _GIT_LOG_PATHSPEC_BATCH):
+        batch = names[start:start + _GIT_LOG_PATHSPEC_BATCH]
+        ok, out = run_git(
+            ["log", "-z", "--format=%x1f%an|%ct", "--name-only", "--", *(f"evaluations/{n}" for n in batch)],
+            cwd=repo,
+        )
+        if ok:
+            result.update(_parse_attribution_log(out, set(batch)))
+    return result
+
+
+def _parse_attribution_log(out: str, wanted: set[str]) -> dict[str, dict]:
+    """Newest commit per *wanted* dir from ``git log -z --name-only`` output."""
+    result: dict[str, dict] = {}
+    meta: dict | None = None
+    for token in out.split("\x00"):
+        if token.startswith("\x1f"):
+            author, _, ts = token[1:].rpartition("|")
+            try:
+                meta = {"publishedBy": author, "publishedAt": int(ts)}
+            except ValueError:
+                meta = None
+            continue
+        parts = token.lstrip("\n").split("/", 2)
+        if meta is None or len(parts) < 2 or parts[0] != "evaluations":
+            continue
+        if parts[1] in wanted and parts[1] not in result:
+            result[parts[1]] = meta
+    return result
+
+
 def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
     """Attribution per published project: who published it, and when.
 
     Prefers the published.json written by stage_project at publish time
     (see shared_publish.py). Falls back to the legacy git-log-derived
-    lookup for project dirs published before that file existed. The
-    fallback is only correct because the clone is full history (no
-    --depth) -- a shallow clone made `git log -1 -- path` return the tip
-    commit for every path, misattributing every project except the most
-    recently pushed one (audit finding C1).
+    lookup, batched 100 pathspecs per git call over the project dirs
+    published before that file existed. The fallback is only correct because the
+    clone is full history (no --depth) -- a shallow clone made `git log -1
+    -- path` return the tip commit for every path, misattributing every
+    project except the most recently pushed one (audit finding C1).
     """
     repo = shared_repo_path(url, env)
     root = shared_evaluations_root(url, env)
     result: dict[str, dict] = {}
     if not root.is_dir():
         return result
+    legacy: list[str] = []
     for entry in sorted(root.iterdir()):
         if not entry.is_dir():
             continue
         meta = _read_published_json(entry)
         if meta is not None:
             result[entry.name] = meta
-            continue
-        ok, out = run_git(
-            ["log", "-1", "--format=%an|%ct", "--", f"evaluations/{entry.name}"],
-            cwd=repo,
-        )
-        if ok and "|" in out:
-            author, _, ts = out.strip().rpartition("|")
-            try:
-                result[entry.name] = {"publishedBy": author, "publishedAt": int(ts)}
-            except ValueError:
-                continue
+        else:
+            legacy.append(entry.name)
+    result.update(_legacy_git_attribution(repo, legacy))
     return result

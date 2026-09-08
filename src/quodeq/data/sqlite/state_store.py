@@ -169,28 +169,27 @@ class SQLiteStateStore(_StateStoreMetaMixin):
         with self._db() as conn:
             conn.execute("DELETE FROM dimension_scores")
             conn.execute("DELETE FROM principle_grades")
-            for dim, p_grade in principle_rows:
-                conn.execute(
-                    "INSERT INTO principle_grades "
-                    "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
-                    (
-                        dim,
-                        p_grade["principle_id"],
-                        p_grade["score"],
-                        p_grade["grade"],
-                        p_grade["finding_count"],
-                        p_grade["dismissed_count"],
-                    ),
-                )
-            for d_score in dimension_rows:
-                conn.execute(
-                    "INSERT INTO dimension_scores "
-                    "(dimension, score, grade, exit_reason, completed_at) "
-                    "VALUES (?, ?, ?, ?, datetime('now'))",
-                    (d_score["dimension"], d_score["score"], d_score["grade"],
-                     d_score.get("exit_reason")),
-                )
+            # One prepared statement per table instead of one Python/SQLite
+            # round-trip per row; rows land in the order given.
+            conn.executemany(
+                "INSERT INTO principle_grades "
+                "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+                [
+                    (dim, p["principle_id"], p["score"], p["grade"],
+                     p["finding_count"], p["dismissed_count"])
+                    for dim, p in principle_rows
+                ],
+            )
+            conn.executemany(
+                "INSERT INTO dimension_scores "
+                "(dimension, score, grade, exit_reason, completed_at) "
+                "VALUES (?, ?, ?, ?, datetime('now'))",
+                [
+                    (d["dimension"], d["score"], d["grade"], d.get("exit_reason"))
+                    for d in dimension_rows
+                ],
+            )
             conn.commit()
 
     def clear_grades(self) -> None:

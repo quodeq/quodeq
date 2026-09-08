@@ -15,9 +15,16 @@
  *
  * This is deliberately session-only and not persisted to storage — page
  * reloads start fresh, which matches the user's existing expectation.
+ *
+ * Each namespace keeps at most MAX_SCOPES_PER_NAMESPACE scopes, least
+ * recently used first out, so a long session hopping across many projects
+ * cannot grow the cache without bound.
  */
 
-const STORES = new Map(); // namespace -> Map<scope, state object>
+// Scopes are project ids, so this is "how many projects' page state to keep".
+export const MAX_SCOPES_PER_NAMESPACE = 50;
+
+const STORES = new Map(); // namespace -> Map<scope, state object>, oldest first
 
 function storeFor(namespace) {
   let s = STORES.get(namespace);
@@ -28,17 +35,28 @@ function storeFor(namespace) {
   return s;
 }
 
+// Map iteration is insertion-ordered, so re-inserting on every touch keeps
+// the least recently used scope at the front for eviction.
+function touch(store, key, value) {
+  store.delete(key);
+  store.set(key, value);
+}
+
 export function readCachedState(namespace, scope, defaults) {
-  const existing = storeFor(namespace).get(scope || '__global__');
-  if (existing) return { ...defaults, ...existing };
-  return { ...defaults };
+  const key = scope || '__global__';
+  const store = storeFor(namespace);
+  const existing = store.get(key);
+  if (!existing) return { ...defaults };
+  touch(store, key, existing);
+  return { ...defaults, ...existing };
 }
 
 export function writeCachedState(namespace, scope, patch) {
   const key = scope || '__global__';
   const store = storeFor(namespace);
   const prev = store.get(key) || {};
-  store.set(key, { ...prev, ...patch });
+  touch(store, key, { ...prev, ...patch });
+  if (store.size > MAX_SCOPES_PER_NAMESPACE) store.delete(store.keys().next().value);
 }
 
 export function resetCachedScope(namespace, scope) {

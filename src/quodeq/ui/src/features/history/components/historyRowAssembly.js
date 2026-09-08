@@ -13,8 +13,7 @@
 export const HIDDEN_STATUSES = new Set(['failed']);
 export const PARTIAL_STATUSES = new Set(['cancelled']);
 
-function buildInProgressStubs(availableRuns, trend) {
-  const trendIds = new Set((trend || []).map((e) => e.runId));
+function buildInProgressStubs(availableRuns, trendIds) {
   return (availableRuns || [])
     .filter((r) => r.status === 'in_progress' && !trendIds.has(r.runId))
     // hasScoredDims=false: this run is running but no dimension has finished
@@ -23,12 +22,11 @@ function buildInProgressStubs(availableRuns, trend) {
     .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: 'in_progress', hasScoredDims: false }));
 }
 
-function buildCancelledStubs(availableRuns, trend) {
+function buildCancelledStubs(availableRuns, trendIds) {
   // Cancelled runs are stripped from `trend` server-side (they're not chart
   // points), but their kept-findings scores still drive the Overview when no
   // complete run exists. Surface them as partial, dated rows so History and
   // the Overview agree instead of showing scores over an empty table.
-  const trendIds = new Set((trend || []).map((e) => e.runId));
   return (availableRuns || [])
     .filter((r) => r.status === 'cancelled' && !trendIds.has(r.runId))
     .map((r) => ({
@@ -45,8 +43,10 @@ function buildCancelledStubs(availableRuns, trend) {
  * Overview shows their scores.
  */
 export function assembleHistoryRows(availableRuns, trend) {
-  const inProgress = buildInProgressStubs(availableRuns, trend);
-  const cancelled = buildCancelledStubs(availableRuns, trend);
+  // Both stub builders skip runs the trend already lists; build the id set once.
+  const trendIds = new Set((trend || []).map((e) => e.runId));
+  const inProgress = buildInProgressStubs(availableRuns, trendIds);
+  const cancelled = buildCancelledStubs(availableRuns, trendIds);
   const dated = [...cancelled, ...(trend || [])].sort(
     (a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''),
   );

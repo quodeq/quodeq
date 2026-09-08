@@ -3,7 +3,6 @@ pom.xml (Maven), and Gradle build files.
 
 Split from ``_dependency_parsers.py`` to keep that file under the size
 ratchet's 300-line cap. All ``has_*`` names stay re-exported from there.
-Moved verbatim.
 """
 from __future__ import annotations
 
@@ -11,6 +10,12 @@ import json
 import re
 import tomllib
 import xml.etree.ElementTree as ET
+from functools import lru_cache
+
+# Same bound as ``_dependency_parsers._PARSE_CACHE_MAX`` (that module imports
+# from here, so the constant cannot come from it): parse each manifest text
+# once, not once per discipline rule that probes it.
+_PARSE_CACHE_MAX = 64
 
 # --- package.json ------------------------------------------------------------
 
@@ -21,13 +26,14 @@ _PACKAGE_JSON_DEP_KEYS = (
 )
 
 
-def _package_json_names(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _package_json_names(content: str) -> frozenset[str]:
     try:
         data = json.loads(content)
     except (json.JSONDecodeError, ValueError):
-        return set()
+        return frozenset()
     if not isinstance(data, dict):
-        return set()
+        return frozenset()
     names: set[str] = set()
     for key in _PACKAGE_JSON_DEP_KEYS:
         v = data.get(key)
@@ -35,7 +41,7 @@ def _package_json_names(content: str) -> set[str]:
             names.update(k.lower() for k in v if isinstance(k, str))
         elif isinstance(v, list):  # bundledDependencies is a list of strings
             names.update(s.lower() for s in v if isinstance(s, str))
-    return names
+    return frozenset(names)
 
 
 def has_package_json_dependency(content: str, needle: str) -> bool:
@@ -45,11 +51,12 @@ def has_package_json_dependency(content: str, needle: str) -> bool:
 # --- Cargo.toml --------------------------------------------------------------
 
 
-def _cargo_dep_names(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _cargo_dep_names(content: str) -> frozenset[str]:
     try:
         data = tomllib.loads(content)
     except tomllib.TOMLDecodeError:
-        return set()
+        return frozenset()
     names: set[str] = set()
     for key in ("dependencies", "dev-dependencies", "build-dependencies"):
         v = data.get(key)
@@ -71,7 +78,7 @@ def _cargo_dep_names(content: str) -> set[str]:
                 v = tcfg.get(key)
                 if isinstance(v, dict):
                     names.update(k.lower() for k in v if isinstance(k, str))
-    return names
+    return frozenset(names)
 
 
 def has_cargo_dependency(content: str, needle: str) -> bool:
@@ -81,7 +88,8 @@ def has_cargo_dependency(content: str, needle: str) -> bool:
 # --- go.mod ------------------------------------------------------------------
 
 
-def _go_mod_modules(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _go_mod_modules(content: str) -> frozenset[str]:
     """Return the set of module paths declared in ``require`` directives."""
     modules: set[str] = set()
     in_block = False
@@ -104,7 +112,7 @@ def _go_mod_modules(content: str) -> set[str]:
         parts = line.split(None, 1)
         if parts:
             modules.add(parts[0])
-    return modules
+    return frozenset(modules)
 
 
 def has_go_mod_module(content: str, needle: str) -> bool:
@@ -122,19 +130,20 @@ def has_go_mod_module(content: str, needle: str) -> bool:
 # --- composer.json -----------------------------------------------------------
 
 
-def _composer_dep_names(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _composer_dep_names(content: str) -> frozenset[str]:
     try:
         data = json.loads(content)
     except (json.JSONDecodeError, ValueError):
-        return set()
+        return frozenset()
     if not isinstance(data, dict):
-        return set()
+        return frozenset()
     names: set[str] = set()
     for key in ("require", "require-dev"):
         v = data.get(key)
         if isinstance(v, dict):
             names.update(k.lower() for k in v if isinstance(k, str))
-    return names
+    return frozenset(names)
 
 
 def has_composer_dependency(content: str, needle: str) -> bool:
@@ -144,7 +153,8 @@ def has_composer_dependency(content: str, needle: str) -> bool:
 # --- pom.xml (Maven) ---------------------------------------------------------
 
 
-def _pom_coords(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _pom_coords(content: str) -> frozenset[str]:
     """Return all groupId / artifactId text values declared in *content*.
 
     Captures dependencies, parent coords, plugins, and BOM imports — anywhere a
@@ -154,18 +164,18 @@ def _pom_coords(content: str) -> set[str]:
     # Guard against XML entity-expansion (billion-laughs / XXE) attacks:
     # reject DOCTYPE and ENTITY declarations before parsing.
     if re.search(r"<!(DOCTYPE|ENTITY)", content, re.IGNORECASE):
-        return set()
+        return frozenset()
     try:
         root = ET.fromstring(content)
     except ET.ParseError:
-        return set()
+        return frozenset()
     coords: set[str] = set()
     for elem in root.iter():
         # Strip default Maven namespace if present (``{http://maven.apache.org/POM/4.0.0}groupId``).
         tag = elem.tag.rsplit("}", 1)[-1]
         if tag in ("groupId", "artifactId") and elem.text:
             coords.add(elem.text.strip())
-    return coords
+    return frozenset(coords)
 
 
 def has_pom_xml_dependency(content: str, needle: str) -> bool:
@@ -194,6 +204,16 @@ def _strip_gradle_comments(content: str) -> str:
     return _GRADLE_LINE_COMMENT.sub("", _GRADLE_BLOCK_COMMENT.sub("", content))
 
 
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _gradle_searchable(content: str) -> str:
+    """Comment-stripped, lowercased text the substring probe runs against.
+
+    Gradle has no name set to extract (see ``has_gradle_dependency``), so the
+    memoized unit is the searchable text rather than a frozenset of names.
+    """
+    return _strip_gradle_comments(content).lower()
+
+
 def has_gradle_dependency(content: str, needle: str) -> bool:
     """Substring-match against build.gradle / build.gradle.kts with comments stripped.
 
@@ -205,4 +225,4 @@ def has_gradle_dependency(content: str, needle: str) -> bool:
     needle_low = needle.strip().lower()
     if not needle_low:
         return True
-    return needle_low in _strip_gradle_comments(content).lower()
+    return needle_low in _gradle_searchable(content)
