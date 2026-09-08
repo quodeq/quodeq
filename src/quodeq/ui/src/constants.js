@@ -25,6 +25,13 @@ export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
 }
 
+// Written under providerKey(id, 'api-key') instead of the raw credential once
+// the backend confirms it stored one, so "configured" survives a reload
+// without the key itself ever going back into localStorage. Lives here, next
+// to providerKey, because both the settings hook that writes it and the
+// evaluation payload builder that must refuse to forward it need it.
+export const API_KEY_CONFIGURED_SENTINEL = '•configured•';
+
 // Fired (same-tab) whenever any provider setting is written — the analysis
 // active-provider or a per-provider model. The assistant gate listens for it
 // so that in Default mode (which mirrors the analysis provider/model) the

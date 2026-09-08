@@ -1,13 +1,10 @@
 import { useState, useCallback } from 'react';
-import { providerKey, notifyProviderSettingsChanged } from '../../../constants.js';
+import { providerKey, notifyProviderSettingsChanged, API_KEY_CONFIGURED_SENTINEL } from '../../../constants.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { saveProviderKey } from '../../../api/providers.js';
 import { t } from '../../../strings/index.js';
 
-// Written to storage instead of the raw key once the backend confirms it
-// stored one, so the "configured" state survives a reload without ever
-// putting the credential itself back into localStorage.
-export const API_KEY_CONFIGURED_SENTINEL = '•configured•';
+export { API_KEY_CONFIGURED_SENTINEL };
 
 const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base', 'cmd-path'];
 const DEFAULTS = {
@@ -30,11 +27,22 @@ const DEFAULTS = {
 // Legacy storage key fallback, only consulted when the new key has no value.
 const LEGACY_KEY_MAP = { 'time-limit': 'pool-budget' };
 
-function loadProviderState(providerId, overrides, storage = localStorage) {
+export function loadProviderState(providerId, overrides, storage = localStorage) {
   const merged = { ...DEFAULTS, ...overrides };
   const state = {};
   for (const key of SETTINGS) {
     let value = storage.getItem(providerKey(providerId, key));
+    if (key === 'api-key' && value === API_KEY_CONFIGURED_SENTINEL) {
+      // The sentinel means "the backend holds a key", not "here is a key".
+      // Consumers of state['api-key'] (OmlxTab hands it straight to
+      // getOmlxModels / testOmlxConcurrency as a real credential) would
+      // otherwise send the literal '•configured•' to a provider. Blank it
+      // out. A genuine legacy raw value is still returned as-is below, so
+      // installs that saved one before the secure-storage change keep
+      // working.
+      state[key] = '';
+      continue;
+    }
     if (value === null && LEGACY_KEY_MAP[key]) {
       // Back-compat: read old key, migrate to new key, drop the old one.
       const legacy = storage.getItem(providerKey(providerId, LEGACY_KEY_MAP[key]));
@@ -85,7 +93,11 @@ export default function useProviderSettings(providerId, defaults, { storage = lo
     const onPersistError = () => showToast(t('settings.persistError'));
     if (key === 'api-key') {
       saveProviderApiKey(providerId, String(value), storage, { onPersistError }).then((ok) => {
-        if (ok) setState(prev => ({ ...prev, [key]: API_KEY_CONFIGURED_SENTINEL }));
+        // Clear the field rather than parking the sentinel in live state:
+        // state['api-key'] is passed to providers as a real credential (see
+        // OmlxTab), and the sentinel is not one. Storage still records it,
+        // which is what survives a reload.
+        if (ok) setState(prev => ({ ...prev, [key]: '' }));
       });
     } else {
       saveProviderSetting(providerId, key, value, storage, { onPersistError });

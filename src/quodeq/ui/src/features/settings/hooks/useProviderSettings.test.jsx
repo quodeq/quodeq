@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import useProviderSettings, { saveProviderSetting, saveProviderApiKey, API_KEY_CONFIGURED_SENTINEL } from './useProviderSettings.js';
+import useProviderSettings, { saveProviderSetting, saveProviderApiKey, loadProviderState, API_KEY_CONFIGURED_SENTINEL } from './useProviderSettings.js';
 import { saveProviderKey } from '../../../api/providers.js';
 
 const showToast = vi.fn();
@@ -184,9 +184,11 @@ describe('useProviderSettings api-key handling', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.state['api-key']).toBe(API_KEY_CONFIGURED_SENTINEL);
+      expect(mockStorage.setItem).toHaveBeenCalledWith('cc-openai-api-key', API_KEY_CONFIGURED_SENTINEL);
     });
-    expect(mockStorage.setItem).toHaveBeenCalledWith('cc-openai-api-key', API_KEY_CONFIGURED_SENTINEL);
+    // The sentinel belongs in storage, not in live state: consumers of
+    // state['api-key'] (OmlxTab) send it to a provider as a real credential.
+    expect(result.current.state['api-key']).toBe('');
   });
 
   it('on backend failure (stored: false), warns and shows a toast without writing to storage', async () => {
@@ -234,6 +236,41 @@ describe('useProviderSettings api-key handling', () => {
     expect(ok).toBe(false);
     expect(onPersistError).toHaveBeenCalled();
     expect(mockStorage.setItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadProviderState api-key handling', () => {
+  const storageWith = (values) => ({
+    getItem: vi.fn((key) => (key in values ? values[key] : null)),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  });
+
+  it('never returns the literal sentinel as state["api-key"]', () => {
+    // OmlxTab passes state['api-key'] straight into getOmlxModels and
+    // testOmlxConcurrency as a real credential, so the sentinel reaching
+    // state means '•configured•' gets sent to a provider as an API key.
+    const storage = storageWith({ 'cc-omlx-api-key': API_KEY_CONFIGURED_SENTINEL });
+    const state = loadProviderState('omlx', {}, storage);
+    expect(state['api-key']).not.toBe(API_KEY_CONFIGURED_SENTINEL);
+    expect(state['api-key']).toBe('');
+  });
+
+  it('still returns a genuine legacy raw value unchanged', () => {
+    const storage = storageWith({ 'cc-omlx-api-key': 'sk-legacy-raw-value' });
+    expect(loadProviderState('omlx', {}, storage)['api-key']).toBe('sk-legacy-raw-value');
+  });
+
+  it('falls back to the default when nothing is stored', () => {
+    expect(loadProviderState('omlx', {}, storageWith({}))['api-key']).toBe('');
+  });
+
+  it('the sentinel only masks api-key, not other settings', () => {
+    const storage = storageWith({
+      'cc-omlx-api-key': API_KEY_CONFIGURED_SENTINEL,
+      'cc-omlx-model': 'gemma-3-4b',
+    });
+    expect(loadProviderState('omlx', {}, storage).model).toBe('gemma-3-4b');
   });
 });
 

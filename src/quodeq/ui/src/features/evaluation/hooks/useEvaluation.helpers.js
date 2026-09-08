@@ -4,7 +4,7 @@
  * Split out of useEvaluation.js (see that file's header for the hook's
  * overall data-flow doc). Kept logic-identical to the pre-split version.
  */
-import { ACTIVE_PROVIDER_KEY, providerKey } from "../../../constants.js";
+import { ACTIVE_PROVIDER_KEY, providerKey, API_KEY_CONFIGURED_SENTINEL } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
 
@@ -66,9 +66,18 @@ export function preparePayload(payload, storage = localStorage) {
   };
   if (settings.perDimension) result.perDimension = true;
   if (!settings.verify) result.verifyFindings = false;
-  // api-key is never read from storage here: the value cached under it is
-  // just a "configured" sentinel (see useProviderSettings.js), not the real
-  // key. The backend resolves the actual key from its own secure store.
+  // A key saved through the current flow leaves only the "configured"
+  // sentinel here (see useProviderSettings.js) and the backend resolves the
+  // real one from its own secure store, so the sentinel must never be
+  // forwarded as a credential. But installs that saved a key before that
+  // change still have the raw value sitting in this browser's localStorage
+  // and nothing has migrated it, so dropping it outright silently stopped
+  // sending any key at all for them. Forward a genuine legacy value; ignore
+  // the sentinel.
+  const storedApiKey = get("api-key");
+  if (storedApiKey && storedApiKey !== API_KEY_CONFIGURED_SENTINEL) {
+    result.apiKey = storedApiKey;
+  }
   const apiBase = get("api-base");
   if (apiBase) result.apiBase = apiBase;
   // The Settings field pre-fills the provider id as its default; only a
