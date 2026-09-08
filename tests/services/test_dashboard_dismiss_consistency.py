@@ -8,7 +8,7 @@ from quodeq.core.scoring.engine import score_evidence
 from quodeq.services._dashboard_cache import _shared_dimension_cache
 from quodeq.services.dashboard import build_dashboard, clear_shared_dimension_cache
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
-from quodeq.services.evidence_rescore import score_dimension_from_evidence
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 from quodeq.services.score_cache import score_cache_version
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from tests.services._scalar_fixtures import build_projected_run
@@ -132,8 +132,10 @@ def test_dismissed_dimension_score_comes_from_run_evidence(tmp_path):
     assert dismissed, "dismiss did not register"
 
     expected = score_dimension_from_evidence(
-        run_dir, dim, dismissed=dismissed, deleted=set(),
-        source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+        run_dir, dim, EvidenceScoreRequest(
+            dismissed=dismissed, deleted=set(),
+            source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+        ),
     )
     assert expected is not None
     assert expected.overall.weighted_score is not None

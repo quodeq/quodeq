@@ -20,7 +20,7 @@ from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.services import grade_formula
 from quodeq.services._rescore_legacy import _group_by_principle, _score_all_principles
 from quodeq.services.dismissed import recount_totals
-from quodeq.services.evidence_rescore import score_dimension_from_evidence
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 from quodeq.services.suppression import is_deleted, is_dismissed
 
 
@@ -47,9 +47,11 @@ def _rescore_from_evidence(
     no evidence for this dimension -- callers fall back to the legacy path."""
     dim_id = dim.dimension or ""
     scores = score_dimension_from_evidence(
-        run_dir, dim_id, dismissed=dismissed, deleted=deleted,
-        source_file_count=dim.source_file_count or 0,
-        files_read=dim.files_read or 0, params=params,
+        run_dir, dim_id, EvidenceScoreRequest(
+            dismissed=dismissed, deleted=deleted,
+            source_file_count=dim.source_file_count or 0,
+            files_read=dim.files_read or 0, params=params,
+        ),
     )
     if scores is None:
         return None

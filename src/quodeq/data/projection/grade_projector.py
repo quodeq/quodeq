@@ -20,6 +20,7 @@ from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.core.scoring.projector_scoring import (
     GRADE_ALGO_VERSION,
+    PrincipleGradeScale,
     compute_dimension_score,
     compute_principle_grade,
 )
@@ -80,6 +81,7 @@ def _grade_all_principles(
 ) -> tuple[list[tuple[str, dict]], dict[str, list[dict]]]:
     """Compute per-principle grades: flat rows (for persistence) plus the
     same grades grouped by dimension (for the dimension-score rollup)."""
+    scale = PrincipleGradeScale(source_file_count=source_file_count, params=params)
     principle_grades_by_dim: dict[str, list[dict]] = {}
     principle_rows: list[tuple[str, dict]] = []
     for dim, principle_id in sorted(set(violations_by) | set(compliance_by)):
@@ -88,8 +90,7 @@ def _grade_all_principles(
             findings=violations_by.get((dim, principle_id), []),
             compliance=compliance_by.get((dim, principle_id), []),
             dismissed_count=dismissed_counts.get((dim, principle_id), 0),
-            source_file_count=source_file_count,
-            params=params,
+            scale=scale,
         )
         principle_grades_by_dim.setdefault(dim, []).append(grade)
         principle_rows.append((dim, grade))

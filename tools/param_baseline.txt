@@ -49,7 +49,6 @@ src/quodeq/core/evidence/_jsonl.py:read_judgments
 src/quodeq/core/evidence/_refs.py:enrich_judgment
 src/quodeq/core/evidence/parser.py:parse_jsonl_to_evidence
 src/quodeq/core/evidence/parser.py:parse_jsonl_to_evidence_by_dimension
-src/quodeq/core/scoring/projector_scoring.py:compute_principle_grade
 src/quodeq/dashboard/runner.py:_start_action_api
 src/quodeq/data/cache_store/index.py:ContentIndex.record
 src/quodeq/data/cache_store/migrate.py:_migrate_v3
@@ -81,7 +80,6 @@ src/quodeq/services/_violations_jsonl.py:parse_violations_from_jsonl
 src/quodeq/services/accumulated.py:_compute_parent_accumulated
 src/quodeq/services/dashboard.py:_make_status_aware_fetcher
 src/quodeq/services/evidence_rescore.py:_parse_evidence_jsonl
-src/quodeq/services/evidence_rescore.py:score_dimension_from_evidence
 src/quodeq/services/jobs.py:JobManager.__init__
 src/quodeq/services/jobs.py:JobManager.start_job
 src/quodeq/services/project_registration.py:_resolve_target_path
@@ -90,7 +88,6 @@ src/quodeq/services/rescore.py:_rescore_dimension
 src/quodeq/services/rescore.py:_rescore_from_evidence
 src/quodeq/services/rescore.py:rescore_dimensions
 src/quodeq/services/score_cache.py:per_run_versions
-src/quodeq/services/score_run.py:_score_one_dimension
 src/quodeq/services/scoring/_project_scores.py:_compute_accumulated_payload
 src/quodeq/services/scoring/_project_scores.py:_resolve_accumulated
 src/quodeq/services/scoring/_rescoring.py:_rescore_runs_by_dimension

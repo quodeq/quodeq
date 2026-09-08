@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.scoring.params import ScoringParams
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.services.grade_formula import load_params
@@ -47,20 +50,43 @@ def _read_project_source_file_count(reports_dir: str, project: str) -> int:
     return read_scan_total_files(Path(reports_dir) / project)
 
 
+@dataclass(frozen=True)
+class _ScoringContext:
+    """Scoring inputs shared across every dimension in one run."""
+
+    evidence_entries: list[tuple[str, Path, int]]
+    source_file_count: int
+    params: ScoringParams
+    compiled_dir: Path | None
+    evaluators_dir: Path | None
+    dim_states: dict
+    run_id: str
+    evaluation_dir: Path
+
+
+@dataclass(frozen=True)
+class _ScoringCollaborators:
+    """Injection seams for one dimension's scoring, grouped for passing
+    through call sites without growing their parameter lists."""
+
+    parser: Callable
+    scorer: Callable
+    reporter: Callable
+    log: logging.Logger
+
+
 def _score_one_dimension(
-    dim_id: str, jsonl_path: Path, run_id: str, evaluation_dir: Path,
-    source_file_count: int, files_read: int,
-    compiled_dir: Path | None, evaluators_dir: Path | None, params,
-    *, parser, scorer, reporter, log,
+    dim_id: str, jsonl_path: Path, files_read: int,
+    ctx: _ScoringContext, deps: _ScoringCollaborators,
 ) -> None:
     """Score one dimension's evidence and write its report. Logs and
     swallows any parse/score failure (fail-soft: one bad dimension must not
     stop scoring the rest)."""
     try:
-        evidence = parser(jsonl_path, EvidenceContext(
+        evidence = deps.parser(jsonl_path, EvidenceContext(
             language="", repository="", date_str="",
-            source_file_count=source_file_count, files_read=files_read,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+            source_file_count=ctx.source_file_count, files_read=files_read,
+        ), compiled_dir=ctx.compiled_dir, evaluators_dir=ctx.evaluators_dir,
             req_map_reader=read_req_to_principle_map,
             refs_reader=load_compiled_refs,
             cwe_url_template=cwe_url_template(),
@@ -68,14 +94,14 @@ def _score_one_dimension(
             on_malformed_line=log_malformed_jsonl_line)
         if evidence is None:
             return
-        scores = scorer(evidence, mode="numerical", params=params)
-        reporter(evidence, scores, dim_id, evaluation_dir)
-        log.info(
+        scores = deps.scorer(evidence, mode="numerical", params=ctx.params)
+        deps.reporter(evidence, scores, dim_id, ctx.evaluation_dir)
+        deps.log.info(
             "Scored cancelled dimension '%s' for run %s (files_read=%d)",
-            dim_id, run_id[:8], files_read,
+            dim_id, ctx.run_id[:8], files_read,
         )
     except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
-        log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)
+        deps.log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)
 
 
 def _should_score_dimension(
@@ -94,11 +120,12 @@ def _should_score_dimension(
     return True
 
 
-def _setup_scoring_context(reports_dir: str, project: str, run_dir: Path, evaluation_dir: Path):
+def _setup_scoring_context(
+    reports_dir: str, project: str, run_dir: Path, evaluation_dir: Path, run_id: str,
+) -> _ScoringContext | None:
     """Resolve the scoring inputs shared across every dimension in this run.
 
-    Returns (evidence_entries, source_file_count, params, compiled_dir,
-    evaluators_dir, dim_states), or None when there's no evidence to score.
+    Returns None when there's no evidence to score.
     """
     evidence_entries = list_dimension_evidence(run_dir)
     if evidence_entries is None:
@@ -113,7 +140,16 @@ def _setup_scoring_context(reports_dir: str, project: str, run_dir: Path, evalua
     compiled_dir, evaluators_dir = standard_dirs()
 
     dim_states = read_dimensions(run_dir).get("dimensions", {})
-    return evidence_entries, source_file_count, params, compiled_dir, evaluators_dir, dim_states
+    return _ScoringContext(
+        evidence_entries=evidence_entries,
+        source_file_count=source_file_count,
+        params=params,
+        compiled_dir=compiled_dir,
+        evaluators_dir=evaluators_dir,
+        dim_states=dim_states,
+        run_id=run_id,
+        evaluation_dir=evaluation_dir,
+    )
 
 
 def score_completed_evidence(
@@ -145,17 +181,15 @@ def score_completed_evidence(
 
     run_dir = Path(reports_dir) / project / run_id
     evaluation_dir = run_dir / "evaluation"
-    ctx = _setup_scoring_context(reports_dir, project, run_dir, evaluation_dir)
+    ctx = _setup_scoring_context(reports_dir, project, run_dir, evaluation_dir, run_id)
     if ctx is None:
         return
-    evidence_entries, source_file_count, params, compiled_dir, evaluators_dir, dim_states = ctx
+    deps = _ScoringCollaborators(parser=parser, scorer=scorer, reporter=reporter, log=_logger)
 
-    for dim_id, jsonl_path, evidence_size in evidence_entries:
-        if not _should_score_dimension(dim_id, evidence_size, run_dir, evaluation_dir, dim_states):
+    for dim_id, jsonl_path, evidence_size in ctx.evidence_entries:
+        if not _should_score_dimension(
+            dim_id, evidence_size, run_dir, evaluation_dir, ctx.dim_states,
+        ):
             continue
         files_read = _read_queue_files_count(dimension_queue_file(run_dir, dim_id))
-        _score_one_dimension(
-            dim_id, jsonl_path, run_id, evaluation_dir, source_file_count, files_read,
-            compiled_dir, evaluators_dir, params,
-            parser=parser, scorer=scorer, reporter=reporter, log=_logger,
-        )
+        _score_one_dimension(dim_id, jsonl_path, files_read, ctx, deps)

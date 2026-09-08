@@ -24,7 +24,7 @@ from quodeq.core.types import ScoringResult
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.evidence_rescore import standard_dirs
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, standard_dirs
 from quodeq.services.suppression import is_deleted, is_dismissed
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
@@ -140,10 +140,11 @@ def _print_scores(
         source_file_count, files_read = _dim_evidence_counts(evaluation_dir, dim)
         try:
             result = _facade.score_dimension_from_evidence(
-                run_dir, dim,
-                dismissed=dismissed, deleted=deleted,
-                source_file_count=source_file_count, files_read=files_read,
-                params=params,
+                run_dir, dim, EvidenceScoreRequest(
+                    dismissed=dismissed, deleted=deleted,
+                    source_file_count=source_file_count, files_read=files_read,
+                    params=params,
+                ),
             )
             adjusted = _format_adjusted_score(score, result) if result is not None else None
         except Exception as exc:  # noqa: BLE001 — console embellishment on top of

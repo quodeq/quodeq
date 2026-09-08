@@ -162,11 +162,13 @@ def test_rescore_dimension_uses_evidence_when_run_dir_given(tmp_path):
     # ...and the SCORE equals the evidence-engine score of the remaining set,
     # not the legacy report-JSON formula.
     from quodeq.core.scoring.params import DEFAULT_PARAMS
-    from quodeq.services.evidence_rescore import score_dimension_from_evidence
+    from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 
     expected = score_dimension_from_evidence(
-        tmp_path, "maintainability", dismissed={("R-1", "a.kt", 10)}, deleted=set(),
-        source_file_count=1000, files_read=10, params=DEFAULT_PARAMS,
+        tmp_path, "maintainability", EvidenceScoreRequest(
+            dismissed={("R-1", "a.kt", 10)}, deleted=set(),
+            source_file_count=1000, files_read=10, params=DEFAULT_PARAMS,
+        ),
     )
     assert out.overall_score == (
         f"{expected.overall.weighted_score}/10"

@@ -16,6 +16,7 @@ map them to their own schema (never the other way round):
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
@@ -94,15 +95,28 @@ def _score_principle_math(vt_counts, ct_counts, params: ScoringParams) -> tuple[
     return final, grade
 
 
+@dataclass(frozen=True)
+class PrincipleGradeScale:
+    """Confidence-scaling and formula inputs for one principle's grade.
+
+    ``source_file_count``/``scale_multiplier`` feed
+    ``classify_confidence_level`` (thin evidence relative to project size);
+    ``params`` is the scoring formula. Defaults reproduce the pre-object
+    call shape (no scaling, default formula).
+    """
+
+    source_file_count: int = 0
+    scale_multiplier: int = 1
+    params: ScoringParams = DEFAULT_PARAMS
+
+
 def compute_principle_grade(
     *,
     principle_id: str,
     findings: list[Finding],
     compliance: list[Finding],
     dismissed_count: int = 0,
-    source_file_count: int = 0,
-    scale_multiplier: int = 1,
-    params: ScoringParams = DEFAULT_PARAMS,
+    scale: PrincipleGradeScale = PrincipleGradeScale(),
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
 
@@ -121,8 +135,8 @@ def compute_principle_grade(
 
     confidence_level = classify_confidence_level(
         len(findings), len(compliance),
-        scale_multiplier=scale_multiplier,
-        source_file_count=source_file_count,
+        scale_multiplier=scale.scale_multiplier,
+        source_file_count=scale.source_file_count,
     )
     if confidence_level == "low":
         return _insufficient_grade(principle_id, len(findings), dismissed_count)
@@ -134,7 +148,7 @@ def compute_principle_grade(
     if not any(vt_counts.values()) and not any(ct_counts.values()):
         return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
-    final, grade = _score_principle_math(vt_counts, ct_counts, params)
+    final, grade = _score_principle_math(vt_counts, ct_counts, scale.params)
 
     return {
         "principle_id": principle_id,
