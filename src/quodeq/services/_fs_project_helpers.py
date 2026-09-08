@@ -29,6 +29,7 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     _max_projects_listed,
 )
 from quodeq.data.fs.report_parser.runs import RunInfo
+from quodeq.services._registration_url import _strip_credentials
 from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
 
 _logger = logging.getLogger(__name__)
@@ -200,7 +201,7 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     try:
         is_url = is_repo_url(repo)
     except ValueError as exc:
-        _logger.warning("Rejecting malformed repo identifier %r in duplicate check: %s", repo, exc)
+        _logger.warning("Rejecting malformed repo identifier %r in duplicate check: %s", _strip_credentials(repo), exc)
         return None
     repo_resolved = repo if is_url else str(Path(repo).resolve())
     expected_name = project_name_from_repo(repo)

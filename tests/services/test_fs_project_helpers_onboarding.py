@@ -305,3 +305,36 @@ def test_find_existing_project_logs_malformed_repo_identifier(caplog, tmp_path):
         result = find_existing_project(str(tmp_path), "not a valid repo!!", None)
     assert result is None
     assert any("not a valid repo!!" in r.message for r in caplog.records)
+
+
+def test_find_existing_project_strips_credentials_from_malformed_repo_log(caplog, tmp_path):
+    """A malformed repo identifier can still carry embedded credentials
+    (e.g. a rejected cleartext http:// URL with user:pass@); the duplicate
+    check's warning log must never leak them."""
+    with patch(
+        "quodeq.shared.utils.is_repo_url",
+        side_effect=ValueError("cannot classify repo identifier"),
+    ), caplog.at_level(logging.WARNING):
+        result = find_existing_project(
+            str(tmp_path), "https://user:token@host/repo.git", None,
+        )
+    assert result is None
+    logged = caplog.records[-1].message
+    assert "user:token" not in logged
+    assert "https://host/repo.git" in logged
+
+
+def test_find_existing_project_strips_slash_credential_from_malformed_repo_log(caplog, tmp_path):
+    """Same as above, but for the slash-in-credential bypass case: bounding
+    the credential search by the first "/" must not let the token through."""
+    with patch(
+        "quodeq.shared.utils.is_repo_url",
+        side_effect=ValueError("cannot classify repo identifier"),
+    ), caplog.at_level(logging.WARNING):
+        result = find_existing_project(
+            str(tmp_path), "https://user:pa/ss@github.com/org/repo.git", None,
+        )
+    assert result is None
+    logged = caplog.records[-1].message
+    assert "pa/ss" not in logged
+    assert "https://github.com/org/repo.git" in logged

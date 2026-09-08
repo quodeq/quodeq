@@ -19,10 +19,27 @@ from quodeq.shared.validation import validate_relative_scope
 
 _logger = logging.getLogger(__name__)
 
-# Userinfo cannot contain an unencoded "/", so excluding it keeps matches
-# identical while a failing scan stays linear (no polynomial backtracking
-# on inputs like repeated "http://" runs).
-_CREDENTIALS_RE = re.compile(r"(https?://)([^/@]+)@")
+# Mirrors _SCHEME_RE / _looks_like_authority in
+# quodeq.services._registration_url. Not imported from there: the api layer
+# must not depend on services internals for this, so the logic is
+# duplicated here rather than layered across.
+_SCHEME_RE = re.compile(r"^(https?://)")
+
+
+def _looks_like_authority(candidate: str) -> bool:
+    """Return True if *candidate* is a plausible ``host[:port]`` authority.
+
+    Deliberately strict: a bare single-label name is rejected so that an
+    ambiguous URL falls to the credential-stripping branch rather than the
+    leaking one.
+    """
+    host, sep, port = candidate.partition(":")
+    if sep and not port.isdigit():
+        return False
+    if not all(c.isalnum() or c in "-._~[]" for c in host):
+        return False
+    return "." in host or host.startswith("[") or host == "localhost"
+
 
 # Bounds for user-supplied evaluation parameters
 _MIN_SUBAGENTS = 1
@@ -73,8 +90,28 @@ def _coerce_int(value: object, default: int) -> int:
 
 
 def _sanitize_url(url: str) -> str:
-    """Remove embedded credentials from a URL for safe logging/error messages."""
-    return _CREDENTIALS_RE.sub(r"\1***@", url)
+    """Remove embedded credentials from a URL for safe logging/error messages.
+
+    Userinfo ends at the LAST "@" of the authority (RFC 3986), so the search
+    runs from the right. A "/" before that "@" usually means the authority
+    already ended and the "@" belongs to a path segment -- but only when the
+    text before that "/" is itself a plausible host. Real credentials
+    (base64-derived tokens, JWTs, CI PATs) often contain a literal "/", and
+    bounding the search by the first "/" would then hide the real "@" and
+    let the whole credential through unmasked.
+    """
+    match = _SCHEME_RE.match(url)
+    if not match:
+        return url
+    scheme = match.group(1)
+    rest = url[len(scheme):]
+    at_pos = rest.rfind("@")
+    if at_pos == -1:
+        return url
+    slash_pos = rest.find("/")
+    if -1 < slash_pos < at_pos and _looks_like_authority(rest[:slash_pos]):
+        return url
+    return f"{scheme}***@{rest[at_pos + 1:]}"
 
 
 def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
