@@ -86,7 +86,6 @@ src/quodeq/services/_job_log_tee.py:consume_stream
 src/quodeq/services/_job_log_tee.py:tee_run_log
 src/quodeq/services/_repo_index.py:add_repo_index_entry
 src/quodeq/services/_repo_index.py:rekey_repo_index_entry
-src/quodeq/services/_scan_progress_dims.py:_build_dim_progress
 src/quodeq/services/_scan_progress_dims.py:_dim_evidence_tally
 src/quodeq/services/_trend_fetcher.py:_make_heavy_trend_fetcher
 src/quodeq/services/_trend_fetcher.py:_make_version_for
@@ -105,8 +104,6 @@ src/quodeq/services/project_registration.py:register_project
 src/quodeq/services/rescore.py:_rescore_dimension
 src/quodeq/services/rescore.py:_rescore_from_evidence
 src/quodeq/services/rescore.py:rescore_dimensions
-src/quodeq/services/scan_progress.py:_build_per_dim_progress
-src/quodeq/services/scan_progress.py:_maybe_consolidated_live_progress
 src/quodeq/services/score_cache.py:per_run_versions
 src/quodeq/services/score_run.py:_score_one_dimension
 src/quodeq/services/scoring/_project_scores.py:_compute_accumulated_payload

@@ -2,11 +2,34 @@
 
 Split from ``scan_progress.py`` (into its own module rather than folded into
 ``_scan_progress_dims.py``) so both that module and the ``scan_progress.py``
-facade can import them without a cycle.
+facade can import them without a cycle. ``_ProgressContext`` lives here for
+the same reason: both ``scan_progress.py`` and ``_scan_progress_dims.py``
+build or consume it.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True)
+class _ProgressContext:
+    """Run-level scalars gathered once per tick, threaded through the
+    progress builders instead of re-passed as individual positional args."""
+    run_dir: Path
+    status: dict
+    state: str
+    is_terminal: bool
+    total_elapsed_s: float | None
+    run_budget_s: int | None
+    project_files: int
+    dim_estimates: dict[str, Any]
+    dim_records: dict
+    dim_ids: list[str]
+    evidence_dir: Path
+    evaluators_dir: Path | None
+    compiled_dir: Path | None
 
 
 @dataclass

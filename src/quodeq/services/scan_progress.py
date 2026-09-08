@@ -26,7 +26,11 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 from quodeq.services._scan_progress_dims import _build_dim_progress, _consolidated_dim_progress
 from quodeq.services._scan_progress_elapsed import _parse_started_at
-from quodeq.services._scan_progress_types import _DimProgress, _ScanProgress  # noqa: F401 - re-export
+from quodeq.services._scan_progress_types import (  # noqa: F401 - _DimProgress/_ScanProgress re-export
+    _DimProgress,
+    _ProgressContext,
+    _ScanProgress,
+)
 from quodeq.services._wiring import read_run_status_json, read_scan_total_files
 from quodeq.services.suppression import project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
@@ -70,10 +74,7 @@ def _recover_dim_ids(status: dict, dim_records: dict, dim_estimates: dict) -> li
     return list(recovered)
 
 
-def _maybe_consolidated_live_progress(
-    job_id: str, run_dir: Path, status: dict, state: str, is_terminal: bool,
-    dim_ids: list[str], project_files: int, total_elapsed_s: float | None, run_budget_s: int | None,
-) -> _ScanProgress | None:
+def _maybe_consolidated_live_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress | None:
     """Consolidated (grouped) runs dispatch every dimension in one pass and
     write consolidated_* files — there are no per-dim queues, so the per-dim
     reader would report 0% / "estimating…" for the whole run. While such a
@@ -81,28 +82,30 @@ def _maybe_consolidated_live_progress(
     counts. Once the run is terminal the per-dim evaluation files exist and
     normal per-dim classification applies. Returns None when this doesn't
     apply (caller falls through to per-dim classification)."""
-    evidence_dir = run_dir / "evidence"
+    evidence_dir = ctx.evidence_dir
     consolidated_queue = evidence_dir / "consolidated_queue.json"
     if (
-        is_terminal
+        ctx.is_terminal
         or not consolidated_queue.is_file()
-        or any((evidence_dir / f"{d}_queue.json").is_file() for d in dim_ids)
+        or any((evidence_dir / f"{d}_queue.json").is_file() for d in ctx.dim_ids)
     ):
         return None
     return _ScanProgress(
         job_id=job_id,
-        state=state,
-        phase=status.get("phase"),
-        current_dimension=status.get("current_dimension"),
-        project_files=project_files,
-        total_elapsed_s=total_elapsed_s,
-        budget_s=run_budget_s,
-        exit_reason=status.get("exit_reason"),
-        dimensions=[_consolidated_dim_progress(run_dir)],
+        state=ctx.state,
+        phase=ctx.status.get("phase"),
+        current_dimension=ctx.status.get("current_dimension"),
+        project_files=ctx.project_files,
+        total_elapsed_s=ctx.total_elapsed_s,
+        budget_s=ctx.run_budget_s,
+        exit_reason=ctx.status.get("exit_reason"),
+        dimensions=[_consolidated_dim_progress(ctx.run_dir)],
     )
 
 
-def _gather_progress_context(status: dict, run_dir: Path, time_limit_s: int | None):
+def _gather_progress_context(
+    status: dict, run_dir: Path, time_limit_s: int | None, compiled_dir: Path | None,
+) -> _ProgressContext:
     """Resolve the run-level scalars build_scan_progress needs before
     dispatching to the consolidated-live check or the per-dim loop."""
     state = status.get("state") or "unknown"
@@ -114,41 +117,44 @@ def _gather_progress_context(status: dict, run_dir: Path, time_limit_s: int | No
     dim_estimates = read_dim_estimates(run_dir)
     dim_records = read_dimensions(run_dir).get("dimensions") or {}
     dim_ids = _recover_dim_ids(status, dim_records, dim_estimates)
-    return (
-        state, is_terminal, total_elapsed_s, run_budget_s, project_files,
-        dim_estimates, dim_records, dim_ids,
+    return _ProgressContext(
+        run_dir=run_dir,
+        status=status,
+        state=state,
+        is_terminal=is_terminal,
+        total_elapsed_s=total_elapsed_s,
+        run_budget_s=run_budget_s,
+        project_files=project_files,
+        dim_estimates=dim_estimates,
+        dim_records=dim_records,
+        dim_ids=dim_ids,
+        evidence_dir=run_dir / "evidence",
+        evaluators_dir=default_paths().evaluators_dir,
+        compiled_dir=compiled_dir,
     )
 
 
-def _build_per_dim_progress(
-    job_id: str, run_dir: Path, status: dict, state: str, is_terminal: bool,
-    dim_records: dict, dim_estimates: dict, dim_ids: list[str],
-    evidence_dir: Path, evaluators_dir: Path | None, compiled_dir: Path | None,
-    project_files: int, total_elapsed_s: float | None, run_budget_s: int | None,
-) -> _ScanProgress:
+def _build_per_dim_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress:
     # The scanner re-finds everything the user has dismissed or deleted, so a
     # raw evidence tally can run several times the number the finished report
     # shows. Read the suppression stores once per tick and net them out here,
     # so the live counters and the run report never tell different stories.
-    dismissed, deleted = project_suppressions(run_dir.parent)
+    dismissed, deleted = project_suppressions(ctx.run_dir.parent)
 
     dim_results = [
-        _build_dim_progress(
-            dim_id, run_dir, status, is_terminal, dim_records, dim_estimates,
-            dismissed, deleted, evidence_dir, evaluators_dir, compiled_dir,
-        )
-        for dim_id in dim_ids
+        _build_dim_progress(dim_id, ctx, dismissed, deleted)
+        for dim_id in ctx.dim_ids
     ]
 
     return _ScanProgress(
         job_id=job_id,
-        state=state,
-        phase=status.get("phase"),
-        current_dimension=status.get("current_dimension"),
-        project_files=project_files,
-        total_elapsed_s=total_elapsed_s,
-        budget_s=run_budget_s,
-        exit_reason=status.get("exit_reason"),
+        state=ctx.state,
+        phase=ctx.status.get("phase"),
+        current_dimension=ctx.status.get("current_dimension"),
+        project_files=ctx.project_files,
+        total_elapsed_s=ctx.total_elapsed_s,
+        budget_s=ctx.run_budget_s,
+        exit_reason=ctx.status.get("exit_reason"),
         dimensions=dim_results,
     )
 
@@ -177,22 +183,10 @@ def build_scan_progress(
     if not status:
         return None
 
-    (
-        state, is_terminal, total_elapsed_s, run_budget_s, project_files,
-        dim_estimates, dim_records, dim_ids,
-    ) = _gather_progress_context(status, run_dir, time_limit_s)
-    evidence_dir = run_dir / "evidence"
-    evaluators_dir = default_paths().evaluators_dir
+    ctx = _gather_progress_context(status, run_dir, time_limit_s, compiled_dir)
 
-    consolidated = _maybe_consolidated_live_progress(
-        job_id, run_dir, status, state, is_terminal, dim_ids,
-        project_files, total_elapsed_s, run_budget_s,
-    )
+    consolidated = _maybe_consolidated_live_progress(job_id, ctx)
     if consolidated is not None:
         return consolidated
 
-    return _build_per_dim_progress(
-        job_id, run_dir, status, state, is_terminal, dim_records, dim_estimates,
-        dim_ids, evidence_dir, evaluators_dir, compiled_dir,
-        project_files, total_elapsed_s, run_budget_s,
-    )
+    return _build_per_dim_progress(job_id, ctx)
