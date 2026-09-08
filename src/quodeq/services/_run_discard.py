@@ -19,6 +19,14 @@ from quodeq.services._wiring import read_dispatched_cache_keys, remove_matching_
 _TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
 _CANCEL_WAIT_TIMEOUT_S = 2.0
 _CANCEL_WAIT_POLL_S = 0.05
+# Entries in scratch patterns: the replayed_unconsolidated_keys pattern belongs
+# to EARLIER runs and is cleaned up as scratch but deliberately not fed to the
+# cache-deletion loop above (entries there are only for this run's cache keys).
+_SCRATCH_PATTERNS = (
+    "*_queue.json", "*_fingerprint.json",
+    "*_evidence.jsonl", "*_dispatch_keys.json",
+    "*_replayed_unconsolidated_keys.json",
+)
 
 
 def _wait_for_terminal_status(
@@ -125,14 +133,7 @@ def _discard_run_state(
             except Exception as exc:  # noqa: BLE001
                 log.warning(f"Could not delete cache entry {key}: {exc}")
 
-    scratch_patterns = (
-        "*_queue.json", "*_fingerprint.json",
-        "*_evidence.jsonl", "*_dispatch_keys.json",
-        # Entries listed here belong to EARLIER runs, so they are cleaned up
-        # as scratch but deliberately not fed to the cache-deletion loop above.
-        "*_replayed_unconsolidated_keys.json",
-    )
-    remove_matching_files(evidence_dir, scratch_patterns)
+    remove_matching_files(evidence_dir, _SCRATCH_PATTERNS)
 
 
 class _CacheEraser(Protocol):
