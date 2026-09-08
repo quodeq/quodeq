@@ -64,13 +64,27 @@ class TestAdvance:
         jsonl.write_text(complete + marker[:-3])  # writer mid-line
         state = DispatchJsonlState()
         state.advance(jsonl)
-        assert state.offset == len(complete.encode())
+        # Expect the offset the file actually has, not len(complete.encode()):
+        # write_text emits CRLF on Windows, and the state counts on-disk bytes.
+        assert state.offset == jsonl.read_bytes().index(b"\n") + 1
         assert state.ok_files() == set()
 
         _append(jsonl, marker[-3:] + "\n")
         state.advance(jsonl)
         assert state.ok_files() == {"a.py"}
         assert state.offset == jsonl.stat().st_size
+
+    def test_crlf_lines_are_consumed_and_parsed(self, tmp_path: Path):
+        # Windows text-mode writers end lines with CRLF. The offset must land
+        # after the LF, and the CR must not leak into the parsed entries.
+        jsonl = tmp_path / "e.jsonl"
+        body = (_line(_finding("a.py", 1)) + _line(_ok("a.py"))).replace("\n", "\r\n")
+        jsonl.write_bytes(body.encode() + b'{"file": "b.py"')  # torn tail
+        state = DispatchJsonlState()
+        state.advance(jsonl)
+        assert state.offset == len(body.encode())
+        assert state.ok_files() == {"a.py"}
+        assert [e["line"] for e in state.grouped["a.py"]] == [1]
 
     def test_include_tail_reads_a_line_without_newline(self, tmp_path: Path):
         jsonl = tmp_path / "e.jsonl"
