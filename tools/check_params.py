@@ -76,7 +76,7 @@ def iter_functions(tree: ast.Module) -> Iterator[tuple[str, FunctionNode, bool]]
 def _scan() -> list[Violation]:
     """Return sorted (relpath, qualname, count) for every over-limit function."""
     found: list[Violation] = []
-    for py in sorted(PY_ROOT.rglob("*.py")):
+    for py in _ratchet.iter_python_files(PY_ROOT):
         text = _ratchet.read_text(py)
         if text is None:
             continue

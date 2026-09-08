@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Callable, Sequence, TypeVar
+from typing import Callable, Iterator, Sequence, TypeVar
 
 V = TypeVar("V")
+
+EXCLUDE_DIRS = frozenset({"node_modules", "dist", "generated", "__pycache__"})
 
 
 def read_text(path: Path) -> str | None:
@@ -22,6 +24,13 @@ def read_text(path: Path) -> str | None:
     except (OSError, UnicodeDecodeError) as e:
         print(f"warning: skipping {path}: {e}", file=sys.stderr)
         return None
+
+
+def iter_python_files(root: Path) -> Iterator[Path]:
+    """Yield root/**/*.py in sorted order, skipping vendored and generated dirs."""
+    for py in sorted(root.rglob("*.py")):
+        if EXCLUDE_DIRS.isdisjoint(py.relative_to(root).parts):
+            yield py
 
 
 def load_baseline(path: Path) -> set[str]:

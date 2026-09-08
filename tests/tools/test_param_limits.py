@@ -37,3 +37,12 @@ def test_baseline_has_no_stale_entries():
         "Baseline lists violations that no longer exist; regenerate with "
         "`python tools/check_params.py --update-baseline`:\n" + "\n".join(stale)
     )
+
+
+def test_violation_keys_have_no_collisions():
+    """relpath:qualname collides for same-named siblings (@overload stacks,
+    property getter/setter, platform-branch defs). If this fails, rename
+    the colliding over-limit function, or extend the key scheme to
+    disambiguate."""
+    keys = [check_params.violation_key(v) for v in check_params._scan()]
+    assert len(keys) == len(set(keys))

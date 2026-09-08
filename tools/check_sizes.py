@@ -6,12 +6,13 @@ gate runs green in CI today while preventing NEW violations. Regenerate the
 baseline (only with justification) via:
     python tools/check_sizes.py --update-baseline
 
-Scans src/quodeq/**/*.py with `ast` for both file- and function-level
-violations (a "function" here means any FunctionDef/AsyncFunctionDef,
-including methods), tests/**/*.py at file level only (test functions are
-long by nature; test files still must stay under 300 lines), and
-src/quodeq/ui/src/**/*.{js,jsx} for file-level violations only -- JS
-function length is enforced separately by src/quodeq/ui/eslint.size.config.js.
+Scans src/quodeq/**/*.py (vendored/generated dirs excluded) with `ast` for
+both file- and function-level violations (a "function" here means any
+FunctionDef/AsyncFunctionDef, including methods), tests/**/*.py (same
+exclusion) at file level only (test functions are long by nature; test
+files still must stay under 300 lines), and src/quodeq/ui/src/**/*.{js,jsx}
+for file-level violations only -- JS function length is enforced separately
+by src/quodeq/ui/eslint.size.config.js.
 """
 from __future__ import annotations
 
@@ -62,7 +63,7 @@ def _relpath(path: Path) -> str:
 def _scan_python() -> list[tuple[str, int, str, int]]:
     """Return (relpath, lineno, kind, size) violations for src/quodeq/**/*.py."""
     found: list[tuple[str, int, str, int]] = []
-    for py in sorted(PY_ROOT.rglob("*.py")):
+    for py in _ratchet.iter_python_files(PY_ROOT):
         text = _read_text(py)
         if text is None:
             continue
@@ -83,7 +84,7 @@ def _scan_python() -> list[tuple[str, int, str, int]]:
 def _scan_tests() -> list[tuple[str, int, str, int]]:
     """Return (relpath, 1, "file", size) violations for tests/**/*.py."""
     found: list[tuple[str, int, str, int]] = []
-    for py in sorted(TESTS_ROOT.rglob("*.py")):
+    for py in _ratchet.iter_python_files(TESTS_ROOT):
         text = _read_text(py)
         if text is None:
             continue

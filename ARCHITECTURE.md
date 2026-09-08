@@ -59,12 +59,12 @@ Pre-existing violations are grandfathered in `tools/import_baseline.txt` (a burn
 
 ## Machine-enforced ratchets
 
-Each gate compares the tree against a committed, burn-down-only baseline and fails CI on new violations. Fix the code rather than add entries; when you fix a grandfathered entry, regenerate so the baseline shrinks.
+Each gate compares the tree against a committed, burn-down-only baseline and fails CI on new violations (100 lines above is the design target; 300 is the enforced cap). Fix the code rather than add entries; when you fix a grandfathered entry, regenerate so the baseline shrinks.
 
 | Gate | Scope | Baseline | Regenerate |
 |------|-------|----------|------------|
-| `tools/check_sizes.py` via `tests/tools/test_size_limits.py` | files <= 300 lines (`src/quodeq`, `tests`, `ui/src`), functions <= 50 lines (`src/quodeq`) | `tools/size_baseline.txt` | `python tools/check_sizes.py --update-baseline` |
-| `tools/check_params.py` via `tests/tools/test_param_limits.py` | functions <= 5 parameters, self/cls excluded (`src/quodeq`) | `tools/param_baseline.txt` | `python tools/check_params.py --update-baseline` |
+| `tools/check_sizes.py` via `tests/tools/test_size_limits.py` | files <= 300 lines (`src/quodeq`, `tests`, `ui/src`), functions <= 50 lines (`src/quodeq`); vendored/generated dirs excluded | `tools/size_baseline.txt` | `python tools/check_sizes.py --update-baseline` |
+| `tools/check_params.py` via `tests/tools/test_param_limits.py` | functions <= 5 parameters, self/cls excluded (`src/quodeq`); vendored/generated dirs excluded | `tools/param_baseline.txt` | `python tools/check_params.py --update-baseline` |
 | `tools/check_imports.py` via `tests/tools/test_import_layers.py` | layer import rules above | `tools/import_baseline.txt` | `python tools/check_imports.py --update-baseline` (line-keyed: prefer hand edits) |
 | `npm run lint:strings` | hardcoded user-visible strings | `ui/tools/strings_baseline.json` | `npm run lint:strings:update` |
 | `npm run lint:size` | UI files <= 300 lines, functions <= 50 lines | `ui/tools/size_grandfather.mjs` | edit the list (ceiling in `check_size_grandfather.mjs`) |
