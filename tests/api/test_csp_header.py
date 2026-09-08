@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from quodeq.api import security as _security
+from quodeq.api import security
 from quodeq.api.app import create_app
 
 # Alt-port origins probed by useServerHealth.js (DEFAULT_ALT_PORTS = [4180..4183]).
@@ -68,7 +68,7 @@ def test_csp_allows_google_fonts(csp):
 def test_alt_port_origins_built_once_as_module_constant(csp):
     """The alt-port list depends on no request data, so it is built at import
     and interpolated per response rather than re-joined in after_request."""
-    constant = _security._ALT_PORT_ORIGINS
+    constant = security._ALT_PORT_ORIGINS
     assert isinstance(constant, str)
     tokens = constant.split()
     for origin in _ALT_PORT_ORIGINS + _WS_ALT_PORT_ORIGINS:
@@ -143,9 +143,21 @@ def test_csp_mask_src_allows_data_uris(csp):
     assert "data:" in mask_src, "mask-src must include data: to allow inline SVG masks"
 
 
-# --- Webview-only unsafe-eval relaxation (UA-gated) -------------------------
+# --- Webview-only unsafe-eval relaxation (per-launch token gated) ----------
+#
+# Held security fix: the relaxation used to be gated on the QuodeqDesktop UA
+# marker alone, a fixed public string any HTTP client could send. It is now
+# gated on a per-launch shared secret (QUODEQ_WEBVIEW_TOKEN) embedded in the
+# webview's own UA — see quodeq.api.security._is_trusted_webview.
 
-_WEBVIEW_UA = "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) QuodeqDesktop/1.4.0 Safari/605.1.15"
+_TOKEN = "shared-secret-abc123"
+_WEBVIEW_UA_MARKER_ONLY = (
+    "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) QuodeqDesktop/1.4.0 Safari/605.1.15"
+)
+_WEBVIEW_UA_WITH_TOKEN = (
+    "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+    f"QuodeqDesktop/1.4.0 {security._WEBVIEW_TOKEN_UA_PREFIX}{_TOKEN} Safari/605.1.15"
+)
 
 
 def _csp_for_ua(ua: str | None) -> str:
@@ -155,16 +167,54 @@ def _csp_for_ua(ua: str | None) -> str:
         return client.get("/api/health", headers=headers).headers["Content-Security-Policy"]
 
 
-def test_webview_ua_gets_unsafe_eval_in_script_src():
-    """The native webview UA must be served script-src with 'unsafe-eval' so
-    pywebview's new Function() bridge works under the otherwise-strict CSP."""
-    script_src = _directive(_csp_for_ua(_WEBVIEW_UA), "script-src")
+def test_webview_ua_with_correct_token_gets_unsafe_eval(monkeypatch):
+    """The native webview UA, carrying the correct per-launch token, must be
+    served script-src with 'unsafe-eval' so pywebview's new Function()
+    bridge works under the otherwise-strict CSP."""
+    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
+    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_WITH_TOKEN), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" in script_src
 
 
-def test_non_webview_ua_stays_strict():
+def test_forged_marker_without_token_stays_strict(monkeypatch):
+    """The OLD static marker string alone, without the token, must NOT get
+    the relaxed CSP — this is the forgery the token gate closes: any HTTP
+    client can set a UA substring, so the marker alone must never be enough."""
+    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
+    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_MARKER_ONLY), "script-src")
+    assert script_src is not None
+    assert "'unsafe-eval'" not in script_src
+
+
+def test_wrong_token_stays_strict(monkeypatch):
+    """A UA carrying a token that doesn't match the launch's secret must not
+    get the relaxation either (not just any token-shaped string)."""
+    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
+    wrong_ua = (
+        "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        f"QuodeqDesktop/1.4.0 {security._WEBVIEW_TOKEN_UA_PREFIX}not-the-real-token Safari/605.1.15"
+    )
+    script_src = _directive(_csp_for_ua(wrong_ua), "script-src")
+    assert script_src is not None
+    assert "'unsafe-eval'" not in script_src
+
+
+def test_no_token_env_var_set_never_relaxes(monkeypatch):
+    """With QUODEQ_WEBVIEW_TOKEN unset entirely (e.g. dashboard run
+    standalone via CLI, not through the desktop launcher), CSP relaxation
+    must never fire, regardless of UA content — preserves today's behavior
+    for non-desktop usage, where unsafe-eval should never be granted."""
+    monkeypatch.delenv(security._ENV_WEBVIEW_TOKEN, raising=False)
+    for ua in (_WEBVIEW_UA_WITH_TOKEN, _WEBVIEW_UA_MARKER_ONLY, "Mozilla/5.0 (a regular browser)"):
+        script_src = _directive(_csp_for_ua(ua), "script-src")
+        assert script_src is not None
+        assert "'unsafe-eval'" not in script_src
+
+
+def test_non_webview_ua_stays_strict(monkeypatch):
     """Any non-webview UA keeps the strict script-src (no unsafe-eval)."""
+    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
     script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)"), "script-src")
     assert script_src is not None
     assert "'unsafe-eval'" not in script_src

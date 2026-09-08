@@ -61,20 +61,22 @@ def _quodeq_version() -> str:
         return "dev"
 
 
-# Marker embedded in the webview's User-Agent so the API serves it the
-# relaxed CSP (see quodeq.api.security._WEBVIEW_UA_MARKER — must match).
+# Human-readable marker (must match quodeq.api.security._WEBVIEW_UA_MARKER).
+# Not itself a security check — any HTTP client can send this substring; the
+# CSP relaxation is gated on the per-launch token below.
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
 
+# UA prefix ahead of the token (must match security._WEBVIEW_TOKEN_UA_PREFIX).
+_WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
 
-def _webview_user_agent() -> str:
-    """Browser-recognisable UA carrying the webview marker.
 
-    The AppleWebKit/Safari tokens keep Google Fonts serving woff2; the
-    marker tells the API to relax the CSP (see _WEBVIEW_UA_MARKER).
-    """
+def _webview_user_agent(token: str | None = None) -> str:
+    """UA carrying the marker (human-readable) and the token that actually
+    grants the relaxed CSP (see quodeq.api.security._is_trusted_webview)."""
+    token_part = f" {_WEBVIEW_TOKEN_UA_PREFIX}{token}" if token else ""
     return (
         "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        f"{_WEBVIEW_UA_MARKER}/{_quodeq_version()} Safari/605.1.15"
+        f"{_WEBVIEW_UA_MARKER}/{_quodeq_version()}{token_part} Safari/605.1.15"
     )
 
 

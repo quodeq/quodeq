@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import signal
 import subprocess
 import sys
@@ -21,6 +22,27 @@ from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
 _HTTP_SCHEME = "http"
+
+# Env var read by quodeq.api.security to gate the webview-only CSP
+# relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
+_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+
+_webview_token: str | None = None
+
+
+def _get_webview_token() -> str:
+    """Per-launch shared secret gating the webview's CSP unsafe-eval relaxation.
+
+    Generated once per process and memoized so the API subprocess (started
+    via _ensure_action_api[_forced], which sets it into this process's
+    environment before spawning) and the webview subprocess (started later
+    by _serve_native, which appends it to argv) get the same value, however
+    far apart their call sites are.
+    """
+    global _webview_token
+    if _webview_token is None:
+        _webview_token = secrets.token_urlsafe(24)
+    return _webview_token
 
 
 def _guard_plaintext_http(
@@ -58,6 +80,7 @@ def _ensure_action_api(
             if probes.api_healthy(base_url):
                 return base_url, None
             continue
+        os.environ[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
         return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
@@ -76,6 +99,7 @@ def _ensure_action_api_forced(
         if probes.api_healthy(base_url):
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
+    os.environ[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
     return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )
@@ -236,7 +260,7 @@ def _serve_native(
     webview_stderr = _open_webview_log()
 
     shell.spawn_window(
-        subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
+        subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid, _get_webview_token()]),
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=webview_stderr,

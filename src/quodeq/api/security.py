@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import os
 import re
 import time
 from http import HTTPStatus
@@ -29,14 +30,51 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 
 # Marker substring in the native webview's User-Agent (set by
-# quodeq.dashboard._webview_window). Requests carrying it are the trusted
-# local desktop shell and are served 'unsafe-eval' so pywebview's
-# new Function() JS bridge works; browsers keep the strict script-src.
-# Loopback-only exposure: a local process could spoof this UA, but it
-# would already have local code execution. The literal MUST match
-# _webview_window._WEBVIEW_UA_MARKER (drift-guarded by
+# quodeq.dashboard._webview_window_about). Kept for human-readable UA
+# strings only — it's a fixed, publicly-known string, so it is NOT what
+# grants 'unsafe-eval' (see _is_trusted_webview below). The literal MUST
+# match _webview_window_about._WEBVIEW_UA_MARKER (drift-guarded by
 # tests/dashboard/test_native_chrome.py).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
+
+# Env var carrying the per-launch shared secret _server.py generates and
+# hands to the API subprocess (env) and the webview subprocess (argv), which
+# embeds it in its own UA. Requests whose UA carries the matching token are
+# the trusted local desktop shell and are served 'unsafe-eval' so pywebview's
+# new Function() JS bridge works; everyone else keeps the strict script-src.
+# Unset (e.g. the dashboard run standalone via `quodeq api`, not through the
+# desktop launcher) means the relaxation never fires.
+_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+
+# UA prefix the webview puts ahead of the token (see
+# _webview_window_about._webview_user_agent). Must match there.
+_WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
+
+
+def _webview_token_from_ua(user_agent: str) -> str | None:
+    idx = user_agent.find(_WEBVIEW_TOKEN_UA_PREFIX)
+    if idx == -1:
+        return None
+    rest = user_agent[idx + len(_WEBVIEW_TOKEN_UA_PREFIX):]
+    return rest.split(" ", 1)[0] or None
+
+
+def _is_trusted_webview(user_agent: str) -> bool:
+    """True only for a request carrying this launch's webview token.
+
+    Reads QUODEQ_WEBVIEW_TOKEN lazily (not at module load) so it reflects
+    whatever _server.py set in this process's environment before spawning
+    the API subprocess, and so standalone (non-desktop) runs that never set
+    it always fail closed here regardless of UA content.
+    """
+    expected = os.environ.get(_ENV_WEBVIEW_TOKEN)
+    if not expected:
+        return False
+    candidate = _webview_token_from_ua(user_agent)
+    if not candidate:
+        return False
+    return hmac.compare_digest(candidate, expected)
+
 
 # Host header must look like a bare hostname/IPv4 or a bracketed IPv6
 # literal (RFC 3986 host syntax, e.g. "[::1]:4180"), with an optional port,
@@ -161,7 +199,7 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
             self_ws = _same_origin_ws_sources(request.host)
         except Exception:
             self_ws = ""
-        is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")
+        is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""))
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "

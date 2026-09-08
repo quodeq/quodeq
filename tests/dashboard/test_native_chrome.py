@@ -73,6 +73,59 @@ class TestUaMarkerNoDrift:
     def test_user_agent_carries_marker(self):
         assert ww._WEBVIEW_UA_MARKER in ww._webview_user_agent()
 
+    def test_token_prefix_matches_security_module(self):
+        from quodeq.api import security
+        from quodeq.dashboard import _webview_window_about
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX == security._WEBVIEW_TOKEN_UA_PREFIX
+
+    def test_user_agent_without_token_has_no_token_prefix(self):
+        """The marker alone is not the security check — no token, no token prefix."""
+        from quodeq.dashboard import _webview_window_about
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ww._webview_user_agent()
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ww._webview_user_agent(None)
+
+    def test_user_agent_with_token_carries_it(self):
+        from quodeq.dashboard import _webview_window_about
+        ua = ww._webview_user_agent("shared-secret-123")
+        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
+        assert ww._WEBVIEW_UA_MARKER in ua  # human-readable marker kept alongside the token
+
+
+class TestMainThreadsWebviewToken:
+    """main() must read the optional argv[4] token (same absent-arg guard as
+    api_pid at argv[3]) and pass it through to the actual UA sent to
+    webview.start — that UA is what the API's security check inspects."""
+
+    def _run_main(self, monkeypatch, tmp_path, argv_tail):
+        argv = ["webview.py", "http://127.0.0.1:7863", str(tmp_path / "reload.sock"), *argv_tail]
+        monkeypatch.setattr(ww.sys, "argv", argv)
+        mock_instance = MagicMock()
+        mock_instance.try_acquire.return_value = False
+        with patch.object(ww, "_set_app_icon"), \
+             patch.object(ww, "InstanceController", return_value=mock_instance), \
+             patch.object(ww, "_create_window", return_value=MagicMock()), \
+             patch.object(ww, "_make_on_reload", return_value=MagicMock()), \
+             patch.object(ww, "_make_on_loaded", return_value=MagicMock()), \
+             patch.object(ww, "_make_on_closing", return_value=MagicMock()), \
+             patch.object(ww, "_non_macos_menu", return_value=None), \
+             patch.object(ww, "_quodeq_dir", return_value=tmp_path), \
+             patch.object(ww, "webview") as mock_webview:
+            ww.main()
+        return mock_webview.start.call_args.kwargs["user_agent"]
+
+    def test_token_present_reaches_user_agent(self, monkeypatch, tmp_path):
+        from quodeq.dashboard import _webview_window_about
+        ua = self._run_main(monkeypatch, tmp_path, ["", "shared-secret-123"])
+        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
+
+    def test_token_absent_is_backward_compatible(self, monkeypatch, tmp_path):
+        """Same guard as the existing api_pid optional-arg handling: an argv
+        without a 5th element must not crash main(), and the UA carries no
+        token prefix (matching a standalone/older-launcher invocation)."""
+        from quodeq.dashboard import _webview_window_about
+        ua = self._run_main(monkeypatch, tmp_path, [])
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ua
+
 
 class TestSetTitlebarTheme:
     def _api(self):
