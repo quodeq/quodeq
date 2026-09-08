@@ -28,6 +28,7 @@ from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache import LocalFileBackend, build_cache_key_for_file
 from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from tests.analysis.cache.conftest import _CountingCache
 
 
 def _make_manifest(file_names: list[str]) -> SourceManifest:
@@ -245,3 +246,39 @@ class TestNoWatcherWhenNoMisses:
         # All-hits path → no watcher thread started.
         watcher_threads = [t for t in threads_created if t.name and "v2-cache-persist" in t.name]
         assert watcher_threads == []
+
+
+class TestTicksAreIncremental:
+    def test_unchanged_ok_file_is_put_once_across_ticks(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """Every tick used to re-read the whole JSONL and re-put every ok
+        file. With one DispatchJsonlState per dispatch, a file whose lines
+        have not changed since the last tick is not written again: several
+        periodic ticks plus the final persist put a.py exactly once."""
+        config = _setup(tmp_path, {"a.py": "x"})
+        from quodeq.core.evidence.model import Evidence
+        counting = _CountingCache(cache)
+
+        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
+            jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            jsonl.write_text(
+                '{"file": "a.py", "line": 1, "t": "violation", "w": "found"}\n'
+                + '{"_marker": "file_done", "file": "a.py", "status": "ok"}\n'
+            )
+            time.sleep(0.3)  # several persist ticks at the tiny interval below
+            return Evidence(
+                repository="", language="python", date="2026-01-01",
+                source_file_count=1, files_read=1, coverage_pct=100.0,
+                principles={},
+            )
+
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(), _make_callbacks(),
+            cache=counting, dispatcher=slow_dispatcher, persist_interval_s=0.05,
+        )
+
+        assert counting.put_count == 1
+        key = build_cache_key_for_file(config, "a.py", "security")
+        assert cache.get(key) is not None

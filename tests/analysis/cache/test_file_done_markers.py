@@ -70,3 +70,15 @@ class TestGroupFindingsByFile:
         grouped, ok_files = _group_findings_by_file(tmp_path / "missing.jsonl")
         assert grouped == {}
         assert ok_files == set()
+
+    def test_last_line_without_trailing_newline_is_read(self, tmp_path: Path):
+        # One-shot reads see a finished file: a final line the writer never
+        # newline-terminated still counts (the live tick reader leaves it).
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.write_text(
+            json.dumps({"file": "a.py", "req": "X-1", "t": "violation"}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"})
+        )
+        grouped, ok_files = _group_findings_by_file(jsonl)
+        assert ok_files == {"a.py"}
+        assert len(grouped["a.py"]) == 1
