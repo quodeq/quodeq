@@ -288,5 +288,6 @@ def persist_dispatch_results(
             effective_params=effective_params, version=version, params_hash=params_hash,
         )
         cache.put(key, entry)
-    # Cleared only once every put landed, so a failed tick retries its files.
+    # A raising put keeps dirty for the next tick. A put that fails silently
+    # (LocalFileBackend swallows OSError) is redone by the final full re-read.
     state.dirty.clear()

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from quodeq.services.jobs import JobManager, STATUS_RUNNING
+from quodeq.services._job_log_tee import _iter_line_batches
 from quodeq.services._job_model import Job
 
 
@@ -286,3 +287,39 @@ def test_pipe_reader_keeps_partial_line_and_translates_crlf(tmp_path: Path) -> N
 
     assert flushes == [["first"], ["last"]]
     assert list(jm._store.get("job-tail").logs) == ["first", "last"]
+
+
+class _ChunkedStream:
+    """Text-stream stand-in whose byte buffer hands back one scripted chunk
+    per read1, the way a pipe returns whatever the child wrote so far."""
+
+    encoding = "utf-8"
+    errors = "strict"
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self.buffer = self
+        self._chunks = list(chunks)
+
+    def read1(self, _n: int) -> bytes:
+        return self._chunks.pop(0) if self._chunks else b""
+
+
+def test_long_unterminated_line_over_many_small_reads_is_delivered_whole() -> None:
+    """A 5000-byte line arriving 99 bytes per read (cuts land inside
+    multibyte characters) is one line once its newline arrives; the lines
+    after it batch and tail as usual."""
+    line = "é" * 2500
+    payload = line.encode("utf-8") + b"\nsecond\nthird"
+    chunks = [payload[i:i + 99] for i in range(0, len(payload), 99)]
+
+    batches = list(_iter_line_batches(_ChunkedStream(chunks)))
+
+    assert batches == [[line, "second"], ["third"]]
+
+
+def test_crlf_split_across_reads_is_one_newline() -> None:
+    """A CR at the end of one read and its LF at the start of the next
+    translate to a single newline, as the text wrapper would do."""
+    batches = list(_iter_line_batches(_ChunkedStream([b"first\r", b"\nlast\r\n", b"tail"])))
+
+    assert batches == [["first", "last"], ["tail"]]

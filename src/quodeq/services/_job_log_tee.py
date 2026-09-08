@@ -48,13 +48,20 @@ def _iter_line_batches(stream: Iterable[str]) -> Iterator[list[str]]:
         codecs.getincrementaldecoder(encoding)(getattr(stream, "errors", None) or "strict"),
         translate=True,
     )
-    pending = ""
+    parts: list[str] = []  # pieces of the line the reads so far left open
     while True:
         chunk = read1(io.DEFAULT_BUFFER_SIZE)
-        lines = (pending + decoder.decode(chunk, final=not chunk)).split("\n")
-        pending = lines.pop()
-        if not chunk and pending:
-            lines.append(pending)
+        text = decoder.decode(chunk, final=not chunk)
+        parts.append(text)
+        if chunk and "\n" not in text:
+            # Still inside one line: join only once a newline (or EOF) lands,
+            # so a long line costs one copy rather than one per read.
+            continue
+        lines = "".join(parts).split("\n")
+        tail = lines.pop()
+        parts = [tail] if tail else []
+        if not chunk and tail:
+            lines.append(tail)
         if lines:
             yield lines
         if not chunk:

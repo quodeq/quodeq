@@ -176,9 +176,8 @@ def _start_watchers(
     already persists synchronously) and the failure-streak breaker.
     Creates the evidence JSONL up front, when absent, so the breaker's
     first poll doesn't warn about a missing file."""
-    persist_fn = _make_persist_fn(config, dim_id, jsonl, classify, cache)
-
     stop_event = threading.Event()
+    persist_fn = _make_persist_fn(config, dim_id, jsonl, classify, cache, stop_event)
     watcher = threading.Thread(
         target=_periodic_persist,
         args=(stop_event, persist_fn, persist_interval_s, _logger.warning),

@@ -12,8 +12,12 @@ things move them: truncation, and the pool's in-place ``deduplicate_jsonl``
 rewrite at the end of a dispatch, which can drop lines *before* the offset
 while a longer tail keeps the file at least as large as before, so a size
 check alone would seek into the middle of a line. Either trips the guard
-and forces a re-read from byte 0. That re-read marks every file dirty
-again, so the next persist rewrites all of them, exactly as a full read did.
+and forces a re-read from byte 0, which marks every file dirty again.
+
+The guard is a tick-level optimisation, not a correctness boundary: a
+rewrite that leaves those trailing bytes unchanged is invisible to it. The
+watcher therefore calls ``reset()`` before its final persist
+(``_persist_watcher.py``), so the last write never trusts the offset.
 
 One state belongs to one watcher thread; it is not synchronised.
 """

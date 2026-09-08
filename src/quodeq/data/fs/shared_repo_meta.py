@@ -113,9 +113,15 @@ def _read_published_json(entry: Path) -> dict | None:
     return {"publishedBy": by, "publishedAt": at}
 
 
+# Pathspecs per ``git log`` call. One argv naming every legacy dir hits the
+# OS command-line limit past a few thousand entries, and that OSError used
+# to drop attribution for all of them at once.
+_GIT_LOG_PATHSPEC_BATCH = 100
+
+
 def _legacy_git_attribution(repo: Path, names: list[str]) -> dict[str, dict]:
     """Author and commit time of the newest commit touching each
-    ``evaluations/<name>``, from one ``git log`` walk over all *names*.
+    ``evaluations/<name>``, from one ``git log`` walk per batch of *names*.
 
     Commits come newest first, so the first one listing a file under a dir
     is the commit ``git log -1 -- evaluations/<name>`` would report, without
@@ -123,17 +129,23 @@ def _legacy_git_attribution(repo: Path, names: list[str]) -> dict[str, dict]:
     a non-ASCII dir name still matches ``entry.name``. Merge commits list no
     files and so never win; that only differs from ``-1`` on a merge that
     itself changed a project dir, which the shared clone's linear history
-    (commit + push, fetch + reset) does not produce.
+    (commit + push, fetch + reset) does not produce. A failed batch drops
+    attribution for its own names only.
     """
-    if not names:
-        return {}
-    ok, out = run_git(
-        ["log", "-z", "--format=%x1f%an|%ct", "--name-only", "--", *(f"evaluations/{n}" for n in names)],
-        cwd=repo,
-    )
-    if not ok:
-        return {}
-    wanted = set(names)
+    result: dict[str, dict] = {}
+    for start in range(0, len(names), _GIT_LOG_PATHSPEC_BATCH):
+        batch = names[start:start + _GIT_LOG_PATHSPEC_BATCH]
+        ok, out = run_git(
+            ["log", "-z", "--format=%x1f%an|%ct", "--name-only", "--", *(f"evaluations/{n}" for n in batch)],
+            cwd=repo,
+        )
+        if ok:
+            result.update(_parse_attribution_log(out, set(batch)))
+    return result
+
+
+def _parse_attribution_log(out: str, wanted: set[str]) -> dict[str, dict]:
+    """Newest commit per *wanted* dir from ``git log -z --name-only`` output."""
     result: dict[str, dict] = {}
     meta: dict | None = None
     for token in out.split("\x00"):
@@ -157,8 +169,8 @@ def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
 
     Prefers the published.json written by stage_project at publish time
     (see shared_publish.py). Falls back to the legacy git-log-derived
-    lookup, batched into one git call for every project dir published
-    before that file existed. The fallback is only correct because the
+    lookup, batched 100 pathspecs per git call over the project dirs
+    published before that file existed. The fallback is only correct because the
     clone is full history (no --depth) -- a shallow clone made `git log -1
     -- path` return the tip commit for every path, misattributing every
     project except the most recently pushed one (audit finding C1).

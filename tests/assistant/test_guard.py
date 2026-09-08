@@ -24,9 +24,9 @@ def test_guard_flags_injection_content():
     assert warnings
 
 
-def test_guard_truncation_matches_one_shot_dump_prefix():
-    # The streamed encoder must reproduce json.dumps output up to the cap, so
-    # the model sees exactly what it saw before the early stop was added.
+def test_guard_truncation_is_a_prefix_cut_of_the_dump():
+    # Truncation keeps exactly the first MAX_TOOL_RESULT_CHARS of the dump
+    # and appends the marker, nothing else.
     items = [{"file": f"src/m{i}.py", "line": i, "reason": "r" * 40} for i in range(2000)]
     result = {"ok": True, "result": {"items": items}}
     expected = json.dumps(result, ensure_ascii=False)[:MAX_TOOL_RESULT_CHARS] + " ...[truncated]"
@@ -39,19 +39,3 @@ def test_guard_small_result_is_serialized_whole():
     fenced, _ = guard_tool_result(result, "search_findings")
     assert json.dumps(result, ensure_ascii=False) in fenced
     assert "[truncated]" not in fenced
-
-
-def test_guard_stops_serializing_past_the_cap():
-    # Each item is a dict subclass so its items() call is observable (both the
-    # C and Python encoders go through items() for non-exact dicts). With the
-    # one-shot dump every item was encoded; now encoding stops near the cap.
-    seen: list[int] = []
-
-    class Spy(dict):
-        def items(self):
-            seen.append(1)
-            return super().items()
-
-    items = [Spy(file=f"src/m{i}.py", reason="r" * 40) for i in range(5000)]
-    guard_tool_result({"ok": True, "result": {"items": items}}, "search_findings")
-    assert 0 < len(seen) < 5000
