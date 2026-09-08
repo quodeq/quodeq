@@ -39,7 +39,7 @@ from quodeq.services._fs_projects import (
     _build_project_entries_threaded,
     _collect_candidate_dirs,
 )
-from quodeq.services._wiring import read_repository_info, repository_info_exists
+from quodeq.services._wiring import repository_info_exists
 
 
 def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:
@@ -53,13 +53,17 @@ def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:
 
 
 def _collect_lightweight_entries(reports_root: Path, dir_names: list[str]) -> list[ProjectEntry]:
-    parent_ids, subproject_ids, _ = _build_parent_child_sets(reports_root, dir_names)
-    registered_ids = {n for n in dir_names if repository_info_exists(reports_root / n)}
-    included = [n for n in dir_names if n in registered_ids or n in parent_ids or n in subproject_ids]
-    return [
-        _build_lightweight_entry(name, read_repository_info(reports_root / name) or {})
-        for name in included
+    parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
+    # info_by_name already holds every parseable record, so only the dirs it
+    # lacks need the presence probe: a corrupt repository_info.json still
+    # marks a registered project (see repository_info_exists) and is listed
+    # with fallback metadata, as before.
+    included = [
+        n for n in dir_names
+        if n in info_by_name or n in parent_ids or n in subproject_ids
+        or repository_info_exists(reports_root / n)
     ]
+    return [_build_lightweight_entry(name, info_by_name.get(name) or {}) for name in included]
 
 
 def build_project_index(reports_root: Path) -> list[ProjectEntry]:

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import io
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from quodeq.services.jobs import JobManager, STATUS_RUNNING
-from quodeq.services._job_model import Job, _CONSUME_BATCH_SIZE
+from quodeq.services._job_model import Job
 
 
 def _make_job(job_id: str) -> Job:
@@ -163,8 +165,8 @@ def test_set_reports_root_updates_job_manager(tmp_path: Path) -> None:
 def test_batch_boundary_all_lines_in_run_log_in_order(tmp_path: Path) -> None:
     """All 100 lines appear in run.log in order even when marker is mid-stream.
 
-    This exercises the batch boundary: with _CONSUME_BATCH_SIZE lines flushed
-    per batch, the marker may land in the middle of a batch.  The final
+    This exercises the batch boundary: lines are flushed in per-read batches,
+    so the marker may land in the middle of a batch.  The final
     _drain_pre_marker_buffer call must ensure no buffered lines are lost.
     """
     project = "proj-batch"
@@ -226,3 +228,61 @@ def test_consume_stream_cleans_up_on_unexpected_exception(tmp_path: Path) -> Non
     # Writer and buffer must be cleaned up regardless.
     assert "job-exc" not in jm._run_log_writers
     assert "job-exc" not in jm._pre_marker_buffer
+
+
+# ---------------------------------------------------------------------------
+# Per-read batching (finding 5208)
+# ---------------------------------------------------------------------------
+
+def _pipe_stream(payload: bytes) -> io.TextIOWrapper:
+    """A text stream over a real pipe that already holds *payload*, writer closed.
+
+    Iterables and StringIO cannot show batching: only a pipe-backed
+    TextIOWrapper has the byte buffer consume_stream reads per burst.
+    """
+    read_fd, write_fd = os.pipe()
+    os.write(write_fd, payload)
+    os.close(write_fd)
+    return io.TextIOWrapper(io.open(read_fd, "rb"), encoding="utf-8")
+
+
+def _spy_flushes(jm: JobManager) -> list[list[str]]:
+    flushes: list[list[str]] = []
+    real_flush = jm._flush_batch
+
+    def _spy(job_id: str, batch: list[str]) -> bool:
+        flushes.append(list(batch))
+        return real_flush(job_id, batch)
+
+    jm._flush_batch = _spy
+    return flushes
+
+
+def test_lines_from_one_pipe_read_reach_the_job_in_one_flush(tmp_path: Path) -> None:
+    """A burst already sitting in the pipe is flushed as one batch, not per line."""
+    lines = [f"line-{i}" for i in range(20)]
+    stream = _pipe_stream("".join(f"{line}\n" for line in lines).encode())
+    jm = JobManager(reports_root=tmp_path)
+    jm._store.put(_make_job("job-pipe"))
+    flushes = _spy_flushes(jm)
+
+    with stream:
+        jm._consume_stream("job-pipe", stream)
+
+    assert flushes == [lines]
+    assert list(jm._store.get("job-pipe").logs) == lines
+
+
+def test_pipe_reader_keeps_partial_line_and_translates_crlf(tmp_path: Path) -> None:
+    """A trailing line without newline waits for EOF and is still delivered;
+    CRLF is translated the way the text-mode wrapper would."""
+    stream = _pipe_stream(b"first\r\nlast")
+    jm = JobManager(reports_root=tmp_path)
+    jm._store.put(_make_job("job-tail"))
+    flushes = _spy_flushes(jm)
+
+    with stream:
+        jm._consume_stream("job-tail", stream)
+
+    assert flushes == [["first"], ["last"]]
+    assert list(jm._store.get("job-tail").logs) == ["first", "last"]

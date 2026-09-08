@@ -573,6 +573,44 @@ def test_published_meta_legacy_fallback_correct_per_path_author_with_full_histor
     assert meta["proj-b"]["publishedBy"] == "bob"
 
 
+def test_published_meta_legacy_fallback_uses_one_git_call_for_all_dirs(tmp_path, monkeypatch):
+    """Legacy dirs (no published.json) are attributed from ONE git log walk.
+
+    Before, every such dir spawned its own `git log -1 -- <path>` on every
+    /api/shared/projects request. The batched walk must still attribute
+    each dir to its own author and skip a dir with no committed history.
+    """
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    url = f"file://{origin}"
+    root = tmp_path / "evaluations"
+
+    for project_id, author in (("proj-a", "alice"), ("proj-b", "bob"), ("proj-c", "carol")):
+        _make_minimal_project(root, project_id)
+        _publish_project_as(monkeypatch, url, root, project_id, author)
+    for project_id in ("proj-a", "proj-b", "proj-c"):
+        (shared_evaluations_root(url) / project_id / "published.json").unlink()
+    (shared_evaluations_root(url) / "proj-uncommitted").mkdir()
+
+    import quodeq.data.fs.shared_repo_meta as meta_mod
+    calls: list[list[str]] = []
+    real_run_git = meta_mod.run_git
+
+    def _spy(args, **kwargs):
+        calls.append(args)
+        return real_run_git(args, **kwargs)
+
+    monkeypatch.setattr(meta_mod, "run_git", _spy)
+    meta = published_meta(url)
+
+    assert {k: v["publishedBy"] for k, v in meta.items()} == {
+        "proj-a": "alice", "proj-b": "bob", "proj-c": "carol",
+    }
+    assert all(isinstance(v["publishedAt"], int) for v in meta.values())
+    assert len(calls) == 1
+
+
 def test_refresh_shared_clone_unshallows_legacy_cache(tmp_path, monkeypatch):
     """Review finding on commit 09c3dd71: unshallowing only helps NEW clones
     (ensure_shared_clone's `--depth 1` removal). A shared-clone cache
