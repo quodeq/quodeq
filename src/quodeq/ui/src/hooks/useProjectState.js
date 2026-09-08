@@ -66,7 +66,7 @@ function makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlight
 function makeRetryLoadProjects({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage }) {
   return function retryLoadProjects() {
     return loadProjects().then((list) => {
-      if (list) resolveInitialProject(list, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage);
+      if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
       return list;
     });
   };
@@ -170,7 +170,7 @@ export function useProjectState({
     loadProjects().then((list) => {
       // Array (possibly empty -> onboarding) on success; null when the load
       // failed after retries -> do NOT force onboarding on a transient error.
-      if (list) resolveInitialProject(list, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage);
+      if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

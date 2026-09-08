@@ -24,22 +24,23 @@ import {
  * @returns {{ hovered: object|null }} - Hovered element info for hit testing
  */
 export function drawFrame(ctx, scene, cam, nav, opts) {
-  const { W, H, t, mx, my, showLabels, animating, rDim, rPrin, w2s, parentEl } = opts;
+  const { rDim, parentEl } = opts;
 
   const tc = getThemeColors(parentEl);
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
 
-  drawBackground(ctx, scene, cam, tc, W, H, t, mr, mg, mb);
-  drawConstellations(ctx, scene, cam, nav, w2s, showLabels, W, H, mr, mg, mb);
-  const dimHovered = drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb);
+  drawBackground(ctx, scene, opts, tc);
+  drawConstellations(ctx, scene, { cam, nav }, opts, tc);
+  const dimHovered = drawDimStars(ctx, scene, { cam, nav }, opts, tc);
   const prinHovered = drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim);
-  drawZoomedPrinciple(ctx, scene, cam, opts, rDim, rPrin, tc, mr, mg, mb);
+  drawZoomedPrinciple(ctx, scene, cam, opts);
 
   return { hovered: prinHovered ?? dimHovered };
 }
 
 /** Phase 1: radial gradient background + background star field. */
-function drawBackground(ctx, scene, cam, tc, W, H, t, mr, mg, mb) {
+function drawBackground(ctx, scene, opts, tc) {
+  const { W, H, t } = opts;
+  const { r: mr, g: mg, b: mb } = tc.textMuted;
   const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
   grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
@@ -51,7 +52,10 @@ function drawBackground(ctx, scene, cam, tc, W, H, t, mr, mg, mb) {
 }
 
 /** Phase 2: constellation dashed circles, lines, and labels (galaxy level only). */
-function drawConstellations(ctx, scene, cam, nav, w2s, showLabels, W, H, mr, mg, mb) {
+function drawConstellations(ctx, scene, view, opts, tc) {
+  const { cam, nav } = view;
+  const { w2s, showLabels, W, H } = opts;
+  const { r: mr, g: mg, b: mb } = tc.textMuted;
   if (cam.z >= 3) return;
   const conAlpha = Math.max(0, 1 - (cam.z - 1) / 2);
   (scene.constellations || []).forEach(con => {
@@ -112,7 +116,9 @@ function drawDimParticles(ctx, scene, i, sc, cam, t, particleAlpha) {
 }
 
 /** Draws one dimension star (glow, label, focus ring) and returns hover info when hit. */
-function drawOneDimStar(ctx, scene, s, i, cam, nav, opts, tc, mr, mg, mb) {
+function drawOneDimStar(ctx, target, view, opts, tc) {
+  const { scene, s, i } = target;
+  const { cam, nav } = view;
   const { t, mx, my, showLabels, animating, rDim, w2s } = opts;
   const sc = w2s(s.x, s.y);
   const pulse = 1 + 0.01 * Math.sin(t * 0.4 + s.pp);
@@ -153,10 +159,10 @@ function drawOneDimStar(ctx, scene, s, i, cam, nav, opts, tc, mr, mg, mb) {
   return null;
 }
 
-function drawDimStars(ctx, scene, cam, nav, opts, tc, mr, mg, mb) {
+function drawDimStars(ctx, scene, view, opts, tc) {
   let newHovered = null;
   scene.stars.forEach((s, i) => {
-    const hit = drawOneDimStar(ctx, scene, s, i, cam, nav, opts, tc, mr, mg, mb);
+    const hit = drawOneDimStar(ctx, { scene, s, i }, view, opts, tc);
     if (hit) newHovered = hit;
   });
   return newHovered;
@@ -228,9 +234,9 @@ function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
 }
 
 /** Phase 5: violation/compliance orbs when zoomed deeply into a principle. */
-function drawZoomedPrinciple(ctx, scene, cam, opts, rDim, rPrin, tc, mr, mg, mb) {
+function drawZoomedPrinciple(ctx, scene, cam, opts) {
+  const { t, showLabels, w2s, rDim, rPrin } = opts;
   if (!(cam.z > 12 && rDim !== null && rPrin !== null)) return;
-  const { t, showLabels, w2s } = opts;
   const prin = scene.principles[rDim][rPrin];
   const psc = w2s(prin.x, prin.y);
   const vAlpha = Math.min(1, (cam.z - 12) / 20);

@@ -67,7 +67,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -83,7 +83,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     restoreFinding.mockRejectedValueOnce(new Error('boom'));
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'local', onReconcile),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -100,7 +100,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -117,7 +117,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -135,7 +135,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'local', onReconcile),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -151,7 +151,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     confirmDialog.mockResolvedValueOnce(false);
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'local', onReconcile),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -165,7 +165,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     restoreFinding.mockResolvedValueOnce({ ok: true });
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn()),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn() }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -186,7 +186,7 @@ describe('useDismissedFindings — shared source', () => {
   it('reads the dismissed list via the shared endpoint instead of the local one', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -199,7 +199,7 @@ describe('useDismissedFindings — shared source', () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const onRefresh = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings('proj', onRefresh, vi.fn(), 0, 'shared'),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -214,7 +214,7 @@ describe('useDismissedFindings — shared source', () => {
   it('handleRestoreAll no-ops and never calls the local restore-all endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -228,7 +228,7 @@ describe('useDismissedFindings — shared source', () => {
   it('handleDelete no-ops and never calls the local delete endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -242,7 +242,7 @@ describe('useDismissedFindings — shared source', () => {
   it('handleDeleteAll no-ops and never opens the confirm dialog', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn(), 0, 'shared'),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -257,7 +257,7 @@ describe('useDismissedFindings — shared source', () => {
   it('defaults to local source when selectedSource is omitted', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings('proj', vi.fn(), vi.fn()),
+      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn() }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));

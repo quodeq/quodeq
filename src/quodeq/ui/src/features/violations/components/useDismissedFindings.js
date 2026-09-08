@@ -14,13 +14,14 @@ import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 /**
- * @param {string} selectedProject
- * @param {Function} [onRefresh] - Unused by the mutation handlers (the
+ * @param {object} options
+ * @param {string} options.selectedProject
+ * @param {Function} [options.onRefresh] - Unused by the mutation handlers (the
  *   reconcile below marks stale itself); kept in the signature for the
  *   navigation-time mount refresh ViolationsPage wires separately.
- * @param {Function} [setRestoreError]
- * @param {number} [refreshKey=0]
- * @param {'local'|'shared'} [selectedSource='local'] - Shared projects have no
+ * @param {Function} [options.setRestoreError]
+ * @param {number} [options.refreshKey=0]
+ * @param {'local'|'shared'} [options.selectedSource='local'] - Shared projects have no
  *   mutation routes on the backend (dismiss/restore/delete are local-only by
  *   design). When shared, the list reads from the shared-repo mirror endpoint
  *   and every mutation handler below early-returns as a defense-in-depth
@@ -28,7 +29,7 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
  *   handlers to the dismissed sub-tab, but this guard protects against a
  *   handler slipping through some other path and corrupting the local cache
  *   with shared-derived deltas (the local id can collide with a shared id).
- * @param {Function} [onReconcile] - The debounced ACTIVE
+ * @param {Function} [options.onReconcile] - The debounced ACTIVE
  *   scheduleDashboardReconcile (see useDashboard.js): the ONE call every
  *   mutation handler below makes on success. It marks the project queries
  *   stale synchronously and then actively refetches after the debounce
@@ -127,7 +128,7 @@ function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyD
   };
 }
 
-export function useDismissedFindings(selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile) {
+export function useDismissedFindings({ selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile }) {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
   const isShared = selectedSource === 'shared';

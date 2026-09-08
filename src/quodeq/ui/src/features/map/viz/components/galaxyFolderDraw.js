@@ -75,7 +75,9 @@ export function drawConstellationLines(ctx, activeScene, tc, w2s) {
  * Draw a folder star's nebula, texture blobs, and dashed cluster border.
  * Mutates `s._clusterHitR` (the hit-test radius the click handler reads).
  */
-function drawFolderNebula(ctx, s, sc, sr, cam, t, curFly, i) {
+function drawFolderNebula(ctx, star, view) {
+  const { s, i, sc, sr } = star;
+  const { cam, t, curFly } = view;
   const { r: cr, g: cg, b: cb } = s.col;
   const zoomed = cam.z > 2;
   const isFlying = curFly && !curFly.reverse && !curFly.swapped && curFly.dimStarIdx === i;
@@ -166,7 +168,10 @@ function collectStarLabel(s, sc, sr, cam, showLabels) {
 }
 
 /** Hit-test this star against the mouse position (idle only — no anim/fly in progress). */
-function hitTestStar(s, i, sc, sr, animRef, fly, mx, my) {
+function hitTestStar({ s, i, sc, sr }, params) {
+  const { animRef, mouseRef, flyRef } = params;
+  const fly = flyRef.current;
+  const mx = mouseRef.current.x, my = mouseRef.current.y;
   if (animRef.current || fly || mx < 0) return null;
   const dx = mx - sc.x, dy = my - sc.y;
   const d2 = dx * dx + dy * dy;
@@ -182,11 +187,9 @@ function hitTestStar(s, i, sc, sr, animRef, fly, mx, my) {
  * Draw all stars and collect label/hit-test info. Returns { pendingLabels, newHovered }.
  */
 export function drawStars(ctx, activeScene, params) {
-  const { t, cam, w2s, showLabels, mouseRef, flyRef, focusedFolderRef, animRef, tc } = params;
-  const mx = mouseRef.current.x, my = mouseRef.current.y;
+  const { t, cam, w2s, showLabels, flyRef, focusedFolderRef, tc } = params;
   let newHovered = null;
   const pendingLabels = [];
-  const fly = flyRef.current;
 
   activeScene.rootStars.forEach((s, i) => {
     const sc = w2s(s.x, s.y);
@@ -200,14 +203,14 @@ export function drawStars(ctx, activeScene, params) {
       : 1;
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: starAlpha });
 
-    if (s.isFolder) drawFolderNebula(ctx, s, sc, sr, cam, t, curFly, i);
+    if (s.isFolder) drawFolderNebula(ctx, { s, i, sc, sr }, { cam, t, curFly });
     drawFileParticles(ctx, s, sc, cam, t);
     drawLabeledOrbs(ctx, s, sc, cam, t, showLabels);
 
     const label = collectStarLabel(s, sc, sr, cam, showLabels);
     if (label) pendingLabels.push(label);
 
-    const hovered = hitTestStar(s, i, sc, sr, animRef, fly, mx, my);
+    const hovered = hitTestStar({ s, i, sc, sr }, params);
     if (hovered) newHovered = hovered;
   });
 

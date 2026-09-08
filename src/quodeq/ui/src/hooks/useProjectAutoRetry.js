@@ -24,7 +24,7 @@ export function useProjectAutoRetry({
           setProjects(list);
           setProjectsLoaded(true);
           setProjectsLoadFailed(false);
-          resolveInitialProject(list, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage);
+          resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
         })
         .catch(() => { /* still down: stay on the failed state, try again next tick */ })
         .finally(() => { loadInFlightRef.current = false; });

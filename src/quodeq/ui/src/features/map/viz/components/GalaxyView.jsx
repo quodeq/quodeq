@@ -34,9 +34,14 @@ function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mou
     if (tooltipRef.current) tooltipRef.current.style.display = 'none';
   }, [mouseRef, hoveredRef, tooltipRef]);
 
+  const handlerParams = useMemo(
+    () => ({ scene, size, navigateTo, startTransition, saveNav, w2s, announce }),
+    [scene, size, navigateTo, startTransition, saveNav, w2s, announce],
+  );
+
   const handleClick = useCallback((e) => {
-    handleCanvasClick(e, { hoveredRef, navRef, animRef, camRef, canvasRef }, scene, size, navigateTo, startTransition, saveNav, w2s);
-  }, [hoveredRef, navRef, animRef, camRef, canvasRef, navigateTo, startTransition, saveNav, scene, size, w2s]);
+    handleCanvasClick(e, { hoveredRef, navRef, animRef, camRef, canvasRef }, handlerParams);
+  }, [hoveredRef, navRef, animRef, camRef, canvasRef, handlerParams]);
 
   const goToDepth = useCallback((d) => {
     const nav = navRef.current;
@@ -46,11 +51,8 @@ function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mou
   }, [navRef, navigateTo]);
 
   const { handleKeyDown, handleFocus, handleBlur } = useMemo(
-    () => createKeyboardHandlers(
-      { navRef, animRef, focusedIdxRef },
-      { scene, navigateTo, startTransition, saveNav, announce },
-    ),
-    [navRef, animRef, focusedIdxRef, scene, navigateTo, startTransition, saveNav, announce],
+    () => createKeyboardHandlers({ navRef, animRef, focusedIdxRef }, handlerParams),
+    [navRef, animRef, focusedIdxRef, handlerParams],
   );
 
   return { handleMouseMove, handleMouseLeave, navigateTo, handleClick, goToDepth, handleKeyDown, handleFocus, handleBlur };

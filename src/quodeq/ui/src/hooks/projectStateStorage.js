@@ -33,7 +33,7 @@ export function readStoredSource(storage = localStorage) {
 }
 
 /** Resolve which project to select from a loaded list, migrating stale storage if needed. */
-export function resolveInitialProject(list, currentProject, currentSource, onChangeProject, onNoProjects, storage) {
+export function resolveInitialProject({ list, currentProject, currentSource, onChangeProject, onNoProjects, storage }) {
   const current = currentProject || readStoredProject(storage);
   // `list` here is always the *local* project list (loadProjects only ever
   // calls the local listProjects API). A restored shared selection can't be

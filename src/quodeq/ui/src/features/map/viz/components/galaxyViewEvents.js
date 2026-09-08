@@ -54,14 +54,15 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
  *
  * @param {MouseEvent} e
  * @param {object} refs - { hoveredRef, navRef, animRef, camRef, canvasRef }
- * @param {object} scene - The scene data
- * @param {object} size - { w, h }
- * @param {Function} navigateTo - (depth, dim, prin) => void
- * @param {Function} startTransition - (zoomingOut) => void
- * @param {Function} saveNav - () => void
- * @param {Function} w2s - World-to-screen transform
+ * @param {object} params
+ * @param {object} params.scene - The scene data
+ * @param {object} params.size - { w, h }
+ * @param {Function} params.navigateTo - (depth, dim, prin) => void
+ * @param {Function} params.startTransition - (zoomingOut) => void
+ * @param {Function} params.saveNav - () => void
+ * @param {Function} params.w2s - World-to-screen transform
  */
-export function handleCanvasClick(e, refs, scene, size, navigateTo, startTransition, saveNav, w2s) {
+export function handleCanvasClick(e, refs, { scene, size, navigateTo, startTransition, saveNav, w2s }) {
   const { hoveredRef, navRef, animRef, camRef, canvasRef } = refs;
   const h = hoveredRef.current;
   const nav = navRef.current;
