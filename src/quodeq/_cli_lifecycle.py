@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
@@ -204,26 +205,34 @@ def _apply_time_budget(args: argparse.Namespace, lifecycle: "RunLifecycleContext
         config.options.on_deadline_extended = lifecycle.set_deadline
 
 
+@dataclass(frozen=True)
+class RunLifecyclePaths:
+    """The on-disk paths a lifecycle-tracked run needs."""
+
+    evidence_dir: Path
+    evaluation_dir: Path
+    run_dir: Path
+    run_id: str
+    pid_file: Path
+
+
 def _run_lifecycle_body(
-    args: argparse.Namespace,
-    inputs: ResolvedInputs,
-    config: RunConfig,
-    evidence_dir: Path,
-    evaluation_dir: Path,
-    run_dir: Path,
-    run_id: str,
-    dimensions_list: list[str],
-    pid_file: Path,
+    args: argparse.Namespace, inputs: ResolvedInputs, config: RunConfig, paths: RunLifecyclePaths,
 ) -> int:
     """Run the lifecycle-tracked pipeline; always clean up run artifacts on exit."""
     from quodeq import _cli_evaluation as _facade
+
+    # Resolve dimensions list for status.json metadata.
+    # Defensively coerce to a real list — config may be a Mock in tests.
+    _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
+    dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
 
     try:
         ai_provider = get_ai_cmd()
         ai_model = _facade.get_ai_model()
         with RunLifecycleContext(
-            run_dir=run_dir,
-            job_id=f"ext-{run_id}",
+            run_dir=paths.run_dir,
+            job_id=f"ext-{paths.run_id}",
             dimensions=dimensions_list,
             ai_provider=ai_provider,
             ai_model=ai_model,
@@ -232,7 +241,7 @@ def _run_lifecycle_body(
                 # "analyzing" gates dashboard per-dimension polling.
                 lifecycle.set_phase("analyzing")
                 _apply_time_budget(args, lifecycle, config)
-                result = _facade._execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                result = _facade._execute_pipeline(args, config, paths.evidence_dir, paths.evaluation_dir)
                 _record_deadline_if_hit(lifecycle, config)
                 _record_provider_fatal_if_cancelled(lifecycle)
                 # run_full writes per-dimension reports as it goes, so scoring
@@ -242,7 +251,7 @@ def _run_lifecycle_body(
                 return result
             finally:
                 # See _cleanup_run_artifacts's docstring for why this is one call.
-                _cleanup_run_artifacts(pid_file, args, inputs)
+                _cleanup_run_artifacts(paths.pid_file, args, inputs)
     except (AnalysisError, EvaluationError) as exc:
         # RunLifecycleContext.__exit__ has already written state=failed.
         log_error(f"{exc}")
@@ -274,16 +283,16 @@ def _run_pipeline_with_cleanup(
 
     writer, handler, logger_root = _install_run_log_handler(run_dir)
 
-    # Resolve dimensions list for status.json metadata.
-    # Defensively coerce to a real list — config may be a Mock in tests.
-    _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
-    dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
+    lifecycle_paths = RunLifecyclePaths(
+        evidence_dir=evidence_dir,
+        evaluation_dir=evaluation_dir,
+        run_dir=run_dir,
+        run_id=run_id,
+        pid_file=pid_file,
+    )
 
     try:
-        return _run_lifecycle_body(
-            args, inputs, config, evidence_dir, evaluation_dir, run_dir, run_id,
-            dimensions_list, pid_file,
-        )
+        return _run_lifecycle_body(args, inputs, config, lifecycle_paths)
     finally:
         logger_root.removeHandler(handler)
         writer.close()

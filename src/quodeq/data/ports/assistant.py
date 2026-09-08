@@ -1,8 +1,19 @@
 """Store protocol for assistant session persistence."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+
+
+@dataclass(frozen=True)
+class SessionScope:
+    """The optional project-binding fields for a session: which project,
+    run, and project id it's attached to (all None for an unattached session)."""
+
+    project_uuid: str | None = None
+    run_id: str | None = None
+    project_id: str | None = None
 
 
 @runtime_checkable
@@ -29,10 +40,8 @@ class AssistantStore(Protocol):
     # -- sessions -----------------------------------------------------------
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, project_uuid: str | None = None,
-                       run_id: str | None = None,
-                       project_id: str | None = None,
-                       source: str = "local") -> dict:
+                       model: str | None = None, source: str = "local",
+                       scope: SessionScope | None = None) -> dict:
         """Create a session row and return it."""
         ...
 

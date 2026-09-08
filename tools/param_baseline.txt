@@ -2,7 +2,6 @@
 # parameters, self/cls excluded). Do NOT add entries without
 # justification -- the goal is to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_params.py --update-baseline
-src/quodeq/_cli_lifecycle.py:_run_lifecycle_body
 src/quodeq/analysis/_api_call.py:_log_call_outcome
 src/quodeq/analysis/_loop_state.py:_safe_write_dim_state
 src/quodeq/analysis/_loops.py:_dispatch_incremental_dim
@@ -23,16 +22,11 @@ src/quodeq/analysis/cache/dimension_runner.py:_start_watchers
 src/quodeq/analysis/cache/dimension_runner.py:process_dimension_with_cache
 src/quodeq/analysis/checks/runner.py:apply_deterministic_checks
 src/quodeq/analysis/fingerprint.py:HashCache.dimension_params_state
-src/quodeq/analysis/manifest_build.py:_build_single_scope_manifest
-src/quodeq/analysis/manifest_build.py:_walk_and_group
-src/quodeq/analysis/manifest_build_scope.py:_build_multi_scope_manifest
-src/quodeq/analysis/manifest_build_scope.py:_walk_and_partition_by_scope
 src/quodeq/analysis/mcp/router.py:FindingsRouter.__init__
 src/quodeq/analysis/run_lifecycle.py:RunLifecycleContext.__init__
 src/quodeq/analysis/subagents/runner.py:process_dimension_with_subagents
 src/quodeq/api/assistant_turn_routes.py:_start_turn_worker
 src/quodeq/api/import_project.py:_stage_and_commit
-src/quodeq/api/zip.py:_write_project_zip_entries
 src/quodeq/assistant/adapters/_api.py:_stream_once
 src/quodeq/assistant/adapters/_api.py:run_api_turn
 src/quodeq/assistant/adapters/_cli.py:_spawn_and_stream
@@ -40,9 +34,7 @@ src/quodeq/assistant/orchestrator.py:run_turn
 src/quodeq/assistant/workspace_actions.py:create_workspace_pr
 src/quodeq/ci/github_render.py:build_review_summary
 src/quodeq/ci/reporter.py:build_review_payload
-src/quodeq/context/precedent_corpus.py:_embed_and_build_corpus
 src/quodeq/context/precedent_store.py:_backfill_missing
-src/quodeq/context/precedent_store.py:_load_or_backfill_vectors
 src/quodeq/core/checks/_judgments.py:violation
 src/quodeq/core/checks/framework_deps.py:_file_framework_judgments
 src/quodeq/core/evidence/_jsonl.py:read_judgments
@@ -52,8 +44,6 @@ src/quodeq/core/evidence/parser.py:parse_jsonl_to_evidence_by_dimension
 src/quodeq/dashboard/runner.py:_start_action_api
 src/quodeq/data/cache_store/index.py:ContentIndex.record
 src/quodeq/data/cache_store/migrate.py:_migrate_v3
-src/quodeq/data/ports/assistant.py:AssistantStore.create_session
-src/quodeq/data/sqlite/assistant_repository.py:AssistantRepository.create_session
 src/quodeq/data/sqlite/state_store.py:SQLiteStateStore.record_principle_grade
 src/quodeq/llm_bridge/_embeddings.py:embed_texts
 src/quodeq/services/_accumulated_data.py:_read_all_run_data

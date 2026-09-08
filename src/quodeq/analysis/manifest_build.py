@@ -9,7 +9,7 @@ from pathlib import Path
 
 from quodeq.analysis._ignore import is_ignored, load_ignore_patterns
 from quodeq.analysis.manifest_build_scope import _build_multi_scope_manifest
-from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.config.discipline_registry import DisciplineRegistry
 
 _logger = logging.getLogger(__name__)
@@ -103,17 +103,14 @@ def _prune_ignored_dirs(
 
 
 def _walk_and_group(
-    src: Path, ext_map: dict[str, str], skip_dirs: set[str],
-    skip_patterns: list[str],
-    scope_path: str | None = None,
-    ignore_patterns: list[str] | None = None,
+    src: Path, walk: ManifestWalkSpec, scope_path: str | None = None,
 ) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter]]:
     """Walk *src* (or a scoped subdirectory) once, grouping files by language.
 
     When *scope_path* is given (relative to *src*), only files under that
     subdirectory are included.  Relative paths in the result are still
     expressed relative to *src* so callers see the same format regardless.
-    *ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
+    *walk.ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
     """
     walk_root = src
     if scope_path:
@@ -124,7 +121,10 @@ def _walk_and_group(
         if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
             walk_root = candidate
 
-    ignore_patterns = ignore_patterns or []
+    ext_map = walk.ext_map
+    skip_dirs = walk.skip_dirs
+    skip_patterns = walk.skip_patterns
+    ignore_patterns = walk.ignore_patterns or []
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
     ext_counts_by_lang: dict[str, Counter] = {}
@@ -153,17 +153,13 @@ def _walk_and_group(
 
 def _build_single_scope_manifest(
     src: Path,
-    ext_map: dict[str, str],
-    skip_dirs: set[str],
-    skip_patterns: list[str],
+    walk: ManifestWalkSpec,
     disciplines_conf: Path | None,
     scope_path: str | None,
-    ignore_patterns: list[str] | None = None,
 ) -> SourceManifest:
     """Legacy single-scope path: walk once at the (optionally scoped) root."""
     files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(
-        src, ext_map, skip_dirs, skip_patterns, scope_path=scope_path,
-        ignore_patterns=ignore_patterns,
+        src, walk, scope_path=scope_path,
     )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
 
@@ -251,26 +247,19 @@ def build_manifest(
     A ``.quodeqignore`` file at *src* adds repo-local exclusions on top of the
     built-in skip_dirs (see quodeq.analysis._ignore for the pattern syntax).
     """
-    ext_map: dict[str, str] = detection.get("extensions", {})
-    skip_dirs = set(detection.get("skip_dirs", []))
-    skip_patterns: list[str] = detection.get("skip_patterns", [])
-    ignore_patterns = load_ignore_patterns(src)
+    walk = ManifestWalkSpec(
+        ext_map=detection.get("extensions", {}),
+        skip_dirs=set(detection.get("skip_dirs", [])),
+        skip_patterns=detection.get("skip_patterns", []),
+        ignore_patterns=load_ignore_patterns(src),
+    )
 
     if scope_path is not None:
-        return _build_single_scope_manifest(
-            src, ext_map, skip_dirs, skip_patterns, disciplines_conf, scope_path,
-            ignore_patterns=ignore_patterns,
-        )
+        return _build_single_scope_manifest(src, walk, disciplines_conf, scope_path)
 
     registry, sub_results = _resolve_registry_and_scopes(src, disciplines_conf)
     if sub_results is not None:
         assert registry is not None  # sub_results is only set alongside a loaded registry
-        return _build_multi_scope_manifest(
-            src, ext_map, skip_dirs, skip_patterns, registry, sub_results,
-            ignore_patterns=ignore_patterns,
-        )
+        return _build_multi_scope_manifest(src, walk, registry, sub_results)
 
-    return _build_single_scope_manifest(
-        src, ext_map, skip_dirs, skip_patterns, disciplines_conf, None,
-        ignore_patterns=ignore_patterns,
-    )
+    return _build_single_scope_manifest(src, walk, disciplines_conf, None)

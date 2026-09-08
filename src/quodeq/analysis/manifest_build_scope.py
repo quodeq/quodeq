@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.analysis._ignore import is_ignored
-from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.config.discipline_registry import DisciplineRegistry
 
 
@@ -56,9 +56,7 @@ def _deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
 
 
 def _walk_and_partition_by_scope(
-    src: Path, ext_map: dict[str, str], skip_dirs: set[str],
-    skip_patterns: list[str], scope_paths: list[str],
-    ignore_patterns: list[str] | None = None,
+    src: Path, walk: ManifestWalkSpec, scope_paths: list[str],
 ) -> tuple[
     dict[str, dict[str, list[str]]],
     Counter[str],
@@ -77,13 +75,14 @@ def _walk_and_partition_by_scope(
         _prune_ignored_dirs,
     )
 
-    ignore_patterns = ignore_patterns or []
+    ext_map = walk.ext_map
+    ignore_patterns = walk.ignore_patterns or []
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
     ext_counts_overall: Counter[str] = Counter()
     ext_counts_by_scope_lang: dict[str, dict[str, Counter]] = {s: {} for s in scope_paths}
     resolve_scope = _scope_resolver(scope_paths)
     for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+        dirnames[:] = [d for d in dirnames if d not in walk.skip_dirs and not d.startswith(".")]
         if ignore_patterns:
             _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
         for fname in filenames:
@@ -93,7 +92,7 @@ def _walk_and_partition_by_scope(
             # Match the POSIX-style scope_paths from detect_matches_recursive
             # so prefix matching works on Windows.
             rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
-            if _matches_skip_pattern(rel, skip_patterns):
+            if _matches_skip_pattern(rel, walk.skip_patterns):
                 continue
             if ignore_patterns and is_ignored(rel, ignore_patterns):
                 continue
@@ -168,18 +167,14 @@ def _build_scope_targets(
 
 def _build_multi_scope_manifest(
     src: Path,
-    ext_map: dict[str, str],
-    skip_dirs: set[str],
-    skip_patterns: list[str],
+    walk: ManifestWalkSpec,
     registry: DisciplineRegistry,
     sub_results: list[tuple[str, list[str]]],
-    ignore_patterns: list[str] | None = None,
 ) -> SourceManifest:
     """Produce a manifest with one target group per detected subproject scope."""
     scope_paths, matches_by_scope = _resolve_scope_paths(sub_results)
     files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
-        src, ext_map, skip_dirs, skip_patterns, scope_paths,
-        ignore_patterns=ignore_patterns,
+        src, walk, scope_paths,
     )
 
     targets = _build_scope_targets(

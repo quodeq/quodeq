@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 
 from quodeq.api import _assistant_helpers
+from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
@@ -78,11 +79,9 @@ def register_assistant_session_routes(app: Flask) -> None:
         run_dir, repo_root, repo_reason = _resolve_session_scope(source, body)
         project_id = body.get("projectId")
         _assistant_helpers.get_repository(app).create_session(
-            session_id=session_id, provider=body["provider"],
-            model=body.get("model"), project_uuid=repo_root,
-            run_id=run_dir,
-            project_id=str(project_id) if project_id else None,
+            session_id=session_id, provider=body["provider"], model=body.get("model"),
             source=source,
+            scope=SessionScope(repo_root, run_dir, str(project_id) if project_id else None),
         )
         write_available = (source == "local"
                            and bool(repo_root)
