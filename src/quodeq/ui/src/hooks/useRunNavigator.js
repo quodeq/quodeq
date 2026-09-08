@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react';
 
-/**
- * Manages run navigation state: current run index, prev/next/latest controls.
- *
- * @param {Object} opts
- * @param {string} opts.selectedRun - Currently selected run ID or 'latest'
- * @param {Array} opts.availableRuns - Array of { runId, dateLabel, ... }
- * @param {Function} opts.onRunChange - Callback when run selection changes
- * @param {Function} opts.onNavigate - Callback to push a page onto the nav stack
- * @returns run navigator state and handlers
- */
+// Builds the prev/next/latest/view/select handlers that operate on the
+// overview run index.
 function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, availableRuns, onRunChange, onNavigate, currentOverviewRun }) {
   function handleRunPrev() {
     const idx = Math.min(overviewRunIndex + 1, availableRuns.length - 1);
@@ -41,6 +33,18 @@ function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, avail
   return { handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect };
 }
 
+/**
+ * Manages run navigation state: current run index, prev/next/latest controls.
+ *
+ * @param {Object} opts
+ * @param {string} opts.selectedRun - Currently selected run ID or 'latest'
+ * @param {Array} opts.availableRuns - Array of { runId, dateLabel, ... }
+ * @param {Function} opts.onRunChange - Callback when run selection changes
+ * @param {Function} opts.onNavigate - Callback to push a page onto the nav stack
+ * @returns {{ overviewRunIndex: number, currentOverviewRun: string, handleRunPrev: Function,
+ *   handleRunNext: Function, handleRunLatest: Function, handleRunView: Function,
+ *   handleRunSelect: Function }}
+ */
 export function useRunNavigator({ selectedRun, availableRuns, onRunChange, onNavigate }) {
   const [overviewRunIndex, setOverviewRunIndex] = useState(0);
 

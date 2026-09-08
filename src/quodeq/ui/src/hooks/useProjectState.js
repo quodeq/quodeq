@@ -12,17 +12,6 @@ const DEFAULT_RETRY_DELAY_MS = 400;
 const DEFAULT_SUMMARY_POLL_MS = 3000;
 const DEFAULT_AUTO_RETRY_MS = 30000;
 
-/**
- * Manages the selected project, run, and project list state.
- *
- * @param {Object} params
- * @param {Function} [params.onNoProjects] - Callback invoked when the loaded project list is empty
- *   (e.g. to redirect to the evaluate tab).
- * @param {number} [params.summaryPollMs] - Poll interval while any project's summary is pending.
- * @returns {{ projects: Array, warmup: Object|null, setProjects: Function, selectedProject: string,
- *   selectedSource: string, selectedRun: string, setSelectedRun: Function, loadProjects: Function,
- *   handleProjectChange: Function, handleRunChange: Function, selectProjectAndRun: Function }}
- */
 // Resilient loader. A *transient* fetch failure (e.g. an aborted request
 // during a startup/reload race) must NOT be mistaken for "no projects" —
 // that used to strand the user in the onboarding wizard even though their
@@ -130,6 +119,24 @@ function useProjectStateFields(storage) {
   };
 }
 
+/**
+ * Manages the selected project, run, and project list state.
+ *
+ * @param {Object} params
+ * @param {Function} [params.onNoProjects] - Callback invoked when the loaded project list is empty
+ *   (e.g. to redirect to the evaluate tab).
+ * @param {Storage} [params.storage=localStorage] - Storage used to persist the selected project/source.
+ * @param {number} [params.maxRetries=3] - Retries for a failed project-list fetch before giving up
+ *   and setting projectsLoadFailed.
+ * @param {number} [params.retryDelayMs=400] - Delay between those retries, in milliseconds.
+ * @param {number} [params.summaryPollMs=3000] - Poll interval while any project's summary is pending.
+ * @param {number} [params.autoRetryMs=30000] - Interval for the background auto-retry that runs while
+ *   projectsLoadFailed is true.
+ * @returns {{ projects: Array, warmup: Object|null, projectsLoaded: boolean, projectsLoadFailed: boolean,
+ *   retryLoadProjects: Function, setProjects: Function, selectedProject: string, selectedSource: string,
+ *   selectedRun: string, setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
+ *   handleRunChange: Function, selectProjectAndRun: Function }}
+ */
 export function useProjectState({
   onNoProjects,
   storage = localStorage,

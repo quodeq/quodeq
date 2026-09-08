@@ -2,8 +2,8 @@
  * Renders surrounding code context with VS Code-style line numbers and
  * highlighted violation lines. Falls back to snippet display if no
  * context is available. Shows a scope badge when scope is provided.
- * The "See more/less" toggle only applies to the highlighted (affected) lines.
- * The surrounding context lines (before/after) are always visible.
+ * A single "See code" / "See <scope>" bar collapses the whole block;
+ * nothing renders until it's expanded.
  *
  * Pretext integration:
  *   The `<pre>` block's height and widest-line width are pre-computed with
@@ -16,7 +16,6 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
 
-const MAX_HIGHLIGHTED_COLLAPSED = 10;
 const CONTEXT_PADDING = 5;
 const CODE_LINE_HEIGHT = 18; // must match terminal.css .ctx-line line-height
 const CODE_PRE_VPAD = 16;    // matches .term-code / .scope-bar-code vertical padding
