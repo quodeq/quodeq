@@ -2,10 +2,10 @@
 
 The module-default instance lives as long as the dashboard/API server, so
 without a cap it would keep one entry per ``(path, size, mtime_ns)`` ever
-seen across every project that process scans. These tests pin the eviction
-contract: an insert past capacity drops the least recently used entry, a
-hit refreshes recency, ``None`` is a real cached value (unreadable file),
-and ``reset`` still empties every map.
+seen across every project that process scans. These tests pin the wiring:
+each map honours its own capacity and evicts through the shared ``LRUDict``
+(whose recency rules live in tests/shared/test_lru.py), ``None`` is a real
+cached value (unreadable file), and ``reset`` still empties every map.
 """
 from __future__ import annotations
 
@@ -38,16 +38,6 @@ def test_file_hash_evicts_least_recent_past_capacity(tmp_path: Path):
     # a was coldest when c arrived, so only a is gone.
     assert _file_reads(cache, b, c) == 0
     assert _file_reads(cache, a) == 1
-
-
-def test_file_hash_hit_refreshes_recency(tmp_path: Path):
-    cache = HashCache(file_capacity=2)
-    a, b, c = (_touch(tmp_path, n) for n in "abc")
-    _file_reads(cache, a, b)
-    _file_reads(cache, a)  # a is now the most recent, b the coldest
-    _file_reads(cache, c)  # evicts b, not a
-    assert _file_reads(cache, a) == 0
-    assert _file_reads(cache, b) == 1
 
 
 def test_file_hash_caches_none_for_unreadable_path(tmp_path: Path):

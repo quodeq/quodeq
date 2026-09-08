@@ -14,10 +14,9 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from collections import OrderedDict
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from quodeq.core.standards.overrides import (
     OVERRIDES_RELPATH,
@@ -25,6 +24,7 @@ from quodeq.core.standards.overrides import (
     hash_non_default_params,
 )
 from quodeq.data.fs.standards_prefs import load_project_overrides
+from quodeq.shared.lru import LRUDict
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
 
@@ -93,20 +93,9 @@ def _compute_dimension_params(compiled: Path, project_root: Path | None) -> tupl
 _K = TypeVar("_K")
 _V = TypeVar("_V")
 _StatKey = tuple[Path, int, int]
-
-
-class _LRUDict(OrderedDict[_K, _V]):
-    """``OrderedDict`` capped at *capacity* entries. ``put`` evicts the least
-    recently used; callers ``move_to_end`` on hits, under their own lock."""
-
-    def __init__(self, capacity: int) -> None:
-        super().__init__()
-        self.capacity = capacity
-
-    def put(self, key: _K, value: _V) -> None:
-        self[key] = value
-        if len(self) > self.capacity:
-            self.popitem(last=False)
+# ``None`` is a real cached value (an unreadable file), so a miss needs a
+# sentinel no memoized computation can return.
+_MISS = object()
 
 
 class HashCache:
@@ -129,18 +118,18 @@ class HashCache:
         override_capacity: int = 1024, params_capacity: int = 1024,
     ) -> None:
         self._lock = threading.Lock()
-        self._file_hashes: _LRUDict[_StatKey, str | None] = _LRUDict(file_capacity)
-        self._override_hashes: _LRUDict[_StatKey, str] = _LRUDict(override_capacity)
-        self._dimension_params: _LRUDict[
+        self._file_hashes: LRUDict[_StatKey, str | None] = LRUDict(file_capacity)
+        self._override_hashes: LRUDict[_StatKey, str] = LRUDict(override_capacity)
+        self._dimension_params: LRUDict[
             tuple[Path, int, int, Path | None, int, int], tuple[str, dict]
-        ] = _LRUDict(params_capacity)
+        ] = LRUDict(params_capacity)
 
-    def _memo(self, table: _LRUDict[_K, _V], key: _K, compute: Callable[[], _V]) -> _V:
+    def _memo(self, table: LRUDict[_K, _V], key: _K, compute: Callable[[], _V]) -> _V:
         """Cached value for *key*; on a miss, *compute* outside the lock, then store."""
         with self._lock:
-            if key in table:
-                table.move_to_end(key)
-                return table[key]
+            hit = table.get(key, _MISS)
+        if hit is not _MISS:
+            return cast(_V, hit)
         value = compute()
         with self._lock:
             table.put(key, value)

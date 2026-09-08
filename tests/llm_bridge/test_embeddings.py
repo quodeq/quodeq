@@ -91,16 +91,15 @@ def test_availability_permissive_for_non_ollama_base() -> None:
     assert embedding_model_available("anything", "http://lan-box:8080")
 
 
-def test_availability_cache_is_a_bounded_lru() -> None:
-    cache = EmbeddingAvailabilityCache(max_entries=2)
-    cache.set(("m1", "u"), True)
-    cache.set(("m2", "u"), False)
-    assert cache.get(("m2", "u")) is False   # a cached False is a hit, not a miss
-    assert cache.get(("m1", "u")) is True    # refresh m1 so m2 is the oldest
-    cache.set(("m3", "u"), True)
-    assert cache.get(("m2", "u")) is None    # evicted at capacity
-    assert cache.get(("m1", "u")) is True
-    assert cache.get(("m3", "u")) is True
+def test_availability_cache_is_bounded_and_treats_false_as_a_hit() -> None:
+    """Capacity is wired through to the shared LRU (whose eviction order is
+    pinned in tests/shared/test_lru.py); a cached False is a hit, not a miss."""
+    cache = EmbeddingAvailabilityCache(max_entries=1)
+    cache.set(("m1", "u"), False)
+    assert cache.get(("m1", "u")) is False
+    cache.set(("m2", "u"), True)
+    assert cache.get(("m1", "u")) is None    # evicted at capacity
+    assert cache.get(("m2", "u")) is True
 
 
 def test_availability_cache_rejects_zero_capacity() -> None:

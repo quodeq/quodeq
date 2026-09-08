@@ -17,10 +17,10 @@ import hashlib
 import logging
 import re
 import threading
-from collections import OrderedDict
 from pathlib import Path
 
 from quodeq.data.ports.precedents import DismissedSnippetsReader, DismissedSourceStamp
+from quodeq.shared.lru import LRUDict
 
 _WS_RE = re.compile(r"\s+")
 _logger = logging.getLogger(__name__)
@@ -29,9 +29,9 @@ _logger = logging.getLogger(__name__)
 # Every scan used to open and query every run's DB again; keying the read on
 # a cheap stamp makes a settled history cost one stat per run, not one query.
 # Bounded LRU so a long-lived server never grows without limit across projects.
-PrecedentMemo = OrderedDict[Path, tuple[object, frozenset[str]]]
+PrecedentMemo = LRUDict[Path, tuple[object, frozenset[str]]]
 _MEMO_MAX_RUNS = 4096
-_memo: PrecedentMemo = OrderedDict()
+_memo: PrecedentMemo = LRUDict(_MEMO_MAX_RUNS)
 _memo_lock = threading.Lock()
 
 
@@ -77,18 +77,14 @@ def _memo_get(cache: PrecedentMemo, run_dir: Path, stamp: object) -> frozenset[s
     """Fingerprints memoized for *run_dir* under exactly *stamp*, else None."""
     with _memo_lock:
         hit = cache.get(run_dir)
-        if hit is None or hit[0] != stamp:
-            return None
-        cache.move_to_end(run_dir)
-        return hit[1]
+    if hit is None or hit[0] != stamp:
+        return None
+    return hit[1]
 
 
 def _memo_put(cache: PrecedentMemo, run_dir: Path, stamp: object, fps: frozenset[str]) -> None:
     with _memo_lock:
-        cache[run_dir] = (stamp, fps)
-        cache.move_to_end(run_dir)
-        while len(cache) > _MEMO_MAX_RUNS:
-            cache.popitem(last=False)
+        cache.put(run_dir, (stamp, fps))
 
 
 def _read_run_fingerprints(

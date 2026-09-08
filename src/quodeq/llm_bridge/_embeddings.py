@@ -9,7 +9,6 @@ model per process). All failures raise; callers own graceful degradation.
 from __future__ import annotations
 
 import threading
-from collections import OrderedDict
 from typing import Any, Callable, Sequence
 
 import httpx
@@ -18,6 +17,8 @@ try:
     import openai
 except ImportError:
     openai = None  # type: ignore[assignment]
+
+from quodeq.shared.lru import LRUDict
 
 BATCH_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
 QUERY_TIMEOUT = httpx.Timeout(connect=10.0, read=10.0, write=30.0, pool=10.0)
@@ -89,25 +90,16 @@ class EmbeddingAvailabilityCache:
     """
 
     def __init__(self, max_entries: int = 64) -> None:
-        if max_entries < 1:
-            raise ValueError("max_entries must be >= 1")
         self._lock = threading.Lock()
-        self._max_entries = max_entries
-        self._cache: OrderedDict[tuple[str, str], bool] = OrderedDict()
+        self._cache: LRUDict[tuple[str, str], bool] = LRUDict(max_entries)
 
     def get(self, key: tuple[str, str]) -> bool | None:
         with self._lock:
-            value = self._cache.get(key)
-            if value is not None:
-                self._cache.move_to_end(key)
-            return value
+            return self._cache.get(key)
 
     def set(self, key: tuple[str, str], value: bool) -> None:
         with self._lock:
-            self._cache[key] = value
-            self._cache.move_to_end(key)
-            while len(self._cache) > self._max_entries:
-                self._cache.popitem(last=False)
+            self._cache.put(key, value)
 
     def clear(self) -> None:
         with self._lock:
