@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from quodeq.assistant.adapters._cli_config import CliChatConfig
 from quodeq.shared._models import normalize_model_id
+
+if TYPE_CHECKING:
+    from quodeq.assistant.adapters._cli import CliTurnConfig
 
 _NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
 
@@ -37,6 +41,32 @@ class CliTurnSpec:
     needs_id_parse: bool
 
 
+@dataclass(frozen=True)
+class TurnArgvRequest:
+    prompt: str
+    model: str | None
+    web_enabled: bool
+    system_prompt: str
+    mcp_config_path: str | None
+    mcp_config_arg: str | None
+    prior_session_id: str | None
+    new_session_id: str
+
+    @classmethod
+    def from_turn_config(cls, cfg: "CliTurnConfig", *, prompt: str,
+                        mcp_config: tuple[str | None, str | None],
+                        prior_session_id: str | None, new_session_id: str
+                        ) -> "TurnArgvRequest":
+        # mcp_config is the (mcp_config_path, mcp_config_arg) pair _setup_mcp_config
+        # returns; exactly one of the two is ever set, so callers thread it through
+        # as one value rather than two individually-optional ones (param-count ratchet).
+        mcp_config_path, mcp_config_arg = mcp_config
+        return cls(prompt=prompt, model=cfg.model, web_enabled=cfg.web_enabled,
+                  system_prompt=cfg.system_prompt, mcp_config_path=mcp_config_path,
+                  mcp_config_arg=mcp_config_arg, prior_session_id=prior_session_id,
+                  new_session_id=new_session_id)
+
+
 def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[list[str], str | None, bool]:
     """Return (session-related argv fragment, assigned id, needs_parse)."""
     if cfg.session_id_source == "parse-jsonl":
@@ -58,35 +88,34 @@ def _model_arg(cfg: CliChatConfig, model: str | None) -> str | None:
     return normalize_model_id(cfg.cmd, model)
 
 
-def build_turn_argv(cfg: CliChatConfig, *, prompt: str, model: str | None,
-                    mcp_config_path: str | None, prior_session_id: str | None,
-                    new_session_id: str, web_enabled: bool = False,
-                    system_prompt: str = "", mcp_config_arg: str | None = None) -> CliTurnSpec:
+def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec:
     argv: list[str] = [cfg.cmd]
     if cfg.cmd_subcommand:
         argv.append(cfg.cmd_subcommand)
 
-    resume_frag, assigned, needs_parse = _resume_args(cfg, prior_session_id, new_session_id)
+    resume_frag, assigned, needs_parse = _resume_args(
+        cfg, request.prior_session_id, request.new_session_id)
     # codex `resume <id>` must sit immediately after the `exec` subcommand
     if cfg.session_id_source == "parse-jsonl" and resume_frag:
         argv.extend(resume_frag)
         resume_frag = []
 
-    argv.extend(_with_web_access(cfg.assistant_args) if web_enabled else cfg.assistant_args)
+    argv.extend(_with_web_access(cfg.assistant_args) if request.web_enabled
+               else cfg.assistant_args)
     if resume_frag:
         argv.extend(resume_frag)
-    if mcp_config_path and cfg.mcp_style == "config-file":
-        argv.extend(["--mcp-config", mcp_config_path])
-    if mcp_config_arg and cfg.mcp_style == "config-arg":
-        argv.extend(["-c", mcp_config_arg])
-    normalized_model = _model_arg(cfg, model)
+    if request.mcp_config_path and cfg.mcp_style == "config-file":
+        argv.extend(["--mcp-config", request.mcp_config_path])
+    if request.mcp_config_arg and cfg.mcp_style == "config-arg":
+        argv.extend(["-c", request.mcp_config_arg])
+    normalized_model = _model_arg(cfg, request.model)
     if normalized_model:
         argv.extend(["--model", normalized_model])
-    if system_prompt and cfg.system_prompt_style == "argv-append":
-        argv.extend(["--append-system-prompt", system_prompt])
+    if request.system_prompt and cfg.system_prompt_style == "argv-append":
+        argv.extend(["--append-system-prompt", request.system_prompt])
 
     if cfg.prompt_style == "positional":
-        argv.append(prompt)
+        argv.append(request.prompt)
     else:
-        argv.extend([cfg.prompt_flag, prompt])
+        argv.extend([cfg.prompt_flag, request.prompt])
     return CliTurnSpec(argv=argv, session_id=assigned, needs_id_parse=needs_parse)

@@ -1,12 +1,14 @@
-from quodeq.assistant.adapters._cli_command import _with_web_access, build_turn_argv
+from quodeq.assistant.adapters._cli_command import (
+    TurnArgvRequest, _with_web_access, build_turn_argv)
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 
 
 def _spec(provider, **kw):
-    defaults = dict(prompt="hi", model="m", mcp_config_path=None,
+    defaults = dict(prompt="hi", model="m", web_enabled=False, system_prompt="",
+                    mcp_config_path=None, mcp_config_arg=None,
                     prior_session_id=None, new_session_id="sid-1")
     defaults.update(kw)
-    return build_turn_argv(load_cli_chat_config(provider), **defaults)
+    return build_turn_argv(load_cli_chat_config(provider), TurnArgvRequest(**defaults))
 
 
 def test_claude_turn1_preassigns_session_id():

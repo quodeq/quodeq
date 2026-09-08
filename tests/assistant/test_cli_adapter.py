@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.assistant.adapters import _cli as _cli_mod
-from quodeq.assistant.adapters._cli import CliTurnConfig, run_cli_turn
+from quodeq.assistant.adapters._cli import CliTurnConfig, CliTurnSession, run_cli_turn
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -41,6 +41,13 @@ def _repo(tmp_path):
     return repo
 
 
+def _session(repo, *, session_id="s1", prior_session_id=None, emit=None,
+             spawn_fn=None, cancel=None):
+    return CliTurnSession(session_id=session_id, prior_session_id=prior_session_id,
+                          repository=repo, emit=emit or (lambda f: None),
+                          spawn_fn=spawn_fn, cancel=cancel)
+
+
 def test_streams_tokens_and_captures_session_id(tmp_path):
     repo = _repo(tmp_path)
     lines = [
@@ -51,9 +58,9 @@ def test_streams_tokens_and_captures_session_id(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "system", "content": "sys"}, {"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "Hello"
     assert {"type": "token", "text": "Hello"} in frames
     assert repo.get_session("s1")["cli_session_id"] == "claude-uuid-1"
@@ -68,9 +75,9 @@ def test_result_echo_of_streamed_text_is_not_emitted_twice(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "Hello"
     token_frames = [f for f in frames if f == {"type": "token", "text": "Hello"}]
     assert len(token_frames) == 1
@@ -84,9 +91,9 @@ def test_result_only_text_is_still_emitted(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "Hi"
     assert {"type": "token", "text": "Hi"} in frames
 
@@ -100,9 +107,9 @@ def test_result_with_differing_text_is_emitted(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     token_texts = [f["text"] for f in frames if f["type"] == "token"]
     assert token_texts == ["Step 1 done", "Final answer: X"]
     assert text == "Final answer: X"
@@ -128,9 +135,9 @@ def test_claude_partial_deltas_stream_and_message_echo_is_suppressed(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "Hello"
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel", "lo"]
 
@@ -152,9 +159,9 @@ def test_claude_deltas_reset_per_message_across_tool_use(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "Done."
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Checking.", "Done", "."]
     assert any(f["type"] == "tool_call" and f["name"] == "get_scores" for f in frames)
@@ -172,9 +179,9 @@ def test_message_echo_differing_from_deltas_is_still_emitted(tmp_path):
     frames = []
     run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel", "Hello world"]
 
 
@@ -187,9 +194,9 @@ def test_partial_deltas_without_message_completion_count_as_output(tmp_path):
     frames = []
     text = run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=_config(tmp_path), session_id="s1", prior_session_id=None,
-        repository=repo, emit=frames.append,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=_config(tmp_path),
+        session=_session(repo, emit=frames.append,
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "Partial"
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Par", "tial"]
 
@@ -202,8 +209,8 @@ def test_tool_use_emits_frame(tmp_path):
     ]
     frames = []
     run_cli_turn(messages=[{"role": "user", "content": "scores?"}], config=_config(tmp_path),
-                 session_id="s1", prior_session_id=None, repository=repo,
-                 emit=frames.append, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+                 session=_session(repo, emit=frames.append,
+                                  spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert any(f["type"] == "tool_call" and f["name"] == "get_scores" for f in frames)
 
 
@@ -218,8 +225,8 @@ def test_codex_multiple_agent_messages_are_joined(tmp_path):
     ]
     frames = []
     text = run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                        session_id="s1", prior_session_id=None, repository=repo,
-                        emit=frames.append, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+                        session=_session(repo, emit=frames.append,
+                                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "First part.\n\nSecond part."
     assert [f["text"] for f in frames if f["type"] == "token"] == ["First part.", "Second part."]
 
@@ -234,8 +241,7 @@ def test_codex_partial_text_then_turn_failed_raises(tmp_path):
     ]
     with pytest.raises(RuntimeError, match="token limit exceeded"):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                     session_id="s1", prior_session_id=None, repository=repo,
-                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+                     session=_session(repo, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
 
 
 def test_codex_mcp_tool_call_emits_single_frame(tmp_path):
@@ -248,8 +254,8 @@ def test_codex_mcp_tool_call_emits_single_frame(tmp_path):
     ]
     frames = []
     text = run_cli_turn(messages=[{"role": "user", "content": "scope?"}], config=_config(tmp_path),
-                        session_id="s1", prior_session_id=None, repository=repo,
-                        emit=frames.append, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+                        session=_session(repo, emit=frames.append,
+                                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert text == "The scope is X."
     assert [f for f in frames if f["type"] == "tool_call"] == [
         {"type": "tool_call", "name": "get_context"}]
@@ -273,9 +279,9 @@ def test_resume_failure_triggers_replay_fallback(tmp_path):
                                   {"role": "user", "content": "earlier"},
                                   {"role": "assistant", "content": "earlier answer"},
                                   {"role": "user", "content": "again"}],
-                        config=_config(tmp_path), session_id="s1",
-                        prior_session_id="old-uuid", repository=repo,
-                        emit=frames.append, spawn_fn=spawn)
+                        config=_config(tmp_path),
+                        session=_session(repo, prior_session_id="old-uuid",
+                                         emit=frames.append, spawn_fn=spawn))
     assert text == "recovered"
     assert len(calls) == 2
     assert calls[0] != calls[1]  # first used --resume, second rebuilt
@@ -293,8 +299,8 @@ def test_nonzero_exit_with_output_does_not_replay(tmp_path):
 
     frames = []
     text = run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                        session_id="s1", prior_session_id="old-uuid", repository=repo,
-                        emit=frames.append, spawn_fn=spawn)
+                        session=_session(repo, prior_session_id="old-uuid",
+                                         emit=frames.append, spawn_fn=spawn))
     assert text == "ok"  # non-empty answer is success despite rc=1
     assert len(calls) == 1  # no replay
     assert not any(f["type"] == "warning" for f in frames)
@@ -304,8 +310,7 @@ def test_empty_output_raises(tmp_path):
     repo = _repo(tmp_path)
     with pytest.raises(RuntimeError):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                     session_id="s1", prior_session_id=None, repository=repo,
-                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc([]))
+                     session=_session(repo, spawn_fn=lambda argv, *, cwd, env: FakeProc([])))
 
 
 def test_web_enabled_reaches_spawned_argv(tmp_path):
@@ -322,8 +327,7 @@ def test_web_enabled_reaches_spawned_argv(tmp_path):
         return FakeProc(['{"type": "result", "result": "ok"}'])
 
     run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=config,
-                 session_id="s1", prior_session_id=None, repository=repo,
-                 emit=lambda f: None, spawn_fn=spawn)
+                 session=_session(repo, spawn_fn=spawn))
     allowed = captured["argv"][captured["argv"].index("--allowedTools") + 1]
     assert "WebSearch" in allowed and "WebFetch" in allowed
 
@@ -337,8 +341,7 @@ def test_web_disabled_by_default_in_spawned_argv(tmp_path):
         return FakeProc(['{"type": "result", "result": "ok"}'])
 
     run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                 session_id="s1", prior_session_id=None, repository=repo,
-                 emit=lambda f: None, spawn_fn=spawn)
+                 session=_session(repo, spawn_fn=spawn))
     assert captured["argv"][captured["argv"].index("--allowedTools") + 1] == "mcp__quodeq-assistant"
 
 
@@ -356,9 +359,9 @@ def test_claude_system_prompt_reaches_argv(tmp_path):
     run_cli_turn(
         messages=[{"role": "system", "content": "CTX"},
                   {"role": "user", "content": "hi"}],
-        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
-        emit=lambda f: None,
-        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+        config=cfg,
+        session=_session(repo, spawn_fn=_capture_spawn(
+            captured, ['{"type": "result", "result": "ok"}'])))
     i = captured["argv"].index("--append-system-prompt")
     assert captured["argv"][i + 1] == "CTX"
     assert captured["argv"][-1] == "hi"  # skill never prefixes argv-append prompts
@@ -378,9 +381,9 @@ def test_message_prefix_provider_gets_system_prompt_on_fresh_session(tmp_path, m
     run_cli_turn(
         messages=[{"role": "system", "content": "QUODEQ CTX"},
                   {"role": "user", "content": "hi"}],
-        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
-        emit=lambda f: None,
-        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+        config=cfg,
+        session=_session(repo, spawn_fn=_capture_spawn(
+            captured, ['{"type": "result", "result": "ok"}'])))
     assert captured["argv"][-1] == "QUODEQ CTX\n\nhi"
     assert "--append-system-prompt" not in captured["argv"]
 
@@ -394,9 +397,9 @@ def test_message_prefix_provider_omits_system_prompt_on_resume(tmp_path, monkeyp
     cfg = dataclasses.replace(_config(tmp_path), system_prompt="QUODEQ CTX", skill_block="")
     run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=cfg, session_id="s1", prior_session_id="th-1", repository=repo,
-        emit=lambda f: None,
-        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+        config=cfg,
+        session=_session(repo, prior_session_id="th-1", spawn_fn=_capture_spawn(
+            captured, ['{"type": "result", "result": "ok"}'])))
     assert captured["argv"][-1] == "hi"
 
 
@@ -409,9 +412,9 @@ def test_message_prefix_provider_prepends_system_prompt_then_skill(tmp_path, mon
     run_cli_turn(
         messages=[{"role": "system", "content": "CTX"},
                   {"role": "user", "content": "hi"}],
-        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
-        emit=lambda f: None,
-        spawn_fn=_capture_spawn(captured, ['{"type": "result", "result": "ok"}']))
+        config=cfg,
+        session=_session(repo, spawn_fn=_capture_spawn(
+            captured, ['{"type": "result", "result": "ok"}'])))
     assert captured["argv"][-1] == "CTX\n\n[skill:x]\nDo X\n\nhi"
     assert "--append-system-prompt" not in captured["argv"]
 
@@ -432,8 +435,7 @@ def test_codex_turn_is_wrapped_in_external_os_sandbox(tmp_path, monkeypatch):
 
     text = run_cli_turn(
         messages=[{"role": "system", "content": "CTX"}, {"role": "user", "content": "hi"}],
-        config=cfg, session_id="s1", prior_session_id=None, repository=repo,
-        emit=lambda f: None, spawn_fn=spawn)
+        config=cfg, session=_session(repo, spawn_fn=spawn))
     argv = captured["argv"]
     assert text == "ok"
     assert argv[0] == "sandbox-exec" and argv[1] == "-f"
@@ -458,9 +460,9 @@ def _codex_sandbox_dirs(tmp_path, monkeypatch, cfg):
              '{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}']
     run_cli_turn(
         messages=[{"role": "user", "content": "hi"}],
-        config=cfg, session_id="s1", prior_session_id=None,
-        repository=_repo(tmp_path), emit=lambda f: None,
-        spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+        config=cfg,
+        session=_session(_repo(tmp_path),
+                         spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     return seen["dirs"]
 
 
@@ -489,8 +491,7 @@ def test_json_error_event_raises_message(tmp_path):
     ]
     with pytest.raises(RuntimeError, match="model not supported"):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                     session_id="s1", prior_session_id=None, repository=repo,
-                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+                     session=_session(repo, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
 
 
 def test_non_json_cli_error_line_raises_message(tmp_path):
@@ -501,8 +502,8 @@ def test_non_json_cli_error_line_raises_message(tmp_path):
     ]
     with pytest.raises(RuntimeError, match="Not inside a trusted directory"):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}], config=_config(tmp_path),
-                     session_id="s1", prior_session_id=None, repository=repo,
-                     emit=lambda f: None, spawn_fn=lambda argv, *, cwd, env: FakeProc(lines, returncode=1))
+                     session=_session(repo, spawn_fn=lambda argv, *, cwd, env: FakeProc(
+                         lines, returncode=1)))
 
 
 # ---- stop-turn cancellation -------------------------------------------------
@@ -521,9 +522,9 @@ def test_cancel_mid_turn_raises_turn_cancelled_with_partial(tmp_path):
 
     with pytest.raises(TurnCancelled) as exc:
         run_cli_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(tmp_path), session_id="s1", prior_session_id=None,
-                     repository=repo, emit=emit, cancel=token,
-                     spawn_fn=lambda argv, *, cwd, env: FakeProc(lines))
+                     config=_config(tmp_path),
+                     session=_session(repo, emit=emit, cancel=token,
+                                      spawn_fn=lambda argv, *, cwd, env: FakeProc(lines)))
     assert exc.value.partial == "Hello"
 
 
@@ -538,9 +539,9 @@ def test_cancel_kills_the_cli_process(tmp_path):
 
     with pytest.raises(TurnCancelled):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(tmp_path), session_id="s1", prior_session_id=None,
-                     repository=repo, emit=emit, cancel=token,
-                     spawn_fn=lambda argv, *, cwd, env: proc)
+                     config=_config(tmp_path),
+                     session=_session(repo, emit=emit, cancel=token,
+                                      spawn_fn=lambda argv, *, cwd, env: proc))
     # the token's kill hook (not the exit-path cleanup: poll() reports the
     # scripted proc as already exited) must have killed the process tree
     assert proc.killed is True
@@ -559,8 +560,8 @@ def test_precancelled_token_spawns_nothing(tmp_path):
 
     with pytest.raises(TurnCancelled):
         run_cli_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(tmp_path), session_id="s1", prior_session_id=None,
-                     repository=repo, emit=lambda f: None, cancel=token, spawn_fn=spawn)
+                     config=_config(tmp_path),
+                     session=_session(repo, cancel=token, spawn_fn=spawn))
     assert spawns == []
 
 
@@ -584,7 +585,8 @@ def test_cancelled_turn_never_rebuilds(tmp_path):
 
     with pytest.raises(TurnCancelled) as exc:
         run_cli_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(tmp_path), session_id="s1", prior_session_id="old-sid",
-                     repository=repo, emit=emit, cancel=token, spawn_fn=spawn)
+                     config=_config(tmp_path),
+                     session=_session(repo, prior_session_id="old-sid", emit=emit,
+                                      cancel=token, spawn_fn=spawn))
     assert len(spawns) == 1
     assert exc.value.partial == ""

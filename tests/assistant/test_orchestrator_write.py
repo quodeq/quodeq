@@ -81,8 +81,7 @@ def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
     store, ctx = _fixture(tmp_path, repo, monkeypatch)
     seen = {}
 
-    def fake_cli_turn(*, messages, config, session_id, prior_session_id,
-                      repository, emit, **_):
+    def fake_cli_turn(*, messages, config, session, **_):
         seen["args"] = config.mcp_server_args
         seen["worktree_dir"] = config.worktree_dir
         return "ok"
@@ -103,8 +102,7 @@ def test_write_enabled_gemini_turn_stays_read_only(tmp_path, repo, monkeypatch):
     store, ctx = _fixture(tmp_path, repo, monkeypatch)
     seen = {}
 
-    def fake_cli_turn(*, messages, config, session_id, prior_session_id,
-                      repository, emit, **_):
+    def fake_cli_turn(*, messages, config, session, **_):
         seen["args"] = config.mcp_server_args
         seen["worktree_dir"] = config.worktree_dir
         seen["system"] = messages[0]["content"]

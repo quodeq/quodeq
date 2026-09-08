@@ -7,12 +7,12 @@ import subprocess
 import tempfile
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable
 
 from quodeq.assistant.adapters import _stream
-from quodeq.assistant.adapters._cli_command import build_turn_argv
+from quodeq.assistant.adapters._cli_command import TurnArgvRequest, build_turn_argv
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
@@ -42,6 +42,16 @@ class CliTurnConfig:
     system_prompt: str = ""
     skill_block: str = ""
     worktree_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class CliTurnSession:
+    session_id: str
+    prior_session_id: str | None
+    repository: AssistantStore
+    emit: Callable[[dict], None]
+    spawn_fn: Callable | None = None
+    cancel: CancelToken | None = None
 
 
 def _latest_user(messages: list[dict]) -> str:
@@ -197,10 +207,8 @@ def _finalize_turn_result(proc, stream_result, *, repository: AssistantStore, se
     return final, parsed_sid, returncode, structured_error, raw_error
 
 
-def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
-              prior_session_id: str | None, new_session_id: str,
-              repository: AssistantStore, emit: Callable[[dict], None],
-              spawn_fn, cancel: CancelToken) -> tuple[str, str | None, int, str | None, str | None]:
+def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
+              new_session_id: str) -> tuple[str, str | None, int, str | None, str | None]:
     mcp_config_path, mcp_config_arg = _setup_mcp_config(cfg, cli_cfg)
     proc = None
     timer = None
@@ -210,16 +218,15 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, *, prompt: str, session_id: str,
         # argv-append providers get the system prompt every run; on the
         # rebuild-replay path the transcript also carries a [system] block,
         # a rare accepted duplication.
-        spec = build_turn_argv(cli_cfg, prompt=prompt, model=cfg.model,
-                               mcp_config_path=mcp_config_path,
-                               prior_session_id=prior_session_id, new_session_id=new_session_id,
-                               web_enabled=cfg.web_enabled,
-                               system_prompt=cfg.system_prompt,
-                               mcp_config_arg=mcp_config_arg)
+        request = TurnArgvRequest.from_turn_config(
+            cfg, prompt=prompt, mcp_config=(mcp_config_path, mcp_config_arg),
+            prior_session_id=session.prior_session_id, new_session_id=new_session_id)
+        spec = build_turn_argv(cli_cfg, request)
         cwd, proc, timer, sandbox_cleanup, stream_result = _spawn_and_stream(
-            cfg, cli_cfg, spec, emit=emit, spawn_fn=spawn_fn, cancel=cancel)
-        return _finalize_turn_result(proc, stream_result, repository=repository,
-                                     session_id=session_id)
+            cfg, cli_cfg, spec, emit=session.emit, spawn_fn=session.spawn_fn,
+            cancel=session.cancel)
+        return _finalize_turn_result(proc, stream_result, repository=session.repository,
+                                     session_id=session.session_id)
     finally:
         if timer is not None:
             timer.cancel()
@@ -256,37 +263,33 @@ def _inject_system_prompt(cli_cfg, config: CliTurnConfig, prior_session_id: str 
     return prompt
 
 
-def run_cli_turn(*, messages: list[dict], config: CliTurnConfig, session_id: str,
-                 prior_session_id: str | None, repository: AssistantStore,
-                 emit: Callable[[dict], None], spawn_fn=None,
-                 cancel: CancelToken | None = None) -> str:
-    spawn_fn = spawn_fn or spawn_turn
-    cancel = cancel or CancelToken()
-    if cancel.cancelled:  # stop landed before the turn even spawned
+def run_cli_turn(*, messages: list[dict], config: CliTurnConfig,
+                 session: CliTurnSession) -> str:
+    session = replace(session, spawn_fn=session.spawn_fn or spawn_turn,
+                      cancel=session.cancel or CancelToken())
+    if session.cancel.cancelled:  # stop landed before the turn even spawned
         raise TurnCancelled("")
     cli_cfg = load_cli_chat_config(config.provider)
-    prompt = _inject_system_prompt(cli_cfg, config, prior_session_id, _latest_user(messages))
+    prompt = _inject_system_prompt(cli_cfg, config, session.prior_session_id,
+                                   _latest_user(messages))
     final, _sid, _rc, structured_error, raw_error = _run_once(
-        config, cli_cfg, prompt=prompt, session_id=session_id,
-        prior_session_id=prior_session_id, new_session_id=str(uuid.uuid4()),
-        repository=repository, emit=emit, spawn_fn=spawn_fn, cancel=cancel)
+        config, cli_cfg, session, prompt, str(uuid.uuid4()))
     # A stopped turn is neither a failure nor a rebuild trigger: the kill
     # leaves empty/partial output and often a nonzero exit, all of which the
     # paths below would misread (rebuilding would RERUN the turn the user
     # just stopped). Unwind with whatever text already streamed.
-    if cancel.cancelled:
+    if session.cancel.cancelled:
         raise TurnCancelled(final)
     # rebuild from the full transcript when a resumed turn came back empty, or
     # when it reported a structured failure (a partial answer before an explicit
     # error is not trustworthy). A non-empty answer with only a benign non-zero
     # exit is still success.
-    if prior_session_id is not None and (final == "" or structured_error):
-        emit({"type": "warning", "message": "session rebuilt"})
+    if session.prior_session_id is not None and (final == "" or structured_error):
+        session.emit({"type": "warning", "message": "session rebuilt"})
         final, _sid, _rc, structured_error, raw_error = _run_once(
-            config, cli_cfg, prompt=_full_transcript(messages), session_id=session_id,
-            prior_session_id=None, new_session_id=str(uuid.uuid4()),
-            repository=repository, emit=emit, spawn_fn=spawn_fn, cancel=cancel)
-        if cancel.cancelled:
+            config, cli_cfg, replace(session, prior_session_id=None),
+            _full_transcript(messages), str(uuid.uuid4()))
+        if session.cancel.cancelled:
             raise TurnCancelled(final)
     if structured_error:
         raise RuntimeError(structured_error)

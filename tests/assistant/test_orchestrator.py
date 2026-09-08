@@ -261,7 +261,7 @@ def test_cli_config_carries_system_prompt_and_skill_block(setup):
     repo, ctx = setup
     captured = {}
 
-    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit, **_):
+    def fake_cli(*, messages, config, session, **_):
         captured["config"] = config
         return "answer"
 
@@ -278,7 +278,7 @@ def test_cli_config_skill_block_empty_without_skill(setup):
     repo, ctx = setup
     captured = {}
 
-    def fake_cli(*, messages, config, session_id, prior_session_id, repository, emit, **_):
+    def fake_cli(*, messages, config, session, **_):
         captured["config"] = config
         return "answer"
 

@@ -35,12 +35,7 @@ src/quodeq/api/import_project.py:_stage_and_commit
 src/quodeq/api/zip.py:_write_project_zip_entries
 src/quodeq/assistant/adapters/_api.py:_stream_once
 src/quodeq/assistant/adapters/_api.py:run_api_turn
-src/quodeq/assistant/adapters/_cli.py:_run_once
 src/quodeq/assistant/adapters/_cli.py:_spawn_and_stream
-src/quodeq/assistant/adapters/_cli.py:run_cli_turn
-src/quodeq/assistant/adapters/_cli_command.py:build_turn_argv
-src/quodeq/assistant/orchestrator.py:_run_api_engine
-src/quodeq/assistant/orchestrator.py:_run_cli_engine
 src/quodeq/assistant/orchestrator.py:run_turn
 src/quodeq/assistant/workspace_actions.py:create_workspace_pr
 src/quodeq/ci/github_render.py:build_review_summary
