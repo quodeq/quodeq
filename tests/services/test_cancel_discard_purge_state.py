@@ -291,3 +291,92 @@ def test_discard_does_not_delete_replayed_cache_entries(tmp_path: Path):
     )
 
     assert deleted == ["key-mine"]
+
+
+def test_discard_rejects_path_traversal_in_run_id(tmp_path: Path):
+    """Path traversal in run_id must not reach cache-key lookup or file deletion.
+
+    A malicious run_id like "../../../etc/passwd" must be rejected before
+    it can cause damage, even if reports_dir and project are legitimate.
+    """
+    reports = tmp_path / "reports"
+    evidence = reports / "proj" / "run1" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_dispatch_keys.json").write_text(
+        json.dumps({"a.py": "key-should-not-delete"})
+    )
+
+    deleted: list[str] = []
+
+    class _FakeCache:
+        def delete(self, key: str) -> None:
+            deleted.append(key)
+
+    _discard_run_state(
+        str(reports),
+        {"outputProject": "proj", "outputRunId": "../../../etc/passwd"},
+        cache=_FakeCache(),
+    )
+
+    assert deleted == [], "traversal run_id must not trigger cache deletion"
+    assert (evidence / "security_dispatch_keys.json").exists(), (
+        "traversal run_id must not delete files"
+    )
+
+
+def test_discard_rejects_absolute_path_in_project(tmp_path: Path):
+    """Absolute paths in project name must not reach cache-key lookup.
+
+    An absolute-path-shaped project value must be rejected before use.
+    """
+    reports = tmp_path / "reports"
+    evidence = reports / "proj" / "run1" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_dispatch_keys.json").write_text(
+        json.dumps({"a.py": "key-should-not-delete"})
+    )
+
+    deleted: list[str] = []
+
+    class _FakeCache:
+        def delete(self, key: str) -> None:
+            deleted.append(key)
+
+    _discard_run_state(
+        str(reports),
+        {"outputProject": "/etc", "outputRunId": "run1"},
+        cache=_FakeCache(),
+    )
+
+    assert deleted == [], "absolute-path project must not trigger cache deletion"
+    assert (evidence / "security_dispatch_keys.json").exists(), (
+        "absolute-path project must not delete files"
+    )
+
+
+def test_discard_allows_legitimate_paths(tmp_path: Path):
+    """Normal legitimate project/run_id values work unchanged."""
+    reports = tmp_path / "reports"
+    evidence = reports / "myproj" / "run-123" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_dispatch_keys.json").write_text(
+        json.dumps({"a.py": "key-to-delete"})
+    )
+    (evidence / "security_evidence.jsonl").write_text('{"file":"a.py"}\n')
+
+    deleted: list[str] = []
+
+    class _FakeCache:
+        def delete(self, key: str) -> None:
+            deleted.append(key)
+
+    _discard_run_state(
+        str(reports),
+        {"outputProject": "myproj", "outputRunId": "run-123"},
+        cache=_FakeCache(),
+    )
+
+    assert deleted == ["key-to-delete"], "legitimate paths must work normally"
+    assert not (evidence / "security_evidence.jsonl").exists(), (
+        "legitimate paths must delete evidence"
+    )

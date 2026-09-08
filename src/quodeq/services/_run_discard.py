@@ -70,6 +70,18 @@ def _open_cache():
     return LocalFileBackend()
 
 
+def _is_run_path_valid(reports_path: Path, run_dir: Path) -> bool:
+    """Verify run_dir is within reports_path (path-traversal guard).
+
+    Returns False if the path escapes or an error occurs; True if jailed.
+    """
+    try:
+        resolved_reports = reports_path.resolve()
+        return run_dir.resolve().is_relative_to(resolved_reports)
+    except (OSError, ValueError):
+        return False
+
+
 def _discard_run_state(
     reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None,
     log: LogSink = NULL_LOG,
@@ -95,7 +107,11 @@ def _discard_run_state(
     if not project or not run_id:
         return
 
-    run_dir = Path(reports_dir) / project / run_id
+    reports_path = Path(reports_dir)
+    run_dir = reports_path / project / run_id
+    if not _is_run_path_valid(reports_path, run_dir):
+        return
+
     evidence_dir = run_dir / "evidence"
     if not evidence_dir.is_dir():
         return
@@ -112,8 +128,6 @@ def _discard_run_state(
     scratch_patterns = (
         "*_queue.json", "*_fingerprint.json",
         "*_evidence.jsonl", "*_dispatch_keys.json",
-        # Entries listed here belong to EARLIER runs, so they are cleaned up
-        # as scratch but deliberately not fed to the cache-deletion loop above.
         "*_replayed_unconsolidated_keys.json",
     )
     remove_matching_files(evidence_dir, scratch_patterns)
