@@ -205,10 +205,11 @@ def _check_stale_and_promote(
     pid_alive = isinstance(pid, int) and _is_pid_alive(pid)
 
     if heartbeat_stale and not pid_alive:
-        # RunStatus.from_status_dict carries deadline_at/ai_provider/ai_model
-        # forward from the existing status.json unchanged: deadline_at so
-        # downstream readers (filesystem snapshot builder) still see it, and
-        # provider/model so the dashboard card stays self-describing.
+        # from_status_dict needs "state"; fall back if status.json omits it
+        # (discarded by the override below). deadline_at/ai_provider/ai_model
+        # carry forward unchanged, so the dashboard and filesystem snapshot
+        # builder keep seeing them.
+        status.setdefault("state", state or RunState.RUNNING.value)
         base = RunStatus.from_status_dict(status)
         new_status = dataclasses.replace(
             base,
