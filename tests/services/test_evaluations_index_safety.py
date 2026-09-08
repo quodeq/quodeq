@@ -13,7 +13,7 @@ from pathlib import Path
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import InMemoryJobStore
 from quodeq.services.jobs import JobManager
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _make_index(tmp_path: Path, reports_root: Path) -> EvaluationsIndex:
@@ -30,12 +30,14 @@ def _seed_terminal_run(reports_root: Path, project: str, run_id: str) -> Path:
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.FAILED,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="done",
-        pid=99999,
+        RunStatus(
+            state=RunState.FAILED,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="done",
+            pid=99999,
+        ),
     )
     return run_dir
 

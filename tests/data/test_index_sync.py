@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.data.sqlite.run_index import open_index, sync_index
 from quodeq.data.sqlite._index_sync import (
     _is_pid_alive,
@@ -92,8 +92,8 @@ def test_upsert_from_status_inserts_new_row(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r5")
-        write_status(run, state=RunState.PENDING, job_id="ext-r5",
-                     started_at="2026-04-20T00:00:00+00:00", dimensions=["security"])
+        write_status(run, RunStatus(state=RunState.PENDING, job_id="ext-r5",
+                     started_at="2026-04-20T00:00:00+00:00", dimensions=["security"]))
         _upsert_from_status(db, run, project_uuid="p", run_id="r5")
         row = db.execute(
             "SELECT state, project_uuid, run_id FROM runs WHERE job_id = ?",
@@ -108,11 +108,11 @@ def test_upsert_updates_existing_row(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r6")
-        write_status(run, state=RunState.RUNNING, job_id="ext-r6",
-                     started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+        write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-r6",
+                     started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
         _upsert_from_status(db, run, project_uuid="p", run_id="r6")
-        write_status(run, state=RunState.DONE, job_id="ext-r6",
-                     started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+        write_status(run, RunStatus(state=RunState.DONE, job_id="ext-r6",
+                     started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
         _upsert_from_status(db, run, project_uuid="p", run_id="r6")
         row = db.execute("SELECT state FROM runs WHERE job_id = ?", ("ext-r6",)).fetchone()
         assert row[0] == "done"
@@ -124,8 +124,8 @@ def test_stale_promotion_old_heartbeat_dead_pid(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r7")
-        write_status(run, state=RunState.RUNNING, job_id="ext-r7",
-                     started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999)
+        write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-r7",
+                     started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999))
         _upsert_from_status(db, run, project_uuid="p", run_id="r7")
         heartbeat = run / ".heartbeat"
         heartbeat.touch()
@@ -149,8 +149,8 @@ def test_stale_promotion_live_pid_not_promoted(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r8")
-        write_status(run, state=RunState.RUNNING, job_id="ext-r8",
-                     started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=os.getpid())
+        write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-r8",
+                     started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=os.getpid()))
         _upsert_from_status(db, run, project_uuid="p", run_id="r8")
         heartbeat = run / ".heartbeat"
         heartbeat.touch()
@@ -188,11 +188,13 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
         run = _make_run_dir(tmp_path, "p", "r10")
         write_status(
             run,
-            state=RunState.RUNNING,
-            job_id="ext-r10",
-            started_at="2026-04-20T00:00:00+00:00",
-            dimensions=[],
-            pid=proc.pid,
+            RunStatus(
+                state=RunState.RUNNING,
+                job_id="ext-r10",
+                started_at="2026-04-20T00:00:00+00:00",
+                dimensions=[],
+                pid=proc.pid,
+            ),
         )
         _upsert_from_status(db, run, project_uuid="p", run_id="r10")
         heartbeat = run / ".heartbeat"
@@ -295,8 +297,10 @@ def test_sync_index_keeps_rows_whose_run_dir_exists(tmp_path: Path) -> None:
     reports = tmp_path / "reports"
     run = _make_run_dir(reports, "p", "real-run")
     write_status(
-        run, state=RunState.RUNNING, job_id="ext-real-run",
-        started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=os.getpid(),
+        run, RunStatus(
+            state=RunState.RUNNING, job_id="ext-real-run",
+            started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=os.getpid(),
+        ),
     )
     db = open_index(tmp_path / "idx.db")
     try:
@@ -313,8 +317,8 @@ def test_stale_promotion_terminal_state_untouched(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r9")
-        write_status(run, state=RunState.DONE, job_id="ext-r9",
-                     started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+        write_status(run, RunStatus(state=RunState.DONE, job_id="ext-r9",
+                     started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
         _upsert_from_status(db, run, project_uuid="p", run_id="r9")
         promoted = _check_stale_and_promote(db, run, project_uuid="p", run_id="r9",
                                             stale_seconds=30)
@@ -333,14 +337,16 @@ def test_force_promote_preserves_provider_model_deadline(tmp_path: Path) -> None
         run = _make_run_dir(tmp_path, "p", "r11")
         write_status(
             run,
-            state=RunState.RUNNING,
-            job_id="ext-r11",
-            started_at="2026-04-20T00:00:00+00:00",
-            dimensions=[],
-            pid=999999999,
-            ai_provider="llamacpp",
-            ai_model="qwen3.6-27b",
-            deadline_at="2026-01-01T00:00:00+00:00",
+            RunStatus(
+                state=RunState.RUNNING,
+                job_id="ext-r11",
+                started_at="2026-04-20T00:00:00+00:00",
+                dimensions=[],
+                pid=999999999,
+                ai_provider="llamacpp",
+                ai_model="qwen3.6-27b",
+                deadline_at="2026-01-01T00:00:00+00:00",
+            ),
         )
         _upsert_from_status(db, run, project_uuid="p", run_id="r11")
 

@@ -8,6 +8,7 @@ import pytest
 
 from quodeq.data.fs.run_status_store import (
     RunState,
+    RunStatus,
     TERMINAL_STATES,
     UnsupportedSchemaError,
     IllegalTransitionError,
@@ -18,12 +19,33 @@ from quodeq.data.fs.run_status_store import (
 
 
 def test_write_and_read_round_trip(tmp_path: Path) -> None:
-    write_status(tmp_path, state=RunState.PENDING, job_id="ext-r", started_at="2026-04-20T00:00:00+00:00", dimensions=["security"])
+    write_status(tmp_path, RunStatus(state=RunState.PENDING, job_id="ext-r", started_at="2026-04-20T00:00:00+00:00", dimensions=["security"]))
     status = read_status(tmp_path)
     assert status["state"] == "pending"
     assert status["job_id"] == "ext-r"
     assert status["dimensions"] == ["security"]
     assert status["schema_version"] == 2
+
+
+def test_run_status_from_status_dict_round_trips_to_same_json(tmp_path: Path, monkeypatch) -> None:
+    """RunStatus.from_status_dict(read_status(run_dir)) must reproduce identical JSON."""
+    import quodeq.data.fs.run_status_store as run_status_store
+    monkeypatch.setattr(run_status_store, "_now_iso", lambda: "2026-04-20T00:00:00+00:00")
+
+    original = RunStatus(
+        state=RunState.DONE, job_id="ext-rt", started_at="2026-04-20T00:00:00+00:00",
+        dimensions=["security", "reliability"], phase="scoring", current_dimension="reliability",
+        pid=4242, exit_reason=None, deadline_at="2026-04-20T01:00:00+00:00",
+        ai_provider="llamacpp", ai_model="qwen3.6-27b", time_limit_s=3600,
+    )
+    write_status(tmp_path, original)
+    first_json = (tmp_path / "status.json").read_text(encoding="utf-8")
+
+    rebuilt = RunStatus.from_status_dict(read_status(tmp_path))
+    write_status(tmp_path, rebuilt)
+    second_json = (tmp_path / "status.json").read_text(encoding="utf-8")
+
+    assert first_json == second_json
 
 
 def test_atomic_write_uses_tmp_then_rename(tmp_path: Path, monkeypatch) -> None:
@@ -34,7 +56,7 @@ def test_atomic_write_uses_tmp_then_rename(tmp_path: Path, monkeypatch) -> None:
         calls.append("replace")
         return real_replace(self, target)
     monkeypatch.setattr(Path, "replace", spy_replace)
-    write_status(tmp_path, state=RunState.PENDING, job_id="x", started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+    write_status(tmp_path, RunStatus(state=RunState.PENDING, job_id="x", started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
     assert calls == ["replace"]
     tmp = tmp_path / "status.json.tmp"
     assert not tmp.exists()
@@ -96,12 +118,14 @@ def test_read_non_dict_json_returns_none(tmp_path: Path) -> None:
 def test_write_status_persists_provider_and_model(tmp_path: Path) -> None:
     write_status(
         tmp_path,
-        state=RunState.RUNNING,
-        job_id="ext-abc",
-        started_at="2026-01-01T00:00:00Z",
-        dimensions=["maintainability"],
-        ai_provider="llamacpp",
-        ai_model="qwen3.6-27b",
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id="ext-abc",
+            started_at="2026-01-01T00:00:00Z",
+            dimensions=["maintainability"],
+            ai_provider="llamacpp",
+            ai_model="qwen3.6-27b",
+        ),
     )
     data = json.loads((tmp_path / "status.json").read_text())
     assert data["ai_provider"] == "llamacpp"
@@ -111,10 +135,12 @@ def test_write_status_persists_provider_and_model(tmp_path: Path) -> None:
 def test_write_status_omits_provider_and_model_when_unset(tmp_path: Path) -> None:
     write_status(
         tmp_path,
-        state=RunState.RUNNING,
-        job_id="ext-abc",
-        started_at="2026-01-01T00:00:00Z",
-        dimensions=[],
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id="ext-abc",
+            started_at="2026-01-01T00:00:00Z",
+            dimensions=[],
+        ),
     )
     data = json.loads((tmp_path / "status.json").read_text())
     assert "ai_provider" not in data
@@ -127,8 +153,8 @@ def test_concurrent_writes_no_partial_file(tmp_path: Path) -> None:
     def worker(label: str) -> None:
         barrier.wait()
         for _ in range(50):
-            write_status(tmp_path, state=RunState.RUNNING, job_id=label,
-                         started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+            write_status(tmp_path, RunStatus(state=RunState.RUNNING, job_id=label,
+                         started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
     t1 = threading.Thread(target=worker, args=("A",))
     t2 = threading.Thread(target=worker, args=("B",))
     t1.start(); t2.start(); t1.join(); t2.join()

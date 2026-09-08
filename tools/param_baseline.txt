@@ -65,10 +65,7 @@ src/quodeq/core/scoring/projector_scoring.py:compute_principle_grade
 src/quodeq/dashboard/runner.py:_start_action_api
 src/quodeq/data/cache_store/index.py:ContentIndex.record
 src/quodeq/data/cache_store/migrate.py:_migrate_v3
-src/quodeq/data/fs/run_status_store.py:_build_status_payload
-src/quodeq/data/fs/run_status_store.py:write_status
 src/quodeq/data/ports/assistant.py:AssistantStore.create_session
-src/quodeq/data/sqlite/_index_sync_promote.py:_promote_via_status_write
 src/quodeq/data/sqlite/assistant_repository.py:AssistantRepository.create_session
 src/quodeq/data/sqlite/state_store.py:SQLiteStateStore.record_principle_grade
 src/quodeq/llm_bridge/_embeddings.py:embed_texts

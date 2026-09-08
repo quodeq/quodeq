@@ -5,15 +5,15 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _seed_run(reports: Path, project: str, run_id: str, state: RunState) -> Path:
     d = reports / project / run_id
     (d / "evidence").mkdir(parents=True)
     (d / "evidence" / "manifest.json").write_text("{}")
-    write_status(d, state=state, job_id=f"ext-{run_id}",
-                 started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+    write_status(d, RunStatus(state=state, job_id=f"ext-{run_id}",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
     return d
 
 
@@ -51,15 +51,15 @@ def test_get_evaluation_status_promotes_stale_ext_run(tmp_path, monkeypatch) -> 
     old filesystem heuristic)."""
     import os
     import time
-    from quodeq.data.fs.run_status_store import RunState, read_status, write_status
+    from quodeq.data.fs.run_status_store import RunState, RunStatus, read_status, write_status
 
     reports = tmp_path / "reports"
     run = reports / "p" / "stale-run"
     (run / "evidence").mkdir(parents=True)
     (run / "evidence" / "manifest.json").write_text("{}")
     # status.json says running but PID is dead
-    write_status(run, state=RunState.RUNNING, job_id="ext-stale-run",
-                 started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999)
+    write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-stale-run",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999))
     # Heartbeat is 60s old
     heartbeat = run / ".heartbeat"
     heartbeat.touch()
@@ -102,7 +102,7 @@ def test_list_evaluations_internal_job_overrides_index_row(tmp_path, monkeypatch
     The authoritative live state must come from JobManager, not the index.
     """
     from unittest.mock import MagicMock
-    from quodeq.data.fs.run_status_store import RunState, write_status
+    from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
     from quodeq.services.filesystem import FilesystemActionProvider
     from quodeq.core.types.job import JobSnapshot
 
@@ -113,8 +113,10 @@ def test_list_evaluations_internal_job_overrides_index_row(tmp_path, monkeypatch
     (run / "evidence").mkdir(parents=True)
     (run / "evidence" / "manifest.json").write_text("{}")
     write_status(
-        run, state=RunState.RUNNING, job_id="internal-42",
-        started_at="2026-04-20T00:00:00+00:00", dimensions=[],
+        run, RunStatus(
+            state=RunState.RUNNING, job_id="internal-42",
+            started_at="2026-04-20T00:00:00+00:00", dimensions=[],
+        ),
     )
 
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(reports))

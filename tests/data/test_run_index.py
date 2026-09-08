@@ -127,7 +127,7 @@ def test_get_index_db_path_default_and_env(tmp_path, monkeypatch) -> None:
     assert Path(get_index_db_path()) == tmp_path / "custom.db"
 
 
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.data.sqlite.run_index import (
     get_run, list_runs, rebuild_index, sync_index, sync_index_for_run,
 )
@@ -137,8 +137,8 @@ def _seed_plan_a_run(root: Path, project: str, run_id: str, state: RunState) -> 
     d = root / project / run_id
     (d / "evidence").mkdir(parents=True)
     (d / "evidence" / "manifest.json").write_text("{}")
-    write_status(d, state=state, job_id=f"ext-{run_id}",
-                 started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+    write_status(d, RunStatus(state=state, job_id=f"ext-{run_id}",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
     return d
 
 
@@ -187,10 +187,10 @@ def test_list_runs_ordered_by_started_at_desc(tmp_path: Path) -> None:
     (newer / "evidence").mkdir(parents=True)
     (older / "evidence" / "manifest.json").write_text("{}")
     (newer / "evidence" / "manifest.json").write_text("{}")
-    write_status(older, state=RunState.DONE, job_id="ext-older",
-                 started_at="2026-04-19T00:00:00+00:00", dimensions=[])
-    write_status(newer, state=RunState.DONE, job_id="ext-newer",
-                 started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+    write_status(older, RunStatus(state=RunState.DONE, job_id="ext-older",
+                 started_at="2026-04-19T00:00:00+00:00", dimensions=[]))
+    write_status(newer, RunStatus(state=RunState.DONE, job_id="ext-newer",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
 
     db = open_index(tmp_path / "idx.db")
     try:
