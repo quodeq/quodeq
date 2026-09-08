@@ -3,7 +3,7 @@
 ``load_precedent_fingerprints``'s own docstring says "Missing or locked DBs
 are skipped -- precedent matching degrades gracefully and never breaks a
 scan," but nothing wrapped the read call: an exception out of
-``read_dismissed_snippets`` (e.g. sqlite3.OperationalError on a locked DB)
+``read_dismissed_snippets_strict`` (e.g. sqlite3.OperationalError on a locked DB)
 propagated straight out and failed the whole run.
 
 The memo tests cover the second cost: every scan used to open and query

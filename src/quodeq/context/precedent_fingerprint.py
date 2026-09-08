@@ -126,7 +126,7 @@ def load_precedent_fingerprints(
     *read_dismissed* and *source_stamp* are the injected seams (see
     ``data/ports/precedents.py``); this module never imports the concrete
     SQLite adapter. Composition roots wire the production defaults from
-    ``quodeq.data.sqlite.findings_queries`` (``read_dismissed_snippets``,
+    ``quodeq.data.sqlite.findings_queries`` (``read_dismissed_snippets_strict``,
     ``dismissed_source_stamp``) at ``analysis/_api_runner.py::
     _build_router_context`` and ``analysis/mcp/findings_server.py::
     _build_router``. Legacy ``<project_dir>/dismissed.json`` entries reach

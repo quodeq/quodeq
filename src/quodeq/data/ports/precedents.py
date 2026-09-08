@@ -9,7 +9,7 @@ DismissedSnippetsReader = Callable[[Path], Iterable[tuple[str | None, str | None
 run directory.
 
 Mirrors the public surface of
-``quodeq.data.sqlite.findings_queries.read_dismissed_snippets``; consumers
+``quodeq.data.sqlite.findings_queries.read_dismissed_snippets_strict``; consumers
 type against this alias so a fake reader can stand in for isolated tests
 without importing the sqlite layer.
 """

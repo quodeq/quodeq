@@ -1,11 +1,20 @@
-from collections import OrderedDict
+import sqlite3
 from pathlib import Path
 
+import pytest
+
 from quodeq.context.precedent import fingerprint, load_precedent_fingerprints
-from quodeq.data.sqlite.findings_queries import dismissed_source_stamp, read_dismissed_snippets
+from quodeq.data.sqlite.findings_queries import (
+    dismissed_source_stamp,
+    read_dismissed_snippets_strict,
+)
+from quodeq.shared.lru import LRUDict
 from tests.context.conftest import seed_dismissed
 
-_PROD_SEAMS = dict(read_dismissed=read_dismissed_snippets, source_stamp=dismissed_source_stamp)
+# What analysis/_api_runner.py and analysis/mcp/findings_server.py inject.
+_PROD_SEAMS = dict(
+    read_dismissed=read_dismissed_snippets_strict, source_stamp=dismissed_source_stamp,
+)
 
 # ---------------------------------------------------------------------------
 # New SQL-based test (was the failing regression)
@@ -159,7 +168,7 @@ def test_new_dismissal_is_visible_on_the_next_load(tmp_path: Path):
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
     seed_dismissed(project_dir, "r1", req="R1", snippet="x = 1", file="a.py", line=1)
-    cache: OrderedDict = OrderedDict()
+    cache: LRUDict = LRUDict(8)
 
     first = load_precedent_fingerprints(project_dir, cache=cache, **_PROD_SEAMS)
     seed_dismissed(project_dir, "r1", req="R2", snippet="y = 2", file="b.py", line=2)
@@ -168,3 +177,25 @@ def test_new_dismissal_is_visible_on_the_next_load(tmp_path: Path):
     assert fingerprint("R1", "x = 1") in first
     assert fingerprint("R2", "y = 2") not in first
     assert fingerprint("R2", "y = 2") in second
+
+
+def test_a_failed_read_is_retried_on_the_next_load(tmp_path: Path):
+    """Production wiring end to end: a transient failure opening one run's DB
+    (EMFILE, disk error) is retried on the next load, not memoized as "no
+    dismissals" until that DB's stat changes. Only a reader that raises lets
+    the memo tell a failure from an empty run.
+    """
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    seed_dismissed(project_dir, "r1", req="R1", snippet="x = 1", file="a.py", line=1)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "quodeq.data.sqlite.connection.apply_evaluation_schema",
+            lambda conn: (_ for _ in ()).throw(sqlite3.OperationalError("disk I/O error")),
+        )
+        failed = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
+    recovered = load_precedent_fingerprints(project_dir, **_PROD_SEAMS)
+
+    assert failed == set()
+    assert fingerprint("R1", "x = 1") in recovered

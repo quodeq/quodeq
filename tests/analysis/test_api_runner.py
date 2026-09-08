@@ -675,3 +675,32 @@ class TestBuildRouterContextCorpus:
 
         assert calls == [(tmp_path, run_dir)]
         assert ctx.precedent_corpus is sentinel
+
+
+class TestBuildRouterContextPrecedentReader:
+    def test_wires_the_strict_dismissed_reader(self, tmp_path, monkeypatch):
+        """The best-effort reader turns a failed DB open into [], which the
+        per-run memo would remember as "no dismissals" until that DB's stat
+        changes. The strict reader lets load_precedent_fingerprints see the
+        failure, log it and skip the run without memoizing."""
+        import quodeq.analysis._api_runner as api_runner_module
+        from quodeq.data.sqlite.findings_queries import (
+            dismissed_source_stamp, read_dismissed_snippets_strict,
+        )
+
+        seams: dict = {}
+
+        def fake_load_precedent_fingerprints(project_dir, **kwargs):
+            seams.update(kwargs)
+            return {"fp"}
+
+        monkeypatch.setattr(
+            api_runner_module, "load_precedent_fingerprints",
+            fake_load_precedent_fingerprints,
+        )
+
+        ctx = _build_router_context(tmp_path, "security", None, tmp_path, tmp_path / "run-1")
+
+        assert seams["read_dismissed"] is read_dismissed_snippets_strict
+        assert seams["source_stamp"] is dismissed_source_stamp
+        assert ctx.precedent_fingerprints == {"fp"}

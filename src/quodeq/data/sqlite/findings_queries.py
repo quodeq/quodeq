@@ -174,23 +174,33 @@ _SEMANTIC_ELIGIBLE_SQL = (
 )
 
 
-def read_dismissed_snippets(run_dir: Path) -> list[tuple[str | None, str | None]]:
+def read_dismissed_snippets_strict(run_dir: Path) -> list[tuple[str | None, str | None]]:
     """``(requirement, snippet)`` for every dismissed finding in *run_dir*.
 
-    Feeds precedent fingerprinting. Any read failure yields an empty list:
-    precedent matching degrades gracefully and never breaks a scan.
+    Feeds precedent fingerprinting. A missing database means no dismissals
+    and yields ``[]``; a database that cannot be opened or read raises
+    (``RuntimeError`` from ``open_evaluation_db``, ``sqlite3.Error``,
+    ``OSError``). The per-run memo in ``context.precedent_fingerprint``
+    depends on seeing the failure: an empty list in its place would be
+    remembered as "no dismissals" until the DB's stat happens to change.
     """
-    if not (run_dir / "evaluation.db").is_file():
+    if not (run_dir / EVALUATION_DB_FILENAME).is_file():
         return []
+    with open_evaluation_db(run_dir) as conn:
+        return [
+            (row[0], row[1])
+            for row in conn.execute(
+                "SELECT requirement, snippet FROM findings WHERE verdict = 'dismissed'"
+            )
+        ]
+
+
+def read_dismissed_snippets(run_dir: Path) -> list[tuple[str | None, str | None]]:
+    """Best-effort ``read_dismissed_snippets_strict``: any read failure yields
+    an empty list, for callers that have no retry of their own and must never
+    let precedent matching break a scan."""
     try:
-        with open_evaluation_db(run_dir) as conn:
-            return [
-                (row[0], row[1])
-                for row in conn.execute(
-                    "SELECT requirement, snippet FROM findings "
-                    "WHERE verdict = 'dismissed'"
-                )
-            ]
+        return read_dismissed_snippets_strict(run_dir)
     except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
         _logger.warning("Could not read dismissed snippets from %s: %s", run_dir, exc)
         return []
@@ -205,19 +215,25 @@ def dismissed_source_stamp(run_dir: Path) -> tuple[int, ...] | None:
     the WAL and leaves the main file's stat untouched until the next
     checkpoint. Keys the per-run memo in ``context.precedent_fingerprint``;
     two stats are far cheaper than the open-plus-query they let it skip.
+
+    The WAL is stat'ed first. A checkpoint moves bytes from the WAL into the
+    main file (and on close removes the WAL), so one landing between the two
+    stats is caught by the main-file stat that follows. The other order reads
+    the old main file, then finds no WAL, and reports the exact stamp taken
+    before the dismissal: a stale memo hit.
     """
     db_path = run_dir / EVALUATION_DB_FILENAME
+    wal_parts: tuple[int, ...] = ()
+    try:
+        wal = db_path.with_name(db_path.name + "-wal").stat()
+        wal_parts = (wal.st_size, wal.st_mtime_ns)
+    except OSError:
+        pass
     try:
         st = db_path.stat()
     except OSError:
         return None
-    parts = [st.st_size, st.st_mtime_ns]
-    try:
-        wal = db_path.with_name(db_path.name + "-wal").stat()
-        parts += [wal.st_size, wal.st_mtime_ns]
-    except OSError:
-        pass
-    return tuple(parts)
+    return (st.st_size, st.st_mtime_ns, *wal_parts)
 
 
 def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, str | None]]:

@@ -120,6 +120,35 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
     assert ctx.precedent_corpus is sentinel
 
 
+def test_build_router_wires_the_strict_dismissed_reader(tmp_path: Path, monkeypatch):
+    """Same reason as the api-runner root: a failed DB open swallowed into []
+    would be memoized as "no dismissals" for that run, so the reader handed to
+    load_precedent_fingerprints must be the raising variant."""
+    from quodeq.data.sqlite.findings_queries import (
+        dismissed_source_stamp, read_dismissed_snippets_strict,
+    )
+
+    seams: dict = {}
+
+    def fake_load_precedent_fingerprints(project_dir, **kwargs):
+        seams.update(kwargs)
+        return {"fp"}
+
+    monkeypatch.setattr(
+        findings_server_module, "load_precedent_fingerprints",
+        fake_load_precedent_fingerprints,
+    )
+    findings_path = tmp_path / "project" / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    ctx = CompiledContext()
+
+    _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
+
+    assert seams["read_dismissed"] is read_dismissed_snippets_strict
+    assert seams["source_stamp"] is dismissed_source_stamp
+    assert ctx.precedent_fingerprints == {"fp"}
+
+
 class TestBuildCompiledContextResolvesTrustModel:
     """C2: findings_server.py:47 (``trust_model = resolve_trust_model(work_dir)
     if work_dir is not None else None``) is one of three live wiring points

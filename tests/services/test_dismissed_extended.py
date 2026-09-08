@@ -130,6 +130,47 @@ class TestCollectDismissedDetails:
         assert "empty" not in {name for name, _ in seen}
         assert [n for _, n in seen] == [2, 1]  # the second run only gets the leftover key
 
+    def test_non_dict_status_json_does_not_break_the_listing(self, tmp_path):
+        """status.json is parsed unchecked. A valid-JSON list must not turn
+        the dismissed listing into a 500; the run just loses its
+        started_at ordering and falls back to mtime."""
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        run = _seed_projected_run(project_dir, "r1", req="A", file="a.py", line=1, reason="only")
+        (run / "status.json").write_text("[]", encoding="utf-8")
+        dismiss_finding(project_dir, {"req": "A", "file": "a.py", "line": 1})
+
+        (item,) = load_dismissed(project_dir)
+
+        assert item["reason"] == "only"
+
+    def test_started_at_is_read_once_per_run_across_requests(self, tmp_path, monkeypatch):
+        """started_at never changes once written, so the listing must not
+        re-parse every run's status.json on each request. A run without one
+        yet is re-read, so it is ordered correctly once the scan writes it."""
+        from quodeq.services import _run_recency as mod
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        stamped = _seed_projected_run(project_dir, "stamped", req="A", file="a.py", line=1)
+        _seed_projected_run(project_dir, "pending", req="B", file="b.py", line=2)
+        self._started(stamped, "2026-01-01T00:00:00")
+        reads: list[str] = []
+        real = mod.read_run_status_json
+
+        def spy(run_dir):
+            reads.append(run_dir.name)
+            return real(run_dir)
+
+        monkeypatch.setattr(mod, "read_run_status_json", spy)
+        monkeypatch.setattr(mod, "_started_at_memo", {})
+
+        mod.run_dirs_newest_first(project_dir)
+        mod.run_dirs_newest_first(project_dir)
+
+        assert reads.count("stamped") == 1
+        assert reads.count("pending") == 2
+
 
 class TestRecountTotals:
     def test_empty_list(self):
