@@ -1,6 +1,8 @@
 """Tests for store_api_key_secure/get_api_key_secure (keyring + cleartext fallback)."""
 from __future__ import annotations
 
+import sys
+
 import keyring.errors
 import pytest
 
@@ -130,6 +132,9 @@ class TestCleartextFallbackPreservesExistingContent:
         assert ai_provider.get_current_provider(paths) == "gemini"
         assert get_api_key_secure("claude") == "sk-anthropic"
 
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="POSIX-mode semantics differ on Windows"
+    )
     def test_env_file_stays_owner_only_after_a_merge(self, paths, no_keyring):
         store_api_key_secure("claude", "sk-anthropic")
         store_api_key_secure("gemini", "sk-gemini")

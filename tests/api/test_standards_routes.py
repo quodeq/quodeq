@@ -1,5 +1,6 @@
 """Tests for Standards API read and write endpoints."""
 import json
+import sys
 from pathlib import Path
 import pytest
 from quodeq.api.app import create_app
@@ -140,6 +141,12 @@ def test_import_standard_missing_data(client):
     assert resp.status_code == 400
 
 # Log sanitization tests
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the id is written into a filename on disk; \\n/\\r are invalid "
+    "path characters on Windows (unrelated to the log-sanitization behavior "
+    "under test here)",
+)
 def test_import_standard_log_sanitization_id_with_newlines(client, caplog):
     import logging
     caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
@@ -158,6 +165,12 @@ def test_import_standard_log_sanitization_id_with_newlines(client, caplog):
             assert "\n" not in msg
             assert "test-idFAKE_LOG_ENTRY" in msg
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the id is written into a filename on disk; \\n/\\r are invalid "
+    "path characters on Windows (unrelated to the log-sanitization behavior "
+    "under test here)",
+)
 def test_import_standard_log_sanitization_id_with_carriage_return(client, caplog):
     import logging
     caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
