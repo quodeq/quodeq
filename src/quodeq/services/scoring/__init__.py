@@ -19,6 +19,7 @@ change.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -151,11 +152,14 @@ def _make_trend_fetcher(
     d = deps or _NO_DEPS
     return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
-        max_history=_max_history_runs(),
-        base_fetcher_factory=_make_run_dimension_fetcher,
-        read_run_scalars=d.read_run_scalars or read_run_scalars,
-        dismissed_keys=d.dismissed_keys or dismissed_keys,
-        deleted_keys=d.deleted_keys or deleted_keys,
+        deps=replace(
+            d,
+            base_fetcher_factory=d.base_fetcher_factory or _make_run_dimension_fetcher,
+            read_run_scalars=d.read_run_scalars or read_run_scalars,
+            dismissed_keys=d.dismissed_keys or dismissed_keys,
+            deleted_keys=d.deleted_keys or deleted_keys,
+            max_history=_max_history_runs(),
+        ),
     )
 
 

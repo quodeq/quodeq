@@ -3,7 +3,7 @@ from collections import OrderedDict
 import threading
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
 
 
 def _reader_returning(score):
@@ -16,10 +16,10 @@ def test_different_version_is_a_separate_cache_entry():
     cache, lock = OrderedDict(), threading.Lock()
     root, proj, run = Path("/reports"), "proj", "run1"
 
-    v1 = make_lru_dimension_fetcher(root, proj, cache, lock, 256,
-                                    reader=_reader_returning("7.0/10"), version="v1")
-    v2 = make_lru_dimension_fetcher(root, proj, cache, lock, 256,
-                                    reader=_reader_returning("9.0/10"), version="v2")
+    ctx1 = DimensionCacheContext(cache=cache, lock=lock, max_size=256, reader=_reader_returning("7.0/10"))
+    ctx2 = DimensionCacheContext(cache=cache, lock=lock, max_size=256, reader=_reader_returning("9.0/10"))
+    v1 = make_lru_dimension_fetcher(root, proj, ctx1, version="v1")
+    v2 = make_lru_dimension_fetcher(root, proj, ctx2, version="v2")
 
     assert v1(run)[0].overall_score == "7.0/10"   # populates key (..., "v1")
     assert v2(run)[0].overall_score == "9.0/10"   # different version -> miss -> new read
@@ -28,7 +28,7 @@ def test_different_version_is_a_separate_cache_entry():
 
 def test_default_version_is_backward_compatible():
     cache, lock = OrderedDict(), threading.Lock()
-    fetch = make_lru_dimension_fetcher(Path("/reports"), "proj", cache, lock, 256,
-                                       reader=_reader_returning("5.0/10"))
+    ctx = DimensionCacheContext(cache=cache, lock=lock, max_size=256, reader=_reader_returning("5.0/10"))
+    fetch = make_lru_dimension_fetcher(Path("/reports"), "proj", ctx)
     assert fetch("run1")[0].overall_score == "5.0/10"
     assert list(cache.keys()) == [(Path("/reports"), "proj", "run1", "")]

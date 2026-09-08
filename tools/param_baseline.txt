@@ -58,7 +58,6 @@ src/quodeq/data/sqlite/assistant_repository.py:AssistantRepository.create_sessio
 src/quodeq/data/sqlite/state_store.py:SQLiteStateStore.record_principle_grade
 src/quodeq/llm_bridge/_embeddings.py:embed_texts
 src/quodeq/services/_accumulated_data.py:_read_all_run_data
-src/quodeq/services/_cache.py:make_lru_dimension_fetcher
 src/quodeq/services/_dashboard_cache.py:_make_run_dimension_fetcher
 src/quodeq/services/_dashboard_history.py:_compute_dashboard_payload
 src/quodeq/services/_dashboard_history.py:_make_history_fetcher
@@ -75,10 +74,8 @@ src/quodeq/services/_job_log_tee.py:tee_run_log
 src/quodeq/services/_repo_index.py:add_repo_index_entry
 src/quodeq/services/_repo_index.py:rekey_repo_index_entry
 src/quodeq/services/_scan_progress_dims.py:_dim_evidence_tally
-src/quodeq/services/_trend_fetcher.py:_make_heavy_trend_fetcher
 src/quodeq/services/_trend_fetcher.py:_make_version_for
 src/quodeq/services/_trend_fetcher.py:make_rescoring_fetcher
-src/quodeq/services/_trend_fetcher.py:make_trend_fetcher
 src/quodeq/services/_violations_jsonl.py:_parse_jsonl_findings
 src/quodeq/services/_violations_jsonl.py:parse_violations_from_jsonl
 src/quodeq/services/accumulated.py:_compute_parent_accumulated

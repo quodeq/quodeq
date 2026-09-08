@@ -7,7 +7,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
 
 _FALLBACK_CACHE_MAX = 256
 
@@ -39,5 +39,6 @@ def get_run_dimensions(
     c = cache if cache is not None else _cache
     lk = cache_lock if cache_lock is not None else _cache_lock
     ceiling = cache_max if cache_max is not None else _resolve_cache_max(env)
-    fetcher = make_lru_dimension_fetcher(reports_root, project, c, lk, ceiling)
+    ctx = DimensionCacheContext(cache=c, lock=lk, max_size=ceiling)
+    fetcher = make_lru_dimension_fetcher(reports_root, project, ctx)
     return fetcher(run_id)

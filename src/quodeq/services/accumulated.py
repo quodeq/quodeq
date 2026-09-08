@@ -38,7 +38,7 @@ from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export
     clear_accumulated_process_cache,
     create_accumulated_cache,
 )
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
 from quodeq.services._accumulated_aggregate import (  # noqa: F401 — re-export
     _AccumulatedResult,
     _aggregate_severity_counts,
@@ -87,7 +87,8 @@ def _build_accumulated_for_runs(
     """Read run data and assemble the accumulated result for *run_infos*."""
     runs = [r.run_id for r in run_infos]
     _cache, _lock, _max = _resolve_cache(cache_config)
-    get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
+    ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
+    get_run_data = make_lru_dimension_fetcher(reports_root, project, ctx)
     # A caller-supplied cache_config asks for per-call isolation, so it backs the
     # walk too; otherwise the walk runs off the shared process cache.
     if cache_config is not None:

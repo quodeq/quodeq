@@ -177,13 +177,16 @@ def _make_history_fetcher(
     """
     cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
     from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
+    from quodeq.services.scoring._deps import ScoringDeps  # noqa: PLC0415
     dim_cache_version = score_cache_version(reports_root / project, params)
     return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
-        max_history=max_history,
-        base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
-            rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
-            version=dim_cache_version,
+        deps=ScoringDeps(
+            max_history=max_history,
+            base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
+                rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+                version=dim_cache_version,
+            ),
         ),
     )
 

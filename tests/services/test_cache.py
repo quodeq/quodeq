@@ -11,7 +11,7 @@ import pytest
 
 from quodeq.core.types import DimensionResult
 from quodeq.services._cache import (
-    _CacheContext,
+    DimensionCacheContext,
     _cache_lookup,
     _cache_store,
     _fetch_and_store,
@@ -26,8 +26,8 @@ def _make_dim(name: str = "security") -> DimensionResult:
     return DimensionResult(dimension=name)
 
 
-def _make_ctx(max_size: int = 10) -> _CacheContext:
-    return _CacheContext(
+def _make_ctx(max_size: int = 10) -> DimensionCacheContext:
+    return DimensionCacheContext(
         cache=OrderedDict(),
         lock=threading.Lock(),
         max_size=max_size,
@@ -169,7 +169,8 @@ class TestMakeLruDimensionFetcher:
         mock_read.return_value = [_make_dim()]
         cache = OrderedDict()
         lock = threading.Lock()
-        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", cache, lock, 10)
+        ctx = DimensionCacheContext(cache=cache, lock=lock, max_size=10)
+        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", ctx)
         result = fetcher("run1")
         assert len(result) == 1
         # Second call should use cache (no additional read_run_data call)
@@ -193,7 +194,8 @@ class TestMakeLruDimensionFetcher:
         mock_read.side_effect = slow_read
         cache = OrderedDict()
         lock = threading.Lock()
-        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", cache, lock, 10)
+        ctx = DimensionCacheContext(cache=cache, lock=lock, max_size=10)
+        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", ctx)
 
         results = [None, None]
 
@@ -256,9 +258,8 @@ class TestSelfHealingGuards:
         cache = OrderedDict()
         # Poisoned entry: cached while only 1 of 3 dims was on disk.
         cache[(tmp_path, "proj", "r1", "")] = [_make_dim("security")]
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", cache, threading.Lock(), 10, reader=reader,
-        )
+        ctx = DimensionCacheContext(cache=cache, lock=threading.Lock(), max_size=10, reader=reader)
+        fetcher = make_lru_dimension_fetcher(tmp_path, "proj", ctx)
 
         result = fetcher("r1")
         assert len(result) == 3
@@ -272,10 +273,11 @@ class TestSelfHealingGuards:
         cache = OrderedDict()
         seeded = [_make_dim("security")]
         cache[(tmp_path, "proj", "r1", "")] = seeded
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", cache, threading.Lock(), 10,
+        ctx = DimensionCacheContext(
+            cache=cache, lock=threading.Lock(), max_size=10,
             reader=lambda *a: pytest.fail("reader must not run on a trusted hit"),
         )
+        fetcher = make_lru_dimension_fetcher(tmp_path, "proj", ctx)
         assert fetcher("r1") is seeded
 
     def test_in_progress_run_reads_fresh_and_is_not_cached(self, tmp_path):
@@ -288,9 +290,8 @@ class TestSelfHealingGuards:
             return [_make_dim("security")]
 
         cache = OrderedDict()
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", cache, threading.Lock(), 10, reader=reader,
-        )
+        ctx = DimensionCacheContext(cache=cache, lock=threading.Lock(), max_size=10, reader=reader)
+        fetcher = make_lru_dimension_fetcher(tmp_path, "proj", ctx)
         fetcher("r1")
         fetcher("r1")
         assert reader_calls == ["r1", "r1"]  # disk read both times
@@ -305,9 +306,8 @@ class TestSelfHealingGuards:
             reader_calls.append(run_id)
             return [_make_dim("security")]
 
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", OrderedDict(), threading.Lock(), 10, reader=reader,
-        )
+        ctx = DimensionCacheContext(cache=OrderedDict(), lock=threading.Lock(), max_size=10, reader=reader)
+        fetcher = make_lru_dimension_fetcher(tmp_path, "proj", ctx)
         fetcher("r1")
         fetcher("r1")
         assert reader_calls == ["r1"]  # second call served from cache
@@ -319,7 +319,7 @@ def test_make_lru_dimension_fetcher_uses_custom_reader():
     from collections import OrderedDict
 
     from quodeq.core.types import DimensionResult
-    from quodeq.services._cache import make_lru_dimension_fetcher
+    from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
 
     calls: list[str] = []
 
@@ -327,9 +327,8 @@ def test_make_lru_dimension_fetcher_uses_custom_reader():
         calls.append(run_id)
         return [DimensionResult(dimension="security", overall_score="9.0/10", overall_grade="Good")]
 
-    fetcher = make_lru_dimension_fetcher(
-        Path("/reports"), "proj", OrderedDict(), threading.Lock(), 8, reader=fake_reader,
-    )
+    ctx = DimensionCacheContext(cache=OrderedDict(), lock=threading.Lock(), max_size=8, reader=fake_reader)
+    fetcher = make_lru_dimension_fetcher(Path("/reports"), "proj", ctx)
     result = fetcher("r1")
     result_again = fetcher("r1")  # served from cache, reader not called twice
 
