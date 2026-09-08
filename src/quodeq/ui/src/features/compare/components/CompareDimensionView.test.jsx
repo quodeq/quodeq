@@ -34,6 +34,23 @@ describe('buildRadarSeries', () => {
     expect(series.map((s) => s.variant)).toEqual(['average', 'trail', 'lead']);
     expect(series.find((s) => s.variant === 'lead').focused).toBe(true);
   });
+
+  it('plots the first of two principles that collapse to one key', () => {
+    // 'Error Handling' and 'error handling' share a nameKey; the axis shows
+    // the first spelling's score, like the find() the Map replaced.
+    const dim = {
+      ...DIM_SEC(8),
+      principles: [
+        { principle: 'Error Handling', score: '8' },
+        { principle: 'error handling', score: '2' },
+      ],
+    };
+    const summaries = { a: makeSummary({ dims: [dim] }) };
+    const view = buildDimensionView('security', [buildRow(makeProject({ id: 'a' }), summaries.a, NOW)], NOW, summaries);
+    expect(view.principles.map((p) => p.key)).toEqual(['error handling']);
+    const lead = buildRadarSeries(view, null).find((s) => s.variant === 'lead');
+    expect(lead.values).toEqual([8]);
+  });
 });
 
 describe('buildDimensionMatrixRows', () => {
@@ -56,5 +73,22 @@ describe('buildDimensionMatrixRows', () => {
   it('leaves cells unclickable without an onOpenPrinciple handler', () => {
     const rows = buildDimensionMatrixRows(makeView(), () => {}, undefined);
     expect(rows[0].cells.integrity.onClick).toBeUndefined();
+  });
+
+  it('fills a cell from the first perProject entry when a project appears twice', () => {
+    // Defensive first-wins: a payload that slipped two entries for one
+    // project past the board builder must not flip the cell to the later one.
+    const row = { id: 'a', name: 'proj-a', remote: false };
+    const view = {
+      standings: [{ row, score: 6 }],
+      principles: [{
+        key: 'error handling',
+        label: 'error handling',
+        perProject: [{ id: 'a', score: 6 }, { id: 'a', score: 3 }],
+      }],
+    };
+    const rows = buildDimensionMatrixRows(view, () => {}, undefined);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].cells['error handling'].score).toBe(6);
   });
 });

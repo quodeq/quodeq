@@ -35,6 +35,16 @@ function buildAttentionItems(dimAttention, onOpenProject, onOpenPrinciple) {
   }));
 }
 
+/** `new Map(pairs)` keeps the LAST pair per key. The lookups below replaced
+ * find() calls, which returned the first match, so two principles that
+ * collapse to one nameKey ('Error Handling' / 'error handling') must still
+ * resolve to the first one. */
+function firstWinsMap(pairs) {
+  const m = new Map();
+  for (const [k, v] of pairs) if (!m.has(k)) m.set(k, v);
+  return m;
+}
+
 /** Radar series: average always shown, plus lead/trail, plus the hovered
  * standings row (recolored to focus instead of duplicated if it's already
  * plotted as lead/trail). */
@@ -42,7 +52,7 @@ export function buildRadarSeries(view, focusId) {
   // One key -> score map per plotted standing, so the axis walk is an O(1)
   // pick per principle instead of a find() over the standing's principles.
   const byKey = (source) => {
-    const scores = new Map(source.principles.map((x) => [x.key, x.score]));
+    const scores = firstWinsMap(source.principles.map((x) => [x.key, x.score]));
     return view.principles.map((p) => (scores.has(p.key) ? scores.get(p.key) : null));
   };
   const focusStanding = focusId ? view.standings.find((s) => s.row.id === focusId) : null;
@@ -63,7 +73,7 @@ export function buildRadarSeries(view, focusId) {
 export function buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple) {
   // Each principle's cells keyed by project id once, so the standings x
   // principles walk below never rescans perProject.
-  const cellsById = view.principles.map((p) => new Map(p.perProject.map((x) => [x.id, x])));
+  const cellsById = view.principles.map((p) => firstWinsMap(p.perProject.map((x) => [x.id, x])));
   return view.standings.map((s) => ({
     id: s.row.id,
     name: s.row.name,

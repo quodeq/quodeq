@@ -3,12 +3,18 @@ requirements.txt.
 
 Split from ``_dependency_parsers.py`` to keep that file under the size
 ratchet's 300-line cap. ``has_pyproject_dependency`` / ``has_requirements_txt_dependency``
-stay re-exported from there. Moved verbatim.
+stay re-exported from there.
 """
 from __future__ import annotations
 
 import re
 import tomllib
+from functools import lru_cache
+
+# Same bound as ``_dependency_parsers._PARSE_CACHE_MAX`` (that module imports
+# from here, so the constant cannot come from it): parse each manifest text
+# once, not once per discipline rule that probes it.
+_PARSE_CACHE_MAX = 64
 
 # PEP 503: package names are case-insensitive and ``[-_.]+`` normalize to ``-``.
 _PEP503_SEP = re.compile(r"[-_.]+")
@@ -52,11 +58,12 @@ def _names_from_dict_keys(items: object) -> set[str]:
 # --- pyproject.toml ----------------------------------------------------------
 
 
-def _pyproject_dep_names(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _pyproject_dep_names(content: str) -> frozenset[str]:
     try:
         data = tomllib.loads(content)
     except tomllib.TOMLDecodeError:
-        return set()
+        return frozenset()
 
     names: set[str] = set()
     project = data.get("project")
@@ -83,7 +90,7 @@ def _pyproject_dep_names(content: str) -> set[str]:
         for v in dep_groups.values():
             names |= _names_from_list(v)
 
-    return names
+    return frozenset(names)
 
 
 def has_pyproject_dependency(content: str, needle: str) -> bool:
@@ -93,7 +100,8 @@ def has_pyproject_dependency(content: str, needle: str) -> bool:
 # --- requirements.txt --------------------------------------------------------
 
 
-def _requirements_txt_names(content: str) -> set[str]:
+@lru_cache(maxsize=_PARSE_CACHE_MAX)
+def _requirements_txt_names(content: str) -> frozenset[str]:
     names: set[str] = set()
     for raw in content.splitlines():
         line = raw.split("#", 1)[0].strip()
@@ -105,7 +113,7 @@ def _requirements_txt_names(content: str) -> set[str]:
         name = _parse_pep508_name(line)
         if name:
             names.add(name)
-    return names
+    return frozenset(names)
 
 
 def has_requirements_txt_dependency(content: str, needle: str) -> bool:

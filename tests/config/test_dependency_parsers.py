@@ -377,18 +377,34 @@ def test_julia_project_toml(body: str, needle: str, expected: bool) -> None:
 
 
 from quodeq.config import _dependency_parsers as _dp
+from quodeq.config import _dependency_parsers_compiled as _dpc
+from quodeq.config import _dependency_parsers_python as _dpp
 
 
-@pytest.mark.parametrize("parser, matcher, body", [
-    ("_gemfile_gems", "has_gemfile_gem", 'gem "rails"\ngem "rack"\n'),
-    ("_mix_deps", "has_mix_dep", 'def deps, do: [{:phoenix, "~> 1.7"}]\n'),
-    ("_pubspec_deps", "has_pubspec_dependency", "name: x\ndependencies:\n  http: ^1.0.0\n"),
-    ("_julia_deps", "has_julia_dependency", 'name = "X"\n[deps]\nDataFrames = "0"\n'),
+@pytest.mark.parametrize("module, parser, matcher, body", [
+    (_dp, "_gemfile_gems", "has_gemfile_gem", 'gem "rails"\ngem "rack"\n'),
+    (_dp, "_mix_deps", "has_mix_dep", 'def deps, do: [{:phoenix, "~> 1.7"}]\n'),
+    (_dp, "_pubspec_deps", "has_pubspec_dependency", "name: x\ndependencies:\n  http: ^1.0.0\n"),
+    (_dp, "_julia_deps", "has_julia_dependency", 'name = "X"\n[deps]\nDataFrames = "0"\n'),
+    # The sibling modules hold the heavily probed manifests (pyproject and
+    # requirements 6 probes, gradle 5, package.json and go.mod 4, pom 3).
+    (_dpp, "_pyproject_dep_names", "has_pyproject_dependency", '[project]\nname="x"\ndependencies=["flask"]\n'),
+    (_dpp, "_requirements_txt_names", "has_requirements_txt_dependency", "flask>=3\n"),
+    (_dpc, "_package_json_names", "has_package_json_dependency", '{"dependencies":{"vue":"^3"}}'),
+    (_dpc, "_cargo_dep_names", "has_cargo_dependency", '[dependencies]\nserde = "1"\n'),
+    (_dpc, "_go_mod_modules", "has_go_mod_module", "module x\nrequire github.com/gofiber/fiber v2.0.0\n"),
+    (_dpc, "_composer_dep_names", "has_composer_dependency", '{"require":{"symfony/console":"^7"}}'),
+    (
+        _dpc, "_pom_coords", "has_pom_xml_dependency",
+        "<project><dependencies><dependency><groupId>io.quarkus</groupId>"
+        "<artifactId>quarkus-resteasy</artifactId></dependency></dependencies></project>",
+    ),
+    (_dpc, "_gradle_searchable", "has_gradle_dependency", 'implementation("io.ktor:ktor-server-core:2.3.0")'),
 ])
-def test_manifest_is_parsed_once_per_content(parser: str, matcher: str, body: str) -> None:
+def test_manifest_is_parsed_once_per_content(module, parser: str, matcher: str, body: str) -> None:
     """Discipline rules probe one manifest once per rule: parse it once, not per needle."""
-    parse = getattr(_dp, parser)
-    match = getattr(_dp, matcher)
+    parse = getattr(module, parser)
+    match = getattr(module, matcher)
     parse.cache_clear()
     assert match(body, "nothing-declared") is False
     assert match(body, "also-missing") is False

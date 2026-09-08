@@ -97,9 +97,13 @@ function _buildPrincipleBoard(standings) {
       if (p.score == null) continue;
       let entry = principleKeys.get(p.key);
       if (!entry) {
-        entry = { key: p.key, label: p.label, perProject: [] };
+        entry = { key: p.key, label: p.label, perProject: [], seen: new Set() };
         principleKeys.set(p.key, entry);
       }
+      // Two spellings collapsing to one key ('Error Handling' and 'error
+      // handling' in a custom standard) get one bar per project: first wins.
+      if (entry.seen.has(s.row.id)) continue;
+      entry.seen.add(s.row.id);
       entry.perProject.push({
         id: s.row.id,
         name: s.row.name,

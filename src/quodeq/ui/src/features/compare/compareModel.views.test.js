@@ -4,6 +4,7 @@ import {
   buildRow,
   buildDimensionsBoard,
   buildAttention,
+  buildDimensionAttention,
   buildDimensionView,
   buildDuelView,
 } from './compareModel.js';
@@ -101,6 +102,37 @@ test('buildDimensionView keeps standings ranks on bars when a project lacks a pr
   assert.equal(conf.trail.id, 'a');
   const integ = view.principles.find((p) => p.key === 'integrity');
   assert.deepEqual(integ.perProject.map((p) => [p.id, p.rank]), [['b', 1], ['c', 2], ['a', 3]]);
+});
+
+test('buildDimensionView keeps one bar per project when two principles collapse to one key', () => {
+  // A custom standard can list 'Error Handling' and 'error handling' in the
+  // same dimension; both nameKey to 'error handling'. The first spelling
+  // wins (the old find() rebuild's behaviour) and the second never becomes
+  // a duplicate bar, a same-project outlier, or a duplicate React key.
+  const dup = (first, second) => ({
+    dimension: 'Security',
+    overallScore: `${first}/10`,
+    totals: { violationCount: 0, severity: {} },
+    principles: [
+      { principle: 'Error Handling', score: `${first}` },
+      { principle: 'error handling', score: `${second}` },
+    ],
+  });
+  const summaries = {
+    a: makeSummary({ dims: [dup(7, 3)] }),
+    b: makeSummary({ dims: [dup(8, 2)] }),
+  };
+  const rows = ['a', 'b'].map((id) => buildRow(makeProject({ id }), summaries[id], NOW));
+  const view = buildDimensionView('security', rows, NOW, summaries);
+  assert.deepEqual(view.principles.map((p) => p.key), ['error handling']);
+  const [eh] = view.principles;
+  assert.deepEqual(eh.perProject.map((p) => [p.id, p.score, p.rank]), [['b', 8, 1], ['a', 7, 2]]);
+  assert.equal(eh.avg, 7.5);
+  assert.equal(eh.lead.id, 'b');
+  assert.equal(eh.trail.id, 'a');
+  // 8 vs 7 is no outlier; only the dropped second spellings (2 and 3) would
+  // have made one.
+  assert.deepEqual(buildDimensionAttention(view), []);
 });
 
 test('buildDimensionView returns null for a dimension nobody has', () => {
