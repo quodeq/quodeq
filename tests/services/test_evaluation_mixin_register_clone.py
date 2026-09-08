@@ -218,6 +218,47 @@ def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
     assert clone_calls == []
 
 
+def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch):
+    """DNS-rebinding guard: validate_remote_url must run again right before
+    run_git_clone, not just once at the top of registration -- project-uuid
+    resolution runs real disk I/O in between, wide enough for a rebind."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    clone_calls = []
+
+    def fake_clone(url, dest):
+        clone_calls.append(url)
+
+    # First call (top-of-registration guard) passes; second call (the
+    # re-validation immediately before run_git_clone) simulates the host
+    # having rebound to a private address in between.
+    validate_calls = []
+
+    def fake_validate(url):
+        validate_calls.append(url)
+        if len(validate_calls) >= 2:
+            raise ValueError("Repository URL resolves to a private/internal address")
+
+    with (
+        patch("quodeq.services.project_registration.validate_remote_url", side_effect=fake_validate),
+        patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone),
+    ):
+        with pytest.raises(ValueError, match="private"):
+            _register_project(
+                "https://github.com/example/repo.git",
+                None,
+                str(reports),
+                ephemeral=True,
+            )
+
+    assert len(validate_calls) == 2
+    assert clone_calls == [], "git clone must not run once the re-validation rejects the URL"
+
+
 def test_start_evaluation_rejects_url_input(tmp_path):
     """start_evaluation no longer clones; URLs must already be registered as local."""
     from quodeq.services.base import EvaluationOptions
