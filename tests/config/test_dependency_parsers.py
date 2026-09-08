@@ -371,3 +371,26 @@ def test_pubspec(body: str, needle: str, expected: bool) -> None:
 ])
 def test_julia_project_toml(body: str, needle: str, expected: bool) -> None:
     assert has_julia_dependency(body, needle) is expected
+
+
+# --- memoization -------------------------------------------------------------
+
+
+from quodeq.config import _dependency_parsers as _dp
+
+
+@pytest.mark.parametrize("parser, matcher, body", [
+    ("_gemfile_gems", "has_gemfile_gem", 'gem "rails"\ngem "rack"\n'),
+    ("_mix_deps", "has_mix_dep", 'def deps, do: [{:phoenix, "~> 1.7"}]\n'),
+    ("_pubspec_deps", "has_pubspec_dependency", "name: x\ndependencies:\n  http: ^1.0.0\n"),
+    ("_julia_deps", "has_julia_dependency", 'name = "X"\n[deps]\nDataFrames = "0"\n'),
+])
+def test_manifest_is_parsed_once_per_content(parser: str, matcher: str, body: str) -> None:
+    """Discipline rules probe one manifest once per rule: parse it once, not per needle."""
+    parse = getattr(_dp, parser)
+    match = getattr(_dp, matcher)
+    parse.cache_clear()
+    assert match(body, "nothing-declared") is False
+    assert match(body, "also-missing") is False
+    info = parse.cache_info()
+    assert (info.misses, info.hits) == (1, 1)

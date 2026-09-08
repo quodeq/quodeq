@@ -70,6 +70,7 @@ def extract_requirements(data: dict, overrides: dict[str, dict] | None = None) -
 
     This is the pure-logic counterpart of ``load_compiled_requirements``.
     """
+    override_map = overrides or {}
     lookup: dict[str, dict] = {}
     for principle in data.get("principles", []):
         principle_name = principle.get("name", "")
@@ -79,7 +80,7 @@ def extract_requirements(data: dict, overrides: dict[str, dict] | None = None) -
                 continue
             lookup[req_id] = {
                 "principle": principle_name,
-                "text": resolve_requirement_text(req, (overrides or {}).get(req_id)),
+                "text": resolve_requirement_text(req, override_map.get(req_id)),
             }
     return lookup
 

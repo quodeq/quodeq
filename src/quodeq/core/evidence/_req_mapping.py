@@ -129,6 +129,11 @@ class PrincipleResolver:
 
     req_to_principle: dict[str, str]
     canonical: frozenset[str]
+    # Built once: resolve() runs per judgment and the fold wants a tuple of ids.
+    _req_ids: tuple[str, ...] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_req_ids", tuple(self.req_to_principle))
 
     def resolve(self, practice_id: str | None) -> str | None:
         """Canonical principle name, or None when the finding is unmappable.
@@ -144,7 +149,7 @@ class PrincipleResolver:
         if principle is None:
             # Second chance before quarantine: fold a near-miss ID (wrong case,
             # truncated or missing prefix) onto the standard's real one.
-            folded = normalize_req_id(practice_id, tuple(self.req_to_principle))
+            folded = normalize_req_id(practice_id, self._req_ids)
             if folded is not None:
                 principle = self.req_to_principle[folded]
         if principle is None:
