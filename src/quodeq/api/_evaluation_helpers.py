@@ -14,31 +14,20 @@ from flask import Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
+from quodeq.shared._repo import _looks_like_authority
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 from quodeq.shared.validation import validate_relative_scope
 
 _logger = logging.getLogger(__name__)
 
-# Mirrors _SCHEME_RE / _looks_like_authority in
-# quodeq.services._registration_url. Not imported from there: the api layer
-# must not depend on services internals for this, so the logic is
-# duplicated here rather than layered across.
+# Mirrors _SCHEME_RE in quodeq.services._registration_url. Not imported from
+# there: the api layer must not depend on services internals for this, so
+# this scheme-match pattern is duplicated here rather than layered across.
+# _looks_like_authority is imported from shared/_repo.py instead of
+# duplicated: it's a pure predicate with no shape coupling to this module,
+# and this codebase already imports private helpers from shared._repo
+# elsewhere (e.g. data/git_cli.py, shared/utils.py).
 _SCHEME_RE = re.compile(r"^(https?://)")
-
-
-def _looks_like_authority(candidate: str) -> bool:
-    """Return True if *candidate* is a plausible ``host[:port]`` authority.
-
-    Deliberately strict: a bare single-label name is rejected so that an
-    ambiguous URL falls to the credential-stripping branch rather than the
-    leaking one.
-    """
-    host, sep, port = candidate.partition(":")
-    if sep and not port.isdigit():
-        return False
-    if not all(c.isalnum() or c in "-._~[]" for c in host):
-        return False
-    return "." in host or host.startswith("[") or host == "localhost"
 
 
 # Bounds for user-supplied evaluation parameters

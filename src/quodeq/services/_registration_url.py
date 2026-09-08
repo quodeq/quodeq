@@ -10,27 +10,16 @@ import re
 from pathlib import Path
 
 from quodeq.services._wiring import remote_origin_url_raw
+from quodeq.shared._repo import _looks_like_authority
 
-# Mirrors _SCHEME_RE / _looks_like_authority in quodeq.api._evaluation_helpers.
-# Not imported from there: services must not depend on the api layer (no
-# other services module does), so the logic is duplicated here rather than
-# layered across.
+# Mirrors _SCHEME_RE in quodeq.api._evaluation_helpers. Not imported from
+# there: services must not depend on the api layer (no other services module
+# does), so this scheme-match pattern is duplicated here rather than layered
+# across. _looks_like_authority is imported from shared/_repo.py instead of
+# duplicated: it's a pure predicate with no shape coupling to this module,
+# and this codebase already imports private helpers from shared._repo
+# elsewhere (e.g. data/git_cli.py, shared/utils.py).
 _SCHEME_RE = re.compile(r"^(https?://)")
-
-
-def _looks_like_authority(candidate: str) -> bool:
-    """Return True if *candidate* is a plausible ``host[:port]`` authority.
-
-    Deliberately strict: a bare single-label name is rejected so that an
-    ambiguous URL falls to the credential-stripping branch rather than the
-    leaking one.
-    """
-    host, sep, port = candidate.partition(":")
-    if sep and not port.isdigit():
-        return False
-    if not all(c.isalnum() or c in "-._~[]" for c in host):
-        return False
-    return "." in host or host.startswith("[") or host == "localhost"
 
 
 def _strip_credentials(url: str) -> str:
