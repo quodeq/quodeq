@@ -39,7 +39,14 @@ def load_suppression_rules(project_dir: Path) -> tuple[SuppressionRule, ...]:
         _logger.warning(
             "Ignoring unreadable or malformed suppression rules %s: %s", path, exc)
         return ()
-    raw_rules = data.get("rules") if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return ()
+    version = data.get("version", 1)
+    if version != 1:
+        _logger.warning(
+            "Ignoring suppression rules with unsupported version %s in %s", version, path)
+        return ()
+    raw_rules = data.get("rules")
     if not isinstance(raw_rules, list):
         return ()
     rules: list[SuppressionRule] = []

@@ -136,6 +136,30 @@ class TestLoadSuppressionRules:
 
         assert load_suppression_rules(tmp_path) == ()
 
+    def test_unsupported_version_yields_no_rules(self, tmp_path):
+        """A future incompatible schema version is rejected like malformed data."""
+        from quodeq.data.fs.suppression_rules import load_suppression_rules
+
+        (tmp_path / "suppression_rules.json").write_text(json.dumps({
+            "version": 2,
+            "rules": [{"req": "CLEA-DEP-01", "file": "src/quodeq/services/*", "reason": "WS1"}],
+        }), encoding="utf-8")
+
+        assert load_suppression_rules(tmp_path) == ()
+
+    def test_missing_version_defaults_to_1(self, tmp_path):
+        """Files written before the version guard existed have no version key."""
+        from quodeq.data.fs.suppression_rules import load_suppression_rules
+
+        (tmp_path / "suppression_rules.json").write_text(json.dumps({
+            "rules": [{"req": "CLEA-DEP-01", "file": "src/quodeq/services/*", "reason": "WS1"}],
+        }), encoding="utf-8")
+
+        rules = load_suppression_rules(tmp_path)
+
+        assert len(rules) == 1
+        assert rules[0].req == "CLEA-DEP-01"
+
 
 def test_suppression_rule_is_frozen():
     rule = SuppressionRule(req="X", file="a.py", reason="r")
