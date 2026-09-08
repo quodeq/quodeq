@@ -1,26 +1,17 @@
-"""CSP header hardening regression tests (held security fix #40)."""
+"""CSP header hardening regression tests (held security fix #40).
+
+Base directive coverage. Split when this file crossed the 300-line cap: the
+webview-token relaxation now lives in test_csp_webview_token.py and the
+Host-header validation in test_csp_host_header.py, with the shared request
+helpers in _csp_helpers.py.
+"""
 from __future__ import annotations
 
 import pytest
 
 from quodeq.api import security
 from quodeq.api.app import create_app
-
-# Alt-port origins probed by useServerHealth.js (DEFAULT_ALT_PORTS = [4180..4183]).
-_ALT_PORT_ORIGINS = [
-    f"http://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
-] + [
-    f"http://localhost:{p}" for p in (4180, 4181, 4182, 4183)
-]
-
-# ws:// alt-port origins for the terminal WebSocket (Task 5). WebKit/pywebview
-# enforces CSP against the WebSocket handshake scheme, so http:// alone does
-# not cover it — each alt port needs an explicit ws:// entry too.
-_WS_ALT_PORT_ORIGINS = [
-    f"ws://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
-] + [
-    f"ws://localhost:{p}" for p in (4180, 4181, 4182, 4183)
-]
+from tests.api._csp_helpers import _ALT_PORT_ORIGINS, _WS_ALT_PORT_ORIGINS, _directive
 
 
 @pytest.fixture(scope="module")
@@ -29,15 +20,6 @@ def csp():
     with app.test_client() as client:
         resp = client.get("/api/health")
         return resp.headers["Content-Security-Policy"]
-
-
-def _directive(csp: str, name: str) -> str | None:
-    """Return the first CSP directive whose keyword exactly equals *name*."""
-    for d in csp.split(";"):
-        parts = d.strip().split()
-        if parts and parts[0] == name:
-            return d.strip()
-    return None
 
 
 def test_csp_restricts_egress(csp):
@@ -141,230 +123,3 @@ def test_csp_mask_src_allows_data_uris(csp):
     mask_src = _directive(csp, "mask-src")
     assert mask_src is not None, "mask-src must be present in CSP"
     assert "data:" in mask_src, "mask-src must include data: to allow inline SVG masks"
-
-
-# --- Webview-only unsafe-eval relaxation (per-launch token gated) ----------
-#
-# Held security fix: the relaxation used to be gated on the QuodeqDesktop UA
-# marker alone, a fixed public string any HTTP client could send. It is now
-# gated on a per-launch shared secret (QUODEQ_WEBVIEW_TOKEN) embedded in the
-# webview's own UA — see quodeq.api.security._is_trusted_webview.
-
-_TOKEN = "shared-secret-abc123"
-_WEBVIEW_UA_MARKER_ONLY = (
-    "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) QuodeqDesktop/1.4.0 Safari/605.1.15"
-)
-_WEBVIEW_UA_WITH_TOKEN = (
-    "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-    f"QuodeqDesktop/1.4.0 {security._WEBVIEW_TOKEN_UA_PREFIX}{_TOKEN} Safari/605.1.15"
-)
-
-
-def _csp_for_ua(ua: str | None) -> str:
-    app = create_app()
-    with app.test_client() as client:
-        headers = {"User-Agent": ua} if ua is not None else {}
-        return client.get("/api/health", headers=headers).headers["Content-Security-Policy"]
-
-
-def test_webview_ua_with_correct_token_gets_unsafe_eval(monkeypatch):
-    """The native webview UA, carrying the correct per-launch token, must be
-    served script-src with 'unsafe-eval' so pywebview's new Function()
-    bridge works under the otherwise-strict CSP."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_WITH_TOKEN), "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" in script_src
-
-
-def test_forged_marker_without_token_stays_strict(monkeypatch):
-    """The OLD static marker string alone, without the token, must NOT get
-    the relaxed CSP — this is the forgery the token gate closes: any HTTP
-    client can set a UA substring, so the marker alone must never be enough."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    script_src = _directive(_csp_for_ua(_WEBVIEW_UA_MARKER_ONLY), "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" not in script_src
-
-
-def test_wrong_token_stays_strict(monkeypatch):
-    """A UA carrying a token that doesn't match the launch's secret must not
-    get the relaxation either (not just any token-shaped string)."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    wrong_ua = (
-        "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        f"QuodeqDesktop/1.4.0 {security._WEBVIEW_TOKEN_UA_PREFIX}not-the-real-token Safari/605.1.15"
-    )
-    script_src = _directive(_csp_for_ua(wrong_ua), "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" not in script_src
-
-
-def test_no_token_env_var_set_never_relaxes(monkeypatch):
-    """With QUODEQ_WEBVIEW_TOKEN unset entirely (e.g. dashboard run
-    standalone via CLI, not through the desktop launcher), CSP relaxation
-    must never fire, regardless of UA content — preserves today's behavior
-    for non-desktop usage, where unsafe-eval should never be granted."""
-    monkeypatch.delenv(security._ENV_WEBVIEW_TOKEN, raising=False)
-    for ua in (_WEBVIEW_UA_WITH_TOKEN, _WEBVIEW_UA_MARKER_ONLY, "Mozilla/5.0 (a regular browser)"):
-        script_src = _directive(_csp_for_ua(ua), "script-src")
-        assert script_src is not None
-        assert "'unsafe-eval'" not in script_src
-
-
-def test_non_webview_ua_stays_strict(monkeypatch):
-    """Any non-webview UA keeps the strict script-src (no unsafe-eval)."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)"), "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" not in script_src
-
-
-def test_non_ascii_ua_token_does_not_crash_and_stays_strict(monkeypatch):
-    """A UA carrying a non-ASCII byte inside the token must fail closed, not 500.
-
-    Regression: Werkzeug decodes headers as latin-1, so any UA byte >= 0x80
-    reaches _webview_token_from_ua as a non-ASCII str, and
-    hmac.compare_digest raises TypeError on one. That fired inside the
-    after_request hook, so EVERY request 500'd with none of the security
-    headers set whenever QUODEQ_WEBVIEW_TOKEN was set (the normal desktop
-    launcher path). The candidate must be dropped instead, exactly like any
-    other non-matching token.
-    """
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    hostile_ua = (
-        "Mozilla/5.0 (quodeq) QuodeqDesktop/1.4.0 "
-        f"{security._WEBVIEW_TOKEN_UA_PREFIX}tøken Safari/605.1.15"
-    )
-    app = create_app()
-    with app.test_client() as client:
-        resp = client.get("/api/health", headers={"User-Agent": hostile_ua})
-
-    assert resp.status_code == 200
-    # The security headers must all still be present (they were not on the 500).
-    assert resp.headers["X-Frame-Options"] == "DENY"
-    assert resp.headers["X-Content-Type-Options"] == "nosniff"
-    script_src = _directive(resp.headers["Content-Security-Policy"], "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" not in script_src, "a non-ASCII token must fail closed"
-
-
-def test_non_ascii_env_token_does_not_crash_and_stays_strict(monkeypatch):
-    """The OTHER side of compare_digest. It raises TypeError if EITHER str is
-    non-ASCII, and QUODEQ_WEBVIEW_TOKEN can be set by hand, so guarding only
-    the UA candidate leaves the same 500-on-every-request hole open behind a
-    misconfigured environment."""
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, "sécret-token")
-    app = create_app()
-    with app.test_client() as client:
-        resp = client.get("/api/health", headers={"User-Agent": _WEBVIEW_UA_WITH_TOKEN})
-
-    assert resp.status_code == 200
-    assert resp.headers["X-Frame-Options"] == "DENY"
-    script_src = _directive(resp.headers["Content-Security-Policy"], "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" not in script_src, "a non-ASCII expected token must fail closed"
-
-
-def test_non_ascii_ua_token_extractor_returns_none():
-    """The guard lives in the extractor, so _is_trusted_webview's
-    compare_digest never sees a non-ASCII str."""
-    ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}café Safari"
-    assert security._webview_token_from_ua(ua) is None
-    ascii_ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}abc123 Safari"
-    assert security._webview_token_from_ua(ascii_ua) == "abc123"
-
-
-def test_audit_log_records_final_status_for_non_ascii_ua(monkeypatch):
-    """The after_request audit line runs ahead of the CSP build, so once the
-    TypeError is gone it logs the request's real final status code."""
-    from unittest.mock import patch
-
-    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
-    hostile_ua = f"QuodeqDesktop/1.0 {security._WEBVIEW_TOKEN_UA_PREFIX}tøken"
-    app = create_app()
-    with patch.object(security._logger, "info") as info, app.test_client() as client:
-        resp = client.get("/api/health", headers={"User-Agent": hostile_ua})
-
-    assert resp.status_code == 200
-    audit_calls = [c.args for c in info.call_args_list if c.args and c.args[0].startswith("API: ")]
-    assert audit_calls, "after_request must emit an audit line"
-    assert audit_calls[-1][2] == "/api/health"
-    assert audit_calls[-1][4] == 200, "the audit line must carry the real final status code"
-
-
-# --- Host header validation before CSP interpolation (Task 9) --------------
-
-
-def _csp_for_host(host: str) -> str:
-    app = create_app()
-    with app.test_client() as client:
-        return client.get(
-            "/api/health", headers={"Host": host}
-        ).headers["Content-Security-Policy"]
-
-
-def test_csp_same_origin_ws_uses_valid_host():
-    """A well-formed Host header still gets an explicit same-origin ws/wss entry."""
-    connect_src = _directive(_csp_for_host("example.com:8080"), "connect-src")
-    assert connect_src is not None
-    tokens = connect_src.split()
-    assert "ws://example.com:8080" in tokens
-    assert "wss://example.com:8080" in tokens
-
-
-def test_csp_omits_same_origin_ws_for_malicious_host_header():
-    """A malicious Host header must not be interpolated raw into the CSP.
-
-    Regression for the finding: connect-src was built from the raw,
-    unvalidated Host header, so a Host containing a quote/space could inject
-    extra CSP sources or directives. Invalid hosts must have the same-origin
-    ws:/wss: entry omitted entirely rather than reflected into the header.
-    """
-    malicious_host = 'evil.example" ws://attacker.evil'
-    csp = _csp_for_host(malicious_host)
-
-    # The raw malicious host must never appear verbatim in the header.
-    assert malicious_host not in csp
-    assert '"' not in csp
-    assert "attacker.evil" not in csp
-
-    connect_src = _directive(csp, "connect-src")
-    assert connect_src is not None
-    # Same-origin ws/wss entries for the bogus host must be absent.
-    assert "evil.example" not in connect_src
-    # The rest of connect-src (alt-port origins) must still be present —
-    # omission of the same-origin entry must not break the whole directive.
-    assert "'self'" in connect_src
-    for origin in _ALT_PORT_ORIGINS:
-        assert origin in connect_src
-
-
-def test_csp_same_origin_ws_uses_bracketed_ipv6_host_with_port():
-    """A bracketed IPv6-literal Host header (RFC 3986 syntax) with a port
-    still gets an explicit same-origin ws/wss entry.
-
-    ::1 is a first-class local address elsewhere in this app
-    (_LOCALHOST_ADDRS, dashboard/_networking.py's _DEFAULT_LOCAL_HOSTS,
-    dashboard/_webview_window_native_ops.py's reload allowlist), so a
-    client reaching the dashboard over IPv6 loopback is a real access
-    path — the same-origin entry must not be silently dropped for it.
-    """
-    connect_src = _directive(_csp_for_host("[::1]:4180"), "connect-src")
-    assert connect_src is not None
-    tokens = connect_src.split()
-    assert "ws://[::1]:4180" in tokens
-    assert "wss://[::1]:4180" in tokens
-
-
-def test_csp_same_origin_ws_uses_bracketed_ipv6_host_without_port():
-    """A bracketed IPv6-literal Host header with no port also validates.
-
-    Werkzeug/Flask preserve the Host header verbatim on request.host, so a
-    bare "[::1]" (no ":port") is a value it can actually take.
-    """
-    connect_src = _directive(_csp_for_host("[::1]"), "connect-src")
-    assert connect_src is not None
-    tokens = connect_src.split()
-    assert "ws://[::1]" in tokens
-    assert "wss://[::1]" in tokens
