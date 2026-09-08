@@ -144,4 +144,19 @@ describe("useEvaluation", () => {
       }),
     );
   });
+
+  it("startEvaluation never forwards a locally cached api-key value", async () => {
+    // Only the "configured" sentinel (see useProviderSettings.js) is ever
+    // written under this key now, never a real credential — but even a
+    // stale raw value from before that change must not be resent, since
+    // the backend now resolves the real key from its own secure store.
+    localStorage.setItem("cc-ollama-api-key", "sk-stale-cached-value");
+    fakeApi.startEvaluation.mockResolvedValue({ jobId: "j4", status: "pending", dimensions: [] });
+    const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.startEvaluation({ repo: "x", dimensions: ["security"] });
+    });
+    const [payload] = fakeApi.startEvaluation.mock.calls.at(-1);
+    expect(payload.apiKey).toBeUndefined();
+  });
 });

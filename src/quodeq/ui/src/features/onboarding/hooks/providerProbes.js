@@ -34,12 +34,14 @@ async function detectOllamaDaemon() {
   }
 }
 
-function detectStoredCloudKey(providerId) {
+async function detectStoredCloudKey(providerId) {
   try {
-    const stored = localStorage.getItem(`cc-${providerId}-api-key`);
-    return { id: providerId, classification: 'cloud', detected: Boolean(stored), defaultModel: null };
+    const res = await fetch(`/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, { method: 'GET', signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
+    const data = await res.json();
+    return { id: providerId, classification: 'cloud', detected: Boolean(data.configured), defaultModel: null };
   } catch {
-    return { id: providerId, classification: 'cloud', detected: false };
+    return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
   }
 }
 

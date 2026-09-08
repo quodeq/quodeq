@@ -66,8 +66,9 @@ export function preparePayload(payload, storage = localStorage) {
   };
   if (settings.perDimension) result.perDimension = true;
   if (!settings.verify) result.verifyFindings = false;
-  const apiKey = get("api-key");
-  if (apiKey) result.apiKey = apiKey;
+  // api-key is never read from storage here: the value cached under it is
+  // just a "configured" sentinel (see useProviderSettings.js), not the real
+  // key. The backend resolves the actual key from its own secure store.
   const apiBase = get("api-base");
   if (apiBase) result.apiBase = apiBase;
   // The Settings field pre-fills the provider id as its default; only a
