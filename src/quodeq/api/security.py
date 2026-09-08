@@ -56,7 +56,17 @@ def _webview_token_from_ua(user_agent: str) -> str | None:
     if idx == -1:
         return None
     rest = user_agent[idx + len(_WEBVIEW_TOKEN_UA_PREFIX):]
-    return rest.split(" ", 1)[0] or None
+    candidate = rest.split(" ", 1)[0]
+    if not candidate:
+        return None
+    # hmac.compare_digest raises TypeError on a non-ASCII str, and Werkzeug
+    # decodes request headers as latin-1, so any UA byte >= 0x80 inside the
+    # token would otherwise blow up _is_trusted_webview from inside the
+    # after_request hook -- turning every request into a 500 with none of
+    # the security headers set. The real token is secrets.token_urlsafe(),
+    # always ASCII, so a non-ASCII candidate can never be a match anyway:
+    # drop it here and fail closed like any other wrong token.
+    return candidate if candidate.isascii() else None
 
 
 def _is_trusted_webview(user_agent: str) -> bool:
