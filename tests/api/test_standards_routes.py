@@ -138,3 +138,40 @@ def test_import_standard_with_warnings(client):
 def test_import_standard_missing_data(client):
     resp = client.post("/api/standards/import", json={}, headers={"Origin": "http://localhost"})
     assert resp.status_code == 400
+
+# Log sanitization tests
+def test_import_standard_log_sanitization_id_with_newlines(client, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    payload = {
+        "data": {
+            "id": "test-id\nFAKE_LOG_ENTRY",
+            "name": "Test",
+            "principles": [],
+        }
+    }
+    resp = client.post("/api/standards/import", json=payload, headers={"Origin": "http://localhost"})
+    assert resp.status_code == 201
+    for record in caplog.records:
+        msg = record.getMessage()
+        if "standards.import" in msg and "id=" in msg:
+            assert "\n" not in msg
+            assert "test-idFAKE_LOG_ENTRY" in msg
+
+def test_import_standard_log_sanitization_id_with_carriage_return(client, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    payload = {
+        "data": {
+            "id": "test-id\rFAKE_ENTRY",
+            "name": "Test",
+            "principles": [],
+        }
+    }
+    resp = client.post("/api/standards/import", json=payload, headers={"Origin": "http://localhost"})
+    assert resp.status_code == 201
+    for record in caplog.records:
+        msg = record.getMessage()
+        if "standards.import" in msg and "id=" in msg:
+            assert "\r" not in msg
+            assert "test-idFAKE_ENTRY" in msg

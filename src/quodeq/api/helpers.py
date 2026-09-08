@@ -14,6 +14,15 @@ def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any]
     return {"error": message, "code": code}, status
 
 
+def _sanitize_for_log(value: str) -> str:
+    """Remove CR/LF from a value before including it in a log message.
+
+    Prevents log forging when client-supplied values contain embedded
+    newlines that would create fake log entries.
+    """
+    return value.replace("\r", "").replace("\n", "")
+
+
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
 
 
