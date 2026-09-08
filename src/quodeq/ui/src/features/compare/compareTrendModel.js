@@ -11,9 +11,9 @@ import { scoreDomain } from '../../components/scoreChartHelpers.js';
  * padding + outward rounding) instead of re-deriving it.
  */
 export function trendDomain(series) {
-  const times = series.flat().map((e) => new Date(e.dateISO).getTime());
-  const values = series.flat().map((e) => e.value);
-  const [v0, v1] = scoreDomain(values);
+  const entries = series.flat();
+  const times = entries.map((e) => new Date(e.dateISO).getTime());
+  const [v0, v1] = scoreDomain(entries.map((e) => e.value));
   return {
     t0: Math.min(...times),
     t1: Math.max(...times),

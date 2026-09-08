@@ -45,6 +45,8 @@ function PrincipleGroup({ group, dim }) {
  * scrolling back up to the dimensions table. */
 export default function CompareDuelPrinciples({ principles, dimensions }) {
   const count = principles.reduce((n, g) => n + g.items.length, 0);
+  // Dimension lookup keyed once, not a find() per principle group.
+  const dimByKey = new Map(dimensions.map((d) => [d.key, d]));
   return (
     <section className="compare-panel" aria-label={t('compare.duelPrinciplesAria')}>
       <div className="compare-panel__head">
@@ -57,7 +59,7 @@ export default function CompareDuelPrinciples({ principles, dimensions }) {
             <PrincipleGroup
               key={group.key}
               group={group}
-              dim={dimensions.find((d) => d.key === group.key)}
+              dim={dimByKey.get(group.key)}
             />
           ))}
         </div>

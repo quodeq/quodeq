@@ -83,6 +83,26 @@ test('buildDimensionView ranks standings and aggregates principles', () => {
   assert.equal(view.weakest.key, 'confidentiality');
 });
 
+test('buildDimensionView keeps standings ranks on bars when a project lacks a principle', () => {
+  // c reports no Confidentiality score: its bar is skipped and the others
+  // keep their STANDINGS rank (1 and 3), not a compacted per-card position.
+  const secNoConf = { ...DIM_SEC(7), principles: [{ principle: 'Integrity', score: '7' }] };
+  const summaries = {
+    a: makeSummary({ dims: [DIM_SEC(6)] }),
+    b: makeSummary({ dims: [DIM_SEC(8)] }),
+    c: makeSummary({ dims: [secNoConf] }),
+  };
+  const rows = ['a', 'b', 'c'].map((id) => buildRow(makeProject({ id }), summaries[id], NOW));
+  const view = buildDimensionView('security', rows, NOW, summaries);
+  assert.deepEqual(view.standings.map((s) => s.row.id), ['b', 'c', 'a']);
+  const conf = view.principles.find((p) => p.key === 'confidentiality');
+  assert.deepEqual(conf.perProject.map((p) => [p.id, p.rank]), [['b', 1], ['a', 3]]);
+  assert.equal(conf.lead.id, 'b');
+  assert.equal(conf.trail.id, 'a');
+  const integ = view.principles.find((p) => p.key === 'integrity');
+  assert.deepEqual(integ.perProject.map((p) => [p.id, p.rank]), [['b', 1], ['c', 2], ['a', 3]]);
+});
+
 test('buildDimensionView returns null for a dimension nobody has', () => {
   const rows = [buildRow(makeProject(), makeSummary({ dims: [DIM_SEC(6)] }), NOW)];
   assert.equal(buildDimensionView('reliability', rows, NOW, {}), null);

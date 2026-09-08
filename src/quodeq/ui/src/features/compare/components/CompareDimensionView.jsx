@@ -38,11 +38,13 @@ function buildAttentionItems(dimAttention, onOpenProject, onOpenPrinciple) {
 /** Radar series: average always shown, plus lead/trail, plus the hovered
  * standings row (recolored to focus instead of duplicated if it's already
  * plotted as lead/trail). */
-function buildRadarSeries(view, focusId) {
-  const byKey = (source) => view.principles.map((p) => {
-    const found = source.principles.find((x) => x.key === p.key);
-    return found ? found.score : null;
-  });
+export function buildRadarSeries(view, focusId) {
+  // One key -> score map per plotted standing, so the axis walk is an O(1)
+  // pick per principle instead of a find() over the standing's principles.
+  const byKey = (source) => {
+    const scores = new Map(source.principles.map((x) => [x.key, x.score]));
+    return view.principles.map((p) => (scores.has(p.key) ? scores.get(p.key) : null));
+  };
   const focusStanding = focusId ? view.standings.find((s) => s.row.id === focusId) : null;
   const isFocused = (s) => Boolean(focusStanding && s === focusStanding);
   const extraFocus = focusStanding && focusStanding !== view.lead && focusStanding !== view.trail
@@ -58,15 +60,18 @@ function buildRadarSeries(view, focusId) {
   ];
 }
 
-function buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple) {
+export function buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple) {
+  // Each principle's cells keyed by project id once, so the standings x
+  // principles walk below never rescans perProject.
+  const cellsById = view.principles.map((p) => new Map(p.perProject.map((x) => [x.id, x])));
   return view.standings.map((s) => ({
     id: s.row.id,
     name: s.row.name,
     remote: s.row.remote,
     overall: s.score,
     onOpenRow: () => onOpenProject(s.row.id),
-    cells: Object.fromEntries(view.principles.map((p) => {
-      const cell = p.perProject.find((x) => x.id === s.row.id);
+    cells: Object.fromEntries(view.principles.map((p, i) => {
+      const cell = cellsById[i].get(s.row.id);
       if (!cell) return [p.key, { score: null }];
       return [p.key, {
         score: cell.score,
