@@ -41,6 +41,13 @@ class _ResolveOptions:
     evaluators_dir: Path | None = None
 
 
+@dataclass(frozen=True)
+class SuppressionKeys:
+    """Dismissed and permanently-deleted violation keys for one project."""
+    dismissed: set[tuple]
+    deleted: set[tuple]
+
+
 def _dismissed_key_for_violation(v: dict) -> tuple:
     """Build a (req, file, line) key from a violation dict.
 
@@ -106,26 +113,25 @@ def _filter_dismissed_from_result(
 
 
 def _try_evidence_formats(
-    base: Path, dimension: str, ctx: ViolationContext,
-    _exists, _stat, compiled_dir, dkeys: set[tuple], delkeys: set[tuple],
+    base: Path, dimension: str, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try evidence file formats (JSON, JSONL, stream) as fallbacks."""
     evidence_path = base / "evidence" / f"{dimension}_evidence.json"
-    if _exists(evidence_path):
+    if opts.exists_fn(evidence_path):
         return _filter_dismissed_from_result(
-            parse_violations_from_evidence(evidence_path, ctx), dkeys,
-            delkeys, dimension,
+            parse_violations_from_evidence(evidence_path, ctx), keys.dismissed,
+            keys.deleted, dimension,
         )
 
     jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
     stream_path = base / "evidence" / f"{dimension}_live.stream"
-    if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
+    if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(
-            jsonl_path, stream_path, ctx, compiled_dir=compiled_dir,
-            dismissed_keys=dkeys, deleted_keys=delkeys,
+            jsonl_path, stream_path, ctx, compiled_dir=opts.compiled_dir,
+            dismissed_keys=keys.dismissed, deleted_keys=keys.deleted,
         )
 
-    if _exists(stream_path):
+    if opts.exists_fn(stream_path):
         return parse_violations_from_stream(stream_path, ctx)
 
     return None
@@ -192,27 +198,25 @@ def _accept_known_dimension(
 
 
 def _resolve_from_json_eval(
-    eval_path: Path, base: Path, project: str, run_id: str, dimension: str,
-    compiled_dir: Path | None, dkeys: set[tuple], delkeys: set[tuple],
+    eval_path: Path, base: Path, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
 ) -> dict[str, Any] | None:
     filtered = _filter_dismissed_from_result(
-        parse_eval_from_json(eval_path, project, run_id, dimension, compiled_dir=compiled_dir),
-        dkeys, delkeys, dimension,
+        parse_eval_from_json(eval_path, ctx.project, ctx.run_id, ctx.dimension, compiled_dir=opts.compiled_dir),
+        keys.dismissed, keys.deleted, ctx.dimension,
     )
-    return _apply_rescored_grades(filtered, base, project, run_id, dimension)
+    return _apply_rescored_grades(filtered, base, ctx.project, ctx.run_id, ctx.dimension)
 
 
 def _resolve_from_markdown(
-    markdown_path: Path, project: str, run_id: str, dimension: str,
-    dkeys: set[tuple], delkeys: set[tuple],
+    markdown_path: Path, ctx: ViolationContext, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     try:
         content = read_text(markdown_path)
     except OSError:
         return None
     return _filter_dismissed_from_result(
-        parse_eval_markdown(content, project, run_id, dimension),
-        dkeys, delkeys, dimension,
+        parse_eval_markdown(content, ctx.project, ctx.run_id, ctx.dimension),
+        keys.dismissed, keys.deleted, ctx.dimension,
     )
 
 
@@ -236,25 +240,20 @@ def resolve_dimension_eval(
     isolation) the check is skipped, preserving prior behaviour.
     """
     opts = options or _ResolveOptions()
-    _exists = opts.exists_fn
-    _stat = opts.stat_fn
-    compiled_dir = opts.compiled_dir
-    evaluators_dir = opts.evaluators_dir
-    if not _accept_known_dimension(dimension, compiled_dir, evaluators_dir):
+    if not _accept_known_dimension(dimension, opts.compiled_dir, opts.evaluators_dir):
         return None
-    dkeys = _dismissed_keys(base.parent)
-    delkeys = _deleted_keys(base.parent)
+    keys = SuppressionKeys(_dismissed_keys(base.parent), _deleted_keys(base.parent))
+    ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
 
     eval_path = base / "evaluation" / f"{dimension}.json"
-    if _exists(eval_path):
-        return _resolve_from_json_eval(eval_path, base, project, run_id, dimension, compiled_dir, dkeys, delkeys)
+    if opts.exists_fn(eval_path):
+        return _resolve_from_json_eval(eval_path, base, ctx, opts, keys)
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
-    if _exists(markdown_path):
-        return _resolve_from_markdown(markdown_path, project, run_id, dimension, dkeys, delkeys)
+    if opts.exists_fn(markdown_path):
+        return _resolve_from_markdown(markdown_path, ctx, keys)
 
-    ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
-    return _try_evidence_formats(base, dimension, ctx, _exists, _stat, compiled_dir, dkeys, delkeys)
+    return _try_evidence_formats(base, dimension, ctx, opts, keys)
 
 
 def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:

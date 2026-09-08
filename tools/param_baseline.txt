@@ -67,9 +67,6 @@ src/quodeq/services/_fs_metadata.py:_compute_on_miss_summary
 src/quodeq/services/_fs_project_helpers.py:_build_project_entry
 src/quodeq/services/_fs_projects.py:_build_project_entries_threaded
 src/quodeq/services/_fs_reports.py:get_dimension_eval
-src/quodeq/services/_job_log_tee.py:_read_and_tee_loop
-src/quodeq/services/_job_log_tee.py:consume_stream
-src/quodeq/services/_job_log_tee.py:tee_run_log
 src/quodeq/services/_repo_index.py:add_repo_index_entry
 src/quodeq/services/_repo_index.py:rekey_repo_index_entry
 src/quodeq/services/_scan_progress_dims.py:_dim_evidence_tally
@@ -93,7 +90,4 @@ src/quodeq/services/scoring/_project_scores.py:_resolve_accumulated
 src/quodeq/services/scoring/_rescoring.py:_rescore_runs_by_dimension
 src/quodeq/services/scoring/_run_scores.py:get_run_dimensions
 src/quodeq/services/suppression_keys.py:is_dismissed
-src/quodeq/services/violations.py:_resolve_from_json_eval
-src/quodeq/services/violations.py:_resolve_from_markdown
-src/quodeq/services/violations.py:_try_evidence_formats
 src/quodeq/terminal/links.py:resolve_path
