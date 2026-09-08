@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._trend_fetcher import make_rescoring_fetcher
+from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
 from quodeq.services.scoring import ScoringDeps, _make_trend_fetcher
 
 
@@ -94,6 +94,23 @@ def test_active_deletion_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
     result = fetcher("r2")
     assert [d.overall_score for d in result] == ["6.0/10"]
     assert rescoring_calls == ["r2"]
+
+
+def test_make_trend_fetcher_requires_max_history_on_heavy_path(tmp_path: Path) -> None:
+    """``max_history`` is validated before path selection, so a caller that
+    omits it must get ``TypeError`` even on the heavy path (active
+    dismissals), not just the fast path -- regression: the check used to
+    live only inside the fast-path branch, so the heavy path silently
+    succeeded without ``max_history`` ever being set."""
+    reports, project = _make_project(tmp_path)
+
+    deps = ScoringDeps(
+        base_fetcher_factory=lambda rr, p: (lambda run_id: []),
+        dismissed_keys=lambda _pd: {("R1", "a.py", 1)},
+        deleted_keys=lambda _pd: set(),
+    )
+    with pytest.raises(TypeError):
+        make_trend_fetcher(reports, project, deps=deps)
 
 
 def test_make_rescoring_fetcher_rejects_traversal_project(tmp_path: Path) -> None:

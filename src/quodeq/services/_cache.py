@@ -26,7 +26,7 @@ _Reader = Callable[[Path, str, str], list[DimensionResult]]
 
 @dataclass
 class DimensionCacheContext:
-    """Grouped cache state used by internal cache helpers."""
+    """Public cache config a caller builds and passes to make_lru_dimension_fetcher."""
     cache: OrderedDict
     lock: threading.Lock
     max_size: int

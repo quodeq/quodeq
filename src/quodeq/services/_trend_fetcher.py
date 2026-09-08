@@ -117,6 +117,21 @@ def _make_version_for(
     return version_for
 
 
+def _require_trend_deps(deps: ScoringDeps) -> None:
+    """Fail fast on the two ``ScoringDeps`` fields with no leaf-level default.
+
+    Both were required keyword-only parameters of the pre-refactor
+    ``make_trend_fetcher``, so a caller that omitted either got a ``TypeError``
+    at call time regardless of which path (fast/heavy) would have run. Called
+    unconditionally, before path selection, to keep that contract now that
+    both live on ``deps`` instead.
+    """
+    if deps.max_history is None:
+        raise TypeError("ScoringDeps.max_history is required for the trend fetcher's fast path")
+    if deps.base_fetcher_factory is None:
+        raise TypeError("ScoringDeps.base_fetcher_factory is required for the heavy trend path")
+
+
 def _make_heavy_trend_fetcher(
     reports_root: Path, project: str, params: ScoringParams,
     cacheable_run_ids: set[str] | None,
@@ -128,12 +143,9 @@ def _make_heavy_trend_fetcher(
     project_dir = reports_root / project
     dismissed_keys = deps.dismissed_keys or _default_dismissed_keys
     deleted_keys = deps.deleted_keys or _default_deleted_keys
-    base_fetcher_factory = deps.base_fetcher_factory
-    if base_fetcher_factory is None:
-        raise TypeError("ScoringDeps.base_fetcher_factory is required for the heavy trend path")
     base = make_rescoring_fetcher(
         reports_root, project, params=params,
-        base_fetcher=base_fetcher_factory(reports_root, project),
+        base_fetcher=deps.base_fetcher_factory(reports_root, project),
         dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
     )
     from quodeq.services.score_cache import load_run_keys_or_empty, open_score_cache  # noqa: PLC0415
@@ -182,8 +194,11 @@ def make_trend_fetcher(
     disagrees with the on-disk ``evaluation/*.json`` count.
 
     ``deps.base_fetcher_factory`` (heavy path) and ``deps.max_history`` (fast
-    path) have no leaf-level default -- callers must always set them.
+    path) have no leaf-level default -- ``_require_trend_deps`` checks both
+    up front, before path selection, so omitting either raises regardless of
+    which path would have run.
     """
+    _require_trend_deps(deps)
     project_dir = reports_root / project
     dismissed_keys = deps.dismissed_keys or _default_dismissed_keys
     deleted_keys = deps.deleted_keys or _default_deleted_keys
@@ -192,8 +207,6 @@ def make_trend_fetcher(
             reports_root, project, params, cacheable_run_ids, deps,
         )
 
-    if deps.max_history is None:
-        raise TypeError("ScoringDeps.max_history is required for the trend fetcher's fast path")
     ctx = DimensionCacheContext(
         cache=OrderedDict(), lock=Lock(), max_size=deps.max_history,
         reader=deps.read_run_scalars or _default_read_run_scalars,
