@@ -128,6 +128,8 @@ def _discard_run_state(
     scratch_patterns = (
         "*_queue.json", "*_fingerprint.json",
         "*_evidence.jsonl", "*_dispatch_keys.json",
+        # Entries listed here belong to EARLIER runs, so they are cleaned up
+        # as scratch but deliberately not fed to the cache-deletion loop above.
         "*_replayed_unconsolidated_keys.json",
     )
     remove_matching_files(evidence_dir, scratch_patterns)
