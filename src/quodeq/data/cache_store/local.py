@@ -21,6 +21,7 @@ import logging
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 from quodeq.data.cache_store.backend import CacheStats
@@ -33,6 +34,10 @@ _ROOT_ENV = "QUODEQ_CACHE_ROOT"
 _RESULTS_SUBDIR = "results"
 _ENTRY_FILENAME = "entry.json"
 _TMP_PREFIX = ".tmp."
+# How long stats() may answer from its last walk. The walk stat()s every
+# entry file (100k possible), so repeated calls inside this window reuse the
+# answer unless this instance changed the tree in between.
+_STATS_TTL_S = 30.0
 # Content-addressed keys are SHA-256 hex in production; restrict to a
 # path-safe charset so a key can never contain '/', '\\', or '..' and
 # escape the cache root in _dir_for.
@@ -64,6 +69,9 @@ class LocalFileBackend:
             self._index = ContentIndex(self._root / INDEX_FILENAME)
         else:
             self._index = None
+        # stats() memo: (monotonic time, mutation count, entries, bytes).
+        self._stats_memo: tuple[float, int, int, int] | None = None
+        self._mutations = 0
 
     @property
     def root(self) -> Path:
@@ -84,6 +92,10 @@ class LocalFileBackend:
     def _entry_path(self, key: str) -> Path:
         return self._dir_for(key) / _ENTRY_FILENAME
 
+    def _mark_mutated(self) -> None:
+        """Invalidate the stats() memo: this instance changed the entry tree."""
+        self._mutations += 1
+
     def get(self, key: str) -> CacheEntry | None:
         path = self._entry_path(key)
         try:
@@ -100,6 +112,7 @@ class LocalFileBackend:
             _logger.warning("cache entry corrupt at %s, removing: %s", path, exc)
             try:
                 path.unlink(missing_ok=True)
+                self._mark_mutated()
             except OSError:
                 pass
             return None
@@ -117,6 +130,7 @@ class LocalFileBackend:
         try:
             tmp.write_text(entry.to_json(), encoding="utf-8")
             os.replace(tmp, target)
+            self._mark_mutated()
             if index and self._index is not None:
                 self._index.record(
                     key, content_hash=entry.file_content_hash, dimension=entry.dimension,
@@ -142,6 +156,7 @@ class LocalFileBackend:
         except OSError as exc:
             _logger.warning("cache delete failed for %s: %s", key, exc)
             return
+        self._mark_mutated()
         if self._index is not None:
             self._index.forget(key)
 
@@ -158,8 +173,27 @@ class LocalFileBackend:
         return self._index.find(content_hash, dimension, params_hash)
 
     def stats(self) -> CacheStats:
+        """Entry count and total bytes on disk.
+
+        Answered from the last walk for up to ``_STATS_TTL_S``, or until this
+        instance puts, deletes or removes a corrupt entry. Changes made behind
+        its back (another process, the migration's direct rmtree) show up once
+        the memo expires. The mutation count is read before the walk, so a
+        concurrent write during the walk invalidates the memo it produces.
+        """
+        now = time.monotonic()
+        memo = self._stats_memo
+        if memo is not None and memo[1] == self._mutations and now - memo[0] < _STATS_TTL_S:
+            return CacheStats(entries=memo[2], bytes=memo[3])
+        mutations = self._mutations
+        entries, total_bytes = self._walk_entries()
+        self._stats_memo = (now, mutations, entries, total_bytes)
+        return CacheStats(entries=entries, bytes=total_bytes)
+
+    def _walk_entries(self) -> tuple[int, int]:
+        """One full walk: (entry count, total bytes). The expensive part of stats()."""
         if not self._root.exists():
-            return CacheStats(entries=0, bytes=0)
+            return 0, 0
         entries = 0
         total_bytes = 0
         for entry_path in self._root.rglob(_ENTRY_FILENAME):
@@ -168,4 +202,4 @@ class LocalFileBackend:
                 entries += 1
             except OSError:
                 continue
-        return CacheStats(entries=entries, bytes=total_bytes)
+        return entries, total_bytes
