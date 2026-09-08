@@ -136,15 +136,35 @@ function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPri
   };
 }
 
+// dimension -> entry and "dimension\0principle" -> principle lookups for the
+// accumulated payload. ViolationsRoute re-renders on every parent state
+// change (dismissRefreshKey bumps, sub-tab flips) while `dims` is the same
+// react-query array, so rebuilding these each render walked every principle
+// for nothing. Memoized by array identity in a WeakMap rather than useMemo:
+// ViolationsRoute is deliberately hook-free (the App tests invoke it as a
+// plain function), and the entry is released together with its payload.
+const LOOKUPS_BY_DIMS = new WeakMap();
+
+export function violationsLookupsFor(dims) {
+  let lookups = LOOKUPS_BY_DIMS.get(dims);
+  if (!lookups) {
+    lookups = {
+      dimMap: new Map(dims.map(d => [d.dimension, d])),
+      principleMap: new Map(
+        dims.flatMap(d => (d.principles || []).map(p => [`${d.dimension}\0${p.name || p.principle}`, p]))
+      ),
+    };
+    LOOKUPS_BY_DIMS.set(dims, lookups);
+  }
+  return lookups;
+}
+
 export function ViolationsRoute({ params, props }) {
   const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
   const dims = acc?.dimensions || [];
   const nav = props.navigation.handleNavigate;
 
-  const dimMap = new Map(dims.map(d => [d.dimension, d]));
-  const principleMap = new Map(
-    dims.flatMap(d => (d.principles || []).map(p => [`${d.dimension}\0${p.name || p.principle}`, p]))
-  );
+  const { dimMap, principleMap } = violationsLookupsFor(dims);
   const navigateToPrinciple = makeNavigateToPrinciple({ dimMap, principleMap, nav });
   const navigateToDimension = makeNavigateToDimension({ dimMap, nav });
 

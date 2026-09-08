@@ -36,6 +36,26 @@ describe('computeLevelInfo', () => {
     expect(info.title).toBe('Demo System');
     expect(info.lines.some((l) => l.label === 'Violations' && l.value === 4)).toBe(true);
     expect(info.lines.some((l) => l.label === 'Critical')).toBe(true);
+    expect(info.lines.some((l) => l.label === 'Score' && l.value === '7.2')).toBe(true);
+    expect(info.lines.some((l) => l.label === 'Compliance' && l.value === 6)).toBe(true);
+  });
+
+  it('depth 0 averages the score and sums counts across every star', () => {
+    const scene = makeScene();
+    scene.stars.push({
+      name: 'Dim2', score: 5.8, violations: 2, compliance: 3, _clusterCx: 50, _clusterCy: 50,
+      _raw: { violations: [{ severity: 'major' }, {}] },
+    });
+    const nav = { depth: 0, dim: null, prin: null, clusterCx: null, clusterCy: null };
+    const info = computeLevelInfo(scene, nav, 'Demo', vi.fn(), { current: nav });
+    const value = (label) => info.lines.find((l) => l.label === label)?.value;
+    expect(value('Score')).toBe('6.5');
+    expect(value('Dimensions')).toBe(2);
+    expect(value('Violations')).toBe(6);
+    expect(value('Compliance')).toBe(9);
+    expect(value('Critical')).toBe(1);
+    expect(value('Major')).toBe(2);
+    expect(value('Minor')).toBe(2);
   });
 
   it('depth 0 titles from the active cluster when clusterCx/Cy are set', () => {

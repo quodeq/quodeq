@@ -46,16 +46,20 @@ function computeSystemLevelInfo(scene, nav, projectName) {
   const clusterCon = nav.clusterCx != null
     ? (scene.constellations || []).find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy)
     : null;
-  const totalV = clusterStars.reduce((s, d) => s + d.violations, 0);
-  const totalC = clusterStars.reduce((s, d) => s + d.compliance, 0);
-  const avgScore = clusterStars.length > 0 ? clusterStars.reduce((s, d) => s + d.score, 0) / clusterStars.length : 0;
+  // One pass over the cluster for every figure (score, violations,
+  // compliance, per-severity counts) rather than a reduce per figure.
+  let totalV = 0, totalC = 0, totalScore = 0;
   const sevCounts = { critical: 0, major: 0, minor: 0 };
-  clusterStars.forEach(s => {
-    (s._raw?.violations || []).forEach(v => {
+  for (const s of clusterStars) {
+    totalV += s.violations;
+    totalC += s.compliance;
+    totalScore += s.score;
+    for (const v of s._raw?.violations || []) {
       const sev = v.severity || 'minor';
       if (sevCounts[sev] != null) sevCounts[sev]++;
-    });
-  });
+    }
+  }
+  const avgScore = clusterStars.length > 0 ? totalScore / clusterStars.length : 0;
   const lines = [
     { label: t('map.score'), value: avgScore.toFixed(1) },
     { label: t('map.dimensions'), value: clusterStars.length },

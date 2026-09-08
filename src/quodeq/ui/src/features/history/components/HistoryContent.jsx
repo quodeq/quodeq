@@ -11,20 +11,23 @@ import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 const TOAST_DISMISS_MS = 2600;
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
-function computeDeltas(rows) {
+// Exported for HistoryContent.deltas.test.jsx.
+export function computeDeltas(rows) {
   // Aligns 1:1 with `rows`, which may include scoreless stub rows
   // (in-progress runs at the front, cancelled partial rows interleaved).
   // A scoreless row has no delta, and each scored row compares against the
   // next SCORED row so a stub in between doesn't null out a real delta.
-  return rows.map((entry, i) => {
-    const curr = parseFloat(entry.numericAverage);
-    if (Number.isNaN(curr)) return null;
-    let nextIdx = i + 1;
-    while (nextIdx < rows.length && Number.isNaN(parseFloat(rows[nextIdx].numericAverage))) nextIdx++;
-    if (nextIdx >= rows.length) return null;
-    const prev = parseFloat(rows[nextIdx].numericAverage);
-    return Math.round((curr - prev) * 10) / 10;
-  });
+  // Rows are newest-first, so one backward pass that remembers the last
+  // scored value parses each row once instead of rescanning past every stub.
+  const deltas = new Array(rows.length).fill(null);
+  let nextScored = NaN;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const curr = parseFloat(rows[i].numericAverage);
+    if (Number.isNaN(curr)) continue;
+    if (!Number.isNaN(nextScored)) deltas[i] = Math.round((curr - nextScored) * 10) / 10;
+    nextScored = curr;
+  }
+  return deltas;
 }
 
 function NotReadyToast({ message, onDismiss }) {
