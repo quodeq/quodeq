@@ -78,7 +78,12 @@ def _is_trusted_webview(user_agent: str) -> bool:
     it always fail closed here regardless of UA content.
     """
     expected = os.environ.get(_ENV_WEBVIEW_TOKEN)
-    if not expected:
+    # isascii() for the same reason _webview_token_from_ua guards the
+    # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
+    # and this one comes from the environment, which an operator can set by
+    # hand. _get_webview_token() only ever produces token_urlsafe() output,
+    # so a non-ASCII value here is a misconfiguration, not a match.
+    if not expected or not expected.isascii():
         return False
     candidate = _webview_token_from_ua(user_agent)
     if not candidate:

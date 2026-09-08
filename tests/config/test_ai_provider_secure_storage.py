@@ -149,6 +149,11 @@ class TestProviderNameValidation:
         "gem ini",
         "gemini;rm -rf /",
         "",
+        # A TRAILING newline specifically: `$` matches just before one, so a
+        # `match()`-based check accepts this and only the api_key_var check
+        # downstream stops it reaching the file. The validator must reject it
+        # itself (hence fullmatch), or the guard is one refactor from useless.
+        "gemini\n",
     ])
     def test_rejects_non_identifier_provider_names(self, paths, no_keyring, provider):
         with pytest.raises(ValueError):

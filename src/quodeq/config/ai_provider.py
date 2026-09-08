@@ -23,7 +23,11 @@ _API_KEY_FORBIDDEN_CHARS = ("\n", "\r", "\0")
 # AI_PROVIDER value and, upper-cased, as the key's env var name). A newline
 # there injects arbitrary extra env vars, which config/_env_loader.py then
 # loads into os.environ. Identifier-shaped names only.
-_VALID_PROVIDER_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+#
+# Matched with fullmatch(), never match(): `$` also matches just BEFORE a
+# trailing newline, so `match()` accepts "gemini\n", which is the exact
+# character this pattern exists to reject.
+_VALID_PROVIDER_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
@@ -63,7 +67,7 @@ def get_current_provider(
 
 def validate_provider_name(provider: str) -> None:
     """Raise ValueError unless *provider* is safe to write into an env file."""
-    if not provider or not _VALID_PROVIDER_RE.match(provider):
+    if not provider or not _VALID_PROVIDER_RE.fullmatch(provider):
         raise ValueError(
             "Provider name must contain only letters, digits, '-' and '_'",
         )
@@ -85,7 +89,7 @@ def _validate_env_write(provider: str | None, api_key_var: str, api_key_value: s
         # extra `export …` lines to the env file.
         if any(ch in api_key_value for ch in _API_KEY_FORBIDDEN_CHARS):
             raise ValueError("API key contains forbidden control characters")
-        if not api_key_var or not _VALID_PROVIDER_RE.match(api_key_var):
+        if not api_key_var or not _VALID_PROVIDER_RE.fullmatch(api_key_var):
             # PROVIDERS maps keyless providers (ollama, llamacpp) to "",
             # which would otherwise produce a malformed `export =<key>` line.
             raise ValueError("Provider has no API key environment variable")

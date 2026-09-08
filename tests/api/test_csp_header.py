@@ -249,6 +249,23 @@ def test_non_ascii_ua_token_does_not_crash_and_stays_strict(monkeypatch):
     assert "'unsafe-eval'" not in script_src, "a non-ASCII token must fail closed"
 
 
+def test_non_ascii_env_token_does_not_crash_and_stays_strict(monkeypatch):
+    """The OTHER side of compare_digest. It raises TypeError if EITHER str is
+    non-ASCII, and QUODEQ_WEBVIEW_TOKEN can be set by hand, so guarding only
+    the UA candidate leaves the same 500-on-every-request hole open behind a
+    misconfigured environment."""
+    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, "sécret-token")
+    app = create_app()
+    with app.test_client() as client:
+        resp = client.get("/api/health", headers={"User-Agent": _WEBVIEW_UA_WITH_TOKEN})
+
+    assert resp.status_code == 200
+    assert resp.headers["X-Frame-Options"] == "DENY"
+    script_src = _directive(resp.headers["Content-Security-Policy"], "script-src")
+    assert script_src is not None
+    assert "'unsafe-eval'" not in script_src, "a non-ASCII expected token must fail closed"
+
+
 def test_non_ascii_ua_token_extractor_returns_none():
     """The guard lives in the extractor, so _is_trusted_webview's
     compare_digest never sees a non-ASCII str."""
