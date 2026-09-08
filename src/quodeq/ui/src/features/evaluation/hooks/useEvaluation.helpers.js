@@ -4,7 +4,7 @@
  * Split out of useEvaluation.js (see that file's header for the hook's
  * overall data-flow doc). Kept logic-identical to the pre-split version.
  */
-import { ACTIVE_PROVIDER_KEY, providerKey, API_KEY_CONFIGURED_SENTINEL } from "../../../constants.js";
+import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
 
@@ -75,7 +75,7 @@ export function preparePayload(payload, storage = localStorage) {
   // sending any key at all for them. Forward a genuine legacy value; ignore
   // the sentinel.
   const storedApiKey = get("api-key");
-  if (storedApiKey && storedApiKey !== API_KEY_CONFIGURED_SENTINEL) {
+  if (storedApiKey && storedApiKey !== PROVIDER_CONFIGURED_MARKER) {
     result.apiKey = storedApiKey;
   }
   const apiBase = get("api-base");

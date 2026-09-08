@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import useProviderSettings, { saveProviderSetting, saveProviderApiKey, loadProviderState, API_KEY_CONFIGURED_SENTINEL } from './useProviderSettings.js';
+import useProviderSettings, { saveProviderSetting, saveProviderApiKey, loadProviderState, PROVIDER_CONFIGURED_MARKER } from './useProviderSettings.js';
 import { saveProviderKey } from '../../../api/providers.js';
 
 const showToast = vi.fn();
@@ -184,7 +184,7 @@ describe('useProviderSettings api-key handling', () => {
     });
 
     await waitFor(() => {
-      expect(mockStorage.setItem).toHaveBeenCalledWith('cc-openai-api-key', API_KEY_CONFIGURED_SENTINEL);
+      expect(mockStorage.setItem).toHaveBeenCalledWith('cc-openai-api-key', PROVIDER_CONFIGURED_MARKER);
     });
     // The sentinel belongs in storage, not in live state: consumers of
     // state['api-key'] (OmlxTab) send it to a provider as a real credential.
@@ -250,9 +250,9 @@ describe('loadProviderState api-key handling', () => {
     // OmlxTab passes state['api-key'] straight into getOmlxModels and
     // testOmlxConcurrency as a real credential, so the sentinel reaching
     // state means '•configured•' gets sent to a provider as an API key.
-    const storage = storageWith({ 'cc-omlx-api-key': API_KEY_CONFIGURED_SENTINEL });
+    const storage = storageWith({ 'cc-omlx-api-key': PROVIDER_CONFIGURED_MARKER });
     const state = loadProviderState('omlx', {}, storage);
-    expect(state['api-key']).not.toBe(API_KEY_CONFIGURED_SENTINEL);
+    expect(state['api-key']).not.toBe(PROVIDER_CONFIGURED_MARKER);
     expect(state['api-key']).toBe('');
   });
 
@@ -267,7 +267,7 @@ describe('loadProviderState api-key handling', () => {
 
   it('the sentinel only masks api-key, not other settings', () => {
     const storage = storageWith({
-      'cc-omlx-api-key': API_KEY_CONFIGURED_SENTINEL,
+      'cc-omlx-api-key': PROVIDER_CONFIGURED_MARKER,
       'cc-omlx-model': 'gemma-3-4b',
     });
     expect(loadProviderState('omlx', {}, storage).model).toBe('gemma-3-4b');

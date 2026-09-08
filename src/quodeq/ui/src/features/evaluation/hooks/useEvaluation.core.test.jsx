@@ -4,7 +4,7 @@ import React from "react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
-import { API_KEY_CONFIGURED_SENTINEL } from "../../../constants.js";
+import { PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
@@ -154,7 +154,7 @@ describe("useEvaluation", () => {
     // (see useProviderSettings.js). Sending it would hand the provider a
     // bogus credential and skip the backend's own get_api_key_secure
     // lookup, which is what actually holds the real key.
-    localStorage.setItem("cc-ollama-api-key", API_KEY_CONFIGURED_SENTINEL);
+    localStorage.setItem("cc-ollama-api-key", PROVIDER_CONFIGURED_MARKER);
     fakeApi.startEvaluation.mockResolvedValue({ jobId: "j4", status: "pending", dimensions: [] });
     const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
     await act(async () => {

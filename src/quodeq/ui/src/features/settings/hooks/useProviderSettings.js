@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
-import { providerKey, notifyProviderSettingsChanged, API_KEY_CONFIGURED_SENTINEL } from '../../../constants.js';
+import { providerKey, notifyProviderSettingsChanged, PROVIDER_CONFIGURED_MARKER } from '../../../constants.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { saveProviderKey } from '../../../api/providers.js';
 import { t } from '../../../strings/index.js';
 
-export { API_KEY_CONFIGURED_SENTINEL };
+export { PROVIDER_CONFIGURED_MARKER };
 
 const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base', 'cmd-path'];
 const DEFAULTS = {
@@ -32,7 +32,7 @@ export function loadProviderState(providerId, overrides, storage = localStorage)
   const state = {};
   for (const key of SETTINGS) {
     let value = storage.getItem(providerKey(providerId, key));
-    if (key === 'api-key' && value === API_KEY_CONFIGURED_SENTINEL) {
+    if (key === 'api-key' && value === PROVIDER_CONFIGURED_MARKER) {
       // The sentinel means "the backend holds a key", not "here is a key".
       // Consumers of state['api-key'] (OmlxTab hands it straight to
       // getOmlxModels / testOmlxConcurrency as a real credential) would
@@ -75,7 +75,7 @@ export async function saveProviderApiKey(providerId, apiKey, storage = localStor
   try {
     const { stored } = await saveProviderKey(providerId, apiKey);
     if (!stored) throw new Error('Provider key was not stored');
-    storage.setItem(providerKey(providerId, 'api-key'), API_KEY_CONFIGURED_SENTINEL);
+    storage.setItem(providerKey(providerId, 'api-key'), PROVIDER_CONFIGURED_MARKER);
     return true;
   } catch (err) {
     console.warn('[useProviderSettings] Could not save provider API key:', err);

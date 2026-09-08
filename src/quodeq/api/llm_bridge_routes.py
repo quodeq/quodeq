@@ -224,11 +224,20 @@ def register_llm_bridge_routes(app: Flask) -> None:
             return jsonify({"error": "apiKey is required", "code": "MISSING_PARAM"}), 400
         try:
             stored, secure = _store_api_key(provider, api_key)
-        except ValueError as exc:
+        except ValueError:
             # Provider names are interpolated into `.quodeq.env` lines, so a
             # name with control characters is rejected outright rather than
             # being allowed to inject extra `export …` lines.
-            return jsonify({"error": str(exc), "code": "INVALID_PARAM"}), 400
+            #
+            # A fixed message, not str(exc): echoing exception text back to a
+            # client is the shape of an information-disclosure bug even when
+            # every reachable message here happens to be a constant today,
+            # and CodeQL flags it as one. Nothing is lost -- the only
+            # ValueError that reaches this handler already says exactly this.
+            return jsonify({
+                "error": "Provider name must contain only letters, digits, '-' and '_'",
+                "code": "INVALID_PARAM",
+            }), 400
         return jsonify({"stored": stored, "secure": secure})
 
     @app.get("/api/provider/key-status")
