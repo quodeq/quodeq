@@ -16,7 +16,9 @@
     "preview": "vite preview",
     "lint:strings": "node tools/check_strings.mjs",
     "lint:strings:update": "node tools/check_strings.mjs --update",
-    "lint:size": "eslint --no-inline-config -c eslint.size.config.js src && node tools/check_size_grandfather.mjs"
+    "lint:size": "eslint --no-inline-config -c eslint.size.config.js src && node tools/check_size_grandfather.mjs",
+    "lint:hygiene": "node tools/check_hygiene.mjs",
+    "lint:hygiene:update": "node tools/check_hygiene.mjs --update"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
