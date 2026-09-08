@@ -11,6 +11,7 @@ after ``FindingEnricher`` maps ``req`` to ``practice_id``.
 from __future__ import annotations
 
 import json
+import re
 from enum import Enum as _Enum
 
 from pydantic import BaseModel, Field
@@ -145,6 +146,14 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
             _extract_finding_dicts(item, sink, dropped)
 
 
+# Next JSON opener at or after a position. One search per hop keeps the walk
+# linear in len(raw_json): every search starts past the previous candidate, so
+# no stretch is scanned twice. Two separate str.find calls re-scanned up to the
+# far bracket after every failed decode, which went quadratic on output with
+# many stray openers.
+_JSON_OPENER_RE = re.compile(r"[\[{]")
+
+
 def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
     """Parse findings from raw (possibly malformed) model output.
 
@@ -164,14 +173,8 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
     findings: list[dict] = []
     dropped: list[dict] = []
     i = 0
-    n = len(raw_json)
-    while i < n:
-        brace = raw_json.find("{", i)
-        bracket = raw_json.find("[", i)
-        candidates = [c for c in (brace, bracket) if c >= 0]
-        if not candidates:
-            break
-        start = min(candidates)
+    while (opener := _JSON_OPENER_RE.search(raw_json, i)) is not None:
+        start = opener.start()
         try:
             node, end = decoder.raw_decode(raw_json, start)
         except json.JSONDecodeError:

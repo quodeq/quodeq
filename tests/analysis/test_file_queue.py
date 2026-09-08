@@ -125,6 +125,18 @@ class TestPersistence:
         assert q2.remaining() == 1
         assert q2.taken_log() == []
 
+    def test_on_disk_format_after_takes(self, tmp_path: Path) -> None:
+        # Other processes read this JSON directly: pending must stay a plain
+        # list of the not-yet-taken files, in order, with each batch logged.
+        qp = tmp_path / "q.json"
+        q = FileQueue(qp, SAMPLE_FILES)
+        q.take(7, agent_id="a")
+        q.take(7, agent_id="b")
+        state = json.loads(qp.read_text())
+        assert state["pending"] == SAMPLE_FILES[14:]
+        assert [e["files"] for e in state["taken"]] == [SAMPLE_FILES[:7], SAMPLE_FILES[7:14]]
+        assert state["agent_totals"] == {"a": 7, "b": 7}
+
 
 class TestCorruptionHandling:
     def test_corrupted_json_raises(self, tmp_path: Path) -> None:

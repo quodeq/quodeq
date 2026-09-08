@@ -6,11 +6,13 @@ tests/analysis/_manifest_fixtures.py.
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
 
 from quodeq.analysis.manifest import build_manifest
+from quodeq.analysis.manifest_build_scope import _deepest_scope, _scope_resolver
 
 from tests.analysis._manifest_fixtures import detection  # noqa: F401 -- pytest fixture
 
@@ -18,6 +20,54 @@ from tests.analysis._manifest_fixtures import detection  # noqa: F401 -- pytest 
 def _write(p: Path, body: str = "") -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(body)
+
+
+def _reference_deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
+    """The original linear scan, kept as the oracle for the indexed lookup."""
+    best, best_depth = None, -1
+    for scope in scope_paths:
+        if scope == ".":
+            depth = 0
+        else:
+            if rel_path != scope and not rel_path.startswith(scope + "/"):
+                continue
+            depth = scope.count("/") + 1
+        if depth > best_depth:
+            best, best_depth = scope, depth
+    return best
+
+
+@pytest.mark.parametrize("scopes", [
+    ["apps/web", "services/api"],
+    ["apps/web", "services/api", "."],
+    ["apps", "apps/web", "apps/web/src", "."],
+    ["app", "."],            # sibling-prefix trap: "app" must not own "apple/x.py"
+    ["services/api/x.py"],   # a scope equal to a file path still owns that file
+    [],
+])
+def test_scope_resolver_matches_linear_scan(scopes: list[str]) -> None:
+    rels = [
+        "apps/web/src/a.js", "apps/web/b.js", "apps/mobile/c.kt", "apps/x.py",
+        "services/api/x.py", "services/api/deep/y.py", "services/z.py",
+        "apple/x.py", "app/y.py", "README.md", "top.py",
+    ]
+    resolve = _scope_resolver(scopes)
+    for rel in rels:
+        expected = _reference_deepest_scope(rel, scopes)
+        assert resolve(rel) == expected, (rel, scopes)
+        assert _deepest_scope(rel, scopes) == expected, (rel, scopes)
+
+
+def test_scope_resolver_cost_independent_of_scope_count() -> None:
+    """Per-file lookup climbs the path's ancestors instead of scanning every scope."""
+    scopes = [f"pkg{i}/mod{i % 7}" for i in range(2000)] + ["."]
+    rels = [f"pkg{i % 2000}/mod{i % 7}/sub/f{i}.py" for i in range(20_000)]
+    resolve = _scope_resolver(scopes)
+    t0 = time.perf_counter()
+    owners = [resolve(r) for r in rels]
+    elapsed = time.perf_counter() - t0
+    assert owners[:2] == ["pkg0/mod0", "pkg1/mod1"]
+    assert elapsed < 5.0, f"20k lookups over 2k scopes took {elapsed:.2f}s (budget 5s; the old linear scan needed >10s)"
 
 
 def test_build_monorepo_partitions_files_by_subproject(

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from quodeq.api import security as _security
 from quodeq.api.app import create_app
 
 # Alt-port origins probed by useServerHealth.js (DEFAULT_ALT_PORTS = [4180..4183]).
@@ -62,6 +63,17 @@ def test_csp_allows_google_fonts(csp):
     """CSP must allow Google Fonts (used by the dashboard) to avoid breaking the UI."""
     assert "fonts.googleapis.com" in csp
     assert "fonts.gstatic.com" in csp
+
+
+def test_alt_port_origins_built_once_as_module_constant(csp):
+    """The alt-port list depends on no request data, so it is built at import
+    and interpolated per response rather than re-joined in after_request."""
+    constant = _security._ALT_PORT_ORIGINS
+    assert isinstance(constant, str)
+    tokens = constant.split()
+    for origin in _ALT_PORT_ORIGINS + _WS_ALT_PORT_ORIGINS:
+        assert origin in tokens
+    assert constant in _directive(csp, "connect-src")
 
 
 def test_csp_connect_src_includes_alt_port_origins(csp):

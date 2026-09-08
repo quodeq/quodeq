@@ -9,6 +9,7 @@ model per process). All failures raise; callers own graceful degradation.
 from __future__ import annotations
 
 import threading
+from collections import OrderedDict
 from typing import Any, Callable, Sequence
 
 import httpx
@@ -78,23 +79,35 @@ def embed_texts(
 
 
 class EmbeddingAvailabilityCache:
-    """Lock-guarded per-process cache of (model, base_url) -> availability.
+    """Lock-guarded per-process LRU of (model, base_url) -> availability.
 
-    Instantiable so tests get isolated caches; production shares the
-    module-default instance below.
+    Bounded so a caller cycling through base URLs (misconfiguration, or a
+    bug) cannot grow it for the process lifetime. Real deployments touch a
+    handful of keys, so the default capacity is never reached and behaves
+    like the plain dict it replaces. Instantiable so tests get isolated
+    caches; production shares the module-default instance below.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_entries: int = 64) -> None:
+        if max_entries < 1:
+            raise ValueError("max_entries must be >= 1")
         self._lock = threading.Lock()
-        self._cache: dict[tuple[str, str], bool] = {}
+        self._max_entries = max_entries
+        self._cache: OrderedDict[tuple[str, str], bool] = OrderedDict()
 
     def get(self, key: tuple[str, str]) -> bool | None:
         with self._lock:
-            return self._cache.get(key)
+            value = self._cache.get(key)
+            if value is not None:
+                self._cache.move_to_end(key)
+            return value
 
     def set(self, key: tuple[str, str], value: bool) -> None:
         with self._lock:
             self._cache[key] = value
+            self._cache.move_to_end(key)
+            while len(self._cache) > self._max_entries:
+                self._cache.popitem(last=False)
 
     def clear(self) -> None:
         with self._lock:

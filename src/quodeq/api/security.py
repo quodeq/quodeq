@@ -50,6 +50,17 @@ _WEBVIEW_UA_MARKER = "QuodeqDesktop"
 # hypothetical.
 _VALID_HOST_RE = re.compile(r"^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d+)?$")
 
+# connect-src alt-port origins probed by useServerHealth (DEFAULT_ALT_PORTS =
+# [4180, 4181, 4182, 4183] in useServerHealth.js). CSP has no port wildcard so
+# each origin is enumerated explicitly. Loopback addresses only, so cross-site
+# exfil to external attackers is still blocked. Depends on no request data, so
+# it is built once here instead of on every response.
+_ALT_PORT_ORIGINS = " ".join(
+    f"http://127.0.0.1:{p} http://localhost:{p} "
+    f"ws://127.0.0.1:{p} ws://localhost:{p}"
+    for p in (4180, 4181, 4182, 4183)
+)
+
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     """Verify API key authentication when *api_key* is set.
@@ -145,28 +156,16 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
     def _add_security_headers(response: Response) -> Response:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        # connect-src: include alt-port origins probed by useServerHealth
-        # (DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183] in useServerHealth.js).
-        # CSP has no port wildcard so each origin is enumerated explicitly.
-        # These are loopback addresses only — cross-site exfil to external
-        # attackers is still blocked.
-        _alt_port_origins = " ".join(
-            f"http://127.0.0.1:{p} http://localhost:{p} "
-            f"ws://127.0.0.1:{p} ws://localhost:{p}"
-            for p in (4180, 4181, 4182, 4183)
-        )
         # The primary bind port isn't known here; add same-origin ws explicitly.
-        _self_ws = ""
         try:
-            from flask import request as _req
-            _self_ws = _same_origin_ws_sources(_req.host)
+            self_ws = _same_origin_ws_sources(request.host)
         except Exception:
-            _self_ws = ""
+            self_ws = ""
         is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"connect-src 'self' {_alt_port_origins} {_self_ws}; "
+            f"connect-src 'self' {_ALT_PORT_ORIGINS} {self_ws}; "
             f"{script_src}; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "

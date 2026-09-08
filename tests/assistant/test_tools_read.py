@@ -209,6 +209,21 @@ def test_get_violations_respects_limit(ctx):
     assert out["result"]["by_principle"] == {"P1": 2, "P2": 1}
 
 
+def test_get_violations_page_keeps_severity_order_and_stable_ties(ctx, monkeypatch):
+    """The page is the first `limit` of the severity-sorted list, ties in input
+    order, exactly as sorted()[:limit] gave before the top-k selection."""
+    from quodeq.assistant.tools import _read_tools_violations as rv
+    raw = [{"principle": "P", "file": f"src/f{i}.py", "line": i, "severity": "minor",
+            "title": "t", "reason": "r"} for i in range(10)]
+    raw.append({"principle": "P", "file": "src/crit.py", "line": 99, "severity": "critical",
+                "title": "t", "reason": "r"})
+    monkeypatch.setattr(rv, "_violations_from_run", lambda c, d: (raw, "security", []))
+    out = rv._get_violations(ctx, "security", limit=5)
+    assert [v["file"] for v in out["violations"]] == [
+        "src/crit.py", "src/f0.py", "src/f1.py", "src/f2.py", "src/f3.py"]
+    assert out["count"] == 11
+
+
 def test_get_violations_aggregates_across_dimensions_when_omitted(ctx):
     reg = build_registry(ctx)
     out = reg.dispatch("get_violations", {})
