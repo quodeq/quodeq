@@ -145,7 +145,10 @@ def test_file_store_check_and_record_does_not_record_when_limited(tmp_path: Path
     assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)
 
 
-def test_file_store_caches_within_ttl_window(tmp_path: Path):
+def test_record_and_check_cache_within_ttl_window(tmp_path: Path):
+    """record()/check() are not on the enforcement path and keep the old
+    TTL-cached behavior; check_and_record() no longer does (see the test
+    below) since it must reload fresh from disk under the OS lock."""
     from unittest.mock import patch
 
     store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
@@ -153,11 +156,28 @@ def test_file_store_caches_within_ttl_window(tmp_path: Path):
     with patch.object(store, "_load", wraps=store._load) as load_spy, \
          patch.object(store, "_save", wraps=store._save) as save_spy:
         for i in range(5):
-            limited = store.check_and_record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
-            assert limited is False
+            store.record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+        assert store.check("1.2.3.4", 1000.4) is False
 
     assert load_spy.call_count == 1, f"expected 1 load for 5 calls inside the TTL window, got {load_spy.call_count}"
     assert save_spy.call_count == 1, f"expected 1 save for 5 calls inside the TTL window, got {save_spy.call_count}"
+
+
+def test_check_and_record_bypasses_cache_and_reloads_every_call(tmp_path: Path):
+    """check_and_record() is the enforcement path: it must reload fresh from
+    disk every call rather than trust the TTL cache, even inside one TTL
+    window, since two processes could otherwise each act on their own stale
+    in-memory snapshot within the same lock-free window."""
+    from unittest.mock import patch
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy:
+        for i in range(5):
+            limited = store.check_and_record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+            assert limited is False
+
+    assert load_spy.call_count == 5
 
 
 def test_file_store_still_enforces_limit_within_a_single_ttl_window(tmp_path: Path):
@@ -183,6 +203,63 @@ def test_file_store_flushes_immediately_once_limited(tmp_path: Path):
     # after waiting out the cache TTL.
     store_b = FileRateLimitStore(path=path, window=60.0, max_requests=1)
     assert store_b.check("1.2.3.4", 1000.05) is True
+
+
+# ---------------------------------------------------------------------------
+# Cross-process locking for check_and_record()
+# ---------------------------------------------------------------------------
+
+def test_check_and_record_creates_lock_sidecar(tmp_path: Path):
+    path = tmp_path / "rl.json"
+    store = FileRateLimitStore(path=path, window=60.0, max_requests=5)
+    store.check_and_record("1.2.3.4", 1000.0)
+    assert (tmp_path / "rl.json.lock").exists()
+
+
+def test_check_and_record_serializes_across_store_instances(tmp_path: Path):
+    """Two FileRateLimitStore instances (simulating two worker processes)
+    racing check_and_record() for the same IP at the same time must never
+    let the combined allowed count exceed max_requests.
+
+    Each instance has its own threading.Lock and its own in-memory cache,
+    so nothing in-process serializes them against each other -- only the
+    cross-process OS lock on the .lock sidecar can. Before that fix, a
+    tight race lets both instances read "0 recorded" from disk and both
+    allow, overshooting the limit.
+    """
+    import threading
+
+    path = tmp_path / "rl.json"
+    max_requests = 5
+    n_threads = 40
+    store_a = FileRateLimitStore(path=path, window=60.0, max_requests=max_requests)
+    store_b = FileRateLimitStore(path=path, window=60.0, max_requests=max_requests)
+
+    barrier = threading.Barrier(n_threads)
+    allowed_count = 0
+    count_lock = threading.Lock()
+
+    def worker(store: FileRateLimitStore) -> None:
+        nonlocal allowed_count
+        barrier.wait()
+        limited = store.check_and_record("1.2.3.4", 1000.0)
+        if not limited:
+            with count_lock:
+                allowed_count += 1
+
+    threads = [
+        threading.Thread(target=worker, args=(store_a if i % 2 == 0 else store_b,))
+        for i in range(n_threads)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert allowed_count == max_requests, (
+        f"expected exactly {max_requests} allowed requests out of {n_threads} racing "
+        f"calls, got {allowed_count} -- the cross-process lock did not serialize the race"
+    )
 
 
 # ---------------------------------------------------------------------------

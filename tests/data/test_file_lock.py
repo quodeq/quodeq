@@ -11,12 +11,16 @@ import pytest
 def test_unix_lock_times_out_on_contention(tmp_path, monkeypatch, caplog) -> None:
     import fcntl
 
+    # quodeq.data._file_lock is a re-export shim; the implementation (and
+    # its timeout constants) now live in quodeq.core.utils._file_lock, so
+    # that's what must be patched for the patch to actually take effect.
+    from quodeq.core.utils import _file_lock as _file_lock_impl
     from quodeq.data import _file_lock
 
-    monkeypatch.setattr(_file_lock, "_WIN_LOCK_TIMEOUT_S", 0.2, raising=False)
+    monkeypatch.setattr(_file_lock_impl, "_WIN_LOCK_TIMEOUT_S", 0.2, raising=False)
     # The Unix path reads its own timeout constant; patch the module-level
     # constant the implementation will use (see Step 3) directly:
-    monkeypatch.setattr(_file_lock, "_UNIX_LOCK_TIMEOUT_S", 0.2, raising=False)
+    monkeypatch.setattr(_file_lock_impl, "_UNIX_LOCK_TIMEOUT_S", 0.2, raising=False)
 
     path = tmp_path / "lock"
     path.write_text("")

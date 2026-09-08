@@ -6,9 +6,12 @@ import logging
 import os
 import tempfile
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window, default_rate_limit_path
+from quodeq.core.utils._file_lock import lock_file, unlock_file
 
 _logger = logging.getLogger(__name__)
 
@@ -19,22 +22,20 @@ class FileRateLimitStore:
     """Rate-limit store backed by a JSON file, with a short in-memory cache.
 
     Lets the workers of a single-machine deployment share rate-limit state
-    through a common file without Redis. NOTE: the ``threading.Lock`` below
-    only serializes access within a SINGLE process; under multiple worker
-    processes the file read-modify-write can still interleave, so the counts
-    are best-effort (a concurrent burst may slip a few requests past the
-    limit) rather than strictly exact across processes. Not recommended for
-    high-throughput production use; add OS-level file locking
-    (``fcntl.flock``) if exact cross-process enforcement is required.
+    through a common file without Redis. The ``threading.Lock`` below only
+    serializes access within a SINGLE process; ``check_and_record()`` -- the
+    actual enforcement path -- additionally takes a cross-process OS file
+    lock (a ``.lock`` sidecar next to the data file, via ``_file_lock``) and
+    reloads fresh from disk inside it, so concurrent worker processes cannot
+    interleave the read-modify-write and cannot each act on a stale
+    in-memory snapshot. ``record()``/``check()`` are not on the enforcement
+    path and stay best-effort, cached, cross-process-racy by design.
 
-    The in-memory cache (TTL ``_CACHE_TTL_S``) further widens that same
-    best-effort window: another process's write may take up to
-    ``_CACHE_TTL_S`` seconds to become visible here, and an allowed request
-    recorded in-memory but not yet flushed to disk is lost if this process
-    is killed before the next flush. Once a client is actually rate-limited
-    that state is flushed immediately, so the "already limited" guarantee
-    stays durable right away -- only the common allowed-request path batches
-    disk writes.
+    The in-memory cache (TTL ``_CACHE_TTL_S``) still governs ``record()``/
+    ``check()``: another process's write may take up to ``_CACHE_TTL_S``
+    seconds to become visible there, and an allowed request recorded
+    in-memory but not yet flushed to disk is lost if this process is killed
+    before the next flush.
     """
 
     _CACHE_TTL_S = 1.0
@@ -146,22 +147,45 @@ class FileRateLimitStore:
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
             return len(timestamps) >= self._max_requests
 
+    @contextmanager
+    def _cross_process_lock(self) -> Iterator[None]:
+        """Hold an exclusive OS lock on the ``.lock`` sidecar next to the
+        data file. Locking the sidecar rather than the data file itself
+        matters because _save() replaces the data file via os.replace() on
+        every write, which would orphan a lock held on the old inode."""
+        lock_path = self._path.with_suffix(self._path.suffix + ".lock")
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError:
+            _logger.warning("Failed to create rate-limit dir %s", lock_path.parent)
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+        try:
+            lock_file(fd)
+            yield
+        finally:
+            unlock_file(fd)
+            os.close(fd)
+
     def check_and_record(self, ip: str, now: float) -> bool:
-        """Same contract as check()+record(), but one cache read + at most
-        one disk round trip (fewer when the cache is warm)."""
+        """Same contract as check()+record(). This is the enforcement path,
+        so it takes the cross-process OS lock and reloads fresh from disk
+        for its decision instead of trusting the TTL cache -- a cached read
+        would let two processes each act on their own stale snapshot within
+        the same lock-free TTL window, even under a perfect file lock."""
         if not ip:
             return False
-        with self._lock:
-            data = self._cache_for(now)
+        with self._lock, self._cross_process_lock():
+            data = self._load()
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
-            if len(timestamps) >= self._max_requests:
-                return True
-            timestamps.append(now)
-            data[ip] = timestamps
-            self._dirty = True
-            # Force-flush the moment this IP becomes rate-limited so the
-            # "limited" state is durable across processes right away; the
-            # still-allowed path only flushes once the TTL elapses.
-            just_limited = len(timestamps) >= self._max_requests
-            self._flush(now, force=just_limited)
-            return False
+            limited = len(timestamps) >= self._max_requests
+            if not limited:
+                timestamps.append(now)
+                data[ip] = timestamps
+                self._save(data)
+                self._last_flush = now
+                self._dirty = False
+            # Keep this process's fast path (record()/check()) warm with the
+            # state we just confirmed on disk, win or lose.
+            self._cache = data
+            self._cache_loaded_at = now
+            return limited
