@@ -222,7 +222,13 @@ def register_llm_bridge_routes(app: Flask) -> None:
             return jsonify({"error": "provider is required", "code": "MISSING_PARAM"}), 400
         if not api_key or not isinstance(api_key, str):
             return jsonify({"error": "apiKey is required", "code": "MISSING_PARAM"}), 400
-        stored, secure = _store_api_key(provider, api_key)
+        try:
+            stored, secure = _store_api_key(provider, api_key)
+        except ValueError as exc:
+            # Provider names are interpolated into `.quodeq.env` lines, so a
+            # name with control characters is rejected outright rather than
+            # being allowed to inject extra `export …` lines.
+            return jsonify({"error": str(exc), "code": "INVALID_PARAM"}), 400
         return jsonify({"stored": stored, "secure": secure})
 
     @app.get("/api/provider/key-status")

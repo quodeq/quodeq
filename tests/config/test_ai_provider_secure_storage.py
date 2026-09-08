@@ -76,6 +76,116 @@ class TestStoreApiKeySecure:
         assert "export MYSTERY-PROVIDER_API_KEY=sk-mystery" in paths.env_file.read_text()
 
 
+@pytest.fixture()
+def no_keyring(monkeypatch):
+    """Force the cleartext fallback for both directions."""
+    def raise_set(service, provider, key):
+        raise keyring.errors.KeyringError("no backend")
+
+    def raise_get(service, provider):
+        raise keyring.errors.KeyringError("no backend")
+
+    monkeypatch.setattr(ai_provider.keyring, "set_password", raise_set)
+    monkeypatch.setattr(ai_provider.keyring, "get_password", raise_get)
+
+
+class TestCleartextFallbackPreservesExistingContent:
+    """Regression: _build_env_lines rebuilt .quodeq.env from a fixed template
+    on every call, so saving one provider's key wiped every other provider's
+    key and silently reset AI_PROVIDER to whichever provider was saved."""
+
+    def test_second_provider_save_keeps_first_providers_key(self, paths, no_keyring):
+        assert store_api_key_secure("claude", "sk-anthropic") is True
+        assert store_api_key_secure("gemini", "sk-gemini") is True
+
+        content = paths.env_file.read_text()
+        assert "export ANTHROPIC_API_KEY=sk-anthropic" in content
+        assert "export GEMINI_API_KEY=sk-gemini" in content
+        assert get_api_key_secure("claude") == "sk-anthropic"
+        assert get_api_key_secure("gemini") == "sk-gemini"
+
+    def test_key_save_never_switches_the_active_provider(self, paths, no_keyring):
+        ai_provider.configure_provider_noninteractive("codex", paths)
+        assert ai_provider.get_current_provider(paths) == "codex"
+
+        store_api_key_secure("claude", "sk-anthropic")
+        store_api_key_secure("gemini", "sk-gemini")
+
+        assert ai_provider.get_current_provider(paths) == "codex"
+        assert "export AI_PROVIDER=gemini" not in paths.env_file.read_text()
+
+    def test_resaving_a_provider_replaces_rather_than_duplicates(self, paths, no_keyring):
+        store_api_key_secure("claude", "sk-old")
+        store_api_key_secure("claude", "sk-new")
+
+        content = paths.env_file.read_text()
+        assert "sk-old" not in content
+        assert content.count("export ANTHROPIC_API_KEY=") == 1
+        assert get_api_key_secure("claude") == "sk-new"
+
+    def test_provider_switch_keeps_stored_keys(self, paths, no_keyring):
+        store_api_key_secure("claude", "sk-anthropic")
+        ai_provider.configure_provider_noninteractive("gemini", paths)
+
+        assert ai_provider.get_current_provider(paths) == "gemini"
+        assert get_api_key_secure("claude") == "sk-anthropic"
+
+    def test_env_file_stays_owner_only_after_a_merge(self, paths, no_keyring):
+        store_api_key_secure("claude", "sk-anthropic")
+        store_api_key_secure("gemini", "sk-gemini")
+        assert paths.env_file.stat().st_mode & 0o777 == 0o600
+
+
+class TestProviderNameValidation:
+    """Regression: _API_KEY_FORBIDDEN_CHARS was checked against the api key
+    only, while the client-controlled provider name was interpolated into two
+    `export …` lines. A newline there injects env vars that _env_loader then
+    pushes into os.environ."""
+
+    @pytest.mark.parametrize("provider", [
+        "gemini\nexport EVIL=1",
+        "gemini\rexport EVIL=1",
+        "gemini\0",
+        "gem ini",
+        "gemini;rm -rf /",
+        "",
+    ])
+    def test_rejects_non_identifier_provider_names(self, paths, no_keyring, provider):
+        with pytest.raises(ValueError):
+            ai_provider._store_api_key(provider, "sk-injected")
+        assert not paths.env_file.exists()
+
+    def test_rejection_happens_before_the_keyring_is_touched(self, paths, monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            ai_provider.keyring, "set_password",
+            lambda *a: calls.append(a),
+        )
+        with pytest.raises(ValueError):
+            ai_provider._store_api_key("gemini\nexport EVIL=1", "sk-injected")
+        assert calls == []
+
+    def test_injection_attempt_leaves_an_existing_file_untouched(self, paths, no_keyring):
+        store_api_key_secure("claude", "sk-anthropic")
+        before = paths.env_file.read_text()
+        with pytest.raises(ValueError):
+            ai_provider._store_api_key("x\nexport EVIL=1", "sk-injected")
+        assert paths.env_file.read_text() == before
+
+    def test_provider_without_an_api_key_var_is_rejected_cleanly(self, paths, no_keyring):
+        """PROVIDERS maps ollama to "", which would write `export =<key>`."""
+        assert ai_provider._api_key_var_for("ollama") == ""
+        stored, secure = ai_provider._store_api_key("ollama", "sk-nowhere")
+        assert (stored, secure) == (False, False)
+        assert not paths.env_file.exists()
+
+    def test_configure_provider_noninteractive_still_writes_keyless_providers(self, paths):
+        assert ai_provider.configure_provider_noninteractive("ollama", paths) == 0
+        content = paths.env_file.read_text()
+        assert "export AI_PROVIDER=ollama" in content
+        assert "export =" not in content
+
+
 class TestGetApiKeySecure:
     def test_returns_keyring_value_when_present(self, paths, monkeypatch):
         monkeypatch.setattr(ai_provider.keyring, "get_password", lambda service, provider: "sk-from-keyring")

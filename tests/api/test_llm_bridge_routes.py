@@ -374,3 +374,31 @@ class TestProviderKeyRoutes:
 
         # The raw key must never leak back through key-status.
         assert "sk-roundtrip" not in status_resp.get_data(as_text=True)
+
+    def test_provider_name_with_newline_is_rejected_before_the_env_file(
+        self, client, tmp_path, monkeypatch,
+    ):
+        """Regression: the provider name is interpolated into `export …` lines
+        in .quodeq.env, which _env_loader loads into os.environ. A newline in
+        it injected arbitrary env vars into the running process."""
+        import keyring.errors
+
+        from quodeq.config import ai_provider
+        from quodeq.config.paths import ConfigPaths
+
+        cfg_paths = ConfigPaths.from_root(tmp_path)
+        monkeypatch.setattr(ai_provider, "default_paths", lambda: cfg_paths)
+        monkeypatch.setattr(
+            ai_provider.keyring, "set_password",
+            lambda *a: (_ for _ in ()).throw(keyring.errors.KeyringError("no backend")),
+        )
+
+        resp = client.post(
+            "/api/provider/key",
+            json={"provider": "gemini\nexport EVIL=pwned", "apiKey": "sk-x"},
+            headers={"Origin": "http://localhost"},
+        )
+
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+        assert not cfg_paths.env_file.exists()
