@@ -3,12 +3,19 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useHistoryRunLive } from './useHistoryRunLive.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { MockEventSource } from '../../../test-utils/MockEventSource.js';
+import { getEvaluationProgress } from '../../../api/index.js';
+
+vi.mock('../../../api/index.js', () => ({
+  getEvaluationProgress: vi.fn(() => Promise.resolve({ dimensions: [] })),
+}));
 
 describe('useHistoryRunLive', () => {
   beforeEach(() => {
     global.EventSource = MockEventSource;
     MockEventSource.last = null;
     vi.stubEnv('VITE_USE_SSE_EVENTS', 'true');
+    getEvaluationProgress.mockReset();
+    getEvaluationProgress.mockResolvedValue({ dimensions: [] });
   });
 
   it('returns empty defaults when no events have arrived', () => {
@@ -76,5 +83,40 @@ describe('useHistoryRunLive', () => {
     expect(MockEventSource.last).toBeNull();
     expect(result.current.liveDims).toEqual({});
     expect(result.current.plannedDimensions).toEqual([]);
+  });
+
+  it('hasScoredDimension becomes true from the progress poll even with SSE off', async () => {
+    vi.stubEnv('VITE_USE_SSE_EVENTS', 'false');
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [
+        { id: 'security', state: 'done' },
+        { id: 'performance', state: 'running' },
+      ],
+    });
+    const wrapper = withQueryClient();
+    const { result } = renderHook(() => useHistoryRunLive('run-polled'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.hasScoredDimension).toBe(true);
+    });
+    expect(getEvaluationProgress).toHaveBeenCalledWith('run-polled');
+  });
+
+  it('hasScoredDimension stays false while no dimension has finished', async () => {
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ id: 'security', state: 'running' }],
+    });
+    const wrapper = withQueryClient();
+    const { result } = renderHook(() => useHistoryRunLive('run-inflight'), { wrapper });
+    await waitFor(() => {
+      expect(getEvaluationProgress).toHaveBeenCalled();
+    });
+    expect(result.current.hasScoredDimension).toBe(false);
+  });
+
+  it('hasScoredDimension is false and no poll fires when runId is empty', () => {
+    const wrapper = withQueryClient();
+    const { result } = renderHook(() => useHistoryRunLive(''), { wrapper });
+    expect(result.current.hasScoredDimension).toBe(false);
+    expect(getEvaluationProgress).not.toHaveBeenCalled();
   });
 });
