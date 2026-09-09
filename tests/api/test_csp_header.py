@@ -1,26 +1,17 @@
-"""CSP header hardening regression tests (held security fix #40)."""
+"""CSP header hardening regression tests (held security fix #40).
+
+Base directive coverage. Split when this file crossed the 300-line cap: the
+webview-token relaxation now lives in test_csp_webview_token.py and the
+Host-header validation in test_csp_host_header.py, with the shared request
+helpers in _csp_helpers.py.
+"""
 from __future__ import annotations
 
 import pytest
 
-from quodeq.api import security as _security
+from quodeq.api import security
 from quodeq.api.app import create_app
-
-# Alt-port origins probed by useServerHealth.js (DEFAULT_ALT_PORTS = [4180..4183]).
-_ALT_PORT_ORIGINS = [
-    f"http://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
-] + [
-    f"http://localhost:{p}" for p in (4180, 4181, 4182, 4183)
-]
-
-# ws:// alt-port origins for the terminal WebSocket (Task 5). WebKit/pywebview
-# enforces CSP against the WebSocket handshake scheme, so http:// alone does
-# not cover it — each alt port needs an explicit ws:// entry too.
-_WS_ALT_PORT_ORIGINS = [
-    f"ws://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
-] + [
-    f"ws://localhost:{p}" for p in (4180, 4181, 4182, 4183)
-]
+from tests.api._csp_helpers import _ALT_PORT_ORIGINS, _WS_ALT_PORT_ORIGINS, _directive
 
 
 @pytest.fixture(scope="module")
@@ -29,15 +20,6 @@ def csp():
     with app.test_client() as client:
         resp = client.get("/api/health")
         return resp.headers["Content-Security-Policy"]
-
-
-def _directive(csp: str, name: str) -> str | None:
-    """Return the first CSP directive whose keyword exactly equals *name*."""
-    for d in csp.split(";"):
-        parts = d.strip().split()
-        if parts and parts[0] == name:
-            return d.strip()
-    return None
 
 
 def test_csp_restricts_egress(csp):
@@ -68,7 +50,7 @@ def test_csp_allows_google_fonts(csp):
 def test_alt_port_origins_built_once_as_module_constant(csp):
     """The alt-port list depends on no request data, so it is built at import
     and interpolated per response rather than re-joined in after_request."""
-    constant = _security._ALT_PORT_ORIGINS
+    constant = security._ALT_PORT_ORIGINS
     assert isinstance(constant, str)
     tokens = constant.split()
     for origin in _ALT_PORT_ORIGINS + _WS_ALT_PORT_ORIGINS:
@@ -141,107 +123,3 @@ def test_csp_mask_src_allows_data_uris(csp):
     mask_src = _directive(csp, "mask-src")
     assert mask_src is not None, "mask-src must be present in CSP"
     assert "data:" in mask_src, "mask-src must include data: to allow inline SVG masks"
-
-
-# --- Webview-only unsafe-eval relaxation (UA-gated) -------------------------
-
-_WEBVIEW_UA = "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) QuodeqDesktop/1.4.0 Safari/605.1.15"
-
-
-def _csp_for_ua(ua: str | None) -> str:
-    app = create_app()
-    with app.test_client() as client:
-        headers = {"User-Agent": ua} if ua is not None else {}
-        return client.get("/api/health", headers=headers).headers["Content-Security-Policy"]
-
-
-def test_webview_ua_gets_unsafe_eval_in_script_src():
-    """The native webview UA must be served script-src with 'unsafe-eval' so
-    pywebview's new Function() bridge works under the otherwise-strict CSP."""
-    script_src = _directive(_csp_for_ua(_WEBVIEW_UA), "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" in script_src
-
-
-def test_non_webview_ua_stays_strict():
-    """Any non-webview UA keeps the strict script-src (no unsafe-eval)."""
-    script_src = _directive(_csp_for_ua("Mozilla/5.0 (a regular browser)"), "script-src")
-    assert script_src is not None
-    assert "'unsafe-eval'" not in script_src
-
-
-# --- Host header validation before CSP interpolation (Task 9) --------------
-
-
-def _csp_for_host(host: str) -> str:
-    app = create_app()
-    with app.test_client() as client:
-        return client.get(
-            "/api/health", headers={"Host": host}
-        ).headers["Content-Security-Policy"]
-
-
-def test_csp_same_origin_ws_uses_valid_host():
-    """A well-formed Host header still gets an explicit same-origin ws/wss entry."""
-    connect_src = _directive(_csp_for_host("example.com:8080"), "connect-src")
-    assert connect_src is not None
-    tokens = connect_src.split()
-    assert "ws://example.com:8080" in tokens
-    assert "wss://example.com:8080" in tokens
-
-
-def test_csp_omits_same_origin_ws_for_malicious_host_header():
-    """A malicious Host header must not be interpolated raw into the CSP.
-
-    Regression for the finding: connect-src was built from the raw,
-    unvalidated Host header, so a Host containing a quote/space could inject
-    extra CSP sources or directives. Invalid hosts must have the same-origin
-    ws:/wss: entry omitted entirely rather than reflected into the header.
-    """
-    malicious_host = 'evil.example" ws://attacker.evil'
-    csp = _csp_for_host(malicious_host)
-
-    # The raw malicious host must never appear verbatim in the header.
-    assert malicious_host not in csp
-    assert '"' not in csp
-    assert "attacker.evil" not in csp
-
-    connect_src = _directive(csp, "connect-src")
-    assert connect_src is not None
-    # Same-origin ws/wss entries for the bogus host must be absent.
-    assert "evil.example" not in connect_src
-    # The rest of connect-src (alt-port origins) must still be present —
-    # omission of the same-origin entry must not break the whole directive.
-    assert "'self'" in connect_src
-    for origin in _ALT_PORT_ORIGINS:
-        assert origin in connect_src
-
-
-def test_csp_same_origin_ws_uses_bracketed_ipv6_host_with_port():
-    """A bracketed IPv6-literal Host header (RFC 3986 syntax) with a port
-    still gets an explicit same-origin ws/wss entry.
-
-    ::1 is a first-class local address elsewhere in this app
-    (_LOCALHOST_ADDRS, dashboard/_networking.py's _DEFAULT_LOCAL_HOSTS,
-    dashboard/_webview_window_native_ops.py's reload allowlist), so a
-    client reaching the dashboard over IPv6 loopback is a real access
-    path — the same-origin entry must not be silently dropped for it.
-    """
-    connect_src = _directive(_csp_for_host("[::1]:4180"), "connect-src")
-    assert connect_src is not None
-    tokens = connect_src.split()
-    assert "ws://[::1]:4180" in tokens
-    assert "wss://[::1]:4180" in tokens
-
-
-def test_csp_same_origin_ws_uses_bracketed_ipv6_host_without_port():
-    """A bracketed IPv6-literal Host header with no port also validates.
-
-    Werkzeug/Flask preserve the Host header verbatim on request.host, so a
-    bare "[::1]" (no ":port") is a value it can actually take.
-    """
-    connect_src = _directive(_csp_for_host("[::1]"), "connect-src")
-    assert connect_src is not None
-    tokens = connect_src.split()
-    assert "ws://[::1]" in tokens
-    assert "wss://[::1]" in tokens

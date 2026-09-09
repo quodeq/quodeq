@@ -1,9 +1,14 @@
 """Tests for the reload URL guard that restricts webview navigation to localhost."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from quodeq.dashboard._webview_window import _is_safe_reload_url, _make_on_reload
+from quodeq.dashboard._webview_window import (
+    _download_via_dialog,
+    _is_safe_reload_url,
+    _make_on_reload,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -103,3 +108,92 @@ class TestOnReloadGuard:
         window.get_current_url.return_value = "http://evil.example.com/"
         on_reload("")
         window.load_url.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _download_via_dialog URL validation
+# ---------------------------------------------------------------------------
+
+
+class TestDownloadViaDialogUrlValidation:
+    """Verify that _download_via_dialog validates joined URLs against the allowlist."""
+
+    def _make_window_and_dialog(self, save_path: str) -> MagicMock:
+        """Create a mock window with a configured save dialog."""
+        window = MagicMock()
+        window.create_file_dialog.return_value = save_path
+        return window
+
+    def test_download_normal_relative_path_accepted(self, tmp_path):
+        """A normal relative path that joins to a safe URL should succeed."""
+        window = self._make_window_and_dialog(str(tmp_path / "output.txt"))
+        base_url = "http://127.0.0.1:7863"
+        path = "/api/export/results"
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response = MagicMock()
+            mock_response.read.return_value = b"test data"
+            mock_response.__enter__.return_value = mock_response
+            mock_response.__exit__.return_value = False
+            mock_urlopen.return_value = mock_response
+
+            result = _download_via_dialog(window, base_url, path, "output.txt")
+
+        assert result is True
+        mock_urlopen.assert_called_once()
+        called_url = mock_urlopen.call_args[0][0]
+        assert called_url == "http://127.0.0.1:7863/api/export/results"
+
+    def test_download_path_with_network_scheme_rejected(self, tmp_path):
+        """A path starting with // (network scheme) should be rejected."""
+        window = self._make_window_and_dialog(str(tmp_path / "output.txt"))
+        base_url = "http://127.0.0.1:7863"
+        path = "//evil.example.com/steal-data"
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            result = _download_via_dialog(window, base_url, path, "output.txt")
+
+        assert result is False
+        mock_urlopen.assert_not_called()
+
+    def test_download_path_with_absolute_scheme_rejected(self, tmp_path):
+        """A path with an absolute scheme should be rejected."""
+        window = self._make_window_and_dialog(str(tmp_path / "output.txt"))
+        base_url = "http://127.0.0.1:7863"
+        path = "https://evil.example.com/steal-data"
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            result = _download_via_dialog(window, base_url, path, "output.txt")
+
+        assert result is False
+        mock_urlopen.assert_not_called()
+
+    def test_download_file_scheme_rejected(self, tmp_path):
+        """A file:// scheme in the path should be rejected."""
+        window = self._make_window_and_dialog(str(tmp_path / "output.txt"))
+        base_url = "http://127.0.0.1:7863/api/"
+        path = "file:///etc/passwd"
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            result = _download_via_dialog(window, base_url, path, "output.txt")
+
+        assert result is False
+        mock_urlopen.assert_not_called()
+
+    def test_download_localhost_path_accepted(self, tmp_path):
+        """A relative path joining to localhost should succeed."""
+        window = self._make_window_and_dialog(str(tmp_path / "output.txt"))
+        base_url = "http://localhost:7863"
+        path = "/api/results.json"
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response = MagicMock()
+            mock_response.read.return_value = b"test data"
+            mock_response.__enter__.return_value = mock_response
+            mock_response.__exit__.return_value = False
+            mock_urlopen.return_value = mock_response
+
+            result = _download_via_dialog(window, base_url, path, "output.json")
+
+        assert result is True
+        mock_urlopen.assert_called_once()

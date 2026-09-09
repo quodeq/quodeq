@@ -12,6 +12,7 @@ from http import HTTPStatus
 from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
+from quodeq.config.ai_provider import get_api_key_secure
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.shared._repo import _looks_like_authority
@@ -221,11 +222,15 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     if scope_path is not None:
         # ValueError propagates to the route's 400 INVALID_INPUT handler.
         validate_relative_scope(str(scope_path))
+    ai_cmd = payload.get("aiCmd") or None
+    provider_api_key = str(payload.get("apiKey") or "")
+    if not provider_api_key and ai_cmd:
+        provider_api_key = get_api_key_secure(ai_cmd) or ""
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
         numerical=bool(payload.get("numerical")),
-        ai_cmd=payload.get("aiCmd") or None,
+        ai_cmd=ai_cmd,
         ai_cmd_path=payload.get("aiCmdPath") or None,
         ai_model=ai_model,
         subagent_model=subagent_model,
@@ -237,7 +242,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
         branch=payload.get("branch") or None,
         scope_path=scope_path,
-        provider_api_key=str(payload.get("apiKey") or ""),
+        provider_api_key=provider_api_key,
         provider_api_base=str(payload.get("apiBase") or ""),
     )
 

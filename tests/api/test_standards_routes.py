@@ -1,5 +1,6 @@
 """Tests for Standards API read and write endpoints."""
 import json
+import sys
 from pathlib import Path
 import pytest
 from quodeq.api.app import create_app
@@ -138,3 +139,78 @@ def test_import_standard_with_warnings(client):
 def test_import_standard_missing_data(client):
     resp = client.post("/api/standards/import", json={}, headers={"Origin": "http://localhost"})
     assert resp.status_code == 400
+
+# Log sanitization tests
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the id is written into a filename on disk; \\n/\\r are invalid "
+    "path characters on Windows (unrelated to the log-sanitization behavior "
+    "under test here)",
+)
+def test_import_standard_log_sanitization_id_with_newlines(client, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    payload = {
+        "data": {
+            "id": "test-id\nFAKE_LOG_ENTRY",
+            "name": "Test",
+            "principles": [],
+        }
+    }
+    resp = client.post("/api/standards/import", json=payload, headers={"Origin": "http://localhost"})
+    assert resp.status_code == 201
+    for record in caplog.records:
+        msg = record.getMessage()
+        if "standards.import" in msg and "id=" in msg:
+            assert "\n" not in msg
+            assert "test-idFAKE_LOG_ENTRY" in msg
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the id is written into a filename on disk; \\n/\\r are invalid "
+    "path characters on Windows (unrelated to the log-sanitization behavior "
+    "under test here)",
+)
+def test_import_standard_log_sanitization_id_with_carriage_return(client, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    payload = {
+        "data": {
+            "id": "test-id\rFAKE_ENTRY",
+            "name": "Test",
+            "principles": [],
+        }
+    }
+    resp = client.post("/api/standards/import", json=payload, headers={"Origin": "http://localhost"})
+    assert resp.status_code == 201
+    for record in caplog.records:
+        msg = record.getMessage()
+        if "standards.import" in msg and "id=" in msg:
+            assert "\r" not in msg
+            assert "test-idFAKE_ENTRY" in msg
+
+def test_import_from_library_log_sanitization_file(dirs, caplog, monkeypatch):
+    from unittest.mock import MagicMock
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    mock_library = MagicMock()
+    mock_library.import_standard.return_value = None
+    def get_mock_library(app_instance):
+        return mock_library
+    monkeypatch.setattr("quodeq.api.standards_routes._get_library_client", get_mock_library)
+    app = create_app(test_config={
+        "TESTING": True,
+        "STANDARDS_EVALUATORS_DIR": str(dirs["evaluators"]),
+        "STANDARDS_COMPILED_DIR": str(dirs["compiled"]),
+        "STANDARDS_DIMENSIONS_FILE": str(dirs["dimensions"]),
+    })
+    with app.test_client() as c:
+        payload = {"file": "test-file\nFAKE_LOG_ENTRY\rCAR_RETURN"}
+        resp = c.post("/api/standards/library/import", json=payload, headers={"Origin": "http://localhost"})
+        assert resp.status_code == 201
+        for record in caplog.records:
+            msg = record.getMessage()
+            if "standards.import_from_library" in msg and "file=" in msg:
+                assert "\n" not in msg
+                assert "\r" not in msg
+                assert "test-fileFAKE_LOG_ENTRYCAR_RETURN" in msg

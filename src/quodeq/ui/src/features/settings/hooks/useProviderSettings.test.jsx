@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import useProviderSettings, { saveProviderSetting } from './useProviderSettings.js';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import useProviderSettings, { saveProviderSetting, saveProviderApiKey, loadProviderState, PROVIDER_CONFIGURED_MARKER } from './useProviderSettings.js';
+import { saveProviderKey } from '../../../api/providers.js';
 
 const showToast = vi.fn();
 vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
   useSidePane: () => ({ showToast }),
+}));
+
+vi.mock('../../../api/providers.js', () => ({
+  saveProviderKey: vi.fn(),
 }));
 
 describe('useProviderSettings', () => {
@@ -17,6 +22,7 @@ describe('useProviderSettings', () => {
       removeItem: vi.fn(),
     };
     showToast.mockClear();
+    saveProviderKey.mockReset();
   });
 
   afterEach(() => {
@@ -83,7 +89,7 @@ describe('useProviderSettings', () => {
     );
 
     act(() => {
-      result.current.update('api-key', 'secret');
+      result.current.update('model', 'llama3');
     });
 
     expect(warnSpy).toHaveBeenCalled();
@@ -128,6 +134,143 @@ describe('useProviderSettings', () => {
     });
 
     expect(showToast).not.toHaveBeenCalled();
+  });
+});
+
+describe('useProviderSettings api-key handling', () => {
+  let mockStorage;
+
+  beforeEach(() => {
+    mockStorage = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    showToast.mockClear();
+    saveProviderKey.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('update("api-key", value) calls the backend endpoint instead of storage.setItem with the raw value', async () => {
+    saveProviderKey.mockResolvedValue({ stored: true, secure: true });
+    const { result } = renderHook(() =>
+      useProviderSettings('openai', {}, { storage: mockStorage })
+    );
+
+    act(() => {
+      result.current.update('api-key', 'sk-super-secret');
+    });
+
+    expect(saveProviderKey).toHaveBeenCalledWith('openai', 'sk-super-secret');
+    await waitFor(() => {
+      expect(mockStorage.setItem).toHaveBeenCalled();
+    });
+    for (const call of mockStorage.setItem.mock.calls) {
+      expect(call[1]).not.toBe('sk-super-secret');
+    }
+  });
+
+  it('on success, stores the "configured" sentinel, never the raw key', async () => {
+    saveProviderKey.mockResolvedValue({ stored: true, secure: true });
+    const { result } = renderHook(() =>
+      useProviderSettings('openai', {}, { storage: mockStorage })
+    );
+
+    act(() => {
+      result.current.update('api-key', 'sk-super-secret');
+    });
+
+    await waitFor(() => {
+      expect(mockStorage.setItem).toHaveBeenCalledWith('cc-openai-api-key', PROVIDER_CONFIGURED_MARKER);
+    });
+    // The sentinel belongs in storage, not in live state: consumers of
+    // state['api-key'] (OmlxTab) send it to a provider as a real credential.
+    expect(result.current.state['api-key']).toBe('');
+  });
+
+  it('on backend failure (stored: false), warns and shows a toast without writing to storage', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    saveProviderKey.mockResolvedValue({ stored: false, secure: false });
+    const { result } = renderHook(() =>
+      useProviderSettings('openai', {}, { storage: mockStorage })
+    );
+
+    act(() => {
+      result.current.update('api-key', 'sk-super-secret');
+    });
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledTimes(1);
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(mockStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('on network/request failure, warns and shows a toast without writing to storage', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    saveProviderKey.mockRejectedValue(new Error('network error'));
+    const { result } = renderHook(() =>
+      useProviderSettings('openai', {}, { storage: mockStorage })
+    );
+
+    act(() => {
+      result.current.update('api-key', 'sk-super-secret');
+    });
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledTimes(1);
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(mockStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('saveProviderApiKey resolves false and never writes storage when the backend reports stored:false', async () => {
+    saveProviderKey.mockResolvedValue({ stored: false, secure: false });
+    const onPersistError = vi.fn();
+
+    const ok = await saveProviderApiKey('openai', 'sk-super-secret', mockStorage, { onPersistError });
+
+    expect(ok).toBe(false);
+    expect(onPersistError).toHaveBeenCalled();
+    expect(mockStorage.setItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadProviderState api-key handling', () => {
+  const storageWith = (values) => ({
+    getItem: vi.fn((key) => (key in values ? values[key] : null)),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  });
+
+  it('never returns the literal sentinel as state["api-key"]', () => {
+    // OmlxTab passes state['api-key'] straight into getOmlxModels and
+    // testOmlxConcurrency as a real credential, so the sentinel reaching
+    // state means '•configured•' gets sent to a provider as an API key.
+    const storage = storageWith({ 'cc-omlx-api-key': PROVIDER_CONFIGURED_MARKER });
+    const state = loadProviderState('omlx', {}, storage);
+    expect(state['api-key']).not.toBe(PROVIDER_CONFIGURED_MARKER);
+    expect(state['api-key']).toBe('');
+  });
+
+  it('still returns a genuine legacy raw value unchanged', () => {
+    const storage = storageWith({ 'cc-omlx-api-key': 'sk-legacy-raw-value' });
+    expect(loadProviderState('omlx', {}, storage)['api-key']).toBe('sk-legacy-raw-value');
+  });
+
+  it('falls back to the default when nothing is stored', () => {
+    expect(loadProviderState('omlx', {}, storageWith({}))['api-key']).toBe('');
+  });
+
+  it('the sentinel only masks api-key, not other settings', () => {
+    const storage = storageWith({
+      'cc-omlx-api-key': PROVIDER_CONFIGURED_MARKER,
+      'cc-omlx-model': 'gemma-3-4b',
+    });
+    expect(loadProviderState('omlx', {}, storage).model).toBe('gemma-3-4b');
   });
 });
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import _sanitize_for_log, error_response
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
             "Import from library failed. Check that the library server is reachable and the standard file is valid.",
             502, "import_error",
         )
-    logger.info("standards.import_from_library file=%s", file_path)
+    logger.info("standards.import_from_library file=%s", _sanitize_for_log(file_path))
     return jsonify({"status": "imported"}), 201
 
 
@@ -44,7 +44,7 @@ def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     if not data or not isinstance(data, dict):
         return error_response("'data' field is required and must be an object", 400, "bad_request")
     force = payload.get("force", False)
-    logger.info("standards.import id=%s", data.get("id", "<unknown>"))
+    logger.info("standards.import id=%s", _sanitize_for_log(str(data.get("id", "<unknown>"))))
     try:
         result = svc.import_from_file(data, force=force)
     except ValueError as exc:

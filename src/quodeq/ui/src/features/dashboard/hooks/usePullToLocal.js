@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { t } from '../../../strings/index.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 
 // Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
@@ -22,7 +22,7 @@ export function usePullToLocal({ shared, onProjectsReload }) {
       if (err?.status === 409) {
         setPullConflictId(id);
       } else {
-        showToast(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
+        showToast(apiErrorMessage(err, 'projects.pullFailed'));
       }
     }
   }
@@ -33,7 +33,7 @@ export function usePullToLocal({ shared, onProjectsReload }) {
       setPulledIds((prev) => new Set(prev).add(id));
       await onProjectsReload?.();
     } catch (err) {
-      showToast(t('projects.pullFailed', { message: err?.message || t('history.unknownError') }));
+      showToast(apiErrorMessage(err, 'projects.pullFailed'));
     } finally {
       setPullConflictId(null);
     }

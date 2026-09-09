@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import os
 import re
 import time
 from http import HTTPStatus
@@ -29,14 +30,66 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 
 # Marker substring in the native webview's User-Agent (set by
-# quodeq.dashboard._webview_window). Requests carrying it are the trusted
-# local desktop shell and are served 'unsafe-eval' so pywebview's
-# new Function() JS bridge works; browsers keep the strict script-src.
-# Loopback-only exposure: a local process could spoof this UA, but it
-# would already have local code execution. The literal MUST match
-# _webview_window._WEBVIEW_UA_MARKER (drift-guarded by
+# quodeq.dashboard._webview_window_about). Kept for human-readable UA
+# strings only — it's a fixed, publicly-known string, so it is NOT what
+# grants 'unsafe-eval' (see _is_trusted_webview below). The literal MUST
+# match _webview_window_about._WEBVIEW_UA_MARKER (drift-guarded by
 # tests/dashboard/test_native_chrome.py).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
+
+# Env var carrying the per-launch shared secret _server.py generates and
+# hands to the API subprocess (env) and the webview subprocess (argv), which
+# embeds it in its own UA. Requests whose UA carries the matching token are
+# the trusted local desktop shell and are served 'unsafe-eval' so pywebview's
+# new Function() JS bridge works; everyone else keeps the strict script-src.
+# Unset (e.g. the dashboard run standalone via `quodeq api`, not through the
+# desktop launcher) means the relaxation never fires.
+_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+
+# UA prefix the webview puts ahead of the token (see
+# _webview_window_about._webview_user_agent). Must match there.
+_WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
+
+
+def _webview_token_from_ua(user_agent: str) -> str | None:
+    idx = user_agent.find(_WEBVIEW_TOKEN_UA_PREFIX)
+    if idx == -1:
+        return None
+    rest = user_agent[idx + len(_WEBVIEW_TOKEN_UA_PREFIX):]
+    candidate = rest.split(" ", 1)[0]
+    if not candidate:
+        return None
+    # hmac.compare_digest raises TypeError on a non-ASCII str, and Werkzeug
+    # decodes request headers as latin-1, so any UA byte >= 0x80 inside the
+    # token would otherwise blow up _is_trusted_webview from inside the
+    # after_request hook -- turning every request into a 500 with none of
+    # the security headers set. The real token is secrets.token_urlsafe(),
+    # always ASCII, so a non-ASCII candidate can never be a match anyway:
+    # drop it here and fail closed like any other wrong token.
+    return candidate if candidate.isascii() else None
+
+
+def _is_trusted_webview(user_agent: str) -> bool:
+    """True only for a request carrying this launch's webview token.
+
+    Reads QUODEQ_WEBVIEW_TOKEN lazily (not at module load) so it reflects
+    whatever _server.py set in this process's environment before spawning
+    the API subprocess, and so standalone (non-desktop) runs that never set
+    it always fail closed here regardless of UA content.
+    """
+    expected = os.environ.get(_ENV_WEBVIEW_TOKEN)
+    # isascii() for the same reason _webview_token_from_ua guards the
+    # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
+    # and this one comes from the environment, which an operator can set by
+    # hand. _get_webview_token() only ever produces token_urlsafe() output,
+    # so a non-ASCII value here is a misconfiguration, not a match.
+    if not expected or not expected.isascii():
+        return False
+    candidate = _webview_token_from_ua(user_agent)
+    if not candidate:
+        return False
+    return hmac.compare_digest(candidate, expected)
+
 
 # Host header must look like a bare hostname/IPv4 or a bracketed IPv6
 # literal (RFC 3986 host syntax, e.g. "[::1]:4180"), with an optional port,
@@ -136,17 +189,16 @@ def _same_origin_ws_sources(host: str) -> str:
     return f"ws://{host} wss://{host}"
 
 
+def _actor(api_key: str | None) -> str:
+    if api_key:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer ") and len(auth) > 11:
+            return f" (actor=key:***{auth[-4:]})"
+    return ""
+
+
 def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
     """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
-
-    @app.before_request
-    def _audit_log() -> None:
-        actor = ""
-        if api_key:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer ") and len(auth) > 11:
-                actor = f" (actor=key:***{auth[-4:]})"
-        _logger.info("API: %s %s%s", request.method, request.path, actor)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -154,6 +206,9 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:
+        _logger.info(
+            "API: %s %s%s -> %d", request.method, request.path, _actor(api_key), response.status_code
+        )
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
         # The primary bind port isn't known here; add same-origin ws explicitly.
@@ -161,7 +216,7 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
             self_ws = _same_origin_ws_sources(request.host)
         except Exception:
             self_ws = ""
-        is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")
+        is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""))
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "

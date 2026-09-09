@@ -19,6 +19,15 @@ from quodeq.services._wiring import read_dispatched_cache_keys, remove_matching_
 _TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
 _CANCEL_WAIT_TIMEOUT_S = 2.0
 _CANCEL_WAIT_POLL_S = 0.05
+# The replayed_unconsolidated_keys pattern names keys belonging to EARLIER
+# runs. It is cleaned up as scratch but deliberately never fed to
+# _discard_run_state's cache-deletion loop, which only deletes this run's
+# own dispatched cache keys.
+_SCRATCH_PATTERNS = (
+    "*_queue.json", "*_fingerprint.json",
+    "*_evidence.jsonl", "*_dispatch_keys.json",
+    "*_replayed_unconsolidated_keys.json",
+)
 
 
 def _wait_for_terminal_status(
@@ -70,6 +79,18 @@ def _open_cache():
     return LocalFileBackend()
 
 
+def _is_run_path_valid(reports_path: Path, run_dir: Path) -> bool:
+    """Verify run_dir is within reports_path (path-traversal guard).
+
+    Returns False if the path escapes or an error occurs; True if jailed.
+    """
+    try:
+        resolved_reports = reports_path.resolve()
+        return run_dir.resolve().is_relative_to(resolved_reports)
+    except (OSError, ValueError):
+        return False
+
+
 def _discard_run_state(
     reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None,
     log: LogSink = NULL_LOG,
@@ -95,7 +116,11 @@ def _discard_run_state(
     if not project or not run_id:
         return
 
-    run_dir = Path(reports_dir) / project / run_id
+    reports_path = Path(reports_dir)
+    run_dir = reports_path / project / run_id
+    if not _is_run_path_valid(reports_path, run_dir):
+        return
+
     evidence_dir = run_dir / "evidence"
     if not evidence_dir.is_dir():
         return
@@ -109,14 +134,7 @@ def _discard_run_state(
             except Exception as exc:  # noqa: BLE001
                 log.warning(f"Could not delete cache entry {key}: {exc}")
 
-    scratch_patterns = (
-        "*_queue.json", "*_fingerprint.json",
-        "*_evidence.jsonl", "*_dispatch_keys.json",
-        # Entries listed here belong to EARLIER runs, so they are cleaned up
-        # as scratch but deliberately not fed to the cache-deletion loop above.
-        "*_replayed_unconsolidated_keys.json",
-    )
-    remove_matching_files(evidence_dir, scratch_patterns)
+    remove_matching_files(evidence_dir, _SCRATCH_PATTERNS)
 
 
 class _CacheEraser(Protocol):

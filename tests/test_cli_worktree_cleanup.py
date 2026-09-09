@@ -94,3 +94,26 @@ class TestCreateWorktreeCleanupOnFailure:
 
         assert result is None
         mock_cleanup.assert_called_once()
+
+    def test_branch_argument_injection_guard(self, tmp_path: Path) -> None:
+        """The -- separator before branch prevents argument injection."""
+        from quodeq._cli_resolution import _create_worktree
+
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+
+        with patch("quodeq._cli_resolution.subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            result = _create_worktree(repo_dir, "--upload-pack=evil")
+
+        assert result is not None
+        mock_run.assert_called_once()
+        argv = mock_run.call_args[0][0]
+        dash_dash_index = argv.index("--")
+        branch_index = argv.index("--upload-pack=evil")
+        assert dash_dash_index < branch_index, (
+            f"-- separator should appear before branch argument in argv: {argv}"
+        )
+        assert argv[dash_dash_index + 1] == "--upload-pack=evil", (
+            f"Branch argument should immediately follow --: {argv}"
+        )

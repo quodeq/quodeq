@@ -1,5 +1,6 @@
 """Native-chrome window: creation args, custom UA, and marker drift guard."""
 import inspect
+import io
 import sys
 
 from unittest.mock import MagicMock, patch
@@ -72,6 +73,88 @@ class TestUaMarkerNoDrift:
 
     def test_user_agent_carries_marker(self):
         assert ww._WEBVIEW_UA_MARKER in ww._webview_user_agent()
+
+    def test_token_prefix_matches_security_module(self):
+        from quodeq.api import security
+        from quodeq.dashboard import _webview_window_about
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX == security._WEBVIEW_TOKEN_UA_PREFIX
+
+    def test_user_agent_without_token_has_no_token_prefix(self):
+        """The marker alone is not the security check — no token, no token prefix."""
+        from quodeq.dashboard import _webview_window_about
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ww._webview_user_agent()
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ww._webview_user_agent(None)
+
+    def test_user_agent_with_token_carries_it(self):
+        from quodeq.dashboard import _webview_window_about
+        ua = ww._webview_user_agent("shared-secret-123")
+        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
+        assert ww._WEBVIEW_UA_MARKER in ua  # human-readable marker kept alongside the token
+
+
+class TestMainThreadsWebviewToken:
+    """main() must read the launch token from STDIN (never argv) and thread it
+    into the UA handed to webview.start — that UA is what the API's security
+    check inspects.
+
+    Rewritten from an argv[4] version: argv is world-readable
+    (/proc/<pid>/cmdline is 0444, and `ps` shows it to every user), so a token
+    there let any local user forge the UA that wins the CSP 'unsafe-eval'
+    relaxation. The old test asserted exactly the mechanism that was the bug.
+    """
+
+    def _run_main(self, monkeypatch, tmp_path, stdin_text, argv_tail=("",)):
+        argv = ["webview.py", "http://127.0.0.1:7863", str(tmp_path / "reload.sock"), *argv_tail]
+        monkeypatch.setattr(ww.sys, "argv", argv)
+        monkeypatch.setattr(ww.sys, "stdin", io.StringIO(stdin_text))
+        mock_instance = MagicMock()
+        mock_instance.try_acquire.return_value = False
+        with patch.object(ww, "_set_app_icon"), \
+             patch.object(ww, "InstanceController", return_value=mock_instance), \
+             patch.object(ww, "_create_window", return_value=MagicMock()), \
+             patch.object(ww, "_make_on_reload", return_value=MagicMock()), \
+             patch.object(ww, "_make_on_loaded", return_value=MagicMock()), \
+             patch.object(ww, "_make_on_closing", return_value=MagicMock()), \
+             patch.object(ww, "_non_macos_menu", return_value=None), \
+             patch.object(ww, "_quodeq_dir", return_value=tmp_path), \
+             patch.object(ww, "webview") as mock_webview:
+            ww.main()
+        return mock_webview.start.call_args.kwargs["user_agent"]
+
+    def test_token_from_stdin_reaches_user_agent(self, monkeypatch, tmp_path):
+        from quodeq.dashboard import _webview_window_about
+        ua = self._run_main(monkeypatch, tmp_path, "shared-secret-123\n")
+        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
+
+    def test_empty_stdin_is_backward_compatible(self, monkeypatch, tmp_path):
+        """A launcher that sends nothing (or a parent that died before the
+        write) must not crash main(). The UA carries no token prefix, so the
+        API serves the strict CSP -- fail closed, not fail open."""
+        from quodeq.dashboard import _webview_window_about
+        ua = self._run_main(monkeypatch, tmp_path, "")
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ua
+
+    def test_a_token_left_in_argv_is_ignored(self, monkeypatch, tmp_path):
+        """Regression guard for the fix itself.
+
+        If someone reintroduces an argv token (or an old launcher passes one),
+        it must NOT be honoured -- otherwise the world-readable path is live
+        again and the stdin handover is decorative.
+        """
+        from quodeq.dashboard import _webview_window_about
+        ua = self._run_main(
+            monkeypatch, tmp_path, "", argv_tail=("", "token-from-argv"),
+        )
+        assert "token-from-argv" not in ua
+        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ua
+
+    def test_stdin_wins_over_a_stale_argv_token(self, monkeypatch, tmp_path):
+        from quodeq.dashboard import _webview_window_about
+        ua = self._run_main(
+            monkeypatch, tmp_path, "real-token\n", argv_tail=("", "token-from-argv"),
+        )
+        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}real-token" in ua
+        assert "token-from-argv" not in ua
 
 
 class TestSetTitlebarTheme:

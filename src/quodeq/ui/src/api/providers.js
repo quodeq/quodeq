@@ -49,3 +49,16 @@ export function getKnownModels() {
 export function getProviderConfigs() {
   return request('/provider-configs');
 }
+
+/** @returns {Promise<{stored: boolean, secure: boolean}>} */
+export function saveProviderKey(provider, apiKey) {
+  return request('/provider/key', {
+    method: 'POST',
+    body: JSON.stringify({ provider, apiKey }),
+  });
+}
+
+/** @returns {Promise<{configured: boolean}>} */
+export function getProviderKeyStatus(provider) {
+  return request(`/provider/key-status?provider=${encodeURIComponent(provider)}`);
+}

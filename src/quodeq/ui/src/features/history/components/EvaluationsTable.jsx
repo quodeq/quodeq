@@ -115,11 +115,18 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
  * from the SSE-fed cache, and renders a partial summary as soon as the
  * first dim has scored. Falls back to the 'performing an evaluation...'
  * placeholder while no dim has scored.
+ *
+ * `notReady` also checks hasScoredDimension (a poll-based, SSE-independent
+ * signal from useHistoryRunLive): entry.hasScoredDims is a static stub
+ * that's always false for an in-progress run, and liveCount only moves
+ * with SSE, which is off by default -- without hasScoredDimension the row
+ * would stay stuck "not ready" for a run's entire duration even after a
+ * dimension actually finished scoring on disk.
  */
 function InProgressHistoryRow({ entry, onClick, onNotReadyClick }) {
-  const { liveDims, plannedDimensions } = useHistoryRunLive(entry.runId);
+  const { liveDims, plannedDimensions, hasScoredDimension } = useHistoryRunLive(entry.runId);
   const liveCount = Object.values(liveDims || {}).filter((d) => d?.dimension).length;
-  const notReady = entry.hasScoredDims === false && liveCount === 0;
+  const notReady = entry.hasScoredDims === false && liveCount === 0 && !hasScoredDimension;
   const { date } = formatDateParts(new Date().toISOString());
   const liveText = liveCount === 0 ? '' : formatLiveDimSummary(liveDims, plannedDimensions);
   const dimsCell = liveCount === 0

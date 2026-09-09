@@ -17,6 +17,12 @@ from quodeq.dashboard._networking import _MAX_PORT_SCAN_TRIES, _allow_plaintext_
 from quodeq.dashboard._frozen import subprocess_cmd
 from quodeq.dashboard._probes import ApiProbes, NativeShell
 from quodeq.dashboard._process import _PROCESS_WAIT_TIMEOUT_S, _wait_for_process
+from quodeq.dashboard._webview_token import (
+    _ENV_WEBVIEW_TOKEN,
+    _get_webview_token,
+    _warn_reused_api_token_mismatch,
+    spawn_window_with_token,
+)
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
@@ -56,8 +62,10 @@ def _ensure_action_api(
         base_url = f"{_HTTP_SCHEME}://{host}:{port}"
         if probes.is_port_open(host, port):
             if probes.api_healthy(base_url):
+                _warn_reused_api_token_mismatch(base_url)
                 return base_url, None
             continue
+        os.environ[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
         return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
@@ -74,8 +82,10 @@ def _ensure_action_api_forced(
     base_url = f"http://{host}:{port}"
     if probes.is_port_open(host, port):
         if probes.api_healthy(base_url):
+            _warn_reused_api_token_mismatch(base_url)
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
+    os.environ[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
     return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )
@@ -235,10 +245,10 @@ def _serve_native(
     api_pid = str(action_api_process.pid) if action_api_process else ""
     webview_stderr = _open_webview_log()
 
-    shell.spawn_window(
+    # The launch token goes over stdin inside here, never argv.
+    spawn_window_with_token(
+        shell.spawn_window,
         subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
         stderr=webview_stderr,
     )
 

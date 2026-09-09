@@ -79,6 +79,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'config/ai_provider.py': 'AI provider selection and configuration persistence - out of scope for this sweep (not a flagged per-site conversion)',
     'config/prompt_templates.py': 'Simple mustache-style template rendering for prompt files - out of scope for this sweep (not a flagged per-site conversion)',
     'core/standards/overrides.py': 'Per-project overrides for declared numeric requirement parameters - out of scope for this sweep (not a flagged per-site conversion)',
+    'core/utils/_file_lock.py': "Platform file-locking helpers (fcntl/msvcrt dispatch) - moved inward from data/_file_lock.py so api/ can use it per the check_imports layer rule, same as core/utils/io.py; its pre-existing 'import logging' was carried over unchanged, out of scope for this sweep",
     'core/utils/io.py': 'Low-level text/JSON read helpers with centralized encoding - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_cache.py': 'Shared LRU cache factory for dimension fetchers - out of scope for this sweep (not a flagged per-site conversion)',
     'services/_ephemeral_cleanup.py': 'Lifecycle management for ephemeral clones under ~/.quodeq/clones/ - out of scope for this sweep (not a flagged per-site conversion)',
