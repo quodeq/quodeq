@@ -4,7 +4,7 @@ from __future__ import annotations
 import json as _json
 from pathlib import Path
 
-from quodeq.analysis.stream._incremental_lines import read_new_lines
+from quodeq.analysis.stream._incremental_lines import iter_line_batches
 from quodeq.analysis.stream.counters import extract_files_from_event, parse_stream_event
 from quodeq.shared.logging import log_debug
 
@@ -37,33 +37,33 @@ class _IncrementalProgressReader:
         }
 
     def _read_stream(self) -> None:
-        consumed = 0
         try:
-            lines, consumed = read_new_lines(self._stream_file, self._stream_offset)
-            for line in lines:
-                data = parse_stream_event(line)
-                if data is not None:
-                    self._seen_files.update(extract_files_from_event(data))
+            for lines, nbytes in iter_line_batches(self._stream_file, self._stream_offset):
+                # Advance before processing this chunk's lines: on a
+                # mid-batch error we still credit the chunk as consumed
+                # (never re-read), but lose at most its own remainder.
+                # Chunks not yet read stay unread for the next tick.
+                self._stream_offset += nbytes
+                self._consume_stream_lines(lines)
         except (OSError, ValueError) as exc:
             log_debug(f"Failed to read stream {self._stream_file}: {exc}")
-        finally:
-            # Advance past bytes already consumed even if processing raised,
-            # so a mid-processing error never causes the next tick to re-read
-            # (and double-count) the same bytes.
-            self._stream_offset += consumed
+
+    def _consume_stream_lines(self, lines: list[str]) -> None:
+        for line in lines:
+            data = parse_stream_event(line)
+            if data is not None:
+                self._seen_files.update(extract_files_from_event(data))
 
     def _read_jsonl(self) -> None:
         if self._jsonl_file is None or not self._jsonl_file.exists():
             return
-        consumed = 0
         try:
-            lines, consumed = read_new_lines(self._jsonl_file, self._jsonl_offset)
-            for line in lines:
-                self._count_evidence_line(line)
+            for lines, nbytes in iter_line_batches(self._jsonl_file, self._jsonl_offset):
+                self._jsonl_offset += nbytes
+                for line in lines:
+                    self._count_evidence_line(line)
         except OSError as exc:
             log_debug(f"Failed to read JSONL {self._jsonl_file}: {exc}")
-        finally:
-            self._jsonl_offset += consumed
 
     def _count_evidence_line(self, line: str) -> None:
         stripped = line.strip()

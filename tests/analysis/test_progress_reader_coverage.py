@@ -140,3 +140,47 @@ class TestIncrementalProgressReader:
         monkeypatch.setattr(pr_module, "parse_stream_event", original_parse)
         progress = reader.read_progress()
         assert progress["files_read"] == 0
+
+    def test_stream_multichunk_error_loses_only_first_chunk(self, tmp_path, monkeypatch):
+        from quodeq.analysis.stream import progress_reader as pr_module
+
+        def event_line(file_path):
+            event = {
+                "type": "assistant",
+                "message": {"content": [
+                    {"type": "tool_use", "name": "Read", "input": {"file_path": file_path}},
+                ]},
+            }
+            return json.dumps(event)
+
+        filler_block = (event_line("/filler.py") + "\n") * 800
+        sentinel_line = event_line("/tail_sentinel.py") + "\n"
+        content = filler_block + sentinel_line
+        filler_bytes = len(filler_block.encode("utf-8"))
+        total_bytes = len(content.encode("utf-8"))
+        assert filler_bytes > (1 << 16), "filler block must span the whole first chunk"
+        assert total_bytes < 2 * (1 << 16), "keep this a two-chunk backlog"
+
+        stream_file = tmp_path / "stream.jsonl"
+        stream_file.write_text(content)
+        reader = pr_module._IncrementalProgressReader(stream_file, None)
+
+        original_parse = pr_module.parse_stream_event
+        calls = {"count": 0}
+
+        def boom(line):
+            calls["count"] += 1
+            raise ValueError("boom")
+
+        monkeypatch.setattr(pr_module, "parse_stream_event", boom)
+
+        # Raises on the very first filler line, well inside the first chunk.
+        reader.read_progress()
+        assert reader._stream_offset == 1 << 16
+        assert calls["count"] == 1
+
+        monkeypatch.setattr(pr_module, "parse_stream_event", original_parse)
+        reader.read_progress()
+        # The second chunk was never eagerly consumed by the error, so a
+        # follow-up read still finds and processes the sentinel line in it.
+        assert "/tail_sentinel.py" in reader._seen_files
