@@ -6,6 +6,12 @@ so the gate runs green in CI today while preventing NEW violations.
 Regenerate the baseline (only with justification) via:
     python tools/check_fault_tolerance.py --update-baseline
 
+Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count
+change elsewhere in a file can shift existing entries. Prefer hand-editing
+the baseline (update the shifted line number) over blind --update-baseline
+regeneration, which can silently absorb a genuinely new violation
+introduced in the same change.
+
 Scans src/quodeq/**/*.py (vendored/generated dirs excluded; tests/ and
 JS/TS are out of scope for this ratchet, see the cycle 1 design doc) with
 `ast` for three kinds of ExceptHandler violation:
@@ -42,7 +48,15 @@ def _is_broad_type(type_node: ast.expr) -> bool:
 
 
 def _is_empty_body(body: list[ast.stmt]) -> bool:
-    return len(body) == 1 and isinstance(body[0], ast.Pass)
+    return all(
+        isinstance(s, ast.Pass)
+        or (
+            isinstance(s, ast.Expr)
+            and isinstance(s.value, ast.Constant)
+            and (s.value.value is Ellipsis or isinstance(s.value.value, str))
+        )
+        for s in body
+    )
 
 
 def _reraises(body: list[ast.stmt]) -> bool:
@@ -114,6 +128,11 @@ def write_baseline(path: Path = BASELINE_PATH) -> int:
         "# except handlers). Do NOT add entries without justification -- the\n"
         "# goal is to burn this list down, not grow it.\n"
         "# Regenerate intentionally: python tools/check_fault_tolerance.py --update-baseline\n"
+        "# Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count\n"
+        "# change elsewhere in a file can shift existing entries. Prefer hand-editing\n"
+        "# the baseline (update the shifted line number) over blind --update-baseline\n"
+        "# regeneration, which can silently absorb a genuinely new violation\n"
+        "# introduced in the same change.\n"
     )
     return _ratchet.write_baseline(path, header, collect_violations())
 

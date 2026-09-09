@@ -20,8 +20,13 @@ def test_baseline_has_no_stale_entries():
     current = set(check_fault_tolerance.collect_violations())
     stale = baseline - current
     assert not stale, (
-        f"Fixed entries must be removed from fault_tolerance_baseline.txt: "
-        f"{sorted(stale)}"
+        f"Stale entries in fault_tolerance_baseline.txt: {sorted(stale)}. "
+        "If the violation was actually fixed, remove the entry. If the file "
+        "just shifted lines (an edit elsewhere in the file moved this "
+        "violation to a new line number), hand-edit the entry's line number "
+        "instead of regenerating the whole baseline -- a blind "
+        "--update-baseline can silently absorb a genuinely new violation "
+        "introduced in the same change."
     )
 
 

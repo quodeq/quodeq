@@ -60,3 +60,18 @@ def test_tuple_of_specific_exceptions_is_not_flagged():
         "try:\n    f()\nexcept (ValueError, KeyError):\n    log.warning('x')\n"
     )
     assert cft._handler_kind(h) is None
+
+
+def test_empty_except_ellipsis_is_flagged():
+    h = _handler("try:\n    f()\nexcept ValueError:\n    ...\n")
+    assert cft._handler_kind(h) == "empty-except"
+
+
+def test_empty_except_docstring_is_flagged():
+    h = _handler('try:\n    f()\nexcept ValueError:\n    "ignored"\n')
+    assert cft._handler_kind(h) == "empty-except"
+
+
+def test_empty_except_double_pass_is_flagged():
+    h = _handler("try:\n    f()\nexcept ValueError:\n    pass\n    pass\n")
+    assert cft._handler_kind(h) == "empty-except"
