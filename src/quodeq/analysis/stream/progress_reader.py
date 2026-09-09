@@ -4,6 +4,7 @@ from __future__ import annotations
 import json as _json
 from pathlib import Path
 
+from quodeq.analysis.stream._incremental_lines import read_new_lines
 from quodeq.analysis.stream.counters import extract_files_from_event, parse_stream_event
 from quodeq.shared.logging import log_debug
 
@@ -35,71 +36,45 @@ class _IncrementalProgressReader:
             "compliances": self._compliances,
         }
 
-    _READ_CHUNK = 1 << 16  # 64 KiB
-
     def _read_stream(self) -> None:
+        consumed = 0
         try:
-            partial = ""
-            with open(self._stream_file, "rb") as f:
-                f.seek(self._stream_offset)
-                while True:
-                    chunk = f.read(self._READ_CHUNK)
-                    if not chunk:
-                        break
-                    self._stream_offset += len(chunk)
-                    text = partial + chunk.decode("utf-8", errors="replace")
-                    lines = text.split("\n")
-                    # Last element may be incomplete — save for next chunk
-                    partial = lines.pop()
-                    for line in lines:
-                        data = parse_stream_event(line)
-                        if data is not None:
-                            self._seen_files.update(extract_files_from_event(data))
-            # Process any remaining partial line
-            if partial.strip():
-                data = parse_stream_event(partial)
+            lines, consumed = read_new_lines(self._stream_file, self._stream_offset)
+            for line in lines:
+                data = parse_stream_event(line)
                 if data is not None:
                     self._seen_files.update(extract_files_from_event(data))
         except (OSError, ValueError) as exc:
             log_debug(f"Failed to read stream {self._stream_file}: {exc}")
+        finally:
+            # Advance past bytes already consumed even if processing raised,
+            # so a mid-processing error never causes the next tick to re-read
+            # (and double-count) the same bytes.
+            self._stream_offset += consumed
 
     def _read_jsonl(self) -> None:
         if self._jsonl_file is None or not self._jsonl_file.exists():
             return
+        consumed = 0
         try:
-            partial = ""
-            with open(self._jsonl_file, "rb") as jf:
-                jf.seek(self._jsonl_offset)
-                while True:
-                    chunk = jf.read(self._READ_CHUNK)
-                    if not chunk:
-                        break
-                    self._jsonl_offset += len(chunk)
-                    text = partial + chunk.decode("utf-8", errors="replace")
-                    lines = text.split("\n")
-                    partial = lines.pop()
-                    for line in lines:
-                        stripped = line.strip()
-                        if not stripped:
-                            continue
-                        self._jsonl_count += 1
-                        try:
-                            t = _json.loads(stripped).get("t", "")
-                        except (ValueError, AttributeError):
-                            t = ""
-                        if t == _TYPE_VIOLATION:
-                            self._violations += 1
-                        elif t == _TYPE_COMPLIANCE:
-                            self._compliances += 1
-            if partial.strip():
-                self._jsonl_count += 1
-                try:
-                    t = _json.loads(partial.strip()).get("t", "")
-                except (ValueError, AttributeError):
-                    t = ""
-                if t == _TYPE_VIOLATION:
-                    self._violations += 1
-                elif t == _TYPE_COMPLIANCE:
-                    self._compliances += 1
+            lines, consumed = read_new_lines(self._jsonl_file, self._jsonl_offset)
+            for line in lines:
+                self._count_evidence_line(line)
         except OSError as exc:
             log_debug(f"Failed to read JSONL {self._jsonl_file}: {exc}")
+        finally:
+            self._jsonl_offset += consumed
+
+    def _count_evidence_line(self, line: str) -> None:
+        stripped = line.strip()
+        if not stripped:
+            return
+        self._jsonl_count += 1
+        try:
+            t = _json.loads(stripped).get("t", "")
+        except (ValueError, AttributeError):
+            t = ""
+        if t == _TYPE_VIOLATION:
+            self._violations += 1
+        elif t == _TYPE_COMPLIANCE:
+            self._compliances += 1
