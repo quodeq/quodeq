@@ -12,9 +12,6 @@ const CHARS_PER_TICK = 60;
 /**
  * Pure frame-dispatch table: given a parsed SSE frame and the effect's
  * (already-bound) per-type handlers, calls the one matching frame.type.
- * Extracted verbatim from useAssistantStream's `es.onmessage` handler —
- * partial extraction only, per the split's scope; the rest of the effect
- * (scheduling, refs, EventSource wiring) stays inline.
  */
 export function applyFrame(frame, handlers) {
   if (!frame || typeof frame !== 'object') return;
@@ -30,6 +27,99 @@ export function applyFrame(frame, handlers) {
   else if (frame.type === 'stopped') onStopped(frame);
   else if (frame.type === 'done') onDone(frame);
   else if (frame.type === 'heartbeat') onHeartbeat?.(frame); // liveness only: resetInactivity() already ran by the caller
+}
+
+// One SSE stream serves the whole session, so revealed text lands in the last
+// assistant bubble unless a turn boundary was crossed, which starts a new one.
+function withRevealedChunk(prev, chunk, startNewBubble) {
+  const next = prev.slice();
+  const last = next[next.length - 1];
+  if (!startNewBubble && last && last.role === 'assistant') {
+    next[next.length - 1] = { ...last, text: last.text + chunk };
+  } else {
+    next.push({ role: 'assistant', text: chunk });
+  }
+  return next;
+}
+
+// The reveal machinery: the pending buffer, its rAF/timeout flush pair and the
+// turn-end latch. A factory rather than lifted functions because drain,
+// scheduleFlush, finishTurn and endTurn are mutually recursive over the same
+// refs -- they only make sense as one closure set, bound once per effect run.
+export function createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef }) {
+  const finishTurn = () => { endPending.current = false; setStreaming(false);
+    turnBoundary.current = true; onDoneRef.current?.(); };
+  const drain = (all) => {
+    if (raf.current != null) { cancelAnimationFrame(raf.current); raf.current = null; }
+    if (timer.current != null) { clearTimeout(timer.current); timer.current = null; }
+    const buf = pending.current;
+    if (!buf) { if (endPending.current) finishTurn(); return; }
+    const chunk = all ? buf : buf.slice(0, CHARS_PER_TICK);
+    pending.current = all ? '' : buf.slice(CHARS_PER_TICK);
+    const startNewBubble = turnBoundary.current;
+    turnBoundary.current = false;
+    setMessages((prev) => withRevealedChunk(prev, chunk, startNewBubble));
+    if (pending.current) scheduleFlush();
+    else if (endPending.current) finishTurn();
+  };
+  const scheduleFlush = () => {
+    if (raf.current == null) raf.current = requestAnimationFrame(() => drain(false));
+    if (timer.current == null) timer.current = setTimeout(() => drain(false), 50);
+  };
+  // Structural frames (tool calls, warnings, errors, stop) force the rest
+  // of the reveal out at once so ordering stays exact and errors are never
+  // delayed behind an animation.
+  const flushTokens = () => drain(true);
+  const revealText = (text) => { pending.current += text; scheduleFlush(); };
+  // End the TURN (clear spinner, mark a boundary, notify the provider)
+  // WITHOUT closing the connection — the stream stays open so the next
+  // turn's frames still arrive. The EventSource is only closed in the
+  // effect cleanup (sessionId change / unmount). If text is still being
+  // revealed, the turn ends when the drain empties.
+  const endTurn = () => {
+    if (pending.current) { endPending.current = true; scheduleFlush(); }
+    else finishTurn();
+  };
+  return { drain, flushTokens, revealText, endTurn };
+}
+
+export function createInactivityGuard({ inactivity, setError, endTurn }) {
+  return () => {
+    if (inactivity.current) clearTimeout(inactivity.current);
+    // End the turn cleanly (same as any other terminal frame) instead of
+    // closing the stream: closing here would leave the provider's
+    // turnActive stuck true forever (endTurn never ran) AND kill the
+    // EventSource with nothing left to reconnect it, wedging the drawer.
+    // Leaving the connection open lets the next turn (or a heartbeat)
+    // recover it.
+    inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, INACTIVITY_MS);
+  };
+}
+
+// First content frame of a turn: re-arm streaming and, once a turn boundary
+// has been crossed, clear any stale stream error from the prior turn so a
+// retry starts clean.
+function createContentGate({ turnBoundary, setError, setStreaming }) {
+  return () => { if (turnBoundary.current) setError(null); setStreaming(true); };
+}
+
+export function makeFrameHandlers({ revealer, append, beginContent, setError, endPending }) {
+  const { drain, flushTokens, revealText, endTurn } = revealer;
+  return {
+    onToken: (f) => {
+      // A next-turn token during the previous turn's reveal: close that
+      // turn out first so the new text starts its own bubble.
+      if (endPending.current) drain(true);
+      beginContent(); revealText(f.text || '');
+    },
+    onToolCall: (f) => { beginContent(); flushTokens(); append({ role: 'tool', name: f.name, argsSummary: f.argsSummary }); },
+    onActionDraft: (f) => { beginContent(); flushTokens();
+      append({ role: 'action', actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
+    onWarning: (f) => { beginContent(); flushTokens(); append({ role: 'warning', message: f.message }); },
+    onError: (f) => { flushTokens(); setError(f.message || 'error'); endTurn(); },
+    onStopped: () => { flushTokens(); append({ role: 'warning', message: 'Stopped.' }); endTurn(); },
+    onDone: () => { endTurn(); },
+  };
 }
 
 export function useAssistantStream(sessionId, { onDone } = {}) {
@@ -55,84 +145,19 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
     setMessages([]); setError(null); setStreaming(true); pending.current = '';
     turnBoundary.current = false; endPending.current = false;
 
-    const finishTurn = () => { endPending.current = false; setStreaming(false);
-      turnBoundary.current = true; onDoneRef.current?.(); };
-    const drain = (all) => {
-      if (raf.current != null) { cancelAnimationFrame(raf.current); raf.current = null; }
-      if (timer.current != null) { clearTimeout(timer.current); timer.current = null; }
-      const buf = pending.current;
-      if (!buf) { if (endPending.current) finishTurn(); return; }
-      const chunk = all ? buf : buf.slice(0, CHARS_PER_TICK);
-      pending.current = all ? '' : buf.slice(CHARS_PER_TICK);
-      const startNewBubble = turnBoundary.current;
-      turnBoundary.current = false;
-      setMessages((prev) => {
-        const next = prev.slice();
-        const last = next[next.length - 1];
-        if (!startNewBubble && last && last.role === 'assistant') {
-          next[next.length - 1] = { ...last, text: last.text + chunk };
-        } else {
-          next.push({ role: 'assistant', text: chunk });
-        }
-        return next;
-      });
-      if (pending.current) scheduleFlush();
-      else if (endPending.current) finishTurn();
-    };
-    // Structural frames (tool calls, warnings, errors, stop) force the rest
-    // of the reveal out at once so ordering stays exact and errors are never
-    // delayed behind an animation.
-    const flushTokens = () => drain(true);
-    const scheduleFlush = () => {
-      if (raf.current == null) raf.current = requestAnimationFrame(() => drain(false));
-      if (timer.current == null) timer.current = setTimeout(() => drain(false), 50);
-    };
+    const revealer = createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef });
+    const resetInactivity = createInactivityGuard({ inactivity, setError, endTurn: revealer.endTurn });
     const append = (msg) => setMessages((prev) => [...prev, msg]);
-    const es = new EventSource(assistantEventsUrl(sessionId, 0));
-    // End the TURN (clear spinner, mark a boundary, notify the provider)
-    // WITHOUT closing the connection — the stream stays open so the next
-    // turn's frames still arrive. The EventSource is only closed in the
-    // effect cleanup (sessionId change / unmount). If text is still being
-    // revealed, the turn ends when the drain empties.
-    const endTurn = () => {
-      if (pending.current) { endPending.current = true; scheduleFlush(); }
-      else finishTurn();
-    };
-    const resetInactivity = () => {
-      if (inactivity.current) clearTimeout(inactivity.current);
-      // End the turn cleanly (same as any other terminal frame) instead of
-      // closing the stream: closing here would leave the provider's
-      // turnActive stuck true forever (endTurn never ran) AND kill the
-      // EventSource with nothing left to reconnect it, wedging the drawer.
-      // Leaving the connection open lets the next turn (or a heartbeat)
-      // recover it.
-      inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, INACTIVITY_MS);
-    };
-    // First content frame of a turn: re-arm streaming and, once a turn
-    // boundary has been crossed, clear any stale stream error from the prior
-    // turn so a retry starts clean.
-    const beginContent = () => { if (turnBoundary.current) setError(null); setStreaming(true); };
+    const beginContent = createContentGate({ turnBoundary, setError, setStreaming });
+    const handlers = makeFrameHandlers({ revealer, append, beginContent, setError, endPending });
 
+    const es = new EventSource(assistantEventsUrl(sessionId, 0));
     es.onmessage = (e) => {
       resetInactivity();
       let frame; try { frame = JSON.parse(e.data); } catch { return; }
-      applyFrame(frame, {
-        onToken: (f) => {
-          // A next-turn token during the previous turn's reveal: close that
-          // turn out first so the new text starts its own bubble.
-          if (endPending.current) drain(true);
-          beginContent(); pending.current += f.text || ''; scheduleFlush();
-        },
-        onToolCall: (f) => { beginContent(); flushTokens(); append({ role: 'tool', name: f.name, argsSummary: f.argsSummary }); },
-        onActionDraft: (f) => { beginContent(); flushTokens();
-          append({ role: 'action', actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
-        onWarning: (f) => { beginContent(); flushTokens(); append({ role: 'warning', message: f.message }); },
-        onError: (f) => { flushTokens(); setError(f.message || 'error'); endTurn(); },
-        onStopped: () => { flushTokens(); append({ role: 'warning', message: 'Stopped.' }); endTurn(); },
-        onDone: () => { endTurn(); },
-      });
+      applyFrame(frame, handlers);
     };
-    es.addEventListener('done', endTurn);
+    es.addEventListener('done', revealer.endTurn);
     es.onerror = () => { if (es.readyState === 2) { setStreaming(false); setError((p) => p || 'disconnected'); } };
     resetInactivity();
 
