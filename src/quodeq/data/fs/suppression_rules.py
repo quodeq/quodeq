@@ -28,6 +28,10 @@ _FILENAME = "suppression_rules.json"
 _logger = logging.getLogger(__name__)
 
 
+def _is_nonempty_str(x: object) -> bool:
+    return isinstance(x, str) and bool(x)
+
+
 def load_suppression_rules(project_dir: Path) -> tuple[SuppressionRule, ...]:
     """Return the project's suppression rules, or ``()`` when there are none."""
     path = project_dir / _FILENAME
@@ -56,8 +60,7 @@ def load_suppression_rules(project_dir: Path) -> tuple[SuppressionRule, ...]:
         req, file, reason = entry.get("req"), entry.get("file"), entry.get("reason")
         # Every field is required: a rule missing its pattern would match far
         # more than intended, and one missing its reason is undocumented policy.
-        if not (isinstance(req, str) and req and isinstance(file, str) and file
-                and isinstance(reason, str) and reason):
+        if not (_is_nonempty_str(req) and _is_nonempty_str(file) and _is_nonempty_str(reason)):
             _logger.warning("Skipping incomplete suppression rule in %s: %r", path, entry)
             continue
         rules.append(SuppressionRule(req=req, file=file, reason=reason))

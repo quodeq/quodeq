@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 
 from flask import Flask
 
@@ -22,8 +23,8 @@ class SharedSourceUnavailable(RuntimeError):
 _DEFAULT_SESSION_TTL_DAYS = 90
 
 
-def _session_ttl_days() -> int:
-    raw = os.environ.get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
+def _session_ttl_days(env: Mapping[str, str] | None = None) -> int:
+    raw = (env if env is not None else os.environ).get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
     if raw is None:
         return _DEFAULT_SESSION_TTL_DAYS
     try:
@@ -32,7 +33,7 @@ def _session_ttl_days() -> int:
         return _DEFAULT_SESSION_TTL_DAYS
 
 
-def run_assistant_hygiene(app: Flask) -> None:
+def run_assistant_hygiene(app: Flask, *, ttl_days: int | None = None) -> None:
     """One-shot-per-process cleanup: reap leaked worktrees, prune old sessions.
 
     Runs on the first assistant request. Worktrees are GC'd BEFORE the session
@@ -50,7 +51,9 @@ def run_assistant_hygiene(app: Flask) -> None:
     repo = _helpers.get_repository(app)
     try:
         gc_worktrees(repo)
-        removed = repo.prune_sessions_older_than(_session_ttl_days())
+        removed = repo.prune_sessions_older_than(
+            ttl_days if ttl_days is not None else _session_ttl_days()
+        )
         if removed:
             _logger.info("Pruned %d old assistant session(s)", removed)
     except Exception:  # noqa: BLE001 — hygiene is best-effort

@@ -1,5 +1,8 @@
 """TerminalSessionRegistry: creation, naming, cap, kill semantics, isolation."""
 
+import threading
+import time
+
 from quodeq.terminal.sessions import TerminalSessionRegistry, shell_name
 
 
@@ -127,6 +130,48 @@ def test_get_or_create_default_reuses_existing():
     first = reg.get_or_create_default()
     assert reg.get_or_create_default() is first
     assert len(reg.list()) == 1
+
+
+class _YieldingLock:
+    """threading.Lock stand-in whose release always yields briefly, so a
+    thread blocked waiting on it gets a real chance to run before the
+    releasing thread can loop back and re-acquire. A plain Lock lets the
+    releasing thread win that re-acquire almost every time (confirmed
+    empirically: 0/300 races with a bare barrier, even at a near-zero GIL
+    switch interval), which would make a TOCTOU regression test flaky
+    instead of a reliable guard."""
+
+    def __init__(self):
+        self._real = threading.Lock()
+
+    def __enter__(self):
+        self._real.acquire()
+        return self
+
+    def __exit__(self, *exc_info):
+        self._real.release()
+        time.sleep(0.02)
+
+
+def test_get_or_create_default_is_atomic_under_a_race():
+    reg = _registry()
+    reg._lock = _YieldingLock()
+    barrier = threading.Barrier(2)
+    results = [None, None]
+
+    def worker(i):
+        barrier.wait()
+        results[i] = reg.get_or_create_default()
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=5)
+
+    assert all(not t.is_alive() for t in threads)
+    assert len(reg.list()) == 1
+    assert results[0] is results[1]
 
 
 def test_pid_for_falls_back_to_first_alive():
