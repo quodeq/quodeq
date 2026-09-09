@@ -183,6 +183,31 @@ def _kick_update_check() -> None:
         pass
 
 
+def _resolve_environ(config: DashboardConfig, env: dict[str, str] | None) -> None:
+    environ = env.copy() if env is not None else os.environ
+    if config.build.verbose:
+        environ["QUODEQ_VERBOSE"] = "1"
+
+
+def _log_startup_banner(config: DashboardConfig) -> None:
+    log_info("Starting dashboard...")
+    log_info(f"Reports: {config.reports_dir}")
+    log_info(f"Static:  {config.static_dist}")
+    log_info(f"Port:    {config.server.port}")
+
+
+def _start_action_api_for(
+    config: DashboardConfig, probes: ApiProbes | None, hooks: DashboardHooks,
+) -> tuple[str, "subprocess.Popen | None"]:
+    action_api_host = config.server.api_host or _get_default_host()
+    action_api_port = config.server.api_port or config.server.port
+    api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
+    ensure_api = hooks.ensure_api or _start_action_api
+    return ensure_api(
+        config, action_api_host, action_api_port, api_config, probes=probes, hooks=hooks,
+    )
+
+
 def run_dashboard(
     config: DashboardConfig,
     env: dict[str, str] | None = None,
@@ -199,13 +224,7 @@ def run_dashboard(
     hooks = hooks or DashboardHooks()
     config = _resolve_paths_and_build(config, hooks=hooks)
     validate_paths(config)
-
-    if env is not None:
-        environ = env.copy()
-    else:
-        environ = os.environ
-    if config.build.verbose:
-        environ["QUODEQ_VERBOSE"] = "1"
+    _resolve_environ(config, env)
 
     if _prepare_frozen_macos_launch():
         return 0
@@ -213,18 +232,9 @@ def run_dashboard(
     if _handed_off_to_running_instance(config):
         return 0
 
-    log_info("Starting dashboard...")
-    log_info(f"Reports: {config.reports_dir}")
-    log_info(f"Static:  {config.static_dist}")
-    log_info(f"Port:    {config.server.port}")
+    _log_startup_banner(config)
 
-    action_api_host = config.server.api_host or _get_default_host()
-    action_api_port = config.server.api_port or config.server.port
-    api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
-    ensure_api = hooks.ensure_api or _start_action_api
-    action_api_url, action_api_process = ensure_api(
-        config, action_api_host, action_api_port, api_config, probes=probes, hooks=hooks,
-    )
+    action_api_url, action_api_process = _start_action_api_for(config, probes, hooks)
 
     _kick_update_check()
     _maybe_spawn_menubar()

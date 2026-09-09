@@ -56,7 +56,7 @@ def _trip_on_first(calls):
     return fake_run
 
 
-@patch("quodeq.analysis._loops.emit_marker", lambda *a, **k: None)
+@patch("quodeq.analysis._loop_steps.emit_marker", lambda *a, **k: None)
 def test_incremental_loop_breaks_after_cancellation(tmp_path):
     calls: list[str] = []
     runner = MagicMock()

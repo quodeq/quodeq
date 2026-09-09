@@ -125,7 +125,7 @@ class TestIncrementalLoopTransitions:
         # Patch the success-log call so the test doesn't depend on its side
         # effects (markers, log_success). The loop calls _log_dimension_result
         # directly after a successful incremental dim.
-        monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
+        monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
 
         run_incremental_loop(
             config, ["security"], ctx, runner=_runner_returning(ev),
@@ -148,7 +148,7 @@ class TestIncrementalLoopTransitions:
         ctx = MagicMock(total=1)
         ev = MagicMock()
         ev.exit_reason = None
-        monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
+        monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
         # First call (incremental) fails with RuntimeError → loop triggers
         # the fallback call, which succeeds and returns ev.
         runner = MagicMock()
@@ -163,7 +163,7 @@ class TestIncrementalLoopTransitions:
     ):
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
-        monkeypatch.setattr("quodeq.analysis._loops._log_dimension_result", MagicMock())
+        monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
         # Raise something that's NOT in the (OSError, KeyError, ValueError,
         # RuntimeError) tuple, so the bare ``except Exception`` branch runs.
         runner = _runner_raising(TypeError("unexpected"))

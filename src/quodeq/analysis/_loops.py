@@ -10,9 +10,8 @@ from pathlib import Path
 
 from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
 from quodeq.analysis._types import RunConfig, _AnalysisContext
-from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
+from quodeq.analysis.dimension_runner import DimensionRunner
 from quodeq.core.evidence.model import Evidence
-from quodeq.analysis._runner_markers import emit_marker
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import DimState
@@ -194,25 +193,14 @@ def run_incremental_loop(
     fallback (see ``_dispatch_incremental_dim``) uses ``emit_log=True`` so
     the runner emits its own analyzing marker and success log.
     """
+    from quodeq.analysis._loop_steps import _IncrementalDimDeps, _run_one_incremental_dim  # noqa: PLC0415 -- breaks the circular import with _loop_steps, which imports _dispatch_incremental_dim/_finalize_dim_result/_loop_should_stop from this module
+
     result: dict[str, Evidence] = {}
     log.info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
+    deps = _IncrementalDimDeps(runner=runner, on_dimension_done=on_dimension_done, result=result, log=log)
     for idx, dimension in enumerate(dimensions, 1):
-        log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
-        if _loop_should_stop(config, dimension, log):
+        if _run_one_incremental_dim(config, dimension, idx, ctx, deps):
             break
-        run_dir = _run_dir_for(config)
-        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=log)
-        emit_marker("analyzing", dimension=dimension)
-        log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-        ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, runner=runner, log=log)
-        if ev:
-            _finalize_dim_result(
-                run_dir, dimension, ev, on_dimension_done, result, log,
-                log_result=lambda ev=ev: _log_dimension_result(ev, dimension, idx, ctx.total, log=log),
-            )
-        else:
-            _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(last_exc), log=log)
-        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
     log.info(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'})",

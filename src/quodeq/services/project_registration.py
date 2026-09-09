@@ -15,22 +15,19 @@ from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._wiring import (
-    ProjectIdentity,
     read_repository_info,
     read_scan_json,
-    resolve_project_uuid,
     validate_remote_url,
     write_repository_info,
 )
 from quodeq.services._fs_clone import CloneError, run_git_clone
 from quodeq.services._fs_project_helpers import find_existing_project
-from quodeq.services._fs_scan import scan_project
-from quodeq.services._registration_scan import _scan_parent_project, _zero_run_scan_fallback
+from quodeq.services._registration_scan import _zero_run_scan_fallback
 from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
 from quodeq.services._repo_index import add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared._env import get_clones_dir
-from quodeq.shared.utils import is_repo_url, project_name_from_repo
+from quodeq.shared.utils import is_repo_url
 
 _LOCATION_LOCAL = "local"
 
@@ -141,30 +138,26 @@ def register_project(
 
     Returns the project's UUID.
     """
+    from quodeq.services._project_registration_steps import (  # noqa: PLC0415 -- breaks the circular import with _project_registration_steps, which imports _resolve_target_path/_persist_repository_info/_ensure_onboarding_field from this module
+        _MaterializeRequest,
+        _materialize_and_scan,
+        _resolve_project_slot,
+    )
+
     is_url = is_repo_url(repo)
     _validate_clone_target(repo, is_url, ephemeral, clone_dest)
-
-    project_name = project_name_from_repo(repo)
-    repo_resolved = repo if is_url else str(Path(repo).resolve())
     reports_path = Path(reports_dir)
 
-    project_uuid = resolve_project_uuid(
-        reports_path,
-        ProjectIdentity(project_name, repo_resolved, discipline, _LOCATION_LOCAL, scope_path=scope_path),
+    project_uuid, project_dir, project_name, repo_resolved = _resolve_project_slot(
+        repo, discipline, reports_path, scope_path,
     )
-    project_dir = reports_path / project_uuid
-    _ensure_onboarding_field(project_dir)
 
-    target_path = _resolve_target_path(
-        repo, repo_resolved, project_name, project_uuid,
-        is_url=is_url, ephemeral=ephemeral, clone_dest=clone_dest, clones_dir=clones_dir,
-    )
-    _persist_repository_info(project_dir, target_path, is_url=is_url, repo=repo, ephemeral=ephemeral)
-
-    # Scan now that files are guaranteed on disk.
-    scan_project(target_path, output_dir=project_dir)
-    if scope_path:
-        _scan_parent_project(project_dir, reports_path, target_path)
+    _materialize_and_scan(_MaterializeRequest(
+        repo=repo, repo_resolved=repo_resolved, project_name=project_name,
+        project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
+        scope_path=scope_path, is_url=is_url, ephemeral=ephemeral,
+        clone_dest=clone_dest, clones_dir=clones_dir,
+    ))
 
     _sync_repo_index_on_create(reports_path, project_name, repo_resolved, scope_path, project_uuid)
     return project_uuid
@@ -185,9 +178,10 @@ def _sync_repo_index_on_create(
 def _ensure_onboarding_field(project_dir: Path) -> None:
     """Add `onboardingCompletedAt: null` to repository_info.json if absent.
 
-    Called from `register_project` so newly-registered projects start with the
-    field set to null. Existing projects without the field get a backfill on
-    read (see `_backfill_onboarding_field` in _fs_project_helpers.py).
+    Called during registration (via `_resolve_project_slot`) so newly-registered
+    projects start with the field set to null. Existing projects without the
+    field get a backfill on read (see `_backfill_onboarding_field` in
+    _fs_project_helpers.py).
     """
     data = read_repository_info(project_dir)
     if data is None or "onboardingCompletedAt" in data:

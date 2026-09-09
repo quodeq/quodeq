@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from http import HTTPStatus
+from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
@@ -52,6 +54,48 @@ def _validate_start_payload(payload: dict) -> Response | tuple[Response, int] | 
     return None
 
 
+@dataclass(frozen=True)
+class _StartRequest:
+    """A validated POST /api/evaluations body, ready for provider.start_evaluation."""
+
+    repo: Any
+    options: Any
+
+
+def _validated_start_request(
+    payload: dict,
+) -> tuple[_StartRequest | None, Response | tuple[Response, int] | None]:
+    """Validate + build a start request. Returns ``(request, error)``: on
+    success *error* is None; on failure *request* is None and *error* is the
+    route's early-return value.
+    """
+    error = _validate_start_payload(payload)
+    if error is not None:
+        return None, error
+    repo = payload.get("repo")
+    _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
+    try:
+        options = _build_evaluation_options(payload)
+    except ValueError as exc:
+        body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return None, (jsonify(body), status)
+    # Same allowlist as /api/scan and POST /api/projects: starting an
+    # evaluation registers + scans the directory and persists its file
+    # tree, so an unvalidated local path would leak arbitrary readable
+    # directories through project endpoints.
+    try:
+        is_url = is_repo_url(str(repo))
+    except ValueError:
+        body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
+        return None, (jsonify(body), status)
+    if not is_url:
+        err = scan_target_error(str(repo), _reports_dir())
+        if err is not None:
+            body, status = err
+            return None, (jsonify(body), status)
+    return _StartRequest(repo=repo, options=options), None
+
+
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
 
@@ -84,32 +128,13 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         if rate_error is not None:
             return rate_error
         payload = request.get_json(silent=True) or {}
-        error = _validate_start_payload(payload)
+        start_request, error = _validated_start_request(payload)
         if error is not None:
             return error
-        repo = payload.get("repo")
-        _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
-            options = _build_evaluation_options(payload)
-        except ValueError as exc:
-            body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
-        # Same allowlist as /api/scan and POST /api/projects: starting an
-        # evaluation registers + scans the directory and persists its file
-        # tree, so an unvalidated local path would leak arbitrary readable
-        # directories through project endpoints.
-        try:
-            is_url = is_repo_url(str(repo))
-        except ValueError:
-            body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
-            return jsonify(body), status
-        if not is_url:
-            err = scan_target_error(str(repo), _reports_dir())
-            if err is not None:
-                body, status = err
-                return jsonify(body), status
-        try:
-            job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
+            job = provider.start_evaluation(
+                repo=start_request.repo, reports_dir=_reports_dir(), options=start_request.options,
+            )
         except (FileNotFoundError, ValueError):
             body, status = error_response(
                 "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
