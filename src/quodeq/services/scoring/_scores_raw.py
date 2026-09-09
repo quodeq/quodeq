@@ -2,13 +2,11 @@
 
 Split from ``scoring/__init__.py`` to keep that file under the size
 ratchet's 300-line cap. ``get_scores_raw``/``get_scores_slim`` stay
-re-exported from there. ``_logger`` is threaded from the package
-``__init__.py`` (not a fresh ``logging.getLogger`` here) -- imported after
-that module's own ``_logger`` is already assigned, so this resolves against
-the already-initialized part of that (still-loading) module; no true cycle.
+re-exported from there.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from quodeq.services.grade_formula import load_params
@@ -21,8 +19,9 @@ from quodeq.services.scoring._response_builders import (
     _build_response_from_eval_files,
     _build_response_from_grade_tables,
 )
-from quodeq.services.scoring import _logger
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 
 def _prefer_eval_rescore(deps: ScoringDeps, project_dir: Path, run_dir: Path) -> bool:
