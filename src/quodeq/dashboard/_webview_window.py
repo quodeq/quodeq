@@ -1,22 +1,23 @@
 """PyWebView window process — launched as a subprocess by _server.py.
 
-HIGH RISK: tests/dashboard/test_native_chrome.py patches internals via
+tests/dashboard/test_native_chrome.py patches some internals via
 ``patch.object(ww, "<name>")`` while a DIFFERENT function bare-calls the
 patched name. ``patch.object(ww, "X")`` only rebinds the name ``X`` inside
 *this* module's namespace — so whichever function bare-calls ``X`` must be
 defined here (its ``__globals__`` must be this module's dict), or the mock
-never intercepts the call. ``X`` itself may be defined in a sibling module
-and merely re-exported here (see the imports below); only the caller needs
-to live in this file. Functions below stay here for that reason even though
-their own bodies were extracted to siblings for size — see each sibling
-module's docstring for the specific pair it preserves.
+never intercepts the call. The remaining seams of that kind are ``webview``,
+``InstanceController``, the ``_make_on_*`` factories, ``_create_window``,
+``_quodeq_dir``, ``_set_app_icon``, and ``_non_macos_menu`` — all bare-called
+from main() (or, for ``webview``, also from _create_window), defined here or
+merely re-exported from a sibling module. ``sys`` and ``webbrowser`` are
+patched as shared module objects instead (e.g.
+``patch.object(ww.sys, "platform")``), which works regardless of which file
+calls them.
 """
 from __future__ import annotations
 
 import logging
 import sys
-import threading  # noqa: F401 — `ww.threading` is patched by tests/dashboard/test_native_chrome.py
-import urllib.request  # noqa: F401 — `ww.urllib.request` is patched by the same test module
 import webbrowser
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from quodeq.dashboard._webview_window_about import (  # noqa: F401 — re-export
     _webview_user_agent,
     _WEBVIEW_UA_MARKER,
 )
+from quodeq.dashboard import _webview_window_chrome as _chrome
 from quodeq.dashboard._webview_window_chrome import (  # noqa: F401 — re-export
     _apply_unified_toolbar,
     _set_macos_fullscreen_class,
@@ -40,10 +42,12 @@ from quodeq.dashboard._webview_window_chrome import (  # noqa: F401 — re-expor
 )
 from quodeq.dashboard._webview_window_close import (  # noqa: F401 — re-export
     _alert_return_to_choice,
+    _ask_close_choice,
     _CLOSE_CONFIRM_BODY,
     _CLOSE_CONFIRM_TITLE,
     _macos_confirm_close,
     _make_on_closing,
+    _prompt_close_choice_and_finish,
 )
 from quodeq.dashboard._webview_window_fullscreen import (  # noqa: F401 — re-export
     _install_macos_fullscreen_observer,
@@ -74,9 +78,10 @@ class _WindowApi:
     """Python API exposed to JavaScript for window controls.
 
     HTTP and native-dialog bodies live in _webview_window_native_ops.py
-    (none of them are patch-tested by name); set_titlebar_theme stays here
-    because it bare-calls _set_macos_titlebar_appearance / _set_windows_titlebar,
-    both patch-tested against this module's namespace.
+    (none of them are patch-tested by name); set_titlebar_theme dispatches
+    through _webview_window_chrome (imported here as _chrome), so a patch on
+    either module's copy of _set_macos_titlebar_appearance / _set_windows_titlebar
+    is visible to the call.
     """
 
     def __init__(self) -> None:
@@ -130,9 +135,9 @@ class _WindowApi:
             return
         dark = mode == "dark"
         if sys.platform == "darwin":
-            _set_macos_titlebar_appearance(self._window, dark)
+            _chrome._set_macos_titlebar_appearance(self._window, dark)
         elif sys.platform == "win32":
-            _set_windows_titlebar(dark)
+            _chrome._set_windows_titlebar(dark)
 
 
 def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
@@ -154,61 +159,6 @@ def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
     )
 
 
-def _ask_close_choice(window: object) -> str:
-    """Ask the user how to close while a scan runs; return 'keep', 'cancel', or 'stay'.
-
-    macOS gets a 3-button native alert (keep scanning / cancel scan / stay);
-    other backends get pywebview's 2-button dialog (OK = keep scanning, Cancel =
-    stay). If the dialog can't render, return 'keep' so the user is never
-    trapped in an un-closeable window.
-
-    Stays in this module because it is itself patch-tested
-    (``patch.object(ww, "_ask_close_choice")``) and bare-calls
-    _macos_confirm_close, which is also patch-tested against this namespace.
-    """
-    if sys.platform == "darwin":
-        return _macos_confirm_close(window)
-    try:
-        ok = bool(window.create_confirmation_dialog(
-            _CLOSE_CONFIRM_TITLE, _CLOSE_CONFIRM_BODY,
-        ))
-    except Exception:
-        return "keep"
-    return "keep" if ok else "stay"
-
-
-def _prompt_close_choice_and_finish(
-    api: "_WindowApi", window: object, state: dict, job_id: str | None,
-) -> None:
-    """Worker body for the macOS/GTK/Qt close path: ask the close choice, act
-    on it, and (unless staying) commit the close. Runs OFF the GUI thread —
-    see _webview_window_close._make_on_closing_async for why answering inline
-    would self-deadlock.
-
-    Stays in this module because it bare-calls the patch-tested
-    _ask_close_choice.
-    """
-    try:
-        choice = _ask_close_choice(window)  # 'keep' | 'cancel' | 'stay'
-    except Exception:
-        choice = "keep"  # never trap the user on an unexpected dialog error
-    if choice == "stay":
-        state["prompting"] = False  # re-promptable: a later close asks again
-        return
-    if choice == "cancel":
-        api._cancel_evaluation(job_id)
-    # Set `confirmed` BEFORE destroy(): on GTK/Qt/winforms window.destroy()
-    # re-fires the closing event, and the guard in _on_closing is what lets
-    # that re-issued close through instead of looping into another prompt.
-    # `prompting` is deliberately left set through the cancel call above so a
-    # second close during that window can't pop a duplicate dialog.
-    state["confirmed"] = True
-    try:
-        window.destroy()  # type: ignore[union-attr]
-    except Exception:
-        _logger.debug("window.destroy after close-confirm failed", exc_info=True)
-
-
 def _apply_macos_fullscreen_chrome(
     window: object, is_full: bool, *, restore_toolbar: bool = True,
 ) -> None:
@@ -224,8 +174,8 @@ def _apply_macos_fullscreen_chrome(
     initial install (_set_macos_unified_toolbar) already owns that, so the
     load-time sync must not add a second one.
 
-    Stays in this module because it bare-calls the patch-tested
-    _apply_unified_toolbar.
+    Calls through _webview_window_chrome (imported here as _chrome) for
+    _apply_unified_toolbar, so a patch on either module's copy is visible.
     """
     nswindow = getattr(window, "native", None) if window is not None else None
     if nswindow is not None:
@@ -233,7 +183,7 @@ def _apply_macos_fullscreen_chrome(
             if is_full:
                 nswindow.setToolbar_(None)
             elif restore_toolbar:
-                _apply_unified_toolbar(nswindow)
+                _chrome._apply_unified_toolbar(nswindow)
         except (AttributeError, ValueError, TypeError, ImportError):
             pass
     _set_macos_fullscreen_class(window, is_full)

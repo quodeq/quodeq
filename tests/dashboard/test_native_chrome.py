@@ -9,6 +9,8 @@ import pytest
 import webview as real_webview
 
 from quodeq.dashboard import _webview_window as ww
+from quodeq.dashboard import _webview_window_chrome as chrome
+from quodeq.dashboard import _webview_window_close as wwc
 from tests._timeouts import budget
 
 # Some tests import PyObjCTools to patch AppHelper. pyobjc is darwin-only
@@ -166,28 +168,28 @@ class TestSetTitlebarTheme:
     def test_dark_dispatches_macos(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+             patch.object(chrome, "_set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("dark")
         mac.assert_called_once_with(api._window, True)
 
     def test_light_dispatches_macos(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+             patch.object(chrome, "_set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("light")
         mac.assert_called_once_with(api._window, False)
 
     def test_dark_dispatches_windows(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "win32"), \
-             patch.object(ww, "_set_windows_titlebar") as win:
+             patch.object(chrome, "_set_windows_titlebar") as win:
             api.set_titlebar_theme("dark")
         win.assert_called_once_with(True)
 
     def test_unknown_mode_is_noop(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(ww, "_set_macos_titlebar_appearance") as mac:
+             patch.object(chrome, "_set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("purple")
         mac.assert_not_called()
 
@@ -226,7 +228,7 @@ class TestOnClosing:
 
     def test_no_job_closes_without_prompt(self):
         on_closing, window, api = self._wire(job=None)
-        with patch.object(ww, "_ask_close_choice") as choose:
+        with patch.object(wwc, "_ask_close_choice") as choose:
             assert on_closing() is True
         choose.assert_not_called()
 
@@ -236,7 +238,7 @@ class TestOnClosing:
         # the closing handler (which runs ON the GUI thread) self-deadlocks. The
         # handler vetoes this close and shows the dialog on a worker thread.
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(ww, "_ask_close_choice", return_value="stay") as choose:
+        with patch.object(wwc, "_ask_close_choice", return_value="stay") as choose:
             assert on_closing() is False
             self._join(on_closing)
         choose.assert_called_once()
@@ -251,7 +253,7 @@ class TestOnClosing:
             seen["tid"] = threading.get_ident()
             return "stay"
 
-        with patch.object(ww, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
             assert on_closing() is False
             self._join(on_closing)
         assert seen["tid"] != caller
@@ -268,7 +270,7 @@ class TestOnClosing:
             release.wait()
             return "keep"
 
-        with patch.object(ww, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
             result = []
             caller = threading.Thread(target=lambda: result.append(on_closing()))
             caller.start()
@@ -282,7 +284,7 @@ class TestOnClosing:
 
     def test_keep_scanning_closes_window_without_cancelling(self):
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(ww, "_ask_close_choice", return_value="keep"):
+        with patch.object(wwc, "_ask_close_choice", return_value="keep"):
             on_closing()
             self._join(on_closing)
         window.destroy.assert_called_once()
@@ -292,7 +294,7 @@ class TestOnClosing:
 
     def test_cancel_scan_and_quit_cancels_then_closes(self):
         on_closing, window, api = self._wire(job={"jobId": "job-42"})
-        with patch.object(ww, "_ask_close_choice", return_value="cancel"):
+        with patch.object(wwc, "_ask_close_choice", return_value="cancel"):
             on_closing()
             self._join(on_closing)
         api._cancel_evaluation.assert_called_once_with("job-42")
@@ -301,7 +303,7 @@ class TestOnClosing:
 
     def test_stay_keeps_window_open_and_can_reprompt(self):
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(ww, "_ask_close_choice", return_value="stay") as choose:
+        with patch.object(wwc, "_ask_close_choice", return_value="stay") as choose:
             assert on_closing() is False
             self._join(on_closing)
             window.destroy.assert_not_called()
@@ -325,7 +327,7 @@ class TestOnClosing:
             release.wait()
             return "keep"
 
-        with patch.object(ww, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
             assert on_closing() is False
             first_worker = on_closing._worker
             for _ in range(200):  # wait until the worker is actually prompting
@@ -353,7 +355,7 @@ class TestOnClosing:
             release.wait()
 
         api._cancel_evaluation.side_effect = _cancel
-        with patch.object(ww, "_ask_close_choice", return_value="cancel") as choose:
+        with patch.object(wwc, "_ask_close_choice", return_value="cancel") as choose:
             assert on_closing() is False
             first_worker = on_closing._worker
             assert cancel_started.wait(budget(2))  # worker is now inside the cancel call
@@ -370,7 +372,7 @@ class TestOnClosing:
         # If the choice can't be obtained, fall through to closing the window
         # (treat as 'keep') rather than leaving it un-closeable.
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(ww, "_ask_close_choice", side_effect=RuntimeError("no GUI")):
+        with patch.object(wwc, "_ask_close_choice", side_effect=RuntimeError("no GUI")):
             assert on_closing() is False
             self._join(on_closing)
         window.destroy.assert_called_once()
@@ -381,7 +383,7 @@ class TestOnClosing:
     def test_ask_close_choice_macos_dispatches_to_native_alert(self):
         window = MagicMock()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(ww, "_macos_confirm_close", return_value="cancel") as mac:
+             patch.object(wwc, "_macos_confirm_close", return_value="cancel") as mac:
             assert ww._ask_close_choice(window) == "cancel"
         mac.assert_called_once_with(window)
 
@@ -435,7 +437,7 @@ class TestOnClosing:
             captured["origin"] = req.headers.get("Origin")
             return _Resp()
 
-        with patch.object(ww.urllib.request, "urlopen", side_effect=_fake_urlopen):
+        with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
             api._cancel_evaluation("job-42")
         assert captured["url"] == "http://127.0.0.1:7863/api/evaluations/job-42"
         assert captured["method"] == "DELETE"
@@ -443,7 +445,7 @@ class TestOnClosing:
 
     def test_cancel_evaluation_noop_without_job_or_base_url(self):
         api = ww._WindowApi()
-        with patch.object(ww.urllib.request, "urlopen") as uo:
+        with patch("urllib.request.urlopen") as uo:
             api._base_url = ""
             api._cancel_evaluation("job-42")   # no base url
             api._base_url = "http://x"
@@ -456,8 +458,8 @@ class TestOnClosing:
         import urllib.error
         api = ww._WindowApi()
         api._base_url = "http://127.0.0.1:7863"
-        with patch.object(ww.urllib.request, "urlopen",
-                          side_effect=urllib.error.URLError("boom")):
+        with patch("urllib.request.urlopen",
+                    side_effect=urllib.error.URLError("boom")):
             api._cancel_evaluation("job-42")  # must not raise
 
     # --- Windows / winforms: dialog runs inline on the UI thread (2-button) -
@@ -603,7 +605,7 @@ class _SyncThread:
 class TestMacFullscreenClass:
     def test_toggle_true_adds_class(self):
         window = MagicMock()
-        with patch.object(ww.threading, "Thread", _SyncThread):
+        with patch("threading.Thread", _SyncThread):
             ww._set_macos_fullscreen_class(window, True)
         window.evaluate_js.assert_called_once()
         js = window.evaluate_js.call_args.args[0]
@@ -612,7 +614,7 @@ class TestMacFullscreenClass:
 
     def test_toggle_false_removes_class(self):
         window = MagicMock()
-        with patch.object(ww.threading, "Thread", _SyncThread):
+        with patch("threading.Thread", _SyncThread):
             ww._set_macos_fullscreen_class(window, False)
         js = window.evaluate_js.call_args.args[0]
         assert js.endswith("false)")
@@ -621,7 +623,7 @@ class TestMacFullscreenClass:
         # evaluate_js on the AppKit main thread deadlocks, so the toggle must
         # always be dispatched to a worker thread.
         window = MagicMock()
-        with patch.object(ww.threading, "Thread") as thread_cls:
+        with patch("threading.Thread") as thread_cls:
             ww._set_macos_fullscreen_class(window, True)
         thread_cls.assert_called_once()
         thread_cls.return_value.start.assert_called_once()
@@ -634,8 +636,8 @@ class TestMacFullscreenChrome:
         # fullscreen — drop it (the lights it centers are hidden there anyway).
         window = MagicMock()
         nswindow = window.native
-        with patch.object(ww.threading, "Thread", _SyncThread), \
-             patch.object(ww, "_apply_unified_toolbar") as restore:
+        with patch("threading.Thread", _SyncThread), \
+             patch.object(chrome, "_apply_unified_toolbar") as restore:
             ww._apply_macos_fullscreen_chrome(window, True)
         nswindow.setToolbar_.assert_called_once_with(None)
         restore.assert_not_called()
@@ -644,8 +646,8 @@ class TestMacFullscreenChrome:
     def test_windowed_restores_toolbar(self):
         window = MagicMock()
         nswindow = window.native
-        with patch.object(ww.threading, "Thread", _SyncThread), \
-             patch.object(ww, "_apply_unified_toolbar") as restore:
+        with patch("threading.Thread", _SyncThread), \
+             patch.object(chrome, "_apply_unified_toolbar") as restore:
             ww._apply_macos_fullscreen_chrome(window, False)
         restore.assert_called_once_with(nswindow)
         nswindow.setToolbar_.assert_not_called()
@@ -656,8 +658,8 @@ class TestMacFullscreenChrome:
         # must not add a second one (restore_toolbar=False).
         window = MagicMock()
         nswindow = window.native
-        with patch.object(ww.threading, "Thread", _SyncThread), \
-             patch.object(ww, "_apply_unified_toolbar") as restore:
+        with patch("threading.Thread", _SyncThread), \
+             patch.object(chrome, "_apply_unified_toolbar") as restore:
             ww._apply_macos_fullscreen_chrome(window, False, restore_toolbar=False)
         restore.assert_not_called()
         nswindow.setToolbar_.assert_not_called()

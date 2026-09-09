@@ -1,10 +1,12 @@
 """Native window chrome: titlebar appearance, traffic lights, unified toolbar.
 
-Leaf helpers for _webview_window.py. Callers that are patch-tested (e.g. the
-titlebar-theme dispatch in _WindowApi, the fullscreen-chrome sync) stay in the
-facade and bare-call these by name; moving THEM here would break
-`patch.object(ww, "<name>")` mocks in tests/dashboard/test_native_chrome.py,
-which patch the facade module's own namespace.
+Leaf helpers for _webview_window.py. Callers in the facade (the
+titlebar-theme dispatch in _WindowApi, the fullscreen-chrome sync) reach
+_set_macos_titlebar_appearance / _set_windows_titlebar / _apply_unified_toolbar
+through this module (imported there as ``_chrome``) rather than by bare name,
+so tests/dashboard/test_native_chrome.py patches this module's own namespace
+(`patch.object(chrome, "<name>")`, where ``chrome`` is this module) and the
+patch is visible regardless of which module made the call.
 """
 from __future__ import annotations
 

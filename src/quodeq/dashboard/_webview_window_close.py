@@ -1,17 +1,19 @@
-"""Close-confirmation dialog orchestration (backend dispatch + worker spawn).
+"""Close-confirmation dialog orchestration, backend dispatch, and the
+close-choice seam itself.
 
-_ask_close_choice and _prompt_close_choice_and_finish stay in the facade
-(_webview_window.py): _ask_close_choice is itself patch-tested
-(`patch.object(ww, "_ask_close_choice")`) and _prompt_close_choice_and_finish
-bare-calls it, so both must live where a patch on ``ww`` is visible. Nothing
-here is itself patch-tested — tests exercise it through the returned
-``on_closing`` callable and assert on the (already-co-located) choice seam —
-so the orchestration is free to live in its own module. Imports of the
-facade names are deferred (inside the functions) to avoid a circular import,
-since the facade imports _make_on_closing from here at module load time.
+_ask_close_choice and _prompt_close_choice_and_finish live here rather than
+in the facade (_webview_window.py): _ask_close_choice is patch-tested
+against this module's own namespace (`patch.object(wwc, "_ask_close_choice")`
+in tests/dashboard/test_native_chrome.py, where ``wwc`` is this module) and
+_prompt_close_choice_and_finish bare-calls it from here, so both need to
+live together. The facade re-exports both names so
+``ww._ask_close_choice(window)`` direct calls keep working, but a patch on
+the facade's re-export would not intercept the bare call made from this
+module — tests patch this module directly.
 """
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 from collections.abc import Callable
@@ -19,6 +21,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from quodeq.dashboard._webview_window import _WindowApi
+
+_logger = logging.getLogger(__name__)
 
 _CLOSE_CONFIRM_TITLE = "Quit quodeq?"
 # 2-button backends (OK = quit and keep scanning, Cancel = stay open).
@@ -103,12 +107,65 @@ def _show_macos_close_alert(result: dict, done: threading.Semaphore) -> None:
         done.release()
 
 
+def _ask_close_choice(window: object) -> str:
+    """Ask the user how to close while a scan runs; return 'keep', 'cancel', or 'stay'.
+
+    macOS gets a 3-button native alert (keep scanning / cancel scan / stay);
+    other backends get pywebview's 2-button dialog (OK = keep scanning, Cancel =
+    stay). If the dialog can't render, return 'keep' so the user is never
+    trapped in an un-closeable window.
+
+    Patch-tested against this module's own namespace
+    (``patch.object(wwc, "_ask_close_choice")`` in
+    tests/dashboard/test_native_chrome.py) and bare-calls _macos_confirm_close,
+    which is patch-tested the same way — both live here so a patch on either
+    is visible to the other.
+    """
+    if sys.platform == "darwin":
+        return _macos_confirm_close(window)
+    try:
+        ok = bool(window.create_confirmation_dialog(
+            _CLOSE_CONFIRM_TITLE, _CLOSE_CONFIRM_BODY,
+        ))
+    except Exception:
+        return "keep"
+    return "keep" if ok else "stay"
+
+
+def _prompt_close_choice_and_finish(
+    api: "_WindowApi", window: object, state: dict, job_id: str | None,
+) -> None:
+    """Worker body for the macOS/GTK/Qt close path: ask the close choice, act
+    on it, and (unless staying) commit the close. Runs OFF the GUI thread —
+    see _make_on_closing_async for why answering inline would self-deadlock.
+
+    Lives here because it bare-calls the patch-tested _ask_close_choice.
+    """
+    try:
+        choice = _ask_close_choice(window)  # 'keep' | 'cancel' | 'stay'
+    except Exception:
+        choice = "keep"  # never trap the user on an unexpected dialog error
+    if choice == "stay":
+        state["prompting"] = False  # re-promptable: a later close asks again
+        return
+    if choice == "cancel":
+        api._cancel_evaluation(job_id)
+    # Set `confirmed` BEFORE destroy(): on GTK/Qt/winforms window.destroy()
+    # re-fires the closing event, and the guard in _on_closing is what lets
+    # that re-issued close through instead of looping into another prompt.
+    # `prompting` is deliberately left set through the cancel call above so a
+    # second close during that window can't pop a duplicate dialog.
+    state["confirmed"] = True
+    try:
+        window.destroy()  # type: ignore[union-attr]
+    except Exception:
+        _logger.debug("window.destroy after close-confirm failed", exc_info=True)
+
+
 def _spawn_close_prompt_worker(
     api: "_WindowApi", window: object, state: dict, job_id: str | None,
 ) -> threading.Thread:
     """Start the close-confirm prompt on a daemon worker thread and return it."""
-    from quodeq.dashboard._webview_window import _prompt_close_choice_and_finish  # noqa: PLC0415
-
     worker = threading.Thread(
         target=_prompt_close_choice_and_finish, args=(api, window, state, job_id), daemon=True,
     )
@@ -148,7 +205,7 @@ def _make_on_closing_async(api: "_WindowApi", window: object) -> "Callable[[], b
     dialog on a worker thread so it can't self-deadlock the closing handler.
 
     ``state`` is shared between the GUI thread (``_on_closing``) and the worker
-    (``_prompt_close_choice_and_finish``, in the facade). Dict-item writes are
+    (``_prompt_close_choice_and_finish``, above). Dict-item writes are
     atomic under the GIL; the running job id is passed to the worker as an
     argument (not shared) so a re-entrant close can't make it cancel a
     different job. ``prompting`` stays set until the worker either resolves to
