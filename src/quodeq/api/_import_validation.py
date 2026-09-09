@@ -28,10 +28,16 @@ _MAX_PATH_DEPTH = 64  # limit on path components to bound recursion-style attack
 
 
 class _ImportError(Exception):
-    """Raised when a zip fails validation. Carries an HTTP status + code."""
+    """Raised when a zip fails validation. Carries an HTTP status + code.
+
+    ``public_message`` is the hand-written text the route returns to the
+    client; routes read that attribute rather than ``str(exc)`` so the
+    response never depends on exception formatting.
+    """
 
     def __init__(self, message: str, status: int, code: str) -> None:
         super().__init__(message)
+        self.public_message = message
         self.status = status
         self.code = code
 

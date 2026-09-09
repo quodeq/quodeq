@@ -45,14 +45,24 @@ def read_json(path: Path) -> dict[str, Any]:
     return data
 
 
-def validate_path_segment(*segments: str) -> None:
-    """Raise ValueError if any segment contains path traversal or separator characters."""
+def path_segment_error(*segments: str) -> str | None:
+    """Return an error message for the first segment containing path
+    traversal or separator characters, else None. Message text mirrors
+    :func:`validate_path_segment` exactly."""
     for seg in segments:
         if ".." in seg or "/" in seg or "\\" in seg or "\0" in seg:
-            raise ValueError(
+            return (
                 f"Invalid path segment: {seg!r}. "
                 f"Use only alphanumeric characters, hyphens, underscores, and dots."
             )
+    return None
+
+
+def validate_path_segment(*segments: str) -> None:
+    """Raise ValueError if any segment contains path traversal or separator characters."""
+    err = path_segment_error(*segments)
+    if err is not None:
+        raise ValueError(err)
 
 
 def _match_child_entry(entry: os.DirEntry, root: str | Path, name: str) -> str | None:

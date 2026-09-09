@@ -118,6 +118,29 @@ def params_from_dict(data: Mapping[str, Any]) -> ScoringParams:
     )
 
 
+_COERCION_ERRORS = (TypeError, ValueError, KeyError, AttributeError)
+
+
+def params_error(data: object) -> str | None:
+    """Return ``"Malformed params: <key>"`` naming the first known key whose
+    value :func:`params_from_dict` cannot coerce, ``"Malformed params"`` when
+    *data* is not a mapping at all, else ``None``.
+
+    Names only our own key (from the defaults' key set), never the coercion
+    failure text, so the message is safe to return to an HTTP client.
+    """
+    if not isinstance(data, Mapping):
+        return "Malformed params"
+    for key in params_to_dict(DEFAULT_PARAMS):
+        if key not in data:
+            continue
+        try:
+            params_from_dict({key: data[key]})
+        except _COERCION_ERRORS:
+            return f"Malformed params: {key}"
+    return None
+
+
 def validate_params(params: ScoringParams) -> list[str]:
     """Return a list of human-readable validation errors (empty = valid)."""
     errors: list[str] = []

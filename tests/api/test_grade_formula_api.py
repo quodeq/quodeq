@@ -139,3 +139,14 @@ def test_preview_rejects_invalid_params(client, formula_path):
         "/api/grade-formula/preview", json={"project": "p", "params": payload}, headers=_ORIGIN,
     )
     assert resp.status_code == 400
+
+
+def test_put_names_the_malformed_key_without_echoing_exception_text(client, formula_path):
+    payload = params_to_dict(DEFAULT_PARAMS)
+    payload["baseK"] = "abc"
+    resp = client.put("/api/grade-formula", json=payload, headers=_ORIGIN)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "INVALID_INPUT"
+    assert body["error"] == "Malformed params: baseK"
+    assert not formula_path.exists()

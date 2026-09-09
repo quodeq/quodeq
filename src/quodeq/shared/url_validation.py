@@ -6,6 +6,34 @@ from urllib.parse import urlparse
 from quodeq.shared.ssrf import is_loopback_address, is_private_address
 
 
+def url_safety_error(
+    url: str,
+    *,
+    allow_private: bool = False,
+    allow_loopback: bool = False,
+) -> str | None:
+    """Return an error message if *url* uses a non-HTTP scheme or targets a
+    private address, else None. Message text and branch order mirror
+    :func:`validate_url_safe` exactly."""
+    if not url:
+        return "URL must not be empty"
+
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ("http", "https"):
+        return f"URL scheme {parsed.scheme!r} is not allowed; use http or https"
+
+    hostname = parsed.hostname
+    if not hostname:
+        return "URL must include a hostname"
+
+    if not allow_private and is_private_address(hostname):
+        if allow_loopback and is_loopback_address(hostname):
+            return None  # loopback is explicitly permitted
+        return f"URL targets a private/internal address: {hostname!r}"
+    return None
+
+
 def validate_url_safe(
     url: str,
     *,
@@ -29,19 +57,6 @@ def validate_url_safe(
     (e.g. omlx running on localhost) without opening up the full private range.
     *allow_loopback* is ignored when *allow_private* is ``True``.
     """
-    if not url:
-        raise ValueError("URL must not be empty")
-
-    parsed = urlparse(url)
-
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"URL scheme {parsed.scheme!r} is not allowed; use http or https")
-
-    hostname = parsed.hostname
-    if not hostname:
-        raise ValueError("URL must include a hostname")
-
-    if not allow_private and is_private_address(hostname):
-        if allow_loopback and is_loopback_address(hostname):
-            return  # loopback is explicitly permitted
-        raise ValueError(f"URL targets a private/internal address: {hostname!r}")
+    err = url_safety_error(url, allow_private=allow_private, allow_loopback=allow_loopback)
+    if err is not None:
+        raise ValueError(err)

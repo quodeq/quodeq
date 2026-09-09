@@ -17,6 +17,7 @@ from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
+    params_error,
     params_from_dict,
     params_to_dict,
     validate_params,
@@ -25,21 +26,25 @@ from quodeq.services import grade_formula
 from quodeq.shared.validation import validate_path_segment
 
 
+def _invalid_input(message: str) -> tuple[Response, int]:
+    body, status = error_response(message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    return jsonify(body), status
+
+
 def _parse_params(data: dict) -> tuple:
     """Returns (params, None) or (None, (response, status)) on validation error."""
+    err = params_error(data or {})
+    if err is not None:
+        return None, _invalid_input(err)
     try:
         params = params_from_dict(data or {})
-    except (TypeError, ValueError, KeyError, AttributeError) as exc:
-        body, status = error_response(
-            f"Malformed params: {exc}", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-        )
-        return None, (jsonify(body), status)
+    except (TypeError, ValueError, KeyError, AttributeError):
+        # Unreachable once params_error passed; kept as a safety net with a
+        # constant message so nothing here can ever echo exception text.
+        return None, _invalid_input("Malformed params")
     errors = validate_params(params)
     if errors:
-        body, status = error_response(
-            "; ".join(errors), HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-        )
-        return None, (jsonify(body), status)
+        return None, _invalid_input("; ".join(errors))
     return params, None
 
 
