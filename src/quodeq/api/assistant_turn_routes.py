@@ -106,6 +106,10 @@ def register_assistant_turn_routes(app: Flask) -> None:
             return jsonify({"error": "text required"}), 400
         if local_provider_busy(session["provider"]):
             return jsonify({"error": "model busy with analysis"}), 409
+        if (session.get("source") or "local") == "shared":
+            shared_error = _assistant_routes._shared_source_error()
+            if shared_error is not None:
+                return shared_error
         state = _turn_state(app)
         cancel = state.claim_turn(sid)
         if cancel is None:
@@ -129,9 +133,13 @@ def register_assistant_turn_routes(app: Flask) -> None:
             )
             tool_ctx = _assistant_routes.build_tool_context(app, session)
             _start_turn_worker(state, sid, turn, repo, tool_ctx, cancel)
-        except SharedSourceUnavailable as exc:
+        except SharedSourceUnavailable:
+            # Race between the pre-check above and this build_tool_context
+            # call. Constant body, not str(exc): the pre-check already
+            # reported the specific reason; this is just the narrow window
+            # where the shared clone changed state in between.
             state.release_turn(sid)
-            return jsonify({"error": str(exc)}), 409
+            return jsonify({"error": "shared repository unavailable", "code": "SHARED_REPO_UNAVAILABLE"}), 409
         except Exception:
             state.release_turn(sid)
             raise

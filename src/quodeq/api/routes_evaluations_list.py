@@ -15,9 +15,11 @@ from quodeq.api._evaluation_helpers import (
     _validate_ai_cmd,
     _validate_ai_cmd_path,
     _validate_ai_model,
+    clean_scan_conflict_error,
 )
 from quodeq.api.helpers import error_response, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
+from quodeq.shared.validation import relative_scope_error
 from quodeq.assistant import get_provider_configs
 from quodeq.api.routes import _reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation
@@ -62,6 +64,24 @@ class _StartRequest:
     options: Any
 
 
+def _pre_build_options_error(payload: dict) -> tuple[Response, int] | None:
+    """Pre-check every ValueError source ``_build_evaluation_options`` can
+    hit today (clean_scan conflict, then scope path -- same order it checks
+    them internally), so the caller's try/except is an unreachable safety
+    net, never a path that has to echo exception text."""
+    conflict_err = clean_scan_conflict_error(payload)
+    if conflict_err is not None:
+        body, status = error_response(conflict_err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    scope_path = payload.get("scopePath") or None
+    if scope_path is not None:
+        err = relative_scope_error(str(scope_path))
+        if err is not None:
+            body, status = error_response(err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+    return None
+
+
 def _validated_start_request(
     payload: dict,
 ) -> tuple[_StartRequest | None, Response | tuple[Response, int] | None]:
@@ -74,10 +94,18 @@ def _validated_start_request(
         return None, error
     repo = payload.get("repo")
     _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
+    pre_error = _pre_build_options_error(payload)
+    if pre_error is not None:
+        return None, pre_error
     try:
         options = _build_evaluation_options(payload)
-    except ValueError as exc:
-        body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    except ValueError:
+        # Constant message, not str(exc): both known raise sources are
+        # pre-checked above. Keep it unbound so nothing here can ever echo
+        # exception text.
+        body, status = error_response(
+            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
         return None, (jsonify(body), status)
     # Same allowlist as /api/scan and POST /api/projects: starting an
     # evaluation registers + scans the directory and persists its file

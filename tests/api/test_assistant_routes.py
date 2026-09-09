@@ -872,13 +872,14 @@ def test_message_on_shared_session_without_repo_409s_and_frees_the_slot(client, 
 def test_message_on_shared_session_with_bad_clone_state_409s_and_frees_the_slot(client, app, monkeypatch):
     from quodeq.services.shared_settings import SharedSettings
     # The session was created while the shared clone was in a servable state;
-    # a background refresh has since pulled a foreign/unsupported clone.
-    # build_tool_context must surface this as a 409, and the running-turn
-    # slot must be released so the session is not permanently locked out.
+    # a background refresh has since pulled a foreign/unsupported clone. The
+    # route's pre-check (_shared_source_error, same helper the session-create
+    # route uses) must surface this as a 409 before claiming the turn slot,
+    # so the slot is never held and nothing needs releasing on this path.
     _repo(app).create_session(session_id="s-foreign", provider="ollama", source="shared")
-    monkeypatch.setattr("quodeq.api._assistant_helpers.read_settings",
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_settings",
                         lambda: SharedSettings(url="file:///tmp/fake.git"))
-    monkeypatch.setattr("quodeq.api._assistant_helpers.read_state", lambda url: "foreign")
+    monkeypatch.setattr("quodeq.api.assistant_routes.read_state", lambda url: "foreign")
     first = client.post("/api/assistant/sessions/s-foreign/messages", json={"text": "hi"})
     assert first.status_code == 409
     assert "foreign" in first.get_json()["error"]

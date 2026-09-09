@@ -39,6 +39,20 @@ _MAX_TIME_LIMIT = 3600
 _MAX_CONTEXT_SIZE = 2_000_000
 
 
+def clean_scan_conflict_error(payload: dict) -> str | None:
+    """Return an error message if *payload* sends both the new ``cleanScan``
+    field and the deprecated ``incremental`` field, else None. Message text
+    mirrors :func:`resolve_clean_scan` exactly."""
+    if "cleanScan" in payload and "incremental" in payload:
+        return (
+            "`cleanScan` and `incremental` cannot be combined in a single payload. "
+            "Use `cleanScan` only -- `incremental` is deprecated. "
+            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
+            "(force full re-analysis)."
+        )
+    return None
+
+
 def resolve_clean_scan(payload: dict) -> bool:
     """Resolve the user's clean_scan intent from new and legacy fields.
 
@@ -50,15 +64,10 @@ def resolve_clean_scan(payload: dict) -> bool:
     Sending both is rejected: we won't guess intent if a client transitions
     mid-deployment and ends up posting conflicting flags.
     """
-    has_new = "cleanScan" in payload
+    err = clean_scan_conflict_error(payload)
+    if err is not None:
+        raise ValueError(err)
     has_legacy = "incremental" in payload
-    if has_new and has_legacy:
-        raise ValueError(
-            "`cleanScan` and `incremental` cannot be combined in a single payload. "
-            "Use `cleanScan` only -- `incremental` is deprecated. "
-            "Send `cleanScan: false` (use cached findings, default) or `cleanScan: true` "
-            "(force full re-analysis)."
-        )
     if has_legacy:
         _logger.warning(
             "Evaluation payload uses deprecated `incremental` field. "

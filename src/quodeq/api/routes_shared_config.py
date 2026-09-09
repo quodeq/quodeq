@@ -13,7 +13,7 @@ from quodeq.services.shared_connect import connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status
 from quodeq.services.shared_repo import disconnect_shared_repo, last_synced_at, read_state
 from quodeq.services.shared_settings import read_settings
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import path_segment_error
 
 from .helpers import error_response
 from .routes_common import reports_dir
@@ -115,10 +115,9 @@ def register_shared_config_routes(app: Flask) -> None:
 
     @app.post("/api/projects/<project>/publish")
     def shared_publish_start(project: str) -> tuple[Response, int]:
-        try:
-            validate_path_segment(project)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+        err = path_segment_error(project)
+        if err is not None:
+            return jsonify({"error": err}), 400
         settings = read_settings()
         if not settings.url:
             return jsonify({"error": "no shared repository configured"}), 400

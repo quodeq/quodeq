@@ -18,7 +18,7 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
 from quodeq.services.base import ActionProvider, NewProjectSpec
-from quodeq.shared.validation import contained_path, validate_relative_scope
+from quodeq.shared.validation import contained_path, relative_scope_error
 
 
 def _reports_dir() -> str:
@@ -49,10 +49,9 @@ def _parse_create_project_request(
 
     scope_path = data.get("scopePath") or None
     if scope_path is not None:
-        try:
-            validate_relative_scope(str(scope_path))
-        except ValueError as exc:
-            body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
+        err = relative_scope_error(str(scope_path))
+        if err is not None:
+            body, status = error_response(err, HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
             return None, (jsonify(body), status)
     discipline = data.get("discipline") or None
     clone_dest = data.get("cloneDest") or None

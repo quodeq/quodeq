@@ -20,7 +20,7 @@ from quodeq.llm_bridge import (
     check_cloud_connection,
     resolve_api_key,
 )
-from quodeq.shared.url_validation import validate_url_safe
+from quodeq.shared.url_validation import url_safety_error
 
 
 def _json_body() -> dict | None:
@@ -45,10 +45,10 @@ def _invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
     """
     if base_url is None:
         return None
-    try:
-        validate_url_safe(base_url, allow_private=True)
-    except ValueError as exc:
-        return jsonify({"error": str(exc), "code": "INVALID_URL"}), 400
+    # Checker, not the raising validator: nothing here can echo exception text.
+    err = url_safety_error(base_url, allow_private=True)
+    if err is not None:
+        return jsonify({"error": err, "code": "INVALID_URL"}), 400
     return None
 
 
@@ -194,10 +194,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
             api_key, api_key_env = resolve_api_key(provider_id, api_base)
 
         if api_base:
-            try:
-                validate_url_safe(api_base, allow_private=True)
-            except ValueError as exc:
-                return jsonify({"error": str(exc), "code": "INVALID_URL"}), 400
+            err = url_safety_error(api_base, allow_private=True)
+            if err is not None:
+                return jsonify({"error": err, "code": "INVALID_URL"}), 400
         if not api_key and api_key_env:
             return jsonify({
                 "success": False,

@@ -29,9 +29,13 @@ def _parse_params(data: dict) -> tuple:
     """Returns (params, None) or (None, (response, status)) on validation error."""
     try:
         params = params_from_dict(data or {})
-    except (TypeError, ValueError, KeyError, AttributeError) as exc:
+    except (TypeError, ValueError, KeyError, AttributeError):
+        # A fixed message, not str(exc): echoing exception text back to a
+        # client is the shape of an information-disclosure bug (CodeQL
+        # py/stack-trace-exposure) even though every message reachable here
+        # today is a bare type-conversion failure with no secret content.
         body, status = error_response(
-            f"Malformed params: {exc}", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            "Malformed params", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
         )
         return None, (jsonify(body), status)
     errors = validate_params(params)
