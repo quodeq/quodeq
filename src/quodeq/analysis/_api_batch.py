@@ -53,6 +53,22 @@ class _BatchContext:
     source_files: list[Path]
 
 
+def _resolve_standards_text(
+    work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str],
+) -> str:
+    """Load the compiled standards text for the API prompt, with the
+    project's own requirement overrides applied."""
+    from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
+
+    overrides = load_project_overrides(work_dir)
+    # env is the resolved process environment (run_analysis defaults it to
+    # os.environ), passed explicitly so these lookups skip os.environ itself.
+    return _load_standards_text(
+        cfg.compiled_dir, cfg.dimension, overrides=overrides,
+        max_chars=_max_standards_chars(env),
+    )
+
+
 def _build_api_batch_context(
     work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str], stream_file: Path,
 ) -> _BatchContext | None:
@@ -67,15 +83,7 @@ def _build_api_batch_context(
     if source_files is None:
         return None
 
-    from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
-
-    overrides = load_project_overrides(work_dir)
-    # env is the resolved process environment (run_analysis defaults it to
-    # os.environ), passed explicitly so these lookups skip os.environ itself.
-    standards_text = _load_standards_text(
-        cfg.compiled_dir, cfg.dimension, overrides=overrides,
-        max_chars=_max_standards_chars(env),
-    )
+    standards_text = _resolve_standards_text(work_dir, cfg, env)
     # Resolved once per dimension: the same declared-then-detected trust
     # model the finding sink applies, briefed here to cut out-of-scope findings.
     trust_model = resolve_trust_model(work_dir)

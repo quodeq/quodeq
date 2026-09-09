@@ -394,9 +394,10 @@ class TestRunApiAnalysisBridge:
         assert mock_api.call_args.kwargs["config"].n_subagents == 1
 
     def test_trust_model_reaches_assemble_api_prompt(self, tmp_path):
-        """C2: subprocess.py:435 (``trust_model=trust_model``, fed from
-        subprocess.py:421's ``trust_model = resolve_trust_model(work_dir)``)
-        is one of three live wiring points for the declared trust model.
+        """C2: ``_dispatch_one_batch`` in ``_api_batch.py`` passes
+        ``trust_model=ctx.trust_model``, fed from ``resolve_trust_model(work_dir)``
+        in the same module's ``_build_api_batch_context``. That is one of three
+        live wiring points for the declared trust model.
         Nothing failed when a reviewer set all three to None at once and the
         full suite stayed green -- this closes that gap by asserting the
         resolved model, from a real declared profile, actually reaches

@@ -56,26 +56,31 @@ class _Recorder:
         self.killpg: list[tuple[int, int]] = []
         self.ports: list[int] = []
         self.runs: list[tuple[list[str], bool, int]] = []
+        # Every intercepted call in the order _on_stop makes it.
+        self.order: list[str] = []
 
 
 @pytest.fixture
 def rec(monkeypatch) -> _Recorder:
     """Intercept every process-touching call _on_stop makes."""
     recorder = _Recorder()
+
+    def fake_killpg(pgid, sig):
+        recorder.killpg.append((pgid, sig))
+        recorder.order.append("killpg")
+
+    def fake_kill_port(port):
+        recorder.ports.append(port)
+        recorder.order.append("kill_port")
+
+    def fake_run(args, **kw):
+        recorder.runs.append((args, kw.get("capture_output"), kw.get("timeout")))
+        recorder.order.append("pkill")
+
     monkeypatch.setattr(_app_lifecycle.os, "getpgid", lambda pid: pid + 1000)
-    monkeypatch.setattr(
-        _app_lifecycle.os, "killpg",
-        lambda pgid, sig: recorder.killpg.append((pgid, sig)),
-    )
-    monkeypatch.setattr(
-        _app_lifecycle, "_kill_port_processes", recorder.ports.append,
-    )
-    monkeypatch.setattr(
-        _app_lifecycle.subprocess, "run",
-        lambda args, **kw: recorder.runs.append(
-            (args, kw.get("capture_output"), kw.get("timeout")),
-        ),
-    )
+    monkeypatch.setattr(_app_lifecycle.os, "killpg", fake_killpg)
+    monkeypatch.setattr(_app_lifecycle, "_kill_port_processes", fake_kill_port)
+    monkeypatch.setattr(_app_lifecycle.subprocess, "run", fake_run)
     return recorder
 
 
@@ -139,6 +144,18 @@ class TestProcessGroupTermination:
 
 
 class TestStragglerSweep:
+    def test_group_kill_runs_before_the_sweep(self, rec):
+        # Sweeping first would let pkill race the process-group kill.
+        app = _FakeApp(_FakeProcess())
+
+        app._on_stop(None)
+
+        assert rec.order == (
+            ["killpg"]
+            + ["kill_port"] * len(app._ports)
+            + ["pkill"] * len(_PROCESS_PATTERNS)
+        )
+
     def test_kill_port_processes_called_once_per_port(self, rec):
         app = _FakeApp(_FakeProcess())
 
