@@ -45,7 +45,6 @@ def _invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
     """
     if base_url is None:
         return None
-    # Checker, not the raising validator: nothing here can echo exception text.
     err = url_safety_error(base_url, allow_private=True)
     if err is not None:
         return jsonify({"error": err, "code": "INVALID_URL"}), 400

@@ -251,7 +251,7 @@ def import_zip_stream(
             target_uuid = resolution
             _stage_and_commit(zf, members, reports_root, top_dir, target_uuid, identity)
     except _ImportError as exc:
-        return _error_outcome(str(exc), exc.status, exc.code)
+        return _error_outcome(exc.public_message, exc.status, exc.code)
     except zipfile.BadZipFile:
         return _error_outcome(
             "File is not a valid zip archive.",

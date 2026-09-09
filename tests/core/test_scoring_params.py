@@ -10,6 +10,7 @@ from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
     ScoringParams,
     dimension_weighted_average,
+    params_error,
     params_from_dict,
     params_to_dict,
     validate_params,
@@ -152,3 +153,31 @@ def test_replace_does_not_alias_default_mappings():
     copy = dataclasses.replace(DEFAULT_PARAMS, base_k=0.3)
     assert copy.dimension_weights is not DEFAULT_PARAMS.dimension_weights
     assert copy.severity_weight is not DEFAULT_PARAMS.severity_weight
+
+
+def test_params_error_none_for_valid_payload():
+    assert params_error(params_to_dict(DEFAULT_PARAMS)) is None
+    assert params_error({}) is None
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("baseK", "abc"),
+        ("severityWeight", 5),
+        ("gradeThresholds", [[1.0]]),
+        ("dimensionWeights", {"security": "heavy"}),
+    ],
+)
+def test_params_error_names_the_offending_key_only(key, value):
+    payload = params_to_dict(DEFAULT_PARAMS)
+    payload[key] = value
+    assert params_error(payload) == f"Malformed params: {key}"
+    # The raising path still fails on the same payload; the checker never
+    # echoes its text, only our own key name.
+    with pytest.raises((TypeError, ValueError, KeyError, AttributeError)):
+        params_from_dict(payload)
+
+
+def test_params_error_non_mapping_is_malformed_without_detail():
+    assert params_error(["not", "a", "dict"]) == "Malformed params"

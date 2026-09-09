@@ -2,17 +2,20 @@
 
 CodeQL's ``py/stack-trace-exposure`` fires on any
 ``except X as exc: ... jsonify(...str(exc)...)`` shape: the caught
-exception's text ends up in an HTTP response. This walks every route module
-under ``src/quodeq/api`` and asserts no handler lets the bound exception (or
-its ``repr()``, an f-string interpolation of it, or its ``.args``) reach a
-``jsonify()`` / ``error_response()`` call -- directly, or through a variable
-assigned from one of those forms earlier in the same handler body.
+exception's text ends up in an HTTP response. This walks every module under
+``src/quodeq/api`` and asserts no handler passes the bound exception's text
+(``str()``, ``repr()``, an f-string interpolation, or ``.args``) to any call
+other than a logger -- directly, or through a variable assigned from one of
+those forms earlier in the same handler body. Sink agnostic on purpose:
+``jsonify``/``error_response`` are the direct shapes, but a helper such as
+``_error_outcome(str(exc), ...)`` is the same leak one hop later.
 
 Zero baseline: this must stay empty. A validator that needs to surface a
 message writes a non-raising `<name>_error()` checker (see
 ``shared/validation.py``, ``core/utils/io.py``, ``shared/url_validation.py``)
 and the route returns the checker's string or a fixed constant, never the
-exception object itself.
+exception object itself. A domain exception with a client-facing text keeps
+it in an attribute (``_ImportError.public_message``).
 """
 from __future__ import annotations
 
@@ -21,18 +24,16 @@ from pathlib import Path
 
 _API_ROOT = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "api"
 _REPO_ROOT = _API_ROOT.parents[2]
-_SINK_NAMES = {"jsonify", "error_response"}
+_LOG_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}
 
 
 def _is_sink_call(node: ast.AST) -> bool:
-    """True if *node* calls ``jsonify()``, ``error_response()``, or
-    ``<anything>.error_response()``."""
+    """True for any call that may carry text toward a response: every call
+    except logger methods (``log.warning(...)``, ``warnings.warn(...)``)."""
     if not isinstance(node, ast.Call):
         return False
     func = node.func
-    if isinstance(func, ast.Name) and func.id in _SINK_NAMES:
-        return True
-    return isinstance(func, ast.Attribute) and func.attr == "error_response"
+    return not (isinstance(func, ast.Attribute) and func.attr in _LOG_METHODS)
 
 
 def _is_flagged_expr(node: ast.AST, name: str) -> bool:
