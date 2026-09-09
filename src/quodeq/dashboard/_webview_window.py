@@ -24,6 +24,7 @@ import webview
 
 from quodeq.dashboard._build_npm import _quodeq_dir
 from quodeq.dashboard._instance import InstanceController
+from quodeq.dashboard._webview_token import read_token_from_stdin
 from quodeq.dashboard._webview_window_about import (  # noqa: F401 — re-export
     _set_app_icon,
     _set_macos_app_identity,
@@ -243,7 +244,7 @@ def main() -> None:
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
-    webview_token = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] else None
+    webview_token = read_token_from_stdin()
 
     instance = InstanceController(sock_path)
     api = _WindowApi()
