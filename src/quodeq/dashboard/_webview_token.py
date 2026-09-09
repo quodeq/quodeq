@@ -1,8 +1,12 @@
 """Per-launch shared secret gating the webview's CSP unsafe-eval relaxation."""
 from __future__ import annotations
 
+import contextlib
 import logging
 import secrets
+import subprocess
+import sys
+import typing
 
 # Env var read by quodeq.api.security to gate the webview-only CSP
 # relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
@@ -41,3 +45,64 @@ def _warn_reused_api_token_mismatch(base_url: str) -> None:
         "'unsafe-eval' relaxation will not be granted and its JS bridge may "
         "not work. Stop that API and relaunch to pair them.", base_url,
     )
+
+
+def read_token_from_stdin() -> str | None:
+    """Child side: read this launch's token from stdin, where the parent's
+    spawn_window_with_token wrote it.
+
+    Returns None on anything unexpected (no stdin, empty line, closed pipe).
+    The window then runs a token-less UA and the API serves it the strict
+    CSP -- the JS bridge degrades, the security property holds.
+    """
+    try:
+        if sys.stdin is None:
+            return None
+        return sys.stdin.readline().strip() or None
+    except (OSError, ValueError):
+        return None
+
+
+def _send_token(window_proc: subprocess.Popen | None) -> None:
+    """Write the launch token to the window's stdin, then close it.
+
+    Best-effort by design: on any failure the child reads an empty line, gets
+    no token, and the API serves it the strict CSP. Same fail-closed path as
+    a wrong token, so a broken handover costs the JS bridge, never the
+    security property.
+    """
+    stdin = getattr(window_proc, "stdin", None)
+    if stdin is None:
+        return
+    try:
+        stdin.write(f"{_get_webview_token()}\n".encode())
+        stdin.flush()
+    except (OSError, ValueError):
+        pass
+    finally:
+        # Must close even when the write failed: the child blocks in
+        # readline() until this end is closed.
+        with contextlib.suppress(OSError, ValueError):
+            stdin.close()
+
+
+def spawn_window_with_token(
+    spawn: typing.Callable[..., subprocess.Popen], cmd: list[str], *, stderr: typing.Any,
+) -> subprocess.Popen:
+    """Spawn the webview window and hand it the token over stdin, never argv.
+
+    argv is world-readable: /proc/<pid>/cmdline is mode 0444 and `ps` shows it
+    to every user on the machine, so a token passed there let any local user
+    forge the UA that wins the CSP 'unsafe-eval' relaxation (see
+    quodeq.api.security._is_trusted_webview for what that grants). A pipe is
+    visible only to the two processes holding it.
+    """
+    window_proc = spawn(
+        cmd,
+        start_new_session=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=stderr,
+    )
+    _send_token(window_proc)
+    return window_proc

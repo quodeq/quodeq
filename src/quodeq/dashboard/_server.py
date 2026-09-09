@@ -21,6 +21,7 @@ from quodeq.dashboard._webview_token import (
     _ENV_WEBVIEW_TOKEN,
     _get_webview_token,
     _warn_reused_api_token_mismatch,
+    spawn_window_with_token,
 )
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
@@ -244,10 +245,10 @@ def _serve_native(
     api_pid = str(action_api_process.pid) if action_api_process else ""
     webview_stderr = _open_webview_log()
 
-    shell.spawn_window(
-        subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid, _get_webview_token()]),
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
+    # The launch token goes over stdin inside here, never argv.
+    spawn_window_with_token(
+        shell.spawn_window,
+        subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
         stderr=webview_stderr,
     )
 

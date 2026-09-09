@@ -104,6 +104,59 @@ class TestServeNative:
 
         mock_popen.assert_called_once()
 
+    def test_token_goes_over_stdin_and_never_into_argv(self):
+        """The launch token must not appear in the child's argv.
+
+        /proc/<pid>/cmdline is world-readable and `ps` shows argv to every
+        user on the machine, so a token there let any local user forge the UA
+        that wins the CSP 'unsafe-eval' relaxation. It is written to the
+        child's stdin instead, which only the two processes can see.
+        """
+        from quodeq.dashboard import _webview_token
+        from quodeq.dashboard._server import _serve_native
+
+        mock_instance = MagicMock()
+        mock_instance.probe_existing.return_value = False
+        mock_instance._sock_path = Path("/tmp/test.sock")
+
+        mock_proc = MagicMock()
+        mock_proc.pid = 1234
+        window_proc = MagicMock()
+        mock_popen = MagicMock(return_value=window_proc)
+
+        shell = self._shell(make_instance=lambda: mock_instance, spawn_window=mock_popen)
+        with patch.object(_webview_token, "_get_webview_token", return_value="s3cret-token"):
+            _serve_native("http://localhost:8000", mock_proc, MagicMock(), shell=shell)
+
+        argv = mock_popen.call_args[0][0]
+        assert "s3cret-token" not in argv
+        assert not any("s3cret-token" in str(part) for part in argv), (
+            "the launch token must never reach the child's command line"
+        )
+
+        window_proc.stdin.write.assert_called_once_with(b"s3cret-token\n")
+        window_proc.stdin.close.assert_called_once()
+
+    def test_stdin_is_closed_even_when_the_write_fails(self):
+        """The child blocks in readline() until this end closes, so a failed
+        write must not leave it hanging at startup."""
+        from quodeq.dashboard import _webview_token
+        from quodeq.dashboard._server import _serve_native
+
+        mock_instance = MagicMock()
+        mock_instance.probe_existing.return_value = False
+        mock_instance._sock_path = Path("/tmp/test.sock")
+
+        window_proc = MagicMock()
+        window_proc.stdin.write.side_effect = OSError("broken pipe")
+        mock_popen = MagicMock(return_value=window_proc)
+
+        shell = self._shell(make_instance=lambda: mock_instance, spawn_window=mock_popen)
+        with patch.object(_webview_token, "_get_webview_token", return_value="s3cret-token"):
+            _serve_native("http://localhost:8000", MagicMock(), MagicMock(), shell=shell)
+
+        window_proc.stdin.close.assert_called_once()
+
     def test_parent_never_owns_the_reload_socket(self):
         """The window process owns the socket, so the parent must not bind it.
 
