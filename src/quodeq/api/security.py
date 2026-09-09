@@ -12,6 +12,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.shared.dashboard_ports import alt_port_origins
 
 _logger = logging.getLogger(__name__)
 
@@ -103,16 +104,14 @@ def _is_trusted_webview(user_agent: str) -> bool:
 # hypothetical.
 _VALID_HOST_RE = re.compile(r"^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d+)?$")
 
-# connect-src alt-port origins probed by useServerHealth (DEFAULT_ALT_PORTS =
-# [4180, 4181, 4182, 4183] in useServerHealth.js). CSP has no port wildcard so
-# each origin is enumerated explicitly. Loopback addresses only, so cross-site
-# exfil to external attackers is still blocked. Depends on no request data, so
-# it is built once here instead of on every response.
-_ALT_PORT_ORIGINS = " ".join(
-    f"http://127.0.0.1:{p} http://localhost:{p} "
-    f"ws://127.0.0.1:{p} ws://localhost:{p}"
-    for p in (4180, 4181, 4182, 4183)
-)
+# connect-src alt-port origins probed by useServerHealth.js's
+# altPortCandidates()/PORT_SCAN_SPAN (shared/dashboard_ports.py). CSP has no
+# port wildcard so each origin is enumerated explicitly. Loopback addresses
+# only, so cross-site exfil to external attackers is still blocked. The
+# currentPort..+4 neighbourhood useServerHealth also probes for a non-default
+# QUODEQ_DASHBOARD_PORT stays uncovered here beyond 'self'. Depends on no
+# request data, so it is built once here instead of on every response.
+_ALT_PORT_ORIGINS = alt_port_origins()
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
