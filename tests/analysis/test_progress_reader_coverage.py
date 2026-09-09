@@ -119,7 +119,7 @@ class TestIncrementalProgressReader:
             ]}
         }
         content = json.dumps(event) + "\n"
-        stream_file.write_text(content)
+        stream_file.write_bytes(content.encode("utf-8"))  # bytes: text mode writes CRLF on Windows
         reader = pr_module._IncrementalProgressReader(stream_file, None)
 
         original_parse = pr_module.parse_stream_event
@@ -162,7 +162,7 @@ class TestIncrementalProgressReader:
         assert total_bytes < 2 * (1 << 16), "keep this a two-chunk backlog"
 
         stream_file = tmp_path / "stream.jsonl"
-        stream_file.write_text(content)
+        stream_file.write_bytes(content.encode("utf-8"))  # bytes: text mode writes CRLF on Windows
         reader = pr_module._IncrementalProgressReader(stream_file, None)
 
         original_parse = pr_module.parse_stream_event

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import signal
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -15,6 +16,14 @@ import pytest
 
 from quodeq.menubar import _app_lifecycle
 from quodeq.menubar._app_lifecycle import _PKILL_TIMEOUT_S, _PROCESS_PATTERNS
+
+# The shared fixture patches os.getpgid and os.killpg; neither attribute
+# exists on Windows, so monkeypatch raises before any test body runs. The
+# menubar app only ever runs on macOS.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="patches POSIX-only os.getpgid/os.killpg",
+)
 
 
 class _FakeProcess:
