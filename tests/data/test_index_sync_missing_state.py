@@ -58,3 +58,41 @@ def test_stale_promotion_survives_status_json_missing_state(tmp_path: Path) -> N
         assert disk["exit_reason"] == "stale_detected"
     finally:
         db.close()
+
+
+def test_stale_promotion_survives_status_json_empty_state(tmp_path: Path) -> None:
+    """A status.json with a present but invalid "state" (e.g. "") must not
+    raise ValueError from RunState(...) either.
+
+    Regression for the setdefault("state", state or RunState.RUNNING.value)
+    dead-code path: setdefault only fires when the key is absent, so a
+    present-but-falsy value (like "") was left untouched and blew up in
+    RunState(d["state"]) inside from_status_dict.
+    """
+    db = open_index(tmp_path / "idx.db")
+    try:
+        run = _make_run_dir(tmp_path, "p", "r-empty-state")
+        (run / "status.json").write_text(json.dumps({
+            "schema_version": 2,
+            "job_id": "ext-r-empty-state",
+            "started_at": "2026-04-20T00:00:00+00:00",
+            "dimensions": [],
+            "pid": 999999999,
+            "state": "",
+        }))
+        heartbeat = run / ".heartbeat"
+        heartbeat.touch()
+        old = time.time() - 60
+        os.utime(heartbeat, (old, old))
+
+        promoted = _check_stale_and_promote(
+            db, run, project_uuid="p", run_id="r-empty-state", stale_seconds=30,
+        )
+        assert promoted is True
+
+        disk = read_status(run)
+        assert disk is not None
+        assert disk["state"] == "cancelled"
+        assert disk["exit_reason"] == "stale_detected"
+    finally:
+        db.close()

@@ -25,6 +25,26 @@ function renderReadyContent({ data, callbacks, runMode, projectInfo, selectedRun
   );
 }
 
+/**
+ * @param {object} ctx
+ * @param {object} ctx.data dashboard state slice (dashboard, error, isFetching,
+ *   warmup, accumulated, availableRuns, dailyRuns, overviewRunIndex,
+ *   selectedProject, granularity, selectedSource, scoresPending, customFormula)
+ * @param {object} ctx.callbacks passed through to DashboardContent (onRunSelect,
+ *   onNavigate, onGranularityChange)
+ * @param {boolean} ctx.runMode
+ * @param {object|null} ctx.projectInfo
+ * @param {string} ctx.projectName
+ * @param {object} ctx.pageState from useDashboardPageState (contentReady,
+ *   isLoading, showOverviewSkeleton, dashboardAppearClass)
+ * @param {object} ctx.focus current focused dimension (dimension, setDimension,
+ *   dimensionData)
+ * @param {object} ctx.handlers click handlers from useDashboardHandlers
+ *   (handleDimensionCardClick, handleAccumulatedDimensionClick, handleFileClick)
+ * @param {Array} ctx.accumulatedDimensions pre-rescored accumulated dimensions
+ * @param {string} [ctx.selectedRunId]
+ * @param {() => void} ctx.onSetupComplete
+ */
 export function renderDashboardBody(ctx) {
   const { data, runMode, projectInfo, projectName, pageState, onSetupComplete } = ctx;
   const { dashboard, error, isFetching, warmup = null } = data;

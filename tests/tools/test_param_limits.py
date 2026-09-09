@@ -16,7 +16,7 @@ def test_no_new_param_violations():
 
 # Revise DOWNWARD as maintainability workstreams burn entries; NEVER raise
 # without a justification reviewed in the PR that raises it.
-BASELINE_CEILING = 74  # set to the count --update-baseline printed in Task 1 step 6
+BASELINE_CEILING = 74  # set to the count --update-baseline printed; lower it as entries burn down
 
 
 def test_baseline_only_shrinks():

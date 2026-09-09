@@ -21,6 +21,13 @@ def test_dashboard_base_port_matches_defaults_json():
     assert DASHBOARD_BASE_PORT == defaults["dashboard_port"]
 
 
+def test_alt_ports_matches_use_server_health_js_scan_span():
+    """Pins the literal port set so a PORT_SCAN_SPAN drift from
+    useServerHealth.js's mirrored scan range fails a test instead of
+    silently desyncing the two."""
+    assert alt_ports() == (7863, 7864, 7865, 7866, 7867)
+
+
 def test_alt_port_origins_covers_every_port_both_hosts_both_schemes():
     tokens = alt_port_origins().split()
     ports = alt_ports()

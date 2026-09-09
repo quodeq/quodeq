@@ -17,7 +17,7 @@ source "$(dirname "$0")/_build_common.sh"
 
 build_frontend "$REPO_ROOT"
 sync_engine_version "$REPO_ROOT"
-build_python
+build_python "$REPO_ROOT"
 
 echo "==> Done. Artifacts in dist/"
-ls -lh dist/
+ls -lh "$REPO_ROOT/dist/"

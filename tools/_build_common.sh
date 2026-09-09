@@ -42,6 +42,7 @@ sync_engine_version() {
 }
 
 build_python() {
+  local root="$1"
   echo "==> Building Python package..."
-  uv build
+  (cd "$root" && uv build)
 }

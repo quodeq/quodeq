@@ -1,8 +1,10 @@
 """Canonical scoring functions used by the projection engine.
 
-These produce the same numeric results as services/rescore.py because they
-call the same scoring primitives. Inputs assume dismissed findings have been
-filtered upstream by the caller.
+Both this module and services/_rescore_legacy.py (the in-place fallback
+behind services/rescore.py) call the same shared primitives in
+core/scoring/internals.py, which is why they produce the same numeric
+results. Inputs assume dismissed findings have been filtered upstream by
+the caller.
 
 Output dicts are the neutral domain result contract; persistence adapters
 map them to their own schema (never the other way round):

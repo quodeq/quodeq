@@ -8,6 +8,6 @@ source "$(dirname "$0")/_build_common.sh"
 
 build_frontend "$ROOT"
 sync_engine_version "$ROOT"
-build_python
+build_python "$ROOT"
 
 echo "==> Done. Artifacts in dist/"

@@ -46,7 +46,7 @@ function withRevealedChunk(prev, chunk, startNewBubble) {
 // turn-end latch. A factory rather than lifted functions because drain,
 // scheduleFlush, finishTurn and endTurn are mutually recursive over the same
 // refs -- they only make sense as one closure set, bound once per effect run.
-export function createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef }) {
+function createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef }) {
   const finishTurn = () => { endPending.current = false; setStreaming(false);
     turnBoundary.current = true; onDoneRef.current?.(); };
   const drain = (all) => {
@@ -83,7 +83,7 @@ export function createTurnRevealer({ pending, raf, timer, turnBoundary, endPendi
   return { drain, flushTokens, revealText, endTurn };
 }
 
-export function createInactivityGuard({ inactivity, setError, endTurn }) {
+function createInactivityGuard({ inactivity, setError, endTurn }) {
   return () => {
     if (inactivity.current) clearTimeout(inactivity.current);
     // End the turn cleanly (same as any other terminal frame) instead of
@@ -103,7 +103,7 @@ function createContentGate({ turnBoundary, setError, setStreaming }) {
   return () => { if (turnBoundary.current) setError(null); setStreaming(true); };
 }
 
-export function makeFrameHandlers({ revealer, append, beginContent, setError, endPending }) {
+function makeFrameHandlers({ revealer, append, beginContent, setError, endPending }) {
   const { drain, flushTokens, revealText, endTurn } = revealer;
   return {
     onToken: (f) => {

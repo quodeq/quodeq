@@ -31,6 +31,7 @@ from quodeq.data.sqlite._index_sync_promote import (
 _logger = logging.getLogger(__name__)
 
 _TERMINAL_STATE_VALUES = {s.value for s in TERMINAL_STATES}
+_KNOWN_STATE_VALUES = {s.value for s in RunState}
 
 _UPSERT_SQL = """
 INSERT INTO runs (
@@ -205,11 +206,13 @@ def _check_stale_and_promote(
     pid_alive = isinstance(pid, int) and _is_pid_alive(pid)
 
     if heartbeat_stale and not pid_alive:
-        # from_status_dict needs "state"; fall back if status.json omits it
-        # (discarded by the override below). deadline_at/ai_provider/ai_model
+        # from_status_dict needs a known "state"; fall back if status.json
+        # omits it, or holds a value that isn't a valid RunState (either way
+        # discarded by the override below). deadline_at/ai_provider/ai_model
         # carry forward unchanged, so the dashboard and filesystem snapshot
         # builder keep seeing them.
-        status.setdefault("state", state or RunState.RUNNING.value)
+        if status.get("state") not in _KNOWN_STATE_VALUES:
+            status["state"] = RunState.RUNNING.value
         base = RunStatus.from_status_dict(status)
         new_status = dataclasses.replace(
             base,

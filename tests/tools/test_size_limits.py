@@ -31,7 +31,7 @@ def test_tests_tree_is_scanned_at_file_level():
 
 # Revise DOWNWARD as size workstreams burn entries; NEVER raise without a
 # justification reviewed in the PR that raises it.
-BASELINE_CEILING = 72  # set to the count --update-baseline printed in Task 2 step 3
+BASELINE_CEILING = 72  # set to the count --update-baseline printed; lower it as entries burn down
 
 
 def test_baseline_only_shrinks():
