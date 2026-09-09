@@ -1,142 +1,17 @@
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { invalidateThemeColors } from '../core/galaxyCore.js';
 import VizBreadcrumb from './VizBreadcrumb.jsx';
 import MapLegend, { VizTooltipAnchor } from './MapLegend.jsx';
-import { buildScene, updateSceneLiveData } from './galaxyViewScene.js';
-import { updateTooltip, handleCanvasClick, createKeyboardHandlers } from './galaxyViewEvents.js';
-import { computeLevelInfo, buildBreadcrumb, LevelInfoPanel } from './galaxyViewInfo.jsx';
-import { useGalaxyCamera } from './useGalaxyCamera.js';
+import { LevelInfoPanel } from './galaxyViewInfo.jsx';
+import { useGalaxyViewModel } from './useGalaxyViewModel.js';
 import { t } from '../../../../strings/index.js';
 
-/* ── Custom hook: mouse/click handler setup ── */
-
-function useGalaxyHandlers({ canvasRef, navRef, animRef, camRef, hoveredRef, mouseRef, tooltipRef, prevNavRef, focusedIdxRef, announce, scene, size, startTransition, saveNav, w2s }) {
-  const navigateTo = useCallback((depth, dim, prin) => {
-    if (animRef.current) return;
-    const wasDepth = navRef.current.depth;
-    const zoomingOut = depth < wasDepth;
-    if (zoomingOut) prevNavRef.current = { ...navRef.current };
-    navRef.current = { depth, dim: dim ?? null, prin: prin ?? null };
-    startTransition(zoomingOut);
-    saveNav();
-  }, [animRef, navRef, prevNavRef, saveNav, startTransition]);
-
-  const handleMouseMove = useCallback((e) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    canvasRef.current.style.cursor = hoveredRef.current && navRef.current.depth < 2 ? 'pointer' : 'default';
-    updateTooltip(tooltipRef.current, hoveredRef.current, !!animRef.current, e.clientX, e.clientY);
-  }, [canvasRef, mouseRef, hoveredRef, navRef, tooltipRef, animRef]);
-
-  const handleMouseLeave = useCallback(() => {
-    mouseRef.current = { x: -1, y: -1 };
-    hoveredRef.current = null;
-    if (tooltipRef.current) tooltipRef.current.style.display = 'none';
-  }, [mouseRef, hoveredRef, tooltipRef]);
-
-  const handlerParams = useMemo(
-    () => ({ scene, size, navigateTo, startTransition, saveNav, w2s, announce }),
-    [scene, size, navigateTo, startTransition, saveNav, w2s, announce],
-  );
-
-  const handleClick = useCallback((e) => {
-    handleCanvasClick(e, { hoveredRef, navRef, animRef, camRef, canvasRef }, handlerParams);
-  }, [hoveredRef, navRef, animRef, camRef, canvasRef, handlerParams]);
-
-  const goToDepth = useCallback((d) => {
-    const nav = navRef.current;
-    if (d >= nav.depth) return;
-    if (d <= 0) navigateTo(0);
-    else if (d === 1) navigateTo(1, nav.dim);
-  }, [navRef, navigateTo]);
-
-  const { handleKeyDown, handleFocus, handleBlur } = useMemo(
-    () => createKeyboardHandlers({ navRef, animRef, focusedIdxRef }, handlerParams),
-    [navRef, animRef, focusedIdxRef, handlerParams],
-  );
-
-  return { handleMouseMove, handleMouseLeave, navigateTo, handleClick, goToDepth, handleKeyDown, handleFocus, handleBlur };
-}
-
 export default function GalaxyView({ dimensions, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '', standardTypes = {} }) {
-  // Guard against an omitted or null `dimensions` prop: normalize to an empty
-  // array so the memos below don't crash on `.map()`/`.length`.
-  const safeDimensions = dimensions ?? [];
-  const canvasRef = useRef(null);
-  const [size, setSize] = useState({ w: 800, h: 600 });
-  const savedNavRef = useRef(null);
-  const savedCamRef = useRef(null);
-
   useEffect(() => { invalidateThemeColors(); }, [darkMode]);
 
-  const dimKey = useMemo(() => safeDimensions.map(d => d.dimension).sort().join('|'), [safeDimensions]);
-  const typesKey = useMemo(() => Object.keys(standardTypes).sort().join('|'), [standardTypes]);
-  const scene = useMemo(() => {
-    if (safeDimensions.length === 0) return null;
-    return buildScene(safeDimensions, 800, 600, standardTypes);
-  }, [dimKey, typesKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useMemo(() => {
-    if (scene && safeDimensions.length > 0) updateSceneLiveData(scene, safeDimensions);
-  }, [safeDimensions, scene]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const el = canvasRef.current?.parentElement;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setSize({ w: width, h: height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const hasSavedDeep = savedNavRef.current && savedNavRef.current.depth > 0;
-  const navRef = useRef(hasSavedDeep ? { ...savedNavRef.current } : { depth: 0, dim: null, prin: null });
-  const animRef = useRef(null);
-  const [navVersion, setNavVersion] = useState(0);
-  const mouseRef = useRef({ x: -1, y: -1 });
-  const hoveredRef = useRef(null);
-  const focusedIdxRef = useRef(null);
-  const tooltipRef = useRef(null);
-  const frameRef = useRef(null);
-  const prevNavRef = useRef(null);
-  const [liveMsg, setLiveMsg] = useState('');
-  const announce = useCallback((msg) => setLiveMsg(msg), []);
-
-  const saveNav = useCallback(() => {
-    savedNavRef.current = { ...navRef.current };
-    savedCamRef.current = { ...camRef.current };
-    setNavVersion(v => v + 1);
-  }, []);
-
-  const { camRef, w2s, startTransition } = useGalaxyCamera({
-    canvasRef, scene, size, showLabels, savedNavRef, savedCamRef,
-    navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef,
+  const { scene, size, canvasRef, tooltipRef, liveMsg, breadcrumb, levelInfo, handlers, startTransition, saveNav } = useGalaxyViewModel({
+    dimensions, standardTypes, showLabels, resetKey, projectName, onNavigate,
   });
-
-  // Reset on resetKey change
-  const prevResetKey = useRef(resetKey);
-  useEffect(() => {
-    if (resetKey !== prevResetKey.current) {
-      prevResetKey.current = resetKey;
-      prevNavRef.current = { ...navRef.current };
-      navRef.current = { depth: 0, dim: null, prin: null };
-      savedNavRef.current = null;
-      savedCamRef.current = null;
-      startTransition(true);
-      saveNav();
-    }
-  }, [resetKey, saveNav, startTransition]);
-
-  const { handleMouseMove, handleMouseLeave, handleClick, goToDepth, handleKeyDown, handleFocus, handleBlur } = useGalaxyHandlers({
-    canvasRef, navRef, animRef, camRef, hoveredRef, mouseRef, tooltipRef, prevNavRef, focusedIdxRef, announce,
-    scene, size, startTransition, saveNav, w2s,
-  });
-
-  const breadcrumb = useMemo(() => buildBreadcrumb(scene, navRef.current, projectName), [scene, navVersion]); // eslint-disable-line react-hooks/exhaustive-deps
-  const levelInfo = useMemo(() => computeLevelInfo(scene, navRef.current, projectName, onNavigate, navRef), [scene, navVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasConstellations = scene?.constellations?.length > 0;
   const [visible, setVisible] = useState(false);
@@ -149,13 +24,13 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
       <canvas ref={canvasRef} width={size.w} height={size.h}
         className="viz-focusable"
         style={{ width: '100%', height: '100%', display: 'block' }}
-        onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleClick}
+        onMouseMove={handlers.handleMouseMove} onMouseLeave={handlers.handleMouseLeave} onClick={handlers.handleClick}
         tabIndex={0}
         role="application"
         aria-label={t('map.galaxyAria')}
-        onKeyDown={handleKeyDown}
-        onFocus={handleFocus}
-        onBlur={handleBlur} />
+        onKeyDown={handlers.handleKeyDown}
+        onFocus={handlers.handleFocus}
+        onBlur={handlers.handleBlur} />
       <div aria-live="polite" aria-atomic="true" style={{
         position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
         overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
@@ -164,7 +39,7 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         label: bc.label,
         onClick: i < breadcrumb.length - 1 ? () => {
           if (bc.action) { bc.action(); startTransition(true); saveNav(); }
-          else goToDepth(bc.depth);
+          else handlers.goToDepth(bc.depth);
         } : undefined,
       }))} />
       <VizTooltipAnchor tooltipRef={tooltipRef} />
