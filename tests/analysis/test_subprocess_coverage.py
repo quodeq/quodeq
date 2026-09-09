@@ -402,12 +402,12 @@ class TestRunApiAnalysisBridge:
         resolved model, from a real declared profile, actually reaches
         assemble_api_prompt's kwargs.
 
-        Patched at ``quodeq.analysis.subprocess.assemble_api_prompt``
-        (the name subprocess.py imported into its OWN namespace via
+        Patched at ``quodeq.analysis._api_batch.assemble_api_prompt``
+        (the name _api_batch.py imported into its OWN namespace via
         ``from ... import assemble_api_prompt``), not at
         ``quodeq.analysis.api_prompt_assembly.assemble_api_prompt`` -- the
         latter only rebinds the origin module's attribute and would silently
-        fail to intercept the call subprocess.py already bound at import
+        fail to intercept the call _api_batch.py already bound at import
         time.
         """
         stream = tmp_path / "stream.json"
@@ -423,7 +423,7 @@ class TestRunApiAnalysisBridge:
         provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.analysis.subprocess.assemble_api_prompt", return_value="prompt") as mock_assemble, \
+             patch("quodeq.analysis._api_batch.assemble_api_prompt", return_value="prompt") as mock_assemble, \
              patch("quodeq.analysis._api_runner.run_api_analysis"):
             _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 

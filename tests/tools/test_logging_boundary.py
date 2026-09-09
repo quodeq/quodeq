@@ -28,6 +28,7 @@ _CHECKED_DIRS = ("core", "analysis", "services", "config")
 # param and deleting the import.
 DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_analysis_context.py': 'Analysis context - dimension loading and resolution - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/_api_batch.py': 'Per-dimension batch context and the sub-batch dispatch loop for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_call.py': 'Direct LLM API call: request construction, the raw chat-completion round-trip, and error classification - split out of _api_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_runner.py': 'API runner for direct LLM evaluation - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_api_source_gathering.py': 'Credential loading and file-batching helpers for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
@@ -40,6 +41,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_process.py': 'Subprocess spawning, heartbeat monitoring, and error handling - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/api_prompt_assembly.py': 'Prompt assembly for the direct API runner - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/cache/_dimension_context.py': 'Pre-dispatch setup for the V2 cache-aware dimension processor (cache backend, trust model, file listing, classification) - split out of dimension_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/cache/_failure_streak.py': 'Consecutive-failure circuit breaker for the dim runner - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/_replay.py': "Cache-replay path: writing cached findings and their events.jsonl mirror back into a run's evidence - split out of dimension_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)",
     'analysis/cache/cache_writer.py': 'Factory for the per-file cache-write callback passed to FindingsRouter - out of scope for this sweep (not a flagged per-site conversion)',

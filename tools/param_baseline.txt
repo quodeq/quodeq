@@ -14,11 +14,6 @@ src/quodeq/analysis/api_prompt_assembly.py:assemble_api_prompt
 src/quodeq/analysis/cache/_persist_watcher.py:_make_persist_fn
 src/quodeq/analysis/cache/_replay.py:_write_findings
 src/quodeq/analysis/cache/dimension_helpers.py:_classify_one_file
-src/quodeq/analysis/cache/dimension_runner.py:_handle_all_hits
-src/quodeq/analysis/cache/dimension_runner.py:_handle_breaker_trip
-src/quodeq/analysis/cache/dimension_runner.py:_handle_dispatch_result
-src/quodeq/analysis/cache/dimension_runner.py:_prepare_miss_dispatch
-src/quodeq/analysis/cache/dimension_runner.py:_start_watchers
 src/quodeq/analysis/cache/dimension_runner.py:process_dimension_with_cache
 src/quodeq/analysis/checks/runner.py:apply_deterministic_checks
 src/quodeq/analysis/fingerprint.py:HashCache.dimension_params_state

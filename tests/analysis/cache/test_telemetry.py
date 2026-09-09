@@ -87,7 +87,7 @@ class TestCacheStatsMarker:
             markers.append((phase, kwargs))
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
         ):
             process_dimension_with_cache(
@@ -133,7 +133,7 @@ class TestCacheStatsMarker:
             )
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
         ):
             process_dimension_with_cache(
@@ -174,7 +174,7 @@ class TestCacheStatsMarker:
             )
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
         ):
             process_dimension_with_cache(
@@ -206,7 +206,7 @@ class TestCacheStatsMarker:
             captured.append((phase, kwargs))
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
         ):
             process_dimension_with_cache(
