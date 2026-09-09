@@ -22,7 +22,7 @@ import time
 from datetime import datetime, timezone
 from typing import Iterable
 
-from quodeq.services._job_log_tee import consume_stream, drain_pre_marker_buffer, tee_run_log
+from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import Job, REPORT_PATH_RE, _ANSI_RE, _CC_MARKER_PREFIX, _MAX_COMPLETED_JOBS
 from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
 from quodeq.services.jobs import (
@@ -85,13 +85,16 @@ class _JobMonitorMixin:
                 self._append_log(job, stripped)
         return True
 
-    def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
-        consume_stream(
-            job_id, stream,
+    @property
+    def _tee_ctx(self) -> TeeContext:
+        return TeeContext(
             store=self._store, reports_root=self._reports_root,
             run_log_writers=self._run_log_writers, pre_marker_buffer=self._pre_marker_buffer,
             log=self._log, flush_batch=self._flush_batch,
         )
+
+    def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
+        consume_stream(job_id, stream, self._tee_ctx)
 
     def _drain_pre_marker_buffer(self, job_id: str) -> None:
         """Attempt to resolve run_dir and flush any buffered pre-marker lines.
@@ -100,11 +103,7 @@ class _JobMonitorMixin:
         the report_path marker are not lost when the marker arrives in the last
         batch of the stream.
         """
-        drain_pre_marker_buffer(
-            job_id,
-            store=self._store, reports_root=self._reports_root,
-            run_log_writers=self._run_log_writers, pre_marker_buffer=self._pre_marker_buffer,
-        )
+        drain_pre_marker_buffer(job_id, self._tee_ctx)
 
     def _tee_run_log(self, job_id: str, line: str) -> None:
         """Forward *line* to the job's run.log writer.
@@ -116,11 +115,7 @@ class _JobMonitorMixin:
         Caller invariant: at most one ``_consume_stream`` runs per job_id at a
         time.  This method is not re-entrant for the same job_id.
         """
-        tee_run_log(
-            job_id, line,
-            store=self._store, reports_root=self._reports_root,
-            run_log_writers=self._run_log_writers, pre_marker_buffer=self._pre_marker_buffer,
-        )
+        tee_run_log(job_id, line, self._tee_ctx)
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""

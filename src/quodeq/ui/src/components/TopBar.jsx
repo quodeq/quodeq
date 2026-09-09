@@ -209,10 +209,6 @@ function CompactBackButton({ canGoBack, onBack }) {
  *   cycle (light <-> dark within the current family). Reflects what's
  *   actually showing (so "system" on a light OS still renders the moon icon
  *   since the next click will flip to dark).
- * @param {'local'|'shared'} [props.selectedSource] - Shared projects get
- *   read-only assistant sessions server-side, so this no longer gates the
- *   assistant launcher; it still gates the Evaluate button (see App.jsx's
- *   shouldShowEvaluateButton).
  */
 export default function TopBar({
   projectName,
@@ -233,7 +229,6 @@ export default function TopBar({
   onBack,
   effectiveDark = false,
   onToggleTheme,
-  selectedSource = 'local',
 }) {
   return (
     <header className="topbar pywebview-drag-region">

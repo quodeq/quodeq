@@ -15,6 +15,7 @@ import httpx
 import openai
 
 from quodeq.analysis._api_runner import (
+    ApiAnalysisRequest,
     ApiRunnerConfig,
     _LOCAL_TIMEOUT,
     _build_router_context,
@@ -410,7 +411,10 @@ class TestRunApiAnalysisAppend:
 
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test", jsonl_file=jsonl, config=config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test", jsonl_file=jsonl),
+                config=config,
+            )
 
         lines = [ln for ln in jsonl.read_text().strip().split("\n") if ln]
         finding_lines = [json.loads(ln) for ln in lines if "_marker" not in ln]
@@ -437,8 +441,11 @@ class TestRunApiAnalysisAppend:
                    return_value=None) as mock_ctx:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="test", jsonl_file=jsonl, config=config,
-                compiled_dir=tmp_path, dimension="security",
+                request=ApiAnalysisRequest(
+                    prompt="test", jsonl_file=jsonl,
+                    compiled_dir=tmp_path, dimension="security",
+                ),
+                config=config,
             )
             mock_ctx.assert_called_once()
             args = mock_ctx.call_args.args

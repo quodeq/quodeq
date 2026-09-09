@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _seed_stale_run(reports: Path, project: str, run_id: str) -> Path:
@@ -16,8 +16,8 @@ def _seed_stale_run(reports: Path, project: str, run_id: str) -> Path:
     (d / "evidence" / "manifest.json").write_text("{}")
     # status.json with running state + dead PID; heartbeat 60s old → sync_index
     # will promote to cancelled(stale_detected).
-    write_status(d, state=RunState.RUNNING, job_id=f"ext-{run_id}",
-                 started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999)
+    write_status(d, RunStatus(state=RunState.RUNNING, job_id=f"ext-{run_id}",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999))
     heartbeat = d / ".heartbeat"
     heartbeat.touch()
     old = time.time() - 60

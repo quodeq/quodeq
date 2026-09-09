@@ -61,6 +61,7 @@ class TestJsonObjectBodyRequired:
 
     @pytest.mark.parametrize("route", [
         "/api/ollama/test-concurrency",
+        "/api/llamacpp/test-concurrency",
         "/api/omlx/test-concurrency",
     ])
     def test_string_body_returns_400(self, client, route):

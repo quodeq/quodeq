@@ -23,7 +23,11 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq._cli_evaluation import _count_excluded_findings
 from quodeq.ci._suppressions import filter_suppressed_violations
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
-from quodeq.services.evidence_rescore import score_dimension_from_evidence, standard_dirs
+from quodeq.services.evidence_rescore import (
+    EvidenceScoreRequest,
+    score_dimension_from_evidence,
+    standard_dirs,
+)
 from quodeq.services.suppression import matcher_for
 
 DIM = "maintainability"
@@ -78,11 +82,13 @@ def test_one_dismiss_every_surface_agrees(tmp_path, monkeypatch):
 
     # 3. The evidence rescore drops it from the grade.
     base = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(), deleted=set(),
-        source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS))
     out = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=dismissed, deleted=set(),
-        source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=dismissed, deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS))
     assert out.principles["Modularity"].deductions.critical_type_count \
         == base.principles["Modularity"].deductions.critical_type_count - 1
 

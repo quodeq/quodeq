@@ -9,6 +9,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+@dataclass(frozen=True)
+class ManifestWalkSpec:
+    """The detection.json-derived inputs shared by every filesystem walk
+    that builds a SourceManifest (single-scope or multi-scope)."""
+
+    ext_map: dict[str, str]
+    skip_dirs: set[str]
+    skip_patterns: list[str]
+    ignore_patterns: list[str] | None = None
+
+
 @dataclass
 class AnalysisTarget:
     """One analysis unit within a repository (e.g. 'rust_backend', 'dart_mobile').

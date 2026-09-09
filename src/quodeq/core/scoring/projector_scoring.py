@@ -1,8 +1,10 @@
 """Canonical scoring functions used by the projection engine.
 
-These produce the same numeric results as services/rescore.py because they
-call the same scoring primitives. Inputs assume dismissed findings have been
-filtered upstream by the caller.
+Both this module and services/_rescore_legacy.py (the in-place fallback
+behind services/rescore.py) call the same shared primitives in
+core/scoring/internals.py, which is why they produce the same numeric
+results. Inputs assume dismissed findings have been filtered upstream by
+the caller.
 
 Output dicts are the neutral domain result contract; persistence adapters
 map them to their own schema (never the other way round):
@@ -16,16 +18,15 @@ map them to their own schema (never the other way round):
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
 from quodeq.core.scoring.engine import compute_tallies
 from quodeq.core.scoring.internals import (
-    compliance_lift,
+    finding_to_scoring_dict,
+    principle_score_and_grade,
     score_to_grade_label,
-    severity_grade_floor,
-    violation_base,
-    violation_ceiling,
 )
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
@@ -48,22 +49,6 @@ from quodeq.core.types.finding import Finding
 GRADE_ALGO_VERSION = 2
 
 
-def _finding_to_dict(f: Finding) -> dict[str, Any]:
-    """Convert Finding to the dict shape scoring internals expect.
-
-    Same as the helper in services/rescore.py -- keep them byte-identical.
-    Including 'vt' only when violation_type is set preserves the
-    taxonomy-vs-reason mode selection.
-    """
-    d: dict[str, Any] = {
-        "severity": f.severity or "minor",
-        "reason": f.reason or "",
-    }
-    if f.violation_type:
-        d["vt"] = f.violation_type
-    return d
-
-
 def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: int) -> dict[str, Any]:
     return {
         "principle_id": principle_id,
@@ -74,24 +59,19 @@ def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: 
     }
 
 
-def _score_principle_math(vt_counts, ct_counts, params: ScoringParams) -> tuple[float, str]:
-    base = violation_base(vt_counts, params=params)
-    lift = compliance_lift(ct_counts, vt_counts, params=params)
-    ceil = violation_ceiling(vt_counts, params=params)
-    floor = severity_grade_floor(vt_counts, params=params)
+@dataclass(frozen=True)
+class PrincipleGradeScale:
+    """Confidence-scaling and formula inputs for one principle's grade.
 
-    raw = base + (10.0 - base) * lift
-    # Floor first, ceiling last. The two guards cross when a principle carries a
-    # LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
-    # above the volume ceiling. Clamping the other way round handed back the
-    # floor and discarded the ceiling -- the one guard that encodes volume -- so
-    # a principle with 269 findings read "Good". Algebraically identical whenever
-    # floor <= ceil, so only the contradictory case moves.
-    # Keep byte-identical with services/rescore.py.
-    final = min(ceil, max(floor, raw))
-    final = round(final, 1)
-    grade = score_to_grade_label(final, params=params)
-    return final, grade
+    ``source_file_count``/``scale_multiplier`` feed
+    ``classify_confidence_level`` (thin evidence relative to project size);
+    ``params`` is the scoring formula. Defaults reproduce the pre-object
+    call shape (no scaling, default formula).
+    """
+
+    source_file_count: int = 0
+    scale_multiplier: int = 1
+    params: ScoringParams = DEFAULT_PARAMS
 
 
 def compute_principle_grade(
@@ -100,9 +80,7 @@ def compute_principle_grade(
     findings: list[Finding],
     compliance: list[Finding],
     dismissed_count: int = 0,
-    source_file_count: int = 0,
-    scale_multiplier: int = 1,
-    params: ScoringParams = DEFAULT_PARAMS,
+    scale: PrincipleGradeScale = PrincipleGradeScale(),
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
 
@@ -121,20 +99,20 @@ def compute_principle_grade(
 
     confidence_level = classify_confidence_level(
         len(findings), len(compliance),
-        scale_multiplier=scale_multiplier,
-        source_file_count=source_file_count,
+        scale_multiplier=scale.scale_multiplier,
+        source_file_count=scale.source_file_count,
     )
     if confidence_level == "low":
         return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
-    v_dicts = [_finding_to_dict(v) for v in findings]
-    c_dicts = [_finding_to_dict(c) for c in compliance]
+    v_dicts = [finding_to_scoring_dict(v) for v in findings]
+    c_dicts = [finding_to_scoring_dict(c) for c in compliance]
     vt_counts, ct_counts, _ = compute_tallies(v_dicts, c_dicts)
 
     if not any(vt_counts.values()) and not any(ct_counts.values()):
         return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
-    final, grade = _score_principle_math(vt_counts, ct_counts, params)
+    final, grade = principle_score_and_grade(vt_counts, ct_counts, params=scale.params)
 
     return {
         "principle_id": principle_id,

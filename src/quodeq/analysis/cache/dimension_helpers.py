@@ -52,7 +52,20 @@ from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_ver
 from quodeq.analysis.cache.key import compute_key
 from quodeq.analysis.fingerprint import _hash_file
 
+# CachePersistProvenance/CachePersistTarget live in _persist_watcher.py
+# (which imports from here); referenced below only as annotations.
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CacheEntryTarget:
+    """One dispatched file's persisted-entry identity: file path, cache
+    key, and the model/version stamped on every entry in the dispatch."""
+
+    file_path: str
+    key: str
+    model_id: str
+    version: str
 
 
 @dataclass(frozen=True)
@@ -206,26 +219,25 @@ def _advance_or_warn(
 
 
 def _build_cache_entry_for_file(
-    config: RunConfig, dimension: str, f: str, key: str, grouped: dict[str, list[dict]],
-    *, model_id: str, standards_hash: str, prompts_hash: str, effective_params: dict,
-    version: str, params_hash: str = "",
+    config: RunConfig, dimension: str, target: CacheEntryTarget,
+    grouped: dict[str, list[dict]], provenance: CachePersistProvenance,
 ) -> CacheEntry:
     """Build the CacheEntry for one dispatched file's persisted result."""
     return CacheEntry(
-        key=key,
+        key=target.key,
         schema_version=_SCHEMA_VERSION,
-        findings=grouped.get(f, []),
+        findings=grouped.get(target.file_path, []),
         files_read=1,
-        file_path=f,
+        file_path=target.file_path,
         dimension=dimension,
-        model_id=model_id,
-        file_content_hash=_hash_file(config.src / f) or "",
+        model_id=target.model_id,
+        file_content_hash=_hash_file(config.src / target.file_path) or "",
         language=config.language or "",
-        params_hash=params_hash,
+        params_hash=provenance.params_hash,
         provenance=build_provenance(
-            model_id=model_id, prompts_hash=prompts_hash,
-            standards_hash=standards_hash, version=version,
-            effective_params=effective_params,
+            model_id=target.model_id, prompts_hash=provenance.prompts_hash,
+            standards_hash=provenance.standards_hash, version=target.version,
+            effective_params=provenance.effective_params,
         ),
         # Born unconsolidated: no completed run has these findings in its
         # report yet. mark_run_consolidated flips it when this run ends done.
@@ -243,51 +255,42 @@ def _build_cache_entry_for_file(
 
 
 def persist_dispatch_results(
-    config: RunConfig, dimension: str, *, miss_files: list[str],
-    jsonl_path: Path, miss_keys: dict[str, str], cache: CacheBackend,
-    standards_hash: str, params_hash: str, effective_params: dict,
-    prompts_hash: str, state: DispatchJsonlState | None = None,
+    config: RunConfig, dimension: str, *, classify: ClassifyResult,
+    provenance: CachePersistProvenance, target: CachePersistTarget,
 ) -> None:
     """Write per-file cache entries for files with a file_done='ok' marker.
 
-    Files in *miss_files* that lack an ok marker (worker crashed, token-out,
-    abandoned) are NOT cached, so the next run re-dispatches them.
+    Files in *classify.misses* that lack an ok marker (worker crashed,
+    token-out, abandoned) are NOT cached, so the next run re-dispatches them.
 
-    *standards_hash*/*params_hash*/*effective_params*/*prompts_hash* are
-    provenance context that's constant for the whole dispatch (same
-    standards_dir/prompts_dir/dimension throughout). Callers compute them
-    once and pass them in, rather than this function recomputing them on
-    every call — this is invoked on a fixed interval by the periodic-persist
-    watcher for the life of one dispatch.
-
-    For the same reason the watcher passes one *state* per dispatch: a tick
-    then reads only the lines appended since the previous one and rewrites
-    only the ok files those lines touched. Without *state* the call is
-    one-shot and persists every ok file in the JSONL.
+    *provenance* is dispatch-constant hash context the caller computes once,
+    not on every watcher tick. *target.state* is the watcher's shared
+    per-dispatch state: reused across ticks, so a tick reads only the lines
+    appended since the previous one. ``target.state is None`` makes the
+    call one-shot, re-reading and persisting the whole JSONL.
     """
-    if not jsonl_path.is_file():
+    if not target.jsonl_path.is_file():
         return
-    one_shot = state is None
-    if state is None:
-        state = DispatchJsonlState()
-    if not _advance_or_warn(state, jsonl_path, include_tail=one_shot):
+    one_shot = target.state is None
+    state = target.state if target.state is not None else DispatchJsonlState()
+    if not _advance_or_warn(state, target.jsonl_path, include_tail=one_shot):
         return
     ok_files = state.ok_files()
     model_id = _model_id_from(config)
     version = quodeq_version()
-    for f in miss_files:
+    for f in classify.misses:
         if f not in ok_files or f not in state.dirty:
             continue
-        key = miss_keys.get(f)
+        key = classify.miss_keys.get(f)
         if key is None:
             _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
             continue
         entry = _build_cache_entry_for_file(
-            config, dimension, f, key, state.grouped,
-            model_id=model_id, standards_hash=standards_hash, prompts_hash=prompts_hash,
-            effective_params=effective_params, version=version, params_hash=params_hash,
+            config, dimension,
+            CacheEntryTarget(file_path=f, key=key, model_id=model_id, version=version),
+            state.grouped, provenance,
         )
-        cache.put(key, entry)
+        target.cache.put(key, entry)
     # A raising put keeps dirty for the next tick. A put that fails silently
     # (LocalFileBackend swallows OSError) is redone by the final full re-read.
     state.dirty.clear()

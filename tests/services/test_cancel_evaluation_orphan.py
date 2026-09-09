@@ -18,7 +18,7 @@ from quodeq.services.filesystem import FilesystemActionProvider
 from quodeq.services.jobs import JobManager
 from quodeq.services._external_jobs import ProcessControl
 from quodeq.data.sqlite.run_index import open_index
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _make_run_dir(reports: Path, project: str, run_id: str) -> Path:
@@ -78,9 +78,11 @@ def test_cancel_orphan_with_run_dir_preserves_findings(tmp_path: Path) -> None:
     reports = tmp_path / "reports"
     run = _make_run_dir(reports, "p", "stale-run")
     write_status(
-        run, state=RunState.RUNNING, job_id="ext-stale-run",
-        started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
-        pid=999999999,
+        run, RunStatus(
+            state=RunState.RUNNING, job_id="ext-stale-run",
+            started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
+            pid=999999999,
+        ),
     )
     # Fresh heartbeat — keeps the background stale-check from auto-promoting
     # before our cancel call has a chance to run.
@@ -116,8 +118,10 @@ def test_cancel_terminal_state_unchanged(tmp_path: Path) -> None:
     reports = tmp_path / "reports"
     run = _make_run_dir(reports, "p", "done-run")
     write_status(
-        run, state=RunState.DONE, job_id="ext-done-run",
-        started_at="2026-04-20T00:00:00+00:00", dimensions=[],
+        run, RunStatus(
+            state=RunState.DONE, job_id="ext-done-run",
+            started_at="2026-04-20T00:00:00+00:00", dimensions=[],
+        ),
     )
     db_path = tmp_path / "idx.db"
     provider = FilesystemActionProvider(index_db_path=db_path)
@@ -138,9 +142,11 @@ def test_cancel_live_pid_unchanged_behavior(tmp_path: Path) -> None:
     reports = tmp_path / "reports"
     run = _make_run_dir(reports, "p", "live-run")
     write_status(
-        run, state=RunState.RUNNING, job_id="ext-live-run",
-        started_at="2026-04-20T00:00:00+00:00", dimensions=[],
-        pid=os.getpid(),
+        run, RunStatus(
+            state=RunState.RUNNING, job_id="ext-live-run",
+            started_at="2026-04-20T00:00:00+00:00", dimensions=[],
+            pid=os.getpid(),
+        ),
     )
     # .pid file is what cancel_external_run reads
     (run / ".pid").write_text(str(os.getpid()))

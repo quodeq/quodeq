@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -18,6 +19,7 @@ from quodeq.context.precedent_fingerprint import fingerprint, precedent_text
 from quodeq.context.precedent_store import (
     AvailabilityFn,
     EmbedFn,
+    Embedder,
     VectorStoreFns,
     _load_or_backfill_vectors,
 )
@@ -168,7 +170,7 @@ def _resolve_embed_and_availability(
 def _resolve_available_embedder(
     embed_fn: EmbedFn | None,
     availability_fn: AvailabilityFn | None,
-) -> tuple[str, EmbedFn, object] | None:
+) -> Embedder | None:
     """Resolve model/embed_fn/batch_timeout, or None when unavailable.
 
     Wraps :func:`_resolve_embed_and_availability` with the model/base_url
@@ -189,7 +191,7 @@ def _resolve_available_embedder(
             "Pull it with: ollama pull %s", model, base_url, model,
         )
         return None
-    return model, embed_fn, batch_timeout
+    return Embedder(model, embed_fn, batch_timeout)
 
 
 def _resolve_store() -> VectorStoreFns:
@@ -200,21 +202,24 @@ def _resolve_store() -> VectorStoreFns:
     return _facade._resolve_vector_store()
 
 
+@dataclass(frozen=True)
+class CorpusBuildPolicy:
+    """The circuit-breaker marker path and match threshold for one corpus build."""
+
+    marker: Path
+    threshold: float
+
+
 def _embed_and_build_corpus(
     store: VectorStoreFns,
     project_dir: Path,
-    model: str,
     texts: dict[str, str],
-    embed_fn: EmbedFn,
-    batch_timeout: object,
-    marker: Path,
-    threshold: float,
+    embedder: Embedder,
+    policy: CorpusBuildPolicy,
 ) -> "PrecedentCorpus | None":
     """Backfill/load vectors and assemble the corpus, or None if nothing embedded."""
     start = time.monotonic()
-    result = _load_or_backfill_vectors(
-        store, project_dir, model, texts, embed_fn, batch_timeout,
-    )
+    result = _load_or_backfill_vectors(store, project_dir, texts, embedder)
     if result is None:
         return None
     pairs, embedded_new = result
@@ -226,14 +231,14 @@ def _embed_and_build_corpus(
 
     corpus = PrecedentCorpus(
         vectors=vectors,
-        embed=lambda ts: embed_fn(ts),
-        threshold=threshold,
-        marker_path=marker,
+        embed=lambda ts: embedder.embed_fn(ts),
+        threshold=policy.threshold,
+        marker_path=policy.marker,
     )
     _logger.info(
         "Semantic precedent corpus: %d vector(s), %d newly embedded, "
         "model=%s, %dms",
-        len(vectors), embedded_new, model,
+        len(vectors), embedded_new, embedder.model,
         int((time.monotonic() - start) * 1000),
     )
     return corpus
@@ -269,10 +274,9 @@ def load_precedent_corpus(
             _logger.debug("Semantic precedents: circuit marker present")
             return None
 
-        resolved = _resolve_available_embedder(embed_fn, availability_fn)
-        if resolved is None:
+        embedder = _resolve_available_embedder(embed_fn, availability_fn)
+        if embedder is None:
             return None
-        model, embed_fn, batch_timeout = resolved
 
         texts = _collect_dismissed_texts(project_dir)
         if not texts:
@@ -281,10 +285,8 @@ def load_precedent_corpus(
         if store is None:
             store = _resolve_store()
 
-        return _embed_and_build_corpus(
-            store, project_dir, model, texts, embed_fn, batch_timeout,
-            marker, get_precedent_similarity_threshold(),
-        )
+        policy = CorpusBuildPolicy(marker=marker, threshold=get_precedent_similarity_threshold())
+        return _embed_and_build_corpus(store, project_dir, texts, embedder, policy)
     except Exception as exc:  # noqa: BLE001 -- never break a scan
         _logger.warning("Semantic precedent corpus unavailable: %s", exc)
         return None

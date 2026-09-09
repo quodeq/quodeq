@@ -7,21 +7,17 @@
 # Prerequisites:
 #   - Node.js 20+ and npm 10+
 #   - uv (https://docs.astral.sh/uv/)
+#
+# Now also syncs engine_version into plugin.json (see tools/build.sh), so the
+# dist wheel carries the same plugin-compat pin as a local build.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-UI_DIR="${QUODEQ_UI_DIR:-$REPO_ROOT/src/quodeq/ui}"
+source "$(dirname "$0")/_build_common.sh"
 
-echo "==> Building web UI..."
-cd "$UI_DIR"
-npm ci
-# vite.config.js writes to ../static (i.e. src/quodeq/static) by default,
-# which is exactly where the wheel picks the bundled UI up from.
-npm run build
-cd "$REPO_ROOT"
-
-echo "==> Building Python package..."
-uv build
+build_frontend "$REPO_ROOT"
+sync_engine_version "$REPO_ROOT"
+build_python "$REPO_ROOT"
 
 echo "==> Done. Artifacts in dist/"
-ls -lh dist/
+ls -lh "$REPO_ROOT/dist/"

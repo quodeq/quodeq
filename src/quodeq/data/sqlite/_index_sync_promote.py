@@ -11,22 +11,35 @@ function body, so this module carries no top-level dependency back on
 """
 from __future__ import annotations
 
+import dataclasses
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NamedTuple
 
 from quodeq.data.fs.run_status_store import (
     RunState,
+    RunStatus,
     UnsupportedSchemaError,
     read_status,
     write_status,
 )
 
 
+class _StaleRunRow(NamedTuple):
+    """One row of the ``runs`` table, in SELECT column order."""
+
+    state: str
+    project_uuid: str
+    run_id: str
+    started_at: str | None
+    phase: str | None
+    current_dimension: str | None
+    pid: int | None
+
+
 def _promote_via_status_write(
-    db: sqlite3.Connection, job_id: str, run_dir: Path, *,
-    project_uuid: str, run_id: str, started_at: str | None,
-    phase: str | None, current_dimension: str | None, pid: int | None,
+    db: sqlite3.Connection, job_id: str, run_dir: Path, row: _StaleRunRow,
 ) -> bool:
     """Rewrite status.json to cancelled and let the upsert sync the row.
 
@@ -37,23 +50,23 @@ def _promote_via_status_write(
 
     try:
         existing = read_status(run_dir) or {}
-        dimensions = existing.get("dimensions") or []
-        write_status(
-            run_dir,
+        existing.setdefault("state", row.state)
+        base = RunStatus.from_status_dict(existing)
+        status = dataclasses.replace(
+            base,
             state=RunState.CANCELLED,
             job_id=job_id,
-            started_at=started_at or existing.get("started_at", ""),
-            dimensions=dimensions,
-            phase=phase,
-            current_dimension=current_dimension,
-            pid=pid if isinstance(pid, int) else None,
+            started_at=row.started_at or base.started_at,
+            phase=row.phase,
+            current_dimension=row.current_dimension,
+            pid=row.pid if isinstance(row.pid, int) else None,
             exit_reason="stale_detected",
-            deadline_at=existing.get("deadline_at"),
-            ai_provider=existing.get("ai_provider"),
-            ai_model=existing.get("ai_model"),
+            finalized_at=None,
+            time_limit_s=None,
         )
+        write_status(run_dir, status)
         _upsert_from_status(
-            db, run_dir, project_uuid=project_uuid, run_id=run_id,
+            db, run_dir, project_uuid=row.project_uuid, run_id=row.run_id,
         )
         return True
     except (OSError, UnsupportedSchemaError) as exc:
@@ -98,17 +111,13 @@ def force_promote_to_cancelled_stale(
     ).fetchone()
     if row is None:
         return False
-    state, project_uuid, run_id, started_at, phase, current_dimension, pid = row
-    if state in _TERMINAL_STATE_VALUES:
+    stale_row = _StaleRunRow(*row)
+    if stale_row.state in _TERMINAL_STATE_VALUES:
         return False
 
     # Prefer the FS path: write status.json and let the upsert sync the row.
     if run_dir is not None and run_dir.is_dir():
-        if _promote_via_status_write(
-            db, job_id, run_dir,
-            project_uuid=project_uuid, run_id=run_id, started_at=started_at,
-            phase=phase, current_dimension=current_dimension, pid=pid,
-        ):
+        if _promote_via_status_write(db, job_id, run_dir, stale_row):
             return True
         # Fall through to DB-only path.
 

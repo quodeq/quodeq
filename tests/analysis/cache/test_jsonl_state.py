@@ -17,7 +17,9 @@ import pytest
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
+from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
 from quodeq.analysis.cache.dimension_helpers import (
+    ClassifyResult,
     _group_findings_by_file,
     persist_dispatch_results,
 )
@@ -207,9 +209,14 @@ def _make_config(src: Path) -> RunConfig:
 
 def _persist(config: RunConfig, jsonl: Path, cache, files: list[str], state=None) -> None:
     persist_dispatch_results(
-        config, "security", miss_files=files, jsonl_path=jsonl,
-        miss_keys={f: "key-" + f.replace(".", "-") for f in files}, cache=cache, state=state,
-        standards_hash="", params_hash="", effective_params={}, prompts_hash="",
+        config, "security",
+        classify=ClassifyResult(
+            misses=files, miss_keys={f: "key-" + f.replace(".", "-") for f in files},
+        ),
+        provenance=CachePersistProvenance(
+            standards_hash="", params_hash="", effective_params={}, prompts_hash="",
+        ),
+        target=CachePersistTarget(jsonl_path=jsonl, cache=cache, state=state),
     )
 
 

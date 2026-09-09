@@ -3,6 +3,7 @@ import { hierarchy, pack } from 'd3-hierarchy';
 import { nodeSize } from '../core/mapColors.js';
 import PackInfoPanel from './PackInfoPanel.jsx';
 import PackCircles from './PackCircles.jsx';
+import MapLegend from './MapLegend.jsx';
 import { t } from '../../../../strings/index.js';
 
 const BASE_SIZE = 600;
@@ -191,15 +192,6 @@ function PackTooltip({ circles, hover, mousePos, containerRef }) {
   );
 }
 
-/* ---- PackLegend: color legend ---- */
-const LEGEND_ITEMS = [
-  { color: 'var(--color-grade-top-text)', label: 'Exemplary' },
-  { color: 'var(--color-grade-high-text)', label: 'Good' },
-  { color: 'var(--color-grade-mid-text)', label: 'Adequate' },
-  { color: 'var(--color-grade-low-text)', label: 'Poor' },
-  { color: 'var(--color-grade-bottom-text)', label: 'Critical' },
-];
-
 /* ---- Main orchestrator ---- */
 export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileClick, showLabels = true, resetKey = 0, currentPath = '' }) {
   const [hover, setHover] = useState(null);
@@ -237,13 +229,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
       </svg>
       <PackTooltip circles={circles} hover={hover} mousePos={mousePos} containerRef={containerRef} />
       <PackInfoPanel focusNode={focusNode} root={root} onFileClick={onFileClick} />
-      <div style={{ position: 'absolute', bottom: 8, left: 12, display: 'flex', gap: 14, fontSize: 11, color: 'var(--color-text-muted)', zIndex: 2 }}>
-        {LEGEND_ITEMS.map(({ color, label }) => (
-          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />{label}
-          </span>
-        ))}
-      </div>
+      <MapLegend />
     </div>
   );
 }

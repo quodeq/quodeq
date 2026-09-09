@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -103,44 +104,54 @@ def _parse_evidence_jsonl(
         return None
 
 
-def score_dimension_from_evidence(
-    run_dir: Path,
-    dim_id: str,
-    *,
-    dismissed: set[tuple],
-    deleted: set[tuple],
-    source_file_count: int,
-    files_read: int,
-    params: ScoringParams,
-    standard_dirs_fn: Callable[[], tuple[Path | None, Path | None]] | None = None,
-) -> ScoringResult | None:
-    """Score `dim_id` from run_dir's evidence jsonl, excluding suppressed findings.
-
-    Returns None when the evidence file is missing/empty/unparseable so the
-    caller can fall back to the legacy in-place formula.
+@dataclass(frozen=True)
+class EvidenceScoreRequest:
+    """Inputs for scoring one dimension from its evidence.
 
     *standard_dirs_fn* resolves ``(compiled_dir, evaluators_dir)``; None keeps
     the module-level :func:`standard_dirs` (global config resolution) so
     existing callers stay valid while tests can substitute fixed dirs.
     """
+
+    dismissed: set[tuple]
+    deleted: set[tuple]
+    source_file_count: int
+    files_read: int
+    params: ScoringParams
+    standard_dirs_fn: Callable[[], tuple[Path | None, Path | None]] | None = None
+
+
+def score_dimension_from_evidence(
+    run_dir: Path,
+    dim_id: str,
+    request: EvidenceScoreRequest,
+) -> ScoringResult | None:
+    """Score `dim_id` from run_dir's evidence jsonl, excluding suppressed findings.
+
+    Returns None when the evidence file is missing/empty/unparseable so the
+    caller can fall back to the legacy in-place formula.
+    """
     jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
     if jsonl is None or evidence_file_size(jsonl) == 0:
         return None
-    compiled_dir, evaluators_dir = (standard_dirs_fn or standard_dirs)()
+    compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
     evidence = _parse_evidence_jsonl(
-        jsonl, run_dir, dim_id, compiled_dir, evaluators_dir, source_file_count, files_read,
+        jsonl, run_dir, dim_id, compiled_dir, evaluators_dir,
+        request.source_file_count, request.files_read,
     )
     if evidence is None:
         return None
 
-    _apply_suppressions_and_recompute(evidence, dim_id, dismissed, deleted, source_file_count)
+    _apply_suppressions_and_recompute(
+        evidence, dim_id, request.dismissed, request.deleted, request.source_file_count,
+    )
 
     # Broad catch on purpose (mirrors mutation_rescore and the CLI print
     # guard): the engine can throw on edge-case evidence, and every consumer
     # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back
     # to the stored score" — one bad dimension must not fail the whole run.
     try:
-        return score_evidence(evidence, mode="numerical", params=params)
+        return score_evidence(evidence, mode="numerical", params=request.params)
     except Exception as exc:  # noqa: BLE001
         _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None

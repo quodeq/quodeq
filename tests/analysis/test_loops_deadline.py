@@ -45,7 +45,7 @@ def test_loop_runs_first_dim_then_skips_remaining(monkeypatch):
     fake_now = [time.monotonic()]
 
     monkeypatch.setattr(
-        "quodeq.analysis._loops.time.monotonic",
+        "quodeq.analysis._loop_steps.time.monotonic",
         lambda: fake_now[0],
     )
 

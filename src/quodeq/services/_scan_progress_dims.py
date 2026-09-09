@@ -13,7 +13,7 @@ from pathlib import Path
 from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
-from quodeq.services._scan_progress_types import _DimProgress
+from quodeq.services._scan_progress_types import _DimProgress, _ProgressContext
 from quodeq.services._wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
@@ -143,28 +143,26 @@ def _dim_evidence_tally(
 
 
 def _build_dim_progress(
-    dim_id: str, run_dir: Path, status: dict, is_terminal: bool,
-    dim_records: dict, dim_estimates: dict, dismissed, deleted,
-    evidence_dir: Path, evaluators_dir: Path | None, compiled_dir: Path | None,
+    dim_id: str, ctx: _ProgressContext, dismissed, deleted,
 ) -> _DimProgress:
-    queue = read_queue_state(dimension_queue_file(run_dir, dim_id))
+    queue = read_queue_state(dimension_queue_file(ctx.run_dir, dim_id))
     d_state = _dim_state(
-        dim_id, status, terminal=is_terminal,
+        dim_id, ctx.status, terminal=ctx.is_terminal,
         has_queue=queue is not None,
-        has_evaluation=dimension_report_exists(run_dir / "evaluation", dim_id),
+        has_evaluation=dimension_report_exists(ctx.run_dir / "evaluation", dim_id),
     )
-    record = dim_records.get(dim_id) if isinstance(dim_records, dict) else None
-    files = _dim_files_summary(queue, d_state, dim_estimates, dim_id)
+    record = ctx.dim_records.get(dim_id) if isinstance(ctx.dim_records, dict) else None
+    files = _dim_files_summary(queue, d_state, ctx.dim_estimates, dim_id)
 
-    estimate_meta = dim_estimates.get(dim_id)
+    estimate_meta = ctx.dim_estimates.get(dim_id)
     estimate_reason = estimate_meta["reason"] if estimate_meta else None
     files_cached = estimate_meta["cached"] if estimate_meta else None
     files_project_total = estimate_meta["total"] if estimate_meta else None
     files_excluded = estimate_meta["excluded"] if estimate_meta else None
 
-    tally = _dim_evidence_tally(dim_id, run_dir, dismissed, deleted, evaluators_dir, compiled_dir)
-    elapsed = _dim_elapsed_s(dim_id, run_dir, d_state, record)
-    active = _active_agents(evidence_dir, dim_id) if d_state == "running" else 0
+    tally = _dim_evidence_tally(dim_id, ctx.run_dir, dismissed, deleted, ctx.evaluators_dir, ctx.compiled_dir)
+    elapsed = _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record)
+    active = _active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0
 
     return _DimProgress(
         id=dim_id,

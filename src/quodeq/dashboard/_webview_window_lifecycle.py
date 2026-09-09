@@ -2,8 +2,8 @@
 
 Nothing here is patch-tested by name (tests exercise the individual chrome
 setters through _WindowApi.set_titlebar_theme / _ask_close_choice's own call
-sites in the facade, not through this orchestration layer), so it is free to
-live outside the facade. main() (in _webview_window.py) imports
+sites in _webview_window_close.py, not through this orchestration layer), so
+it is free to live outside the facade. main() (in _webview_window.py) imports
 _make_on_loaded from here.
 """
 from __future__ import annotations

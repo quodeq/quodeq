@@ -10,12 +10,7 @@ import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { providerSupportsWebTools } from '../../models/provider.js';
 import { t } from '../../strings/index.js';
 
-/**
- * The assistant panel's own header: panel switcher, animated compass
- * identity, the live model chip (click opens Settings), the session-state
- * chips, and the window controls that used to live in the shared drawer
- * header.
- */
+// Session-state chips: read-only, no-repo-access, and pending-changes.
 function StatusBadges({ readOnly, repoInfo, workspace, sessionId, refreshWorkspace, addWindow }) {
   return (
     <>
@@ -117,6 +112,12 @@ function DrawerControls({
   );
 }
 
+/**
+ * The assistant panel's own header: panel switcher, animated compass
+ * identity, the live model chip (click opens Settings), the session-state
+ * chips, and the window controls that used to live in the shared drawer
+ * header.
+ */
 export default function AssistantHeader({ selectedProject, onOpenSettings }) {
   const { closeActiveTab, maximized, toggleMaximized, provider, model,
           openPanels, streaming, webEnabled, toggleWebEnabled,

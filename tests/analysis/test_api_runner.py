@@ -11,7 +11,7 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_runner import (
-    run_api_analysis, ApiRunnerConfig,
+    run_api_analysis, ApiAnalysisRequest, ApiRunnerConfig,
     _build_router_context,
     _call_api, _parse_findings, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
 )
@@ -133,7 +133,10 @@ class TestRunApiAnalysis:
 
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
+                config=api_config,
+            )
 
         assert jsonl_file.exists()
         lines = [ln for ln in jsonl_file.read_text().strip().split("\n") if ln]
@@ -149,7 +152,10 @@ class TestRunApiAnalysis:
 
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
+                config=api_config,
+            )
 
             mock_oa.assert_called_once_with(
                 base_url="http://localhost:8000/v1",
@@ -164,7 +170,10 @@ class TestRunApiAnalysis:
 
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
+                config=api_config,
+            )
 
         assert jsonl_file.exists()
         # Only markers (if any), no findings
@@ -180,8 +189,11 @@ class TestRunApiAnalysis:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="test", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/myproject/app.py"],
+                request=ApiAnalysisRequest(
+                    prompt="test", jsonl_file=jsonl_file,
+                    source_file_paths=["src/myproject/app.py"],
+                ),
+                config=api_config,
             )
 
         lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
@@ -407,8 +419,11 @@ class TestMarkerContract:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/a.py", "src/b.py", "src/c.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/a.py", "src/b.py", "src/c.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -425,8 +440,11 @@ class TestMarkerContract:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/clean.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/clean.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -452,8 +470,11 @@ class TestMarkerContract:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/a.py", "src/b.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/a.py", "src/b.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -474,8 +495,11 @@ class TestMarkerContract:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/a.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/a.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -496,8 +520,10 @@ class TestMarkerContract:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=None,
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file, source_file_paths=None,
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -548,12 +574,14 @@ class TestSyncCacheWrite:
         with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t",
-                jsonl_file=jsonl_file,
+                request=ApiAnalysisRequest(
+                    prompt="t",
+                    jsonl_file=jsonl_file,
+                    source_file_paths=["Foo.kt"],
+                    run_config=run_config,
+                    dim_id="flexibility",
+                ),
                 config=api_config,
-                source_file_paths=["Foo.kt"],
-                run_config=run_config,
-                dim_id="flexibility",
             )
 
         entries = list(cache_root.rglob("entry.json"))

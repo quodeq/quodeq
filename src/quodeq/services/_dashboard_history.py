@@ -18,6 +18,7 @@ from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.services._dashboard_cache import DashboardCacheConfig, _make_run_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services._scoring_deps import ScoringDeps
 from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services._wiring import RunInfo, calculate_trend, read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
@@ -180,10 +181,12 @@ def _make_history_fetcher(
     dim_cache_version = score_cache_version(reports_root / project, params)
     return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
-        max_history=max_history,
-        base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
-            rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
-            version=dim_cache_version,
+        deps=ScoringDeps(
+            max_history=max_history,
+            base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
+                rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+                version=dim_cache_version,
+            ),
         ),
     )
 

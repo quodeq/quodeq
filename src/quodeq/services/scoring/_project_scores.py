@@ -2,10 +2,10 @@
 
 Split from ``scoring/__init__.py`` to keep that file under the size
 ratchet's 300-line cap. ``get_project_scores`` stays re-exported from there.
-Imported at the bottom of that file (after ``_max_history_runs`` and
-``_make_trend_fetcher`` are already defined there), so the
-``from quodeq.services.scoring import ...`` below resolves against the
-already-initialized part of that (still-loading) module; no true cycle.
+Fetchers are called through the ``_fetchers`` module attribute (not names
+bound into this module's namespace) so tests can still
+``monkeypatch.setattr(_fetchers, "_make_trend_fetcher", ...)`` and have it
+take effect here.
 """
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ from quodeq.services.score_cache import (
     per_run_versions,
 )
 from quodeq.services._wiring import find_children, list_runs
+from quodeq.services.scoring import _fetchers
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.services.scoring._rescoring import _rescore_accumulated_with_coverage
-from quodeq.services.scoring import _make_trend_fetcher, _max_history_runs
 
 
 def _compute_accumulated_payload(
@@ -79,13 +79,13 @@ def _resolve_trend(
     chart. They remain in availableRuns so the UI can show them when the
     user asks for them explicitly."""
     scoreable_runs = select_trend_runs(all_runs)
-    history_runs = scoreable_runs[:_max_history_runs()]
+    history_runs = scoreable_runs[:_fetchers._max_history_runs()]
     # Only completed runs may be persisted to the score cache: an in-progress
     # run's scalar set is still growing, and the cache version can't see that,
     # so caching its partial set would strand a stale row (e.g. 1 of 6 dims)
     # served forever after the run finishes.
     cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
-    trend_fetcher = _make_trend_fetcher(
+    trend_fetcher = _fetchers._make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         deps=deps,
     )

@@ -144,13 +144,19 @@ class DashboardLifecycleMixin:
             ),
         )
 
-    def _on_stop(self, _):
+    def _terminate_process_group(self) -> None:
+        """SIGTERM the dashboard's whole process group, falling back to the
+        process itself when the group is already gone."""
         if self._process and self._process.poll() is None:
             try:
                 os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
             except (OSError, ProcessLookupError):
                 self._process.terminate()
             self._process = None
+
+    def _sweep_stragglers(self) -> None:
+        """Kill leftovers a restart would trip over: anything still holding a
+        dashboard port, and anything matching a known dashboard command."""
         for port in self._ports:
             _kill_port_processes(port)
         for pattern in _PROCESS_PATTERNS:
@@ -158,6 +164,10 @@ class DashboardLifecycleMixin:
                 subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=_PKILL_TIMEOUT_S)
             except (subprocess.TimeoutExpired, OSError):
                 pass
+
+    def _on_stop(self, _):
+        self._terminate_process_group()
+        self._sweep_stragglers()
         with self._state_lock:
             self._port = None
         self._status_item.title = "Stopped"

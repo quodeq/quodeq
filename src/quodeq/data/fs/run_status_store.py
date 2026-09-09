@@ -23,6 +23,7 @@ from quodeq.core.run.state import (  # noqa: F401 — re-exported API
     TERMINAL_STATES,
     IllegalTransitionError,
     RunState,
+    RunStatus,
     UnsupportedSchemaError,
     validate_transition,
 )
@@ -42,78 +43,44 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _build_status_payload(
-    *,
-    state: RunState,
-    job_id: str,
-    started_at: str,
-    dimensions: list[str],
-    phase: str | None,
-    current_dimension: str | None,
-    pid: int | None,
-    exit_reason: str | None,
-    finalized_at: str | None,
-    deadline_at: str | None,
-    ai_provider: str | None,
-    ai_model: str | None,
-    time_limit_s: int | None,
-) -> dict[str, Any]:
+def _build_status_payload(status: RunStatus) -> dict[str, Any]:
+    pid = status.pid
     if pid is None:
         pid = os.getpid()
-    if finalized_at is None and state in TERMINAL_STATES:
+    finalized_at = status.finalized_at
+    if finalized_at is None and status.state in TERMINAL_STATES:
         finalized_at = _now_iso()
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
-        "job_id": job_id,
-        "state": state.value,
-        "started_at": started_at,
+        "job_id": status.job_id,
+        "state": status.state.value,
+        "started_at": status.started_at,
         "updated_at": _now_iso(),
         "finalized_at": finalized_at,
-        "phase": phase,
-        "current_dimension": current_dimension,
-        "dimensions": dimensions,
+        "phase": status.phase,
+        "current_dimension": status.current_dimension,
+        "dimensions": status.dimensions,
         "pid": pid,
-        "exit_reason": exit_reason,
-        "deadline_at": deadline_at,
+        "exit_reason": status.exit_reason,
+        "deadline_at": status.deadline_at,
     }
-    if time_limit_s is not None:
-        payload["time_limit_s"] = time_limit_s
-    if ai_provider is not None:
-        payload["ai_provider"] = ai_provider
-    if ai_model is not None:
-        payload["ai_model"] = ai_model
+    if status.time_limit_s is not None:
+        payload["time_limit_s"] = status.time_limit_s
+    if status.ai_provider is not None:
+        payload["ai_provider"] = status.ai_provider
+    if status.ai_model is not None:
+        payload["ai_model"] = status.ai_model
     return payload
 
 
-def write_status(
-    run_dir: Path,
-    *,
-    state: RunState,
-    job_id: str,
-    started_at: str,
-    dimensions: list[str],
-    phase: str | None = None,
-    current_dimension: str | None = None,
-    pid: int | None = None,
-    exit_reason: str | None = None,
-    finalized_at: str | None = None,
-    deadline_at: str | None = None,
-    ai_provider: str | None = None,
-    ai_model: str | None = None,
-    time_limit_s: int | None = None,
-) -> None:
-    """Atomically write status.json with *state* and metadata.
+def write_status(run_dir: Path, status: RunStatus) -> None:
+    """Atomically write status.json for *status*.
 
     Uses write-tmp-then-rename so readers never see a partial file.
     Caller is responsible for calling ``validate_transition`` first if a
     transition is being performed.
     """
-    payload = _build_status_payload(
-        state=state, job_id=job_id, started_at=started_at, dimensions=dimensions,
-        phase=phase, current_dimension=current_dimension, pid=pid,
-        exit_reason=exit_reason, finalized_at=finalized_at, deadline_at=deadline_at,
-        ai_provider=ai_provider, ai_model=ai_model, time_limit_s=time_limit_s,
-    )
+    payload = _build_status_payload(status)
     body = json.dumps(payload, indent=2)
     tmp_path = run_dir / (STATUS_FILENAME + ".tmp")
     final_path = run_dir / STATUS_FILENAME

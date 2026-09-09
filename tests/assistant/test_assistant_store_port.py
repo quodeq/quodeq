@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.assistant.tools import ToolContext
-from quodeq.data.ports.assistant import AssistantStore
+from quodeq.data.ports.assistant import AssistantStore, SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -32,13 +32,12 @@ class FakeAssistantStore:
         return self._db_path
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, project_uuid: str | None = None,
-                       run_id: str | None = None,
-                       project_id: str | None = None,
-                       source: str = "local") -> dict:
+                       model: str | None = None, source: str = "local",
+                       scope: SessionScope | None = None) -> dict:
+        scope = scope or SessionScope()
         row = {"id": session_id, "provider": provider, "model": model,
-               "project_uuid": project_uuid, "run_id": run_id,
-               "project_id": project_id, "source": source,
+               "project_uuid": scope.project_uuid, "run_id": scope.run_id,
+               "project_id": scope.project_id, "source": source,
                "cli_session_id": None}
         self.sessions[session_id] = row
         return row

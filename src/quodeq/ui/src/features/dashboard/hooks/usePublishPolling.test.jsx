@@ -50,4 +50,51 @@ describe('usePublishPolling', () => {
     expect(result.current.publishError).toBe('MAPPED: friendly publish failure');
     expect(result.current.publishState).toBe('error');
   });
+
+  // FROZEN (see applyPublishSuccess's doc comment): the done branch must
+  // clear an error left over from a PREVIOUS failed attempt on this same
+  // project -- CardFooter keys showError on publishErrorProject alone, not
+  // on publishState, so a stale error would otherwise keep showing under the
+  // card after a successful retry.
+  it('a successful poll clears an error left over from a previous failed attempt', async () => {
+    const getSharedStatus = vi.fn()
+      .mockResolvedValueOnce({ publish: { state: 'error', project: 'p1', error: 'raw backend text' } })
+      .mockResolvedValueOnce({ publish: { state: 'done', project: 'p1' } });
+    const { result } = setup({ getSharedStatus, queryClient: { fetchQuery: vi.fn(async () => ({})) } });
+
+    await act(async () => {
+      await result.current.checkStatus();
+    });
+    expect(result.current.publishState).toBe('error');
+    expect(result.current.publishError).toBe('MAPPED: friendly publish failure');
+    expect(result.current.publishErrorProject).toBe('p1');
+
+    await act(async () => {
+      await result.current.checkStatus();
+    });
+    expect(result.current.publishState).toBe('done');
+    expect(result.current.publishError).toBeNull();
+    expect(result.current.publishErrorProject).toBeNull();
+  });
+
+  // FROZEN (see applyPublishSuccess's doc comment): the optimistic patch
+  // must land BEFORE the authoritative refresh is awaited, not after.
+  it('applies the optimistic patch before awaiting the authoritative refresh', async () => {
+    const callOrder = [];
+    const applyOptimisticPublish = vi.fn(() => callOrder.push('optimistic'));
+    const queryClient = {
+      fetchQuery: vi.fn(async () => {
+        callOrder.push('refresh');
+        return {};
+      }),
+    };
+    const getSharedStatus = vi.fn(async () => ({ publish: { state: 'done', project: 'p1' } }));
+    const { result } = setup({ getSharedStatus, applyOptimisticPublish, queryClient });
+
+    await act(async () => {
+      await result.current.checkStatus();
+    });
+
+    expect(callOrder).toEqual(['optimistic', 'refresh']);
+  });
 });

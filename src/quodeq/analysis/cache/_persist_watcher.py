@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
@@ -36,8 +37,38 @@ from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
 _PERSIST_INTERVAL_S = 30.0
 
 
-def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> dict:
-    """Provenance hash inputs for persist_dispatch_results, as kwargs.
+@dataclass(frozen=True)
+class CachePersistProvenance:
+    """Provenance hashes for a whole dispatch, constant across every file
+    persist_dispatch_results writes an entry for. Computed once (at watcher
+    start), not recomputed on every tick."""
+
+    standards_hash: str
+    params_hash: str
+    effective_params: dict
+    prompts_hash: str
+
+
+@dataclass(frozen=True)
+class CachePersistTarget:
+    """Where persist_dispatch_results reads dispatch output from and writes
+    cache entries to, plus the incremental JSONL-read state shared across
+    watcher ticks.
+
+    ``state`` defaults to None: persist_dispatch_results then treats the
+    call as one-shot (fresh state, reads the whole JSONL). The watcher
+    builds one CachePersistTarget per dispatch and reuses it -- and
+    therefore its *state* -- on every tick, so later ticks read only the
+    lines appended since the previous one.
+    """
+
+    jsonl_path: Path
+    cache: CacheBackend
+    state: DispatchJsonlState | None = None
+
+
+def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> CachePersistProvenance:
+    """Provenance hash inputs for persist_dispatch_results.
 
     standards_dir/prompts_dir/dimension are constant for a whole dispatch,
     so the caller computes these once (at watcher start) instead of
@@ -50,11 +81,11 @@ def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> dict:
     params_hash, effective_params = dimension_params_state(
         config.standards_dir, dimension, config.src,
     )
-    return {
-        "standards_hash": standards_hash, "params_hash": params_hash,
-        "effective_params": effective_params,
-        "prompts_hash": _hash_prompts_combined(config.prompts_dir),
-    }
+    return CachePersistProvenance(
+        standards_hash=standards_hash, params_hash=params_hash,
+        effective_params=effective_params,
+        prompts_hash=_hash_prompts_combined(config.prompts_dir),
+    )
 
 
 def _make_persist_fn(
@@ -75,15 +106,15 @@ def _make_persist_fn(
     Resetting first marks every ok file dirty again, so the final persist
     re-puts all of them, as the pre-incremental one did.
     """
-    hash_inputs = _compute_persist_hash_inputs(config, dim_id)
+    provenance = _compute_persist_hash_inputs(config, dim_id)
     state = DispatchJsonlState()
+    target = CachePersistTarget(jsonl_path=jsonl, cache=cache, state=state)
 
     def _persist_now() -> None:
         if stop_event.is_set():
             state.reset()
         persist_dispatch_results(
-            config, dim_id, miss_files=classify.misses, cache=cache,
-            jsonl_path=jsonl, miss_keys=classify.miss_keys, state=state, **hash_inputs,
+            config, dim_id, classify=classify, provenance=provenance, target=target,
         )
 
     return _persist_now

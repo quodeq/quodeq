@@ -7,13 +7,19 @@ SAME fast, cache-backed, scalar-only fetcher instead of reading full run data
 (violations, multi-MB) for every historical run.
 
 This module depends only on leaf modules (``_cache``, ``score_cache``,
-``ports``, ``rescore``) so it can be imported by both ``dashboard.py`` and
-``scoring/__init__.py`` without a circular import.
+``ports``, ``rescore``, ``_scoring_deps``) so it can be imported by both
+``dashboard.py`` and ``scoring/__init__.py`` without a circular import.
+``ScoringDeps`` lives at ``quodeq.services._scoring_deps`` (a leaf outside
+the ``scoring`` package), so importing it here at module load time does not
+force ``quodeq.services.scoring`` to initialize first.
 
-Dependency injection: the scalar reader and the dismissed/deleted lookups are
-parameters (defaulting to the real functions). ``scoring/__init__.py`` passes
-its own module-level references so its monkeypatch-based tests keep working;
-``dashboard.py`` uses the defaults.
+Dependency injection: the scalar reader, the dismissed/deleted lookups, the
+full-data base-fetcher factory, and the trend-window size are bundled in a
+``ScoringDeps`` (see ``_scoring_deps.py``). A ``None`` field falls back to the
+real function; ``scoring/__init__.py`` passes its own module-level references
+so its monkeypatch-based tests keep working; ``dashboard.py`` uses the
+defaults for everything except ``base_fetcher_factory``/``max_history``,
+which have no leaf-level default and must always be supplied.
 """
 from __future__ import annotations
 
@@ -26,7 +32,8 @@ from typing import Callable
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services._scoring_deps import ScoringDeps
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.data.fs.report_parser.runs import read_run_scalars as _default_read_run_scalars
@@ -108,21 +115,35 @@ def _make_version_for(
     return version_for
 
 
+def _require_trend_deps(deps: ScoringDeps) -> None:
+    """Fail fast on the two ``ScoringDeps`` fields with no leaf-level default.
+
+    Both were required keyword-only parameters of the pre-refactor
+    ``make_trend_fetcher``, so a caller that omitted either got a ``TypeError``
+    at call time regardless of which path (fast/heavy) would have run. Called
+    unconditionally, before path selection, to keep that contract now that
+    both live on ``deps`` instead.
+    """
+    if deps.max_history is None:
+        raise TypeError("ScoringDeps.max_history is required for the trend fetcher's fast path")
+    if deps.base_fetcher_factory is None:
+        raise TypeError("ScoringDeps.base_fetcher_factory is required for the heavy trend path")
+
+
 def _make_heavy_trend_fetcher(
     reports_root: Path, project: str, params: ScoringParams,
     cacheable_run_ids: set[str] | None,
-    *,
-    base_fetcher_factory: Callable[[Path, str], _Fetcher],
-    dismissed_keys: Callable[[Path], set],
-    deleted_keys: Callable[[Path], set],
+    deps: ScoringDeps,
 ) -> _Fetcher:
     """Wrap the findings-based rescoring fetcher with the read-through score
     cache. The cache version is a content hash of dismissals/deletions/
     params, so any change auto-invalidates."""
     project_dir = reports_root / project
+    dismissed_keys = deps.dismissed_keys or _default_dismissed_keys
+    deleted_keys = deps.deleted_keys or _default_deleted_keys
     base = make_rescoring_fetcher(
         reports_root, project, params=params,
-        base_fetcher=base_fetcher_factory(reports_root, project),
+        base_fetcher=deps.base_fetcher_factory(reports_root, project),
         dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
     )
     from quodeq.services.score_cache import load_run_keys_or_empty, open_score_cache  # noqa: PLC0415
@@ -146,16 +167,12 @@ def make_trend_fetcher(
     params: ScoringParams = DEFAULT_PARAMS,
     cacheable_run_ids: set[str] | None = None,
     *,
-    max_history: int,
-    base_fetcher_factory: Callable[[Path, str], _Fetcher],
-    read_run_scalars: Callable[[Path, str, str], list[DimensionResult]] = _default_read_run_scalars,
-    dismissed_keys: Callable[[Path], set] = _default_dismissed_keys,
-    deleted_keys: Callable[[Path], set] = _default_deleted_keys,
+    deps: ScoringDeps,
 ) -> _Fetcher:
     """Return the dimension fetcher for the history trend / previous / stale path.
 
     Fast path (no active dismissals/deletions): read only per-run scalar grades
-    via *read_run_scalars* through a fresh per-call LRU cache, so scalar
+    via *deps.read_run_scalars* through a fresh per-call LRU cache, so scalar
     (findings-less) results never collide with the shared full-data cache used
     for the selected run.
 
@@ -173,17 +190,23 @@ def make_trend_fetcher(
     persisting. Stale-partial detection is preserved inside ``read_run_scalars``,
     which falls back to full ``read_run_data`` whenever the SQL scalar projection
     disagrees with the on-disk ``evaluation/*.json`` count.
+
+    ``deps.base_fetcher_factory`` (heavy path) and ``deps.max_history`` (fast
+    path) have no leaf-level default -- ``_require_trend_deps`` checks both
+    up front, before path selection, so omitting either raises regardless of
+    which path would have run.
     """
+    _require_trend_deps(deps)
     project_dir = reports_root / project
+    dismissed_keys = deps.dismissed_keys or _default_dismissed_keys
+    deleted_keys = deps.deleted_keys or _default_deleted_keys
     if dismissed_keys(project_dir) or deleted_keys(project_dir):
         return _make_heavy_trend_fetcher(
-            reports_root, project, params, cacheable_run_ids,
-            base_fetcher_factory=base_fetcher_factory,
-            dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+            reports_root, project, params, cacheable_run_ids, deps,
         )
 
-    cache: OrderedDict = OrderedDict()
-    return make_lru_dimension_fetcher(
-        reports_root, project, cache, Lock(),
-        max_history, reader=read_run_scalars,
+    ctx = DimensionCacheContext(
+        cache=OrderedDict(), lock=Lock(), max_size=deps.max_history,
+        reader=deps.read_run_scalars or _default_read_run_scalars,
     )
+    return make_lru_dimension_fetcher(reports_root, project, ctx)

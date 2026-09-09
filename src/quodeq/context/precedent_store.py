@@ -24,6 +24,15 @@ AvailabilityFn = Callable[[str, str], bool]
 
 
 @dataclass(frozen=True)
+class Embedder:
+    """The resolved embedding model, callable, and batch timeout for one corpus build."""
+
+    model: str
+    embed_fn: EmbedFn
+    batch_timeout: object
+
+
+@dataclass(frozen=True)
 class VectorStoreFns:
     """The six vector-store callables ``load_precedent_corpus`` needs.
 
@@ -114,10 +123,8 @@ def _backfill_missing(
 def _load_or_backfill_vectors(
     store: VectorStoreFns,
     project_dir: Path,
-    model: str,
     texts: dict[str, str],
-    embed_fn: EmbedFn,
-    batch_timeout: object,
+    embedder: Embedder,
 ) -> tuple[list[tuple[str, list[float]]], int] | None:
     """Open the vector store, backfill missing fingerprints, return all pairs.
 
@@ -128,13 +135,13 @@ def _load_or_backfill_vectors(
     just get whatever is already stored.
     """
     embedded_new = 0
-    with store.open_vector_store(project_dir, model) as conn:
+    with store.open_vector_store(project_dir, embedder.model) as conn:
         if conn is None:
             return None
         if store.try_claim_backfill(conn):
             try:
                 embedded_new = _backfill_missing(
-                    store, conn, model, texts, embed_fn, batch_timeout,
+                    store, conn, embedder.model, texts, embedder.embed_fn, embedder.batch_timeout,
                 )
             finally:
                 store.release_backfill_claim(conn)

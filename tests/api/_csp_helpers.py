@@ -8,21 +8,22 @@ request helpers.
 from __future__ import annotations
 
 from quodeq.api.app import create_app
+from quodeq.shared.dashboard_ports import alt_ports
 
-# Alt-port origins probed by useServerHealth.js (DEFAULT_ALT_PORTS = [4180..4183]).
+# Alt-port origins probed by useServerHealth.js's altPortCandidates().
 _ALT_PORT_ORIGINS = [
-    f"http://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
+    f"http://127.0.0.1:{p}" for p in alt_ports()
 ] + [
-    f"http://localhost:{p}" for p in (4180, 4181, 4182, 4183)
+    f"http://localhost:{p}" for p in alt_ports()
 ]
 
 # ws:// alt-port origins for the terminal WebSocket (Task 5). WebKit/pywebview
 # enforces CSP against the WebSocket handshake scheme, so http:// alone does
 # not cover it — each alt port needs an explicit ws:// entry too.
 _WS_ALT_PORT_ORIGINS = [
-    f"ws://127.0.0.1:{p}" for p in (4180, 4181, 4182, 4183)
+    f"ws://127.0.0.1:{p}" for p in alt_ports()
 ] + [
-    f"ws://localhost:{p}" for p in (4180, 4181, 4182, 4183)
+    f"ws://localhost:{p}" for p in alt_ports()
 ]
 
 

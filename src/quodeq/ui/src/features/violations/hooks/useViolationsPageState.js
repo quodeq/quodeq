@@ -50,7 +50,7 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
   // sub-tab reflects new entries without needing the user to re-open the
   // page or switch projects.
   const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
-    useDismissedFindings(selectedProject, onRefresh, setRestoreError, dismissRefreshKey, selectedSource, onReconcile);
+    useDismissedFindings({ selectedProject, onRefresh, setRestoreError, refreshKey: dismissRefreshKey, selectedSource, onReconcile });
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());

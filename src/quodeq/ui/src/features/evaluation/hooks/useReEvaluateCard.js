@@ -41,7 +41,7 @@ export function useReEvaluateCard(project, onStart, projectInfo, preselectDims) 
   const { estimates, loading: estimatesLoading } = useScanEstimates(project, isLocal && !info?.pathMissing);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
-    useDimensionSelection(allDimensions, info, branch, scopePath, onStart, showToast, preselectDims, project, timeLimitS);
+    useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail: showToast, preselectDims, project, timeLimitS });
 
   return {
     info, error, retry, allDimensions, selectedDims,

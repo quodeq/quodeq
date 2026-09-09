@@ -3,7 +3,7 @@ import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
 
-export function ModelTextInput({ label, value, placeholder, onChange, required }) {
+export function ModelTextInput({ label, value, placeholder, onChange, required, ariaLabel }) {
   const inputId = `model-input-${label || 'default'}`;
   return (
     <div className="settings-model-field">
@@ -15,7 +15,7 @@ export function ModelTextInput({ label, value, placeholder, onChange, required }
         value={value || ''}
         placeholder={placeholder || t('settings.typeModelId')}
         onChange={(e) => onChange(e.target.value)}
-        aria-label={label ? t('settings.modelNameAria', { label }) : t('settings.modelAria')}
+        aria-label={ariaLabel || (label ? t('settings.modelNameAria', { label }) : t('settings.modelAria'))}
         autoCapitalize="off"
         autoCorrect="off"
         autoComplete="off"

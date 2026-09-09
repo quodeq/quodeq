@@ -32,25 +32,40 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
     )
 
 
-def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
-    """Return the UUID of any other project matching this identity.
-
-    Fast path: O(1) index lookup instead of a directory walk + repository_info.json
-    parse per existing project (mirrors ``_update_index``'s use of the same index).
-
-    Fallback: the index is not guaranteed to have an entry for every project on
-    disk (legacy projects created before the index existed, or an imported
-    project whose best-effort index write failed). On a miss we fall back to
-    walking ``reports_root`` and reading each ``repository_info.json`` directly,
-    mirroring ``_scan_legacy_projects``'s self-healing pattern: a fallback hit
-    is written back into the index so subsequent lookups for that project take
-    the fast path.
-    """
+def _index_collision(reports_root: Path, identity: ProjectIdentity, ignore_uuid: str) -> str | None:
+    """O(1) index lookup for a colliding project (mirrors ``_update_index``'s
+    use of the same index)."""
     index = load_index(reports_root)
     candidate = index.get(index_key(identity))
     if candidate is not None and candidate != ignore_uuid:
         return candidate
+    return None
 
+
+def _info_matches_identity(data: dict[str, Any], identity: ProjectIdentity) -> bool:
+    if data.get("name") != identity.project_name:
+        return False
+    if data.get("path") != identity.repo_path:
+        return False
+    if (data.get("scopePath") or None) != (identity.scope_path or None):
+        return False
+    return True
+
+
+def _heal_index(reports_root: Path, identity: ProjectIdentity, uuid: str) -> None:
+    """Write a fallback-walk hit back into the index so the next lookup for
+    this identity takes the fast path."""
+    try:
+        index = load_index(reports_root)
+        index[index_key(identity)] = uuid
+        save_index(reports_root, index)
+    except OSError as exc:
+        _logger.warning("import: could not update project_index.json: %s", exc)
+
+
+def _walk_for_collision(reports_root: Path, identity: ProjectIdentity, ignore_uuid: str) -> str | None:
+    """Directory-walk fallback: reads each project's repository_info.json
+    directly, mirroring ``_scan_legacy_projects``'s self-healing pattern."""
     if not reports_root.is_dir():
         return None
     for child in reports_root.iterdir():
@@ -63,19 +78,30 @@ def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, i
             data = json.loads(info_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if data.get("name") != identity.project_name:
+        if not _info_matches_identity(data, identity):
             continue
-        if data.get("path") != identity.repo_path:
-            continue
-        if (data.get("scopePath") or None) != (identity.scope_path or None):
-            continue
-        try:
-            index[index_key(identity)] = child.name
-            save_index(reports_root, index)
-        except OSError as exc:
-            _logger.warning("import: could not update project_index.json: %s", exc)
+        _heal_index(reports_root, identity, child.name)
         return child.name
     return None
+
+
+def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
+    """Return the UUID of any other project matching this identity.
+
+    Fast path: O(1) index lookup instead of a directory walk + repository_info.json
+    parse per existing project.
+
+    Fallback: the index is not guaranteed to have an entry for every project on
+    disk (legacy projects created before the index existed, or an imported
+    project whose best-effort index write failed). On a miss we fall back to
+    walking ``reports_root`` and reading each ``repository_info.json`` directly;
+    a fallback hit is written back into the index so subsequent lookups for
+    that project take the fast path.
+    """
+    collision = _index_collision(reports_root, identity, ignore_uuid)
+    if collision is not None:
+        return collision
+    return _walk_for_collision(reports_root, identity, ignore_uuid)
 
 
 def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:

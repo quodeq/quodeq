@@ -1,3 +1,4 @@
+from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -22,7 +23,8 @@ def test_create_and_get_session(tmp_path):
 
 def test_create_session_stores_project_id(tmp_path):
     repo = _repo(tmp_path)
-    repo.create_session(session_id="s1", provider="ollama", project_id="selectives")
+    repo.create_session(session_id="s1", provider="ollama",
+                        scope=SessionScope(project_id="selectives"))
     assert repo.get_session("s1")["project_id"] == "selectives"
 
 

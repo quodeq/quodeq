@@ -62,6 +62,27 @@ def _invalid_model_name(model: str) -> tuple[Response, int] | None:
     return None
 
 
+def _require_model_name(
+    data: dict, *, require_nonempty: bool,
+) -> tuple[str | None, tuple[Response, int] | None]:
+    """Validate the ``model`` field shared by the concurrency-test routes.
+
+    ollama requires a non-empty string (``require_nonempty=True``, rejects
+    ``""`` with MISSING_PARAM); llamacpp and omlx accept an empty string and
+    only reject non-strings (``require_nonempty=False``, INVALID_PARAM).
+    """
+    model = data.get("model", "")
+    if require_nonempty:
+        if not model or not isinstance(model, str):
+            return None, (jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400)
+    elif not isinstance(model, str):
+        return None, (jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400)
+    err = _invalid_model_name(model)
+    if err is not None:
+        return None, err
+    return model, None
+
+
 def register_llm_bridge_routes(app: Flask) -> None:
     """Register all llm_bridge API routes."""
 
@@ -78,10 +99,7 @@ def register_llm_bridge_routes(app: Flask) -> None:
         data = _json_body()
         if data is None:
             return jsonify(_BODY_NOT_OBJECT), 400
-        model = data.get("model", "")
-        if not model or not isinstance(model, str):
-            return jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400
-        err = _invalid_model_name(model)
+        model, err = _require_model_name(data, require_nonempty=True)
         if err is not None:
             return err
         result = run_concurrency_test(model)
@@ -113,10 +131,7 @@ def register_llm_bridge_routes(app: Flask) -> None:
         data = _json_body()
         if data is None:
             return jsonify(_BODY_NOT_OBJECT), 400
-        model = data.get("model", "")
-        if not isinstance(model, str):
-            return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
-        err = _invalid_model_name(model)
+        model, err = _require_model_name(data, require_nonempty=False)
         if err is not None:
             return err
         result = run_llamacpp_concurrency_test(model)
@@ -146,10 +161,7 @@ def register_llm_bridge_routes(app: Flask) -> None:
         data = _json_body()
         if data is None:
             return jsonify(_BODY_NOT_OBJECT), 400
-        model = data.get("model", "")
-        if not isinstance(model, str):
-            return jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400
-        err = _invalid_model_name(model)
+        model, err = _require_model_name(data, require_nonempty=False)
         if err is not None:
             return err
         base_url = data.get("base_url") or ""

@@ -20,7 +20,11 @@ import { SIZE_GRANDFATHER } from './size_grandfather.mjs';
 // files remain in this list; the 74 entries are all pre-existing
 // production-code max-lines / max-lines-per-function violations, unrelated
 // to this task.
-const CEILING = 4;
+//
+// Lowered 4 -> 1 by the maintainability majors: DashboardPage.jsx,
+// useAssistantStream.js and GalaxyView.jsx were split into sibling render
+// modules / hooks, leaving useAppState.js as the last entry.
+const CEILING = 1;
 
 const count = SIZE_GRANDFATHER.length;
 if (count > CEILING) {

@@ -119,7 +119,10 @@ def _resolve_dimension_cache_writer(server_args: ServerArgs):
             "--dimension is set; got cache_root=%r, model_id=%r"
             % (server_args.cache_root, server_args.model_id),
         )
-    from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
+    from quodeq.analysis.cache.cache_writer import (  # noqa: PLC0415
+        CacheWriterSpec,
+        build_cache_writer,
+    )
     from quodeq.config.paths import default_paths  # noqa: PLC0415
     src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
     # NOTE: standards_dir must be the standards ROOT (parent of
@@ -130,7 +133,7 @@ def _resolve_dimension_cache_writer(server_args: ServerArgs):
     # under the default-thresholds key. --standards-dir is None when
     # not supplied by the caller (back-compat: no params fingerprint).
     standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
-    return build_cache_writer(
+    spec = CacheWriterSpec(
         cache_root=Path(server_args.cache_root),
         src_root=src_root,
         standards_dir=standards_dir,
@@ -142,6 +145,7 @@ def _resolve_dimension_cache_writer(server_args: ServerArgs):
         # parent's RunConfig.prompts_dir carries.
         prompts_dir=default_paths().prompts_dir,
     )
+    return build_cache_writer(spec)
 
 
 def _build_router(

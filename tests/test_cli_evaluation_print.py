@@ -17,7 +17,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
-from quodeq.services.evidence_rescore import score_dimension_from_evidence
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 
 DIM = "maintainability"
 # Small source_file_count/files_read (matching tests/services/test_evidence_rescore.py
@@ -73,8 +73,10 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     assert dismissed, "dismiss did not register"
 
     expected = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=dismissed, deleted=set(),
-        source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS,
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=dismissed, deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS,
+        ),
     )
     assert expected is not None and expected.overall.weighted_score is not None
     # Sanity: the dismiss must actually move the score, or this test would

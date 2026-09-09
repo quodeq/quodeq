@@ -19,12 +19,28 @@ from __future__ import annotations
 
 import codecs
 import io
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
 from quodeq.core.observability import LogSink
 from quodeq.services._job_model import JobStore, _CC_MARKER_PREFIX
 from quodeq.shared.run_log import RunLogWriter
+
+
+@dataclass(frozen=True)
+class TeeContext:
+    """Collaborators consume_stream/_read_and_tee_loop/tee_run_log share.
+
+    All fields are owned and mutated by JobManager; see the module docstring
+    for the invariant governing who else may touch the dicts.
+    """
+    store: JobStore
+    reports_root: Path | None
+    run_log_writers: dict[str, RunLogWriter]
+    pre_marker_buffer: dict[str, list[str]]
+    log: LogSink
+    flush_batch: Callable[[str, list[str]], bool]
 
 
 def _iter_line_batches(stream: Iterable[str]) -> Iterator[list[str]]:
@@ -71,13 +87,7 @@ def _iter_line_batches(stream: Iterable[str]) -> Iterator[list[str]]:
 def _read_and_tee_loop(
     job_id: str,
     stream: Iterable[str],
-    *,
-    store: JobStore,
-    reports_root: Path | None,
-    run_log_writers: dict[str, RunLogWriter],
-    pre_marker_buffer: dict[str, list[str]],
-    log: LogSink,
-    flush_batch: Callable[[str, list[str]], bool],
+    ctx: TeeContext,
 ) -> bool:
     """Flush each read's lines to the job, then tee them to run.log.
 
@@ -87,7 +97,7 @@ def _read_and_tee_loop(
     """
     try:
         for lines in _iter_line_batches(stream):
-            if not flush_batch(job_id, lines):
+            if not ctx.flush_batch(job_id, lines):
                 return False
             # Tee after flush so a marker in this batch is already applied
             # to the job before we try to resolve run_dir. Skip _cc JSON
@@ -95,87 +105,56 @@ def _read_and_tee_loop(
             # output, and leaking them makes the xterm pane noisy.
             for stripped in lines:
                 if not stripped.startswith(_CC_MARKER_PREFIX):
-                    tee_run_log(
-                        job_id, stripped, store=store, reports_root=reports_root,
-                        run_log_writers=run_log_writers, pre_marker_buffer=pre_marker_buffer,
-                    )
+                    tee_run_log(job_id, stripped, ctx)
     except (IOError, BrokenPipeError) as exc:
-        log.warning(f"Stream read error for job {job_id}: {exc}")
+        ctx.log.warning(f"Stream read error for job {job_id}: {exc}")
     return True
 
 
 def consume_stream(
     job_id: str,
     stream: Iterable[str] | None,
-    *,
-    store: JobStore,
-    reports_root: Path | None,
-    run_log_writers: dict[str, RunLogWriter],
-    pre_marker_buffer: dict[str, list[str]],
-    log: LogSink,
-    flush_batch: Callable[[str, list[str]], bool],
+    ctx: TeeContext,
 ) -> None:
     if stream is None:
         return
-    pre_marker_buffer.setdefault(job_id, [])
+    ctx.pre_marker_buffer.setdefault(job_id, [])
     try:
-        if _read_and_tee_loop(
-            job_id, stream, store=store, reports_root=reports_root,
-            run_log_writers=run_log_writers, pre_marker_buffer=pre_marker_buffer,
-            log=log, flush_batch=flush_batch,
-        ):
+        if _read_and_tee_loop(job_id, stream, ctx):
             # Final drain: if the report_path marker arrived in the last
             # batch, the writer may not have been created yet — try one
             # more time so buffered pre-marker lines are not lost.
-            drain_pre_marker_buffer(
-                job_id, store=store, reports_root=reports_root,
-                run_log_writers=run_log_writers, pre_marker_buffer=pre_marker_buffer,
-            )
+            drain_pre_marker_buffer(job_id, ctx)
     finally:
         # Always release the writer and buffer, even on unexpected exceptions.
-        writer = run_log_writers.pop(job_id, None)
+        writer = ctx.run_log_writers.pop(job_id, None)
         if writer is not None:
             writer.close()
-        pre_marker_buffer.pop(job_id, None)
+        ctx.pre_marker_buffer.pop(job_id, None)
 
 
-def drain_pre_marker_buffer(
-    job_id: str,
-    *,
-    store: JobStore,
-    reports_root: Path | None,
-    run_log_writers: dict[str, RunLogWriter],
-    pre_marker_buffer: dict[str, list[str]],
-) -> None:
+def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
     """Attempt to resolve run_dir and flush any buffered pre-marker lines.
 
     Called after the final flush_batch so that lines buffered before the
     report_path marker are not lost when the marker arrives in the last
     batch of the stream.
     """
-    if run_log_writers.get(job_id) is not None:
+    if ctx.run_log_writers.get(job_id) is not None:
         # Writer already open — nothing to drain.
         return
-    job = store.get(job_id)
-    if job and job.output_project and job.output_run_id and reports_root is not None:
-        run_dir = reports_root / job.output_project / job.output_run_id
+    job = ctx.store.get(job_id)
+    if job and job.output_project and job.output_run_id and ctx.reports_root is not None:
+        run_dir = ctx.reports_root / job.output_project / job.output_run_id
         if run_dir.is_dir():
             writer = RunLogWriter(run_dir)
-            run_log_writers[job_id] = writer
-            for pending in pre_marker_buffer.get(job_id, []):
+            ctx.run_log_writers[job_id] = writer
+            for pending in ctx.pre_marker_buffer.get(job_id, []):
                 writer.write(pending)
-            pre_marker_buffer[job_id] = []
+            ctx.pre_marker_buffer[job_id] = []
 
 
-def tee_run_log(
-    job_id: str,
-    line: str,
-    *,
-    store: JobStore,
-    reports_root: Path | None,
-    run_log_writers: dict[str, RunLogWriter],
-    pre_marker_buffer: dict[str, list[str]],
-) -> None:
+def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
     """Forward *line* to the job's run.log writer.
 
     Before the report_path marker arrives, ``run_dir`` is unknown — lines
@@ -185,20 +164,20 @@ def tee_run_log(
     Caller invariant: at most one ``consume_stream`` runs per job_id at a
     time. This function is not re-entrant for the same job_id.
     """
-    writer = run_log_writers.get(job_id)
+    writer = ctx.run_log_writers.get(job_id)
     if writer is None:
         # Try to resolve run_dir from the job snapshot now.
-        job = store.get(job_id)
-        if job and job.output_project and job.output_run_id and reports_root is not None:
-            run_dir = reports_root / job.output_project / job.output_run_id
+        job = ctx.store.get(job_id)
+        if job and job.output_project and job.output_run_id and ctx.reports_root is not None:
+            run_dir = ctx.reports_root / job.output_project / job.output_run_id
             if run_dir.is_dir():
                 writer = RunLogWriter(run_dir)
-                run_log_writers[job_id] = writer
+                ctx.run_log_writers[job_id] = writer
                 # Flush any buffered pre-marker lines.
-                for pending in pre_marker_buffer.get(job_id, []):
+                for pending in ctx.pre_marker_buffer.get(job_id, []):
                     writer.write(pending)
-                pre_marker_buffer[job_id] = []
+                ctx.pre_marker_buffer[job_id] = []
         if writer is None:
-            pre_marker_buffer.setdefault(job_id, []).append(line)
+            ctx.pre_marker_buffer.setdefault(job_id, []).append(line)
             return
     writer.write(line)

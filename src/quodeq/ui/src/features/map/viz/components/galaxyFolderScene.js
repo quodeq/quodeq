@@ -50,10 +50,11 @@ const FOLDER_DIST_MIN = 0.35;
 const FOLDER_DIST_MAX = 0.65;
 const FILE_DIST_MIN = 0.2;
 const FILE_DIST_MAX = 0.5;
-const REPULSION_ITERATIONS = 50;
-const REPULSION_RADIUS = 3;
-const REPULSION_STRENGTH = 5;
-const REPULSION_DECAY = 8;
+const LARGE_SCENE_STARS = 50;
+const MEDIUM_SCENE_STARS = 20;
+const REPULSION_PASSES_LARGE = 3;
+const REPULSION_PASSES_MEDIUM = 5;
+const REPULSION_PASSES_SMALL = 8;
 const TARGET_RADIUS_FRACTION = 0.42;
 const BG_STAR_COUNT = 120;
 
@@ -175,7 +176,7 @@ function recenterStars(rootStars) {
 function applyRepulsion(rootStars, n) {
   const folderGap = 10 + Math.min(n, 20) * 1.0;
   const fileGap = 1;
-  const repulsionIters = rootStars.length > REPULSION_ITERATIONS ? REPULSION_RADIUS : rootStars.length > 20 ? REPULSION_STRENGTH : REPULSION_DECAY;
+  const repulsionIters = rootStars.length > LARGE_SCENE_STARS ? REPULSION_PASSES_LARGE : rootStars.length > MEDIUM_SCENE_STARS ? REPULSION_PASSES_MEDIUM : REPULSION_PASSES_SMALL;
   for (let iter = 0; iter < repulsionIters; iter++) {
     for (let i = 0; i < rootStars.length; i++) {
       for (let j = i + 1; j < rootStars.length; j++) {

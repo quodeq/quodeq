@@ -45,6 +45,7 @@ from quodeq.analysis._run_lifecycle_support import (
 )
 from quodeq.data.fs.run_status_store import (
     RunState,
+    RunStatus,
     TERMINAL_STATES,
     validate_transition,
     write_status,
@@ -92,8 +93,7 @@ class _StatusWriter:
         self.ai_model = ai_model
 
     def write(self, state: RunState, *, exit_reason: str | None = None) -> None:
-        write_status(
-            self.run_dir,
+        status = RunStatus(
             state=state,
             job_id=self.job_id,
             started_at=self.started_at,
@@ -106,6 +106,7 @@ class _StatusWriter:
             ai_model=self.ai_model,
             time_limit_s=self.time_limit_s,
         )
+        write_status(self.run_dir, status)
 
 
 class RunLifecycleContext:

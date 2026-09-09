@@ -3,6 +3,7 @@ import pytest
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant.worktree import _run
+from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -23,7 +24,8 @@ def repo(tmp_path):
 def _fixture(tmp_path, repo_root, monkeypatch):
     monkeypatch.setenv("QUODEQ_WORKTREES_DIR", str(tmp_path / "wts"))
     store = AssistantRepository(tmp_path / "assistant.db")
-    store.create_session(session_id="s1", provider="ollama", project_id="proj")
+    store.create_session(session_id="s1", provider="ollama",
+                         scope=SessionScope(project_id="proj"))
     ctx = ToolContext(
         repository=store, session_id="s1", run_dir=None, repo_root=repo_root,
         evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
@@ -81,8 +83,7 @@ def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
     store, ctx = _fixture(tmp_path, repo, monkeypatch)
     seen = {}
 
-    def fake_cli_turn(*, messages, config, session_id, prior_session_id,
-                      repository, emit, **_):
+    def fake_cli_turn(*, messages, config, session, **_):
         seen["args"] = config.mcp_server_args
         seen["worktree_dir"] = config.worktree_dir
         return "ok"
@@ -103,8 +104,7 @@ def test_write_enabled_gemini_turn_stays_read_only(tmp_path, repo, monkeypatch):
     store, ctx = _fixture(tmp_path, repo, monkeypatch)
     seen = {}
 
-    def fake_cli_turn(*, messages, config, session_id, prior_session_id,
-                      repository, emit, **_):
+    def fake_cli_turn(*, messages, config, session, **_):
         seen["args"] = config.mcp_server_args
         seen["worktree_dir"] = config.worktree_dir
         seen["system"] = messages[0]["content"]

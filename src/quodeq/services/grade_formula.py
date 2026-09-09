@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -81,42 +82,63 @@ _APPLY_RETRIES = 2
 _APPLY_RETRY_SLEEP_S = 0.15
 
 
+def _iter_event_log_runs(reports_root: Path) -> Iterator[Path]:
+    """Yield every run dir under *reports_root* that has an events.jsonl.
+
+    Legacy runs without an event log cannot be rescored and are skipped.
+    """
+    if not reports_root.is_dir():
+        return
+    for project_dir in sorted(p for p in reports_root.iterdir() if p.is_dir()):
+        for run_dir in sorted(r for r in project_dir.iterdir() if r.is_dir()):
+            if (run_dir / "events.jsonl").is_file():
+                yield run_dir
+
+
+def _recompute_with_retries(run_dir: Path, params: ScoringParams) -> bool:
+    """Recompute *run_dir*'s grades, retrying transient failures.
+
+    Returns True on success. On exhausting the retries, logs the failure
+    itself and returns False -- the caller decides what to do with that.
+    """
+    from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
+
+    for attempt in range(_APPLY_RETRIES + 1):
+        try:
+            recompute_grades(run_dir, params=params)
+            return True
+        except Exception:  # noqa: BLE001 — one bad run must not block the rest
+            if attempt < _APPLY_RETRIES:
+                time.sleep(_APPLY_RETRY_SLEEP_S)
+                continue
+            _logger.warning(
+                "Rescore failed for %s after %d attempts; it will "
+                "keep the old formula's grades.",
+                run_dir, _APPLY_RETRIES + 1, exc_info=True,
+            )
+            return False
+    return False
+
+
 def apply_to_all_runs(reports_root: Path) -> ApplyResult:
     """Rescore every run that has an events.jsonl with the currently saved params.
 
-    Legacy runs without an event log cannot be rescored and are skipped.
     Always clears the dashboard cache (even when nothing was rescored, e.g.
     when *reports_root* does not exist). Returns an ``ApplyResult`` with the
     rescored count and the run-dir names that failed after retries — a
     partial apply is reported, not swallowed, so the UI can warn the user
     that some runs still show the old formula.
     """
-    from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
     from quodeq.services.dashboard import clear_shared_dimension_cache  # noqa: PLC0415
 
     params = load_params()
     rescored = 0
     failed: list[str] = []
-    if reports_root.is_dir():
-        for project_dir in sorted(p for p in reports_root.iterdir() if p.is_dir()):
-            for run_dir in sorted(r for r in project_dir.iterdir() if r.is_dir()):
-                if not (run_dir / "events.jsonl").is_file():
-                    continue
-                for attempt in range(_APPLY_RETRIES + 1):
-                    try:
-                        recompute_grades(run_dir, params=params)
-                        rescored += 1
-                        break
-                    except Exception:  # noqa: BLE001 — one bad run must not block the rest
-                        if attempt < _APPLY_RETRIES:
-                            time.sleep(_APPLY_RETRY_SLEEP_S)
-                            continue
-                        failed.append(run_dir.name)
-                        _logger.warning(
-                            "Rescore failed for %s after %d attempts; it will "
-                            "keep the old formula's grades.",
-                            run_dir, _APPLY_RETRIES + 1, exc_info=True,
-                        )
+    for run_dir in _iter_event_log_runs(reports_root):
+        if _recompute_with_retries(run_dir, params):
+            rescored += 1
+        else:
+            failed.append(run_dir.name)
     clear_shared_dimension_cache()
     return ApplyResult(rescored=rescored, failed=failed)
 

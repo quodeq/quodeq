@@ -39,6 +39,24 @@ def _reports_dir() -> str:
     return _facade.reports_dir()
 
 
+def _contained_project_dir(project: str) -> Path | None:
+    """Resolve *project* under the reports root, or None if it escapes or
+    does not exist.
+
+    Containment check in the exact normpath + startswith shape CodeQL
+    recognizes as a path-injection barrier (pathlib's is_relative_to is
+    not modeled and left the alerts open).
+    """
+    root = os.path.realpath(_reports_dir())
+    candidate = os.path.normpath(os.path.join(root, project))
+    if not candidate.startswith(root + os.sep):
+        return None
+    project_dir = Path(candidate)
+    if not project_dir.is_dir():
+        return None
+    return project_dir
+
+
 def project_scan(project: str) -> Response | tuple[Response, int]:
     """Return scan data for a project. Triggers scan if needed for local projects."""
     try:
@@ -47,15 +65,8 @@ def project_scan(project: str) -> Response | tuple[Response, int]:
         body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
 
-    # Same containment shape as project_estimates below — the normpath +
-    # startswith form is the one CodeQL/Snyk recognize as a barrier.
-    root = os.path.realpath(_reports_dir())
-    candidate = os.path.normpath(os.path.join(root, project))
-    if not candidate.startswith(root + os.sep):
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    project_dir = Path(candidate)
-    if not project_dir.is_dir():
+    project_dir = _contained_project_dir(project)
+    if project_dir is None:
         body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
 
@@ -106,16 +117,8 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
         body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
 
-    # Containment check in the exact normpath + startswith shape CodeQL
-    # recognizes as a path-injection barrier (pathlib's is_relative_to
-    # is not modeled and left the alerts open).
-    root = os.path.realpath(_reports_dir())
-    candidate = os.path.normpath(os.path.join(root, project))
-    if not candidate.startswith(root + os.sep):
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    project_dir = Path(candidate)
-    if not project_dir.is_dir():
+    project_dir = _contained_project_dir(project)
+    if project_dir is None:
         body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
 

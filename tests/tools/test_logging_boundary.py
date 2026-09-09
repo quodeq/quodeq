@@ -28,6 +28,7 @@ _CHECKED_DIRS = ("core", "analysis", "services", "config")
 # param and deleting the import.
 DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_analysis_context.py': 'Analysis context - dimension loading and resolution - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/_api_batch.py': 'Per-dimension batch context and the sub-batch dispatch loop for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_call.py': 'Direct LLM API call: request construction, the raw chat-completion round-trip, and error classification - split out of _api_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_runner.py': 'API runner for direct LLM evaluation - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_api_source_gathering.py': 'Credential loading and file-batching helpers for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
@@ -40,6 +41,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_process.py': 'Subprocess spawning, heartbeat monitoring, and error handling - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/api_prompt_assembly.py': 'Prompt assembly for the direct API runner - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/cache/_dimension_context.py': 'Pre-dispatch setup for the V2 cache-aware dimension processor (cache backend, trust model, file listing, classification) - split out of dimension_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/cache/_failure_streak.py': 'Consecutive-failure circuit breaker for the dim runner - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/_replay.py': "Cache-replay path: writing cached findings and their events.jsonl mirror back into a run's evidence - split out of dimension_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)",
     'analysis/cache/cache_writer.py': 'Factory for the per-file cache-write callback passed to FindingsRouter - out of scope for this sweep (not a flagged per-site conversion)',
@@ -106,8 +108,8 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/mutation_rescore.py': 'Rescore-after-mutation helpers, shared by API routes and assistant actions - out of scope for this sweep (not a flagged per-site conversion)',
     'services/plugin_discovery.py': 'Discover available languages and return plugin metadata - out of scope for this sweep (not a flagged per-site conversion)',
     'services/score_run.py': 'Use case: score completed evidence after cancellation - imports the raw stdlib logger (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
-    'services/scoring/__init__.py': 'Scoring reader - single read-side entry point for all score data - out of scope for this sweep (not a flagged per-site conversion)',
     'services/scoring/_rescoring.py': 'Accumulated-rescore machinery for the scoring reader - out of scope for this sweep (not a flagged per-site conversion)',
+    'services/scoring/_scores_raw.py': 'Single-run scores: SQL-backed with a JSON-eval-file fallback - own logger (quodeq.services.scoring._scores_raw), no longer threaded from the package facade (M-MOD-3 import-cycle fix) - out of scope for this sweep (not a flagged per-site conversion)',
     'services/shared_publish.py': 'Staging logic for publishing a project into the shared results repo - out of scope for this sweep (not a flagged per-site conversion)',
     'services/tooling_mixin.py': 'Mixin providing repo browsing and AI client discovery for the filesystem provider - out of scope for this sweep (not a flagged per-site conversion)',
     'services/violations.py': 'Violation resolution and aggregation for the filesystem action provider - out of scope for this sweep (not a flagged per-site conversion)',

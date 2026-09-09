@@ -29,7 +29,7 @@ from quodeq.core.scoring.internals import (
     compliance_lift,
 )
 from quodeq.core.scoring.params import DEFAULT_PARAMS
-from quodeq.core.scoring.projector_scoring import compute_principle_grade
+from quodeq.core.scoring.projector_scoring import PrincipleGradeScale, compute_principle_grade
 from quodeq.core.types.finding import Finding
 
 
@@ -86,8 +86,7 @@ def test_principle_grade_does_not_read_good_under_a_pile_of_minor_findings() -> 
         principle_id="Learnability",
         findings=[_minor(i) for i in range(250)],
         compliance=[_minor(i, verdict="compliance") for i in range(53)],
-        source_file_count=1800,
-        scale_multiplier=1,
+        scale=PrincipleGradeScale(source_file_count=1800, scale_multiplier=1),
     )
     assert result["score"] is not None
     assert result["score"] < 8.0, (

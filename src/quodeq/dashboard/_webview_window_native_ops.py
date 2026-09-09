@@ -1,11 +1,12 @@
 """Operational helpers extracted from the facade purely to fit the file-size
 cap: _WindowApi's HTTP/native-dialog bodies, the reload-socket handler, and
-process teardown. None of this is patch-tested by name — tests patch the
-underlying ww.urllib.request / ww.webbrowser / ww.sys module objects, which
-work regardless of which file calls them (patch.object(ww.urllib.request,
-...) patches the real shared module, not a name in ww's own namespace) — so
-none of it needs to stay co-located with a caller in the facade. See
-_webview_window.py's module docstring for what DOES need to stay there.
+process teardown. None of this is patch-tested by name — tests patch
+urllib.request.urlopen directly (a global module attribute, patching the
+real shared module rather than a name in some namespace) and the underlying
+ww.webbrowser / ww.sys module objects, which work regardless of which file
+calls them — so none of it needs to stay co-located with a caller in the
+facade. See _webview_window.py's module docstring for what DOES need to
+stay there.
 """
 from __future__ import annotations
 

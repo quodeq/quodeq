@@ -1,5 +1,6 @@
 import sqlite3
 
+from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite._assistant_schema import ASSISTANT_DDL, ASSISTANT_SCHEMA_VERSION
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -40,7 +41,8 @@ def test_migrates_v1_db_to_add_project_id(tmp_path):
     repo = AssistantRepository(db)
     # First connect runs the migration; existing rows tolerate NULL project_id.
     assert repo.get_session("old")["project_id"] is None
-    repo.create_session(session_id="new", provider="ollama", project_id="proj")
+    repo.create_session(session_id="new", provider="ollama",
+                        scope=SessionScope(project_id="proj"))
     assert repo.get_session("new")["project_id"] == "proj"
 
     check = sqlite3.connect(db)

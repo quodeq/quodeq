@@ -72,17 +72,17 @@ function collectAffectedFiles(violations) {
   return Array.from(files).sort();
 }
 
-/** Render a single violation entry as markdown lines. */
-function renderViolationEntry(v, index, { principleKey, reasonKey }) {
-  const lines = [];
-  const loc = v.file ? ` — \`${v.file}${v.line ? `:${v.line}` : ''}\`` : '';
-  const principle = v[principleKey] || 'Violation';
-  const reason = v[reasonKey];
+/**
+ * Render one violation entry as markdown lines: a heading (from `titleFor`),
+ * the reason/fix-hint/snippet body, and a reference line (from `refLine`).
+ * Shared by renderViolationEntry (dimension plans) and defaultRenderEntry
+ * (group plans), which only differ in heading and reference format.
+ */
+function renderEntryLines(v, i, { titleFor, refLine }) {
+  const lines = [titleFor(v, i)];
 
-  lines.push(`### ${index + 1}. ${principle}${loc}`);
-
-  if (reason) {
-    lines.push('', `**Why it's a violation:** ${reason}`);
+  if (v.reason) {
+    lines.push('', `**Why it's a violation:** ${v.reason}`);
   }
 
   const hint = getFixHint(v.req);
@@ -90,8 +90,9 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
     lines.push('', `**Expected fix:** ${hint}`);
   }
 
-  if (v.cwe) {
-    lines.push('', `**Reference:** CWE-${v.cwe}`);
+  const ref = refLine(v);
+  if (ref) {
+    lines.push('', ref);
   }
 
   if (v.snippet) {
@@ -103,6 +104,17 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
 
   lines.push('');
   return lines;
+}
+
+/** Render a single violation entry as markdown lines. */
+function renderViolationEntry(v, index, { principleKey, reasonKey }) {
+  return renderEntryLines({ ...v, reason: v[reasonKey] }, index, {
+    titleFor: (vv, i) => {
+      const loc = vv.file ? ` — \`${vv.file}${vv.line ? `:${vv.line}` : ''}\`` : '';
+      return `### ${i + 1}. ${vv[principleKey] || 'Violation'}${loc}`;
+    },
+    refLine: (vv) => (vv.cwe ? `**Reference:** CWE-${vv.cwe}` : null),
+  });
 }
 
 function _buildPlanLines(dimName, totalCount, bySeverity, allViolations, entryKeys) {
@@ -193,27 +205,18 @@ export function buildGroupPlanText({ title, violations, violationsBySeverity, co
   if (context) lines.push('', `**Context:** ${context}`);
   lines.push('', '---', '');
 
-  const defaultRenderEntry = (v, i) => {
-    const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
-    const entryLines = [];
-    const heading = v._entryTitle
-      ? `### ${i + 1}. ${v._entryTitle}${loc ? ` — \`${loc}\`` : ''}`
-      : `### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`;
-    entryLines.push(heading);
-    if (v.reason) entryLines.push('', `**Why it's a violation:** ${v.reason}`);
-    const hint = getFixHint(v.req);
-    if (hint) entryLines.push('', `**Expected fix:** ${hint}`);
-    const linkedRefs = (v.reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
-    if (linkedRefs.length > 0) entryLines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
-    if (v.snippet) {
-      entryLines.push('', '**Affected code:**');
-      entryLines.push('```');
-      capSnippet(v.snippet).split('\n').forEach((l) => entryLines.push(l));
-      entryLines.push('```');
-    }
-    entryLines.push('');
-    return entryLines;
-  };
+  const defaultRenderEntry = (v, i) => renderEntryLines(v, i, {
+    titleFor: (vv, ii) => {
+      const loc = vv.file ? `${vv.file}${vv.line ? `:${vv.line}` : ''}` : '';
+      return vv._entryTitle
+        ? `### ${ii + 1}. ${vv._entryTitle}${loc ? ` — \`${loc}\`` : ''}`
+        : `### ${ii + 1}.${loc ? ` \`${loc}\`` : ''}`;
+    },
+    refLine: (vv) => {
+      const linkedRefs = (vv.reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
+      return linkedRefs.length > 0 ? `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}` : null;
+    },
+  });
 
   const render = renderEntry || defaultRenderEntry;
 

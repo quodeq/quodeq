@@ -97,7 +97,7 @@ def test_post_projects_rejects_metadata_endpoint_ssrf(client):
     with 400 and never reaches git clone."""
     clone_calls = []
     with patch(
-        "quodeq.services.project_registration.run_git_clone",
+        "quodeq.services._project_registration_steps.run_git_clone",
         side_effect=lambda url, dest: clone_calls.append(url),
     ):
         resp = client.post(

@@ -81,7 +81,7 @@ class TestProvenanceSurfacing:
             ))
 
         handler = _ListHandler()
-        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger = logging.getLogger("quodeq.analysis.cache._dimension_context")
         logger.addHandler(handler)
         dispatcher = FakeDispatcher(src)
         try:
@@ -125,7 +125,7 @@ class TestModelSwitchReuse:
         )
         d2 = FakeDispatcher(src)
         handler = _ListHandler()
-        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger = logging.getLogger("quodeq.analysis.cache._dimension_context")
         logger.addHandler(handler)
         try:
             ev = process_dimension_with_cache(
@@ -279,11 +279,11 @@ class TestAdoptedReporting:
             file_content_hash=struct.file_content_hash,
         ))
         handler = _ListHandler()
-        logger = logging.getLogger("quodeq.analysis.cache.dimension_runner")
+        logger = logging.getLogger("quodeq.analysis.cache._dimension_context")
         logger.addHandler(handler)
         dispatcher = FakeDispatcher(src)
         try:
-            with patch("quodeq.analysis.cache.dimension_runner.emit_marker") as marker:
+            with patch("quodeq.analysis.cache._dimension_context.emit_marker") as marker:
                 process_dimension_with_cache(
                     config, "security", idx=1, ctx=_make_ctx(), callbacks=_make_callbacks(),
                     cache=cache, dispatcher=dispatcher,

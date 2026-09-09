@@ -11,12 +11,40 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 from quodeq.api import _assistant_helpers
+from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
+
+
+def _validate_session_request(body: dict) -> tuple[Response | tuple[Response, int] | None, str]:
+    """Validate provider + source. Returns ``(error, source)``: *error* is the
+    route's early-return value (or None to proceed); *source* is the resolved
+    source string, valid whether or not *error* is set.
+    """
+    from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
+
+    provider_cfg = _assistant_routes._known_provider(str(body.get("provider", "")))
+    if provider_cfg is None:
+        return (jsonify({"error": "unknown or unsupported provider"}), 400), ""
+    source = str(body.get("source") or "local")
+    if source not in ("local", "shared"):
+        return (jsonify({"error": "invalid source"}), 400), source
+    if source == "shared":
+        shared_error = _assistant_routes._shared_source_error()
+        if shared_error is not None:
+            return shared_error, source
+    return None, source
+
+
+def _compute_write_available(source: str, repo_root: str | None, provider: str) -> bool:
+    return (source == "local"
+            and bool(repo_root)
+            and (Path(repo_root) / ".git").exists()
+            and write_safe_provider(provider))
 
 
 def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | None, str]:
@@ -58,36 +86,22 @@ def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | N
 def register_assistant_session_routes(app: Flask) -> None:
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
-        from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
-
         # First assistant request of the process: reap leaked worktrees +
         # prune stale sessions before minting a new one (one-shot, best-effort).
         _assistant_helpers.run_assistant_hygiene(app)
         body = request.get_json(silent=True) or {}
-        provider_cfg = _assistant_routes._known_provider(str(body.get("provider", "")))
-        if provider_cfg is None:
-            return jsonify({"error": "unknown or unsupported provider"}), 400
-        source = str(body.get("source") or "local")
-        if source not in ("local", "shared"):
-            return jsonify({"error": "invalid source"}), 400
-        if source == "shared":
-            shared_error = _assistant_routes._shared_source_error()
-            if shared_error is not None:
-                return shared_error
+        error, source = _validate_session_request(body)
+        if error is not None:
+            return error
         session_id = uuid.uuid4().hex
         run_dir, repo_root, repo_reason = _resolve_session_scope(source, body)
         project_id = body.get("projectId")
         _assistant_helpers.get_repository(app).create_session(
-            session_id=session_id, provider=body["provider"],
-            model=body.get("model"), project_uuid=repo_root,
-            run_id=run_dir,
-            project_id=str(project_id) if project_id else None,
+            session_id=session_id, provider=body["provider"], model=body.get("model"),
             source=source,
+            scope=SessionScope(repo_root, run_dir, str(project_id) if project_id else None),
         )
-        write_available = (source == "local"
-                           and bool(repo_root)
-                           and (Path(repo_root) / ".git").exists()
-                           and write_safe_provider(str(body["provider"])))
+        write_available = _compute_write_available(source, repo_root, str(body["provider"]))
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,

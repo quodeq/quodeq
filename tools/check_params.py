@@ -8,7 +8,8 @@ gate runs green today while preventing NEW ones. Regenerate the baseline
 (only with justification) via:
     python tools/check_params.py --update-baseline
 
-Scans src/quodeq/**/*.py with `ast`. Positional, keyword-only, *args and
+Scans src/quodeq/**/*.py with `ast`, excluding vendored/generated dirs
+(see tools/_ratchet.py:EXCLUDE_DIRS). Positional, keyword-only, *args and
 **kwargs all count; `self`/`cls` on methods do not. Keys are
 `relpath:qualname` (e.g. `src/quodeq/x.py:Foo.m`, `src/quodeq/y.py:outer.inner`),
 not line-keyed, so edits above a grandfathered function do not churn the

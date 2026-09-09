@@ -61,10 +61,11 @@ def test_alt_port_origins_built_once_as_module_constant(csp):
 def test_csp_connect_src_includes_alt_port_origins(csp):
     """connect-src must list the alt-port loopback origins probed by useServerHealth.js.
 
-    DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183] in useServerHealth.js.
-    The hook calls fetch(`${baseUrl}:${port}/api/health`) where baseUrl
-    defaults to http://127.0.0.1, so each probe is a cross-origin request
-    that requires an explicit connect-src entry.
+    useServerHealth.js's altPortCandidates() scans DASHBOARD_BASE_PORT (7863)
+    through PORT_SCAN_SPAN (5) ports: 7863-7867. The hook calls
+    fetch(`${baseUrl}:${port}/api/health`) where baseUrl defaults to
+    http://127.0.0.1, so each probe is a cross-origin request that requires
+    an explicit connect-src entry.
     """
     connect_src = _directive(csp, "connect-src")
     assert connect_src is not None, "connect-src must be present in CSP"
@@ -89,8 +90,8 @@ def test_csp_connect_src_includes_ws_sources(csp):
     assert connect_src is not None, "connect-src must be present in CSP"
 
     # Spot-check loopback alt-port ws origins, then check the full set.
-    assert "ws://127.0.0.1:4180" in connect_src
-    assert "ws://localhost:4183" in connect_src
+    assert "ws://127.0.0.1:7863" in connect_src
+    assert "ws://localhost:7867" in connect_src
     for origin in _WS_ALT_PORT_ORIGINS:
         assert origin in connect_src, (
             f"connect-src must include ws alt-port origin {origin!r} "

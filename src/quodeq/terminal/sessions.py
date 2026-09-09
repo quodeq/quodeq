@@ -69,21 +69,24 @@ class TerminalSessionRegistry:
     def create(self) -> TerminalSession | None:
         """New session, or None when at MAX_SESSIONS."""
         with self._lock:
-            if len(self._sessions) >= self.MAX_SESSIONS:
-                return None
-            # Lowest free ordinal, like real terminal tabs: close "zsh · 2"
-            # and the next new session is "zsh · 2" again, so numbers stay
-            # within 1..MAX_SESSIONS instead of growing forever.
-            used = {s.ordinal for s in self._sessions.values()}
-            ordinal = 1
-            while ordinal in used:
-                ordinal += 1
-            sid = uuid.uuid4().hex[:8]
-            session = TerminalSession(
-                sid, f"{shell_name()} · {ordinal}", self._factory(), ordinal
-            )
-            self._sessions[sid] = session
-            return session
+            return self._create_locked()
+
+    def _create_locked(self) -> TerminalSession | None:
+        if len(self._sessions) >= self.MAX_SESSIONS:
+            return None
+        # Lowest free ordinal, like real terminal tabs: close "zsh · 2"
+        # and the next new session is "zsh · 2" again, so numbers stay
+        # within 1..MAX_SESSIONS instead of growing forever.
+        used = {s.ordinal for s in self._sessions.values()}
+        ordinal = 1
+        while ordinal in used:
+            ordinal += 1
+        sid = uuid.uuid4().hex[:8]
+        session = TerminalSession(
+            sid, f"{shell_name()} · {ordinal}", self._factory(), ordinal
+        )
+        self._sessions[sid] = session
+        return session
 
     def get(self, sid: str) -> TerminalSession | None:
         with self._lock:
@@ -91,11 +94,13 @@ class TerminalSessionRegistry:
 
     def get_or_create_default(self) -> TerminalSession:
         """First existing session, else a fresh one. Back-compat path for WS
-        clients that connect without a session id (pre-multi-session bundles)."""
+        clients that connect without a session id (pre-multi-session bundles).
+        Holds the lock across the check and the create so two concurrent
+        callers with no existing session can't each spawn their own PTY."""
         with self._lock:
             for session in self._sessions.values():
                 return session
-        return self.create() or next(iter(self._sessions.values()))
+            return self._create_locked() or next(iter(self._sessions.values()))
 
     def list(self) -> list[dict]:
         with self._lock:

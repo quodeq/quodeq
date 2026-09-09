@@ -6,6 +6,7 @@ cancelled based on heartbeat mtime + PID liveness.
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import sqlite3
 import time
@@ -16,6 +17,7 @@ from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
 from quodeq.data.fs.run_status_store import (
     RunState,
+    RunStatus,
     STATUS_FILENAME,
     TERMINAL_STATES,
     UnsupportedSchemaError,
@@ -29,6 +31,7 @@ from quodeq.data.sqlite._index_sync_promote import (
 _logger = logging.getLogger(__name__)
 
 _TERMINAL_STATE_VALUES = {s.value for s in TERMINAL_STATES}
+_KNOWN_STATE_VALUES = {s.value for s in RunState}
 
 _UPSERT_SQL = """
 INSERT INTO runs (
@@ -203,23 +206,24 @@ def _check_stale_and_promote(
     pid_alive = isinstance(pid, int) and _is_pid_alive(pid)
 
     if heartbeat_stale and not pid_alive:
-        write_status(
-            run_dir,
+        # from_status_dict needs a known "state"; fall back if status.json
+        # omits it, or holds a value that isn't a valid RunState (either way
+        # discarded by the override below). deadline_at/ai_provider/ai_model
+        # carry forward unchanged, so the dashboard and filesystem snapshot
+        # builder keep seeing them.
+        if status.get("state") not in _KNOWN_STATE_VALUES:
+            status["state"] = RunState.RUNNING.value
+        base = RunStatus.from_status_dict(status)
+        new_status = dataclasses.replace(
+            base,
             state=RunState.CANCELLED,
             job_id=status.get("job_id", f"ext-{run_id}"),
-            started_at=status.get("started_at", ""),
-            dimensions=status.get("dimensions") or [],
-            phase=status.get("phase"),
-            current_dimension=status.get("current_dimension"),
             pid=pid if isinstance(pid, int) else None,
             exit_reason="stale_detected",
-            # Preserve deadline_at across the stale → cancelled rewrite so
-            # downstream readers (filesystem snapshot builder) still see it.
-            deadline_at=status.get("deadline_at"),
-            # Preserve provider/model so the dashboard card stays self-describing.
-            ai_provider=status.get("ai_provider"),
-            ai_model=status.get("ai_model"),
+            finalized_at=None,
+            time_limit_s=None,
         )
+        write_status(run_dir, new_status)
         with db:
             _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         return True

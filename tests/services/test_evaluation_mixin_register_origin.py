@@ -28,7 +28,7 @@ def test_register_url_repo_persists_origin_url(tmp_path, monkeypatch):
         (dest / ".git").mkdir()
         (dest / "main.py").write_text("print('hi')\n")
 
-    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(url, None, str(reports), ephemeral=True)
 
     assert _read_info(reports, uuid)["originUrl"] == url
@@ -148,8 +148,12 @@ def test_register_project_with_rollback_strips_credentials_from_error_log(tmp_pa
     )
 
     with (
+        # Called from two modules now: _validate_clone_target's top-of-registration
+        # guard stays in project_registration.py, the re-validation right before
+        # run_git_clone moved to _project_registration_steps.py with _resolve_target_path.
         patch("quodeq.services.project_registration.validate_remote_url", return_value=None),
-        patch("quodeq.services.project_registration.run_git_clone", side_effect=RuntimeError("boom")),
+        patch("quodeq.services._project_registration_steps.validate_remote_url", return_value=None),
+        patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=RuntimeError("boom")),
     ):
         result = register_project_with_rollback(str(reports), spec, log=recording_log)
 

@@ -2,7 +2,7 @@
 
 _apply_macos_fullscreen_chrome stays in the facade (_webview_window.py): it
 bare-calls the patch-tested ``_apply_unified_toolbar``
-(`patch.object(ww, "_apply_unified_toolbar")` in
+(`patch.object(chrome, "_apply_unified_toolbar")` in
 tests/dashboard/test_native_chrome.py), so it must live where that patch is
 visible. Nothing in this module is itself patch-tested — tests call
 _install_macos_fullscreen_observer directly, which works from any module —

@@ -5,15 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _seed_run(reports: Path, project: str, run_id: str) -> Path:
     d = reports / project / run_id
     (d / "evidence").mkdir(parents=True)
     (d / "evidence" / "manifest.json").write_text("{}")
-    write_status(d, state=RunState.DONE, job_id=f"ext-{run_id}",
-                 started_at="2026-04-20T00:00:00+00:00", dimensions=[])
+    write_status(d, RunStatus(state=RunState.DONE, job_id=f"ext-{run_id}",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
     return d
 
 

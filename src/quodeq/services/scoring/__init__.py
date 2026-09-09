@@ -18,22 +18,18 @@ change.
 """
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any, Callable
 
-_logger = logging.getLogger(__name__)
-
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
-from quodeq.services._trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
+from quodeq.services._trend_fetcher import make_rescoring_fetcher
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._wiring import read_run_data, read_run_scalars
+from quodeq.services._wiring import read_run_data
 from quodeq.services.rescore import _rescore_dimension
-from quodeq.shared._env import env_int
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 — facade re-export
 
@@ -42,6 +38,7 @@ from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 —
 # callers and test patch targets keep working against the package facade.
 # ---------------------------------------------------------------------------
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS  # noqa: F401
+from quodeq.services.scoring._fetchers import _make_trend_fetcher, _max_history_runs  # noqa: F401
 from quodeq.services.scoring._response_builders import (  # noqa: F401
     _build_dimension_dict,
     _build_response_from_eval_files,
@@ -57,20 +54,9 @@ from quodeq.services.scoring._rescoring import (  # noqa: F401
     _rescore_accumulated_with_coverage,
     _rescore_runs_by_dimension,
 )
+from quodeq.services.scoring._project_scores import get_project_scores  # noqa: F401
+from quodeq.services.scoring._scores_raw import get_scores_raw, get_scores_slim  # noqa: F401
 from quodeq.services._wiring import load_suppression_rules
-
-def _max_history_runs() -> int:
-    """Read max history runs from env at call time for lazy configuration."""
-    return env_int("QUODEQ_MAX_HISTORY_RUNS", 100, minimum=1)
-
-
-# ---------------------------------------------------------------------------
-# SQL-backed response builder (get_scores_raw / get_scores_slim), imported
-# after _logger above so that module's `from quodeq.services.scoring import
-# _logger` resolves against this already-initialized part of this
-# (still-loading) module. See _scores_raw.py.
-# ---------------------------------------------------------------------------
-from quodeq.services.scoring._scores_raw import get_scores_raw, get_scores_slim  # noqa: F401, E402
 
 
 def scored_run_dimensions(
@@ -135,30 +121,6 @@ def _make_rescoring_fetcher(
     )
 
 
-def _make_trend_fetcher(
-    reports_root: Path, project: str,
-    params: ScoringParams = DEFAULT_PARAMS,
-    cacheable_run_ids: set[str] | None = None,
-    deps: ScoringDeps | None = None,
-) -> Callable[[str], list[DimensionResult]]:
-    """Return the dimension fetcher for the trend chart.
-
-    Thin seam over the shared :func:`make_trend_fetcher` factory. The scalar
-    reader and suppression readers come from *deps* (production defaults
-    when None), plus the shared full-data base-fetcher factory. See
-    :func:`make_trend_fetcher` for the fast/heavy path and caching semantics.
-    """
-    d = deps or _NO_DEPS
-    return make_trend_fetcher(
-        reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
-        max_history=_max_history_runs(),
-        base_fetcher_factory=_make_run_dimension_fetcher,
-        read_run_scalars=d.read_run_scalars or read_run_scalars,
-        dismissed_keys=d.dismissed_keys or dismissed_keys,
-        deleted_keys=d.deleted_keys or deleted_keys,
-    )
-
-
 def rescore_accumulated(
     accumulated: dict[str, Any] | None,
     reports_root: Path, project: str,
@@ -184,13 +146,6 @@ def rescore_accumulated(
     return _rescore_accumulated_response(
         accumulated, reports_root, project, params=params, deps=deps,
     )
-
-
-# get_project_scores, imported after _max_history_runs and _make_trend_fetcher
-# above so that module's `from quodeq.services.scoring import ...` resolves
-# against this already-initialized part of this (still-loading) module. See
-# _project_scores.py.
-from quodeq.services.scoring._project_scores import get_project_scores  # noqa: F401, E402
 
 
 __all__ = [

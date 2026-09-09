@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from quodeq.core.scoring._constants import (  # noqa: F401 — re-exports
     GRADE_LADDER,
@@ -25,6 +26,7 @@ from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export
     count_grade_drops,
 )
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.types.finding import Finding
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +91,45 @@ def severity_grade_floor(
     if violation_type_counts.get("minor", 0) > 0:
         return params.floor_minor
     return 10.0
+
+
+def finding_to_scoring_dict(f: Finding) -> dict[str, Any]:
+    """Convert a Finding dataclass to the dict format scoring internals expect.
+
+    Only includes 'vt' when the finding has an explicit violation_type, so
+    ``evidence_has_taxonomy()`` selects the same mode (taxonomy vs reason)
+    that the original evaluation used.
+    """
+    d: dict[str, Any] = {
+        "severity": f.severity or "minor",
+        "reason": f.reason or "",
+    }
+    if f.violation_type:
+        d["vt"] = f.violation_type
+    return d
+
+
+def principle_score_and_grade(
+    vt_counts: dict[str, int],
+    ct_counts: dict[str, int],
+    *, params: ScoringParams = DEFAULT_PARAMS,
+) -> tuple[float, str]:
+    base = violation_base(vt_counts, params=params)
+    lift = compliance_lift(ct_counts, vt_counts, params=params)
+    ceil = violation_ceiling(vt_counts, params=params)
+    floor = severity_grade_floor(vt_counts, params=params)
+
+    raw = base + (10.0 - base) * lift
+    # Floor first, ceiling last. The two guards cross when a principle carries a
+    # LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
+    # above the volume ceiling. Clamping the other way round handed back the
+    # floor and discarded the ceiling -- the one guard that encodes volume -- so
+    # a principle with 269 findings read "Good". Algebraically identical whenever
+    # floor <= ceil, so only the contradictory case moves.
+    final = min(ceil, max(floor, raw))
+    final = round(final, 1)
+    grade = score_to_grade_label(final, params=params)
+    return final, grade
 
 
 # ---------------------------------------------------------------------------

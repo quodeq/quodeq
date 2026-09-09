@@ -37,6 +37,36 @@ function useRefreshListAfterCompletion(queryClient, sharedListProjects) {
   }, [queryClient, sharedListProjects]);
 }
 
+// No `code` on the polled payload yet -- services/shared_publish.py's
+// PublishStatus only ever sets {state, project, runs, error, finished_at},
+// so apiErrorMessage falls back to the raw message here exactly like the old
+// `publish.error || t(...)` did. Routing it through the shared mapper anyway
+// keeps this call site consistent with the rest of the app and makes it
+// forward-compatible the moment the backend starts emitting a discriminating
+// code.
+function applyPublishFailure(publish, finishedProject, setters) {
+  setters.setPublishState('error');
+  setters.setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
+  setters.setPublishErrorProject(finishedProject);
+}
+
+// 'done' (or an unexpected 'idle') -- refresh the shared list once so the
+// card that just finished gets its "published <relative time>" meta line
+// updated. Also clear any error left over from a PREVIOUS failed attempt on
+// this same project (single global job -- only one publish is ever in
+// flight): without this, a retry that succeeds still shows the stale error
+// banner under the card, since CardFooter keys showError on
+// publishErrorProject alone, not on publishState.
+async function applyPublishSuccess(finishedProject, setters, { applyOptimisticPublish, refreshListAfterCompletion }) {
+  setters.setPublishState('done');
+  setters.setPublishError(null);
+  setters.setPublishErrorProject(null);
+  // Flip the card BEFORE the network round trip below, then let the
+  // authoritative refresh overwrite this optimistic entry once it lands.
+  if (finishedProject) applyOptimisticPublish(finishedProject);
+  await refreshListAfterCompletion();
+}
+
 function useCheckStatus({ getSharedStatus, mountedRef, stopPolling, applyOptimisticPublish, refreshListAfterCompletion, publishingProjectRef, setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth }) {
   return useCallback(async () => {
     let data;
@@ -50,32 +80,11 @@ function useCheckStatus({ getSharedStatus, mountedRef, stopPolling, applyOptimis
     if (publish.state === 'running') return; // keep polling
     stopPolling();
     const finishedProject = publish.project ?? publishingProjectRef.current;
+    const setters = { setPublishState, setPublishError, setPublishErrorProject };
     if (publish.state === 'error') {
-      setPublishState('error');
-      // No `code` on the polled payload yet -- services/shared_publish.py's
-      // PublishStatus only ever sets {state, project, runs, error,
-      // finished_at}, so apiErrorMessage falls back to the raw message here
-      // exactly like the old `publish.error || t(...)` did. Routing it
-      // through the shared mapper anyway keeps this call site consistent
-      // with the rest of the app and makes it forward-compatible the moment
-      // the backend starts emitting a discriminating code.
-      setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
-      setPublishErrorProject(finishedProject);
+      applyPublishFailure(publish, finishedProject, setters);
     } else {
-      // 'done' (or an unexpected 'idle') -- refresh the shared list once so
-      // the card that just finished gets its "published <relative time>"
-      // meta line updated. Also clear any error left over from a PREVIOUS
-      // failed attempt on this same project (single global job -- only one
-      // publish is ever in flight): without this, a retry that succeeds
-      // still shows the stale error banner under the card, since CardFooter
-      // keys showError on publishErrorProject alone, not on publishState.
-      setPublishState('done');
-      setPublishError(null);
-      setPublishErrorProject(null);
-      // Flip the card BEFORE the network round trip below, then let the
-      // authoritative refresh overwrite this optimistic entry once it lands.
-      if (finishedProject) applyOptimisticPublish(finishedProject);
-      await refreshListAfterCompletion();
+      await applyPublishSuccess(finishedProject, setters, { applyOptimisticPublish, refreshListAfterCompletion });
     }
     setPublishingProjectBoth(null);
   }, [getSharedStatus, stopPolling, applyOptimisticPublish, refreshListAfterCompletion, setPublishingProjectBoth]);

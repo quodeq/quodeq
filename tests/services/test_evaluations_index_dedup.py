@@ -20,7 +20,7 @@ from pathlib import Path
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import Job, InMemoryJobStore
 from quodeq.services.jobs import JobManager, STATUS_RUNNING
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _seed_status(reports_root: Path, project: str, run_id: str) -> None:
@@ -29,12 +29,14 @@ def _seed_status(reports_root: Path, project: str, run_id: str) -> None:
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.RUNNING,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="analyzing",
-        pid=99999,
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="analyzing",
+            pid=99999,
+        ),
     )
 
 
@@ -91,14 +93,16 @@ def test_external_snapshot_carries_provider_and_model(tmp_path: Path) -> None:
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.RUNNING,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="analyzing",
-        pid=99999,
-        ai_provider="llamacpp",
-        ai_model="qwen3.6-27b",
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="analyzing",
+            pid=99999,
+            ai_provider="llamacpp",
+            ai_model="qwen3.6-27b",
+        ),
     )
 
     store = InMemoryJobStore()  # no internal job for this run
@@ -203,12 +207,14 @@ def test_lost_internal_job_yields_to_the_live_indexed_row(tmp_path: Path) -> Non
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.RUNNING,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="analyzing",
-        pid=os.getpid(),
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="analyzing",
+            pid=os.getpid(),
+        ),
     )
 
     store = InMemoryJobStore()
@@ -305,10 +311,12 @@ def test_list_limit_pushdown_keeps_db_row_that_outranks_a_deduped_job(tmp_path: 
         run_dir.mkdir(parents=True)
         write_status(
             run_dir,
-            state=RunState.DONE,
-            job_id=f"ext-{run_id}",
-            started_at=started_at,
-            dimensions=["security"],
+            RunStatus(
+                state=RunState.DONE,
+                job_id=f"ext-{run_id}",
+                started_at=started_at,
+                dimensions=["security"],
+            ),
         )
 
     store = InMemoryJobStore()
@@ -366,14 +374,16 @@ def test_list_state_filter_reaches_past_the_limit_window(tmp_path: Path) -> None
         run_dir.mkdir(parents=True)
         write_status(
             run_dir,
-            state=state,
-            job_id=f"ext-{run_id}",
-            started_at=started_at,
-            dimensions=["security"],
-            # Live PID: a running row with a dead pid gets promoted to
-            # cancelled(stale_detected) by sync_index and would drop out of
-            # the filter for an unrelated reason.
-            pid=os.getpid() if state is RunState.RUNNING else None,
+            RunStatus(
+                state=state,
+                job_id=f"ext-{run_id}",
+                started_at=started_at,
+                dimensions=["security"],
+                # Live PID: a running row with a dead pid gets promoted to
+                # cancelled(stale_detected) by sync_index and would drop out
+                # of the filter for an unrelated reason.
+                pid=os.getpid() if state is RunState.RUNNING else None,
+            ),
         )
 
     jobs = JobManager(job_store=InMemoryJobStore(), reports_root=reports_root)

@@ -1,9 +1,9 @@
 """DDL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
-EVALUATION_DDL = """
-PRAGMA user_version = 8;
+SCHEMA_VERSION = 8
 
+_DDL_BODY = """
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     schema_version  INTEGER NOT NULL DEFAULT 1,
@@ -104,4 +104,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 8
+EVALUATION_DDL = f"PRAGMA user_version = {SCHEMA_VERSION};\n" + _DDL_BODY

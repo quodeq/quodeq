@@ -52,7 +52,7 @@ function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
   }, [allDimensions, preselectDims]);
 }
 
-export function useDimensionSelection(allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null, timeLimitS = null) {
+export function useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null, timeLimitS = null }) {
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [cleanScan, setCleanScan] = useState('off');
 

@@ -39,6 +39,18 @@ class TestOllamaModels:
         assert len(data["models"]) == 1
 
 
+class TestOllamaConcurrency:
+    def test_empty_model_returns_400_missing_param(self, client):
+        """Unlike llamacpp/omlx, ollama rejects an empty model string as missing."""
+        resp = client.post(
+            "/api/ollama/test-concurrency",
+            json={"model": ""},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "MISSING_PARAM"
+
+
 class TestLlamacppRoutes:
     def test_status(self, client):
         with patch("quodeq.api.llm_bridge_routes.get_llamacpp_status") as mock:
@@ -64,6 +76,18 @@ class TestLlamacppRoutes:
             )
         assert resp.status_code == 200
         assert resp.get_json()["recommended"] == 3
+
+    def test_concurrency_accepts_empty_model(self, client):
+        """Unlike ollama, llamacpp accepts an empty model string (INVALID_PARAM
+        only fires on a non-string; empty string is not rejected)."""
+        with patch("quodeq.api.llm_bridge_routes.run_llamacpp_concurrency_test") as mock:
+            mock.return_value = {"recommended": 3, "vram_per_context": 0, "gpu_memory": 128e9}
+            resp = client.post(
+                "/api/llamacpp/test-concurrency",
+                json={"model": ""},
+                headers={"Origin": "http://localhost"},
+            )
+        assert resp.status_code == 200
 
     def test_concurrency_rejects_path_traversal(self, client):
         resp = client.post(

@@ -7,6 +7,8 @@ writing ``status.json`` lives in ``data/fs/run_status_store.py``.
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass
+from typing import Any
 
 SCHEMA_VERSION = 2
 STATUS_FILENAME = "status.json"
@@ -19,6 +21,50 @@ class RunState(str, enum.Enum):
     DONE = "done"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True)
+class RunStatus:
+    """The full set of fields ``status.json`` can carry for one run.
+
+    Passed to ``run_status_store.write_status`` instead of 13 separate
+    keyword arguments; ``_build_status_payload`` maps this 1:1 onto the
+    wire format (see that module for the exact key set and defaulting
+    rules, which are unchanged by this type).
+    """
+
+    state: RunState
+    job_id: str
+    started_at: str
+    dimensions: list[str]
+    phase: str | None = None
+    current_dimension: str | None = None
+    pid: int | None = None
+    exit_reason: str | None = None
+    finalized_at: str | None = None
+    deadline_at: str | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    time_limit_s: int | None = None
+
+    @classmethod
+    def from_status_dict(cls, d: dict[str, Any]) -> "RunStatus":
+        """Rebuild a ``RunStatus`` from ``read_status()`` output (or a compatible dict)."""
+        return cls(
+            state=RunState(d["state"]),
+            job_id=d.get("job_id", ""),
+            started_at=d.get("started_at", ""),
+            dimensions=d.get("dimensions") or [],
+            phase=d.get("phase"),
+            current_dimension=d.get("current_dimension"),
+            pid=d.get("pid"),
+            exit_reason=d.get("exit_reason"),
+            finalized_at=d.get("finalized_at"),
+            deadline_at=d.get("deadline_at"),
+            ai_provider=d.get("ai_provider"),
+            ai_model=d.get("ai_model"),
+            time_limit_s=d.get("time_limit_s"),
+        )
 
 
 TERMINAL_STATES: frozenset[RunState] = frozenset({RunState.DONE, RunState.FAILED, RunState.CANCELLED})

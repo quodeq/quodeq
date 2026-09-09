@@ -35,7 +35,7 @@ class TestIncrementalLoopSafety:
         def on_done(dim, _ev):
             callback_calls.append(dim)
 
-        with patch("quodeq.analysis._loops._log_dimension_result", side_effect=log_result):
+        with patch("quodeq.analysis._loop_steps._log_dimension_result", side_effect=log_result):
             result = run_incremental_loop(
                 cfg, ["security", "usability", "flexibility"], _ctx(3),
                 runner=_runner_from(fake_runner),
@@ -61,7 +61,7 @@ class TestIncrementalLoopSafety:
                 raise AttributeError("not in catch list")
             return _FakeEvidence()
 
-        with patch("quodeq.analysis._loops._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
             result = run_incremental_loop(
                 cfg, ["security", "reliability", "maintainability"], _ctx(3),
                 runner=_runner_from(fake_runner),
@@ -71,7 +71,7 @@ class TestIncrementalLoopSafety:
 
     def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()
-        with patch("quodeq.analysis._loops._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
             run_incremental_loop(
                 cfg, ["security", "flexibility"], _ctx(2),
                 runner=_runner_from(lambda *a: _FakeEvidence()),

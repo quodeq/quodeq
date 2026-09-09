@@ -11,6 +11,7 @@ import openai
 import pytest
 
 from quodeq.analysis._api_runner import (
+    ApiAnalysisRequest,
     ApiRunnerConfig,
     _call_api,
     _classify_fatal_api_error,
@@ -140,8 +141,11 @@ class TestCallApiFatal:
             mock_oa.return_value.__enter__.return_value = client
             with pytest.raises(FatalProviderError):
                 run_api_analysis(
-                    prompt="p", jsonl_file=jsonl_file, config=self._config(),
-                    source_file_paths=["a.py", "b.py"],
+                    request=ApiAnalysisRequest(
+                        prompt="p", jsonl_file=jsonl_file,
+                        source_file_paths=["a.py", "b.py"],
+                    ),
+                    config=self._config(),
                 )
         text = jsonl_file.read_text()
         assert text.count('"error"') >= 2

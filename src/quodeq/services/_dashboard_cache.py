@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
 
 
 @dataclass
@@ -110,14 +110,12 @@ def _make_run_dimension_fetcher(
     project's suppression state so a dismiss/delete invalidates it. Tests pass
     explicit cache/lock to isolate state.
     """
-    return make_lru_dimension_fetcher(
-        reports_root,
-        project,
-        cache if cache is not None else _shared_dimension_cache.data,
-        lock if lock is not None else _shared_dimension_cache.lock,
-        max_size if max_size is not None else _run_dim_cache_max(),
-        version=version,
+    ctx = DimensionCacheContext(
+        cache=cache if cache is not None else _shared_dimension_cache.data,
+        lock=lock if lock is not None else _shared_dimension_cache.lock,
+        max_size=max_size if max_size is not None else _run_dim_cache_max(),
     )
+    return make_lru_dimension_fetcher(reports_root, project, ctx, version=version)
 
 
 __all__ = [

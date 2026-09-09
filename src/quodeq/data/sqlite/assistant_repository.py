@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
+from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite._assistant_schema import (
     ASSISTANT_DDL,
     ASSISTANT_MIGRATIONS,
@@ -84,16 +85,15 @@ class AssistantRepository:
                 self._conn = None
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, project_uuid: str | None = None,
-                       run_id: str | None = None,
-                       project_id: str | None = None,
-                       source: str = "local") -> dict:
+                       model: str | None = None, source: str = "local",
+                       scope: SessionScope | None = None) -> dict:
+        scope = scope or SessionScope()
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO sessions (id, provider, model, project_uuid, run_id,"
                 " project_id, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (session_id, provider, model, project_uuid, run_id, project_id,
-                 source),
+                (session_id, provider, model, scope.project_uuid, scope.run_id,
+                 scope.project_id, source),
             )
         return self.get_session(session_id)  # type: ignore[return-value]
 

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.shared.validation import validate_path_segment
+from quodeq.shared.validation import validate_path_segment, validate_resolved_within
 
 
 class ProjectLockRegistry:
@@ -65,11 +65,7 @@ def _resolve_project_dir(evaluations_dir: str, project: str) -> Path:
     themselves.
     """
     validate_path_segment(project)
-    base = Path(evaluations_dir).resolve()
-    resolved = (base / project).resolve()
-    if not resolved.is_relative_to(base):
-        raise ValueError("Invalid project path")
-    return resolved
+    return validate_resolved_within(Path(evaluations_dir) / project, Path(evaluations_dir))
 
 
 def _project_all_runs(

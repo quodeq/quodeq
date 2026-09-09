@@ -14,7 +14,7 @@ from pathlib import Path
 
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.services._external_jobs import ProcessControl
 from quodeq.services.evaluation_mixin import _discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
@@ -142,9 +142,11 @@ class TestProviderDiscardPurgesRun:
         (run / "evidence").mkdir(parents=True)
         (run / "evidence" / "manifest.json").write_text("{}")
         write_status(
-            run, state=RunState.RUNNING, job_id="ext-stale-run",
-            started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
-            pid=999999999,
+            run, RunStatus(
+                state=RunState.RUNNING, job_id="ext-stale-run",
+                started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
+                pid=999999999,
+            ),
         )
         (run / ".heartbeat").touch()
         (run / ".pid").write_text("999999999")
@@ -186,9 +188,11 @@ class TestProviderDiscardPurgesRun:
         (run / "evidence").mkdir(parents=True)
         (run / "evidence" / "manifest.json").write_text("{}")
         write_status(
-            run, state=RunState.RUNNING, job_id="ext-wedged-run",
-            started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
-            pid=os.getpid(),
+            run, RunStatus(
+                state=RunState.RUNNING, job_id="ext-wedged-run",
+                started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
+                pid=os.getpid(),
+            ),
         )
         (run / ".heartbeat").touch()
         (run / ".pid").write_text(str(os.getpid()))
@@ -234,9 +238,11 @@ class TestProviderDiscardPurgesRun:
         (run / "evidence").mkdir(parents=True)
         (run / "evidence" / "manifest.json").write_text("{}")
         write_status(
-            run, state=RunState.RUNNING, job_id="ext-keep-run",
-            started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
-            pid=999999999,
+            run, RunStatus(
+                state=RunState.RUNNING, job_id="ext-keep-run",
+                started_at="2026-04-20T00:00:00+00:00", dimensions=["security"],
+                pid=999999999,
+            ),
         )
         (run / ".heartbeat").touch()
         (run / ".pid").write_text("999999999")

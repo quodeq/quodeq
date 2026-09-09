@@ -39,7 +39,10 @@ class TestPerDimensionRunDirRescore:
         from quodeq.core.types.finding import Finding
         from quodeq.data.fs.report_parser.runs import RunInfo
         from quodeq.services.dismissed import dismiss_finding, dismissed_keys
-        from quodeq.services.evidence_rescore import score_dimension_from_evidence
+        from quodeq.services.evidence_rescore import (
+            EvidenceScoreRequest,
+            score_dimension_from_evidence,
+        )
 
         monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
@@ -137,8 +140,10 @@ class TestPerDimensionRunDirRescore:
         assert dismissed, "dismiss did not register"
 
         expected = score_dimension_from_evidence(
-            run_old_dir, dim_a, dismissed=dismissed, deleted=set(),
-            source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+            run_old_dir, dim_a, EvidenceScoreRequest(
+                dismissed=dismissed, deleted=set(),
+                source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+            ),
         )
         assert expected is not None
         assert expected.overall.weighted_score is not None
@@ -148,8 +153,10 @@ class TestPerDimensionRunDirRescore:
         # merely a missing-evidence None -- so a regression can't be masked
         # by a fallback path silently agreeing with the correct answer.
         wrong = score_dimension_from_evidence(
-            run_new_dir, dim_a, dismissed=dismissed, deleted=set(),
-            source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+            run_new_dir, dim_a, EvidenceScoreRequest(
+                dismissed=dismissed, deleted=set(),
+                source_file_count=sfc, files_read=files_read, params=DEFAULT_PARAMS,
+            ),
         )
         assert wrong is not None
         assert wrong.overall.weighted_score != expected.overall.weighted_score, (
