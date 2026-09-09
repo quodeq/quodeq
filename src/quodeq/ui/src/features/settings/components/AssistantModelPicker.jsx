@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { settingsKeys } from '../../../api/queryKeys.js';
 import { classifyProvider } from './providerUtils.js';
+import { ModelTextInput } from './CliAdvancedPanel.jsx';
 import { t } from '../../../strings/index.js';
 
 const LOCAL_API_CONFIG = {
@@ -39,32 +40,14 @@ function LocalApiModelSelect({ providerId, value, onChange }) {
   );
 }
 
-// A text input for a model id, mirroring CliProviderTab's ModelTextInput.
-function ModelTextInput({ value, onChange }) {
-  return (
-    <div className="settings-model-field">
-      <input
-        type="text"
-        className="settings-model-input"
-        value={value || ''}
-        placeholder={t('settings.typeModelId')}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={t('settings.assistantModelAria')}
-        autoCapitalize="off"
-        autoCorrect="off"
-        autoComplete="off"
-        spellCheck={false}
-      />
-    </div>
-  );
-}
-
 // Mirrors the evaluation's per-provider model widget: a dropdown of installed
 // models for local-api providers, a free-text model id for cli / cloud-api.
+// ariaLabel keeps this picker's own accessible name now that the text input
+// is CliAdvancedPanel's shared ModelTextInput rather than a local copy.
 export default function AssistantModelPicker({ provider, providerConfig, value, onChange }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
   if (classification === 'local-api') {
     return <LocalApiModelSelect providerId={provider.id} value={value} onChange={onChange} />;
   }
-  return <ModelTextInput value={value} onChange={onChange} />;
+  return <ModelTextInput value={value} onChange={onChange} ariaLabel={t('settings.assistantModelAria')} />;
 }
