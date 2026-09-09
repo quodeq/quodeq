@@ -7,37 +7,13 @@ _rescore_from_evidence in rescore.py is preferred whenever a run's
 """
 from __future__ import annotations
 
-from typing import Any
-
 from quodeq.core.evidence.model import classify_confidence_level
-from quodeq.core.scoring.internals import (
-    compliance_lift,
-    score_to_grade_label,
-    severity_grade_floor,
-    violation_base,
-    violation_ceiling,
-)
 from quodeq.core.scoring.engine import compute_tallies
+from quodeq.core.scoring.internals import finding_to_scoring_dict, principle_score_and_grade
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.scoring import PrincipleScore
-
-
-def _finding_to_dict(f: Finding) -> dict[str, Any]:
-    """Convert a Finding dataclass to the dict format scoring internals expect.
-
-    Only includes 'vt' when the finding has an explicit violation_type, so
-    ``evidence_has_taxonomy()`` selects the same mode (taxonomy vs reason)
-    that the original evaluation used.
-    """
-    d: dict[str, Any] = {
-        "severity": f.severity or "minor",
-        "reason": f.reason or "",
-    }
-    if f.violation_type:
-        d["vt"] = f.violation_type
-    return d
 
 
 def _score_principle(
@@ -55,8 +31,8 @@ def _score_principle(
 
     Returns (final_score, grade).
     """
-    v_dicts = [_finding_to_dict(v) for v in violations]
-    c_dicts = [_finding_to_dict(c) for c in compliance]
+    v_dicts = [finding_to_scoring_dict(v) for v in violations]
+    c_dicts = [finding_to_scoring_dict(c) for c in compliance]
     vt_counts, ct_counts, _using_taxonomy = compute_tallies(v_dicts, c_dicts)
     if not vt_counts and not ct_counts:
         return None, "Insufficient"
@@ -69,18 +45,7 @@ def _score_principle(
     if confidence == "low":
         return None, "Insufficient"
 
-    base = violation_base(vt_counts, params=params)
-    lift = compliance_lift(ct_counts, vt_counts, params=params)
-    ceil = violation_ceiling(vt_counts, params=params)
-    floor = severity_grade_floor(vt_counts, params=params)
-
-    raw = base + (10.0 - base) * lift
-    # Floor first, ceiling last -- see the note in core/scoring/projector_scoring.py.
-    # Keep byte-identical with it.
-    final = min(ceil, max(floor, raw))
-    final = round(final, 1)
-    grade = score_to_grade_label(final, params=params)
-    return final, grade
+    return principle_score_and_grade(vt_counts, ct_counts, params=params)
 
 
 def _group_by_principle(
