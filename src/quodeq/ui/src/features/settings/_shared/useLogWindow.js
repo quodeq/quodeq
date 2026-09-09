@@ -31,7 +31,10 @@ export function useLogWindow({ windowId, useLogSource, buildSpec }) {
 
   const openLog = useCallback(() => {
     setOpen(true);
-    const fresh = buildSpec(source);
+    // source is still the pre-open snapshot here (e.g. Ollama's idle state);
+    // the { open: true } flag lets buildSpec paint the just-opened look
+    // immediately, before the source hook's own effect catches up.
+    const fresh = buildSpec(source, { open: true });
     addWindow(fresh);
     replaceWindow(fresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps

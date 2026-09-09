@@ -13,11 +13,16 @@ const STATUS_LABEL = {
   error: t('settings.logUnavailable'),
 };
 
-function buildSpec({ logs, status }) {
+// `opening` is true only for the synchronous "just clicked open" spec
+// useLogWindow builds before useOllamaLogStream's own effect has flipped
+// status from 'idle' to 'streaming' — without it the freshly opened window
+// would paint with no status suffix for one commit.
+function buildSpec({ logs, status }, { open: opening } = {}) {
+  const effectiveStatus = opening ? 'streaming' : status;
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
-    title: `${t('settings.ollamaLogTitle')}${STATUS_LABEL[status] || ''}`,
+    title: `${t('settings.ollamaLogTitle')}${STATUS_LABEL[effectiveStatus] || ''}`,
     render: () => <ConsoleLogViewer logs={logs} />,
   };
 }
