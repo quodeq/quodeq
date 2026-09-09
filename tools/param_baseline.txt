@@ -4,9 +4,9 @@
 # Regenerate intentionally: python tools/check_params.py --update-baseline
 src/quodeq/analysis/_api_call.py:_log_call_outcome
 src/quodeq/analysis/_loop_state.py:_safe_write_dim_state
-src/quodeq/analysis/_loops.py:_dispatch_incremental_dim
+src/quodeq/analysis/_loop_steps.py:_dispatch_incremental_dim
+src/quodeq/analysis/_loop_steps.py:_finalize_dim_result
 src/quodeq/analysis/_loops.py:_dispatch_per_dim
-src/quodeq/analysis/_loops.py:_finalize_dim_result
 src/quodeq/analysis/_loops.py:run_incremental_loop
 src/quodeq/analysis/_loops.py:run_per_dimension_loop
 src/quodeq/analysis/_run_lifecycle_support.py:_run_signal_shutdown
@@ -57,6 +57,7 @@ src/quodeq/services/_fs_metadata.py:_compute_on_miss_summary
 src/quodeq/services/_fs_project_helpers.py:_build_project_entry
 src/quodeq/services/_fs_projects.py:_build_project_entries_threaded
 src/quodeq/services/_fs_reports.py:get_dimension_eval
+src/quodeq/services/_project_registration_steps.py:_resolve_target_path
 src/quodeq/services/_repo_index.py:add_repo_index_entry
 src/quodeq/services/_repo_index.py:rekey_repo_index_entry
 src/quodeq/services/_scan_progress_dims.py:_dim_evidence_tally
@@ -69,7 +70,6 @@ src/quodeq/services/dashboard.py:_make_status_aware_fetcher
 src/quodeq/services/evidence_rescore.py:_parse_evidence_jsonl
 src/quodeq/services/jobs.py:JobManager.__init__
 src/quodeq/services/jobs.py:JobManager.start_job
-src/quodeq/services/project_registration.py:_resolve_target_path
 src/quodeq/services/project_registration.py:register_project
 src/quodeq/services/rescore.py:_rescore_dimension
 src/quodeq/services/rescore.py:_rescore_from_evidence

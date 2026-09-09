@@ -72,7 +72,7 @@ def test_register_url_clones_to_dest_then_scans(tmp_path):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(
             "https://github.com/example/repo.git",
             None,
@@ -99,7 +99,7 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(
             "https://github.com/example/repo.git",
             None,
@@ -124,7 +124,7 @@ def test_register_url_clone_failure_raises(tmp_path):
     clone_dest.mkdir()
 
     with patch(
-        "quodeq.services.project_registration.run_git_clone",
+        "quodeq.services._project_registration_steps.run_git_clone",
         side_effect=CloneError("network", "git clone failed (network)"),
     ):
         with pytest.raises(CloneError):
@@ -178,7 +178,7 @@ def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         with pytest.raises(ValueError, match="private"):
             _register_project(
                 "https://169.254.169.254/latest/meta-data",
@@ -206,7 +206,7 @@ def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         with pytest.raises(ValueError):
             _register_project(
                 "https://localhost/git/repo.git",
@@ -244,8 +244,12 @@ def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch
             raise ValueError("Repository URL resolves to a private/internal address")
 
     with (
+        # Called from two modules now: _validate_clone_target's top-of-registration
+        # guard stays in project_registration.py, the re-validation right before
+        # run_git_clone moved to _project_registration_steps.py with _resolve_target_path.
         patch("quodeq.services.project_registration.validate_remote_url", side_effect=fake_validate),
-        patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone),
+        patch("quodeq.services._project_registration_steps.validate_remote_url", side_effect=fake_validate),
+        patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone),
     ):
         with pytest.raises(ValueError, match="private"):
             _register_project(

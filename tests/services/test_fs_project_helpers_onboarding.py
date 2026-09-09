@@ -213,7 +213,7 @@ def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
 
-    with patch("quodeq.services.project_registration.run_git_clone", side_effect=fake_clone):
+    with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = register_project(url, None, str(reports), clone_dest=str(clone_dest))
 
     key = _repo_index_key("repo", url, None)

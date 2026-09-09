@@ -20,78 +20,18 @@ from quodeq.services._wiring import (
     validate_remote_url,
     write_repository_info,
 )
-from quodeq.services._fs_clone import CloneError, run_git_clone
+from quodeq.services._fs_clone import CloneError
 from quodeq.services._fs_project_helpers import find_existing_project
 from quodeq.services._registration_scan import _zero_run_scan_fallback
-from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
+from quodeq.services._registration_url import _strip_credentials
+from quodeq.services._project_registration_steps import (
+    _MaterializeRequest,
+    _materialize_and_scan,
+    _resolve_project_slot,
+)
 from quodeq.services._repo_index import add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
-from quodeq.shared._env import get_clones_dir
 from quodeq.shared.utils import is_repo_url
-
-_LOCATION_LOCAL = "local"
-
-
-def _resolve_target_path(
-    repo: str, repo_resolved: str, project_name: str, project_uuid: str, *,
-    is_url: bool, ephemeral: bool, clone_dest: str | None, clones_dir: Path | None,
-) -> Path:
-    """Resolve/create the on-disk path the project will live at.
-
-    For a URL input, clones into an ephemeral cache dir or the caller's
-    chosen *clone_dest*. For a local path input, resolves in place -- the
-    directory must already exist.
-    """
-    if is_url:
-        if ephemeral:
-            target_path = (clones_dir or get_clones_dir()) / project_uuid
-        else:
-            target_path = Path(clone_dest).resolve() / project_name
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        # Re-validate immediately before the clone dispatch: the project-uuid
-        # resolution between _validate_clone_target's check and here (index
-        # load, legacy directory scan, project creation) does real disk I/O and
-        # can take enough wall-clock time for a DNS-rebinding attacker to flip
-        # the host from a public to a private IP. This narrows, but does not
-        # close, the race -- git clone re-resolves DNS again itself, independently,
-        # inside the subprocess below; only pinning the resolved IP through git's
-        # own connection (a hosts-file override or proxy layer) would close it,
-        # and that's out of scope here.
-        validate_remote_url(repo)
-        # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
-        run_git_clone(repo, target_path)
-        return target_path
-
-    target_path = Path(repo_resolved)
-    if not target_path.is_dir():
-        # A path pointing at a FILE is a distinct user mistake from a
-        # missing path (a real registration once slipped through as
-        # .../lib/player.js) — say which one it was.
-        detail = "points at a file, not a directory" if target_path.exists() else "does not exist"
-        raise FileNotFoundError(f"Repo path {detail}: {target_path}")
-    return target_path
-
-
-def _persist_repository_info(
-    project_dir: Path, target_path: Path, *, is_url: bool, repo: str, ephemeral: bool,
-) -> None:
-    """Persist the resolved path + ephemeral flag in repository_info.json.
-
-    A corrupt existing file is treated as empty and rewritten (self-heal);
-    registration is the flow that owns this file's creation.
-    """
-    info = read_repository_info(project_dir) or {}
-    info["path"] = str(target_path.resolve())
-    info["location"] = _LOCATION_LOCAL
-    info["ephemeral"] = bool(ephemeral)
-    origin_url = repo if is_url else _read_origin_remote(target_path)
-    if origin_url:
-        # Defense in depth: _read_origin_remote already strips credentials
-        # from the local-remote branch, but strip again here so the
-        # URL-registration branch (raw *repo*) is covered too, and so this
-        # call site stays safe even if the helper's behavior changes.
-        info["originUrl"] = _strip_credentials(origin_url)
-    write_repository_info(project_dir, info)
 
 
 def _validate_clone_target(
@@ -138,12 +78,6 @@ def register_project(
 
     Returns the project's UUID.
     """
-    from quodeq.services._project_registration_steps import (  # noqa: PLC0415 -- breaks the circular import with _project_registration_steps, which imports _resolve_target_path/_persist_repository_info/_ensure_onboarding_field from this module
-        _MaterializeRequest,
-        _materialize_and_scan,
-        _resolve_project_slot,
-    )
-
     is_url = is_repo_url(repo)
     _validate_clone_target(repo, is_url, ephemeral, clone_dest)
     reports_path = Path(reports_dir)
@@ -173,21 +107,6 @@ def _sync_repo_index_on_create(
     dangling index entry if this ran any earlier.
     """
     add_repo_index_entry(reports_path, project_name, repo_resolved, scope_path, project_uuid)
-
-
-def _ensure_onboarding_field(project_dir: Path) -> None:
-    """Add `onboardingCompletedAt: null` to repository_info.json if absent.
-
-    Called during registration (via `_resolve_project_slot`) so newly-registered
-    projects start with the field set to null. Existing projects without the
-    field get a backfill on read (see `_backfill_onboarding_field` in
-    _fs_project_helpers.py).
-    """
-    data = read_repository_info(project_dir)
-    if data is None or "onboardingCompletedAt" in data:
-        return
-    data["onboardingCompletedAt"] = None
-    write_repository_info(project_dir, data)
 
 
 def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:

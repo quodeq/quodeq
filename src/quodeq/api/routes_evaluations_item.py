@@ -100,7 +100,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
     app.extensions["reset_scored_jobs"] = reset_scored_jobs
 
-    def _cancel_running(job_id: str, snapshot: Any) -> Response | tuple[Response, int]:
+    def _cancel_running(job_id: str) -> Response | tuple[Response, int]:
         discard = request.args.get("discard", "").lower() == "true"
         _logger.info(
             "cancel_evaluation: job_id=%s, discard=%s, remote_addr=%s",
@@ -191,5 +191,5 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
             body, status = conflict
             return jsonify(body), status
         if snapshot.status == "running":
-            return _cancel_running(job_id, snapshot)
+            return _cancel_running(job_id)
         return _delete_finished(job_id)
