@@ -89,6 +89,25 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     return resolved
 
 
+def _finding_target_or_error(
+    body: dict[str, Any],
+) -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
+    """Parse and validate the project/req/file/line target shared by dismiss,
+    restore, and unverify. Returns the target dict, or None plus the ready
+    error response.
+    """
+    project = body.get("project", "")
+    req = body.get("req", "")
+    file = body.get("file", "")
+    line = body.get("line")
+    if not project or not req or not file or line is None:
+        return None, (jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400)
+    type_err = _invalid_body_fields(body, ("project", "req", "file"), ("line",))
+    if type_err:
+        return None, (jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400)
+    return {"project": project, "req": req, "file": file, "line": line}, None
+
+
 def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
 
@@ -118,40 +137,30 @@ def register_findings_routes(app: Flask) -> None:
     @app.post("/api/findings/dismiss")
     def dismiss() -> tuple[Response, int]:
         body = request.get_json(silent=True) or {}
-        project = body.get("project", "")
-        req = body.get("req", "")
-        file = body.get("file", "")
-        line = body.get("line")
+        target, err = _finding_target_or_error(body)
+        if err is not None:
+            return err
         run_id = body.get("run_id") or body.get("runId")
-        if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
-        type_err = _invalid_body_fields(body, ("project", "req", "file"), ("line",))
-        if type_err:
-            return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
-        dismiss_finding(_project_dir(_eval_dir(), project), body)
-        scores = _scores_with_fallback(project, run_id)
+        dismiss_finding(_project_dir(_eval_dir(), target["project"]), body)
+        scores = _scores_with_fallback(target["project"], run_id)
         delta = dismiss_delta(
-            _eval_dir(), project, run_id, {"req": req, "file": file, "line": line},
+            _eval_dir(), target["project"], run_id,
+            {"req": target["req"], "file": target["file"], "line": target["line"]},
         )
         return jsonify({"scores": scores, "delta": delta}), 200
 
     @app.post("/api/findings/restore")
     def restore() -> tuple[Response, int]:
         body = request.get_json(silent=True) or {}
-        project = body.get("project", "")
-        req = body.get("req", "")
-        file = body.get("file", "")
-        line = body.get("line")
+        target, err = _finding_target_or_error(body)
+        if err is not None:
+            return err
         run_id = body.get("run_id") or body.get("runId")
-        if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
-        type_err = _invalid_body_fields(body, ("project", "req", "file"), ("line",))
-        if type_err:
-            return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
-        restore_finding(_project_dir(_eval_dir(), project), body)
-        scores = _scores_with_fallback(project, run_id)
+        restore_finding(_project_dir(_eval_dir(), target["project"]), body)
+        scores = _scores_with_fallback(target["project"], run_id)
         delta = restore_delta(
-            _eval_dir(), project, run_id, {"req": req, "file": file, "line": line},
+            _eval_dir(), target["project"], run_id,
+            {"req": target["req"], "file": target["file"], "line": target["line"]},
         )
         return jsonify({"scores": scores, "delta": delta}), 200
 
@@ -223,14 +232,8 @@ def register_findings_routes(app: Flask) -> None:
     @app.post("/api/findings/unverify")
     def unverify() -> tuple[Response, int]:
         body = request.get_json(silent=True) or {}
-        project = body.get("project", "")
-        req = body.get("req", "")
-        file = body.get("file", "")
-        line = body.get("line")
-        if not project or not req or not file or line is None:
-            return jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400
-        type_err = _invalid_body_fields(body, ("project", "req", "file"), ("line",))
-        if type_err:
-            return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
-        unverify_finding(_project_dir(_eval_dir(), project), body)
+        target, err = _finding_target_or_error(body)
+        if err is not None:
+            return err
+        unverify_finding(_project_dir(_eval_dir(), target["project"]), body)
         return jsonify({"ok": True}), 200
