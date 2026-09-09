@@ -26,6 +26,17 @@ _WCAG_FILE = "wcag/level_a.json"
 _logger = logging.getLogger(__name__)
 
 
+def _load_standards_json(path: Path, label: str) -> dict | None:
+    """Read a standards JSON file, or None if it's absent or unreadable."""
+    if not path.exists():
+        return None
+    try:
+        return _read_json(path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.warning("Skipping %s refs: %s", label, exc)
+        return None
+
+
 def attach_cwe_refs(index: dict[str, list[dict]], cwe_db: object | None, get_cwe_name: Callable[..., str]) -> None:
     """Add a CWE ref for each CWE ID referenced by a requirement."""
     for reqs in index.values():
@@ -45,12 +56,8 @@ def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     if dimension not in CISQ_DIMENSIONS:
         return
     cisq_file = standards_dir / "cisq" / f"{dimension}.json"
-    if not cisq_file.exists():
-        return
-    try:
-        cisq_data = _read_json(cisq_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping CISQ refs for %s: %s", dimension, exc)
+    cisq_data = _load_standards_json(cisq_file, f"CISQ for {dimension}")
+    if cisq_data is None:
         return
     cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
     for reqs in index.values():
@@ -88,12 +95,8 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     if dimension != "security":
         return
     asvs_file = standards_dir / _ASVS_FILE
-    if not asvs_file.exists():
-        return
-    try:
-        asvs_data = _read_json(asvs_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping ASVS refs: %s", exc)
+    asvs_data = _load_standards_json(asvs_file, "ASVS")
+    if asvs_data is None:
         return
     asvs_by_cwe: dict[int, list[dict]] = {}
     for r in asvs_data.get("requirements", []):
@@ -136,12 +139,8 @@ def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     if dimension not in CERT_DIMENSIONS:
         return
     cert_file = standards_dir / "cert" / f"{dimension}.json"
-    if not cert_file.exists():
-        return
-    try:
-        cert_data = _read_json(cert_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping CERT refs for %s: %s", dimension, exc)
+    cert_data = _load_standards_json(cert_file, f"CERT for {dimension}")
+    if cert_data is None:
         return
     cert_by_cwe: dict[int, list[dict]] = {}
     cert_by_id: dict[str, dict] = {}
@@ -159,12 +158,8 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     if dimension not in WCAG_DIMENSIONS:
         return
     wcag_file = standards_dir / _WCAG_FILE
-    if not wcag_file.exists():
-        return
-    try:
-        wcag_data = _read_json(wcag_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping WCAG refs: %s", exc)
+    wcag_data = _load_standards_json(wcag_file, "WCAG")
+    if wcag_data is None:
         return
     wcag_lookup = {c["id"]: c for c in wcag_data.get("criteria", [])}
     for reqs in index.values():
