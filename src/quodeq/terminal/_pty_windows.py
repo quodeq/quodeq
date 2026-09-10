@@ -1,11 +1,14 @@
 """Windows ConPTY backend via pywinpty. Only imported on win32 (see backend.py)."""
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import time
 
 from winpty import PtyProcess  # type: ignore[import-untyped]
+
+_logger = logging.getLogger(__name__)
 
 # When no output is buffered, pywinpty's read returns immediately with an empty
 # string. Sleep briefly on empty so the reader thread doesn't hot-spin the CPU
@@ -49,7 +52,7 @@ class WindowsPty:
         return data.encode("utf-8", "replace")
 
     def write(self, data: bytes) -> None:
-        if self._proc is not None:
+        if self._proc is not None and self._proc.isalive():
             self._proc.write(data.decode("utf-8", "replace"))
 
     def resize(self, cols: int, rows: int) -> None:
@@ -69,4 +72,4 @@ class WindowsPty:
             try:
                 self._proc.terminate(force=True)
             except Exception:
-                pass
+                _logger.warning("failed to terminate PTY process", exc_info=True)

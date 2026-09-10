@@ -57,7 +57,7 @@ src/quodeq/api/_sse_log_helpers.py:55:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:52:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:69:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:82:empty-except
-src/quodeq/api/_terminal_ws_helpers.py:98:empty-except
+src/quodeq/api/_terminal_ws_helpers.py:98:broad-except
 src/quodeq/api/app.py:108:broad-except
 src/quodeq/api/app.py:198:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
@@ -221,7 +221,7 @@ src/quodeq/terminal/_pty_unix.py:109:empty-except
 src/quodeq/terminal/_pty_unix.py:131:empty-except
 src/quodeq/terminal/_pty_unix.py:136:empty-except
 src/quodeq/terminal/_pty_unix.py:42:empty-except
-src/quodeq/terminal/_pty_windows.py:71:empty-except
+src/quodeq/terminal/_pty_windows.py:74:broad-except
 src/quodeq/update/checker.py:71:broad-except
 src/quodeq/update/checker.py:74:broad-except
 src/quodeq/update/checker.py:81:broad-except
