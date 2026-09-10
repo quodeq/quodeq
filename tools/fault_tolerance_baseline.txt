@@ -166,7 +166,7 @@ src/quodeq/data/sqlite/run_index.py:88:broad-except
 src/quodeq/data/sqlite/run_index.py:94:broad-except
 src/quodeq/llm_bridge/_cloud.py:60:broad-except
 src/quodeq/llm_bridge/_ollama.py:141:empty-except
-src/quodeq/menubar/_app_lifecycle.py:165:empty-except
+src/quodeq/menubar/_app_lifecycle.py:168:empty-except
 src/quodeq/menubar/_process.py:107:empty-except
 src/quodeq/menubar/_process.py:133:empty-except
 src/quodeq/menubar/_process.py:65:empty-except
@@ -181,7 +181,8 @@ src/quodeq/services/_fs_reports.py:36:empty-except
 src/quodeq/services/_mutation_projection.py:101:broad-except
 src/quodeq/services/_mutation_scoring.py:108:broad-except
 src/quodeq/services/_mutation_scoring.py:86:broad-except
-src/quodeq/services/_post_run_hook.py:38:broad-except
+src/quodeq/services/_post_run_hook.py:37:broad-except
+src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_repo_index.py:67:empty-except
 src/quodeq/services/_run_discard.py:134:broad-except
 src/quodeq/services/_run_discard.py:61:empty-except

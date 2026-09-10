@@ -167,6 +167,45 @@ class TestBuildProjectList:
 
 
 # ---------------------------------------------------------------------------
+# Cluster 10: _build_one fail-soft (one bad project dir must not fail the
+# whole listing)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildProjectListFailSoft:
+    def test_one_bad_project_dir_is_skipped_not_fatal(self, tmp_path: Path, caplog):
+        """A project whose entry build raises is logged and skipped; every
+        other project still comes back -- mirrors score_run.py's
+        _score_one_dimension fail-soft handling."""
+        good = tmp_path / "good-uuid"
+        good.mkdir()
+        (good / "repository_info.json").write_text(json.dumps({
+            "name": "good", "path": str(tmp_path), "location": "local",
+        }))
+        bad = tmp_path / "bad-uuid"
+        bad.mkdir()
+        (bad / "repository_info.json").write_text(json.dumps({
+            "name": "bad", "path": str(tmp_path), "location": "local",
+        }))
+
+        import quodeq.services._fs_projects as mod
+        real_build = mod._build_project_entry
+
+        def side_effect(reports_root, entry_name, runs, **kwargs):
+            if entry_name == "bad-uuid":
+                raise OSError("simulated disk error reading bad-uuid")
+            return real_build(reports_root, entry_name, runs, **kwargs)
+
+        with patch("quodeq.services._fs_projects._build_project_entry", side_effect=side_effect):
+            with caplog.at_level("WARNING", logger="quodeq.services._fs_projects"):
+                entries = build_project_list(tmp_path)
+
+        ids = {e.id for e in entries}
+        assert ids == {"good-uuid"}
+        assert any("bad-uuid" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
 # build_project_index
 # ---------------------------------------------------------------------------
 

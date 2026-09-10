@@ -99,9 +99,13 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
 def _tail_new_lines(path: Path, offset: int, line_filter):
     """Read new bytes from *path* since *offset*, yield an SSE frame per
     complete new line, and return the updated offset."""
-    with open(path, "rb") as fh:
-        fh.seek(offset)
-        raw = fh.read(_tail_max_bytes())
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(offset)
+            raw = fh.read(_tail_max_bytes())
+    except (FileNotFoundError, OSError):
+        yield sse_line("log file unavailable", event="error")
+        return offset
     text = raw.decode("utf-8", errors="replace")
     if text:
         complete = text if text.endswith("\n") else text[: text.rfind("\n") + 1]
