@@ -255,3 +255,45 @@ def test_read_run_score_skips_null_dimension_scores(tmp_path: Path) -> None:
 
     run = store.read_run_score_from_dim_scores()
     assert run["score"] == 8.0  # only Security counts
+
+
+def test_checkpoint_returns_none_on_malformed_value(tmp_path: Path) -> None:
+    """Malformed (non-ISO string) stored checkpoint heals on read, returning None."""
+    store = SQLiteStateStore(tmp_path)
+    # Store a malformed non-ISO string directly in the database
+    with open_evaluation_db(tmp_path) as conn:
+        conn.execute(
+            "INSERT INTO run_meta (key, value) VALUES (?, ?)",
+            ("projection_checkpoint", "not a valid iso string"),
+        )
+        conn.commit()
+    # Reader should return None instead of raising ValueError
+    assert store.get_checkpoint() is None
+
+
+def test_projected_size_returns_none_on_malformed_value(tmp_path: Path) -> None:
+    """Malformed (non-numeric string) stored projected_size heals on read, returning None."""
+    store = SQLiteStateStore(tmp_path)
+    # Store a malformed non-numeric string directly in the database
+    with open_evaluation_db(tmp_path) as conn:
+        conn.execute(
+            "INSERT INTO run_meta (key, value) VALUES (?, ?)",
+            ("projection_event_log_size", "not a number"),
+        )
+        conn.commit()
+    # Reader should return None instead of raising ValueError
+    assert store.get_projected_size() is None
+
+
+def test_actions_projected_size_returns_none_on_malformed_value(tmp_path: Path) -> None:
+    """Malformed (non-numeric string) stored actions_projected_size heals on read, returning None."""
+    store = SQLiteStateStore(tmp_path)
+    # Store a malformed non-numeric string directly in the database
+    with open_evaluation_db(tmp_path) as conn:
+        conn.execute(
+            "INSERT INTO run_meta (key, value) VALUES (?, ?)",
+            ("actions_log_projected_size", "not a number"),
+        )
+        conn.commit()
+    # Reader should return None instead of raising ValueError
+    assert store.get_actions_projected_size() is None
