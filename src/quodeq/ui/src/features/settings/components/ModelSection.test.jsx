@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent } from '@testing-library/react';
 import React from 'react';
 import ModelSection from './ModelSection.jsx';
 
@@ -44,5 +44,35 @@ describe('ModelSection — finding #214 (availableClients undefined)', () => {
         />
       )
     ).not.toThrow();
+  });
+});
+
+// Cluster 19 — handleModelChange had no try/catch at all, so a throwing
+// storage.setItem (e.g. QuotaExceededError in private browsing) would escape
+// this React onChange handler.
+describe('ModelSection — handleModelChange storage guard', () => {
+  it('does not throw when storage.setItem throws, and still updates the field', () => {
+    const setItemSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onFastChange = vi.fn();
+    const aiCmd = { value: 'claude', onApply: () => {} };
+
+    const { getAllByRole } = render(
+      <ModelSection
+        aiCmd={aiCmd}
+        models={{ ...stubModels, onFastChange }}
+        availableClients={[]}
+      />
+    );
+
+    const fastInput = getAllByRole('textbox').find((el) => el.id === 'model-override-1');
+    expect(() => fireEvent.change(fastInput, { target: { value: 'new-model' } })).not.toThrow();
+    expect(onFastChange).toHaveBeenCalledWith('new-model');
+    expect(warn).toHaveBeenCalled();
+
+    setItemSpy.mockRestore();
+    warn.mockRestore();
   });
 });

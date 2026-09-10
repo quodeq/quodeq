@@ -12,6 +12,12 @@ vi.mock('../../../api/providers.js', () => ({
   saveProviderKey: vi.fn(),
 }));
 
+const storageWith = (values) => ({
+  getItem: vi.fn((key) => (key in values ? values[key] : null)),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+});
+
 describe('useProviderSettings', () => {
   let mockStorage;
 
@@ -62,18 +68,15 @@ describe('useProviderSettings', () => {
     mockStorage.setItem.mockImplementation(() => {
       throw new DOMException('QuotaExceededError');
     });
-
     const { result } = renderHook(() =>
       useProviderSettings('ollama', {}, { storage: mockStorage })
     );
-
     // This must not throw.
     expect(() => {
       act(() => {
         result.current.update('model', 'llama3');
       });
     }).not.toThrow();
-
     // State was still updated in memory even though storage failed.
     expect(result.current.state.model).toBe('llama3');
   });
@@ -83,15 +86,12 @@ describe('useProviderSettings', () => {
     mockStorage.setItem.mockImplementation(() => {
       throw new DOMException('QuotaExceededError');
     });
-
     const { result } = renderHook(() =>
       useProviderSettings('ollama', {}, { storage: mockStorage })
     );
-
     act(() => {
       result.current.update('model', 'llama3');
     });
-
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -240,12 +240,6 @@ describe('useProviderSettings api-key handling', () => {
 });
 
 describe('loadProviderState api-key handling', () => {
-  const storageWith = (values) => ({
-    getItem: vi.fn((key) => (key in values ? values[key] : null)),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-  });
-
   it('never returns the literal sentinel as state["api-key"]', () => {
     // OmlxTab passes state['api-key'] straight into getOmlxModels and
     // testOmlxConcurrency as a real credential, so the sentinel reaching
@@ -271,6 +265,19 @@ describe('loadProviderState api-key handling', () => {
       'cc-omlx-model': 'gemma-3-4b',
     });
     expect(loadProviderState('omlx', {}, storage).model).toBe('gemma-3-4b');
+  });
+
+  it('migration write failure does not throw, and warns + calls onPersistError', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onPersistError = vi.fn();
+    const storage = storageWith({ 'cc-omlx-pool-budget': '42' });
+    storage.setItem.mockImplementation(() => { throw new DOMException('Quota'); });
+    let state;
+    expect(() => { state = loadProviderState('omlx', {}, storage, { onPersistError }); }).not.toThrow();
+    expect(state['time-limit']).toBe('42');
+    expect(warn).toHaveBeenCalled();
+    expect(onPersistError).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

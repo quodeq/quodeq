@@ -27,7 +27,7 @@ const DEFAULTS = {
 // Legacy storage key fallback, only consulted when the new key has no value.
 const LEGACY_KEY_MAP = { 'time-limit': 'pool-budget' };
 
-export function loadProviderState(providerId, overrides, storage = localStorage) {
+export function loadProviderState(providerId, overrides, storage = localStorage, { onPersistError } = {}) {
   const merged = { ...DEFAULTS, ...overrides };
   const state = {};
   for (const key of SETTINGS) {
@@ -51,7 +51,10 @@ export function loadProviderState(providerId, overrides, storage = localStorage)
         try {
           storage.setItem(providerKey(providerId, key), legacy);
           storage.removeItem(providerKey(providerId, LEGACY_KEY_MAP[key]));
-        } catch { /* storage write may fail in tests with restricted mocks */ }
+        } catch (err) {
+          console.warn('[useProviderSettings] Could not migrate legacy setting in storage:', err);
+          onPersistError?.(err);
+        }
       }
     }
     state[key] = value ?? merged[key];
@@ -86,7 +89,9 @@ export async function saveProviderApiKey(providerId, apiKey, storage = localStor
 
 export default function useProviderSettings(providerId, defaults, { storage = localStorage } = {}) {
   const { showToast } = useSidePane();
-  const [state, setState] = useState(() => loadProviderState(providerId, defaults, storage));
+  const [state, setState] = useState(() => loadProviderState(providerId, defaults, storage, {
+    onPersistError: () => showToast(t('settings.persistError')),
+  }));
 
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));
