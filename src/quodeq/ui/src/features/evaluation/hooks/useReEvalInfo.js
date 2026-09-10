@@ -5,7 +5,6 @@
  * Split out of ReEvaluateCard.jsx verbatim.
  */
 import { useState, useEffect } from 'react';
-import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 export function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
@@ -24,10 +23,15 @@ export function useReEvalInfo(project, initialInfo, { getProjectInfo, relocatePr
         setInfo(result);
         setError(null);
       })
-      .catch(() => {
+      .catch((err) => {
+        // Always trace the real failure, even when a usable initialInfo
+        // fallback means the UI keeps showing it silently (see below) --
+        // that fallback must not cost us the only record that a refresh
+        // (including one from the user's own explicit retry()) failed.
+        console.error('Failed to load project info:', err);
         if (!initialInfo) {
           setInfo(null);
-          setError(t('evaluate.projectInfoLoadFailed'));
+          setError(apiErrorMessage(err, 'evaluate.projectInfoLoadFailed'));
         }
       });
   }, [project, reloadKey]);

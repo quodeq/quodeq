@@ -480,6 +480,7 @@
   "evaluate.repoCoverageFiles": "repository coverage · {count} files",
   "evaluate.repoIndicator": "repo",
   "evaluate.repositoryLabelCap": "Repository",
+  "evaluate.resumeFailed": "Could not check for a running evaluation.",
   "evaluate.runStoppedEarly": "run stopped early, results are partial",
   "evaluate.running": "Running...",
   "evaluate.runningPrefix": "running",

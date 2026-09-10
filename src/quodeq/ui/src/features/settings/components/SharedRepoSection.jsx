@@ -106,7 +106,14 @@ function buildDisconnectMutationConfig({ disconnectShared, setError, setNewUrl, 
 function buildStatusQueryConfig(getSharedStatus) {
   return {
     queryKey: [...sharedKeys.status(), 'settings-detail'],
-    queryFn: () => getSharedStatus().catch(() => ({ configured: false, url: null })),
+    queryFn: () => getSharedStatus().catch((err) => {
+      // A server 500 and "genuinely not configured" must not collapse
+      // into the same silent {configured: false} with no trace: log the
+      // real failure so a backend outage is debuggable, even though the
+      // UI still shows the not-configured empty state either way.
+      console.error('Failed to fetch shared repo status:', err);
+      return { configured: false, url: null };
+    }),
   };
 }
 

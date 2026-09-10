@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
+import { apiErrorMessage } from "../../../strings/apiErrors.js";
 import { confirmCancelEvaluation } from "../cancelDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
@@ -41,7 +42,7 @@ export { LOCAL_API_PROVIDERS };
 // Adopt any in-progress CLI-started external run on mount so it surfaces on
 // the Evaluate tab. setJobId's functional-update guard prevents a
 // late-resolving resume from clobbering a job the user started meanwhile.
-function useResumeRunningJob(api, queryClient, setJobId) {
+function useResumeRunningJob(api, queryClient, setJobId, setJobError) {
   useEffect(() => {
     let cancelled = false;
     api.listEvaluations({ states: ["running"], limit: 1 })
@@ -56,7 +57,13 @@ function useResumeRunningJob(api, queryClient, setJobId) {
         });
       })
       .catch((err) => {
+        if (cancelled) return;
+        // A failed resume check must not look identical to "nothing is
+        // running": a CLI-started job could still be in flight and the
+        // dashboard would otherwise show no trace of it. Surface it the
+        // same way startEvaluation/cancelEvaluation do, via jobError.
         console.warn("Failed to fetch running evaluations:", err);
+        setJobError(apiErrorMessage(err, "evaluate.resumeFailed"));
       });
     return () => {
       cancelled = true;
@@ -108,7 +115,7 @@ export function useEvaluation() {
   // SSE side-effect — writes status/dimensions/findings into cache.
   // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
   useRunEventStream(jobId);
-  useResumeRunningJob(api, queryClient, setJobId);
+  useResumeRunningJob(api, queryClient, setJobId, setJobError);
 
   const { job, liveViolations } = useEvaluationQueries(api, jobId);
 
