@@ -68,7 +68,8 @@ src/quodeq/api/routes_shared_mirrors.py:97:broad-except
 src/quodeq/api/routes_shared_mirrors.py:122:broad-except
 src/quodeq/api/routes_shared_mirrors.py:164:broad-except
 src/quodeq/api/routes_shared_mirrors.py:181:broad-except
-src/quodeq/api/security.py:216:broad-except
+src/quodeq/api/security.py:235:empty-except
+src/quodeq/api/security.py:256:broad-except
 src/quodeq/assistant/_worktree_manager.py:85:empty-except
 src/quodeq/assistant/adapters/_api.py:103:broad-except
 src/quodeq/assistant/adapters/_capabilities.py:31:broad-except

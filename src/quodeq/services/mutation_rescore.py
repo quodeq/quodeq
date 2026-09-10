@@ -174,7 +174,7 @@ def rescore_with_fallback(
             finally:
                 lock.release()
 
-        (runner or ThreadBackgroundRunner()).submit(
+        (runner or ThreadBackgroundRunner(log=_logger)).submit(
             _bg_project, name=f"rescore-project-{project}",
         )
     return scores

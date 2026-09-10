@@ -113,6 +113,18 @@ _VALID_HOST_RE = re.compile(r"^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d+)?$")
 # request data, so it is built once here instead of on every response.
 _ALT_PORT_ORIGINS = alt_port_origins()
 
+# Cooldown between consecutive "CSP same-origin ws computation failed" log
+# lines. This except block sits in after_request, so it runs on every
+# response; if the computation starts failing under some sustained condition
+# we still want the FIRST occurrence surfaced immediately (was previously
+# silent), but must not turn a per-request code path into a per-request log
+# line -- that would make the failure itself a new source of log-volume
+# noise. Module-level, best-effort (no lock): a rare double-log right at the
+# window boundary under concurrent requests is harmless: it's a diagnostic
+# throttle, not a correctness guarantee.
+_CSP_WS_FAILURE_LOG_INTERVAL_S = 60.0
+_last_csp_ws_failure_log_at = 0.0
+
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     """Verify API key authentication when *api_key* is set.
@@ -196,6 +208,34 @@ def _actor(api_key: str | None) -> str:
     return ""
 
 
+def _log_csp_ws_failure(exc: Exception) -> None:
+    """Surface a same-origin ws CSP computation failure, rate-limited.
+
+    Runs inside ``after_request`` on every response, so this must never
+    raise and must never become an unbounded log source on its own: only
+    the exception's type name is logged (no header/request content, so
+    nothing attacker-controlled reaches the log line), and repeats within
+    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. Any failure logging
+    itself (e.g. a misbehaving handler) is swallowed here so the response
+    still completes with the safe (omitted same-origin ws entry) fallback.
+    """
+    global _last_csp_ws_failure_log_at
+    now = time.monotonic()
+    if now - _last_csp_ws_failure_log_at < _CSP_WS_FAILURE_LOG_INTERVAL_S:
+        return
+    _last_csp_ws_failure_log_at = now
+    try:
+        _logger.warning(
+            "CSP same-origin ws/wss connect-src computation failed (%s); "
+            "omitting that entry for this response (further repeats "
+            "suppressed for %ss)",
+            type(exc).__name__,
+            _CSP_WS_FAILURE_LOG_INTERVAL_S,
+        )
+    except Exception:  # noqa: BLE001 — logging must never break header assembly
+        pass
+
+
 def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
     """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
 
@@ -213,8 +253,9 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
         # The primary bind port isn't known here; add same-origin ws explicitly.
         try:
             self_ws = _same_origin_ws_sources(request.host)
-        except Exception:
+        except Exception as exc:
             self_ws = ""
+            _log_csp_ws_failure(exc)
         is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""))
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
