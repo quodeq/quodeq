@@ -697,3 +697,37 @@ class TestMacFullscreenObserver:
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
             ww._install_macos_fullscreen_observer(window)
             ww._install_macos_fullscreen_observer(window)  # must not raise
+
+
+@_MACOS_ONLY
+class TestNativeChromeLogging:
+    """Verify that native chrome functions log exceptions instead of silently swallowing them."""
+
+    def test_traffic_lights_logs_on_exception(self, caplog):
+        import logging
+        from PyObjCTools import AppHelper
+
+        window = MagicMock()
+        window.native = MagicMock()
+        window.native.standardWindowButton_.side_effect = AttributeError("button not found")
+
+        with patch.object(chrome.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
+            with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+                chrome._show_macos_traffic_lights(window)
+        assert "traffic light visibility toggle failed" in caplog.text
+
+    def test_unified_toolbar_logs_on_exception(self, caplog):
+        import logging
+        from PyObjCTools import AppHelper
+
+        window = MagicMock()
+        window.native = MagicMock()
+
+        # Make _apply_unified_toolbar raise
+        with patch.object(chrome.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()), \
+             patch.object(chrome, "_apply_unified_toolbar", side_effect=TypeError("toolbar error")):
+            with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+                chrome._set_macos_unified_toolbar(window)
+        assert "unified toolbar installation failed" in caplog.text
