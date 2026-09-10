@@ -178,11 +178,8 @@ src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_repo_index.py:67:empty-except
 src/quodeq/services/_run_discard.py:134:broad-except
 src/quodeq/services/_run_discard.py:61:empty-except
-src/quodeq/services/_score_cache_fetch.py:116:empty-except
-src/quodeq/services/_score_cache_fetch.py:122:empty-except
-src/quodeq/services/_score_cache_fetch.py:172:empty-except
-src/quodeq/services/_score_cache_fetch.py:83:empty-except
-src/quodeq/services/_score_cache_fetch.py:91:empty-except
+src/quodeq/services/_score_cache_fetch.py:141:empty-except
+src/quodeq/services/_score_cache_fetch.py:103:empty-except
 src/quodeq/services/_warmup.py:164:broad-except
 src/quodeq/services/_warmup.py:170:broad-except
 src/quodeq/services/_warmup.py:98:broad-except

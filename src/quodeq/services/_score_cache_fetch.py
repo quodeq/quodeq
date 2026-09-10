@@ -11,6 +11,7 @@ import threading
 from contextlib import contextmanager
 from typing import Callable, Iterator
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
 from quodeq.services._wiring import (
     open_score_cache,
@@ -22,6 +23,21 @@ from quodeq.services._wiring import (
     write_cached_rows,
 )
 from quodeq.shared._env import score_cache_disabled
+
+
+def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> None:
+    """Log a best-effort cache write failure before degrading to recompute.
+
+    A persistently broken cache (disk full, corrupt DB) must not be silently
+    invisible -- every request would keep paying full recompute cost with no
+    signal anywhere. The caller still degrades exactly as before; this only
+    adds visibility. ``log`` defaults to :data:`NULL_LOG` at every call site
+    below (no caller currently threads a real sink this far down), matching
+    the injected-LogSink discipline for inner layers -- see
+    ``quodeq.core.observability``.
+    """
+    log.warning(f"score-cache write failed for {operation}, degrading to recompute: {exc}")
+
 
 # In-flight computes by (kind, project, version). Concurrent misses on the
 # same key must share ONE compute: these computes walk a project's full run
@@ -51,6 +67,7 @@ def _single_flight(kind: str, project: str, version: str) -> Iterator[None]:
 def cached_accumulated(
     project: str, version: str, compute: Callable[[], dict],
     cacheable: Callable[[dict], bool] | None = None,
+    *, log: LogSink = NULL_LOG,
 ) -> dict:
     """Read-through cache for the accumulated payload.
 
@@ -63,6 +80,9 @@ def cached_accumulated(
     the caller withhold payloads it knows are incomplete (e.g. a rescore that
     covered only part of the dimensions), which would otherwise freeze under a
     version hash that cannot self-invalidate.
+
+    *log* receives a warning if the best-effort cache write fails; no current
+    caller threads a real sink here, so it defaults to a silent no-op.
     """
     if score_cache_disabled():
         return compute()
@@ -88,15 +108,20 @@ def cached_accumulated(
         try:
             with open_score_cache() as conn:
                 write_cached_accumulated(conn, project, version, result)
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as exc:
+            _log_write_failure("write_cached_accumulated", exc, log=log)
         return result
 
 
 def cached_project_summary(
     project: str, version: str, compute: Callable[[], dict],
+    *, log: LogSink = NULL_LOG,
 ) -> dict:
-    """Read-through cache for the project-card summary (mirrors cached_accumulated)."""
+    """Read-through cache for the project-card summary (mirrors cached_accumulated).
+
+    *log* receives a warning if the best-effort cache write fails; no current
+    caller threads a real sink here, so it defaults to a silent no-op.
+    """
     if score_cache_disabled():
         return compute()
     try:
@@ -119,15 +144,15 @@ def cached_project_summary(
         try:
             with open_score_cache() as conn:
                 write_cached_project_summary(conn, project, version, result)
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as exc:
+            _log_write_failure("write_cached_project_summary", exc, log=log)
         return result
 
 
 def make_cache_backed_fetcher(
     project: str, version_for: Callable[[str], str],
     base_fetcher: Callable[[str], list[DimensionResult]],
-    is_cacheable: Callable[[str], bool] | None = None,
+    is_cacheable: Callable[[str], bool] | None = None, *, log: LogSink = NULL_LOG,
 ) -> Callable[[str], list[DimensionResult]]:
     """Wrap *base_fetcher* with the read-through cache, versioned PER RUN.
 
@@ -169,8 +194,8 @@ def make_cache_backed_fetcher(
             try:
                 with open_score_cache() as conn:
                     write_cached_rows(conn, project, run_id, version, scalars)
-            except sqlite3.Error:
-                pass
+            except sqlite3.Error as exc:
+                _log_write_failure("write_cached_rows", exc, log=log)
         return scalars
 
     return fetch
