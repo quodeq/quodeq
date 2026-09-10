@@ -4,8 +4,10 @@ import { t } from '../../../strings/index.js';
 /**
  * Shared verified-badge chip for any violation row.
  * Renders nothing when there is no VerifiedFindingsProvider in the tree
- * or when the finding has no badge. A failed unverify POST is swallowed
- * so it cannot produce an unhandled rejection.
+ * or when the finding has no badge. A failed unverify POST is logged
+ * (console.warn) and swallowed so it cannot produce an unhandled
+ * rejection; the chip itself is left as-is (no revert of the optimistic
+ * removal, no toast) — a stronger UX fix is out of scope here.
  */
 export function VerifiedChip({ v }) {
   const verifiedCtx = useVerifiedFindings();
@@ -42,7 +44,7 @@ export function VerifiedChip({ v }) {
       aria-label={label}
       onClick={(e) => {
         e.stopPropagation();
-        verifiedCtx.unverify(v).catch(() => {});
+        verifiedCtx.unverify(v).catch((err) => console.warn('unverify failed:', err));
       }}
     >
       {icon}
