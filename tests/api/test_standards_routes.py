@@ -189,6 +189,77 @@ def test_import_standard_log_sanitization_id_with_carriage_return(client, caplog
             assert "\r" not in msg
             assert "test-idFAKE_ENTRY" in msg
 
+class _FakeLibraryHttpClient:
+    """Minimal HttpClient stand-in for StandardsLibraryClient, mirroring
+    tests/services/test_standards_library.py's FakeHttpClient."""
+
+    def __init__(self, responses=None, raise_exc=None):
+        self._responses = responses or {}
+        self._raise_exc = raise_exc
+
+    def get_json(self, url, headers=None):
+        if self._raise_exc is not None:
+            raise self._raise_exc
+        if url in self._responses:
+            return self._responses[url]
+        raise ConnectionError(f"Not found: {url}")
+
+
+def _library_client(dirs, monkeypatch, http_client):
+    from quodeq.services.standards_library import StandardsLibraryClient
+    library = StandardsLibraryClient(base_url="https://example.com", http_client=http_client)
+    monkeypatch.setattr("quodeq.api.standards_routes._get_library_client", lambda app_instance: library)
+    return create_app(test_config={
+        "TESTING": True,
+        "STANDARDS_EVALUATORS_DIR": str(dirs["evaluators"]),
+        "STANDARDS_COMPILED_DIR": str(dirs["compiled"]),
+        "STANDARDS_DIMENSIONS_FILE": str(dirs["dimensions"]),
+    })
+
+
+def test_import_from_library_conflict_returns_409(dirs, monkeypatch):
+    # A standard with the same ID already exists locally from a different origin.
+    existing = {
+        "id": "clean-arch", "name": "Clean Architecture", "description": "",
+        "weight": 1.0, "source": "", "principles": [],
+        "origin": "other-repo/clean-arch.json", "managed": False, "type": "custom",
+    }
+    dirs["evaluators"].joinpath("clean-arch.json").write_text(json.dumps(existing))
+    remote_standard = {
+        "id": "clean-arch", "name": "Clean Architecture", "description": "Test",
+        "weight": 1.0, "source": "Martin", "principles": [],
+    }
+    http = _FakeLibraryHttpClient({"https://example.com/standards/clean-arch.json": remote_standard})
+    app = _library_client(dirs, monkeypatch, http)
+    with app.test_client() as c:
+        resp = c.post(
+            "/api/standards/library/import",
+            json={"file": "standards/clean-arch.json"},
+            headers={"Origin": "http://localhost"},
+        )
+    assert resp.status_code == 409
+    body = resp.get_json()
+    assert body["code"] == "conflict"
+
+
+def test_import_from_library_malformed_json_returns_502_not_conflict(dirs, monkeypatch):
+    # The "server" returns a body that fails JSON decoding -- a
+    # transport/parse failure, not a business-logic conflict.
+    malformed_json_error = json.JSONDecodeError("Expecting value", "not json", 0)
+    http = _FakeLibraryHttpClient(raise_exc=malformed_json_error)
+    app = _library_client(dirs, monkeypatch, http)
+    with app.test_client() as c:
+        resp = c.post(
+            "/api/standards/library/import",
+            json={"file": "standards/clean-arch.json"},
+            headers={"Origin": "http://localhost"},
+        )
+    assert resp.status_code == 502
+    body = resp.get_json()
+    assert body["code"] == "import_error"
+    assert body["code"] != "conflict"
+
+
 def test_import_from_library_log_sanitization_file(dirs, caplog, monkeypatch):
     from unittest.mock import MagicMock
     import logging
