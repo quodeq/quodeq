@@ -191,6 +191,7 @@ src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:155:broad-except
 src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/jobs.py:234:empty-except
+src/quodeq/services/mutation_rescore.py:177:broad-except
 src/quodeq/services/project_registration.py:122:empty-except
 src/quodeq/services/project_registration.py:175:broad-except
 src/quodeq/services/shared_publish.py:141:broad-except
