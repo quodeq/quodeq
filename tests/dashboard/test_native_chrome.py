@@ -731,3 +731,28 @@ class TestNativeChromeLogging:
             with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
                 chrome._set_macos_unified_toolbar(window)
         assert "unified toolbar installation failed" in caplog.text
+
+    def test_titlebar_appearance_logs_on_exception(self, caplog):
+        import logging
+        from PyObjCTools import AppHelper
+
+        window = MagicMock()
+        window.native = MagicMock()
+        # Make setAppearance_ raise to trigger the except block
+        window.native.setAppearance_.side_effect = AttributeError("appearance not available")
+
+        with patch.object(chrome.sys, "platform", "darwin"), \
+             patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
+            with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+                chrome._set_macos_titlebar_appearance(window, dark=True)
+        assert "titlebar appearance toggle failed" in caplog.text
+
+    def test_windows_titlebar_logs_on_exception(self, caplog):
+        import logging
+
+        # On non-Windows, ctypes.windll doesn't exist, triggering AttributeError
+        # which lands in the except (AttributeError, OSError) clause
+        with patch.object(chrome.sys, "platform", "win32"):
+            with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+                chrome._set_windows_titlebar(dark=True)
+        assert "Windows titlebar DWM configuration failed" in caplog.text
