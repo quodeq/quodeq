@@ -88,6 +88,43 @@ describe('computeLevelInfo', () => {
       evalPrincipal: expect.objectContaining({ principle: 'P1' }),
     }));
   });
+
+  it('depth 1 returns null instead of throwing when nav.dim is stale after the dimension list shrinks', () => {
+    // Drill into dim=1 while the scene has 2 stars.
+    const bigScene = makeScene();
+    bigScene.stars.push({
+      name: 'Dim2', score: 1, violations: 0, compliance: 0, _clusterCx: 60, _clusterCy: 60, _raw: {},
+    });
+    bigScene.principles.push([{ name: 'P2', score: 1, violations: 0, compliance: 0, critical: 0, major: 0, minor: 0 }]);
+    const nav = { depth: 1, dim: 1, prin: null, clusterCx: null, clusterCy: null };
+    const navRef = { current: nav };
+    expect(computeLevelInfo(bigScene, nav, 'Demo', vi.fn(), navRef).title).toBe('Dim2');
+
+    // A rescan/rescore replaces the scene with a shorter dimension list; nav.dim=1 is now stale.
+    const smallScene = makeScene();
+    let info;
+    expect(() => {
+      info = computeLevelInfo(smallScene, nav, 'Demo', vi.fn(), navRef);
+    }).not.toThrow();
+    expect(info).toBeNull();
+  });
+
+  it('depth 2 returns null instead of throwing when nav.prin is stale after the principle list shrinks', () => {
+    // Drill into prin=1 while dim=0 has 2 principles.
+    const bigScene = makeScene();
+    bigScene.principles[0].push({ name: 'P2', score: 2, violations: 0, compliance: 0, critical: 0, major: 0, minor: 0 });
+    const nav = { depth: 2, dim: 0, prin: 1, clusterCx: null, clusterCy: null };
+    const navRef = { current: nav };
+    expect(computeLevelInfo(bigScene, nav, 'Demo', vi.fn(), navRef).title).toBe('P2');
+
+    // A rescan/rescore replaces the scene with a shorter principle list; nav.prin=1 is now stale.
+    const smallScene = makeScene();
+    let info;
+    expect(() => {
+      info = computeLevelInfo(smallScene, nav, 'Demo', vi.fn(), navRef);
+    }).not.toThrow();
+    expect(info).toBeNull();
+  });
 });
 
 describe('buildBreadcrumb', () => {
