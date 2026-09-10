@@ -98,14 +98,20 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
 
 def _tail_new_lines(path: Path, offset: int, line_filter):
     """Read new bytes from *path* since *offset*, yield an SSE frame per
-    complete new line, and return the updated offset."""
+    complete new line, and return ``(offset, status)``.
+
+    status is ``"continue"`` normally, or ``"error"`` if the open failed --
+    in which case an ``event: error`` frame has already been yielded exactly
+    once and the caller must stop (mirrors :func:`_wait_for_log_file`, which
+    yields its "log file unavailable" frame once and returns a status that
+    makes the caller ``return`` rather than retrying forever)."""
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
             raw = fh.read(_tail_max_bytes())
     except (FileNotFoundError, OSError):
         yield sse_line("log file unavailable", event="error")
-        return offset
+        return offset, "error"
     text = raw.decode("utf-8", errors="replace")
     if text:
         complete = text if text.endswith("\n") else text[: text.rfind("\n") + 1]
@@ -114,7 +120,7 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
                 offset += len(line.encode("utf-8")) + 1  # +1 for '\n'
                 if line_filter is None or line_filter(line):
                     yield sse_line(line, event_id=offset)
-    return offset
+    return offset, "continue"
 
 
 def sse_tail_generator(
@@ -160,7 +166,9 @@ def sse_tail_generator(
                 yield _emit_done_frame(terminal_state, offset)
                 return
             continue
-        offset = yield from _tail_new_lines(path, offset, line_filter)
+        offset, tail_status = yield from _tail_new_lines(path, offset, line_filter)
+        if tail_status == "error":
+            return
         if is_done is not None and is_done():
             yield _emit_done_frame(terminal_state, offset)
             return

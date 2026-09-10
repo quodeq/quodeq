@@ -27,6 +27,7 @@ export function migrateLegacyProviderSettings(clients, storage) {
   if (readString(MIGRATION_DONE_KEY, null, storage)) return { migrated: false, movedKeys: [] };
   const targetId = readString(LEGACY_AI_CMD_KEY, null, storage) || clients[0].id;
   const movedKeys = [];
+  let allWrote = true;
   for (const [oldKey, newSuffix] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
     const oldVal = readString(oldKey, null, storage);
     if (oldVal !== null) {
@@ -34,9 +35,14 @@ export function migrateLegacyProviderSettings(clients, storage) {
       if (wrote) {
         removeKey(oldKey, storage);
         movedKeys.push(oldKey);
+      } else {
+        allWrote = false;
       }
     }
   }
-  writeString(MIGRATION_DONE_KEY, '1', storage);
+  // Only mark the migration complete when every key that needed to move did.
+  // A single quota failure must not strand the un-migrated key(s) forever --
+  // leaving MIGRATION_DONE_KEY unset lets the whole migration retry next run.
+  if (allWrote) writeString(MIGRATION_DONE_KEY, '1', storage);
   return { migrated: true, movedKeys };
 }

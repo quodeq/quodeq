@@ -131,6 +131,38 @@ test('a failed write (writeString returns false) must not remove the old key or 
   assert.deepEqual(result.movedKeys, []); // not recorded as moved
 });
 
+test('a single failed key write must NOT mark the migration done, so it retries next run', () => {
+  // Two legacy keys present; only the write for 'cc-max-subagents' fails.
+  // Final review Minor 16: the old unconditional MIGRATION_DONE_KEY write
+  // stranded 'cc-max-subagents' forever once one key quota-failed.
+  const store = { 'cc-max-subagents': '4', 'cc-per-dimension': 'true' };
+  let subagentsWriteAttempts = 0;
+  const s = {
+    getItem: (key) => (key in store ? store[key] : null),
+    setItem: (key, value) => {
+      if (key === 'cc-claude-subagents' && subagentsWriteAttempts++ === 0) {
+        throw new Error('quota exceeded');
+      }
+      store[key] = String(value);
+    },
+    removeItem: (key) => { delete store[key]; },
+  };
+
+  migrateLegacyProviderSettings([{ id: 'claude' }], s);
+
+  // The succeeding key still migrates...
+  assert.equal(store['cc-claude-per-dimension'], 'true');
+  // ...but the done-flag is withheld because not every key wrote.
+  assert.equal(MIGRATION_DONE_KEY in store, false);
+
+  // Next mount: migration is NOT marked done, so it runs again and this
+  // time the previously-failing key succeeds (quota freed up, say).
+  const second = migrateLegacyProviderSettings([{ id: 'claude' }], s);
+  assert.equal(store['cc-claude-subagents'], '4');
+  assert.deepEqual(second.movedKeys, ['cc-max-subagents']);
+  assert.equal(store[MIGRATION_DONE_KEY], '1');
+});
+
 test('sets MIGRATION_DONE_KEY after running, so a second call is a no-op', () => {
   const s = fakeStorage({ 'cc-max-subagents': '4' });
   migrateLegacyProviderSettings([{ id: 'claude' }], s);

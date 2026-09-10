@@ -14,11 +14,18 @@ introduced in the same change.
 
 Scans src/quodeq/**/*.py (vendored/generated dirs excluded; tests/ and
 JS/TS are out of scope for this ratchet, see the cycle 1 design doc) with
-`ast` for three kinds of ExceptHandler violation:
+`ast` for four kinds of violation:
   - bare-except:  `except:` with no type at all
-  - empty-except: the handler's entire body is `pass`
+  - empty-except: the handler's entire body is `pass`, an ellipsis
+    (`...`), or a docstring-only body
   - broad-except: catches Exception/BaseException (directly, via a
     qualified attribute, or inside a tuple of types) without re-raising
+  - suppress:     `with contextlib.suppress(...):` (or `with suppress(...):`,
+    or any `X.suppress(...)`) -- semantically an except-and-pass, just
+    spelled as a context manager instead of a try/except, so it is caught
+    the same way `broad-except`/`empty-except` are: grandfathered by line,
+    not narrowed by the suppressed types (that is a judgment call, not a
+    mechanical one)
 """
 from __future__ import annotations
 
@@ -63,6 +70,23 @@ def _reraises(body: list[ast.stmt]) -> bool:
     return any(isinstance(stmt, ast.Raise) for stmt in body)
 
 
+def _is_suppress_call(node: ast.expr) -> bool:
+    """True for `suppress(...)` or `contextlib.suppress(...)` (or any
+    `X.suppress(...)`, since a module can be imported under an alias)."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id == "suppress"
+    if isinstance(func, ast.Attribute):
+        return func.attr == "suppress"
+    return False
+
+
+def _with_has_suppress(node: ast.With | ast.AsyncWith) -> bool:
+    return any(_is_suppress_call(item.context_expr) for item in node.items)
+
+
 def _handler_kind(handler: ast.ExceptHandler) -> str | None:
     """Return the violation kind for one except-handler, or None if it's fine."""
     if handler.type is None:
@@ -92,11 +116,13 @@ def _scan_python() -> list[tuple[str, int, str]]:
             print(f"warning: skipping {py}: {e}", file=sys.stderr)
             continue
         for node in ast.walk(tree):
-            if not isinstance(node, ast.ExceptHandler):
-                continue
-            kind = _handler_kind(node)
-            if kind is not None:
-                found.append((rel, node.lineno, kind))
+            if isinstance(node, ast.ExceptHandler):
+                kind = _handler_kind(node)
+                if kind is not None:
+                    found.append((rel, node.lineno, kind))
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                if _with_has_suppress(node):
+                    found.append((rel, node.lineno, "suppress"))
     return found
 
 
@@ -125,8 +151,9 @@ def write_baseline(path: Path = BASELINE_PATH) -> int:
     """Write current violations to the baseline file; return the count."""
     header = (
         "# Grandfathered fault-tolerance violations (bare/empty/overly-broad\n"
-        "# except handlers). Do NOT add entries without justification -- the\n"
-        "# goal is to burn this list down, not grow it.\n"
+        "# except handlers, plus contextlib.suppress()). Do NOT add entries\n"
+        "# without justification -- the goal is to burn this list down, not\n"
+        "# grow it.\n"
         "# Regenerate intentionally: python tools/check_fault_tolerance.py --update-baseline\n"
         "# Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count\n"
         "# change elsewhere in a file can shift existing entries. Prefer hand-editing\n"

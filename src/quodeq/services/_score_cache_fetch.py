@@ -31,10 +31,13 @@ def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> N
     A persistently broken cache (disk full, corrupt DB) must not be silently
     invisible -- every request would keep paying full recompute cost with no
     signal anywhere. The caller still degrades exactly as before; this only
-    adds visibility. ``log`` defaults to :data:`NULL_LOG` at every call site
-    below (no caller currently threads a real sink this far down), matching
-    the injected-LogSink discipline for inner layers -- see
-    ``quodeq.core.observability``.
+    adds visibility. ``log`` defaults to :data:`NULL_LOG`, matching the
+    injected-LogSink discipline for inner layers -- see
+    ``quodeq.core.observability``. ``_fs_metadata.py`` and ``_trend_fetcher.py``
+    thread ``log=SHARED_LOG`` through their calls to ``cached_project_summary``
+    and ``make_cache_backed_fetcher`` respectively (final review item B,
+    fault-tolerance cycle 1); ``scoring/_project_scores.py``'s call to
+    ``cached_accumulated`` still leaves it at the silent default.
     """
     log.warning(f"score-cache write failed for {operation}, degrading to recompute: {exc}")
 
@@ -81,8 +84,9 @@ def cached_accumulated(
     covered only part of the dimensions), which would otherwise freeze under a
     version hash that cannot self-invalidate.
 
-    *log* receives a warning if the best-effort cache write fails; no current
-    caller threads a real sink here, so it defaults to a silent no-op.
+    *log* receives a warning if the best-effort cache write fails; defaults to
+    a silent no-op (``NULL_LOG``) since no current caller of this entry point
+    threads a real sink here -- see ``_log_write_failure``.
     """
     if score_cache_disabled():
         return compute()
@@ -119,8 +123,10 @@ def cached_project_summary(
 ) -> dict:
     """Read-through cache for the project-card summary (mirrors cached_accumulated).
 
-    *log* receives a warning if the best-effort cache write fails; no current
-    caller threads a real sink here, so it defaults to a silent no-op.
+    *log* receives a warning if the best-effort cache write fails; defaults to
+    a silent no-op (``NULL_LOG``), but ``_fs_metadata.py`` threads
+    ``log=SHARED_LOG`` through both of its production call sites, so a write
+    failure reaches a real sink there.
     """
     if score_cache_disabled():
         return compute()

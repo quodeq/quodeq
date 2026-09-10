@@ -75,3 +75,41 @@ def test_empty_except_docstring_is_flagged():
 def test_empty_except_double_pass_is_flagged():
     h = _handler("try:\n    f()\nexcept ValueError:\n    pass\n    pass\n")
     assert cft._handler_kind(h) == "empty-except"
+
+
+def _with_node(src: str) -> ast.With | ast.AsyncWith:
+    """Parse a one-statement `with`/`async with` snippet and return its node."""
+    tree = ast.parse(src)
+    node = tree.body[0]
+    if isinstance(node, ast.AsyncFunctionDef):
+        node = node.body[0]
+    assert isinstance(node, (ast.With, ast.AsyncWith))
+    return node
+
+
+def test_contextlib_suppress_is_flagged():
+    node = _with_node("with contextlib.suppress(OSError):\n    f()\n")
+    assert cft._with_has_suppress(node) is True
+
+
+def test_bare_suppress_is_flagged():
+    node = _with_node("with suppress(OSError):\n    f()\n")
+    assert cft._with_has_suppress(node) is True
+
+
+def test_plain_open_is_not_flagged():
+    node = _with_node("with open('x') as fh:\n    f(fh)\n")
+    assert cft._with_has_suppress(node) is False
+
+
+def test_async_with_suppress_is_flagged():
+    node = _with_node(
+        "async def g():\n    async with contextlib.suppress(OSError):\n        await f()\n"
+    )
+    assert cft._with_has_suppress(node) is True
+
+
+def test_aliased_module_suppress_is_flagged():
+    # Any `X.suppress(...)`, since contextlib can be imported under an alias.
+    node = _with_node("with cl.suppress(OSError):\n    f()\n")
+    assert cft._with_has_suppress(node) is True

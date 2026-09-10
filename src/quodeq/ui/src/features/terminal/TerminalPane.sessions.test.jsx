@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
 // Split from TerminalPane.test.jsx: multi-session tabs, creation/close,
@@ -188,13 +188,12 @@ it('copy button copies the active session selection to the clipboard', async () 
 });
 
 it('copy button does not throw when navigator.clipboard is unavailable', async () => {
-  const { userEvent } = await import('@testing-library/user-event').then((m) => ({ userEvent: m.default }));
   Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
   fakeTerm.getSelection.mockReturnValue('picked text');
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
-  await expect(userEvent.click(screen.getByRole('button', { name: 'Copy terminal output' })))
-    .resolves.not.toThrow();
+  const button = screen.getByRole('button', { name: 'Copy terminal output' });
+  expect(() => fireEvent.click(button)).not.toThrow();
 });
 
 // OSC 8 hyperlinks are activated by xterm itself. Without an explicit

@@ -1,7 +1,13 @@
 # Grandfathered fault-tolerance violations (bare/empty/overly-broad
-# except handlers). Do NOT add entries without justification -- the
-# goal is to burn this list down, not grow it.
+# except handlers, plus contextlib.suppress()). Do NOT add entries
+# without justification -- the goal is to burn this list down, not
+# grow it.
 # Regenerate intentionally: python tools/check_fault_tolerance.py --update-baseline
+# Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count
+# change elsewhere in a file can shift existing entries. Prefer hand-editing
+# the baseline (update the shifted line number) over blind --update-baseline
+# regeneration, which can silently absorb a genuinely new violation
+# introduced in the same change.
 src/quodeq/_cli_lifecycle.py:181:empty-except
 src/quodeq/_cli_lifecycle.py:279:empty-except
 src/quodeq/_cli_lifecycle.py:70:broad-except
@@ -64,10 +70,10 @@ src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_project_scan.py:78:empty-except
 src/quodeq/api/routes_runs.py:30:broad-except
-src/quodeq/api/routes_shared_mirrors.py:97:broad-except
 src/quodeq/api/routes_shared_mirrors.py:122:broad-except
 src/quodeq/api/routes_shared_mirrors.py:164:broad-except
 src/quodeq/api/routes_shared_mirrors.py:181:broad-except
+src/quodeq/api/routes_shared_mirrors.py:97:broad-except
 src/quodeq/api/security.py:235:empty-except
 src/quodeq/api/security.py:256:broad-except
 src/quodeq/assistant/_worktree_manager.py:85:empty-except
@@ -104,6 +110,7 @@ src/quodeq/dashboard/_process.py:124:empty-except
 src/quodeq/dashboard/_server.py:115:empty-except
 src/quodeq/dashboard/_server.py:279:empty-except
 src/quodeq/dashboard/_webview_token.py:80:empty-except
+src/quodeq/dashboard/_webview_token.py:85:suppress
 src/quodeq/dashboard/_webview_window.py:187:empty-except
 src/quodeq/dashboard/_webview_window_about.py:258:empty-except
 src/quodeq/dashboard/_webview_window_about.py:272:empty-except
@@ -140,6 +147,7 @@ src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/dimension_report/_report_io.py:38:empty-except
 src/quodeq/data/fs/evidence_tally.py:136:empty-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except
+src/quodeq/data/fs/run_artifacts.py:60:suppress
 src/quodeq/data/fs/run_files.py:191:empty-except
 src/quodeq/data/fs/standards_prefs.py:116:broad-except
 src/quodeq/data/fs/standards_prefs.py:41:broad-except
@@ -179,8 +187,8 @@ src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_repo_index.py:67:empty-except
 src/quodeq/services/_run_discard.py:134:broad-except
 src/quodeq/services/_run_discard.py:61:empty-except
-src/quodeq/services/_score_cache_fetch.py:141:empty-except
-src/quodeq/services/_score_cache_fetch.py:103:empty-except
+src/quodeq/services/_score_cache_fetch.py:107:empty-except
+src/quodeq/services/_score_cache_fetch.py:147:empty-except
 src/quodeq/services/_warmup.py:164:broad-except
 src/quodeq/services/_warmup.py:170:broad-except
 src/quodeq/services/_warmup.py:98:broad-except

@@ -32,7 +32,11 @@ def test_baseline_has_no_stale_entries():
 
 # Revise DOWNWARD as fault-tolerance findings burn entries; NEVER raise
 # without a justification reviewed in the PR that raises it.
-BASELINE_CEILING = 236  # set to the count --update-baseline printed in Step 1
+# 221 = 219 (final review baseline) + 2 `suppress` entries grandfathered when
+# the scanner was extended to see contextlib.suppress() (final review item D,
+# fault-tolerance cycle 1 fix wave): dashboard/_webview_token.py:85 and
+# data/fs/run_artifacts.py:60, both pre-existing, previously invisible.
+BASELINE_CEILING = 221  # set to the count --update-baseline printed in Step 1
 
 
 def test_baseline_only_shrinks():
