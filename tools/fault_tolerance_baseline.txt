@@ -11,7 +11,6 @@ src/quodeq/analysis/_api_runner.py:121:broad-except
 src/quodeq/analysis/_api_standards_text.py:157:empty-except
 src/quodeq/analysis/_api_standards_text.py:166:empty-except
 src/quodeq/analysis/_api_standards_text.py:51:empty-except
-src/quodeq/analysis/_command.py:177:empty-except
 src/quodeq/analysis/_loop_state.py:106:empty-except
 src/quodeq/analysis/_loop_steps.py:103:broad-except
 src/quodeq/analysis/_loop_steps.py:146:broad-except
@@ -42,7 +41,6 @@ src/quodeq/analysis/checks/runner.py:74:broad-except
 src/quodeq/analysis/fingerprint.py:72:broad-except
 src/quodeq/analysis/mcp/router.py:138:broad-except
 src/quodeq/analysis/mcp/router.py:174:broad-except
-src/quodeq/analysis/subagents/_consolidated.py:82:empty-except
 src/quodeq/analysis/subagents/_pool_launcher.py:87:broad-except
 src/quodeq/analysis/subagents/_queue_state.py:119:empty-except
 src/quodeq/analysis/subagents/_queue_state.py:47:empty-except
@@ -168,7 +166,6 @@ src/quodeq/data/sqlite/run_index.py:88:broad-except
 src/quodeq/data/sqlite/run_index.py:94:broad-except
 src/quodeq/llm_bridge/_cloud.py:60:broad-except
 src/quodeq/llm_bridge/_ollama.py:141:empty-except
-src/quodeq/llm_bridge/_ollama.py:88:empty-except
 src/quodeq/menubar/_app_lifecycle.py:165:empty-except
 src/quodeq/menubar/_process.py:107:empty-except
 src/quodeq/menubar/_process.py:133:empty-except
@@ -185,7 +182,6 @@ src/quodeq/services/_mutation_projection.py:101:broad-except
 src/quodeq/services/_mutation_scoring.py:108:broad-except
 src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:38:broad-except
-src/quodeq/services/_registration_scan.py:38:empty-except
 src/quodeq/services/_repo_index.py:67:empty-except
 src/quodeq/services/_run_discard.py:134:broad-except
 src/quodeq/services/_run_discard.py:61:empty-except
@@ -204,8 +200,8 @@ src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:155:broad-except
 src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/jobs.py:234:empty-except
-src/quodeq/services/project_registration.py:121:empty-except
-src/quodeq/services/project_registration.py:173:broad-except
+src/quodeq/services/project_registration.py:122:empty-except
+src/quodeq/services/project_registration.py:175:broad-except
 src/quodeq/services/shared_publish.py:141:broad-except
 src/quodeq/services/shared_publish.py:167:broad-except
 src/quodeq/services/shared_settings.py:59:empty-except
@@ -215,9 +211,8 @@ src/quodeq/shared/_process_kill.py:33:empty-except
 src/quodeq/shared/_process_kill.py:67:empty-except
 src/quodeq/shared/_process_kill.py:73:empty-except
 src/quodeq/shared/_process_kill.py:77:empty-except
-src/quodeq/shared/dim_estimates_io.py:49:empty-except
 src/quodeq/shared/frozen.py:83:empty-except
-src/quodeq/shared/resource_sampler.py:136:empty-except
+src/quodeq/shared/resource_sampler.py:140:broad-except
 src/quodeq/shared/run_log.py:85:empty-except
 src/quodeq/shared/ssrf.py:32:empty-except
 src/quodeq/terminal/_pty_unix.py:109:empty-except

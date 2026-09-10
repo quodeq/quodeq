@@ -174,8 +174,8 @@ def _unregister_cli_mcp(cmd: str, name: str) -> None:
             [_cmd_binary(cmd), "mcp", "remove", name],
             check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        _log.warning("Failed to unregister MCP server '%s' via '%s mcp remove': %s", name, cmd, exc)
 
 
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:

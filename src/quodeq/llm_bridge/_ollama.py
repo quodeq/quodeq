@@ -86,8 +86,8 @@ def get_running_model_info(base_url: str = _OLLAMA_BASE) -> dict | None:
                     "size_vram": m.get("size_vram", 0),
                 }
     except (urllib.error.URLError, ConnectionRefusedError, OSError,
-            ValueError, KeyError, TypeError, AttributeError):
-        pass
+            ValueError, KeyError, TypeError, AttributeError) as exc:
+        _log.warning("Could not get running Ollama model info: %s", exc)
     return None
 
 

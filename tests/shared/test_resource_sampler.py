@@ -7,6 +7,7 @@ when ``ps``/``pgrep`` aren't available (CI sandboxes, weird platforms).
 """
 from __future__ import annotations
 
+import logging
 import re
 import sys
 import time
@@ -81,6 +82,25 @@ class TestErrorTolerance:
             time.sleep(0.15)  # multiple ticks, each raising
             assert sampler._thread is not None and sampler._thread.is_alive()
             sampler.stop()
+
+    def test_loop_logs_tick_failure_once_not_per_iteration(self, caplog) -> None:
+        """A failing tick must still be observable, but only logged once —
+        this loop runs every interval_s, so a log-per-iteration would flood
+        the run log across a long-running analysis."""
+        sampler = ResourceSampler(interval_s=0.02)
+        with patch(
+            "quodeq.shared.resource_sampler.log_info",
+            side_effect=OSError("disk full"),
+        ), caplog.at_level(logging.WARNING, logger="quodeq.shared.resource_sampler"):
+            sampler.start()
+            time.sleep(budget(0.3))  # several ticks, every one raising
+            sampler.stop()
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1, (
+            f"expected exactly one warning for a repeatedly-failing tick, got {len(warnings)}"
+        )
+        assert "resource sampler" in warnings[0].message.lower()
 
     @pytest.mark.skipif(
         sys.platform == "win32",
