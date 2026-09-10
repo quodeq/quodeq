@@ -307,6 +307,39 @@ def test_shared_project_info_invalid_segment(client, shared_clone_fixture):
     assert resp.status_code == 400
 
 
+def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
+    client, shared_clone_fixture, monkeypatch,
+):
+    """Cluster 11: shared_project_info is reached via a publicly shared URL,
+    unlike most of this app's local-only UI. Before this fix it had no
+    try/except at all -- an unexpected exception from get_project_info would
+    propagate straight into Flask's raw error handling instead of the
+    sanitized {"error", "code"} contract its three siblings (shared_runs,
+    shared_scores, shared_compare_summary) already return. This locks the
+    same contract in for shared_project_info and confirms the raised
+    exception's own text never reaches the response body."""
+    import quodeq.services._fs_projects as fs_projects_mod
+
+    secret_detail = "SECRET_DB_PATH=/private/leak/db.sqlite exploded"
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError(secret_detail)
+
+    monkeypatch.setattr(fs_projects_mod, "get_project_info", _boom)
+
+    resp = client.get("/api/shared/projects/proj-a/info")
+
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body is not None, "Response body must be JSON, not a raw Flask error page"
+    assert body == {"error": "Failed to load project info", "code": "INTERNAL_ERROR"}
+
+    raw = resp.get_data(as_text=True)
+    assert secret_detail not in raw
+    assert "RuntimeError" not in raw
+    assert "Traceback" not in raw
+
+
 # --- GET /api/shared/projects/<project>/runs ----------------------------------
 
 def test_shared_runs(client, shared_clone_fixture):
