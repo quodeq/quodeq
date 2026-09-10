@@ -113,11 +113,7 @@ src/quodeq/dashboard/_webview_window_about.py:258:empty-except
 src/quodeq/dashboard/_webview_window_about.py:272:empty-except
 src/quodeq/dashboard/_webview_window_about.py:298:empty-except
 src/quodeq/dashboard/_webview_window_about.py:60:broad-except
-src/quodeq/dashboard/_webview_window_chrome.py:119:empty-except
 src/quodeq/dashboard/_webview_window_chrome.py:138:broad-except
-src/quodeq/dashboard/_webview_window_chrome.py:163:empty-except
-src/quodeq/dashboard/_webview_window_chrome.py:41:empty-except
-src/quodeq/dashboard/_webview_window_chrome.py:75:empty-except
 src/quodeq/dashboard/_webview_window_close.py:104:broad-except
 src/quodeq/dashboard/_webview_window_close.py:130:broad-except
 src/quodeq/dashboard/_webview_window_close.py:146:broad-except
@@ -138,7 +134,7 @@ src/quodeq/dashboard/_webview_window_native_ops.py:71:broad-except
 src/quodeq/dashboard/cli.py:88:broad-except
 src/quodeq/dashboard/runner.py:154:broad-except
 src/quodeq/dashboard/runner.py:172:broad-except
-src/quodeq/dashboard/runner.py:182:empty-except
+src/quodeq/dashboard/runner.py:183:broad-except
 src/quodeq/data/cache_store/entry.py:37:broad-except
 src/quodeq/data/cache_store/index.py:120:empty-except
 src/quodeq/data/cache_store/local.py:116:empty-except
@@ -177,9 +173,9 @@ src/quodeq/menubar/_app_lifecycle.py:165:empty-except
 src/quodeq/menubar/_process.py:107:empty-except
 src/quodeq/menubar/_process.py:133:empty-except
 src/quodeq/menubar/_process.py:65:empty-except
-src/quodeq/menubar/app.py:122:empty-except
-src/quodeq/menubar/app.py:141:empty-except
-src/quodeq/menubar/app.py:203:empty-except
+src/quodeq/menubar/app.py:122:broad-except
+src/quodeq/menubar/app.py:141:broad-except
+src/quodeq/menubar/app.py:203:broad-except
 src/quodeq/menubar/app.py:219:broad-except
 src/quodeq/menubar/control.py:91:empty-except
 src/quodeq/menubar/state.py:65:empty-except

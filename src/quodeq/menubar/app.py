@@ -120,7 +120,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
         try:
             _state.set_enabled(False)
         except Exception:
-            pass
+            _logging.getLogger(__name__).debug("could not disable menubar preference on quit", exc_info=True)
         _control.remove_pidfile()
         rumps.quit_application()
 
@@ -139,7 +139,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
             else:
                 rumps.notification("Quodeq", "Up to date", f"You're on {status['current']}.")
         except Exception:
-            pass
+            _logging.getLogger(__name__).debug("update check failed", exc_info=True)
 
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port (delegates to cached helper)."""
@@ -201,7 +201,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
             else:
                 self._update_item.title = "Check for Updates…"
         except Exception:
-            pass
+            _logging.getLogger(__name__).debug("update availability check failed", exc_info=True)
 
 
 def _set_accessory_policy() -> None:
