@@ -161,3 +161,9 @@ test('buildPeriodRuns: month keeps newest run per month', () => {
 test('buildPeriodRuns: day matches buildDailyRuns', () => {
   assert.deepEqual(buildPeriodRuns(AVAILABLE_RUNS, TREND, 'day'), buildDailyRuns(AVAILABLE_RUNS, TREND));
 });
+
+test('buildPeriodRuns: non-array trend returns empty instead of throwing', () => {
+  assert.deepEqual(buildPeriodRuns(AVAILABLE_RUNS, null, 'day'), []);
+  assert.deepEqual(buildPeriodRuns(AVAILABLE_RUNS, undefined, 'day'), []);
+  assert.deepEqual(buildPeriodRuns(AVAILABLE_RUNS, 'not-an-array', 'day'), []);
+});

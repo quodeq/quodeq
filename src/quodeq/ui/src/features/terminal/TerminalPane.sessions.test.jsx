@@ -187,6 +187,16 @@ it('copy button copies the active session selection to the clipboard', async () 
   expect(writeText).toHaveBeenCalledWith('picked text');
 });
 
+it('copy button does not throw when navigator.clipboard is unavailable', async () => {
+  const { userEvent } = await import('@testing-library/user-event').then((m) => ({ userEvent: m.default }));
+  Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  fakeTerm.getSelection.mockReturnValue('picked text');
+  render(<TerminalPane active />);
+  await screen.findByTestId('tty-root');
+  await expect(userEvent.click(screen.getByRole('button', { name: 'Copy terminal output' })))
+    .resolves.not.toThrow();
+});
+
 // OSC 8 hyperlinks are activated by xterm itself. Without an explicit
 // linkHandler xterm uses its built-in one, which confirms and then calls
 // window.open() with no URL — null inside pywebview's WKWebView, so clicking OK

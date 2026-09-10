@@ -36,7 +36,7 @@ function DimensionRow({ dim, onBarClick, delta, scores }) {
 export default function DimensionScorePanel({ dimensions = [], onBarClick, dimTrends }) {
   if (!dimensions || dimensions.length === 0) return null;
 
-  const sorted = [...dimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
+  const sorted = [...dimensions].sort((a, b) => String(a.dimension || '').localeCompare(String(b.dimension || '')));
 
   return (
     <section className="dim-score-panel dim-score-panel--terminal panel" aria-label={t('overview.dimensionScoresAria')}>
