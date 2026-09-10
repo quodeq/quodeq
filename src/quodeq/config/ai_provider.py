@@ -268,7 +268,7 @@ def get_api_key_secure(provider: str) -> str | None:
         value = keyring.get_password(_KEYRING_SERVICE, provider)
         if value:
             return value
-    except Exception as exc:
+    except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
         log_debug(f"keyring lookup failed for '{provider}': {exc}")
 
     paths = default_paths()
