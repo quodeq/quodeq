@@ -77,7 +77,7 @@ class ProjectionEngine:
                 try:
                     handle(event, store)
                     applied += 1
-                except Exception:
+                except (ValueError, KeyError, TypeError):
                     _logger.error(
                         "Handler failed for action event %s (type=%s) - skipping",
                         getattr(event, "event_id", "?"),

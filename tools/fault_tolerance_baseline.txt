@@ -88,7 +88,6 @@ src/quodeq/cli.py:116:empty-except
 src/quodeq/cli.py:86:broad-except
 src/quodeq/config/ai_provider.py:193:empty-except
 src/quodeq/config/ai_provider.py:239:broad-except
-src/quodeq/config/ai_provider.py:249:broad-except
 src/quodeq/config/ai_provider.py:271:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
@@ -97,7 +96,6 @@ src/quodeq/context/online_cache.py:125:empty-except
 src/quodeq/context/precedent_corpus.py:290:broad-except
 src/quodeq/context/precedent_corpus.py:69:empty-except
 src/quodeq/context/precedent_corpus.py:87:broad-except
-src/quodeq/context/precedent_fingerprint.py:100:broad-except
 src/quodeq/context/precedent_store.py:114:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
 src/quodeq/context/trust_model.py:161:broad-except
@@ -125,10 +123,8 @@ src/quodeq/dashboard/_webview_window_help_menu.py:165:broad-except
 src/quodeq/dashboard/_webview_window_help_menu.py:39:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:44:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:50:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:119:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:128:empty-except
 src/quodeq/dashboard/_webview_window_native_ops.py:158:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:46:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:71:broad-except
 src/quodeq/dashboard/cli.py:88:broad-except
 src/quodeq/dashboard/runner.py:154:broad-except
@@ -140,9 +136,7 @@ src/quodeq/data/cache_store/local.py:116:empty-except
 src/quodeq/data/cache_store/local.py:144:empty-except
 src/quodeq/data/cache_store/migrate.py:235:empty-except
 src/quodeq/data/cache_store/migrate.py:91:broad-except
-src/quodeq/data/events/reader.py:124:broad-except
 src/quodeq/data/events/reader.py:62:broad-except
-src/quodeq/data/fs/_index_io.py:60:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/dimension_report/_report_io.py:38:empty-except
 src/quodeq/data/fs/evidence_tally.py:136:empty-except
@@ -154,7 +148,6 @@ src/quodeq/data/fs/standards_prefs.py:86:broad-except
 src/quodeq/data/fs/stream_files.py:62:empty-except
 src/quodeq/data/fs/suppression_rules.py:42:broad-except
 src/quodeq/data/migrations/dismissed_json_to_actions_log.py:51:broad-except
-src/quodeq/data/projection/engine.py:80:broad-except
 src/quodeq/data/sqlite/_run_index_schema.py:77:empty-except
 src/quodeq/data/sqlite/findings_queries.py:204:broad-except
 src/quodeq/data/sqlite/findings_queries.py:230:empty-except

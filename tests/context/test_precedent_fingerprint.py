@@ -17,6 +17,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from quodeq.context import precedent_fingerprint as pf
 from quodeq.context.precedent_fingerprint import fingerprint, load_precedent_fingerprints
 from quodeq.shared.lru import LRUDict
@@ -56,6 +58,40 @@ def test_locked_db_is_skipped_not_raised(tmp_path: Path) -> None:
     )
 
     assert result == set()  # degrades gracefully, doesn't raise
+
+
+def test_wrapped_open_db_failure_is_skipped_not_raised(tmp_path: Path) -> None:
+    """Cluster 13 (R-FT-7) — ``open_evaluation_db`` wraps locked/missing-file
+    and generic sqlite3.Error failures in ``RuntimeError`` for a clearer,
+    path-scoped message (see data/sqlite/connection.py). That RuntimeError
+    must still be caught here, not just the raw sqlite3 types."""
+    project_dir = tmp_path / "project"
+    _run(project_dir, "r1")
+
+    def _boom(run_dir: Path) -> list[tuple[str | None, str | None]]:
+        raise RuntimeError(f"Could not open evaluation database at {run_dir}: locked")
+
+    result = load_precedent_fingerprints(
+        project_dir, read_dismissed=_boom, source_stamp=lambda d: 1, cache=_memo(),
+    )
+
+    assert result == set()  # degrades gracefully, doesn't raise
+
+
+def test_out_of_scope_error_propagates(tmp_path: Path) -> None:
+    """Cluster 13 (R-FT-7) — the catch was narrowed from bare ``Exception``
+    to ``(RuntimeError, sqlite3.Error, OSError)``. Anything else (e.g. a
+    programming bug) must now propagate instead of being swallowed."""
+    project_dir = tmp_path / "project"
+    _run(project_dir, "r1")
+
+    def _boom(run_dir: Path) -> list[tuple[str | None, str | None]]:
+        raise TypeError("not a realistic DB-open failure")
+
+    with pytest.raises(TypeError):
+        load_precedent_fingerprints(
+            project_dir, read_dismissed=_boom, source_stamp=lambda d: 1, cache=_memo(),
+        )
 
 
 def test_unchanged_stamp_serves_later_scans_from_the_memo(tmp_path: Path) -> None:

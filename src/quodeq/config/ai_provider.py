@@ -246,7 +246,7 @@ def _store_api_key(provider: str, api_key: str) -> tuple[bool, bool]:
         _write_env(paths, None, _api_key_var_for(provider), api_key)
         _ensure_gitignore(paths)
         return True, False
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log_error(f"Failed to store API key for '{provider}': {exc}")
         return False, False
 
