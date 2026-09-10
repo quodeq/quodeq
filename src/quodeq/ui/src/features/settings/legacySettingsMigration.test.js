@@ -110,6 +110,27 @@ test('cc-time-limit and cc-pool-budget both land on the same new key (last one w
   assert.equal(s._store['cc-claude-time-limit'], '1200');
 });
 
+test('a failed write (writeString returns false) must not remove the old key or record the move', () => {
+  // setItem throws for the new provider-scoped key only, so writeString
+  // (adapters/storage.js) catches it and returns false — the old key must
+  // survive and movedKeys must not include it (real data-loss path otherwise).
+  const store = { 'cc-max-subagents': '4' };
+  const s = {
+    getItem: (key) => (key in store ? store[key] : null),
+    setItem: (key, value) => {
+      if (key === 'cc-claude-subagents') throw new Error('quota exceeded');
+      store[key] = String(value);
+    },
+    removeItem: (key) => { delete store[key]; },
+  };
+
+  const result = migrateLegacyProviderSettings([{ id: 'claude' }], s);
+
+  assert.equal(store['cc-max-subagents'], '4'); // old key NOT removed
+  assert.equal('cc-claude-subagents' in store, false); // failed write never landed
+  assert.deepEqual(result.movedKeys, []); // not recorded as moved
+});
+
 test('sets MIGRATION_DONE_KEY after running, so a second call is a no-op', () => {
   const s = fakeStorage({ 'cc-max-subagents': '4' });
   migrateLegacyProviderSettings([{ id: 'claude' }], s);

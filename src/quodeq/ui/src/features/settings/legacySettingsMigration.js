@@ -30,9 +30,11 @@ export function migrateLegacyProviderSettings(clients, storage) {
   for (const [oldKey, newSuffix] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
     const oldVal = readString(oldKey, null, storage);
     if (oldVal !== null) {
-      writeString(`cc-${targetId}-${newSuffix}`, oldVal, storage);
-      removeKey(oldKey, storage);
-      movedKeys.push(oldKey);
+      const wrote = writeString(`cc-${targetId}-${newSuffix}`, oldVal, storage);
+      if (wrote) {
+        removeKey(oldKey, storage);
+        movedKeys.push(oldKey);
+      }
     }
   }
   writeString(MIGRATION_DONE_KEY, '1', storage);

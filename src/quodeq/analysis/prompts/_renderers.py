@@ -117,7 +117,16 @@ def render_compact_standards(
 def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     """Format dimension info for prompt inclusion."""
     applies = dimensions_data.get("applies", [])
-    dim_entry = next((d for d in applies if d["id"] == dimension), None)
+    dim_entry = None
+    for d in applies:
+        d_id = d.get("id")
+        if d_id is None:
+            raise ValueError(
+                f"Malformed standards file: a dimension is missing required 'id': {d!r}"
+            )
+        if d_id == dimension:
+            dim_entry = d
+            break
 
     if not dim_entry:
         return f"_Dimension '{dimension}' not configured._"

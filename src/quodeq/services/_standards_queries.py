@@ -26,8 +26,11 @@ def list_builtin(dimensions_file: Path, compiled_dir: Path,
         return []
     out: list[StandardMeta] = []
     for dim in data.get("applies", []):
-        p_count, r_count, description = _read_compiled_meta(dim["id"], compiled_dir, read_json)
-        out.append(build_builtin_meta(dim, p_count, r_count, description))
+        try:
+            p_count, r_count, description = _read_compiled_meta(dim["id"], compiled_dir, read_json)
+            out.append(build_builtin_meta(dim, p_count, r_count, description))
+        except (OSError, ValueError, KeyError) as exc:
+            logger.warning("Skipping invalid dimension entry %r: %s", dim, exc)
     return out
 
 
