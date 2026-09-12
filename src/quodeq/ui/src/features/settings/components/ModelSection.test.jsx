@@ -52,8 +52,16 @@ describe('ModelSection — finding #214 (availableClients undefined)', () => {
 // this React onChange handler.
 describe('ModelSection — handleModelChange storage guard', () => {
   it('does not throw when storage.setItem throws, and still updates the field', () => {
-    const setItemSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-      throw new DOMException('QuotaExceededError');
+    // Replace the whole global rather than spying on `localStorage.setItem`:
+    // when JSDOM supplies a real Storage, its proxy swallows the added own
+    // property and the spy never takes effect (green locally, red in CI).
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException('QuotaExceededError');
+      },
+      removeItem: () => {},
+      clear: () => {},
     });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const onFastChange = vi.fn();
@@ -72,7 +80,7 @@ describe('ModelSection — handleModelChange storage guard', () => {
     expect(onFastChange).toHaveBeenCalledWith('new-model');
     expect(warn).toHaveBeenCalled();
 
-    setItemSpy.mockRestore();
+    vi.unstubAllGlobals();
     warn.mockRestore();
   });
 });
