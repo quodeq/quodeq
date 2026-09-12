@@ -14,6 +14,14 @@ from quodeq.services._wiring import (
 _HTTP_TIMEOUT_S = 30
 _HASH_PREFIX_LEN = 16
 
+class StandardImportConflictError(ValueError):
+    """Raised when a standard with the same ID already exists locally from
+    a different origin. The only genuine business-logic conflict raised by
+    ``import_standard`` -- every other ``ValueError`` it raises (invalid
+    library file path, invalid/missing standard ID, malformed remote JSON)
+    is a transport/parse failure, not a conflict, and stays a plain
+    ``ValueError`` so callers can tell the two apart by type."""
+
 class HttpClient(Protocol):
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any: ...
 
@@ -70,7 +78,7 @@ class StandardsLibraryClient:
                 # Same origin — update in place
                 pass
             else:
-                raise ValueError(
+                raise StandardImportConflictError(
                     f"A standard with ID '{data['id']}' already exists "
                     f"from a different source. Duplicate to customize it first, "
                     f"or delete the existing one."

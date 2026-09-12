@@ -1,8 +1,9 @@
 """Parent/child project relationships read from repository_info.json."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+from quodeq.core.utils.io import read_json
 
 
 def find_children(reports_root: Path, parent_id: str) -> list[str]:
@@ -15,9 +16,9 @@ def find_children(reports_root: Path, parent_id: str) -> list[str]:
         if not info_path.exists():
             continue
         try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
+            info = read_json(info_path)
             if info.get("parent") == parent_id:
                 children.append(entry.name)
-        except (json.JSONDecodeError, OSError):
+        except ValueError:
             continue
     return children

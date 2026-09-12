@@ -96,4 +96,11 @@ def terminal_read_loop(ws, manager, stop: threading.Event, apply_control) -> Non
             elif tag == "1":
                 apply_control(manager, payload)
     except Exception:
-        pass
+        # A write to a dead/killed process (or any other failure in this
+        # loop) must not silently end the session: log it for operators,
+        # and signal the write-side pump to stop rather than leaving it
+        # running unsignaled after its counterpart has already died.
+        # Mirrors pump_terminal_out's unconditional stop.set() below.
+        _logger.warning("terminal read loop failed", exc_info=True)
+    finally:
+        stop.set()

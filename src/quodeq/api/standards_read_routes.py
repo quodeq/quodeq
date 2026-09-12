@@ -91,7 +91,7 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
             return jsonify([])
         try:
             index = library.fetch_index()
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             logger.warning("Failed to fetch library index: %s", exc)
             return error_response("Failed to connect to standards library", 502, "library_error")
         return jsonify(index)

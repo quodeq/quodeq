@@ -5,7 +5,12 @@ const CHANGE_EVENT = 'terminal-settings-changed';
 
 function loadEnabled(storage) {
   // Enabled by default: only an explicit opt-out ('false') disables it.
-  return storage.getItem(TERMINAL_ENABLED_KEY) !== 'false';
+  try {
+    return storage.getItem(TERMINAL_ENABLED_KEY) !== 'false';
+  } catch (err) {
+    console.warn('[useTerminalSettings] could not read:', err);
+    return true;
+  }
 }
 
 export default function useTerminalSettings({ storage = localStorage } = {}) {

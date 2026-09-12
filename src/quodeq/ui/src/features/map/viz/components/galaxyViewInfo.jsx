@@ -75,7 +75,8 @@ function computeSystemLevelInfo(scene, nav, projectName) {
 
 /** Depth 1: one dimension. */
 function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
-  const dim = scene.stars[nav.dim];
+  const dim = scene.stars?.[nav.dim];
+  if (!dim) return null;
   const prins = scene.principles[nav.dim] || [];
   const rawDim = dim._raw;
   const dimSev = { critical: 0, major: 0, minor: 0 };
@@ -102,7 +103,8 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
 
 /** Depth 2: one principle within a dimension. */
 function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
-  const prin = scene.principles[nav.dim][nav.prin];
+  const prin = scene.principles?.[nav.dim]?.[nav.prin];
+  if (!prin) return null;
   const prinLines = [
     { label: t('map.score'), value: prin.score.toFixed(1) },
     { label: t('map.violations'), value: prin.violations },

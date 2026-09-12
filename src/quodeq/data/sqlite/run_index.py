@@ -85,7 +85,7 @@ def _sync_status_backed_run(
     if cached_value is None or cached_value != disk_mtime:
         try:
             _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - one malformed status.json must not stop syncing the rest
             _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
             return
     # Always check staleness, even on mtime-unchanged runs.
@@ -176,7 +176,7 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
                 try:
                     _upsert_from_status(
                         db, run_dir, project_uuid=project_uuid, run_id=run_dir.name)
-                except Exception:
+                except Exception:  # noqa: BLE001 - one run's date-sync failure must not stop syncing the rest
                     _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
 
 

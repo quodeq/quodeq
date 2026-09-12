@@ -53,6 +53,23 @@ describe('UpdatesSection', () => {
     await waitFor(() => expect(fakeApi.setUpdateAutoCheck).toHaveBeenCalledWith(false));
   });
 
+  it('warns (and leaves state untouched) when "Check now" fails, instead of failing silently', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fakeApi.checkForUpdates.mockRejectedValue(new Error('check network error'));
+    renderWithApi();
+    await waitFor(() => expect(fakeApi.getUpdateStatus).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: /check/i }));
+    await waitFor(() => expect(fakeApi.checkForUpdates).toHaveBeenCalled());
+    await waitFor(() => expect(warn).toHaveBeenCalledWith('check for updates failed:', expect.any(Error)));
+
+    // No optimistic status mutation happens for a check, so a rejection
+    // leaves the prior "up to date" state in place rather than a false update.
+    expect(screen.getByText(/1\.4\.0/)).toBeInTheDocument();
+    expect(screen.queryByText(/1\.5\.0/)).toBeNull();
+    warn.mockRestore();
+  });
+
   it('rolls back the toggle when setUpdateAutoCheck fails, instead of leaving a false "success"', async () => {
     fakeApi.setUpdateAutoCheck.mockRejectedValue(new Error('network'));
     renderWithApi();

@@ -32,7 +32,14 @@ class PostRunHook:
         if not project_uuid:
             return
         reports = Path(self._reports_root) if self._reports_root is not None else _default_reports_root()
-        self.cleanup_clone(project_uuid, reports)
+        try:
+            self.cleanup_clone(project_uuid, reports)
+        except Exception:
+            _logger.warning(
+                "Post-run cleanup failed for job %s — ephemeral clone may be left behind",
+                job_id,
+                exc_info=True,
+            )
         try:
             self.project_events(job_id, job, reports)
         except Exception:

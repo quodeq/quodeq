@@ -129,11 +129,13 @@ function useKeyNav(stopAuto, stepPhrase) {
 
 function useAutoAdvance(stepPhrase, setRightAuto, setLeftPress, setRightPress) {
   const autoRef = useRef(null);
+  const innerAutoRef = useRef(null);
   const autoEnabledRef = useRef(true);
 
   const stopAuto = useCallback(() => {
     autoEnabledRef.current = false;
     clearTimeout(autoRef.current);
+    clearTimeout(innerAutoRef.current);
     setRightAuto(false);
     setLeftPress(false);
     setRightPress(false);
@@ -145,11 +147,22 @@ function useAutoAdvance(stepPhrase, setRightAuto, setLeftPress, setRightPress) {
     autoRef.current = setTimeout(() => {
       if (!autoEnabledRef.current) return;
       setRightAuto(true);
-      setTimeout(() => { setRightAuto(false); stepPhrase(1); scheduleAuto(); }, TRANSITION_MS);
+      innerAutoRef.current = setTimeout(() => {
+        if (!autoEnabledRef.current) return;
+        setRightAuto(false); stepPhrase(1); scheduleAuto();
+      }, TRANSITION_MS);
     }, AUTO_ADVANCE_MS);
   }, [stepPhrase, setRightAuto]);
 
-  useEffect(() => { autoEnabledRef.current = true; scheduleAuto(); return () => clearTimeout(autoRef.current); }, [scheduleAuto]);
+  useEffect(() => {
+    autoEnabledRef.current = true;
+    scheduleAuto();
+    return () => {
+      autoEnabledRef.current = false;
+      clearTimeout(autoRef.current);
+      clearTimeout(innerAutoRef.current);
+    };
+  }, [scheduleAuto]);
 
   return { stopAuto, scheduleAuto };
 }

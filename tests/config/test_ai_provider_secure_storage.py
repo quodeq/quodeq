@@ -67,6 +67,26 @@ class TestStoreApiKeySecure:
 
         assert result is False
 
+    def test_out_of_scope_error_propagates(self, paths, monkeypatch):
+        """Cluster 13 (R-FT-7): the cleartext-fallback except was narrowed
+        from bare `Exception` to `(OSError, ValueError)` — the realistic
+        surface of `_write_env`/`_ensure_gitignore`'s file I/O plus
+        `_validate_env_write`'s ValueError for malformed input (see
+        `test_provider_without_an_api_key_var_is_rejected_cleanly` below).
+        Anything else (e.g. a programming bug raising TypeError) must now
+        propagate instead of being silently swallowed."""
+        def raise_keyring_error(service, provider, key):
+            raise keyring.errors.KeyringError("no backend")
+
+        def raise_type_error(*args, **kwargs):
+            raise TypeError("not an I/O or validation failure")
+
+        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
+        monkeypatch.setattr(ai_provider, "_write_env", raise_type_error)
+
+        with pytest.raises(TypeError):
+            store_api_key_secure("claude", "sk-doomed")
+
     def test_unknown_provider_derives_env_var_name(self, paths, monkeypatch):
         def raise_keyring_error(service, provider, key):
             raise keyring.errors.KeyringError("no backend")

@@ -41,12 +41,15 @@ class DashboardLifecycleMixin:
             return
         # Launches the dashboard app (or brings the existing window to the
         # front via its socket IPC) by re-executing our own binary.
-        subprocess.Popen(
-            _dashboard_cmd(["--no-build", "--port", str(port)]),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        try:
+            subprocess.Popen(
+                _dashboard_cmd(["--no-build", "--port", str(port)]),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as e:
+            self._set_error(f"Failed: {e}")
 
     def _on_start(self, _):
         threading.Thread(target=self._do_start, daemon=True).start()

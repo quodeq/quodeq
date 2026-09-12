@@ -169,12 +169,28 @@ def rescore_with_fallback(
             try:
                 # No log= kwarg: tests patch _project_all_runs wholesale with a
                 # bare (project_dir) side_effect, so the call site must stay
-                # single-positional-arg compatible.
+                # single-positional-arg compatible. NULL_LOG default means an
+                # individual run's own projection failure is already logged
+                # at warning by _project_all_runs itself (it falls back to
+                # this module's _logger when no log is injected).
                 _project_all_runs(proj_dir)
+            except Exception as exc:  # noqa: BLE001 -- last-resort fallback: a failure that
+                # escapes _project_all_runs itself (e.g. a directory-listing
+                # or repo-factory error, not an individual run's projection,
+                # which _project_all_runs already handles per-run) would
+                # otherwise only reach ThreadBackgroundRunner.submit's own
+                # debug-level swallow -- invisible at this process's default
+                # INFO level (shared/logging.py). Log at warning here,
+                # matching the level _project_all_runs itself already uses
+                # for per-run failures, so this stays visible in production.
+                _logger.warning(
+                    "Background projection fallback failed for project %r "
+                    "(run_id=%r): %s", project, run_id, exc,
+                )
             finally:
                 lock.release()
 
-        (runner or ThreadBackgroundRunner()).submit(
+        (runner or ThreadBackgroundRunner(log=_logger)).submit(
             _bg_project, name=f"rescore-project-{project}",
         )
     return scores

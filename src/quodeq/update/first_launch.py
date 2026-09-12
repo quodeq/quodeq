@@ -60,7 +60,10 @@ def offer_move_to_applications(
         if copied.returncode != 0:
             _logger.warning("move to Applications failed: %s", copied.stderr)
             return False
-        runner(["open", "-n", str(dest)], capture_output=True, text=True, encoding="utf-8")
+        relaunched = runner(["open", "-n", str(dest)], capture_output=True, text=True, encoding="utf-8")
+        if relaunched.returncode != 0:
+            _logger.warning("relaunch from Applications failed: %s", relaunched.stderr)
+            return False
         return True
     except Exception:
         _logger.debug("move-to-Applications offer failed", exc_info=True)

@@ -43,7 +43,7 @@ def _fetch_running_evaluation(base_url: str) -> dict | None:
         req = urllib.request.Request(f"{base_url}/api/evaluations/active")
         with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
             job = json.loads(resp.read())
-    except Exception:
+    except (OSError, ValueError):
         return None
     return job if isinstance(job, dict) else None
 
@@ -116,7 +116,7 @@ def _download_via_dialog(window: object, base_url: str, path: str, filename: str
         with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
             Path(save_path).write_bytes(resp.read())
         return True
-    except (OSError, Exception):
+    except OSError:
         return False
 
 

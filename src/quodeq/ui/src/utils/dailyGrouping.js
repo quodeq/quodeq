@@ -146,6 +146,7 @@ export function collectPeriodDimensions(trend, selectedRunId, granularity = 'day
  */
 export function buildPeriodRuns(availableRuns, trend, granularity = 'day') {
   if (!availableRuns || !availableRuns.length) return [];
+  if (!Array.isArray(trend)) return [];
   const trendMap = new Map(trend.map((r) => [r.runId, r]));
   const byBucket = [];
   let lastKey = null;

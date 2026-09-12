@@ -149,8 +149,11 @@ def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
         if run_dir.is_dir():
             writer = RunLogWriter(run_dir)
             ctx.run_log_writers[job_id] = writer
-            for pending in ctx.pre_marker_buffer.get(job_id, []):
-                writer.write(pending)
+            try:
+                for pending in ctx.pre_marker_buffer.get(job_id, []):
+                    writer.write(pending)
+            except (IOError, BrokenPipeError) as exc:
+                ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
             ctx.pre_marker_buffer[job_id] = []
 
 

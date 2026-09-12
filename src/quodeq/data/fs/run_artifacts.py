@@ -8,9 +8,11 @@ nothing here may swallow one.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
 
@@ -41,7 +43,19 @@ def copy_matching_files(src_dir: Path, dest_dir: Path, pattern: str) -> None:
 
 
 def replace_json_file(path: Path, data: dict) -> None:
-    """Write *data* as JSON via a same-directory temp file + atomic replace."""
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data), encoding="utf-8")
-    os.replace(tmp, path)
+    """Write *data* as JSON via a same-directory temp file + atomic replace.
+
+    Uses ``tempfile.mkstemp`` (not a fixed ``.tmp`` suffix) so concurrent
+    writers to the same *path* never collide on the same temp name.
+    """
+    fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    cleanup_tmp: str | None = tmp_path
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data))
+        os.replace(tmp_path, str(path))
+        cleanup_tmp = None  # ownership transferred to final path
+    finally:
+        if cleanup_tmp is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(cleanup_tmp)

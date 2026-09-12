@@ -121,7 +121,7 @@ class EventLogReader:
         try:
             for event in self.stream():
                 last_ts = event.timestamp
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             _logger.error(f"Failed to retrieve latest timestamp from {self.log_path}: {e}")
         
         return last_ts

@@ -172,7 +172,7 @@ def _request_app_exit() -> None:
         try:
             callback()
             return
-        except Exception:
+        except Exception:  # noqa: BLE001 - shutdown callback is best-effort
             _logger.debug("shutdown callback failed", exc_info=True)
     # Give the HTTP response that reported "relaunching" time to flush.
     threading.Timer(0.5, lambda: os._exit(0)).start()

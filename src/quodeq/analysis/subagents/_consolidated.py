@@ -1,6 +1,7 @@
 """Consolidated multi-dimension analysis — extracted from subagents/runner.py."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,8 @@ from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.analysis._runner_markers import cleanup_stream
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -79,8 +82,8 @@ def _collect_consolidated_results(
     if queue_path.exists():
         try:
             analyzed |= set(FileQueue(queue_path).all_taken_files())
-        except (OSError, ValueError, KeyError):
-            pass
+        except (OSError, ValueError, KeyError) as exc:
+            _logger.warning("Could not read taken files from consolidated queue %s: %s", queue_path, exc)
 
     # V2 cache owns incremental state via per-file entries written
     # during dispatch; the V1 per-dimension fingerprint write is no

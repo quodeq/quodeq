@@ -105,7 +105,7 @@ def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     reports_root = Path(evaluations_dir).resolve()
     try:
         runs = list_runs(reports_root, project)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - unable to list runs, return None to use fallback
         _logger.warning("Failed to resolve default run for %s: %s", project, exc)
         return None
     if not runs:

@@ -74,3 +74,43 @@ class TestReplaceJsonFile:
         path.write_text('{"old": true}')
         replace_json_file(path, {"new": 1})
         assert json.loads(path.read_text()) == {"new": 1}
+
+    def test_temp_file_is_not_the_predictable_name(self, tmp_path, monkeypatch):
+        # The old implementation used path.with_suffix(path.suffix + ".tmp"),
+        # a fixed, predictable name two concurrent writers could collide on.
+        # mkstemp must be used instead, so capture the name it hands back.
+        import quodeq.data.fs.run_artifacts as run_artifacts_mod
+
+        seen_tmp_paths = []
+        real_mkstemp = run_artifacts_mod.tempfile.mkstemp
+
+        def spying_mkstemp(*args, **kwargs):
+            fd, tmp_path_str = real_mkstemp(*args, **kwargs)
+            seen_tmp_paths.append(tmp_path_str)
+            return fd, tmp_path_str
+
+        monkeypatch.setattr(run_artifacts_mod.tempfile, "mkstemp", spying_mkstemp)
+
+        path = tmp_path / "published.json"
+        predictable_name = str(path.with_suffix(path.suffix + ".tmp"))
+        replace_json_file(path, {"a": 1})
+
+        assert len(seen_tmp_paths) == 1
+        assert seen_tmp_paths[0] != predictable_name
+        # Atomically replaced: only the final file remains, no leftover temp.
+        assert list(tmp_path.iterdir()) == [path]
+
+    def test_temp_file_cleaned_up_on_write_failure(self, tmp_path, monkeypatch):
+        import quodeq.data.fs.run_artifacts as run_artifacts_mod
+
+        def boom(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(run_artifacts_mod.os, "replace", boom)
+
+        path = tmp_path / "published.json"
+        with pytest.raises(OSError):
+            replace_json_file(path, {"a": 1})
+
+        # No leftover temp file, and the destination was never created.
+        assert list(tmp_path.iterdir()) == []

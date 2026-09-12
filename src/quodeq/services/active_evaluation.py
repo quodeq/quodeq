@@ -65,7 +65,7 @@ def find_active_evaluation(
         data = provider.list_projects(reports_dir)
         projects = data.get("projects", []) if isinstance(data, dict) else []
         project_ids = {_project_id(p) for p in projects}
-    except Exception:
+    except Exception:  # noqa: BLE001 - transient glitch in project list: fall back to first running job
         return running[0]
     for j in running:
         project = _job_project(j)

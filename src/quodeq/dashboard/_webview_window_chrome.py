@@ -39,7 +39,7 @@ def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
         try:
             nswindow.setAppearance_(NSAppearance.appearanceNamed_(name))
         except (AttributeError, ValueError):
-            pass
+            _logger.debug("titlebar appearance toggle failed", exc_info=True)
 
     AppHelper.callAfter(_apply)
 
@@ -73,7 +73,7 @@ def _show_macos_traffic_lights(window: object) -> None:
                 if btn is not None:
                     btn.setHidden_(False)
             except (AttributeError, ValueError):
-                pass
+                _logger.debug("traffic light visibility toggle failed", exc_info=True)
 
     AppHelper.callAfter(_apply)
 
@@ -117,7 +117,7 @@ def _set_macos_unified_toolbar(window: object) -> None:
         try:
             _apply_unified_toolbar(nswindow)
         except (AttributeError, ValueError, TypeError):
-            pass
+            _logger.debug("unified toolbar installation failed", exc_info=True)
 
     AppHelper.callAfter(_apply)
 
@@ -161,4 +161,4 @@ def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
             if res == 0:
                 return
     except (AttributeError, OSError):
-        pass
+        _logger.debug("Windows titlebar DWM configuration failed", exc_info=True)

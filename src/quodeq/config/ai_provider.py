@@ -246,7 +246,7 @@ def _store_api_key(provider: str, api_key: str) -> tuple[bool, bool]:
         _write_env(paths, None, _api_key_var_for(provider), api_key)
         _ensure_gitignore(paths)
         return True, False
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log_error(f"Failed to store API key for '{provider}': {exc}")
         return False, False
 
@@ -268,7 +268,7 @@ def get_api_key_secure(provider: str) -> str | None:
         value = keyring.get_password(_KEYRING_SERVICE, provider)
         if value:
             return value
-    except Exception as exc:
+    except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
         log_debug(f"keyring lookup failed for '{provider}': {exc}")
 
     paths = default_paths()
