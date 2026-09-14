@@ -227,8 +227,8 @@ def dismissed_source_stamp(run_dir: Path) -> tuple[int, ...] | None:
     try:
         wal = db_path.with_name(db_path.name + "-wal").stat()
         wal_parts = (wal.st_size, wal.st_mtime_ns)
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("dismissed-source stamp unreadable: %s", exc)
     try:
         st = db_path.stat()
     except OSError:

@@ -117,8 +117,8 @@ class ContentIndex:
             if self._conn is not None:
                 try:
                     self._conn.close()
-                except sqlite3.Error:
-                    pass
+                except sqlite3.Error as exc:
+                    _logger.debug("cache index connection close failed: %s", exc)
                 self._conn = None
 
     # -- writes -----------------------------------------------------------

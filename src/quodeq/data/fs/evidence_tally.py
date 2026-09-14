@@ -8,12 +8,15 @@ appends from many parallel agents and contains overlapping findings.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 from quodeq.core.evidence._req_mapping import PrincipleResolver
 from quodeq.shared.utils import open_text
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -133,8 +136,8 @@ def tally_unique_findings(
                     violations += 1
                 elif kind == "compliance":
                     compliance += 1
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("evidence file unreadable during tally: %s", exc)
     return FindingTally(
         violations=violations, compliance=compliance,
         duplicates=duplicates, suppressed=hidden, quarantined=quarantined,

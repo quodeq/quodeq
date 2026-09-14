@@ -232,8 +232,8 @@ def _acquire_lock(lock: Path) -> bool:
 def _release_lock(lock: Path) -> None:
     try:
         lock.unlink(missing_ok=True)
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("cache migration lock release failed: %s", exc)
 
 
 def _migrate_locked(

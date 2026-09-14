@@ -178,8 +178,8 @@ def insert_vectors(
         _logger.warning("Precedent vector insert failed: %s", exc)
         try:
             conn.rollback()
-        except sqlite3.DatabaseError:
-            pass
+        except sqlite3.DatabaseError as exc:
+            _logger.debug("precedent vector insert skipped: %s", exc)
         return False
 
 
@@ -221,5 +221,5 @@ def release_backfill_claim(conn: sqlite3.Connection) -> None:
     try:
         conn.execute("DELETE FROM meta WHERE key = 'backfill_claim'")
         conn.commit()
-    except sqlite3.DatabaseError:
-        pass
+    except sqlite3.DatabaseError as exc:
+        _logger.debug("backfill claim release failed: %s", exc)

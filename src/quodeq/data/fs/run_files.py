@@ -188,8 +188,8 @@ def remove_matching_files(directory: Path, patterns: Sequence[str]) -> None:
         for victim in directory.glob(pattern):
             try:
                 victim.unlink()
-            except FileNotFoundError:
-                pass
+            except FileNotFoundError as exc:
+                _logger.debug("file already removed: %s", exc)
             except OSError as exc:
                 _logger.warning("Could not discard %s: %s", victim, exc)
 
