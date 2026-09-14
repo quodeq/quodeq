@@ -11,6 +11,8 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from quodeq.core.observability import NULL_LOG, LogSink
+
 _FILENAME = "shared.json"
 
 
@@ -48,7 +50,7 @@ def read_settings(env: dict | None = None) -> SharedSettings:
     return settings
 
 
-def write_settings(settings: SharedSettings, env: dict | None = None) -> None:
+def write_settings(settings: SharedSettings, env: dict | None = None, *, log: LogSink = NULL_LOG) -> None:
     """Write shared settings atomically to disk, fail-silent on error."""
     path = shared_settings_path(env=env)
     try:
@@ -56,8 +58,8 @@ def write_settings(settings: SharedSettings, env: dict | None = None) -> None:
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(asdict(settings)), encoding="utf-8")
         os.replace(tmp, path)
-    except OSError:
+    except OSError as exc:
         # Fail-soft: not worth a 500 on the config routes. A lost write is
         # not silent, status reads come from this file, so the UI shows
         # whatever was actually persisted.
-        pass
+        log.debug(f"shared settings write failed (fail-soft): {exc}")

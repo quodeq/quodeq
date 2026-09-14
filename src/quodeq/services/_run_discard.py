@@ -35,6 +35,7 @@ def _wait_for_terminal_status(
     *,
     timeout_s: float = _CANCEL_WAIT_TIMEOUT_S,
     poll_interval_s: float = _CANCEL_WAIT_POLL_S,
+    log: LogSink = NULL_LOG,
 ) -> bool:
     """Block until ``run_dir/status.json`` reports a terminal state, or timeout.
 
@@ -53,13 +54,16 @@ def _wait_for_terminal_status(
     """
     deadline = time.monotonic() + timeout_s
     status_path = run_dir / "status.json"
+    logged = False
     while True:
         try:
             data = json.loads(status_path.read_text(encoding="utf-8"))
             if isinstance(data, dict) and data.get("state") in _TERMINAL_RUN_STATES:
                 return True
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as exc:
+            if not logged:
+                log.debug(f"status.json not yet readable while waiting for a terminal state: {exc}")
+                logged = True
         if time.monotonic() >= deadline:
             return False
         time.sleep(poll_interval_s)

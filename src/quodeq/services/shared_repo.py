@@ -7,6 +7,7 @@ code imports ``quodeq.data.fs.shared_repo`` directly.
 """
 from __future__ import annotations
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.shared_repo import (  # noqa: F401 — re-exported API
     check_repo_format,
     clone_lock,
@@ -26,7 +27,7 @@ from quodeq.data.fs.shared_repo import (  # noqa: F401 — re-exported API
 from quodeq.services.shared_settings import SharedSettings, read_settings, write_settings
 
 
-def disconnect_shared_repo() -> None:
+def disconnect_shared_repo(*, log: LogSink = NULL_LOG) -> None:
     """Disconnect the configured shared repository, removing its clone from disk.
 
     Moved verbatim from the DELETE /api/shared/config route body (Task 20)
@@ -52,7 +53,7 @@ def disconnect_shared_repo() -> None:
     leaving a partially-deleted .git that doesn't self-heal.
     """
     settings = read_settings()
-    write_settings(SharedSettings(url=None))
+    write_settings(SharedSettings(url=None), log=log)
     if settings.url is not None:
         with clone_lock(settings.url):
             remove_clone_dir(shared_cache_dir(settings.url))

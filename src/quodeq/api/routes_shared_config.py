@@ -13,6 +13,7 @@ from quodeq.services.shared_connect import connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status
 from quodeq.services.shared_repo import disconnect_shared_repo, last_synced_at, read_state
 from quodeq.services.shared_settings import read_settings
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
 from .helpers import error_response
@@ -60,7 +61,7 @@ def register_shared_config_routes(app: Flask) -> None:
         if not url:
             body, status = error_response("url is required", 400, "URL_REQUIRED")
             return jsonify(body), status
-        outcome = connect_shared_repo(url)
+        outcome = connect_shared_repo(url, log=SHARED_LOG)
         if outcome.status == "invalid_url":
             return jsonify({"error": outcome.detail}), 400
         if outcome.status == "clone_failed":
@@ -90,7 +91,7 @@ def register_shared_config_routes(app: Flask) -> None:
     def shared_config_delete() -> Response:
         # Ordering + locking business rule lives in
         # services/shared_repo.disconnect_shared_repo (Task 20).
-        disconnect_shared_repo()
+        disconnect_shared_repo(log=SHARED_LOG)
         return jsonify({"configured": False})
 
     @app.post("/api/shared/refresh")

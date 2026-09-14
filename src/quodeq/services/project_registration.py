@@ -9,9 +9,11 @@ Split (Task 12) into two sibling modules plus this orchestrator:
 """
 from __future__ import annotations
 
+import functools
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._wiring import (
@@ -110,7 +112,7 @@ def _sync_repo_index_on_create(
     add_repo_index_entry(reports_path, project_name, repo_resolved, scope_path, project_uuid)
 
 
-def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
+def _rollback_new_dirs(reports_root: str, before: set[str], *, log: LogSink = NULL_LOG) -> None:
     """Delete any project directories created since *before* was captured."""
     reports_path = Path(reports_root)
     if not reports_path.is_dir():
@@ -118,16 +120,16 @@ def _rollback_new_dirs(reports_root: str, before: set[str]) -> None:
     after = {p.name for p in reports_path.iterdir() if p.is_dir()}
     for new in after - before:
         try:
-            shutil.rmtree(reports_path / new, ignore_errors=True)
-        except OSError:
-            pass
+            shutil.rmtree(reports_path / new)
+        except OSError as exc:
+            log.warning(f"registration rollback could not remove {reports_path / new}: {exc}")
 
 
 def _rollback_and_report(
-    reports_dir: str, before: set[str], status: str, message: str = "", **extra,
+    rollback: Callable[[], None], status: str, message: str = "", **extra,
 ) -> CreateProjectResult:
-    """Roll back any partial project dirs and build the failure result."""
-    _rollback_new_dirs(reports_dir, before)
+    """Run *rollback*, then build the failure result."""
+    rollback()
     return CreateProjectResult(status=status, message=message, **extra)
 
 
@@ -154,6 +156,7 @@ def register_project_with_rollback(
 
     reports_root_path = Path(reports_dir)
     before = _snapshot_project_dirs(reports_root_path)
+    rollback = functools.partial(_rollback_new_dirs, reports_dir, before, log=log)
 
     try:
         project_uuid = register_project(
@@ -167,10 +170,10 @@ def register_project_with_rollback(
             log=log,
         )
     except (FileNotFoundError, ValueError) as exc:
-        return _rollback_and_report(reports_dir, before, "invalid_repo", str(exc))
+        return _rollback_and_report(rollback, "invalid_repo", str(exc))
     except CloneError as exc:
         return _rollback_and_report(
-            reports_dir, before, "clone_failed", str(exc), clone_error_kind=exc.kind,
+            rollback, "clone_failed", str(exc), clone_error_kind=exc.kind,
         )
     except Exception as exc:
         # error_response (route layer) swallows the traceback Flask's own 500
@@ -178,7 +181,7 @@ def register_project_with_rollback(
         # generic, no-detail result (the exception text can carry filesystem
         # paths or backend internals that must not reach the remote caller).
         log.error(f"Registration failed for repo={_strip_credentials(spec.repo)!r}: {exc}")
-        return _rollback_and_report(reports_dir, before, "internal_error")
+        return _rollback_and_report(rollback, "internal_error")
 
     # scan.json is now always present after register_project succeeds.
     project_dir = reports_root_path / project_uuid

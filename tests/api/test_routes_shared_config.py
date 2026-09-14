@@ -48,7 +48,7 @@ def test_put_shared_config_missing_url_has_code(client):
 def test_put_shared_config_clone_failed_has_code(client, monkeypatch):
     monkeypatch.setattr(
         "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url: ConnectOutcome(status="clone_failed", url=url),
+        lambda url, **_kwargs: ConnectOutcome(status="clone_failed", url=url),
     )
     resp = client.put(
         "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
@@ -60,7 +60,7 @@ def test_put_shared_config_clone_failed_has_code(client, monkeypatch):
 def test_put_shared_config_foreign_repo_has_code(client, monkeypatch):
     monkeypatch.setattr(
         "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url: ConnectOutcome(status="foreign", url=url),
+        lambda url, **_kwargs: ConnectOutcome(status="foreign", url=url),
     )
     resp = client.put(
         "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN
@@ -72,7 +72,7 @@ def test_put_shared_config_foreign_repo_has_code(client, monkeypatch):
 def test_put_shared_config_unsupported_version_has_code(client, monkeypatch):
     monkeypatch.setattr(
         "quodeq.api.routes_shared_config.connect_shared_repo",
-        lambda url: ConnectOutcome(status="unsupported_version", url=url),
+        lambda url, **_kwargs: ConnectOutcome(status="unsupported_version", url=url),
     )
     resp = client.put(
         "/api/shared/config", json={"url": "https://example.invalid/x.git"}, headers=_ORIGIN

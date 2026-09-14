@@ -190,7 +190,7 @@ class FilesystemActionProvider(ActionProvider):
     # -- reports (delegate to _fs_reports) ------------------------------
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
-        return _fs_reports.get_dashboard(reports_dir, project, run)
+        return _fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
 
     def get_accumulated(
         self, reports_dir: str, project: str, as_of: str | None,
@@ -205,7 +205,7 @@ class FilesystemActionProvider(ActionProvider):
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
-        return _fs_reports.get_violations(reports_dir, project, run_id)
+        return _fs_reports.get_violations(reports_dir, project, run_id, log=SHARED_LOG)
 
     # -- tooling (delegate to FsToolingMixin) ---------------------------
 
