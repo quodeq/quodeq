@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.observability import LogSink
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
 from quodeq.data.fs.run_status_store import RunState, TERMINAL_STATES, read_status
 
@@ -34,25 +34,26 @@ if hasattr(signal, "SIGHUP"):
 class _SignalGuard:
     """Install *handler* on the run's signals; restore the originals after."""
 
-    def __init__(self, handler: Any) -> None:
+    def __init__(self, handler: Any, *, log: LogSink = NULL_LOG) -> None:
         self._handler = handler
         self._previous: dict[int, Any] = {}
+        self._log = log
 
     def install(self) -> None:
         for sig in _SIGNALS_TO_HANDLE:
             try:
                 self._previous[sig] = signal.getsignal(sig)
                 signal.signal(sig, self._handler)
-            except (OSError, ValueError):
+            except (OSError, ValueError) as exc:
                 # Can fail in non-main threads; tests may run under such a case.
-                pass
+                self._log.debug(f"signal handler for {sig!r} not installed: {exc}")
 
     def restore(self) -> None:
         for sig, prev in self._previous.items():
             try:
                 signal.signal(sig, prev)
-            except (OSError, ValueError):
-                pass
+            except (OSError, ValueError) as exc:
+                self._log.debug(f"signal handler for {sig!r} not restored: {exc}")
         self._previous.clear()
 
 

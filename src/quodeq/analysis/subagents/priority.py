@@ -23,6 +23,7 @@ from quodeq.analysis.subagents.priority_scoring import (
     compute_fan_in,
     compute_previous_violations,
 )
+from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-export everything that consumers import from this module
 __all__ = [
@@ -51,6 +52,7 @@ class PriorityContext:
     language: str | None = None
     evidence_dir: Path | None = None
     config: Any = None
+    log: LogSink = NULL_LOG
 
 
 def prioritize_files(
@@ -65,6 +67,7 @@ def prioritize_files(
     language = context.language if context else None
     evidence_dir = context.evidence_dir if context else None
     config = context.config if context else None
+    log = context.log if context else NULL_LOG
     priority_config = load_priority_config()
     fan_in_divisor = priority_config.get("fan_in_divisor", _DEFAULT_FAN_IN_DIVISOR)
     fan_in_max = priority_config.get("fan_in_max", _DEFAULT_FAN_IN_MAX)
@@ -78,7 +81,7 @@ def prioritize_files(
     inputs = ScoringInputs(
         fan_in=fan_in, fan_in_divisor=fan_in_divisor, fan_in_max=fan_in_max,
         git_scores=git_scores, prev_violations=prev_violations,
-        max_prev_violations=max_prev_violations,
+        max_prev_violations=max_prev_violations, log=log,
     )
     scored = _score_files(files, src, dimension, category, inputs)
     scored.sort(key=lambda x: (-x[0], x[1]))
@@ -96,8 +99,8 @@ def _score_files(
         file_size = 0
         try:
             file_size = (src / f).stat().st_size
-        except OSError:
-            pass
+        except OSError as exc:
+            inputs.log.debug(f"file size unavailable for {f}: {exc}")
         dim_boost = compute_dimension_boost(f, dimension, file_size=file_size)
         fi_raw = inputs.fan_in.get(f, 0)
         fi_score = min(inputs.fan_in_max, fi_raw / inputs.fan_in_divisor) if fi_raw > 0 else 0
