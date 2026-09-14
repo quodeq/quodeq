@@ -11,7 +11,12 @@ def test_no_new_fault_tolerance_violations():
     new = current - baseline
     assert not new, (
         f"New fault-tolerance violations (fix the except handler, don't "
-        f"grandfather it): {sorted(new)}"
+        f"grandfather it): {sorted(new)}. One legitimate exception: if you "
+        "added a log line to a grandfathered `except Exception: pass`, the "
+        "site re-keys from empty-except to broad-except -- that is an "
+        "improvement, not a new violation. Rename the existing baseline "
+        "entry's kind (and fix its line number if it moved); do not add a "
+        "second entry."
     )
 
 
@@ -34,8 +39,9 @@ def test_baseline_has_no_stale_entries():
 # without a justification reviewed in the PR that raises it.
 # 221 = 219 (final review baseline) + 2 `suppress` entries grandfathered when
 # the scanner was extended to see contextlib.suppress() (final review item D,
-# fault-tolerance cycle 1 fix wave): dashboard/_webview_token.py:85 and
-# data/fs/run_artifacts.py:60, both pre-existing, previously invisible.
+# fault-tolerance cycle 1 fix wave): dashboard/_webview_token.py:85
+# (pre-existing) and data/fs/run_artifacts.py:60 (added by cluster 28 of the
+# same cycle, before the scanner could see suppress); both previously invisible.
 BASELINE_CEILING = 221  # set to the count --update-baseline printed in Step 1
 
 

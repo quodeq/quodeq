@@ -1,6 +1,7 @@
 """Import routes for the Standards Browser & Editor."""
 from __future__ import annotations
 
+import http.client
 import logging
 from pathlib import Path
 
@@ -28,7 +29,9 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
     except StandardImportConflictError as exc:
         logger.warning("Library import conflict: %s", exc)
         return error_response("Import conflict", 409, "conflict")
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, http.client.HTTPException) as exc:
+        # See list_library: HTTPException is urllib's truncated/malformed
+        # response family and is not an OSError.
         logger.warning("Library import failed: %s", exc)
         return error_response(
             "Import from library failed. Check that the library server is reachable and the standard file is valid.",

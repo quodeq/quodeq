@@ -49,6 +49,8 @@ class StandardsLibraryClient:
     def fetch_index(self) -> list[dict]:
         """Retrieve the remote standards library index."""
         data = self._http.get_json(f"{self._base_url}/index.json", headers=self._headers())
+        if not isinstance(data, dict):
+            raise ValueError(f"Library index is not a JSON object: {type(data).__name__}")
         return data.get("standards", [])
 
     def fetch_standard(self, file_path: str) -> dict:
@@ -65,6 +67,8 @@ class StandardsLibraryClient:
         if ".." in file_path:
             raise ValueError(f"Invalid library file path: {file_path}")
         data = self.fetch_standard(file_path)
+        if not isinstance(data, dict):
+            raise ValueError(f"Library standard is not a JSON object: {file_path}")
         self._validate_id(data.get("id", ""))
         content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:_HASH_PREFIX_LEN]
         try:

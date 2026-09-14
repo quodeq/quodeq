@@ -123,7 +123,10 @@ _ALT_PORT_ORIGINS = alt_port_origins()
 # window boundary under concurrent requests is harmless: it's a diagnostic
 # throttle, not a correctness guarantee.
 _CSP_WS_FAILURE_LOG_INTERVAL_S = 60.0
-_last_csp_ws_failure_log_at = 0.0
+# None, not 0.0: time.monotonic() is seconds-since-boot, so a 0.0 sentinel
+# would silently drop the first failure on any machine up for less than the
+# interval (a desktop app launched at login).
+_last_csp_ws_failure_log_at: float | None = None
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
@@ -221,7 +224,10 @@ def _log_csp_ws_failure(exc: Exception) -> None:
     """
     global _last_csp_ws_failure_log_at
     now = time.monotonic()
-    if now - _last_csp_ws_failure_log_at < _CSP_WS_FAILURE_LOG_INTERVAL_S:
+    if (
+        _last_csp_ws_failure_log_at is not None
+        and now - _last_csp_ws_failure_log_at < _CSP_WS_FAILURE_LOG_INTERVAL_S
+    ):
         return
     _last_csp_ws_failure_log_at = now
     try:

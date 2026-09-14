@@ -30,6 +30,24 @@ def test_fetch_index():
     assert len(index) == 1
     assert index[0]["id"] == "clean-arch"
 
+def test_fetch_index_rejects_non_object_body():
+    # A library server answering with valid JSON that is not an object is a
+    # transport/format failure and must surface as ValueError (which the
+    # routes map to 502), not AttributeError on data.get(...).
+    http = FakeHttpClient({"https://example.com/index.json": ["not", "an", "object"]})
+    client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
+    with pytest.raises(ValueError):
+        client.fetch_index()
+
+
+def test_import_standard_rejects_non_object_body(tmp_path):
+    http = FakeHttpClient({"https://example.com/standards/clean-arch.json": "just a string"})
+    client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
+    with pytest.raises(ValueError) as excinfo:
+        client.import_standard("standards/clean-arch.json", tmp_path)
+    assert not isinstance(excinfo.value, StandardImportConflictError)
+
+
 def test_fetch_standard():
     http = FakeHttpClient({"https://example.com/standards/clean-arch.json": STANDARD_DATA})
     client = StandardsLibraryClient(base_url="https://example.com", http_client=http)

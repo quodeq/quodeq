@@ -1,6 +1,7 @@
 """GET routes for the Standards Browser & Editor."""
 from __future__ import annotations
 
+import http.client
 import logging
 import os
 import threading
@@ -91,7 +92,10 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
             return jsonify([])
         try:
             index = library.fetch_index()
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            # OSError covers urllib/ssl transport errors, ValueError covers
+            # JSON decode and a non-object body; HTTPException (IncompleteRead,
+            # BadStatusLine, ...) is urllib's own family and NOT an OSError.
             logger.warning("Failed to fetch library index: %s", exc)
             return error_response("Failed to connect to standards library", 502, "library_error")
         return jsonify(index)

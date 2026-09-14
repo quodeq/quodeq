@@ -28,7 +28,7 @@ def _boom(_host: str) -> str:
 def _reset_throttle(monkeypatch) -> None:
     # Each test gets a fresh cooldown window regardless of module import
     # order / earlier tests in the same process.
-    monkeypatch.setattr(security_module, "_last_csp_ws_failure_log_at", 0.0)
+    monkeypatch.setattr(security_module, "_last_csp_ws_failure_log_at", None)
 
 
 @pytest.fixture
@@ -101,6 +101,34 @@ def test_csp_header_failure_log_is_rate_limited_across_responses(monkeypatch, se
     assert len(matching) == 1, (
         "5 consecutive failures inside the cooldown window must log once, "
         f"not per-response; got {len(matching)}"
+    )
+
+
+def test_csp_header_first_failure_logs_on_freshly_booted_machine(monkeypatch, security_caplog):
+    """Post-PR review M1: the throttle's "never logged yet" state must not be
+    a plain 0.0, because time.monotonic() is seconds-since-boot on every
+    platform we ship to. On a machine up for less than the cooldown window
+    (a desktop app launched at login), ``now - 0.0 < 60`` was true and the
+    very first failure was silently dropped -- the exact silence this site
+    was fixed to remove.
+    """
+    import types
+
+    caplog = security_caplog
+    monkeypatch.setattr(security_module, "_same_origin_ws_sources", _boom)
+    monkeypatch.setattr(security_module, "_last_csp_ws_failure_log_at", None)
+    # Clock says the machine has been up for 5 s.
+    monkeypatch.setattr(security_module, "time", types.SimpleNamespace(monotonic=lambda: 5.0))
+
+    app = create_app()
+    with app.test_client() as client:
+        resp = client.get("/api/health")
+
+    assert resp.status_code == 200
+    matching = [r for r in caplog.records if _FAILURE_MARKER in r.message]
+    assert len(matching) == 1, (
+        "the first failure after boot must be logged even when uptime < cooldown; "
+        f"got {len(matching)} records"
     )
 
 
