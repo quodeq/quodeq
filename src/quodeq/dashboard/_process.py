@@ -121,5 +121,5 @@ def _wait_for_process(proc: subprocess.Popen) -> None:
     while proc.poll() is None:
         try:
             proc.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            pass
+        except subprocess.TimeoutExpired as exc:
+            log_debug(f"dashboard process did not exit before the wait timeout: {exc}")

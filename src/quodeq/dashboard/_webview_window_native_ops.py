@@ -131,8 +131,8 @@ def _kill_api(pid: int) -> None:
     try:
         sig = signal.SIGTERM if sys.platform != "win32" else signal.CTRL_BREAK_EVENT
         os.kill(pid, sig)
-    except (OSError, ProcessLookupError):
-        pass
+    except (OSError, ProcessLookupError) as exc:
+        _logger.debug("action API process already gone or not killable: %s", exc)
 
 
 def _is_safe_reload_url(url: str) -> bool:
