@@ -37,13 +37,18 @@ import time
 from quodeq.services import mutation_rescore
 
 
-def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkeypatch):
+def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkeypatch, caplog):
     """Deterministic check of the wiring itself: production code (no
-    ``runner=`` injected) must construct its ThreadBackgroundRunner with the
-    module's own _logger, not the silent default. This is defense in depth
-    (see module docstring) -- it does not by itself make the common failure
-    path production-visible; the ``_bg_project`` warning-level catch below
-    does that.
+    ``runner=`` injected) must construct its ThreadBackgroundRunner with a
+    sink over the module's own _logger, not the silent default. This is
+    defense in depth (see module docstring) -- it does not by itself make the
+    common failure path production-visible; the ``_bg_project`` warning-level
+    catch below does that.
+
+    Post-PR review M6: the runner is typed ``log: LogSink`` and a bare
+    ``logging.Logger`` has no ``success``, so the module hands it a
+    ``LoggerSink`` wrapper. What matters is that lines written through that
+    sink still land on ``quodeq.services.mutation_rescore``.
     """
     captured = {}
     real_runner_cls = mutation_rescore.ThreadBackgroundRunner
@@ -62,7 +67,15 @@ def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkey
 
     mutation_rescore.rescore_with_fallback("evaluations", "cluster17-wiring-proj", None)
 
-    assert captured["log"] is mutation_rescore._logger
+    sink = captured["log"]
+    assert sink is mutation_rescore._log_sink
+    assert callable(getattr(sink, "success"))  # the LogSink surface a Logger lacks
+    with caplog.at_level(logging.DEBUG, logger=mutation_rescore._logger.name):
+        sink.debug("wiring probe")
+    assert any(
+        r.name == mutation_rescore._logger.name and r.getMessage() == "wiring probe"
+        for r in caplog.records
+    ), [r.getMessage() for r in caplog.records]
 
 
 def test_rescore_with_fallback_logs_background_projection_failure_at_warning(

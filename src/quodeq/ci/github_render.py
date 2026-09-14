@@ -1,7 +1,7 @@
 """Render violations into GitHub PR review comments, summary, and verdict."""
 from __future__ import annotations
 
-from quodeq.services.suppression_keys import _coerce_line
+from quodeq.shared.serialization import coerce_line
 
 
 def violation_to_comment(violation: dict, status: str = "new") -> dict:
@@ -30,7 +30,7 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
 
     line = violation.get("line")
     if line is not None:
-        comment["line"] = _coerce_line(line)
+        comment["line"] = coerce_line(line)
 
     return comment
 

@@ -6,6 +6,8 @@ logger it used to import directly -- without importing it.
 """
 from __future__ import annotations
 
+from typing import Protocol
+
 from quodeq.core.evidence import QuarantinedFinding
 from quodeq.core.observability import LogSink
 from quodeq.shared.logging import log_debug, log_error, log_info, log_success, log_warning
@@ -31,6 +33,42 @@ class SharedLog:
 
 
 SHARED_LOG: LogSink = SharedLog()
+
+
+class _StdlibLogger(Protocol):
+    """The slice of ``logging.Logger`` that ``LoggerSink`` delegates to."""
+
+    def info(self, msg: str) -> None: ...
+    def warning(self, msg: str) -> None: ...
+    def debug(self, msg: str) -> None: ...
+    def error(self, msg: str) -> None: ...
+
+
+class LoggerSink:
+    """LogSink over a stdlib logger, for outer-layer modules that already own one.
+
+    A ``logging.Logger`` is not a ``LogSink``: it has no ``success``. Passing
+    one where a sink is typed only works until the callee uses that level.
+    ``success`` maps to INFO here (stdlib has no such level).
+    """
+
+    def __init__(self, logger: _StdlibLogger) -> None:
+        self._logger = logger
+
+    def info(self, message: str) -> None:
+        self._logger.info(message)
+
+    def warning(self, message: str) -> None:
+        self._logger.warning(message)
+
+    def debug(self, message: str) -> None:
+        self._logger.debug(message)
+
+    def error(self, message: str) -> None:
+        self._logger.error(message)
+
+    def success(self, message: str) -> None:
+        self._logger.info(message)
 
 
 def log_quarantined_findings(

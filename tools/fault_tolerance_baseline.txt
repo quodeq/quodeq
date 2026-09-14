@@ -129,9 +129,9 @@ src/quodeq/dashboard/_webview_window_help_menu.py:165:broad-except
 src/quodeq/dashboard/_webview_window_help_menu.py:39:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:44:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:50:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:128:empty-except
-src/quodeq/dashboard/_webview_window_native_ops.py:158:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:71:broad-except
+src/quodeq/dashboard/_webview_window_native_ops.py:134:empty-except
+src/quodeq/dashboard/_webview_window_native_ops.py:164:broad-except
+src/quodeq/dashboard/_webview_window_native_ops.py:72:broad-except
 src/quodeq/dashboard/cli.py:88:broad-except
 src/quodeq/dashboard/runner.py:154:broad-except
 src/quodeq/dashboard/runner.py:172:broad-except
@@ -199,7 +199,7 @@ src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:155:broad-except
 src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/jobs.py:234:empty-except
-src/quodeq/services/mutation_rescore.py:177:broad-except
+src/quodeq/services/mutation_rescore.py:180:broad-except
 src/quodeq/services/project_registration.py:122:empty-except
 src/quodeq/services/project_registration.py:175:broad-except
 src/quodeq/services/shared_publish.py:141:broad-except

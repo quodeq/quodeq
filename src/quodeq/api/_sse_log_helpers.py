@@ -109,7 +109,7 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
         with open(path, "rb") as fh:
             fh.seek(offset)
             raw = fh.read(_tail_max_bytes())
-    except (FileNotFoundError, OSError):
+    except OSError:  # includes FileNotFoundError
         yield sse_line("log file unavailable", event="error")
         return offset, "error"
     text = raw.decode("utf-8", errors="replace")

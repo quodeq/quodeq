@@ -78,15 +78,6 @@ def _requirement_of(v: dict) -> str:
     return str(v.get("req") or v.get("requirement") or "")
 
 
-def _coerce_line(line) -> int:
-    # dismiss keys store line as int; Finding.line is typed int|str|None. Coerce
-    # so a string line ("5") still matches a stored int line (5).
-    try:
-        return int(line)
-    except (TypeError, ValueError):
-        return 0
-
-
 def _trim_violation(v: dict) -> dict:
     out = {k: v.get(k) for k in _VIOLATION_FIELDS}
     out["principle"] = _principle_of(v)

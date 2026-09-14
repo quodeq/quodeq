@@ -20,12 +20,26 @@ JS/TS are out of scope for this ratchet, see the cycle 1 design doc) with
     (`...`), or a docstring-only body
   - broad-except: catches Exception/BaseException (directly, via a
     qualified attribute, or inside a tuple of types) without re-raising
-  - suppress:     `with contextlib.suppress(...):` (or `with suppress(...):`,
-    or any `X.suppress(...)`) -- semantically an except-and-pass, just
-    spelled as a context manager instead of a try/except, so it is caught
-    the same way `broad-except`/`empty-except` are: grandfathered by line,
-    not narrowed by the suppressed types (that is a judgment call, not a
-    mechanical one)
+  - suppress:     any CALL of `suppress(...)`, `contextlib.suppress(...)` or
+    `X.suppress(...)` (X may be an import alias), wherever it appears: as
+    a `with` item, via `ExitStack.enter_context(...)`, or bound to a name
+    first. Semantically an except-and-pass spelled as a context manager, so
+    it is treated like `broad-except`/`empty-except`: grandfathered by line,
+    not narrowed by the suppressed types (a judgment call, not a mechanical
+    one). Keyed at the call's line.
+
+`broad-except` re-raise detection is a reachability-aware scan of the
+handler's TOP LEVEL: a `raise` after a `return` does not count, and a `raise`
+nested inside an `if`/`with`/`for` is not seen, so such a handler is flagged
+(conservative: lift the raise to the top level to clear it).
+
+Known evasions, documented rather than closed (all need deliberate effort;
+none happens by accident):
+  - a broad type reached through a name alias (`E = Exception` then
+    `except E:`) -- `_is_broad_type` resolves by spelling only
+  - a function that happens to be NAMED `suppress` would be flagged (there
+    is none in the tree today)
+  - `tools/` is outside PY_ROOT (cycle-1 follow-up #8)
 """
 from __future__ import annotations
 
@@ -67,7 +81,19 @@ def _is_empty_body(body: list[ast.stmt]) -> bool:
 
 
 def _reraises(body: list[ast.stmt]) -> bool:
-    return any(isinstance(stmt, ast.Raise) for stmt in body)
+    """True if the handler's top level re-raises on a reachable path.
+
+    Statements after a top-level `return` never run, so a `raise` placed
+    there does not launder the catch. Nested raises (inside if/with/for)
+    are deliberately not searched: they may or may not run, and the ratchet
+    errs toward flagging.
+    """
+    for stmt in body:
+        if isinstance(stmt, ast.Raise):
+            return True
+        if isinstance(stmt, ast.Return):
+            return False
+    return False
 
 
 def _is_suppress_call(node: ast.expr) -> bool:
@@ -81,10 +107,6 @@ def _is_suppress_call(node: ast.expr) -> bool:
     if isinstance(func, ast.Attribute):
         return func.attr == "suppress"
     return False
-
-
-def _with_has_suppress(node: ast.With | ast.AsyncWith) -> bool:
-    return any(_is_suppress_call(item.context_expr) for item in node.items)
 
 
 def _handler_kind(handler: ast.ExceptHandler) -> str | None:
@@ -102,6 +124,19 @@ def _relpath(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
 
 
+def _scan_tree(tree: ast.AST, rel: str) -> list[tuple[str, int, str]]:
+    """Return (relpath, lineno, kind) violations found in one parsed module."""
+    found: list[tuple[str, int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ExceptHandler):
+            kind = _handler_kind(node)
+            if kind is not None:
+                found.append((rel, node.lineno, kind))
+        elif _is_suppress_call(node):
+            found.append((rel, node.lineno, "suppress"))
+    return found
+
+
 def _scan_python() -> list[tuple[str, int, str]]:
     """Return (relpath, lineno, kind) violations for src/quodeq/**/*.py."""
     found: list[tuple[str, int, str]] = []
@@ -109,20 +144,12 @@ def _scan_python() -> list[tuple[str, int, str]]:
         text = _read_text(py)
         if text is None:
             continue
-        rel = _relpath(py)
         try:
             tree = ast.parse(text, filename=str(py))
         except SyntaxError as e:
             print(f"warning: skipping {py}: {e}", file=sys.stderr)
             continue
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ExceptHandler):
-                kind = _handler_kind(node)
-                if kind is not None:
-                    found.append((rel, node.lineno, kind))
-            elif isinstance(node, (ast.With, ast.AsyncWith)):
-                if _with_has_suppress(node):
-                    found.append((rel, node.lineno, "suppress"))
+        found.extend(_scan_tree(tree, _relpath(py)))
     return found
 
 

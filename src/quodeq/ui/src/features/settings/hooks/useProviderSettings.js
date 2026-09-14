@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { providerKey, notifyProviderSettingsChanged, PROVIDER_CONFIGURED_MARKER } from '../../../constants.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { saveProviderKey } from '../../../api/providers.js';
@@ -89,9 +89,22 @@ export async function saveProviderApiKey(providerId, apiKey, storage = localStor
 
 export default function useProviderSettings(providerId, defaults, { storage = localStorage } = {}) {
   const { showToast } = useSidePane();
+  // loadProviderState runs inside the useState initializer, i.e. during
+  // render, and its legacy-key migration can fail to persist. showToast
+  // updates SidePaneContext, and a state update from another component's
+  // render is a React error ("Cannot update a component while rendering a
+  // different component"). Record the failure here; toast it from the mount
+  // effect below.
+  const migrationFailedRef = useRef(false);
   const [state, setState] = useState(() => loadProviderState(providerId, defaults, storage, {
-    onPersistError: () => showToast(t('settings.persistError')),
+    onPersistError: () => { migrationFailedRef.current = true; },
   }));
+  useEffect(() => {
+    if (migrationFailedRef.current) {
+      migrationFailedRef.current = false;
+      showToast(t('settings.persistError'));
+    }
+  }, [showToast]);
 
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));

@@ -77,39 +77,73 @@ def test_empty_except_double_pass_is_flagged():
     assert cft._handler_kind(h) == "empty-except"
 
 
-def _with_node(src: str) -> ast.With | ast.AsyncWith:
-    """Parse a one-statement `with`/`async with` snippet and return its node."""
-    tree = ast.parse(src)
-    node = tree.body[0]
-    if isinstance(node, ast.AsyncFunctionDef):
-        node = node.body[0]
-    assert isinstance(node, (ast.With, ast.AsyncWith))
-    return node
+def _kinds(src: str) -> list[tuple[int, str]]:
+    """Scan a source snippet the way the ratchet scans a file; return (lineno, kind)."""
+    return [(lineno, kind) for _rel, lineno, kind in cft._scan_tree(ast.parse(src), "x.py")]
 
 
 def test_contextlib_suppress_is_flagged():
-    node = _with_node("with contextlib.suppress(OSError):\n    f()\n")
-    assert cft._with_has_suppress(node) is True
+    assert _kinds("with contextlib.suppress(OSError):\n    f()\n") == [(1, "suppress")]
 
 
 def test_bare_suppress_is_flagged():
-    node = _with_node("with suppress(OSError):\n    f()\n")
-    assert cft._with_has_suppress(node) is True
+    assert _kinds("with suppress(OSError):\n    f()\n") == [(1, "suppress")]
 
 
 def test_plain_open_is_not_flagged():
-    node = _with_node("with open('x') as fh:\n    f(fh)\n")
-    assert cft._with_has_suppress(node) is False
+    assert _kinds("with open('x') as fh:\n    f(fh)\n") == []
 
 
 def test_async_with_suppress_is_flagged():
-    node = _with_node(
-        "async def g():\n    async with contextlib.suppress(OSError):\n        await f()\n"
-    )
-    assert cft._with_has_suppress(node) is True
+    src = "async def g():\n    async with contextlib.suppress(OSError):\n        await f()\n"
+    assert _kinds(src) == [(2, "suppress")]
 
 
 def test_aliased_module_suppress_is_flagged():
     # Any `X.suppress(...)`, since contextlib can be imported under an alias.
-    node = _with_node("with cl.suppress(OSError):\n    f()\n")
-    assert cft._with_has_suppress(node) is True
+    assert _kinds("with cl.suppress(OSError):\n    f()\n") == [(1, "suppress")]
+
+
+# Post-PR review M3: suppress() is flagged wherever it is CALLED, not only as
+# a direct `with` item, so the two evasions the review probed are closed.
+
+def test_suppress_via_exit_stack_is_flagged():
+    src = "with ExitStack() as stack:\n    stack.enter_context(contextlib.suppress(OSError))\n    f()\n"
+    assert _kinds(src) == [(2, "suppress")]
+
+
+def test_suppress_bound_to_a_name_first_is_flagged():
+    src = "cm = contextlib.suppress(OSError)\nwith cm:\n    f()\n"
+    assert _kinds(src) == [(1, "suppress")]
+
+
+def test_suppress_is_keyed_once_per_call_site():
+    # The `with` line and the call are the same line; one entry, not two.
+    src = "with contextlib.suppress(OSError), open('x') as fh:\n    f(fh)\n"
+    assert _kinds(src) == [(1, "suppress")]
+
+
+# Post-PR review M3: `_reraises` is a reachability-aware scan of the handler's
+# top level, so a `raise` that can never run does not launder a broad catch.
+
+def test_unreachable_raise_after_return_does_not_count_as_reraise():
+    h = _handler(
+        "try:\n    f()\nexcept Exception:\n    log.warning('x')\n    return None\n    raise\n"
+    )
+    assert cft._handler_kind(h) == "broad-except"
+
+
+def test_raise_inside_a_branch_is_still_conservatively_flagged():
+    # Documented limit, not a hole: a nested raise may or may not run, so the
+    # handler counts as non-reraising. Lift the raise to the top level to clear it.
+    h = _handler(
+        "try:\n    f()\nexcept Exception as e:\n    if fatal(e):\n        raise\n    log.warning('x')\n"
+    )
+    assert cft._handler_kind(h) == "broad-except"
+
+
+def test_broad_type_behind_a_name_alias_is_a_documented_evasion():
+    # `_is_broad_type` resolves by name only; a module that rebinds Exception
+    # is not detected. Pinned here so the docstring's coverage claim stays honest.
+    h = _handler("try:\n    f()\nexcept E:\n    log.warning('x')\n")
+    assert cft._handler_kind(h) is None

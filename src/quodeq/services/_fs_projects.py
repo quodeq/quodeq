@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextvars
-import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -116,7 +115,7 @@ def _build_project_entries_threaded(
                 reports_root, name, runs, backfill=backfill, inline_summaries=inline_summaries,
                 pre_read_info=info_by_name.get(name),
             )
-        except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
+        except (OSError, ValueError, KeyError) as exc:  # JSONDecodeError is a ValueError
             _logger.warning("Skipping project dir %r: could not build entry: %s", name, exc)
 
     # contextvars do NOT propagate into ThreadPoolExecutor worker threads --

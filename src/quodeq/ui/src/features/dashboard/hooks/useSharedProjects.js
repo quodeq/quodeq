@@ -117,6 +117,12 @@ function useBackgroundRevalidate(listQuerySuccess, refresh) {
   useEffect(() => {
     if (listQuerySuccess && !bgTriggeredRef.current) {
       bgTriggeredRef.current = true;
+      // No .catch needed here or at the toolbar's onRefresh: refreshCore
+      // (makeRefreshCore above) catches both of its phases and reports
+      // failure through setStaleOverride, so the promise refresh() returns
+      // never rejects. useCoalescedRefresh's waiter rejection (cluster 25)
+      // only surfaces a refreshCore throw, which this core cannot produce.
+      // Audited after the post-PR review (M8).
       refresh();
     }
   }, [listQuerySuccess, refresh]);

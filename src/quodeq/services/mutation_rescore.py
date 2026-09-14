@@ -31,8 +31,11 @@ from quodeq.services._mutation_scoring import (  # noqa: F401 — re-export
     _resolve_default_run_id,
     _slim_scores,
 )
+from quodeq.shared.log_sink import LoggerSink
 
 _logger = logging.getLogger(__name__)
+# What the LogSink-typed callees get. A bare Logger has no ``success``.
+_log_sink = LoggerSink(_logger)
 
 
 def _mutation_envelope(
@@ -156,7 +159,7 @@ def rescore_with_fallback(
     production defaults to a fresh ThreadBackgroundRunner per call (it holds
     no state, so there is nothing to share between calls).
     """
-    scores = _rescore_run(evaluations_dir, project, run_id, log=_logger)
+    scores = _rescore_run(evaluations_dir, project, run_id, log=_log_sink)
     if scores is None:
         proj_dir = _resolve_project_dir(evaluations_dir, project)
         lock = _get_projection_lock(project)
@@ -190,7 +193,7 @@ def rescore_with_fallback(
             finally:
                 lock.release()
 
-        (runner or ThreadBackgroundRunner(log=_logger)).submit(
+        (runner or ThreadBackgroundRunner(log=_log_sink)).submit(
             _bg_project, name=f"rescore-project-{project}",
         )
     return scores

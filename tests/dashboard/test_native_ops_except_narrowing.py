@@ -96,7 +96,7 @@ class TestDownloadViaDialogExceptNarrowing:
     def test_out_of_scope_error_propagates(self, tmp_path):
         """R-FT-7 — the old `except (OSError, Exception)` was a no-op tuple,
         literally equivalent to `except Exception`. Now that it's narrowed
-        to plain OSError, anything else (e.g. a programming bug) must
+        to the transport family, anything else (e.g. a programming bug) must
         propagate instead of being swallowed."""
         window = self._window(str(tmp_path / "output.txt"))
 
@@ -105,3 +105,35 @@ class TestDownloadViaDialogExceptNarrowing:
                 _download_via_dialog(
                     window, "http://127.0.0.1:7863", "/api/export", "output.txt",
                 )
+
+    # Post-PR review M9: two realistic transport failures sat outside plain
+    # OSError and escaped into the pywebview js_api bridge as an unhandled
+    # error instead of reporting "download failed".
+
+    def test_truncated_response_is_caught_and_returns_false(self, tmp_path):
+        import http.client
+
+        window = self._window(str(tmp_path / "output.txt"))
+        mock_response = MagicMock()
+        mock_response.read.side_effect = http.client.IncompleteRead(b"partial")
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
+
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            result = _download_via_dialog(
+                window, "http://127.0.0.1:7863", "/api/export", "output.txt",
+            )
+
+        assert result is False
+        assert not (tmp_path / "output.txt").exists()
+
+    def test_malformed_url_is_caught_and_returns_false(self, tmp_path):
+        # urllib raises ValueError("unknown url type") for a URL it cannot parse.
+        window = self._window(str(tmp_path / "output.txt"))
+
+        with patch("urllib.request.urlopen", side_effect=ValueError("unknown url type")):
+            result = _download_via_dialog(
+                window, "http://127.0.0.1:7863", "/api/export", "output.txt",
+            )
+
+        assert result is False
