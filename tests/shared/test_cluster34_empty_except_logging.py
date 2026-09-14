@@ -81,4 +81,11 @@ def test_is_private_address_logs_non_literal_before_dns(monkeypatch) -> None:
     )
     with patch.object(ssrf._logger, "debug") as debug:
         assert ssrf.is_private_address("intranet.example") is True
-    assert any("falling through to DNS" in c.args[0] for c in debug.call_args_list)
+    # The ValueError sibling at ssrf.py:23 logs once ("Cannot parse ... as IP
+    # literal"), and the OSError site at ssrf.py:32 under test must log a
+    # second time ("... is not an IPv4 literal ..."). Asserting call_count
+    # plus the site-specific substring (rather than the shared "falling
+    # through to DNS" suffix both messages end with) is what makes this test
+    # actually discriminate the :32 site instead of passing regardless of it.
+    assert debug.call_count == 2
+    assert any("not an IPv4 literal" in c.args[0] for c in debug.call_args_list)
