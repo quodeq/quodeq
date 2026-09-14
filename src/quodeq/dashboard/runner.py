@@ -170,6 +170,7 @@ def _prepare_frozen_macos_launch() -> bool:
         selfupdate.cleanup_stale_staging()
         return first_launch.offer_move_to_applications()
     except Exception:  # pragma: no cover - defensive
+        logging.getLogger(__name__).debug("frozen macOS app preparation failed", exc_info=True)
         return False
 
 
@@ -180,7 +181,7 @@ def _kick_update_check() -> None:
 
         check_async()
     except Exception:  # pragma: no cover - defensive
-        pass
+        logging.getLogger(__name__).debug("async update check failed", exc_info=True)
 
 
 def _resolve_environ(config: DashboardConfig, env: dict[str, str] | None) -> None:

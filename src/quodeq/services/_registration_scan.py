@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._fs_scan import scan_project
 
 
@@ -26,7 +27,9 @@ def _zero_run_scan_fallback() -> dict:
     }
 
 
-def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path) -> None:
+def _scan_parent_project(
+    project_dir: Path, reports_path: Path, repo_path: Path, *, log: LogSink = NULL_LOG,
+) -> None:
     """Scan the parent project directory if it lacks a scan.json."""
     info_path = project_dir / "repository_info.json"
     try:
@@ -35,5 +38,5 @@ def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path)
             parent_dir = reports_path / parent_uuid
             if not (parent_dir / "scan.json").exists():
                 scan_project(repo_path, output_dir=parent_dir)
-    except (json.JSONDecodeError, OSError):
-        pass
+    except (json.JSONDecodeError, OSError) as exc:
+        log.warning(f"Could not scan parent project for {info_path}: {exc}")

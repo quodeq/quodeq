@@ -67,7 +67,7 @@ def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
         from quodeq.api import _evaluation_routes as _facade
         try:
             _facade.score_completed_evidence(_reports, _score_args)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - fire-and-forget background task, any error must not propagate
             _logger.debug(
                 "Could not score cancelled dimension for %s: %s",
                 _score_args.get("outputRunId"), exc,

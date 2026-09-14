@@ -32,8 +32,11 @@ Legacy fallbacks for older/partial payloads:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 DIM_ESTIMATES_FILENAME = "dim_estimates.json"
 
@@ -46,8 +49,10 @@ def write_dim_estimates(
         run_dir.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(estimates, indent=2)
         (run_dir / DIM_ESTIMATES_FILENAME).write_text(payload, encoding="utf-8")
-    except OSError:
-        pass
+    except OSError as exc:
+        # Best-effort — the dashboard falls back to no estimate on read.
+        # Still worth a warning: silent failure here masks stale progress UI.
+        _logger.warning("write_dim_estimates failed for %s: %s", run_dir, exc)
 
 
 def read_dim_estimates(run_dir: Path) -> dict[str, dict[str, Any]]:

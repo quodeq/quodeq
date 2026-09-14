@@ -2,6 +2,7 @@ import CopyButton from '../../../../components/CopyButton.jsx';
 import Badge from '../../../../components/Badge.jsx';
 import { t } from '../../../../strings/index.js';
 import { formatPath } from './projectDisplayHelpers.js';
+import { copyToClipboard } from '../../../../utils/clipboard.js';
 
 function RelocateRow({ id, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating }) {
   return (
@@ -26,7 +27,7 @@ export function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0
       {pathMissing && <span className="project-path-missing">{t('projects.pathNotFound')}</span>}
       {p.location === 'online' && p.path ? (
         <span onClick={(e) => e.stopPropagation()}>
-          <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
+          <CopyButton label={path} onClick={() => copyToClipboard(p.path)} />
         </span>
       ) : (
         path && <div className="project-card-path">{path}</div>

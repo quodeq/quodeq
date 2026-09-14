@@ -46,4 +46,29 @@ describe('useSelfUpdate API injection', () => {
       vi.useRealTimers();
     }
   });
+
+  it('warns instead of swallowing a poll failure during an active self-update', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const getUpdateStatus = vi.fn().mockRejectedValue(new Error('poll network error'));
+      const startSelfUpdate = vi.fn();
+      const apiValue = { getUpdateStatus, startSelfUpdate };
+      const setStatus = vi.fn();
+      const status = { self_update: { phase: 'downloading', supported: true, percent: 10 } };
+
+      renderHook(() => useSelfUpdate(status, setStatus), {
+        wrapper: ({ children }) => <ApiProvider value={apiValue}>{children}</ApiProvider>,
+      });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+      expect(warn).toHaveBeenCalledWith('self-update status poll failed:', expect.any(Error));
+      // setStatus must not be called with a resolved value on a rejected poll.
+      expect(setStatus).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      warn.mockRestore();
+    }
+  });
 });

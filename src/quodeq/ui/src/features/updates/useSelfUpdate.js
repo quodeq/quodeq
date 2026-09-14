@@ -18,7 +18,7 @@ export function useSelfUpdate(status, setStatus) {
   useEffect(() => {
     if (!active) return undefined;
     const id = setInterval(() => {
-      getUpdateStatus().then(setStatus).catch(() => {});
+      getUpdateStatus().then(setStatus).catch((e) => console.warn('self-update status poll failed:', e));
     }, 1000);
     return () => clearInterval(id);
   }, [active, setStatus, getUpdateStatus]);

@@ -58,6 +58,22 @@ describe('usePluginDimensions', () => {
     expect(result.current.allDimensions).toHaveLength(0);
   });
 
+  it('sets dimLoadError when the load fails (cache.load now rejects instead of swallowing to [])', async () => {
+    readVisibleStandardIds.mockReturnValue(['security']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      // listPlugins/listStandards degrade individually to `[]`; force the
+      // failure inside dedup so cache.load's own promise rejects.
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: null }]),
+      listStandards: vi.fn().mockResolvedValue([]),
+    };
+    const { result } = renderHook(() => usePluginDimensions(cache), {
+      wrapper: makeWrapper(fakeApi),
+    });
+    await waitFor(() => expect(result.current.dimLoadError).toBeTruthy());
+    expect(result.current.allDimensions).toEqual([]);
+  });
+
   it('accepts an injected cache instance so tests never touch the module singleton', async () => {
     readVisibleStandardIds.mockReturnValue(['security']);
     const cache = createDimensionCache();
@@ -107,6 +123,25 @@ describe('createDimensionCache', () => {
     await cache.load(listPlugins, listStandards);
     expect(listPlugins).toHaveBeenCalledTimes(2);
     expect(cache.get()).toHaveLength(1);
+  });
+
+  it('rejects instead of resolving to [] on failure, and clears the cached promise for retry', async () => {
+    const cache = createDimensionCache();
+    const listPlugins = vi.fn().mockResolvedValue([{ dimensions: null }]); // breaks dedup
+    const listStandards = vi.fn().mockResolvedValue([]);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(cache.load(listPlugins, listStandards)).rejects.toBeTruthy();
+    expect(cache.get()).toBeNull();
+
+    // A retry after the rejection issues fresh calls (cachePromise was
+    // cleared) instead of replaying the same rejected promise forever.
+    listPlugins.mockResolvedValueOnce(plugins);
+    await cache.load(listPlugins, listStandards);
+    expect(listPlugins).toHaveBeenCalledTimes(2);
+    expect(cache.get()).toHaveLength(1);
+
+    warnSpy.mockRestore();
   });
 
   it('two instances do not share state', async () => {

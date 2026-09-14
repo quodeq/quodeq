@@ -104,9 +104,17 @@ export default function UpdatesSection() {
   const selfUpdate = useSelfUpdate(status, setStatus);
   const [checking, setChecking] = useState(false);
 
+  // Unlike onToggle below, there is no optimistic mutation to undo here:
+  // status is only written on success, so a failed check already leaves it
+  // exactly as it was before the click. Logging (matching the begin()
+  // precedent) is enough; a "revert" would be a no-op.
   const onCheck = async () => {
     setChecking(true);
-    try { setStatus(await checkForUpdates()); } catch { /* fail-silent */ }
+    try {
+      setStatus(await checkForUpdates());
+    } catch (e) {
+      console.warn('check for updates failed:', e);
+    }
     setChecking(false);
   };
 

@@ -40,6 +40,7 @@ from quodeq.data.fs.report_parser.runs import read_run_scalars as _default_read_
 from quodeq.services._wiring import load_suppression_rules
 from quodeq.services.rescore import _rescore_dimension
 from quodeq.services.score_cache import make_cache_backed_fetcher
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -158,7 +159,9 @@ def _make_heavy_trend_fetcher(
         None if cacheable_run_ids is None
         else (lambda rid: rid in cacheable_run_ids)
     )
-    return make_cache_backed_fetcher(project, version_for, base, is_cacheable=is_cacheable)
+    return make_cache_backed_fetcher(
+        project, version_for, base, is_cacheable=is_cacheable, log=SHARED_LOG,
+    )
 
 
 def make_trend_fetcher(

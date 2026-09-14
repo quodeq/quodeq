@@ -71,7 +71,7 @@ function useCopySupport(activeId) {
   const handleCopy = useCallback(() => {
     const text = viewApis.current[activeId]?.getCopyText() || '';
     if (!text) return false;
-    navigator.clipboard?.writeText(text).catch(() => {});
+    navigator.clipboard?.writeText(text)?.catch(() => {});
     return true;
   }, [activeId]);
   return { registerApi, handleCopy };

@@ -149,4 +149,19 @@ describe('useServerLogPoll', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.getByTestId('logs')).toBeEmptyDOMElement();
   });
+
+  it('logs an HTTP-status failure distinctly from "no new lines", without throwing', async () => {
+    // Regression: `if (!r.ok) return null` resolves normally (it is not a
+    // fetch() exception), so it was silently indistinguishable from a
+    // successful empty poll. It needs its own trace.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    globalThis.fetch.mockResolvedValue({ ok: false, status: 503 });
+    renderProbe(true);
+
+    await waitFor(() => {
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/503/));
+    });
+    expect(screen.getByTestId('logs')).toBeEmptyDOMElement();
+    warnSpy.mockRestore();
+  });
 });

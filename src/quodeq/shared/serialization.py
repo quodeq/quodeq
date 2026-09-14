@@ -14,6 +14,19 @@ def _to_camel(name: str) -> str:
 _MAX_DEPTH = 64
 
 
+def coerce_line(line: object) -> int:
+    """Normalize a finding's line to the int the dismiss/delete keys store.
+
+    ``Finding.line`` is typed ``int | str | None`` and the CI renderer sees
+    whatever a report carried, so ``"12"`` must match a stored ``12`` and
+    anything unusable keys on ``0``.
+    """
+    try:
+        return int(line)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
 def to_camel_dict(obj: object, *, _depth: int = 0) -> object:
     """Recursively convert a frozen dataclass to a camelCase dict."""
     if _depth >= _MAX_DEPTH:

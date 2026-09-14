@@ -98,7 +98,7 @@ def _project_all_runs(
             continue
         try:
             repo_factory(run_dir).ensure_projected()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - one run's projection failure must not stop projecting the rest
             if log is NULL_LOG:
                 # No caller-injected log (the production call site can't pass
                 # one — tests patch this whole function with a bare

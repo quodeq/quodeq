@@ -38,6 +38,14 @@ class TestProjectNameFromRepo:
     def test_url_without_git_suffix(self):
         assert utils.project_name_from_repo("https://github.com/org/repo") == "repo"
 
+    def test_url_with_trailing_slash(self):
+        # A trailing slash used to leave split("/")[-1] == "", collapsing the
+        # project name to "".
+        assert utils.project_name_from_repo("https://github.com/org/repo/") == "repo"
+
+    def test_url_with_trailing_slash_and_git_suffix(self):
+        assert utils.project_name_from_repo("https://github.com/org/repo.git/") == "repo"
+
 
 class TestReadJson:
     def test_reads_valid_json(self, tmp_path):

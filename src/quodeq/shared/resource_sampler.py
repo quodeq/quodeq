@@ -16,12 +16,15 @@ the silence. No new dependencies — uses ``ps`` and stdlib only.
 """
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import threading
 import time
 
 from quodeq.shared.logging import log_info
+
+_logger = logging.getLogger(__name__)
 
 _DEFAULT_INTERVAL_S = 60.0
 _PS_TIMEOUT_S = 2.0
@@ -96,6 +99,7 @@ class ResourceSampler:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_at: float | None = None
+        self._error_logged = False
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -133,6 +137,12 @@ class ResourceSampler:
         while not self._stop.is_set():
             try:
                 log_info(self.sample_once())
-            except Exception:
-                pass  # best-effort: never let observability kill the run
+            except Exception as exc:
+                # best-effort: never let observability kill the run. Log once
+                # (not per-iteration — this runs in a tight loop) via the
+                # standard logging module directly, since log_info is what
+                # just failed.
+                if not self._error_logged:
+                    _logger.warning("resource sampler tick failed: %s", exc)
+                    self._error_logged = True
             self._stop.wait(self._interval)

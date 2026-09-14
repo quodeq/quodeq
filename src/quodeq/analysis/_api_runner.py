@@ -118,7 +118,7 @@ def _build_router_context(
             precedent_fingerprints=precedents,
             precedent_corpus=corpus,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully to raw findings on enrichment setup failure
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)
         return None
 

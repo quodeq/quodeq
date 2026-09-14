@@ -87,3 +87,45 @@ def test_latest_timestamp(writer: EventLogWriter, reader: EventLogReader):
     latest = reader.get_latest_timestamp()
     assert latest is not None
     assert isinstance(latest, datetime)
+
+
+def test_latest_timestamp_missing_file_is_caught(tmp_path: Path):
+    """Cluster 13 (R-FT-7) — get_latest_timestamp's except was narrowed
+    from bare `Exception` to `(OSError, UnicodeDecodeError)`. A missing log
+    file (open() raising FileNotFoundError, an OSError subclass) is the
+    realistic case this function exists to tolerate: return None, not raise."""
+    missing = tmp_path / "does-not-exist.jsonl"
+    reader = EventLogReader(missing)
+
+    assert reader.get_latest_timestamp() is None
+
+
+def test_latest_timestamp_undecodable_bytes_are_caught(log_path: Path, reader: EventLogReader):
+    """A log corrupted with invalid UTF-8 raises UnicodeDecodeError during
+    line iteration (not just at open()) -- also part of the realistic
+    surface, per _load_index's precedent of bundling I/O-open failures with
+    decode failures."""
+    with open(log_path, "wb") as f:
+        f.write(b'{"event_type": "JUDGMENT_CREATED"}\n')
+        f.write(b"\xff\xfe not valid utf-8\n")
+
+    assert reader.get_latest_timestamp() is None
+
+
+def test_latest_timestamp_out_of_scope_error_propagates(
+    writer: EventLogWriter, reader: EventLogReader, monkeypatch,
+):
+    """R-FT-7 — an error outside (OSError, UnicodeDecodeError) (e.g. a
+    programming bug in the streaming pipeline) must now propagate instead
+    of being swallowed and reported as 'no timestamp found'."""
+    payload = JudgmentPayload(practice_id="p1", verdict="compliance", dimension="D1", file="f1", line=1, reason="r1")
+    writer.emit(JudgmentCreatedEvent(payload=payload))
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom")
+        yield  # pragma: no cover - makes this a generator, never reached
+
+    monkeypatch.setattr(reader, "stream", _boom)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        reader.get_latest_timestamp()

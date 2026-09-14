@@ -18,6 +18,7 @@ from __future__ import annotations
 from fnmatch import fnmatch
 
 from quodeq.core.types.suppression_rule import SuppressionRule
+from quodeq.shared.serialization import coerce_line
 
 
 def matches_suppression_rule(
@@ -36,13 +37,6 @@ def matches_suppression_rule(
         fnmatch(req, rule.req) and fnmatch(file, rule.file)
         for rule in rules
     )
-
-
-def _coerce_line(line: object) -> int:
-    try:
-        return int(line)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
 
 
 def is_dismissed(
@@ -69,7 +63,7 @@ def is_dismissed(
         return True
     if not dismissed:
         return False
-    line_key = _coerce_line(line)
+    line_key = coerce_line(line)
     if (req or principle or "", file_key, line_key) in dismissed:
         return True
     return not req and ("", file_key, line_key) in dismissed

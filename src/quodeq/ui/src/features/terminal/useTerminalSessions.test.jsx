@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { ApiProvider } from '../../api/ApiContext.jsx';
 import { useTerminalSessions } from './useTerminalSessions.js';
 
@@ -109,5 +109,95 @@ describe('useTerminalSessions', () => {
     expect(fakeApi.listTerminalSessions).toHaveBeenCalledTimes(1);
     await act(async () => { await result.current.reconcile(); });
     expect(fakeApi.listTerminalSessions).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs and keeps current tabs when the session list is unreachable', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const fakeApi = {
+      listTerminalSessions: vi.fn().mockRejectedValue(new Error('network down')),
+      createTerminalSession: vi.fn(),
+      killTerminalSession: vi.fn(),
+    };
+    const { result } = renderHook(() => useTerminalSessions({ enabled: false }), {
+      wrapper: makeWrapper(fakeApi),
+    });
+
+    await act(async () => { await result.current.reconcile(); });
+
+    // The current (empty) tabs are kept, not cleared, on an unreachable server.
+    expect(result.current.sessions).toEqual([]);
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('reconcile list unreachable'),
+      expect.any(Error),
+    );
+    warnSpy.mockRestore();
+    debugSpy.mockRestore();
+  });
+
+  it('logs when the create-if-empty call fails, distinct from the list-unreachable case', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fakeApi = {
+      listTerminalSessions: vi.fn()
+        .mockResolvedValueOnce({ sessions: [], max: 6 })
+        .mockResolvedValue({ sessions: [], max: 6 }),
+      createTerminalSession: vi.fn().mockRejectedValue(new Error('create failed')),
+      killTerminalSession: vi.fn(),
+    };
+    const { result } = renderHook(() => useTerminalSessions({ enabled: false }), {
+      wrapper: makeWrapper(fakeApi),
+    });
+
+    await act(async () => { await result.current.reconcile(); });
+
+    expect(fakeApi.createTerminalSession).toHaveBeenCalledTimes(1);
+    // The list call ran twice (initial + create-if-empty re-list), so this
+    // reached setSessions/setActiveId rather than bailing out as "unreachable".
+    expect(fakeApi.listTerminalSessions).toHaveBeenCalledTimes(2);
+    expect(result.current.sessions).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('create-if-empty session failed'),
+      expect.any(Error),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('logs when killing a closed session fails, after the tab is already dropped locally', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // closeSession awaits the rejected kill (and its warn) before calling
+    // reconcile() again; keep that follow-up list call in-flight so the
+    // local removal + warning can be observed independent of the resync.
+    const secondList = deferred();
+    const fakeApi = {
+      listTerminalSessions: vi.fn()
+        .mockResolvedValueOnce({ sessions: [{ id: 's1' }, { id: 's2' }], max: 6 })
+        .mockImplementationOnce(() => secondList.promise),
+      createTerminalSession: vi.fn(),
+      killTerminalSession: vi.fn().mockRejectedValue(new Error('kill failed')),
+    };
+    const { result } = renderHook(() => useTerminalSessions({ enabled: false }), {
+      wrapper: makeWrapper(fakeApi),
+    });
+
+    await act(async () => { await result.current.reconcile(); });
+    expect(result.current.sessions).toEqual([{ id: 's1' }, { id: 's2' }]);
+
+    act(() => { result.current.closeSession('s1'); });
+
+    // The tab is gone from local state even though the server-side kill
+    // rejected: this is exactly the orphan case the warning documents.
+    await waitFor(() => {
+      expect(result.current.sessions).toEqual([{ id: 's2' }]);
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      'terminal: failed to kill session',
+      's1',
+      expect.any(Error),
+    );
+
+    await act(async () => {
+      secondList.resolve({ sessions: [{ id: 's1' }, { id: 's2' }], max: 6 });
+    });
+    warnSpy.mockRestore();
   });
 });

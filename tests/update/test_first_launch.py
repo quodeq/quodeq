@@ -104,6 +104,33 @@ def test_normal_install_never_prompts(tmp_path: Path) -> None:
     assert runner.calls == []
 
 
+def test_relaunch_failure_returns_false(tmp_path: Path) -> None:
+    """A nonzero `open` returncode means the relaunch didn't actually happen:
+    offer_move_to_applications must report False so the caller does not exit
+    the running instance with no replacement launched."""
+    app = _fake_dmg_bundle(tmp_path)
+    apps_dir = tmp_path / "Applications"
+    apps_dir.mkdir()
+    runner = _runner()
+
+    def failing_open_runner(argv, **kwargs):
+        result = runner(argv, **kwargs)
+        if Path(argv[0]).name == "open":
+            result.returncode = 1
+            result.stderr = "open: relaunch failed"
+        return result
+
+    failing_open_runner.calls = runner.calls
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"),
+        applications_dir=apps_dir,
+        runner=_spy_fs(failing_open_runner, app),
+    )
+    assert moved is False
+    tools = [Path(c[0]).name for c in runner.calls]
+    assert tools == ["osascript", "ditto", "open"]
+
+
 def test_any_exception_is_swallowed(tmp_path: Path) -> None:
     def exploding_runner(argv, **kwargs):
         raise RuntimeError("boom")

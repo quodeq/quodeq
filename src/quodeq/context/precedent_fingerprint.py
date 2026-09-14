@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import sqlite3
 import threading
 from pathlib import Path
 
@@ -97,7 +98,12 @@ def _read_run_fingerprints(
     """
     try:
         entries = list(read_dismissed(run_dir))
-    except Exception as exc:  # noqa: BLE001 - missing/locked DBs must not fail a scan
+    except (RuntimeError, sqlite3.Error, OSError) as exc:
+        # RuntimeError: open_evaluation_db wraps locked/missing-file/disk-I/O
+        # failures for a clearer path-scoped message (see connection.py).
+        # sqlite3.Error: corruption/schema-mismatch (sqlite3.DatabaseError),
+        # deliberately left unwrapped there. OSError: run_dir.mkdir() failing
+        # before a connection is even attempted.
         _logger.warning("Skipping precedent read for %s: %s", run_dir, exc)
         return None
     fps = (fingerprint(req, snippet) for req, snippet in entries)

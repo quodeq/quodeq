@@ -106,7 +106,7 @@ def _read_and_tee_loop(
             for stripped in lines:
                 if not stripped.startswith(_CC_MARKER_PREFIX):
                     tee_run_log(job_id, stripped, ctx)
-    except (IOError, BrokenPipeError) as exc:
+    except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
         ctx.log.warning(f"Stream read error for job {job_id}: {exc}")
     return True
 
@@ -149,8 +149,11 @@ def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
         if run_dir.is_dir():
             writer = RunLogWriter(run_dir)
             ctx.run_log_writers[job_id] = writer
-            for pending in ctx.pre_marker_buffer.get(job_id, []):
-                writer.write(pending)
+            try:
+                for pending in ctx.pre_marker_buffer.get(job_id, []):
+                    writer.write(pending)
+            except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
+                ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
             ctx.pre_marker_buffer[job_id] = []
 
 

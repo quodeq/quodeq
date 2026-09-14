@@ -77,7 +77,12 @@ class ProjectionEngine:
                 try:
                     handle(event, store)
                     applied += 1
-                except Exception:
+                except (ValueError, KeyError, TypeError):
+                    # Only per-event data errors are skipped. A sqlite3.Error
+                    # from handle() propagates and aborts the replay before
+                    # save_actions_projected_size runs: a DB failure is not
+                    # "one bad event", and skipping it would mark every later
+                    # event as projected while the store is unwritable.
                     _logger.error(
                         "Handler failed for action event %s (type=%s) - skipping",
                         getattr(event, "event_id", "?"),
@@ -107,6 +112,8 @@ class ProjectionEngine:
                     last_ts = event.timestamp
                     count += 1
                 except (ValueError, KeyError, TypeError):
+                    # Same contract as _project_actions: a sqlite3.Error aborts
+                    # the replay rather than being skipped as a bad event.
                     _logger.error(
                         "Handler failed for event %s (type=%s) - skipping",
                         event.event_id,

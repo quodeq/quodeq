@@ -64,6 +64,7 @@ def register_project(
     clone_dest: str | None = None,
     ephemeral: bool = False,
     clones_dir: Path | None = None,
+    log: LogSink = NULL_LOG,
 ) -> str:
     """Resolve/register project and run a scan.
 
@@ -90,7 +91,7 @@ def register_project(
         repo=repo, repo_resolved=repo_resolved, project_name=project_name,
         project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
         scope_path=scope_path, is_url=is_url, ephemeral=ephemeral,
-        clone_dest=clone_dest, clones_dir=clones_dir,
+        clone_dest=clone_dest, clones_dir=clones_dir, log=log,
     ))
 
     _sync_repo_index_on_create(reports_path, project_name, repo_resolved, scope_path, project_uuid)
@@ -163,6 +164,7 @@ def register_project_with_rollback(
             clone_dest=spec.clone_dest,
             ephemeral=spec.ephemeral,
             clones_dir=clones_dir,
+            log=log,
         )
     except (FileNotFoundError, ValueError) as exc:
         return _rollback_and_report(reports_dir, before, "invalid_repo", str(exc))

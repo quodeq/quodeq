@@ -88,7 +88,7 @@ def _get_highest_id(reqs: list[dict], prefix: str) -> int:
                 num = int(rid.split("-")[-1])
                 highest = max(highest, num)
             except ValueError:
-                pass
+                print(f"Skipping malformed requirement id: {rid!r}", file=sys.stderr)
     return highest
 
 

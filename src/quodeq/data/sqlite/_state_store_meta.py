@@ -24,7 +24,10 @@ class _StateStoreMetaMixin:
             ).fetchone()
         if row is None:
             return None
-        return datetime.fromisoformat(row[0])
+        try:
+            return datetime.fromisoformat(row[0])
+        except (TypeError, ValueError):
+            return None
 
     def save_checkpoint(self, ts: datetime) -> None:
         with self._db() as conn:
@@ -41,7 +44,10 @@ class _StateStoreMetaMixin:
             ).fetchone()
         if row is None:
             return None
-        return int(row[0])
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return None
 
     def save_projected_size(self, size: int) -> None:
         with self._db() as conn:
@@ -58,7 +64,10 @@ class _StateStoreMetaMixin:
             ).fetchone()
         if row is None:
             return None
-        return int(row[0])
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return None
 
     def save_actions_projected_size(self, size: int) -> None:
         with self._db() as conn:

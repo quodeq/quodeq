@@ -117,3 +117,45 @@ def test_start_uses_own_binary(monkeypatch) -> None:
     assert app._launch_dashboard_process(stderr_log) is True
     cmd = popen.call_args.args[0]
     assert cmd == [sys.executable, "-m", "quodeq.dashboard", "--no-open", "--port", "7863"]
+
+
+def test_on_quit_logs_when_preference_set_fails(monkeypatch, caplog) -> None:
+    import logging
+
+    module, _, app = _make_app()
+
+    def boom(*a, **k):
+        raise RuntimeError("state write failed")
+
+    monkeypatch.setattr("quodeq.menubar.state.set_enabled", boom)
+    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
+        app._on_quit(None)
+    assert "could not disable menubar preference on quit" in caplog.text
+
+
+def test_on_check_updates_logs_when_check_fails(monkeypatch, caplog) -> None:
+    import logging
+
+    module, _, app = _make_app()
+
+    def boom(*a, **k):
+        raise RuntimeError("update check failed")
+
+    monkeypatch.setattr("quodeq.update.checker.run_check", boom)
+    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
+        app._on_check_updates(None)
+    assert "update check failed" in caplog.text
+
+
+def test_poll_logs_when_update_status_check_fails(monkeypatch, caplog) -> None:
+    import logging
+
+    module, _, app = _make_app()
+
+    def boom(*a, **k):
+        raise RuntimeError("status check failed")
+
+    monkeypatch.setattr("quodeq.update.checker.get_status", boom)
+    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
+        app._poll(None)
+    assert "update availability check failed" in caplog.text

@@ -74,10 +74,14 @@ function ClientSelector({ aiCmd = {}, availableClients }) {
 
 function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_PREFIX}${level}`, storage = localStorage) {
   setter(value);
-  if (value) {
-    storage.setItem(storageKey, value);
-  } else {
-    storage.removeItem(storageKey);
+  try {
+    if (value) {
+      storage.setItem(storageKey, value);
+    } else {
+      storage.removeItem(storageKey);
+    }
+  } catch (err) {
+    console.warn('[ModelSection] Could not persist model override to storage:', err);
   }
 }
 

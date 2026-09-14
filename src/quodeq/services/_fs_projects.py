@@ -107,13 +107,16 @@ def _build_project_entries_threaded(
         info_by_name = {}
 
     def _build_one(name: str) -> ProjectEntry | None:
-        runs = list_runs(reports_root, name)
-        if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
-            return None
-        return _build_project_entry(
-            reports_root, name, runs, backfill=backfill, inline_summaries=inline_summaries,
-            pre_read_info=info_by_name.get(name),
-        )
+        try:
+            runs = list_runs(reports_root, name)
+            if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
+                return None
+            return _build_project_entry(
+                reports_root, name, runs, backfill=backfill, inline_summaries=inline_summaries,
+                pre_read_info=info_by_name.get(name),
+            )
+        except (OSError, ValueError, KeyError) as exc:  # JSONDecodeError is a ValueError
+            _logger.warning("Skipping project dir %r: could not build entry: %s", name, exc)
 
     # contextvars do NOT propagate into ThreadPoolExecutor worker threads --
     # each worker runs with its own default Context, so a caller-side
@@ -151,7 +154,6 @@ def build_project_list(
     reported pending and left for the warm-up engine.
     """
     dir_names = _collect_candidate_dirs(reports_root, _max_projects_listed())
-
     parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
     if backfill:
         for name in dir_names:
@@ -177,7 +179,6 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         return False
     if not repository_info_exists(project_dir):
         return False
-
     try:
         is_url = is_repo_url(new_path)
     except ValueError:
@@ -232,7 +233,6 @@ def delete_project(reports_dir: str, project: str) -> bool:
         return False
     if not project_path.exists() or not project_path.is_dir():
         return False
-
     # Cascade: find and delete children first
     children_removed = True
     removed_ids: set[str] = set()
@@ -277,7 +277,6 @@ def get_project_info(
     info = read_repository_info(project_dir)
     if info is None:
         return None
-
     discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
     available_dimensions = (
         list_dimensions(log=SHARED_LOG) if discipline else []

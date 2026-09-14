@@ -102,6 +102,18 @@ function makeHandleDelete({ selectedProject, isShared, applyDelta, setDismissed,
   };
 }
 
+// Mirrors the console.error + setRestoreError convention every mutation
+// handler above uses -- a failed load used to fall back to [] silently,
+// leaving the user staring at an empty list with no explanation.
+function loadDismissed({ selectedProject, isShared, setDismissed, setRestoreError }) {
+  const fetchDismissed = isShared ? sharedListDismissedFindings : listDismissedFindings;
+  fetchDismissed(selectedProject).then(setDismissed).catch((err) => {
+    console.error('Failed to load dismissed findings:', err);
+    setDismissed([]);
+    setRestoreError?.(t('violations.dismissedLoadFailed'));
+  });
+}
+
 function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyDelta, setDismissed, onReconcile, setRestoreError }) {
   return async () => {
     if (isShared) return;
@@ -147,13 +159,11 @@ export function useDismissedFindings({ selectedProject, onRefresh, setRestoreErr
   }, [queryClient, selectedProject]);
 
   // refreshKey lets the parent force a refetch when something dismissed an
-  // entry elsewhere (e.g. the principle-detail page). Without it, the
-  // dismissed sub-tab only fetched on mount, so dismisses made on other
-  // pages never appeared until the user switched projects.
+  // entry elsewhere. setRestoreError excluded: callers don't memoize it.
   useEffect(() => {
     if (!selectedProject) return;
-    const fetchDismissed = isShared ? sharedListDismissedFindings : listDismissedFindings;
-    fetchDismissed(selectedProject).then(setDismissed).catch(() => setDismissed([]));
+    loadDismissed({ selectedProject, isShared, setDismissed, setRestoreError });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProject, refreshKey, isShared]);
 
   const handleRestore = useCallback(

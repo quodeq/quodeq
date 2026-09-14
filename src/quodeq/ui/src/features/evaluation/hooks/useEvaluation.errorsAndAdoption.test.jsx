@@ -169,11 +169,17 @@ describe("useEvaluation", () => {
     expect(result.current.job?.jobId).toBe("j-fresh");
   });
 
-  it("ignores listEvaluations failure on mount", async () => {
+  it("surfaces a failed resume check via jobError instead of looking like nothing is running", async () => {
+    // Regression: a failed listEvaluations() used to only console.warn, so a
+    // real CLI-started running job could be silently invisible on the
+    // dashboard, indistinguishable from "nothing is running."
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     fakeApi.listEvaluations.mockRejectedValue(new Error("network"));
     const { result } = renderHook(() => useEvaluation(), { wrapper: makeWrapper() });
     await waitFor(() => expect(fakeApi.listEvaluations).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.jobError).toMatch(/network|resum/i));
     expect(result.current.job).toBeNull();
-    expect(result.current.jobError).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

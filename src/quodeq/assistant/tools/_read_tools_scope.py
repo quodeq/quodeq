@@ -17,7 +17,7 @@ from quodeq.services import _fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
-from quodeq.shared.serialization import to_camel_dict
+from quodeq.shared.serialization import coerce_line, to_camel_dict
 
 _logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> None:
     try:
         for f in _findings_repo(ctx, ctx.run_dir).list_all():
             keys.add((str(f.req or ""), str(f.file or ""),
-                      _violations_facade._coerce_line(f.line)))
+                      coerce_line(f.line)))
     except Exception:  # noqa: BLE001 - a corrupt db must not block the read
         _logger.warning(
             "evaluation.db unreadable in %s; finding keys may be incomplete",
@@ -164,7 +164,7 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
 
     def _add(v: dict) -> None:
         keys.add((_violations_facade._requirement_of(v), str(v.get("file") or ""),
-                  _violations_facade._coerce_line(v.get("line"))))
+                  coerce_line(v.get("line"))))
 
     if _has_run(ctx):
         _eval_json_finding_keys(ctx, _add)

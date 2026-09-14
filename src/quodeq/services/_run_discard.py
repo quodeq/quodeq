@@ -131,7 +131,7 @@ def _discard_run_state(
         for key in keys:
             try:
                 cache.delete(key)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001 - one cache-entry deletion failure must not stop cleaning the rest
                 log.warning(f"Could not delete cache entry {key}: {exc}")
 
     remove_matching_files(evidence_dir, _SCRATCH_PATTERNS)

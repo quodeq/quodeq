@@ -38,7 +38,13 @@ export function useServerLogPoll(active) {
       const since = sinceRef.current;
       const url = `${BASE}/logs` + (since >= 0 ? `?since=${since}` : '');
       const r = await fetch(url);
-      if (!r.ok) return null;
+      if (!r.ok) {
+        // Distinct from the fetch()-throw path swallowed below: an HTTP
+        // error status resolves normally, so it needs its own trace or it
+        // is indistinguishable from "no new log lines."
+        console.warn(`Server log poll failed: HTTP ${r.status}`);
+        return null;
+      }
       const data = await r.json();
       if (!data || !data.lines) return null;
       if (data.lines.length) {

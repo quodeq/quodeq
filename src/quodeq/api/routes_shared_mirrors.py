@@ -92,7 +92,12 @@ def register_shared_mirror_routes(app: Flask) -> None:
         err = _validate_segment(project)
         if err:
             return err
-        info = _fs_projects.get_project_info(str(eval_root), project)
+        try:
+            info = _fs_projects.get_project_info(str(eval_root), project)
+        except Exception:
+            _logger.exception("Failed to load shared project info for %s", project)
+            body, status = error_response("Failed to load project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+            return jsonify(body), status
         if not info:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

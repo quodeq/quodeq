@@ -125,10 +125,34 @@ describe('ReEvaluateCard error state', () => {
     const api = makeFakeApi({ getProjectInfo: vi.fn().mockRejectedValue(new Error('boom')) });
     renderCard({ project: 'uuid-err', projectInfo: null, api });
 
+    // apiErrorMessage prefers the real backend sentence over the generic
+    // fallback, same policy as every other error site in this file
+    // (handleUrlRestore) and in useEvaluationMutations.
+    await waitFor(() => {
+      expect(screen.getByText('boom')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('falls back to the generic message when the failure carries no text', async () => {
+    const api = makeFakeApi({ getProjectInfo: vi.fn().mockRejectedValue(new Error('')) });
+    renderCard({ project: 'uuid-err-empty', projectInfo: null, api });
+
     await waitFor(() => {
       expect(screen.getByText(/could not load project info/i)).toBeInTheDocument();
     });
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('logs the real error to console on a failed info load', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const err = new Error('boom');
+    const api = makeFakeApi({ getProjectInfo: vi.fn().mockRejectedValue(err) });
+    renderCard({ project: 'uuid-log', projectInfo: null, api });
+
+    await waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/project info/i), err);
+    });
+    errorSpy.mockRestore();
   });
 
   it('retry re-invokes the info load', async () => {
@@ -139,7 +163,7 @@ describe('ReEvaluateCard error state', () => {
     renderCard({ project: 'uuid-retry', projectInfo: null, api });
 
     await waitFor(() => {
-      expect(screen.getByText(/could not load project info/i)).toBeInTheDocument();
+      expect(screen.getByText('boom')).toBeInTheDocument();
     });
     expect(getProjectInfo).toHaveBeenCalledTimes(1);
 
@@ -149,4 +173,5 @@ describe('ReEvaluateCard error state', () => {
       expect(getProjectInfo).toHaveBeenCalledTimes(2);
     });
   });
+
 });

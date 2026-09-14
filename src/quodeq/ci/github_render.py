@@ -1,6 +1,8 @@
 """Render violations into GitHub PR review comments, summary, and verdict."""
 from __future__ import annotations
 
+from quodeq.shared.serialization import coerce_line
+
 
 def violation_to_comment(violation: dict, status: str = "new") -> dict:
     """Convert a violation to a GitHub PR review comment dict.
@@ -22,13 +24,13 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
         body_parts.append(f"_Requirement: {req}_")
 
     comment: dict = {
-        "path": violation["file"],
+        "path": violation.get("file", "?"),
         "body": "\n\n".join(body_parts),
     }
 
     line = violation.get("line")
     if line is not None:
-        comment["line"] = int(line)
+        comment["line"] = coerce_line(line)
 
     return comment
 

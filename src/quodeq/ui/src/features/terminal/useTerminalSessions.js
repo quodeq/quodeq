@@ -29,14 +29,30 @@ function makeReconcile({ listTerminalSessions, createTerminalSession, setSession
     if (!reconcilingRef.current) {
       reconcilingRef.current = (async () => {
         try {
-          let r = await listTerminalSessions();
-          if (!(r.sessions || []).length && createIfEmpty) {
-            await createTerminalSession().catch(() => {});
-            r = await listTerminalSessions();
+          // Only the network round-trip (list, and the create-if-empty
+          // re-list) is caught here, matching the comment below: a genuinely
+          // unreachable server keeps the current tabs and lets sockets
+          // surface it. setSessions/setMax/setActiveId run outside this try
+          // so a bug in the reconcile logic itself doesn't get silently
+          // swallowed as "server unreachable".
+          let list;
+          let listMax;
+          try {
+            let r = await listTerminalSessions();
+            if (!(r.sessions || []).length && createIfEmpty) {
+              await createTerminalSession().catch((err) => {
+                console.warn('terminal: create-if-empty session failed, list may still be empty', err);
+              });
+              r = await listTerminalSessions();
+            }
+            list = r.sessions || [];
+            listMax = r.max;
+          } catch (err) {
+            console.debug('terminal: reconcile list unreachable, keeping current tabs', err);
+            return;
           }
-          const list = r.sessions || [];
           setSessions(list);
-          if (r.max) setMax(r.max);
+          if (listMax) setMax(listMax);
           setActiveId((prev) => {
             if (list.some((s) => s.id === prev)) return prev;
             // Fresh mount (drawer reopened): restore the last selected tab if
@@ -45,8 +61,7 @@ function makeReconcile({ listTerminalSessions, createTerminalSession, setSession
             if (list.some((s) => s.id === stored)) return stored;
             return list[list.length - 1]?.id ?? null;
           });
-        } catch { /* server unreachable: keep current tabs; sockets surface it */ }
-        finally { reconcilingRef.current = null; }
+        } finally { reconcilingRef.current = null; }
       })();
     }
     return reconcilingRef.current;
@@ -77,7 +92,11 @@ function makeCloseSession({ sessionsRef, setSessions, setActiveId, killTerminalS
     const neighbor = (next[idx - 1] || next[0])?.id ?? null;
     setSessions(next);
     setActiveId((cur) => (cur === id ? neighbor : cur));
-    await killTerminalSession(id).catch(() => {});
+    // The tab is already gone from local state above, so a failed kill here
+    // leaves an orphaned server-side session with no other trace: log it.
+    await killTerminalSession(id).catch((err) => {
+      console.warn('terminal: failed to kill session', id, err);
+    });
     // Recreates a fresh session when the last tab was closed.
     await reconcile();
   };

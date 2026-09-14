@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../../strings/index.js';
+import { copyToClipboard } from '../../utils/clipboard.js';
 
 const COPY_FEEDBACK_MS = 1500;
 // Defer mounting the body until the slide-in animation finishes (~220ms).
@@ -126,8 +127,11 @@ export function SidePaneWindow({ spec, onClose }) {
 
   const onCopy = useCallback(() => {
     if (!spec.copy) return;
-    navigator.clipboard?.writeText(spec.copy());
-    setJustCopied(true);
+    // Only flip the "Copied" indicator once the write actually succeeded —
+    // copyToClipboard resolves `false` (never rejects) on failure.
+    copyToClipboard(spec.copy()).then((ok) => {
+      if (ok) setJustCopied(true);
+    });
   }, [spec]);
 
   const onDownload = useCallback(() => {

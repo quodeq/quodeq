@@ -35,6 +35,7 @@ from quodeq.services._fs_discipline import (  # noqa: F401 — re-export
     _read_discipline_from_eval,
     _read_language_stats,
 )
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -177,6 +178,7 @@ def _compute_on_miss_summary(
     payload = cached_project_summary(
         entry_name, version,
         lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+        log=SHARED_LOG,
     )
     return payload["grade"], payload["score"], payload["files"], False
 
@@ -261,4 +263,5 @@ def warm_project_summary(reports_root: Path, entry_name: str) -> None:
     cached_project_summary(
         entry_name, version,
         lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+        log=SHARED_LOG,
     )

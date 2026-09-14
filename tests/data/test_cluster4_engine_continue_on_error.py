@@ -88,12 +88,20 @@ def test_update_actions_continues_after_handler_error(tmp_path: Path, caplog):
 
 
 def test_update_actions_does_not_abort_on_error(tmp_path: Path):
-    """update_actions must not raise when a handler fails; it returns a count of successes."""
+    """update_actions must not raise when a handler fails with an in-scope
+    error; it returns a count of successes.
+
+    Cluster 13 (R-FT-7) narrowed the catch from bare ``Exception`` to
+    ``(ValueError, KeyError, TypeError)`` — the same realistic surface as
+    the sibling ``_project()`` handling of the identical ``handle()`` call.
+    ``ValueError`` stands in here for "malformed event data", which is the
+    class of error this loop is meant to tolerate.
+    """
     actions_log = tmp_path / "actions.jsonl"
     actions_log.write_text("")
 
     def always_raise(event, store):
-        raise RuntimeError("boom")
+        raise ValueError("boom")
 
     engine = ProjectionEngine()
     with (
@@ -105,3 +113,24 @@ def test_update_actions_does_not_abort_on_error(tmp_path: Path):
         result = engine.update_actions(actions_log, tmp_path, force=True)
 
     assert result == 0
+
+
+def test_update_actions_propagates_out_of_scope_error(tmp_path: Path):
+    """Cluster 13 (R-FT-7): a handler failure outside the narrowed
+    ``(ValueError, KeyError, TypeError)`` set must now propagate instead of
+    being silently swallowed — e.g. a genuine programming bug (RuntimeError)
+    should surface rather than be logged-and-skipped forever."""
+    actions_log = tmp_path / "actions.jsonl"
+    actions_log.write_text("")
+
+    def always_raise(event, store):
+        raise RuntimeError("boom")
+
+    engine = ProjectionEngine()
+    with (
+        patch("quodeq.data.actions_log.read_action_events", return_value=iter([_BadEvent()])),
+        patch("quodeq.data.projection.engine.SQLiteStateStore", return_value=MagicMock(spec=SQLiteStateStore, get_actions_projected_size=MagicMock(return_value=None))),
+        patch("quodeq.data.projection.engine.handle", side_effect=always_raise),
+    ):
+        with pytest.raises(RuntimeError, match="boom"):
+            engine.update_actions(actions_log, tmp_path, force=True)

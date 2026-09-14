@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._fs_clone import run_git_clone
 from quodeq.services._fs_scan import scan_project
 from quodeq.services._registration_scan import _scan_parent_project
@@ -145,6 +146,7 @@ class _MaterializeRequest:
     ephemeral: bool
     clone_dest: str | None
     clones_dir: Path | None
+    log: LogSink = NULL_LOG
 
 
 def _materialize_and_scan(request: _MaterializeRequest) -> None:
@@ -162,4 +164,4 @@ def _materialize_and_scan(request: _MaterializeRequest) -> None:
     # Scan now that files are guaranteed on disk.
     scan_project(target_path, output_dir=request.project_dir)
     if request.scope_path:
-        _scan_parent_project(request.project_dir, request.reports_path, target_path)
+        _scan_parent_project(request.project_dir, request.reports_path, target_path, log=request.log)

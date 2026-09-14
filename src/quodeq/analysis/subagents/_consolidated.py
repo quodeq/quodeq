@@ -12,7 +12,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
-from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
@@ -62,6 +62,7 @@ def _build_consolidated_config(
 
 def _collect_consolidated_results(
     config: "RunConfig", run_ctx: _ConsolidatedRunContext, paths: _ConsolidatedPaths,
+    *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
     merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
@@ -79,8 +80,11 @@ def _collect_consolidated_results(
     if queue_path.exists():
         try:
             analyzed |= set(FileQueue(queue_path).all_taken_files())
-        except (OSError, ValueError, KeyError):
-            pass
+        except (OSError, ValueError, KeyError, FileQueueError) as exc:
+            # FileQueueError (a RuntimeError) is what the queue raises for a
+            # corrupt or wrong-shaped file; the other three cover an unreadable
+            # file and a malformed "taken" entry.
+            log.warning(f"Could not read taken files from consolidated queue {queue_path}: {exc}")
 
     # V2 cache owns incremental state via per-file entries written
     # during dispatch; the V1 per-dimension fingerprint write is no
@@ -167,4 +171,6 @@ def process_consolidated_dimensions(
         dimensions=dimensions, ctx=ctx, results=results, files=files,
         exit_reason=pool.exit_reason,
     )
-    return _collect_consolidated_results(config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))
+    return _collect_consolidated_results(
+        config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir), log=log,
+    )

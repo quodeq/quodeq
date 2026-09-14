@@ -25,7 +25,6 @@ from quodeq.config.paths import default_paths
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
-    _coerce_line,
     is_deleted,
     is_dismissed,
 )

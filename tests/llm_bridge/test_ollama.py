@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from quodeq.llm_bridge._ollama import (
     get_ollama_status,
+    get_running_model_info,
     list_ollama_models,
     estimate_max_agents,
     run_concurrency_test,
@@ -110,6 +112,46 @@ class TestListOllamaModels:
             models = list_ollama_models()
 
         assert models == []
+
+
+class TestGetRunningModelInfo:
+    def test_returns_running_model(self):
+        mock_data = {"models": [{"name": "gemma4:26b", "size": 34e9, "size_vram": 17e9}]}
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(mock_data).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", return_value=mock_resp):
+            info = get_running_model_info()
+
+        assert info["name"] == "gemma4:26b"
+
+    def test_server_offline_returns_none(self):
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", side_effect=ConnectionRefusedError):
+            assert get_running_model_info() is None
+
+    def test_server_offline_logs_warning(self, caplog):
+        """The failure must be observable, matching the sibling status/list checks."""
+        with patch(
+            "quodeq.llm_bridge._ollama.urllib.request.urlopen",
+            side_effect=ConnectionRefusedError("refused"),
+        ), caplog.at_level(logging.WARNING):
+            result = get_running_model_info()
+
+        assert result is None
+        assert any(
+            "running ollama model" in r.message.lower() for r in caplog.records
+        ), f"expected a warning about the running-model lookup, got: {[r.message for r in caplog.records]}"
+
+    def test_malformed_body_returns_none(self):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"not json at all"
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        with patch("quodeq.llm_bridge._ollama.urllib.request.urlopen", return_value=mock_resp):
+            assert get_running_model_info() is None
 
 
 class TestEstimateMaxAgents:

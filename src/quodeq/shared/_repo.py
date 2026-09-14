@@ -25,7 +25,7 @@ def is_repo_url(repo_input: str) -> bool:
 def project_name_from_repo(repo: str) -> str:
     """Extract a human-readable project name from a repo path or URL."""
     if is_repo_url(repo):
-        return repo.split("/")[-1].replace(".git", "")
+        return repo.rstrip("/").split("/")[-1].replace(".git", "")
     return Path(repo).resolve().name
 
 

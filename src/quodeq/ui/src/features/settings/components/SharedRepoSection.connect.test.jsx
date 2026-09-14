@@ -20,6 +20,26 @@ describe('SharedRepoSection', () => {
     });
   });
 
+  it('logs the real error and still falls back to not-configured when the status fetch fails', async () => {
+    // Regression: a server 500 and "genuinely not configured" used to
+    // collapse into the identical {configured: false, url: null} result
+    // with zero trace, making a backend outage indistinguishable from a
+    // legitimate empty state.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const err = new Error('shared status 500');
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => { throw err; }),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => {
+      expect(screen.getByText(/not configured/i)).toBeTruthy();
+    });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/shared repo status/i), err);
+    errorSpy.mockRestore();
+  });
+
   it('renders with current URL when status returns configured: true', async () => {
     const testUrl = 'https://github.com/team/results.git';
     const fakeApi = makeFakeApi({

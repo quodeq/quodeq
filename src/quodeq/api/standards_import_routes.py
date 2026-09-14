@@ -1,12 +1,14 @@
 """Import routes for the Standards Browser & Editor."""
 from __future__ import annotations
 
+import http.client
 import logging
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import _sanitize_for_log, error_response
+from quodeq.services.standards_library import StandardImportConflictError
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -24,10 +26,12 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         return error_response("Invalid file path", 400, "bad_request")
     try:
         library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
-    except ValueError as exc:
+    except StandardImportConflictError as exc:
         logger.warning("Library import conflict: %s", exc)
         return error_response("Import conflict", 409, "conflict")
-    except Exception as exc:
+    except (OSError, ValueError, http.client.HTTPException) as exc:
+        # See list_library: HTTPException is urllib's truncated/malformed
+        # response family and is not an OSError.
         logger.warning("Library import failed: %s", exc)
         return error_response(
             "Import from library failed. Check that the library server is reachable and the standard file is valid.",
