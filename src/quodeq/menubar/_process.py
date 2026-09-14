@@ -6,6 +6,7 @@ quodeq.shared.frozen.dashboard_cmd instead of probing a `quodeq` CLI.
 """
 from __future__ import annotations
 
+import logging
 import os
 import signal
 import subprocess
@@ -15,6 +16,8 @@ import time
 from typing import NamedTuple
 
 from quodeq.menubar._health import health_check as _health_check
+
+_logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
@@ -62,8 +65,8 @@ def cleanup_stderr_log(path: str | None) -> None:
     if path:
         try:
             os.unlink(path)
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.debug("stderr log %s not removed: %s", path, exc)
 
 
 def find_pids_on_port(port: int) -> list[int]:
@@ -104,8 +107,8 @@ def kill_port_processes(port: int) -> None:
             continue
         try:
             os.kill(pid, signal.SIGTERM)
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as exc:
+            _logger.debug("could not signal pid %s on port %s: %s", pid, port, exc)
 
 
 def wait_for_dashboard(
@@ -130,8 +133,8 @@ def wait_for_dashboard(
     finally:
         try:
             stderr_log.close()
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.debug("stderr log close failed: %s", exc)
 
 
 def open_stderr_log(prefix: str = "quodeq-dashboard-") -> tempfile.NamedTemporaryFile:
