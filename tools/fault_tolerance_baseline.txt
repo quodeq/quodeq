@@ -163,15 +163,8 @@ src/quodeq/services/mutation_rescore.py:180:broad-except
 src/quodeq/services/project_registration.py:178:broad-except
 src/quodeq/services/shared_publish.py:141:broad-except
 src/quodeq/services/shared_publish.py:167:broad-except
-src/quodeq/shared/_io.py:47:empty-except
-src/quodeq/shared/_process_kill.py:33:empty-except
-src/quodeq/shared/_process_kill.py:67:empty-except
-src/quodeq/shared/_process_kill.py:73:empty-except
-src/quodeq/shared/_process_kill.py:77:empty-except
-src/quodeq/shared/frozen.py:83:empty-except
 src/quodeq/shared/resource_sampler.py:140:broad-except
 src/quodeq/shared/run_log.py:85:empty-except
-src/quodeq/shared/ssrf.py:32:empty-except
 src/quodeq/terminal/_pty_unix.py:109:empty-except
 src/quodeq/terminal/_pty_unix.py:131:empty-except
 src/quodeq/terminal/_pty_unix.py:136:empty-except

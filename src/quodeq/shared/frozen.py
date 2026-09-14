@@ -5,10 +5,13 @@ not import each other (dashboard, menubar) can share one launch vocabulary.
 dashboard/_frozen.py re-exports these names for its existing importers."""
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import subprocess
 import sys
+
+_logger = logging.getLogger(__name__)
 
 _MODULE_MAP = {
     "api": "quodeq.api.app",
@@ -80,8 +83,8 @@ def source_user_path() -> None:
         if result.returncode == 0 and result.stdout.strip():
             os.environ["PATH"] = result.stdout.strip()
             return
-    except (subprocess.TimeoutExpired, OSError):
-        pass
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        _logger.debug("login-shell PATH discovery failed, using fallback locations: %s", exc)
     # Fallback: add common locations
     brew = "/opt/homebrew/bin" if platform.machine() == "arm64" else "/usr/local/bin"
     extra = f"{os.path.expanduser('~/.local/bin')}:{brew}"

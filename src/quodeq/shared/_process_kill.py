@@ -6,11 +6,14 @@ os.killpg call is allowlisted for this path.
 """
 from __future__ import annotations
 
+import logging
 import os
 import signal
 import subprocess
 import sys
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 _TERMINATE_TIMEOUT_S = 10
 _KILL_WAIT_TIMEOUT_S = 5
@@ -30,8 +33,8 @@ def kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
         except (ProcessLookupError, OSError):
             try:
                 os.kill(pid, sig)
-            except (ProcessLookupError, OSError):
-                pass
+            except (ProcessLookupError, OSError) as exc:
+                _logger.debug("process %s already gone: %s", pid, exc)
 
 
 def terminate_process(process: subprocess.Popen) -> None:
@@ -64,15 +67,19 @@ def kill_proc_tree(proc: Any) -> None:
                 # the tree was NOT killed; fall through to proc.kill().
                 if result.returncode == 0:
                     return
-            except (OSError, subprocess.SubprocessError, TypeError):
-                pass
+            except (OSError, subprocess.SubprocessError, TypeError) as exc:
+                _logger.debug(
+                    "taskkill failed for pid %s, falling back to proc.kill(): %s", pid, exc,
+                )
         else:
             try:
                 os.killpg(os.getpgid(pid), signal.SIGKILL)
                 return
-            except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError):
-                pass
+            except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError) as exc:
+                _logger.debug(
+                    "killpg failed for pid %s, falling back to proc.kill(): %s", pid, exc,
+                )
     try:
         proc.kill()
-    except (ProcessLookupError, OSError, AttributeError):
-        pass
+    except (ProcessLookupError, OSError, AttributeError) as exc:
+        _logger.debug("process %s already gone: %s", pid, exc)
