@@ -224,7 +224,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
         if err:
             return err
         try:
-            payload = _fs_reports.get_violations(str(eval_root), project, run_id)
+            payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
         except FileNotFoundError:
             body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

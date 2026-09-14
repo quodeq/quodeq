@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.api.app import create_app
+from quodeq.core.observability import NULL_LOG
 from quodeq.data.fs.shared_repo import (
     FORMAT_NAME,
     MARKER_FILENAME,
@@ -29,7 +30,9 @@ from quodeq.data.fs.shared_repo import (
     shared_evaluations_root,
     shared_repo_path,
 )
+from quodeq.services import _fs_reports
 from quodeq.services.shared_settings import SharedSettings, write_settings
+from quodeq.shared.log_sink import SHARED_LOG
 from tests.api.conftest import _make_origin
 
 # _VIOLATION, _EVAL_JSON, _make_origin and shared_clone_fixture moved to
@@ -505,6 +508,21 @@ def test_shared_violations(client, shared_clone_fixture):
 def test_shared_violations_invalid_run_segment(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects/proj-a/violations?run=..%2fescape")
     assert resp.status_code == 400
+
+
+def test_shared_violations_passes_shared_log_sink(client, shared_clone_fixture, monkeypatch):
+    """shared_violations threads log=SHARED_LOG, matching shared_dashboard (Task 3 follow-up)."""
+    calls: list[object] = []
+    original = _fs_reports.get_violations
+
+    def spy(reports_dir, project, run_id, *, log=NULL_LOG):
+        calls.append(log)
+        return original(reports_dir, project, run_id, log=log)
+
+    monkeypatch.setattr(_fs_reports, "get_violations", spy)
+    resp = client.get("/api/shared/projects/proj-a/violations?run=run-1")
+    assert resp.status_code == 200
+    assert calls == [SHARED_LOG]
 
 
 # --- GET /api/shared/projects/<project>/findings/dismissed & /verified --------

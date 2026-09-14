@@ -97,8 +97,8 @@ class FileRateLimitStore:
             _logger.warning("Failed to write rate-limit file %s", self._path)
             try:
                 os.unlink(tmp_name)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("temp rate-limit file %s not removed: %s", tmp_name, exc)
 
     def _cache_for(self, now: float) -> dict[str, list[float]]:
         """Return the in-memory cache, refilling from disk if stale. Caller

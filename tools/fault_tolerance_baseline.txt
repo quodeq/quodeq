@@ -44,9 +44,6 @@ src/quodeq/analysis/mcp/router.py:174:broad-except
 src/quodeq/analysis/subagents/_pool_launcher.py:87:broad-except
 src/quodeq/api/_assistant_hygiene.py:59:broad-except
 src/quodeq/api/_index_routes.py:24:broad-except
-src/quodeq/api/_llamacpp_log_routes.py:53:empty-except
-src/quodeq/api/_log_tail_helpers.py:103:empty-except
-src/quodeq/api/_rate_limit_file_store.py:100:empty-except
 src/quodeq/api/_run_event_watcher.py:152:broad-except
 src/quodeq/api/_scores_routes.py:45:broad-except
 src/quodeq/api/_scores_routes.py:65:broad-except
@@ -59,7 +56,6 @@ src/quodeq/api/app.py:116:broad-except
 src/quodeq/api/app.py:206:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
-src/quodeq/api/routes_project_scan.py:78:empty-except
 src/quodeq/api/routes_runs.py:30:broad-except
 src/quodeq/api/routes_shared_mirrors.py:123:broad-except
 src/quodeq/api/routes_shared_mirrors.py:165:broad-except

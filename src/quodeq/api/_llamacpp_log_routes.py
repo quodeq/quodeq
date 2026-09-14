@@ -19,6 +19,7 @@ hides the console button. Recommended launch:
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from http import HTTPStatus
@@ -27,6 +28,8 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator
+
+_logger = logging.getLogger(__name__)
 
 
 def _default_log_paths() -> list[Path]:
@@ -50,10 +53,10 @@ def _default_log_paths() -> list[Path]:
     # fresh install before the user has run any evaluations.
     try:
         quodeq_logs.mkdir(parents=True, exist_ok=True)
-    except OSError:
+    except OSError as exc:
         # Permission denied or read-only home — fall through to other
         # candidates rather than failing the whole probe.
-        pass
+        _logger.debug("could not create %s, trying the next log location: %s", quodeq_logs, exc)
     candidates: list[Path] = [quodeq_logs / "llama-server.log"]
     if sys.platform == "darwin":
         candidates.append(home / "Library" / "Logs" / "llama-server.log")
