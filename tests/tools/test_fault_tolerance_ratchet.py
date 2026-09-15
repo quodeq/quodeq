@@ -42,7 +42,7 @@ def test_baseline_has_no_stale_entries():
 # fault-tolerance cycle 1 fix wave): dashboard/_webview_token.py:85
 # (pre-existing) and data/fs/run_artifacts.py:60 (added by cluster 28 of the
 # same cycle, before the scanner could see suppress); both previously invisible.
-BASELINE_CEILING = 221  # set to the count --update-baseline printed in Step 1
+BASELINE_CEILING = 142  # cycle 2 (2026-09): empty-except swept 79 -> 0; 140 broad-except + 2 suppress remain
 
 
 def test_baseline_only_shrinks():
