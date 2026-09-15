@@ -66,8 +66,8 @@ class PrecedentCorpus:
         _logger.warning("Semantic precedent matching disabled for this run: %s", why)
         try:
             self._marker_path.touch()
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.debug("precedent marker %s not written: %s", self._marker_path, exc)
 
     def match(self, text: str) -> float | None:
         """Best cosine similarity of *text* against the corpus, or None."""

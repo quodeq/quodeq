@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
+from quodeq.update import source
 from quodeq.update.source import LatestInfo, fetch_latest
 
 _GH_RELEASE = {
@@ -105,6 +106,21 @@ def test_wheel_takes_version_from_pypi() -> None:
         info = fetch_latest("wheel")
     assert info is not None and info.version == "1.6.0"
     assert info.url == _GH_RELEASE["html_url"]  # changelog still from GitHub
+
+
+def test_wheel_pypi_error_keeps_github_tag_and_logs() -> None:
+    def fake_get(url, *a, **k):
+        if "pypi.org" in url:
+            raise source.httpx.HTTPError("down")
+        return _resp(payload=_GH_RELEASE)
+
+    with patch("quodeq.update.source.httpx.get", side_effect=fake_get):
+        with patch.object(source._logger, "debug") as debug:
+            info = fetch_latest("wheel")
+    assert info is not None
+    assert info.version == "1.5.0"  # GitHub tag_name, PyPI lookup failed
+    assert debug.called
+    assert "PyPI version lookup failed" in debug.call_args.args[0]
 
 
 def test_not_modified_returns_sentinel() -> None:

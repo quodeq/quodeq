@@ -7,6 +7,7 @@ import …`` statements continue to work unchanged.
 
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Callable
 
@@ -89,6 +90,9 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
         logging.getLogger(__name__).debug("update notice failed", exc_info=True)
 
 
+_logger = logging.getLogger(__name__)
+
+
 def _install_broken_pipe_guard() -> None:
     """Silently redirect stdout/stderr to /dev/null after a BrokenPipeError.
 
@@ -113,8 +117,9 @@ def _install_broken_pipe_guard() -> None:
                 devnull = _os.open(_os.devnull, _os.O_WRONLY)
                 _os.dup2(devnull, _sys.stdout.fileno())
                 _os.dup2(devnull, _sys.stderr.fileno())
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug(
+                    "could not redirect stdio to devnull after BrokenPipeError: %s", exc)
             return  # swallow
         previous_hook(exc_type, exc_value, traceback)
 

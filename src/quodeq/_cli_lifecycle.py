@@ -178,8 +178,9 @@ def _cleanup_run_artifacts(pid_file: Path, args: argparse.Namespace, inputs: Res
 
     try:
         pid_file.unlink(missing_ok=True)
-    except OSError:
-        pass  # non-fatal; cancel-by-filesystem just won't work for this run
+    except OSError as exc:
+        _logger.debug(
+            "pid file cleanup failed; cancel-by-filesystem is unavailable for this run: %s", exc)
     if _facade.is_repo_url(args.repo):
         _facade.cleanup_cloned_repo(str(inputs.src))
     if inputs.worktree_dir and inputs.worktree_origin:
@@ -276,8 +277,9 @@ def _run_pipeline_with_cleanup(
     pid_file = run_dir / ".pid"
     try:
         pid_file.write_text(str(os.getpid()), encoding="utf-8")
-    except OSError:
-        pass  # non-fatal; cancel-by-filesystem just won't work for this run
+    except OSError as exc:
+        _logger.debug(
+            "pid file write failed; cancel-by-filesystem is unavailable for this run: %s", exc)
 
     config = _facade._build_run_config(args, inputs=inputs, evidence_dir=evidence_dir, run_dir=run_dir)
 

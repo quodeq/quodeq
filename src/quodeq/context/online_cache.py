@@ -122,8 +122,8 @@ def _touch(path: Path) -> None:
     """
     try:
         os.utime(path, None)
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("cache touch failed for %s: %s", path, exc)
 
 
 def _prune_lru(root: Path, *, keep: int) -> None:

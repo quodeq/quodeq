@@ -3,6 +3,7 @@ any error so the caller can never be broken by the network."""
 
 from __future__ import annotations
 
+import logging
 import sys
 from dataclasses import dataclass
 
@@ -10,6 +11,8 @@ import httpx
 
 from quodeq import __version__
 from quodeq.update.compare import normalize
+
+_logger = logging.getLogger(__name__)
 
 _PYPI_URL = "https://pypi.org/pypi/quodeq/json"
 _GH_LATEST_URL = "https://api.github.com/repos/quodeq/quodeq/releases/latest"
@@ -98,6 +101,6 @@ def fetch_latest(
                 pypi_version = normalize(str(pypi_data.get("info", {}).get("version") or ""))
                 if pypi_version:
                     info.version = pypi_version
-        except (httpx.HTTPError, ValueError):
-            pass  # keep the GitHub tag as the version
+        except (httpx.HTTPError, ValueError) as exc:
+            _logger.debug("PyPI version lookup failed, keeping the GitHub tag: %s", exc)
     return info

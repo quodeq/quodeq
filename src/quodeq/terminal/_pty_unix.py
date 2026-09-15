@@ -3,6 +3,7 @@ POSIX-only stdlib imports are safe at module top level."""
 from __future__ import annotations
 
 import fcntl
+import logging
 import os
 import select
 import struct
@@ -11,6 +12,8 @@ import sys
 import termios
 
 from quodeq.shared._process_kill import kill_proc_tree
+
+_logger = logging.getLogger(__name__)
 
 _ALLOWED_SHELL_BASENAMES = frozenset({"zsh", "bash", "fish", "sh", "dash", "tcsh", "ksh"})
 # $SHELL must live in a system-managed bin directory. Validating the basename
@@ -40,7 +43,10 @@ def _make_controlling_tty() -> None:
     try:
         fcntl.ioctl(0, _TIOCSCTTY, 0)  # fd 0 == the slave in the child
     except OSError:
-        pass
+        # Post-fork preexec hook: no logging or allocation is safe here and
+        # the spawn must proceed. The shell reports the consequence itself
+        # ("can't access tty; job control turned off").
+        return
 
 
 def resolve_shell(env: dict[str, str] | None = None) -> list[str]:
@@ -106,8 +112,8 @@ class UnixPty:
         if self._master_fd is not None:
             try:
                 os.write(self._master_fd, data)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("pty write dropped, master closed: %s", exc)
 
     def resize(self, cols: int, rows: int) -> None:
         if self._master_fd is not None:
@@ -128,13 +134,13 @@ class UnixPty:
             # sends SIGKILL, so this returns promptly; bound it regardless).
             try:
                 self._proc.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                pass
+            except subprocess.TimeoutExpired as exc:
+                _logger.debug("pty child did not exit within 2s after kill: %s", exc)
         if self._master_fd is not None:
             try:
                 os.close(self._master_fd)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("pty master close failed: %s", exc)
             self._master_fd = None
 
 

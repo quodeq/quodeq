@@ -138,8 +138,8 @@ def _accumulated_finding_keys(ctx: ToolContext, add) -> None:
         for d in (_accumulated_dims(ctx, rescored=False) or []):
             for v in (d.get("violations") or []):
                 add(v)
-    except (ToolError, OSError, ValueError):
-        pass
+    except (ToolError, OSError, ValueError) as exc:
+        _logger.debug("accumulated findings unavailable for identity keys: %s", exc)
 
 
 def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:

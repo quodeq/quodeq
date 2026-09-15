@@ -10,10 +10,13 @@ _isolate_quodeq_home fixture isolates this file automatically.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 _STATE_FILENAME = "update_state.json"
 
@@ -64,10 +67,11 @@ def write_state(state: UpdateState, env: dict[str, str] | None = None) -> None:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
             fh.write(json.dumps(asdict(state), indent=2))
         os.replace(tmp_name, path)
-    except OSError:
+    except OSError as exc:
+        _logger.debug("update state write failed (fail-soft): %s", exc)
         # fail-silent: a notice is never worth crashing over
         if tmp_name is not None:
             try:
                 os.unlink(tmp_name)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("temp notice file %s not removed: %s", tmp_name, exc)
