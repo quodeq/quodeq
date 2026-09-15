@@ -5,6 +5,8 @@ avoid pushing that file over the 300-line size ratchet.
 """
 from __future__ import annotations
 
+import pytest
+
 from quodeq.ci.review_builder import violation_to_comment
 
 
@@ -69,7 +71,7 @@ def test_markdown_in_title_reason_and_req_is_escaped():
     assert body.startswith("🆕 NEW · **MINOR** — ")
     # Every control character is backslash-escaped, so GitHub renders it as
     # the literal character instead of a heading, link, tag, or emphasis.
-    assert "\\# Fake heading \\[link\\](https://evil.example) \\<img src=x\\>" in body
+    assert "\\# Fake heading \\[link\\](https://\u200bevil.example) \\<img src=x\\>" in body
     assert "trailing \\`code\\` and \\*\\*bold\\*\\* and \\_em\\_" in body
     assert "_Requirement: S-INT-9 \\| extra_" in body
 
@@ -77,7 +79,7 @@ def test_markdown_in_title_reason_and_req_is_escaped():
         reports=[], new_violations=[violation], existing_violations=[],
         outside_diff_violations=[violation],
     )
-    assert "\\[link\\](https://evil.example) \\<img src=x\\>" in summary
+    assert "\\[link\\](https://\u200bevil.example) \\<img src=x\\>" in summary
 
 
 def test_plain_text_is_left_alone():
@@ -85,3 +87,35 @@ def test_plain_text_is_left_alone():
     body = violation_to_comment(violation)["body"]
     assert "— Missing input validation" in body
     assert "_Requirement: V5.1.1_" in body
+
+
+def test_bare_urls_and_mentions_do_not_autolink():
+    # GitHub's extended-autolink and @mention scans run on rendered text, so a
+    # backslash cannot defuse them; the trigger sequence itself must be broken.
+    violation = {
+        "file": "a.py", "line": 1, "severity": "minor",
+        "title": "See https://evil.example/steal or www.evil.example",
+        "reason": "ping @octocat too",
+    }
+    body = violation_to_comment(violation)["body"]
+    assert "https://evil" not in body
+    assert "www.evil" not in body
+    assert "@octocat" not in body
+    assert "evil.example/steal" in body  # only the trigger is broken, the text survives
+
+
+@pytest.mark.parametrize(
+    ("reason", "expected"),
+    [
+        ("- not a bullet", "\\- not a bullet"),
+        ("+ not a bullet", "\\+ not a bullet"),
+        ("1. not ordered", "1\\. not ordered"),
+        ("2) not ordered", "2\\) not ordered"),
+        ("--- not a rule", "\\--- not a rule"),
+    ],
+)
+def test_reason_at_paragraph_start_cannot_open_a_block(reason, expected):
+    # reason is its own paragraph, so a leading list or rule marker would
+    # otherwise render as a bullet, an ordered item, or a horizontal rule.
+    body = violation_to_comment({"file": "a.py", "line": 1, "severity": "minor", "title": "t", "reason": reason})["body"]
+    assert "\n\n" + expected in body
