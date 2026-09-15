@@ -15,7 +15,7 @@ _LEADING_BLOCK_MARKER = re.compile(r"^(\d+)([.)])|^([-+])")
 # resolved, so escaping cannot defuse them. A zero-width space after the
 # trigger breaks the scan while leaving the text readable.
 _AUTOLINK_TRIGGER = re.compile(r"(https?://|www\.|@)", re.IGNORECASE)
-_ZWSP = "​"
+_ZWSP = "\u200b"
 
 
 def _escape_leading_marker(match: re.Match) -> str:
