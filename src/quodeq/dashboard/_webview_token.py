@@ -8,6 +8,7 @@ import subprocess
 import sys
 import typing
 
+_logger = logging.getLogger(__name__)
 # Env var read by quodeq.api.security to gate the webview-only CSP
 # relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
 _ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
@@ -77,8 +78,8 @@ def _send_token(window_proc: subprocess.Popen | None) -> None:
     try:
         stdin.write(f"{_get_webview_token()}\n".encode())
         stdin.flush()
-    except (OSError, ValueError):
-        pass
+    except (OSError, ValueError) as exc:
+        _logger.debug("webview token handoff failed: %s", exc)
     finally:
         # Must close even when the write failed: the child blocks in
         # readline() until this end is closed.

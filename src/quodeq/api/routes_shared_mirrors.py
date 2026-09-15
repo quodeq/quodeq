@@ -29,6 +29,7 @@ from quodeq.services.shared_repo import (
     shared_index_db_path,
 )
 from quodeq.services.verified import verified_entries
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.serialization import to_camel_dict
 
 from .routes_shared_common import _logger, _shared_project_dir, _validate_segment, _with_shared_root
@@ -133,7 +134,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
             return err
         run = request.args.get("run", "latest")
         try:
-            payload = _fs_reports.get_dashboard(str(eval_root), project, run)
+            payload = _fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
         except FileNotFoundError:
             body, status = error_response("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
@@ -223,7 +224,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
         if err:
             return err
         try:
-            payload = _fs_reports.get_violations(str(eval_root), project, run_id)
+            payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
         except FileNotFoundError:
             body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

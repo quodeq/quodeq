@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.shared_repo import (
     check_repo_format,
     ensure_shared_clone,
@@ -28,7 +29,7 @@ class ConnectOutcome:
     detail: str = ""  # ValueError text, only set for invalid_url
 
 
-def connect_shared_repo(url: str) -> ConnectOutcome:
+def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     """Validate, clone (or refresh an existing clone of), and format-check *url*.
 
     Persists the new setting on success. Moved verbatim from the PUT
@@ -65,5 +66,5 @@ def connect_shared_repo(url: str) -> ConnectOutcome:
         return ConnectOutcome(status="foreign", url=url)
     if fmt == "unsupported_version":
         return ConnectOutcome(status="unsupported_version", url=url)
-    write_settings(SharedSettings(url=url))
+    write_settings(SharedSettings(url=url), log=log)
     return ConnectOutcome(status="ok", url=url)

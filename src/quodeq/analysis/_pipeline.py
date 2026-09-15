@@ -109,7 +109,8 @@ def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> None:
         return  # dev mode (no run_dir) — nothing for the dashboard to read
     try:
         estimates = compute_dim_estimates(config, dimensions, log=SHARED_LOG)
-    except (OSError, ValueError, KeyError, RuntimeError):
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
+        SHARED_LOG.debug(f"dim estimates skipped; the dashboard falls back to the project-wide ceiling: {exc}")
         return
     write_dim_estimates(config.work_dir.parent, estimates)
 

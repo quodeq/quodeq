@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -139,3 +139,23 @@ def test_any_exception_is_swallowed(tmp_path: Path) -> None:
         Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
     )
     assert moved is False
+
+
+def test_previous_bundle_removal_failure_aborts_the_move(tmp_path: Path, monkeypatch) -> None:
+    runner = _runner()
+    apps_dir = tmp_path / "Applications"
+    apps_dir.mkdir()
+    (apps_dir / "Quodeq.app").mkdir()  # a previous install is present
+
+    def _denied(path, *_a, **_k):
+        raise OSError(13, "Permission denied", str(path))
+
+    monkeypatch.setattr(first_launch.shutil, "rmtree", _denied)
+    with patch.object(first_launch._logger, "warning") as warning:
+        moved = first_launch.offer_move_to_applications(
+            Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=apps_dir, runner=runner,
+        )
+    assert moved is False
+    assert [Path(c[0]).name for c in runner.calls] == ["osascript"]  # ditto never ran
+    assert warning.called
+    assert "could not remove the previous bundle" in warning.call_args.args[0]

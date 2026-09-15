@@ -88,8 +88,8 @@ def write_pidfile() -> None:
 def remove_pidfile() -> None:
     try:
         _pidfile_path().unlink()
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("could not remove menubar pidfile: %s", exc)
 
 
 def spawn() -> bool:

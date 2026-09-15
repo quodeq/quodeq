@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from quodeq.config.paths import default_paths
+from quodeq.core.observability import NULL_LOG, LogSink
 
 _logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class ScoringInputs:
     git_scores: dict[str, float]
     prev_violations: dict[str, int]
     max_prev_violations: int
+    log: LogSink = NULL_LOG
 
 
 @lru_cache(maxsize=1)

@@ -7,6 +7,11 @@ by tests/api/test_terminal_routes.py.
 """
 from __future__ import annotations
 
+from unittest.mock import patch
+
+from flask_sock import ConnectionClosed
+
+from quodeq.api import _terminal_ws_helpers as ws_helpers
 from quodeq.api._terminal_ws_helpers import setup_terminal_session
 
 
@@ -74,3 +79,15 @@ def test_setup_failure_swallows_send_error_on_disconnected_client():
 
     ok = setup_terminal_session(_RaisingManager(), _DeadWs())
     assert ok is False  # must not raise past this point
+
+
+def test_setup_failure_logs_when_client_closed_before_fallback_frame():
+    class _ClosedWs(_FakeWs):
+        def send(self, data):
+            raise ConnectionClosed()
+
+    with patch.object(ws_helpers._logger, "warning"), patch.object(ws_helpers._logger, "debug") as debug:
+        ok = setup_terminal_session(_RaisingManager(), _ClosedWs())
+    assert ok is False
+    assert debug.called
+    assert "client already gone" in debug.call_args.args[0]

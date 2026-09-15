@@ -82,6 +82,8 @@ class RunLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             self._writer.write(self.format(record))
-        except Exception:
-            # Logging must never crash the app.
-            pass
+        except (OSError, ValueError, TypeError, KeyError):
+            # Logging must never crash the app. The stdlib contract for a
+            # failing handler is handleError: it reports to stderr (when
+            # logging.raiseExceptions is set) and never raises.
+            self.handleError(record)

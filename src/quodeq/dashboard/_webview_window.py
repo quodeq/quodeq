@@ -184,8 +184,8 @@ def _apply_macos_fullscreen_chrome(
                 nswindow.setToolbar_(None)
             elif restore_toolbar:
                 _chrome._apply_unified_toolbar(nswindow)
-        except (AttributeError, ValueError, TypeError, ImportError):
-            pass
+        except (AttributeError, ValueError, TypeError, ImportError) as exc:
+            _logger.debug("macOS fullscreen chrome not applied: %s", exc)
     _set_macos_fullscreen_class(window, is_full)
 
 

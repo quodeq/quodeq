@@ -123,8 +123,8 @@ class EvaluationsIndex:
         try:
             if hasattr(self._jobs, "delete"):
                 self._jobs.delete(job_id)
-        except (KeyError, AttributeError):
-            pass
+        except (KeyError, AttributeError) as exc:
+            _logger.debug("in-memory job entry already gone on delete: %s", exc)
         return removed_dir
 
     def get_status(self, job_id: str, reports_dir: Path | None = None) -> JobSnapshot | None:

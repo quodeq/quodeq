@@ -223,6 +223,9 @@ def _build_cache_entry_for_file(
     grouped: dict[str, list[dict]], provenance: CachePersistProvenance,
 ) -> CacheEntry:
     """Build the CacheEntry for one dispatched file's persisted result."""
+    content_hash = _hash_file(config.src / target.file_path)
+    if content_hash is None:
+        _logger.debug("content hash unavailable for %s; cache entry stored without it", target.file_path)
     return CacheEntry(
         key=target.key,
         schema_version=_SCHEMA_VERSION,
@@ -231,7 +234,7 @@ def _build_cache_entry_for_file(
         file_path=target.file_path,
         dimension=dimension,
         model_id=target.model_id,
-        file_content_hash=_hash_file(config.src / target.file_path) or "",
+        file_content_hash=content_hash or "",
         language=config.language or "",
         params_hash=provenance.params_hash,
         provenance=build_provenance(

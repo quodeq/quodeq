@@ -218,9 +218,11 @@ def _log_csp_ws_failure(exc: Exception) -> None:
     raise and must never become an unbounded log source on its own: only
     the exception's type name is logged (no header/request content, so
     nothing attacker-controlled reaches the log line), and repeats within
-    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. Any failure logging
-    itself (e.g. a misbehaving handler) is swallowed here so the response
-    still completes with the safe (omitted same-origin ws entry) fallback.
+    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. A failing handler is the
+    handler's problem (stdlib handleError contract); this module does not
+    control its logger's handlers, and ``_add_security_headers`` already
+    logs unguarded on every request, so a guard here never covered the
+    real risk.
     """
     global _last_csp_ws_failure_log_at
     now = time.monotonic()
@@ -230,16 +232,13 @@ def _log_csp_ws_failure(exc: Exception) -> None:
     ):
         return
     _last_csp_ws_failure_log_at = now
-    try:
-        _logger.warning(
-            "CSP same-origin ws/wss connect-src computation failed (%s); "
-            "omitting that entry for this response (further repeats "
-            "suppressed for %ss)",
-            type(exc).__name__,
-            _CSP_WS_FAILURE_LOG_INTERVAL_S,
-        )
-    except Exception:  # noqa: BLE001 — logging must never break header assembly
-        pass
+    _logger.warning(
+        "CSP same-origin ws/wss connect-src computation failed (%s); "
+        "omitting that entry for this response (further repeats "
+        "suppressed for %ss)",
+        type(exc).__name__,
+        _CSP_WS_FAILURE_LOG_INTERVAL_S,
+    )
 
 
 def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:

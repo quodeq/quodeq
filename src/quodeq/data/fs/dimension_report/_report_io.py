@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -11,6 +12,8 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.shared.validation import validate_path_segment
 
 from quodeq.data.fs.dimension_report._report_assembly import build_full_report, build_dashboard_report
+
+_logger = logging.getLogger(__name__)
 
 
 def _persist_json(data: dict, path: Path) -> None:
@@ -35,8 +38,8 @@ def _persist_json(data: dict, path: Path) -> None:
         if tmp_path is not None:
             try:
                 os.unlink(tmp_path)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("temp dimension report file not removed after a failed write: %s", exc)
 
 
 def write_reports(

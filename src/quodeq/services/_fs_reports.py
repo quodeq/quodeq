@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.config.paths import default_paths
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import ViolationResponse, ViolationSummary
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
@@ -16,7 +17,9 @@ from quodeq.services.violations import _ResolveOptions, aggregate_violations, re
 _SCAN_FILENAME = "scan.json"
 
 
-def _enrich_with_coverage(reports_dir: str, project: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _enrich_with_coverage(
+    reports_dir: str, project: str, payload: dict[str, Any], *, log: LogSink = NULL_LOG,
+) -> dict[str, Any]:
     """Add coverage fields from scan.json if available."""
     scan_path = Path(reports_dir) / project / _SCAN_FILENAME
     if not scan_path.exists():
@@ -33,15 +36,15 @@ def _enrich_with_coverage(reports_dir: str, project: str, payload: dict[str, Any
             payload["analyzedFiles"] = min(files_count, total)
         else:
             payload["analyzedFiles"] = None
-    except (json.JSONDecodeError, OSError):
-        pass
+    except (json.JSONDecodeError, OSError) as exc:
+        log.debug(f"coverage enrichment skipped for {project}: {exc}")
     return payload
 
 
-def get_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
+def get_dashboard(reports_dir: str, project: str, run: str, *, log: LogSink = NULL_LOG) -> dict[str, Any]:
     """Return the dashboard payload for a specific project run."""
     payload = build_dashboard(reports_dir, project, run)
-    return _enrich_with_coverage(reports_dir, project, payload)
+    return _enrich_with_coverage(reports_dir, project, payload, log=log)
 
 
 def get_accumulated(reports_dir: str, project: str, as_of: str | None) -> dict[str, Any] | None:
@@ -78,7 +81,7 @@ def get_dimension_eval(
     return None
 
 
-def get_violations(reports_dir: str, project: str, run_id: str) -> ViolationSummary:
+def get_violations(reports_dir: str, project: str, run_id: str, *, log: LogSink = NULL_LOG) -> ViolationSummary:
     """Return aggregated violation counts and top files for a run."""
-    dashboard = get_dashboard(reports_dir, project, run_id)
+    dashboard = get_dashboard(reports_dir, project, run_id, log=log)
     return aggregate_violations(dashboard)

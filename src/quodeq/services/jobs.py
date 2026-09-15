@@ -231,8 +231,8 @@ class JobManager(_JobMonitorMixin):
             for job_id, process in list(self._processes.items()):
                 try:
                     _kill_tree(process.pid)
-                except (ProcessLookupError, OSError):
-                    pass
+                except (ProcessLookupError, OSError) as exc:
+                    self._log.debug(f"job {job_id} process already gone during shutdown: {exc}")
             self._processes.clear()
 
     def get_job(self, job_id: str, reports_root: Path | None = None) -> JobSnapshot | None:

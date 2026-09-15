@@ -104,8 +104,8 @@ def cached_accumulated(
                 cached = read_cached_accumulated(conn, project, version)
             if cached is not None:
                 return cached
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as exc:
+            log.debug(f"score-cache re-check read failed for accumulated {project}: {exc}")
         result = compute()
         if cacheable is not None and not cacheable(result):
             return result
@@ -144,8 +144,8 @@ def cached_project_summary(
                 hit = read_cached_project_summary(conn, project, version)
             if hit is not None:
                 return hit
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as exc:
+            log.debug(f"score-cache re-check read failed for project summary {project}: {exc}")
         result = compute()
         try:
             with open_score_cache() as conn:

@@ -13,8 +13,10 @@ from here at module load time.
 """
 from __future__ import annotations
 
+import logging
 import sys
 
+_logger = logging.getLogger(__name__)
 _macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
 _macos_fullscreen_observer_installed = False  # register the notifications once
 _macos_fullscreen_handler_class = None  # the ObjC handler class is defined once per process
@@ -74,8 +76,8 @@ def _sync_fullscreen_observer(window: object, nswindow: object) -> None:
         # Don't re-add the toolbar windowed — _set_macos_unified_toolbar
         # already installed it; a second one would race/flicker.
         _apply_macos_fullscreen_chrome(window, is_full, restore_toolbar=False)
-    except (AttributeError, ValueError, TypeError):
-        pass
+    except (AttributeError, ValueError, TypeError) as exc:
+        _logger.debug("fullscreen observer sync failed: %s", exc)
 
 
 def _install_macos_fullscreen_observer(window: object) -> None:

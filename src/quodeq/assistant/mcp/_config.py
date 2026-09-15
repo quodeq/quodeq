@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -9,6 +10,8 @@ import threading
 from pathlib import Path
 
 from quodeq.shared._mcp import codex_mcp_override
+
+_logger = logging.getLogger(__name__)
 
 _SERVER_NAME = "quodeq-assistant"
 _SERVER_MODULE = ["-m", "quodeq.assistant.mcp.server"]
@@ -61,8 +64,8 @@ def _unregister_locked(cmd: str) -> None:
     try:
         subprocess.run([cmd, "mcp", "remove", _SERVER_NAME],
                        check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        _logger.debug("MCP server unregister via %s failed: %s", cmd, exc)
     _registered.discard(key)
 
 

@@ -25,10 +25,10 @@ _ALLOWLIST: set[str] = {
     # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from analysis/_process.py so
     # services/ and analysis/ can share one implementation.
-    "shared/_process_kill.py:29",
+    "shared/_process_kill.py:32",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from assistant to shared.
-    "shared/_process_kill.py:71",
+    "shared/_process_kill.py:76",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
     "shared/resource_sampler.py:44",
@@ -44,10 +44,10 @@ _ALLOWLIST: set[str] = {
     # are therefore never reached on Windows, and each call is wrapped to
     # degrade gracefully anyway. The ps call in _is_quodeq_process only sees
     # pids from find_pids_on_port, which returns [] off-darwin.
-    "menubar/_process.py:80",
-    "menubar/_process.py:92",
-    "menubar/_app_lifecycle.py:155",
-    "menubar/_app_lifecycle.py:167",
+    "menubar/_process.py:83",
+    "menubar/_process.py:95",
+    "menubar/_app_lifecycle.py:157",
+    "menubar/_app_lifecycle.py:169",
 }
 
 

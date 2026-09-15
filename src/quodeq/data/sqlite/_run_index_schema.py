@@ -74,8 +74,8 @@ def _close_quietly(db: sqlite3.Connection) -> None:
     # subsequent unlink would raise PermissionError unless closed first.
     try:
         db.close()
-    except sqlite3.Error:
-        pass
+    except sqlite3.Error as exc:
+        _logger.debug("run index connection close failed: %s", exc)
 
 
 def _connect_with_pragmas(db_path: Path) -> sqlite3.Connection:

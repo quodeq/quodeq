@@ -29,8 +29,8 @@ def is_private_address(hostname: str) -> bool:
     try:
         addr = ipaddress.ip_address(socket.inet_ntoa(socket.inet_aton(hostname)))
         return addr.is_private or addr.is_loopback or addr.is_link_local
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("%r is not an IPv4 literal (%s), falling through to DNS", hostname, exc)
     try:
         for _fam, _typ, _pro, _can, sockaddr in socket.getaddrinfo(hostname, None):
             addr = ipaddress.ip_address(sockaddr[0])

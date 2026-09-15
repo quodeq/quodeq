@@ -239,8 +239,8 @@ class InstanceController:
         if self._server_sock:
             try:
                 self._server_sock.close()
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("instance shutdown cleanup failed: %s", exc)
         if self._listen_thread:
             self._listen_thread.join(timeout=0.5)
         if not owns_socket:

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import os
 from http import HTTPStatus
 from pathlib import Path
@@ -32,6 +33,8 @@ from quodeq.services._fs_project_helpers import (
 )
 from quodeq.services._fs_scan import scan_project
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 
 def _reports_dir() -> str:
@@ -75,8 +78,8 @@ def project_scan(project: str) -> Response | tuple[Response, int]:
         try:
             data = json.loads(scan_path.read_text(encoding="utf-8"))
             return jsonify(data)
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project, exc)
 
     # Check if local — read the project's repository record (via the
     # service layer; the route keeps no repository_info.json knowledge).

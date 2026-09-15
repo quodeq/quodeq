@@ -131,7 +131,7 @@ class RunLifecycleContext:
         )
         self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
         self._resources = ResourceSampler()
-        self._signals = _SignalGuard(self._handle_signal)
+        self._signals = _SignalGuard(self._handle_signal, log=_logger)
         self._atexit = _AtexitGuard(self._finalize_on_atexit)
         self._pending_exit_reason: str | None = None
 

@@ -65,8 +65,8 @@ def _dismissed_key_for_violation(v: dict) -> tuple:
         parts = raw_file.rsplit(":", 1)
         try:
             return (req, parts[0], int(parts[1]))
-        except (ValueError, IndexError):
-            pass
+        except (ValueError, IndexError) as exc:
+            _logger.debug("violation line could not be parsed for its dismissal key: %s", exc)
     return (req, raw_file, 0)
 
 

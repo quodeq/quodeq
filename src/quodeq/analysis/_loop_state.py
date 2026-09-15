@@ -104,4 +104,8 @@ def _silence_broken_stdout() -> None:
         sys.stdout = devnull
         sys.stderr = devnull
     except OSError:
-        pass
+        # /dev/null itself could not be opened, so the streams stay broken and
+        # there is no channel left to report on. Callers proceed; later writes
+        # keep raising BrokenPipeError, which the loop already treats as
+        # non-fatal.
+        return

@@ -118,8 +118,11 @@ def _spawn_and_wait_local(
 
 def _wait_for_process(proc: subprocess.Popen) -> None:
     """Block until *proc* terminates, polling every 5 seconds."""
+    logged = False
     while proc.poll() is None:
         try:
             proc.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            pass
+        except subprocess.TimeoutExpired as exc:
+            if not logged:
+                log_debug(f"dashboard process still running after {_PROCESS_WAIT_TIMEOUT_S}s; waiting: {exc}")
+                logged = True

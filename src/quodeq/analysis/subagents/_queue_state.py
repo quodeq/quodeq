@@ -44,8 +44,8 @@ def cleanup_stale_lock(lock_path: Path, threshold: float = _STALE_LOCK_THRESHOLD
     if age > threshold:
         try:
             lock_path.unlink()
-        except FileNotFoundError:
-            pass  # another process already cleaned it up
+        except FileNotFoundError as exc:
+            _log.debug("stale lock already removed by another process: %s", exc)
         _log.debug(
             "Removed stale lock file %s (age=%.1fs, threshold=%.0fs)",
             lock_path, age, threshold,
@@ -116,5 +116,5 @@ def write_state(state: dict, path: Path) -> None:
         if cleanup_tmp is not None:
             try:
                 os.unlink(cleanup_tmp)
-            except OSError:
-                pass
+            except OSError as exc:
+                _log.debug("temp queue state file not removed after a failed write: %s", exc)

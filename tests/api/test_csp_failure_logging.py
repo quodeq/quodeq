@@ -132,22 +132,28 @@ def test_csp_header_first_failure_logs_on_freshly_booted_machine(monkeypatch, se
     )
 
 
-def test_csp_header_logging_cannot_break_response_even_if_logger_raises(monkeypatch, caplog):
-    """The log call itself must be provably safe: even if logging blows up
-    (e.g. a misbehaving handler), the response must still complete with the
-    safe fallback rather than turning into a 500.
-    """
+def test_csp_header_logging_cannot_break_response_even_if_a_handler_raises(monkeypatch):
+    """A misbehaving handler must be contained by the handler contract
+    (handleError), so the response still completes with the safe fallback."""
     monkeypatch.setattr(security_module, "_same_origin_ws_sources", _boom)
     _reset_throttle(monkeypatch)
 
-    def _raising_warning(*_args, **_kwargs):
-        raise RuntimeError("logging handler exploded")
+    class _ExplodingHandler(logging.Handler):
+        def emit(self, record):
+            try:
+                raise RuntimeError("logging handler exploded")
+            except RuntimeError:
+                self.handleError(record)
 
-    monkeypatch.setattr(security_module._logger, "warning", _raising_warning)
-
-    app = create_app()
-    with app.test_client() as client:
-        resp = client.get("/api/health")
+    handler = _ExplodingHandler()
+    security_module._logger.addHandler(handler)
+    monkeypatch.setattr(logging, "raiseExceptions", False)  # keep the traceback off the test's stderr
+    try:
+        app = create_app()
+        with app.test_client() as client:
+            resp = client.get("/api/health")
+    finally:
+        security_module._logger.removeHandler(handler)
 
     assert resp.status_code == 200
     assert "wss://" not in resp.headers["Content-Security-Policy"]

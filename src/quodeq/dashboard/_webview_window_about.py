@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from quodeq.shared.logging import log_debug
 
 _APP_DISPLAY_NAME = "quodeq"
 
@@ -255,8 +256,8 @@ def _set_macos_app_identity() -> None:
         if info is not None:
             info["CFBundleName"] = _APP_DISPLAY_NAME
             info["CFBundleDisplayName"] = _APP_DISPLAY_NAME
-    except (AttributeError, TypeError):
-        pass
+    except (AttributeError, TypeError) as exc:
+        log_debug(f"bundle name patch skipped: {exc}")
     path = _icon_path(".icns")
     if not path:
         return
@@ -269,8 +270,8 @@ def _set_macos_app_identity() -> None:
     _macos_app_icon = icon  # keep a live reference for the About-panel override
     try:
         NSApplication.sharedApplication().setApplicationIconImage_(icon)
-    except (AttributeError, ValueError):
-        pass
+    except (AttributeError, ValueError) as exc:
+        log_debug(f"dock icon not set: {exc}")
     # Override the default About panel so it shows our icon + name. The
     # standard panel reads from Info.plist and ignores setApplicationIconImage_
     # for non-bundled apps, so we wire a custom action on the first-responder
@@ -295,5 +296,5 @@ def _set_app_icon() -> None:
                     ctypes.windll.user32.SendMessageW(
                         ctypes.windll.kernel32.GetConsoleWindow(), 0x0080, 0, hicon,
                     )
-        except (AttributeError, OSError):
-            pass
+        except (AttributeError, OSError) as exc:
+            log_debug(f"windows taskbar icon not set: {exc}")

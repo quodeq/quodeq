@@ -9,6 +9,7 @@ duplicated.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -19,6 +20,8 @@ from pathlib import Path
 from quodeq.assistant.worktree import (
     WorktreeError, _run, _run_bytes, diff_stats, diff_text, worktrees_base,
 )
+
+_logger = logging.getLogger(__name__)
 
 _BRANCH_PREFIX = "quodeq/fix-"
 _MAX_BRANCH_TRIES = 5
@@ -82,8 +85,8 @@ class WorktreeManager:
         if delete_branch:
             try:
                 _run(["git", "-C", str(self.repo_root), "branch", "-D", self.branch])
-            except WorktreeError:
-                pass  # branch already gone; removal is best-effort
+            except WorktreeError as exc:
+                _logger.debug("branch %s already gone: %s", self.branch, exc)
 
     def apply_to_repo(self) -> list[dict]:
         """Apply the worktree diff onto the user's working tree, uncommitted.

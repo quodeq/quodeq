@@ -138,8 +138,8 @@ def _detect_memory() -> float:
             # First GPU, value in MiB
             mib = float(out.decode().strip().split("\n")[0])
             return mib * _MIB_TO_BYTES
-    except (subprocess.SubprocessError, FileNotFoundError, ValueError, OSError):
-        pass
+    except (subprocess.SubprocessError, FileNotFoundError, ValueError, OSError) as exc:
+        _log.debug("GPU memory detection failed, assuming 0: %s", exc)
     return 0
 
 

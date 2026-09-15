@@ -190,8 +190,8 @@ def _write_env(
             os.close(fd)
         try:
             os.unlink(tmp_path)
-        except OSError:
-            pass
+        except OSError as exc:
+            log_debug(f"temp env file cleanup failed: {exc}")
         raise
 
 

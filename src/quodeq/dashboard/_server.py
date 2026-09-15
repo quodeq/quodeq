@@ -26,6 +26,7 @@ from quodeq.dashboard._webview_token import (
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
+_logger = logging.getLogger(__name__)
 _HTTP_SCHEME = "http"
 
 
@@ -112,8 +113,8 @@ def _make_tstp_handler(stop_children: typing.Callable) -> typing.Callable:
         # sees us exit, and tears itself down cleanly.
         try:
             os.kill(os.getppid(), signal.SIGCONT)
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.debug("SIGTSTP handling failed: %s", exc)
         sys.exit(0)
     return _handle_tstp
 
@@ -277,6 +278,6 @@ def _serve_blocking(
         else:
             signal.pause()
     except KeyboardInterrupt:
-        pass
+        _logger.debug("serve loop stopped by KeyboardInterrupt")
     finally:
         stop_children()

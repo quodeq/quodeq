@@ -48,8 +48,8 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     for f in all_files:
         try:
             stat_cache[f] = f.stat().st_size
-        except OSError:
-            pass
+        except OSError as exc:
+            _log.debug("source file skipped while gathering standards text: %s", exc)
 
     # Env-derived caps: read once per call, not once per candidate file.
     size_cap = dispatch_policy.api_file_size_cap()
@@ -154,8 +154,8 @@ def _load_standards_text(
                               dimension, len(text), limit)
                     text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
                 return text
-        except (OSError, _json.JSONDecodeError):
-            pass
+        except (OSError, _json.JSONDecodeError) as exc:
+            _log.debug("compiled standards file skipped: %s", exc)
     md_path = compiled_dir / f"{dimension}.md"
     if md_path.exists():
         try:
@@ -163,8 +163,8 @@ def _load_standards_text(
             if len(text) > limit:
                 text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
             return text
-        except OSError:
-            pass
+        except OSError as exc:
+            _log.debug("standards text file unreadable: %s", exc)
     return ""
 
 

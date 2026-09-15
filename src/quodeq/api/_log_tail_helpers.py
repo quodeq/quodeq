@@ -7,9 +7,12 @@ the split already used by ``_sse_log_helpers.py`` for the SSE tail generator.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from http import HTTPStatus
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 # Lines containing this marker are kept in run.log for forensics but suppressed
 # from the dashboard's live console — they're per-minute resource snapshots
@@ -100,6 +103,6 @@ def _stream_terminal_state(provider, job_id: str) -> str:
             state = data.get("state")
             if isinstance(state, str):
                 return state
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as exc:
+            _logger.debug("status.json unreadable for job %s, reporting completed: %s", job_id, exc)
     return "completed"

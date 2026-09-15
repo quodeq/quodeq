@@ -26,6 +26,8 @@ from quodeq.menubar._process import (
     _STDERR_READ_MAX,
 )
 
+_logger = _logging.getLogger(__name__)
+
 _PKILL_TIMEOUT_S = 5
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
 
@@ -165,8 +167,8 @@ class DashboardLifecycleMixin:
         for pattern in _PROCESS_PATTERNS:
             try:
                 subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=_PKILL_TIMEOUT_S)
-            except (subprocess.TimeoutExpired, OSError):
-                pass
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                _logger.debug("pkill -f %s failed: %s", pattern, exc)
 
     def _on_stop(self, _):
         self._terminate_process_group()

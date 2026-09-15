@@ -6,6 +6,7 @@ re-exported here for the rest of the codebase.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -15,6 +16,8 @@ from quodeq.core.utils.io import (  # noqa: F401 — re-exported API
     open_text,
     read_json,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def read_text(path: Path, *, errors: str = "strict") -> str:
@@ -44,5 +47,5 @@ def configure_stdio_utf8() -> None:
             continue
         try:
             reconfigure(encoding="utf-8")
-        except (ValueError, OSError):
-            pass
+        except (ValueError, OSError) as exc:
+            _logger.debug("stdio stream could not be reconfigured to UTF-8: %s", exc)
