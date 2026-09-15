@@ -44,6 +44,8 @@ from quodeq._cli_evaluation import (  # noqa: F401 — public re-exports
     run_evaluate,
 )
 
+_logger = logging.getLogger(__name__)
+
 
 _COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": lambda argv: dashboard_main(argv[1:] if argv is not None else sys.argv[2:]),
@@ -85,12 +87,7 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
                 file=out,
             )
     except Exception:  # pragma: no cover - defensive
-        import logging
-
-        logging.getLogger(__name__).debug("update notice failed", exc_info=True)
-
-
-_logger = logging.getLogger(__name__)
+        _logger.debug("update notice failed", exc_info=True)
 
 
 def _install_broken_pipe_guard() -> None:

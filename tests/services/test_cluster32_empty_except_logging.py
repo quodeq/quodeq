@@ -6,8 +6,6 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import pytest
-
 from quodeq.services import (
     _evaluations_index,
     _fs_reports,
@@ -172,7 +170,7 @@ def test_save_repo_index_logs_when_tmp_cleanup_also_fails(tmp_path, recording_lo
 
     assert recording_log.warning_messages  # the pre-existing outer failure log
     assert recording_log.debug_messages  # the new inner cleanup-failure log
-    assert "repo index save failed" in recording_log.debug_messages[0]
+    assert "temp repo index file not removed after a failed save" in recording_log.debug_messages[0]
 
 
 def test_job_manager_shutdown_logs_when_kill_tree_fails(recording_log, monkeypatch) -> None:

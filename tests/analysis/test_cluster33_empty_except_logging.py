@@ -95,7 +95,20 @@ def test_write_state_logs_cleanup_failure_after_replace_error(tmp_path, monkeypa
         _queue_state.write_state({"version": 1, "pending": [], "taken": []}, state_path)
 
     assert messages
-    assert "queue state write failed" in messages[0][0]
+    assert "temp queue state file not removed after a failed write" in messages[0][0]
+
+
+def test_load_standards_text_logs_corrupt_json_and_falls_back(tmp_path) -> None:
+    """The compiled JSON is corrupt; the handler logs it and falls through
+    to the (absent) .md file, the same failure path
+    ``test_subprocess_coverage.py::test_falls_back_to_md`` exercises for the
+    success case."""
+    (tmp_path / "security.json").write_text("{not json")
+    with patch.object(_api_standards_text._log, "debug") as debug:
+        result = _api_standards_text._load_standards_text(tmp_path, "security")
+    assert debug.called
+    assert "compiled standards file skipped" in debug.call_args.args[0]
+    assert result == ""
 
 
 def test_gather_source_files_logs_unreadable_file(tmp_path, monkeypatch) -> None:

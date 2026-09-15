@@ -114,7 +114,7 @@ class LocalFileBackend:
                 path.unlink(missing_ok=True)
                 self._mark_mutated()
             except OSError as exc:
-                _logger.debug("local cache read failed: %s", exc)
+                _logger.debug("corrupt local cache entry not removed: %s", exc)
             return None
 
     def put(self, key: str, entry: CacheEntry, *, index: bool = True) -> None:
@@ -142,7 +142,7 @@ class LocalFileBackend:
             try:
                 tmp.unlink(missing_ok=True)
             except OSError as exc:
-                _logger.debug("local cache write failed: %s", exc)
+                _logger.debug("temp cache file not removed after a failed write: %s", exc)
 
     def has(self, key: str) -> bool:
         return self._entry_path(key).is_file()

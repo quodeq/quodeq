@@ -78,7 +78,7 @@ def test_persist_json_logs_cleanup_unlink_failure(tmp_path) -> None:
         with pytest.raises(OSError):
             _report_io._persist_json({"ok": True}, target)  # (data, path) order
     assert debug.called
-    assert "write failed" in debug.call_args.args[0]
+    assert "not removed after a failed write" in debug.call_args.args[0]
 
 
 def test_release_backfill_claim_logs_database_error() -> None:
@@ -114,7 +114,7 @@ def test_local_backend_get_logs_read_failure_on_corrupt_cleanup(tmp_path) -> Non
         result = backend.get(key)
     assert result is None
     assert debug.called
-    assert "read failed" in debug.call_args.args[0]
+    assert "corrupt local cache entry not removed" in debug.call_args.args[0]
 
 
 def test_local_backend_put_logs_write_failure_on_tmp_cleanup(tmp_path) -> None:
@@ -133,7 +133,7 @@ def test_local_backend_put_logs_write_failure_on_tmp_cleanup(tmp_path) -> None:
     ):
         backend.put(key, entry)
     assert debug.called
-    assert "write failed" in debug.call_args.args[0]
+    assert "temp cache file not removed after a failed write" in debug.call_args.args[0]
 
 
 def test_release_lock_logs_oserror(tmp_path) -> None:
@@ -190,7 +190,7 @@ def test_count_active_agent_streams_logs_stat_failure() -> None:
         )
     assert count == 0
     assert debug.called
-    assert "stream file stat failed" in debug.call_args.args[0]
+    assert "stream directory glob failed" in debug.call_args.args[0]
 
 
 def test_dismissed_source_stamp_logs_unreadable_wal(tmp_path) -> None:
@@ -210,4 +210,4 @@ def test_insert_vectors_logs_skipped_rollback_failure() -> None:
         ok = precedent_vectors.insert_vectors(conn, "model-x", [("fp1", [0.1, 0.2])])
     assert ok is False
     assert debug.called
-    assert "insert skipped" in debug.call_args.args[0]
+    assert "rollback after a failed precedent vector insert also failed" in debug.call_args.args[0]

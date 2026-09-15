@@ -218,10 +218,11 @@ def _log_csp_ws_failure(exc: Exception) -> None:
     raise and must never become an unbounded log source on its own: only
     the exception's type name is logged (no header/request content, so
     nothing attacker-controlled reaches the log line), and repeats within
-    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. A failing handler is
-    contained by the handler itself (``_BufferHandler.emit`` and
-    ``RunLogHandler.emit`` follow the stdlib ``handleError`` contract), so
-    the call needs no guard here.
+    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. A failing handler is the
+    handler's problem (stdlib handleError contract); this module does not
+    control its logger's handlers, and ``_add_security_headers`` already
+    logs unguarded on every request, so a guard here never covered the
+    real risk.
     """
     global _last_csp_ws_failure_log_at
     now = time.monotonic()

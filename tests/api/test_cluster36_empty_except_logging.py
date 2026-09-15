@@ -4,8 +4,6 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-import pytest
-
 from quodeq.api import _llamacpp_log_routes as llama_routes
 from quodeq.api import _log_tail_helpers as log_tail_helpers
 from quodeq.api import _rate_limit_file_store as store_mod

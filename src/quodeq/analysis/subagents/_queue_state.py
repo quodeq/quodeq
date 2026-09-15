@@ -117,4 +117,4 @@ def write_state(state: dict, path: Path) -> None:
             try:
                 os.unlink(cleanup_tmp)
             except OSError as exc:
-                _log.debug("queue state write failed: %s", exc)
+                _log.debug("temp queue state file not removed after a failed write: %s", exc)

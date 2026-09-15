@@ -73,5 +73,5 @@ def write_state(state: UpdateState, env: dict[str, str] | None = None) -> None:
         if tmp_name is not None:
             try:
                 os.unlink(tmp_name)
-            except OSError as exc:
-                _logger.debug("temp notice file %s not removed: %s", tmp_name, exc)
+            except OSError as inner_exc:
+                _logger.debug("temp notice file %s not removed: %s", tmp_name, inner_exc)

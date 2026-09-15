@@ -39,7 +39,7 @@ def _persist_json(data: dict, path: Path) -> None:
             try:
                 os.unlink(tmp_path)
             except OSError as exc:
-                _logger.debug("dimension report write failed: %s", exc)
+                _logger.debug("temp dimension report file not removed after a failed write: %s", exc)
 
 
 def write_reports(

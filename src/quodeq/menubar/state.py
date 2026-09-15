@@ -66,8 +66,8 @@ def write_state(state: MenubarState, env: dict[str, str] | None = None) -> None:
         if tmp_name is not None:
             try:
                 os.unlink(tmp_name)
-            except OSError as exc:
-                _logger.debug("temp state file %s not removed: %s", tmp_name, exc)
+            except OSError as inner_exc:
+                _logger.debug("temp state file %s not removed: %s", tmp_name, inner_exc)
 
 
 def set_enabled(enabled: bool, env: dict[str, str] | None = None) -> None:

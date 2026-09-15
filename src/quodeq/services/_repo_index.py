@@ -64,8 +64,8 @@ def _save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink 
         if tmp and os.path.exists(tmp):
             try:
                 os.unlink(tmp)
-            except OSError as exc:
-                log.debug(f"repo index save failed: {exc}")
+            except OSError as inner_exc:
+                log.debug(f"temp repo index file not removed after a failed save: {inner_exc}")
 
 
 def add_repo_index_entry(

@@ -144,7 +144,7 @@ def test_shutdown_logs_when_socket_close_fails(tmp_path) -> None:
     assert "instance shutdown cleanup failed" in debug.call_args.args[0]
 
 
-def test_wait_for_process_logs_on_timeout(monkeypatch) -> None:
+def test_wait_for_process_logs_once_across_multiple_timeouts(monkeypatch) -> None:
     messages: list[str] = []
     monkeypatch.setattr(_process, "log_debug", messages.append)
 
@@ -154,13 +154,15 @@ def test_wait_for_process_logs_on_timeout(monkeypatch) -> None:
 
         def poll(self):
             self._poll_calls += 1
-            return None if self._poll_calls == 1 else 0
+            return None if self._poll_calls <= 2 else 0
 
         def wait(self, timeout=None):
             raise subprocess.TimeoutExpired("x", 1)
 
     _process._wait_for_process(_FakeProcess())  # signature: (proc: subprocess.Popen) -> None
-    assert any("did not exit before the wait timeout" in m for m in messages)
+    # Two TimeoutExpired pacing iterations must yield exactly one debug log.
+    assert len(messages) == 1
+    assert "still running after" in messages[0]
 
 
 def test_handle_tstp_logs_when_sigcont_kill_fails(monkeypatch) -> None:

@@ -178,8 +178,8 @@ def insert_vectors(
         _logger.warning("Precedent vector insert failed: %s", exc)
         try:
             conn.rollback()
-        except sqlite3.DatabaseError as exc:
-            _logger.debug("precedent vector insert skipped: %s", exc)
+        except sqlite3.DatabaseError as inner_exc:
+            _logger.debug("rollback after a failed precedent vector insert also failed: %s", inner_exc)
         return False
 
 

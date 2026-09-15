@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import threading
 from collections import OrderedDict
-from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.services import _cache

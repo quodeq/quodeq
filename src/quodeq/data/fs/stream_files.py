@@ -60,7 +60,7 @@ def count_active_agent_streams(
             except OSError:
                 continue
     except OSError as exc:
-        _logger.debug("stream file stat failed: %s", exc)
+        _logger.debug("stream directory glob failed: %s", exc)
     return count
 
 
