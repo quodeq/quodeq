@@ -13,6 +13,8 @@ import logging
 import os
 import threading
 
+from flask_sock import ConnectionClosed
+
 from quodeq.terminal.sessions import TerminalSessionRegistry
 
 _logger = logging.getLogger(__name__)
@@ -79,8 +81,8 @@ def setup_terminal_session(manager, ws) -> bool:
             # silently dropped. Matches terminal_routes.py's "already open
             # in another window" banner, sent the same way.
             ws.send("0\r\n[terminal could not be started; check server logs]\r\n")
-        except Exception:
-            pass  # client already disconnected; nothing more to do
+        except (ConnectionClosed, OSError) as exc:
+            _logger.debug("fallback error frame not delivered, client already gone: %s", exc)
         return False
 
 

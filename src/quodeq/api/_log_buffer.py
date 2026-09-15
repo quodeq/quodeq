@@ -135,8 +135,17 @@ class _BufferHandler(logging.Handler):
         self._buffer = buffer
 
     def emit(self, record: logging.LogRecord) -> None:
-        if _is_noisy_poll(record):
-            return
-        if _is_noisy_werkzeug_access(record):
-            return
-        self._buffer.append(self.format(record))
+        try:
+            if _is_noisy_poll(record):
+                return
+            if _is_noisy_werkzeug_access(record):
+                return
+            self._buffer.append(self.format(record))
+        except (ValueError, TypeError, KeyError):
+            # A malformed format string or mismatched args must not reach the
+            # code that logged; the stdlib contract for a failing handler is
+            # handleError, which reports to stderr and never raises. Both
+            # noise-filter helpers above call record.getMessage(), which can
+            # raise the same way self.format(record) can, so they need the
+            # same guard.
+            self.handleError(record)

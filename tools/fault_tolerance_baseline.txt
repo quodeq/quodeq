@@ -17,10 +17,9 @@ src/quodeq/analysis/_loop_steps.py:146:broad-except
 src/quodeq/analysis/_loop_steps.py:148:broad-except
 src/quodeq/analysis/_loop_steps.py:70:broad-except
 src/quodeq/analysis/_loops.py:106:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:113:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:121:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:150:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:76:empty-except
+src/quodeq/analysis/_run_lifecycle_support.py:112:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:120:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:149:broad-except
 src/quodeq/analysis/cache/_dimension_context.py:67:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:149:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:154:broad-except
@@ -46,10 +45,9 @@ src/quodeq/api/_run_event_watcher.py:152:broad-except
 src/quodeq/api/_scores_routes.py:45:broad-except
 src/quodeq/api/_scores_routes.py:65:broad-except
 src/quodeq/api/_sse_log_helpers.py:55:broad-except
-src/quodeq/api/_terminal_ws_helpers.py:52:broad-except
-src/quodeq/api/_terminal_ws_helpers.py:69:broad-except
-src/quodeq/api/_terminal_ws_helpers.py:82:empty-except
-src/quodeq/api/_terminal_ws_helpers.py:98:broad-except
+src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
+src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
+src/quodeq/api/_terminal_ws_helpers.py:71:broad-except
 src/quodeq/api/app.py:116:broad-except
 src/quodeq/api/app.py:206:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
@@ -59,8 +57,7 @@ src/quodeq/api/routes_shared_mirrors.py:123:broad-except
 src/quodeq/api/routes_shared_mirrors.py:165:broad-except
 src/quodeq/api/routes_shared_mirrors.py:182:broad-except
 src/quodeq/api/routes_shared_mirrors.py:98:broad-except
-src/quodeq/api/security.py:241:empty-except
-src/quodeq/api/security.py:262:broad-except
+src/quodeq/api/security.py:260:broad-except
 src/quodeq/assistant/adapters/_api.py:103:broad-except
 src/quodeq/assistant/adapters/_capabilities.py:31:broad-except
 src/quodeq/assistant/cancel.py:48:broad-except
@@ -145,7 +142,6 @@ src/quodeq/services/project_registration.py:178:broad-except
 src/quodeq/services/shared_publish.py:141:broad-except
 src/quodeq/services/shared_publish.py:167:broad-except
 src/quodeq/shared/resource_sampler.py:140:broad-except
-src/quodeq/shared/run_log.py:85:empty-except
 src/quodeq/terminal/_pty_windows.py:74:broad-except
 src/quodeq/update/checker.py:71:broad-except
 src/quodeq/update/checker.py:74:broad-except

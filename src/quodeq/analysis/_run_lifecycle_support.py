@@ -71,10 +71,9 @@ class _AtexitGuard:
     def deregister(self) -> None:
         if not self._registered:
             return
-        try:
-            atexit.unregister(self._callback)
-        except Exception:
-            pass
+        # atexit.unregister is a no-op for a callback that is not registered
+        # and does not raise for one; there is nothing to guard.
+        atexit.unregister(self._callback)
         self._registered = False
 
 
