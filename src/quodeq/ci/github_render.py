@@ -1,7 +1,24 @@
 """Render violations into GitHub PR review comments, summary, and verdict."""
 from __future__ import annotations
 
+import re
+
 from quodeq.shared.serialization import coerce_line
+
+# Markdown and HTML control characters that untrusted finding text may carry.
+_MD_SPECIAL = re.compile(r"([\\`*_#\[\]<>|~])")
+
+
+def _md_escape(text: object) -> str:
+    """Backslash-escape markdown/HTML control characters in untrusted text.
+
+    Titles, reasons, and requirement ids come from LLM output that quotes the
+    PR's own content, so a crafted finding could inject headings, links, or
+    HTML into the review comment. CommonMark treats a backslash before any
+    ASCII punctuation as that literal character, which GitHub renders plainly.
+    Newlines are collapsed so no line can start a block construct.
+    """
+    return _MD_SPECIAL.sub(r"\\\1", " ".join(str(text).split()))
 
 
 def violation_to_comment(violation: dict, status: str = "new") -> dict:
@@ -10,9 +27,9 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
     status: "new" (introduced by this PR) or "existing" (pre-existing baseline issue).
     """
     severity = violation.get("severity", "minor")
-    title = violation.get("title", "Violation")
-    reason = violation.get("reason", "")
-    req = violation.get("req", "")
+    title = _md_escape(violation.get("title", "Violation"))
+    reason = _md_escape(violation.get("reason", ""))
+    req = _md_escape(violation.get("req", ""))
 
     severity_label = severity.upper()
     status_prefix = "🆕 NEW" if status == "new" else "⚠️ Pre-existing"
@@ -99,7 +116,7 @@ def _outside_diff_lines(outside: list[dict]) -> list[str]:
         line = v.get("line")
         loc = f"{file}:{line}" if line is not None else file
         severity = str(v.get("severity", "minor")).upper()
-        title = v.get("title") or "Violation"
+        title = _md_escape(v.get("title") or "Violation")
         lines.append(f"- `{loc}` — **{severity}** {title}")
     lines.append("")
     return lines

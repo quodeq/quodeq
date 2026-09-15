@@ -15,6 +15,7 @@ from typing import Any
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
@@ -161,7 +162,10 @@ def compute_accumulated(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
     reports_root = Path(reports_dir)
-    if not (reports_root / project).exists():
+    # *project* comes from the request path. Resolve it against the directory
+    # listing instead of joining it onto reports_root, so a traversal or
+    # absolute segment cannot probe for paths outside the reports tree.
+    if resolve_child_dir(reports_root, project) is None:
         return None
     all_run_infos = list_runs(reports_root, project)
     if as_of:
