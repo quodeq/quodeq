@@ -55,7 +55,11 @@ def offer_move_to_applications(
             return False
         dest = (applications_dir or APPLICATIONS_DIR) / app.name
         if dest.exists():
-            shutil.rmtree(dest, ignore_errors=True)
+            try:
+                shutil.rmtree(dest)
+            except OSError as exc:
+                _logger.warning("could not remove the previous bundle at %s: %s", dest, exc)
+                return False
         copied = runner(["ditto", str(app), str(dest)], capture_output=True, text=True, encoding="utf-8")
         if copied.returncode != 0:
             _logger.warning("move to Applications failed: %s", copied.stderr)

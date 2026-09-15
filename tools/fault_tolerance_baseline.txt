@@ -146,7 +146,7 @@ src/quodeq/terminal/_pty_windows.py:74:broad-except
 src/quodeq/update/checker.py:71:broad-except
 src/quodeq/update/checker.py:74:broad-except
 src/quodeq/update/checker.py:81:broad-except
-src/quodeq/update/first_launch.py:68:broad-except
+src/quodeq/update/first_launch.py:72:broad-except
 src/quodeq/update/selfupdate.py:175:broad-except
 src/quodeq/update/selfupdate.py:238:broad-except
 src/quodeq/update/selfupdate.py:282:broad-except

@@ -124,9 +124,14 @@ def _cache_store(
 
 def _wait_for_inflight(
     key: tuple, event: threading.Event, ctx: DimensionCacheContext,
-) -> list[DimensionResult]:
-    """Wait for another thread's in-flight fetch and return the cached result."""
-    event.wait(timeout=_CACHE_WAIT_TIMEOUT_S)
+) -> list[DimensionResult] | None:
+    """Wait for another thread's in-flight fetch; None if it did not finish in time."""
+    if not event.wait(timeout=_CACHE_WAIT_TIMEOUT_S):
+        _logger.debug(
+            "in-flight dimension fetch for %s did not finish within %ss; fetching directly",
+            key, _CACHE_WAIT_TIMEOUT_S,
+        )
+        return None
     with ctx.lock:
         return list(ctx.cache.get(key, []))
 
@@ -175,7 +180,12 @@ def _get_run_dimensions(
             ctx.inflight[key] = threading.Event()
 
     if wait_event is not None:
-        return _wait_for_inflight(key, wait_event, ctx)
+        waited = _wait_for_inflight(key, wait_event, ctx)
+        if waited is not None:
+            return waited
+        return _fetch_dimensions_from_disk(
+            reports_root, project, run_id, ctx.get_reader(),
+        )
 
     return _fetch_and_store(
         key, reports_root, project, run_id, ctx,
