@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -57,6 +58,7 @@ def test_kill_proc_tree_logs_killpg_failure_then_proc_kill_failure(monkeypatch) 
     assert any("already gone" in m for m in messages)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="source_user_path is a no-op on Windows by design")
 def test_source_user_path_logs_timeout_and_falls_back(monkeypatch) -> None:
     def _slow(*_args, **_kwargs):
         raise subprocess.TimeoutExpired(cmd="zsh", timeout=1)

@@ -1,6 +1,8 @@
 """Cluster 31: dashboard best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
+import ctypes
+import os
 import subprocess
 import sys
 import types
@@ -96,12 +98,19 @@ def test_set_macos_app_identity_logs_dock_icon_failure(monkeypatch) -> None:
     assert any("dock icon not set" in m for m in messages)
 
 
+class _Raising:
+    """Stand-in for ctypes.windll that raises AttributeError on any access,
+    so the test exercises the except branch on every platform, including
+    real Windows where ctypes.windll exists and would otherwise succeed."""
+
+    def __getattr__(self, name):
+        raise AttributeError(name)
+
+
 def test_set_app_icon_logs_windows_taskbar_failure(monkeypatch) -> None:
-    # ctypes has no `windll` attribute off Windows, so this fails for real
-    # instead of needing a fake — same failure a real Windows AttributeError
-    # (e.g. a missing user32 export) would produce.
     monkeypatch.setattr(about.sys, "platform", "win32")
-    monkeypatch.setattr(about, "_icon_path", lambda ext: "/tmp/fake.ico")
+    monkeypatch.setattr(about, "_icon_path", lambda ext: "quodeq.ico")
+    monkeypatch.setattr(ctypes, "windll", _Raising(), raising=False)
     messages: list[str] = []
     monkeypatch.setattr(about, "log_debug", messages.append)
     about._set_app_icon()
@@ -120,6 +129,8 @@ def test_kill_api_logs_when_process_is_already_gone(monkeypatch) -> None:
 
 
 def test_sync_fullscreen_observer_logs_attribute_error() -> None:
+    pytest.importorskip("AppKit", reason="macOS-only fullscreen observer")
+
     class _BrokenWindow:
         def __getattr__(self, name):
             raise AttributeError(name)
@@ -165,6 +176,7 @@ def test_wait_for_process_logs_once_across_multiple_timeouts(monkeypatch) -> Non
     assert "still running after" in messages[0]
 
 
+@pytest.mark.skipif(os.name == "nt", reason="SIGTSTP/SIGCONT are POSIX-only")
 def test_handle_tstp_logs_when_sigcont_kill_fails(monkeypatch) -> None:
     def _raise(*_a, **_k):
         raise OSError("no such process")
