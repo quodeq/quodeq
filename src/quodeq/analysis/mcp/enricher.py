@@ -274,6 +274,12 @@ class FindingEnricher:
         finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
         finding.update({k: v for k, v in args.items() if v is not None})
 
+        # Keep the model's tag exactly as emitted. PR B maps `vt` onto the
+        # taxonomy; `vt_raw` is what the unmapped-types report and alias
+        # curation read. Absent when the model sent no tag.
+        if args.get("vt"):
+            finding["vt_raw"] = str(args["vt"])
+
         if not args.get("p") and req and req in self._reqs:
             finding["p"] = self._reqs[req]["principle"]
 

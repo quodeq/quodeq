@@ -63,6 +63,9 @@ class Judgment:
     snippet: Optional[str] = None
     severity: str = "medium"
     violation_type: Optional[str] = None
+    # The model's tag exactly as emitted, before any taxonomy mapping. Feeds
+    # the per-run unmapped-types report; never a scoring input.
+    violation_type_raw: Optional[str] = None
     title: Optional[str] = None
     context: Optional[str] = None
     scope: Optional[str] = None

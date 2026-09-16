@@ -92,3 +92,27 @@ def test_fake_reader_with_no_findings(tmp_path, monkeypatch):
     assert dim["violations"] == []
     assert dim["totals"]["violationCount"] == 0
     assert not (tmp_path / "evaluation.db").exists()
+
+
+def test_fake_reader_carries_density_from_dimension_scores_files_read(tmp_path, monkeypatch):
+    """dimension_scores.files_read must reach totals.violationsPer100Files
+    (getRunScores / compare-summary read this path, not the eval-JSON one)."""
+    monkeypatch.setattr(rb, "read_active_findings", lambda run_dir: [
+        _active_row(),
+        _active_row(id=2, requirement="SEC-01-R2", verdict="violation",
+                    file="src/b.py", line=7),
+        _active_row(id=3, requirement="SEC-01-R3", verdict="violation",
+                    file="src/c.py", line=9),
+    ])
+    dim_rows = [
+        {"dimension": "security", "score": 8.2, "grade": "B+", "exit_reason": None,
+         "files_read": 8},
+    ]
+
+    out = _build_response_from_grade_tables(
+        tmp_path, store_factory=lambda run_dir: FakeGradeTables(dim_rows=dim_rows))
+
+    (dim,) = out["dimensions"]
+    assert dim["totals"]["violationCount"] == 3
+    assert dim["totals"]["violationsPer100Files"] == 37.5
+    assert dim["filesRead"] == 8

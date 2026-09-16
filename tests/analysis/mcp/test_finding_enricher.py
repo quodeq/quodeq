@@ -358,3 +358,18 @@ def test_read_file_is_cached_across_findings_in_the_same_file(tmp_path) -> None:
     enricher.enrich({"p": "P1", "t": "violation", "d": "perf", "file": "a.py", "line": 3})
 
     assert read_calls["n"] == 1, f"expected 1 read for 3 findings in the same file, got {read_calls['n']}"
+
+
+# ---------------------------------------------------------------------------
+# Raw violation-type tag (taxonomy spec 2026-09-15, PR A)
+# ---------------------------------------------------------------------------
+
+def test_stamps_vt_raw_from_model_tag() -> None:
+    result = _enricher().enrich({"t": "violation", "req": "R-FT-1", "vt": "Empty_Catch"})
+    assert result["vt"] == "Empty_Catch"  # PR A leaves the scoring key untouched
+    assert result["vt_raw"] == "Empty_Catch"
+
+
+def test_no_vt_raw_without_model_tag() -> None:
+    result = _enricher().enrich({"t": "violation", "req": "R-FT-1"})
+    assert "vt_raw" not in result

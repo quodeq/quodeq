@@ -14,6 +14,8 @@
  * @property {number}        violationCount
  * @property {number}        complianceCount
  * @property {SeverityTally} severity
+ * @property {number|null}   [violationsPer100Files] - violations per 100 files
+ *   read; null when nothing was read.
  *
  * @typedef {Object} Dimension
  * @property {string}        dimension

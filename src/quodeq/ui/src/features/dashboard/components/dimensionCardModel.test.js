@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations } from './dimensionCardModel.js';
+import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
 
 test('SEVERITY_OPTIONS: the fixed severity vocabulary', () => {
   assert.deepEqual(SEVERITY_OPTIONS, ['critical', 'major', 'minor', 'unknown']);
@@ -89,4 +89,15 @@ test('filterViolations: combined filters intersect (AND, not OR)', () => {
   assert.equal(result.length, 1);
   assert.equal(result[0].file, 'src/Login.jsx');
   assert.deepEqual(filterViolations(DIMENSION, ['critical'], ['Input'], ''), []);
+});
+
+// ---------------------------------------------------------------------------
+// formatPer100Files
+// ---------------------------------------------------------------------------
+
+test('formatPer100Files renders one decimal or a dash', () => {
+  assert.equal(formatPer100Files(12.06), '12.1');
+  assert.equal(formatPer100Files(0), '0.0');
+  assert.equal(formatPer100Files(null), '-');
+  assert.equal(formatPer100Files(undefined), '-');
 });

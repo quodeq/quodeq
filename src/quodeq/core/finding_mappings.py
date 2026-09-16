@@ -68,6 +68,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
         # accept the long key too so both spellings survive this seam.
         violation_type=d.get("vt") or d.get("violation_type"),
+        violation_type_raw=d.get("vt_raw") or None,
         reason=d.get("reason") or "",
         title=d.get("w"),
         context=d.get("context"),
@@ -105,6 +106,7 @@ def judgment_to_finding(j: Judgment, *, dismissed: bool = False) -> Finding:
         context=j.context,
         dimension=j.dimension,
         violation_type=j.violation_type,
+        violation_type_raw=j.violation_type_raw,
         scope=j.scope,
         confidence=j.confidence,
         provenance_downgrade=j.provenance_downgrade,

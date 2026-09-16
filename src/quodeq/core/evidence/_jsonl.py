@@ -74,6 +74,7 @@ def parse_jsonl_line(
         file=obj.get("file", ""), line=obj.get("line", 0), end_line=obj.get("end_line"),
         snippet=obj.get("snippet", ""), severity=obj.get("severity", "medium"),
         violation_type=obj.get("vt") or None, reason=obj.get("reason", ""),
+        violation_type_raw=obj.get("vt_raw") or None,
         req=obj.get("req"), title=obj.get("w") or None,
         context=obj.get("context") or None, scope=obj.get("scope") or None,
         confidence=_jsonl_confidence(obj.get("confidence")),
@@ -95,7 +96,7 @@ def judgment_to_dict(j: Judgment) -> dict:
     # breaking any consumer.
     _optional = {"line": j.line, "end_line": j.end_line, "snippet": j.snippet,
                  "severity": j.severity, "violation_type": j.violation_type,
-                 "vt": j.violation_type,
+                 "vt": j.violation_type, "vt_raw": j.violation_type_raw,
                  "context": j.context, "scope": j.scope}
     d.update({k: v for k, v in _optional.items() if v})
     if j.req:

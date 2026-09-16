@@ -11,6 +11,7 @@ from quodeq.core.types.finding import Finding, ReqRef, SeverityTally, Totals
 from ._mapper_helpers import (
     _bool,
     _int,
+    _opt_float,
     _opt_str,
     _opt_str_or_int,
     _str,
@@ -67,6 +68,7 @@ def parse_totals(raw: dict[str, object]) -> Totals:
         violation_count=_int(raw, "violationCount"),
         compliance_count=_int(raw, "complianceCount"),
         severity=severity,
+        violations_per100_files=_opt_float(raw.get("violationsPer100Files")),
     )
 
 

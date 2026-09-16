@@ -17,12 +17,12 @@ _INSERT_SQL = """
 INSERT OR IGNORE INTO findings (
     schema_version, practice_id, dimension, requirement, verdict, severity,
     file, line, end_line, title, reason, snippet,
-    violation_type, context, scope, req_refs_json, dedup_key, confidence,
+    violation_type, violation_type_raw, context, scope, req_refs_json, dedup_key, confidence,
     provenance_downgrade, scope_downgrade_json
 ) VALUES (
     :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
     :file, :line, :end_line, :title, :reason, :snippet,
-    :violation_type, :context, :scope, :req_refs_json, :dedup_key, :confidence,
+    :violation_type, :violation_type_raw, :context, :scope, :req_refs_json, :dedup_key, :confidence,
     :provenance_downgrade, :scope_downgrade_json
 )
 """
@@ -30,7 +30,7 @@ INSERT OR IGNORE INTO findings (
 _SELECT_COLUMNS = (
     "id, practice_id, dimension, requirement, verdict, severity, "
     "file, line, end_line, title, reason, snippet, "
-    "violation_type, context, scope, req_refs_json, confidence, "
+    "violation_type, violation_type_raw, context, scope, req_refs_json, confidence, "
     "provenance_downgrade, scope_downgrade_json"
 )
 
