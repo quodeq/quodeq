@@ -326,8 +326,7 @@ class TestBuildMcpServerArgs:
 
 class TestMcpServerName:
     def test_returns_prefix(self):
-        config = AnalysisConfig()
-        name = _mcp_server_name(config)
+        name = _mcp_server_name()
         assert name == "quodeq-findings"
 
 

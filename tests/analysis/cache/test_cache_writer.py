@@ -99,7 +99,6 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     )
     from quodeq.analysis.cache.local import LocalFileBackend
     from quodeq.analysis.fingerprint import _hash_file
-    from quodeq.config.paths import default_paths
 
     src_root = tmp_path / "src"
     src_root.mkdir()
@@ -260,7 +259,6 @@ def test_cache_writer_path_traversal_yields_empty_hash(tmp_path):
     """A traversal file_path (e.g. '../outside/secret.txt') must NOT hash a
     file outside src_root. The resulting cache entry's file_content_hash must
     be empty, not a real hash of the escaped file."""
-    import json
 
     from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
 

@@ -7,14 +7,15 @@ from pathlib import Path
 
 from quodeq.api._run_event_stream import (
     WatcherState,
+    _payload_as_sse_finding,
+    run_events_generator,
     compute_tick,
     serialize_status_event,
     serialize_dimension_event,
     serialize_finding_event,
 )
-from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.models import Judgment, JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
-import json as _json
 
 
 # ---------------------------------------------------------------------------
@@ -71,8 +72,6 @@ def test_serialize_finding_event_includes_judgment_fields():
 def test_payload_as_sse_finding_includes_provenance_downgrade():
     # Issue #656: the live SSE finding payload lists fields explicitly, so the
     # gate's provenance_downgrade marker must be added there too.
-    from quodeq.api._run_event_stream import _payload_as_sse_finding
-    from quodeq.core.events.models import Judgment
 
     j = Judgment(
         practice_id="R-FT-2", verdict="violation", dimension="security",
@@ -86,8 +85,6 @@ def test_payload_as_sse_finding_includes_provenance_downgrade():
 def test_payload_as_sse_finding_includes_carried_forward():
     # The live feed's carried-forward filter needs this flag on the SSE
     # path too, or every finding reads as new under VITE_USE_SSE_EVENTS.
-    from quodeq.api._run_event_stream import _payload_as_sse_finding
-    from quodeq.core.events.models import Judgment
 
     j = Judgment(
         practice_id="R-FT-2", verdict="violation", dimension="security",
@@ -99,8 +96,6 @@ def test_payload_as_sse_finding_includes_carried_forward():
 
 
 def test_payload_as_sse_finding_defaults_carried_forward_false():
-    from quodeq.api._run_event_stream import _payload_as_sse_finding
-    from quodeq.core.events.models import Judgment
 
     j = Judgment(
         practice_id="R-FT-2", verdict="violation", dimension="security",
@@ -114,8 +109,6 @@ def test_payload_as_sse_finding_includes_scope_downgrade():
     # The scope gate's marker must reach the live SSE payload too, naming
     # the rule so the dashboard badge can say WHAT moved the finding, not
     # just that something did.
-    from quodeq.api._run_event_stream import _payload_as_sse_finding
-    from quodeq.core.events.models import Judgment
 
     j = Judgment(
         practice_id="S-AUT-3", verdict="violation", dimension="security",
@@ -129,8 +122,6 @@ def test_payload_as_sse_finding_includes_scope_downgrade():
 
 
 def test_payload_as_sse_finding_defaults_scope_downgrade_none():
-    from quodeq.api._run_event_stream import _payload_as_sse_finding
-    from quodeq.core.events.models import Judgment
 
     j = Judgment(
         practice_id="R-FT-2", verdict="violation", dimension="security",
@@ -171,14 +162,14 @@ def test_watcher_state_with_emitted_dimensions():
 
 
 def _write_status(run_dir: Path, state: str = "running") -> None:
-    (run_dir / "status.json").write_text(_json.dumps({"state": state}))
+    (run_dir / "status.json").write_text(json.dumps({"state": state}))
 
 
 def _write_dim_eval(run_dir: Path, dim: str, score: int = 90) -> None:
     eval_dir = run_dir / "evaluation"
     eval_dir.mkdir(exist_ok=True)
     (eval_dir / f"{dim}.json").write_text(
-        _json.dumps({"dimension": dim, "score": score}),
+        json.dumps({"dimension": dim, "score": score}),
     )
 
 
@@ -215,7 +206,7 @@ def test_compute_tick_emits_status_pending_when_status_json_missing(tmp_path: Pa
     events, new_state = compute_tick(tmp_path, state)
     status_events = [e for e in events if e[0] == "status"]
     assert len(status_events) == 1
-    payload = _json.loads(status_events[0][1])
+    payload = json.loads(status_events[0][1])
     assert payload["state"] == "pending"
 
 
@@ -319,7 +310,6 @@ def _drain_generator(gen, max_frames: int) -> list[str]:
 
 
 def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: Path):
-    from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="done")
     frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
@@ -329,7 +319,6 @@ def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: 
 
 
 def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
-    from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="running")
     _write_finding_event(tmp_path)
@@ -340,12 +329,11 @@ def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
     # event_id is an ISO timestamp string
     assert "id: " in finding_frames[0]
     # payload id is counter = 1
-    data = _json.loads(next(l for l in finding_frames[0].splitlines() if l.startswith("data: "))[6:])
+    data = json.loads(next(l for l in finding_frames[0].splitlines() if l.startswith("data: "))[6:])
     assert data["id"] == 1
 
 
 def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
-    from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="running")
     _write_finding_event(tmp_path, p="P1", line=1)
@@ -365,12 +353,11 @@ def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
     frames = _drain_generator(gen, max_frames=3)
     finding_frames = [f for f in frames if "event: finding" in f]
     assert len(finding_frames) == 1
-    data = _json.loads(next(l for l in finding_frames[0].splitlines() if l.startswith("data: "))[6:])
+    data = json.loads(next(l for l in finding_frames[0].splitlines() if l.startswith("data: "))[6:])
     assert data["practice_id"] == "P2"
 
 
 def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
-    from quodeq.api._run_event_stream import run_events_generator
 
     _write_status(tmp_path, state="failed")
     _write_finding_event(tmp_path)
