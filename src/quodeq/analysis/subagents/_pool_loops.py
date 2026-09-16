@@ -18,6 +18,7 @@ from quodeq.analysis.subagents._pool_scaling import (
     ScaleUpContext,
     check_agent_failure_streak,
     collect_done,
+    compute_scale_up,
     maybe_scale_up,
     should_respawn,
 )
@@ -52,7 +53,8 @@ class LoopContext:
 
 def scout_loop(ctx: LoopContext) -> None:
     """Scout-then-scale loop: one agent first, then fill the pool when the
-    scout finishes or times out, then one respawn per finished agent."""
+    scout finishes or times out. Each later poll respawns for the pending
+    files no in-flight agent will take, capped by the slots just vacated."""
     scout_timeout = _SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * _SCOUT_BUDGET_FRACTION)
     state = ScaleUpState(
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
@@ -82,12 +84,14 @@ def scout_loop(ctx: LoopContext) -> None:
             # included. Respawning for it on top would launch one agent more
             # than there are files left.
             continue
-        for _ in done:
-            if should_respawn(
-                ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
-                deadline_at=ctx.deadline_at,
-            ):
-                ctx.submit_fn()
+        remaining = should_respawn(
+            ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
+            deadline_at=ctx.deadline_at,
+        )
+        # Agents still in flight will take from the same pending set; only the
+        # surplus needs a fresh slot, and only the slots just vacated are free.
+        for _ in range(compute_scale_up(remaining - len(ctx.futures), len(done))):
+            ctx.submit_fn()
 
 
 def immediate_loop(ctx: LoopContext) -> None:
@@ -107,9 +111,11 @@ def immediate_loop(ctx: LoopContext) -> None:
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)
             continue
-        for _ in done:
-            if should_respawn(
-                ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
-                deadline_at=ctx.deadline_at,
-            ):
-                ctx.submit_fn()
+        remaining = should_respawn(
+            ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
+            deadline_at=ctx.deadline_at,
+        )
+        # Agents still in flight will take from the same pending set; only the
+        # surplus needs a fresh slot, and only the slots just vacated are free.
+        for _ in range(compute_scale_up(remaining - len(ctx.futures), len(done))):
+            ctx.submit_fn()
