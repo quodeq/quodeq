@@ -78,7 +78,8 @@ def _count_excluded_findings(
     for pe in evidence.principles.values():
         for v in pe.violations:
             if is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
-                            file=v.get("file"), line=v.get("line")) \
+                            file=v.get("file"), line=v.get("line"),
+                            snippet=v.get("snippet")) \
                     or is_deleted(deleted, dimension=dim_id,
                                   principle=pe.practice_id, file=v.get("file")):
                 count += 1

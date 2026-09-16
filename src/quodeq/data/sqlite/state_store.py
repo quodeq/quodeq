@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
 
 from quodeq.core.events.models import Judgment
+from quodeq.core.dismissals import DismissedKeys
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
@@ -35,6 +36,12 @@ INSERT OR IGNORE INTO findings (
 )
 """
 
+# Compliance rows are never dismissed, so they are not read back.
+_SELECT_VERDICT_ROWS = (
+    "SELECT id, requirement, practice_id, file, line, snippet, verdict "
+    "FROM findings WHERE verdict != 'compliance'"
+)
+
 
 class SQLiteStateStore(_StateStoreMetaMixin):
     """Writes projected event state into evaluation.db."""
@@ -47,9 +54,10 @@ class SQLiteStateStore(_StateStoreMetaMixin):
     def connection(self) -> Iterator[sqlite3.Connection]:
         """Hold ONE connection for a batch of store operations.
 
-        The projection replay calls update_verdict once per event; without
-        this, every call opens/configures/closes its own connection
-        (measured: ~21s of pure connection churn for a 100-run project).
+        The projection applies the dismissed state and then saves the
+        projected size; without this, every call opens/configures/closes its
+        own connection (measured: ~21s of pure connection churn for a 100-run
+        project back when the replay ran one UPDATE per event).
         """
         with open_evaluation_db(self._run_dir) as conn:
             self._held = conn
@@ -82,14 +90,40 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             )
             conn.commit()
 
-    def update_verdict(self, *, req: str, file: str, line: int, verdict: str) -> int:
-        """Update a finding's verdict by (requirement, file, line). Returns row count.
+    def apply_dismissed_state(self, dismissed: DismissedKeys) -> int:
+        """Set every finding's verdict from the project's net dismissed state.
 
-        A finding with no requirement id is stored with ``requirement`` NULL, but
-        the dismiss/restore event carries an empty string. ``requirement = ''``
-        never matches NULL in SQL, so an empty ``req`` is matched on (file, line)
-        against rows whose requirement is NULL or empty, scoped so it cannot
-        sweep a different, req-bearing finding at the same location.
+        Rows are matched with :meth:`DismissedKeys.matches`, the predicate the
+        services read side uses, so SQL and in-memory reads can never
+        disagree on which findings are hidden. A row with no requirement id
+        matches on its practice id, mirroring the ``req || principle`` key
+        the UI records. Compliance rows are never touched. Only rows whose
+        verdict actually changes are written; returns that count.
+        """
+        with self._db() as conn:
+            rows = conn.execute(_SELECT_VERDICT_ROWS).fetchall()
+            changes: list[tuple[str, int]] = []
+            for fid, req, practice_id, file, line, snippet, verdict in rows:
+                hidden = dismissed.matches(
+                    req=req, principle=practice_id, file=file, line=line, snippet=snippet)
+                wanted = "dismissed" if hidden else "violation"
+                if wanted != verdict:
+                    changes.append((wanted, fid))
+            if changes:
+                conn.executemany("UPDATE findings SET verdict = ? WHERE id = ?", changes)
+            conn.commit()
+        return len(changes)
+
+    def update_verdict(self, *, req: str, file: str, line: int, verdict: str) -> int:
+        """Update one finding's verdict by (requirement, file, line). Returns row count.
+
+        Direct per-row write for tools and tests; the projection itself goes
+        through :meth:`apply_dismissed_state`. A finding with no requirement
+        id is stored with ``requirement`` NULL, but callers key it as an empty
+        string. ``requirement = ''`` never matches NULL in SQL, so an empty
+        ``req`` is matched on (file, line) against rows whose requirement is
+        NULL or empty, scoped so it cannot sweep a different, req-bearing
+        finding at the same location.
         """
         with self._db() as conn:
             if req:

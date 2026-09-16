@@ -537,7 +537,7 @@ def test_apply_dismiss_finding_writes_action_log(client, app, tmp_path, monkeypa
     resp = client.post("/api/assistant/actions/a1/apply")
     assert resp.status_code == 200
     from quodeq.services.dismissed import dismissed_keys
-    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+    assert dismissed_keys(evals / "proj").line_keys() == {("r1", "a.py", 3)}
 
 
 def test_apply_dismiss_finding_returns_delta_for_run_scoped_session(client, app, tmp_path, monkeypatch):
@@ -576,7 +576,7 @@ def test_apply_dismiss_finding_returns_delta_for_run_scoped_session(client, app,
     # even if the user switched projects while the apply POST was in flight.
     assert delta["project"] == "proj"
     from quodeq.services.dismissed import dismissed_keys
-    assert dismissed_keys(evals / "proj") == {("r1", "a.py", 3)}
+    assert dismissed_keys(evals / "proj").line_keys() == {("r1", "a.py", 3)}
 
 
 def test_apply_verify_finding_writes_badge(client, app, tmp_path, monkeypatch):

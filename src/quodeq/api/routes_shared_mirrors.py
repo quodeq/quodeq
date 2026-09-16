@@ -21,7 +21,7 @@ from quodeq.api.helpers import error_response
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit
-from quodeq.services.dismissed import load_dismissed
+from quodeq.services._dismissed_listing import load_dismissed
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_repo import (
     published_meta,

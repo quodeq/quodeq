@@ -73,7 +73,8 @@ def _apply_suppressions_and_recompute(
         pe.violations = [
             v for v in pe.violations
             if not is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
-                                file=v.get("file"), line=v.get("line"))
+                                file=v.get("file"), line=v.get("line"),
+                                snippet=v.get("snippet"))
             and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
                                file=v.get("file"))
         ]

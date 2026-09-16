@@ -77,7 +77,7 @@ def test_dismiss_roundtrip_suppresses_the_finding(tmp_path):
     # key, so the suppression read path actually drops it. Before the fix the
     # model had no way to obtain "R1" and would key on the principle, diverging.
     keys = dismissed_keys(eval_root / "proj")
-    assert keys == {("R1", "a.py", 10)}
+    assert keys.line_keys() == {("R1", "a.py", 10)}
     finding = Finding(req="R1", file="a.py", line=10, practice_id="P1", severity="critical")
     assert _suppresses(keys, finding)
 
@@ -102,6 +102,6 @@ def test_dismiss_roundtrip_for_req_none_finding(tmp_path):
     _apply_latest(ctx, eval_root, draft["result"]["action_id"])
 
     keys = dismissed_keys(eval_root / "proj")
-    assert keys == {("", "b.py", 7)}
+    assert keys.line_keys() == {("", "b.py", 7)}
     finding = Finding(file="b.py", line=7, practice_id="P1", severity="major")  # req=None
     assert _suppresses(keys, finding)

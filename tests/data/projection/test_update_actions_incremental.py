@@ -1,4 +1,9 @@
-"""update_actions replays only appended events, under a single connection."""
+"""update_actions folds the whole log into the net state, under a single connection.
+
+The pass is skipped while actions.jsonl has the size it had at the last
+application; any size change (growth or a rewrite) or ``force`` re-applies
+the full net state. The return value counts the rows whose verdict changed.
+"""
 import json
 import uuid
 from quodeq.data.projection.engine import ProjectionEngine
@@ -6,8 +11,8 @@ from quodeq.data.projection.engine import ProjectionEngine
 
 def _write_event(project_dir, event_type, req, file="a.kt", line=1):
     # event_id must parse as a UUID (BaseEvent.event_id: UUID); a non-UUID
-    # value fails pydantic validation and read_action_events silently skips
-    # the line, which would make every test pass/fail for the wrong reason.
+    # value fails decoding and read_action_events silently skips the line,
+    # which would make every test pass/fail for the wrong reason.
     line_obj = {
         "event_id": str(uuid.uuid4()),
         "timestamp": "2026-07-24T10:00:00Z",
@@ -40,7 +45,7 @@ def _verdict(run_dir, req):
     return row[0]
 
 
-def test_second_call_replays_only_the_tail(tmp_path):
+def test_second_call_applies_only_the_new_change(tmp_path):
     project = tmp_path
     run_dir = project / "run1"
     run_dir.mkdir()
@@ -54,13 +59,13 @@ def test_second_call_replays_only_the_tail(tmp_path):
     assert _verdict(run_dir, "R-1") == "dismissed"
 
     _write_event(project, "FINDING_DISMISSED", "R-2", line=2)
-    applied = engine.update_actions(log, run_dir)
-    assert applied == 1          # only the appended event, not both
+    changed = engine.update_actions(log, run_dir)
+    assert changed == 1          # only R-2 flipped; R-1 was already dismissed
     assert _verdict(run_dir, "R-2") == "dismissed"
     assert _verdict(run_dir, "R-1") == "dismissed"  # earlier state intact
 
 
-def test_force_replays_everything(tmp_path):
+def test_unchanged_log_is_a_no_op(tmp_path):
     project = tmp_path
     run_dir = project / "run1"
     run_dir.mkdir()
@@ -69,10 +74,30 @@ def test_force_replays_everything(tmp_path):
     _write_event(project, "FINDING_DISMISSED", "R-1")
     engine = ProjectionEngine()
     engine.update_actions(log, run_dir)
-    assert engine.update_actions(log, run_dir, force=True) == 1  # full replay
+
+    assert engine.update_actions(log, run_dir) == 0
 
 
-def test_shrunk_log_triggers_full_replay(tmp_path):
+def test_force_reapplies_the_state(tmp_path):
+    """events.jsonl grew: the brand-new rows must meet the existing dismissals."""
+    project = tmp_path
+    run_dir = project / "run1"
+    run_dir.mkdir()
+    _seed_finding(run_dir, "R-1")
+    log = project / "actions.jsonl"
+    _write_event(project, "FINDING_DISMISSED", "R-1")
+    engine = ProjectionEngine()
+    engine.update_actions(log, run_dir)
+    _seed_finding(run_dir, "R-1", file="b.kt", line=1)  # a new row, not yet matched
+
+    assert engine.update_actions(log, run_dir) == 0        # size unchanged: skipped
+    assert engine.update_actions(log, run_dir, force=True) == 0  # different file: no match
+    _write_event(project, "FINDING_DISMISSED", "R-1", file="b.kt")
+    assert engine.update_actions(log, run_dir) == 1
+    assert _verdict(run_dir, "R-1") == "dismissed"
+
+
+def test_shrunk_log_reapplies_the_new_content(tmp_path):
     project = tmp_path
     run_dir = project / "run1"
     run_dir.mkdir()
@@ -81,11 +106,11 @@ def test_shrunk_log_triggers_full_replay(tmp_path):
     _write_event(project, "FINDING_DISMISSED", "R-1")
     _write_event(project, "FINDING_UNDISMISSED", "R-1")
     engine = ProjectionEngine()
-    assert engine.update_actions(log, run_dir) == 2
+    assert engine.update_actions(log, run_dir) == 0  # net state: not dismissed
     assert _verdict(run_dir, "R-1") == "violation"
     # Rewrite the log smaller (e.g. a migration compacted it).
     log.write_text(log.read_text().splitlines(keepends=True)[0])
-    assert engine.update_actions(log, run_dir) == 1  # full replay of new content
+    assert engine.update_actions(log, run_dir) == 1  # full fold of the new content
     assert _verdict(run_dir, "R-1") == "dismissed"
 
 

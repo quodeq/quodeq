@@ -16,10 +16,12 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.suppression_keys import as_dismissed_keys
 from quodeq.services._wiring import load_suppression_rules
 
 # ---------------------------------------------------------------------------
@@ -49,6 +51,9 @@ from quodeq.services._score_cache_fetch import (  # noqa: F401 — facade re-exp
 )
 from quodeq.shared._env import get_score_cache_path  # noqa: F401 — facade re-export
 
+if TYPE_CHECKING:
+    from quodeq.core.dismissals import DismissedKeys
+
 
 def _params_fingerprint(params: ScoringParams) -> str:
     """Deterministic serialization of the grade-formula params (sorted maps)."""
@@ -75,7 +80,7 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     """
     payload = json.dumps({
         "epoch": _CACHE_WRITER_EPOCH,
-        "dismissed": sorted(str(k) for k in dismissed_keys(project_dir)),
+        "dismissed": as_dismissed_keys(dismissed_keys(project_dir)).version_payload(),
         "deleted": sorted(str(k) for k in deleted_keys(project_dir)),
         "rules": [
             [r.req, r.file, r.reason] for r in load_suppression_rules(project_dir)
@@ -89,18 +94,21 @@ def run_scoped_version(
     params: ScoringParams,
     run_dismiss_keys: set[tuple],
     run_class_keys: set[tuple],
-    dismissed_all: set[tuple],
+    dismissed_all: "DismissedKeys | set[tuple]",
     deleted_all: set[tuple],
 ) -> str:
     """Version hash for a single run: params + only the suppressions that touch it.
 
-    A run's rescored score depends solely on dismissals whose (req,file,line) is
-    in *run_dismiss_keys* and deletions whose (dim,principle,file) is in
-    *run_class_keys*, so intersecting keeps unaffected runs' versions stable.
+    A run's rescored score depends solely on dismissals that can hide one of
+    its findings (``DismissedKeys.touching`` against *run_dismiss_keys*, the
+    run's ``finding_dismiss_keys`` union) and deletions whose
+    (dim,principle,file) is in *run_class_keys*, so intersecting keeps
+    unaffected runs' versions stable.
     """
+    touching = as_dismissed_keys(dismissed_all).touching(run_dismiss_keys)
     payload = json.dumps({
         "epoch": _CACHE_WRITER_EPOCH,
-        "dismissed": sorted(str(k) for k in (dismissed_all & run_dismiss_keys)),
+        "dismissed": touching.version_payload(),
         "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
         "params": _params_fingerprint(params),
     }, sort_keys=True)

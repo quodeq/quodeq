@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 from quodeq.services.violations import (
     _deleted_key_for_violation,
-    _dismissed_key_for_violation,
     _filter_dismissed_from_result,
+    _violation_location,
     _max_violation_files,
     aggregate_violations,
     resolve_dimension_eval,
@@ -17,30 +17,30 @@ from quodeq.services.violations import (
 )
 
 
-class TestDismissedKeyForViolation:
+class TestViolationLocation:
     def test_separated_format(self):
         v = {"req": "REQ-1", "file": "main.py", "line": 42}
-        assert _dismissed_key_for_violation(v) == ("REQ-1", "main.py", 42)
+        assert _violation_location(v) == ("main.py", 42)
 
     def test_combined_format(self):
         v = {"req": "REQ-2", "file": "main.py:10", "line": None}
-        assert _dismissed_key_for_violation(v) == ("REQ-2", "main.py", 10)
+        assert _violation_location(v) == ("main.py", 10)
 
     def test_no_line_no_colon(self):
         v = {"req": "REQ-3", "file": "main.py", "line": None}
-        assert _dismissed_key_for_violation(v) == ("REQ-3", "main.py", 0)
+        assert _violation_location(v) == ("main.py", 0)
 
     def test_combined_format_invalid_line(self):
         v = {"req": "REQ-4", "file": "main.py:abc", "line": None}
-        assert _dismissed_key_for_violation(v) == ("REQ-4", "main.py:abc", 0)
+        assert _violation_location(v) == ("main.py:abc", 0)
 
     def test_empty_dict(self):
         v = {}
-        assert _dismissed_key_for_violation(v) == ("", "", 0)
+        assert _violation_location(v) == ("", 0)
 
     def test_line_zero_explicit(self):
         v = {"req": "R", "file": "f.py", "line": 0}
-        assert _dismissed_key_for_violation(v) == ("R", "f.py", 0)
+        assert _violation_location(v) == ("f.py", 0)
 
 
 class TestDeletedKeyForViolation:

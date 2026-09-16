@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.events.models import Judgment
+from quodeq.core.finding_identity import snippet_fingerprint
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 
@@ -83,6 +84,36 @@ class TestReadFindingDetails:
         assert set(out) == {("", "src/a.py", 10), ("X-2", "src/b.py", 20)}
         assert out[("", "src/a.py", 10)]["req"] == ""
 
+    def test_fingerprint_key_finds_the_finding_at_any_line(self, tmp_path):
+        """The Dismissed tab keeps showing a dismissed finding after it moved."""
+        from quodeq.data.sqlite.findings_queries import read_finding_details
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=42, snippet="x = 1")
+        key = ("X-1", "src/a.py", snippet_fingerprint("X-1", "x = 1"))
+
+        out = read_finding_details(tmp_path, {key, ("X-1", "src/a.py", 10)})
+
+        assert set(out) == {key}
+        assert out[key]["line"] == 42
+
+    def test_fingerprint_key_ignores_different_code(self, tmp_path):
+        from quodeq.data.sqlite.findings_queries import read_finding_details
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10, snippet="y = 2")
+        key = ("X-1", "src/a.py", snippet_fingerprint("X-1", "x = 1"))
+
+        assert read_finding_details(tmp_path, {key}) == {}
+
+    def test_principle_keyed_dismissal_matches_a_requirement_less_finding(self, tmp_path):
+        """The UI records a no-req finding under ``req || principle``."""
+        from quodeq.data.sqlite.findings_queries import read_finding_details
+
+        _seed(tmp_path, req=None, file="src/a.py", line=10, practice_id="Modularity")
+
+        out = read_finding_details(tmp_path, {("Modularity", "src/a.py", 10)})
+
+        assert set(out) == {("Modularity", "src/a.py", 10)}
+
     def test_chunking_across_multiple_batches_drops_nothing_and_dedupes(self, tmp_path):
         """Regression for the SQL-side rewrite: keys are split into chunks to
         stay under SQLite's ~999 bind-parameter limit. 350 keys forces 2+
@@ -112,7 +143,11 @@ class TestReadRunKeySets:
         _seed(tmp_path)
         dismiss, cls = read_run_key_sets(tmp_path)
 
-        assert dismiss == {("X-1", "src/a.py", 10)}
+        # Both identity shapes: the line key and the snippet fingerprint key.
+        assert dismiss == {
+            ("X-1", "src/a.py", 10),
+            ("X-1", "src/a.py", snippet_fingerprint("X-1", "s")),
+        }
         assert cls == {("clean-architecture", "P1", "src/a.py")}
 
     def test_missing_db_returns_empty_sets(self, tmp_path):
@@ -142,7 +177,7 @@ class TestFindDismissedMatching:
             tmp_path, dimension="clean-architecture", practice_id="P1", file="src/a.py",
         )
 
-        assert rows == [("X-1", "src/a.py", 10)]
+        assert rows == [("X-1", "src/a.py", 10, "P1", "s")]
 
     def test_missing_db_returns_empty(self, tmp_path):
         from quodeq.data.sqlite.findings_queries import find_dismissed_matching

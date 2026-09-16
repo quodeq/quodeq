@@ -32,7 +32,7 @@ def _filter_excluded_violations(
     return [
         v for v in dim.violations
         if not is_dismissed(dismissed, req=v.req, principle=v.practice_id, rules=rules,
-                            file=v.file, line=v.line)
+                            file=v.file, line=v.line, snippet=v.snippet)
         and not is_deleted(deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
     ]
 

@@ -56,6 +56,30 @@ class TestReadFindingDetailsFromJsonEval:
         out = read_finding_details_from_json_eval(tmp_path, {("S-1", "a.py", 1)})
         assert ("S-1", "a.py", 1) in out
 
+    def test_fingerprint_key_matches_the_moved_finding(self, tmp_path):
+        from quodeq.core.finding_identity import snippet_fingerprint
+
+        _seed_eval(tmp_path, "security", [
+            {"req": "S-1", "file": "a.py", "line": 30, "snippet": "eval(x)", "title": "moved"},
+            {"req": "S-1", "file": "a.py", "line": 1, "snippet": "print(x)", "title": "other"},
+        ])
+        key = ("S-1", "a.py", snippet_fingerprint("S-1", "eval(x)"))
+
+        out = read_finding_details_from_json_eval(tmp_path, {key})
+
+        assert list(out) == [key]
+        assert out[key]["title"] == "moved"
+        assert out[key]["line"] == 30
+
+    def test_principle_keyed_dismissal_matches_a_requirement_less_finding(self, tmp_path):
+        _seed_eval(tmp_path, "security", [
+            {"file": "a.py", "line": 3, "principle": "Input", "title": "no req"},
+        ])
+
+        out = read_finding_details_from_json_eval(tmp_path, {("Input", "a.py", 3)})
+
+        assert out[("Input", "a.py", 3)]["title"] == "no req"
+
     def test_non_int_line_coerces_to_zero(self, tmp_path):
         _seed_eval(tmp_path, "security", [{"req": "S-1", "file": "a.py", "line": "x"}])
         out = read_finding_details_from_json_eval(tmp_path, {("S-1", "a.py", 0)})

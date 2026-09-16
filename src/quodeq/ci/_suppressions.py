@@ -13,7 +13,8 @@ def filter_suppressed_violations(report: dict, project_dir: Path) -> dict:
 
     Mirrors the dashboard's own suppression state so `ci report` and
     `export sarif` never surface a finding the user has already dismissed
-    or deleted there. ``dismissed`` keys match on ``(req, file, line)``;
+    or deleted there. ``dismissed`` matches on ``(req, file, snippet
+    fingerprint)``, falling back to the line for snippet-less findings;
     ``deleted`` keys match on ``(dimension, principle, file)``.
 
     The dimension used for the deleted-key match is taken per-violation
@@ -37,7 +38,8 @@ def filter_suppressed_violations(report: dict, project_dir: Path) -> dict:
         # reports (--from-evidence, quodeq review) carry "practiceId".
         principle = v.get("principle") or v.get("practiceId")
         return not is_dismissed(dismissed, req=v.get("req"), principle=principle,
-                                file=v.get("file"), line=v.get("line")) \
+                                file=v.get("file"), line=v.get("line"),
+                                snippet=v.get("snippet")) \
             and not is_deleted(deleted, dimension=v.get("dimension") or report_dim,
                                principle=principle, file=v.get("file"))
 

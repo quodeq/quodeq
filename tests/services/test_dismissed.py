@@ -50,7 +50,7 @@ def test_dismissed_keys_folds_legacy_dismissed_json(tmp_path: Path) -> None:
         {"req": "R2", "file": "b.py", "line": 20},
     ])
 
-    assert dismissed_keys(project_dir) == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert dismissed_keys(project_dir).line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
 
 
 def test_dismiss_after_upgrade_preserves_legacy_dismissals(tmp_path: Path) -> None:
@@ -62,7 +62,7 @@ def test_dismiss_after_upgrade_preserves_legacy_dismissals(tmp_path: Path) -> No
 
     dismiss_finding(project_dir, {"req": "R2", "file": "b.py", "line": 20})
 
-    assert dismissed_keys(project_dir) == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert dismissed_keys(project_dir).line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
 
 
 def test_restore_after_upgrade_nets_to_undismissed(tmp_path: Path) -> None:
@@ -77,7 +77,7 @@ def test_restore_after_upgrade_nets_to_undismissed(tmp_path: Path) -> None:
 
     restore_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
 
-    assert dismissed_keys(project_dir) == {("R2", "b.py", 20)}
+    assert dismissed_keys(project_dir).line_keys() == {("R2", "b.py", 20)}
 
 
 def test_dismiss_finding_appends_to_actions_log(tmp_path: Path) -> None:
@@ -117,13 +117,13 @@ def test_dismissed_keys_aggregates_across_runs(tmp_path: Path) -> None:
 
     keys = dismissed_keys(project_dir)
 
-    assert keys == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert keys.line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
 
 
 def test_dismissed_keys_empty_when_no_runs(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    assert dismissed_keys(project_dir) == set()
+    assert not dismissed_keys(project_dir)
 
 
 def test_dismiss_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path) -> None:

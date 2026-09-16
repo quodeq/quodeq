@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from quodeq.core.dismissals import fold_dismissals
 from quodeq.data.events.reader import EventLogReader
 from quodeq.data.projection.handlers import handle
 from quodeq.data.sqlite.state_store import SQLiteStateStore
@@ -47,17 +48,20 @@ class ProjectionEngine:
         )
 
     def update_actions(self, actions_log: Path, run_dir: Path, *, force: bool = False) -> int:
-        """Replay actions.jsonl events into run_dir's state store.
+        """Apply the project's net dismissed state to run_dir's findings.
 
-        Incremental: the log is append-only, so when it merely grew we replay
-        only the appended tail (from the last projected byte size). A full
-        replay happens when ``force=True`` (events.jsonl grew — new findings
-        must be matched against existing dismissals) or when the log shrank
-        (rewritten/compacted). Handlers are idempotent (UPDATE by stable key),
-        so a full replay is always safe.
+        ``actions.jsonl`` is folded into one ``DismissedKeys`` -- the same fold
+        the services read side uses -- and every finding row's verdict is set
+        from it. The pass is skipped while the log's size is unchanged since
+        the last application, unless ``force=True`` (events.jsonl grew: the
+        brand-new findings must be matched against existing dismissals).
+        Returns the number of rows whose verdict changed.
 
-        The whole replay holds ONE db connection; per-event connections made
-        bulk dismiss/delete O(runs x events x connect) and froze the Overview.
+        The fold replaces the older per-event replay: a fingerprinted entry
+        supersedes the line-keyed entry of the same finding, which one UPDATE
+        per event could never take back. One db connection for the whole
+        pass; per-event connections made bulk dismiss/delete
+        O(runs x events x connect) and froze the Overview.
         """
         from quodeq.data.actions_log import read_action_events  # noqa: PLC0415
 
@@ -68,29 +72,11 @@ class ProjectionEngine:
         if not force and current_size == last_size:
             return 0
 
-        grew_only = not force and 0 < last_size < current_size
-        offset = last_size if grew_only else 0
-
-        applied = 0
+        dismissed = fold_dismissals(read_action_events(actions_log.parent))
         with store.connection():
-            for event in read_action_events(actions_log.parent, from_offset=offset):
-                try:
-                    handle(event, store)
-                    applied += 1
-                except (ValueError, KeyError, TypeError):
-                    # Only per-event data errors are skipped. A sqlite3.Error
-                    # from handle() propagates and aborts the replay before
-                    # save_actions_projected_size runs: a DB failure is not
-                    # "one bad event", and skipping it would mark every later
-                    # event as projected while the store is unwritable.
-                    _logger.error(
-                        "Handler failed for action event %s (type=%s) - skipping",
-                        getattr(event, "event_id", "?"),
-                        getattr(event, "event_type", "?"),
-                        exc_info=True,
-                    )
+            changed = store.apply_dismissed_state(dismissed)
             store.save_actions_projected_size(current_size)
-        return applied
+        return changed
 
     def _project(
         self,

@@ -17,8 +17,11 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.dismissals import DismissedEntry
+from quodeq.core.finding_identity import finding_dismiss_keys, snippet_fingerprint
 from quodeq.data.ports.actions_log import ActionLog
-from quodeq.services.dismissed import load_dismissed
+from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._wiring import (
     ActionLogWriter,
     find_dismissed_matching,
@@ -114,6 +117,7 @@ def delete_all_dismissed(project_dir: Path, *, writer: ActionLog | None = None) 
                 req=entry.get("req", ""),
                 file=entry.get("file", ""),
                 line=int(entry.get("line", 0)),
+                fingerprint=entry.get("fingerprint") or None,
             )
             log.emit(FindingUndismissedEvent(payload=payload))
         return count
@@ -130,22 +134,38 @@ def _sweep_dismissed_matching(
     accumulating every run's matches in memory before emitting any —
     bounds peak memory to one run's matches at a time on projects with a
     large run history.
+
+    Each dismissed row is mapped back to the actions-log entries that hide
+    it (any identity form, see ``finding_dismiss_keys``) so the undismiss
+    names the recorded entry -- by fingerprint when it has one -- and the
+    finding is released in every run, not only at the line this run holds.
     """
     dimension, principle, file = key
     if not project_dir.is_dir():
         return 0
 
+    state = dismissed_keys(project_dir)
     log = writer or ActionLogWriter(project_dir)
     count = 0
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
-        for req, f, line in find_dismissed_matching(
+        for req, f, line, practice_id, snippet in find_dismissed_matching(
             run_dir, dimension=dimension, practice_id=principle, file=file,
         ):
-            payload = FindingUndismissed(req=req, file=f, line=line)
-            log.emit(FindingUndismissedEvent(payload=payload))
-            count += 1
+            keys = finding_dismiss_keys(
+                req=req, principle=practice_id, file=f, line=line, snippet=snippet)
+            targets = [e for e in state.entries if e.key in keys or e.line_key in keys]
+            if not targets:
+                # SQL says dismissed but the log has no entry (stale
+                # projection): release the row by its own identity.
+                targets = [DismissedEntry(req, f, line, snippet_fingerprint(req, snippet))]
+            for entry in targets:
+                payload = FindingUndismissed(
+                    req=entry.req, file=entry.file, line=entry.line,
+                    fingerprint=entry.fingerprint)
+                log.emit(FindingUndismissedEvent(payload=payload))
+                count += 1
     return count
 
 

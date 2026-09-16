@@ -41,7 +41,13 @@ function makeHandleRestore({ selectedProject, isShared, applyDelta, setDismissed
   return async (d) => {
     if (isShared) return;
     try {
-      const result = await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
+      // The fingerprint names the dismissed entry exactly; the line the
+      // listing shows is the finding's current location and may differ from
+      // the line the dismissal was recorded at.
+      const result = await restoreFinding(selectedProject, {
+        req: d.req, file: d.file, line: d.line,
+        ...(d.fingerprint ? { fingerprint: d.fingerprint } : {}),
+      });
       applyDelta(result);
       setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
       onReconcile?.();
