@@ -14,19 +14,16 @@ pytest.importorskip("openai", reason="requires the openai SDK")
 import httpx
 import openai
 
+from quodeq.analysis._api_call import _LOCAL_TIMEOUT
 from quodeq.analysis._api_runner import (
     ApiAnalysisRequest,
     ApiRunnerConfig,
-    _LOCAL_TIMEOUT,
     _build_router_context,
     _call_api,
-    _Finding,
-    _FindingType,
-    _parse_findings,
     _resolve_file_paths,
-    _Severity,
     run_api_analysis,
 )
+from quodeq.analysis._api_schema import _Finding, _FindingType, _Severity, _parse_findings
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +225,7 @@ _BAD_MISSING_REASON = (
 
 class TestCallApi:
     def _run(self, content=None, side_effect=None, config=None):
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             client = MagicMock()
             if side_effect is not None:
                 client.chat.completions.create.side_effect = side_effect
@@ -409,7 +406,7 @@ class TestRunApiAnalysisAppend:
         msg = MagicMock(content=content)
         raw_client.chat.completions.create.return_value = MagicMock(choices=[MagicMock(message=msg)])
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(prompt="test", jsonl_file=jsonl),
@@ -436,7 +433,7 @@ class TestRunApiAnalysisAppend:
         msg = MagicMock(content=content)
         raw_client.chat.completions.create.return_value = MagicMock(choices=[MagicMock(message=msg)])
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa, \
+        with patch("openai.OpenAI") as mock_oa, \
              patch("quodeq.analysis._api_runner._build_router_context",
                    return_value=None) as mock_ctx:
             mock_oa.return_value.__enter__.return_value = raw_client
