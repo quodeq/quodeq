@@ -1,4 +1,4 @@
-"""Integration test: adaptive scaling reduces agent count for small projects."""
+"""Integration test: scout-then-burst pool sizing through SubagentPool.run()."""
 from __future__ import annotations
 
 import json
@@ -44,9 +44,10 @@ def _counting_run_analysis(call_log):
     return _inner
 
 
-class TestAdaptiveScalingIntegration:
-    def test_20_files_uses_1_agent(self, tmp_path):
-        """The exact scenario from the spec: 20 files should use 1 agent."""
+class TestScoutBurstIntegration:
+    def test_scout_draining_queue_launches_no_overflow(self, tmp_path):
+        """No per-agent cap on the queue: the scout takes all 20 files, so
+        nothing is left to feed a burst and only agent-0 runs."""
         call_log = []
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, [_TEST_FILE_PATTERN.format(i) for i in range(20)])

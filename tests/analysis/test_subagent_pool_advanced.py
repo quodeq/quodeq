@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from unittest.mock import patch
 
 import pytest
@@ -9,7 +10,12 @@ import pytest
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-from quodeq.analysis.subagents._pool_scaling import compute_scale_up
+from quodeq.analysis.subagents._pool_models import ScaleUpState
+from quodeq.analysis.subagents._pool_scaling import (
+    ScaleUpContext,
+    compute_scale_up,
+    maybe_scale_up,
+)
 
 
 from tests._analysis_helpers import _fake_run_analysis  # noqa: F401 — shared helper
@@ -24,20 +30,73 @@ _TEST_DIMENSION = "security"
 
 
 class TestComputeScaleUp:
+    """Once the scout gate opens, every free slot launches; only the queue
+    size bounds the burst, never a files-per-agent estimate."""
+
     def test_no_remaining_returns_zero(self):
-        assert compute_scale_up(0, 5, 30) == 0
+        assert compute_scale_up(0, 5) == 0
 
-    def test_remaining_within_one_batch(self):
-        assert compute_scale_up(25, 5, 30) == 0
+    def test_small_queue_still_fills_every_slot(self):
+        # 25 files used to fit "one batch" and spawn nothing; now all 4
+        # free slots launch and share the queue.
+        assert compute_scale_up(25, 5) == 4
 
-    def test_remaining_needs_two_agents(self):
-        assert compute_scale_up(50, 5, 30) == 2
+    def test_burst_never_exceeds_remaining_files(self):
+        assert compute_scale_up(2, 5) == 2
 
-    def test_remaining_capped_by_max_agents(self):
-        assert compute_scale_up(200, 3, 30) == 2
+    def test_burst_capped_by_max_agents(self):
+        assert compute_scale_up(200, 3) == 2
 
     def test_max_agents_1_never_scales(self):
-        assert compute_scale_up(500, 1, 30) == 0
+        assert compute_scale_up(500, 1) == 0
+
+
+class _FixedQueue:
+    """WorkQueue stand-in that reports a fixed remaining count."""
+
+    def __init__(self, remaining: int) -> None:
+        self._remaining = remaining
+
+    def remaining(self) -> int:
+        return self._remaining
+
+
+class TestMaybeScaleUp:
+    """The scout gate: nothing launches until the scout finishes or times
+    out; then the burst fills every free slot the queue can feed."""
+
+    def _ctx(self, tmp_path, remaining: int, submits: list[int]) -> ScaleUpContext:
+        return ScaleUpContext(
+            queue=_FixedQueue(remaining), queue_path=tmp_path / "queue.json",
+            submit_fn=lambda: submits.append(1),
+        )
+
+    def test_scout_still_running_launches_nothing(self, tmp_path):
+        submits: list[int] = []
+        state = ScaleUpState(pool_start=time.monotonic(), max_duration=0, scout_timeout=30)
+
+        scout_done = maybe_scale_up(set(), state, 5, self._ctx(tmp_path, 15, submits))
+
+        assert scout_done is False
+        assert submits == []
+
+    def test_scout_done_bursts_every_free_slot(self, tmp_path):
+        submits: list[int] = []
+        state = ScaleUpState(pool_start=time.monotonic(), max_duration=0, scout_timeout=30)
+
+        scout_done = maybe_scale_up({object()}, state, 5, self._ctx(tmp_path, 15, submits))
+
+        assert scout_done is True
+        assert len(submits) == 4
+
+    def test_scout_timeout_bursts_without_waiting_for_scout(self, tmp_path):
+        submits: list[int] = []
+        state = ScaleUpState(pool_start=time.monotonic() - 31, max_duration=0, scout_timeout=30)
+
+        scout_done = maybe_scale_up(set(), state, 3, self._ctx(tmp_path, 100, submits))
+
+        assert scout_done is True
+        assert len(submits) == 2
 
 
 def _recording_fake(seen: list[AnalysisConfig]):
@@ -84,8 +143,9 @@ class TestMultiDimensionPool:
 
 
 class TestScoutThenScale:
-    def test_small_queue_uses_one_agent(self, tmp_path):
-        """20 files with max_agents=5 -> only 1 agent should run (scout handles all)."""
+    def test_scout_draining_queue_launches_no_overflow(self, tmp_path):
+        """No per-agent cap on the queue: the scout takes all 20 files, so
+        the burst has nothing to feed and only agent-0 runs."""
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, [f"src/f{i}.py" for i in range(20)])
 

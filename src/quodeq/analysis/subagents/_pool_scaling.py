@@ -6,7 +6,6 @@ import time
 from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from math import ceil
 from pathlib import Path
 from typing import Callable
 
@@ -14,7 +13,6 @@ from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
     SubagentResult,
     _AGENT_ID_PREFIX,
-    _DEFAULT_FILES_PER_AGENT,
 )
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
 from quodeq.shared import cancellation
@@ -162,14 +160,19 @@ def check_agent_failure_streak(results: list[SubagentResult]) -> None:
         cancellation.request_cancel(reason="agent_failure_streak")
 
 
-def compute_scale_up(
-    remaining: int, n_agents: int, max_files_per_agent: int | None,
-) -> int:
-    """Compute how many overflow agents to spawn after scout completes."""
-    if remaining <= 0:
+def compute_scale_up(remaining: int, n_agents: int) -> int:
+    """How many overflow agents to launch once the scout gate opens.
+
+    The scout exists to surface entry problems (auth, quota, oversized
+    prompt) on one agent before the run commits to N. Once it has been
+    running healthily for the scout timeout, or finished, every free slot
+    launches at once. Agents draw files from the shared queue in small
+    batches, so the only cap is the number of files left: a slot with
+    nothing to take would exit immediately.
+    """
+    if remaining <= 0 or n_agents <= 1:
         return 0
-    needed = ceil(remaining / (max_files_per_agent or _DEFAULT_FILES_PER_AGENT))
-    return min(needed, n_agents - 1) if needed > 1 else 0
+    return min(remaining, n_agents - 1)
 
 
 def collect_done(
@@ -201,9 +204,7 @@ def collect_done(
 
 
 def maybe_scale_up(
-    done: set, state: ScaleUpState, n_agents: int,
-    max_files_per_agent: int | None,
-    ctx: ScaleUpContext,
+    done: set, state: ScaleUpState, n_agents: int, ctx: ScaleUpContext,
 ) -> bool:
     """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
     if state.scout_done:
@@ -217,6 +218,6 @@ def maybe_scale_up(
         ctx.queue, ctx.queue_path, state.pool_start, state.max_duration,
         deadline_at=ctx.deadline_at,
     )
-    for _ in range(compute_scale_up(remaining, n_agents, max_files_per_agent)):
+    for _ in range(compute_scale_up(remaining, n_agents)):
         ctx.submit_fn()
     return True
