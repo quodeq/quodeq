@@ -1,8 +1,12 @@
-let since = -1;
+const SINCE_UNSET = -1; // no line index seen yet: the first poll fetches everything
+const LOGS_ENDPOINT = '/api/logs';
+const SINCE_PARAM = 'since'; // query key: only lines after this index
+const ISO_TIME_START = 11, ISO_TIME_END = 19; // the HH:MM:SS slice of an ISO timestamp
+let since = SINCE_UNSET;
 const el = document.getElementById('logs');
 async function poll() {
   try {
-    const url = '/api/logs' + (since >= 0 ? '?since=' + since : '');
+    const url = LOGS_ENDPOINT + (since >= 0 ? '?' + SINCE_PARAM + '=' + since : '');
     const r = await fetch(url);
     if (!r.ok) return;
     const data = await r.json();
@@ -10,7 +14,7 @@ async function poll() {
       const frag = document.createDocumentFragment();
       data.lines.forEach(e => {
         const line = document.createElement('div');
-        const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
+        const ts = e.timestamp ? e.timestamp.slice(ISO_TIME_START, ISO_TIME_END) : '';
         const ets = ts.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         line.innerHTML = '<span class="ts">[' + ets + ']</span> ' +
           e.line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

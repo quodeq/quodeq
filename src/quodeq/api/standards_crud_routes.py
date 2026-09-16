@@ -6,6 +6,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
 
@@ -17,13 +18,13 @@ def _handle_create(get_service, app: Flask) -> tuple[Response, int]:
     svc = get_service(app)
     payload = request.get_json(force=True)
     if not isinstance(payload, dict):
-        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, "bad_request")
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     logger.info("standards.create id=%s", payload.get("id", "<unknown>"))
     try:
         detail = svc.create_standard(payload)
     except ValueError as exc:
         logger.debug("standards.create validation error: %s", exc)
-        return error_response("Invalid standard data", HTTPStatus.BAD_REQUEST, "bad_request")
+        return error_response("Invalid standard data", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     return jsonify(to_camel_dict(detail)), HTTPStatus.CREATED
 
 
@@ -32,15 +33,15 @@ def _handle_update(get_service, app: Flask, standard_id: str) -> Response:
     svc = get_service(app)
     payload = request.get_json(force=True)
     if not isinstance(payload, dict):
-        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, "bad_request")
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     logger.info("standards.update id=%s", standard_id)
     try:
         detail = svc.update_standard(standard_id, payload)
     except FileNotFoundError:
-        return error_response(f"Standard not found: {standard_id}", HTTPStatus.NOT_FOUND, "not_found")
+        return error_response(f"Standard not found: {standard_id}", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
     except PermissionError as exc:
         logger.warning("standards.update permission error: %s", exc)
-        return error_response("Permission denied", HTTPStatus.FORBIDDEN, "forbidden")
+        return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)
     return jsonify(to_camel_dict(detail))
 
 
@@ -51,10 +52,10 @@ def _handle_delete(get_service, app: Flask, standard_id: str) -> tuple[str, int]
     try:
         svc.delete_standard(standard_id)
     except FileNotFoundError:
-        return error_response(f"Standard not found: {standard_id}", HTTPStatus.NOT_FOUND, "not_found")
+        return error_response(f"Standard not found: {standard_id}", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
     except PermissionError as exc:
         logger.warning("standards.delete permission error: %s", exc)
-        return error_response("Permission denied", HTTPStatus.FORBIDDEN, "forbidden")
+        return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)
     return "", HTTPStatus.NO_CONTENT
 
 
@@ -63,16 +64,16 @@ def _handle_duplicate(get_service, app: Flask, standard_id: str) -> tuple[Respon
     svc = get_service(app)
     payload = request.get_json(force=True)
     if not isinstance(payload, dict):
-        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, "bad_request")
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     new_id = payload.get("newId") or payload.get("new_id")
     if not new_id:
-        return error_response("newId is required", HTTPStatus.BAD_REQUEST, "bad_request")
+        return error_response("newId is required", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     logger.info("standards.duplicate id=%s new_id=%s", standard_id, new_id)
     try:
         detail = svc.duplicate_standard(standard_id, new_id)
     except (FileNotFoundError, ValueError) as exc:
         logger.debug("standards.duplicate error: %s", exc)
-        return error_response("Could not duplicate standard", HTTPStatus.BAD_REQUEST, "bad_request")
+        return error_response("Could not duplicate standard", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     return jsonify(to_camel_dict(detail)), HTTPStatus.CREATED
 
 

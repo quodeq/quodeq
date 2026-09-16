@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 
 from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
 from quodeq.shared.prereqs import _SAFE_CMD_TOKEN_RE, _run_version_cmd
 from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
 
@@ -111,7 +112,7 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
     _env = os.environ if env is None else env
     if provider == "ollama":
         try:
-            _ollama_base = _env.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            _ollama_base = _env.get("OLLAMA_BASE_URL", OLLAMA_DEFAULT_BASE_URL)
             with urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S):
                 pass
         except (urllib.error.URLError, OSError) as exc:

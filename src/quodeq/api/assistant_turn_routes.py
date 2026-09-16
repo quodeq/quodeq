@@ -26,6 +26,7 @@ from quodeq.api.assistant_turn_state import AssistantTurnState, _turn_state
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.services.score_cache import score_cache_path_override
+from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 
 def _start_turn_worker(state: AssistantTurnState, sid: str, turn: TurnRequest,
@@ -106,7 +107,7 @@ def register_assistant_turn_routes(app: Flask) -> None:
             return jsonify({"error": "text required"}), 400
         if local_provider_busy(session["provider"]):
             return jsonify({"error": "model busy with analysis"}), 409
-        if (session.get("source") or "local") == "shared":
+        if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
             shared_error = _assistant_routes._shared_source_error()
             if shared_error is not None:
                 return shared_error
@@ -129,7 +130,7 @@ def register_assistant_turn_routes(app: Flask) -> None:
                 model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
                 web_enabled=bool(body.get("webEnabled", False)),
                 write_enabled=(bool(body.get("writeEnabled", False))
-                               and (session.get("source") or "local") == "local"),
+                               and (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_LOCAL),
             )
             tool_ctx = _assistant_routes.build_tool_context(app, session)
             _start_turn_worker(state, sid, turn, repo, tool_ctx, cancel)

@@ -9,11 +9,12 @@ import subprocess
 import urllib.request
 import urllib.error
 
+from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+_OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", OLLAMA_DEFAULT_BASE_URL)
 _TIMEOUT_S = 3
 _MAX_PARALLEL_AGENTS = 5
 _SYSCTL_TIMEOUT_S = 3

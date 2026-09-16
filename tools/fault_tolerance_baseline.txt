@@ -10,7 +10,7 @@
 # introduced in the same change.
 src/quodeq/_cli_lifecycle.py:70:broad-except
 src/quodeq/_cli_scoring.py:171:broad-except
-src/quodeq/analysis/_api_call.py:292:broad-except
+src/quodeq/analysis/_api_call.py:291:broad-except
 src/quodeq/analysis/_api_runner.py:96:broad-except
 src/quodeq/analysis/_loop_steps.py:103:broad-except
 src/quodeq/analysis/_loop_steps.py:146:broad-except
@@ -82,7 +82,7 @@ src/quodeq/context/trust_model.py:161:broad-except
 src/quodeq/context/trust_model.py:93:broad-except
 src/quodeq/dashboard/_webview_token.py:86:suppress
 src/quodeq/dashboard/_webview_window_about.py:61:broad-except
-src/quodeq/dashboard/_webview_window_chrome.py:138:broad-except
+src/quodeq/dashboard/_webview_window_chrome.py:143:broad-except
 src/quodeq/dashboard/_webview_window_close.py:104:broad-except
 src/quodeq/dashboard/_webview_window_close.py:130:broad-except
 src/quodeq/dashboard/_webview_window_close.py:146:broad-except

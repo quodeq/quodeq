@@ -18,6 +18,7 @@ try:
 except ImportError:
     openai = None  # type: ignore[assignment]
 
+from quodeq.shared.constants import OLLAMA_DEFAULT_PORT
 from quodeq.shared.lru import LRUDict
 
 BATCH_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
@@ -133,7 +134,7 @@ def embedding_model_available(
         # Narrower than _providers._local_api_markers() on purpose: this gates
         # "/api/tags exists", not "is local" — localhost llama.cpp/omlx must
         # NOT match.
-        if "11434" in base_url or "ollama" in base_url.lower():
+        if OLLAMA_DEFAULT_PORT in base_url or "ollama" in base_url.lower():
             from quodeq.llm_bridge._ollama import list_ollama_models  # noqa: PLC0415
             lister = list_ollama_models
         else:

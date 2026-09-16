@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._assistant_helpers import resolve_repo_root
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.shared.validation import validate_path_segment
 from quodeq.core.standards.overrides import validate_overrides
@@ -38,10 +39,10 @@ def register_overrides_routes(app: Flask) -> None:
         try:
             validate_path_segment(project_id)
         except ValueError:
-            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
+            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
         root = _repo_root(project_id)
         if root is None:
-            return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, "not_found")
+            return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
         compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
         overrides = load_project_overrides(root)
         return jsonify({"overrides": overrides, "counts": override_counts_by_dimension(overrides, compiled_dir)})
@@ -51,15 +52,15 @@ def register_overrides_routes(app: Flask) -> None:
         try:
             validate_path_segment(project_id)
         except ValueError:
-            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
+            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
         root = _repo_root(project_id)
         if root is None:
-            return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, "not_found")
+            return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
         payload = request.get_json(force=True)
         raw = payload.get("overrides") if isinstance(payload, dict) else None
         if raw is None:
             return error_response(
-                'Body must be {"overrides": {...}}', HTTPStatus.BAD_REQUEST, "bad_request"
+                'Body must be {"overrides": {...}}', HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST
             )
         compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
         evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])

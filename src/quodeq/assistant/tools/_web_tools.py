@@ -27,6 +27,8 @@ _MAX_FETCH_BYTES = 2 * 1024 * 1024
 _MAX_FETCH_SECONDS = 60.0  # total budget: read=30.0 is per-read-op, so a slow
 # drip (1 byte per 29s) would otherwise wedge the turn thread indefinitely
 _MAX_TEXT_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
+_MAX_TITLE_CHARS = 300  # per search result; keeps _MAX_RESULTS results well under the fence
+_MAX_SNIPPET_CHARS = 500  # per search result, same budget
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
 
@@ -93,8 +95,8 @@ def _search_web(query: str, max_results: int = 5) -> dict:
     parser = _DdgResultParser()
     parser.feed(resp.text)
     parser.close()  # convert_charrefs buffers a trailing run near a bare &
-    results = [{"title": r["title"].strip()[:300], "url": r["url"],
-                "snippet": " ".join(r["snippet"].split())[:500]}
+    results = [{"title": r["title"].strip()[:_MAX_TITLE_CHARS], "url": r["url"],
+                "snippet": " ".join(r["snippet"].split())[:_MAX_SNIPPET_CHARS]}
                for r in parser.results if r["url"].startswith("http")]
     if not results:
         raise ToolError("web search returned no results; the search service may be "
