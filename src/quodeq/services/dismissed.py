@@ -27,6 +27,7 @@ from quodeq.core.events.models import (
     FindingUndismissed,
     FindingUndismissedEvent,
 )
+from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 
 
@@ -225,6 +226,7 @@ def recount_totals(
     violations: list[Finding],
     compliance_count: int | None = None,
     old_totals: Totals | None = None,
+    files_read: int | None = None,
 ) -> Totals:
     """Recompute totals from a filtered violations list."""
     cc = compliance_count if compliance_count is not None else (old_totals.compliance_count if old_totals else 0)
@@ -243,6 +245,7 @@ def recount_totals(
         violation_count=len(violations),
         compliance_count=cc,
         severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
+        violations_per_100_files=violations_per_100_files(len(violations), files_read),
     )
 
 

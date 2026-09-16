@@ -34,6 +34,18 @@ def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
     return 0.0
 
 
+def violations_per_100_files(count: int, files_read: int | None) -> float | None:
+    """Violations per 100 files read, one decimal; None when nothing was read.
+
+    Volume next to the grade: the grade deducts per distinct violation type,
+    so this is what shows a bucket shrinking between runs (taxonomy spec
+    2026-09-15, section 5).
+    """
+    if not files_read or files_read <= 0:
+        return None
+    return round(100.0 * count / files_read, 1)
+
+
 def classify_confidence_level(
     n_violations: int,
     n_compliance: int,

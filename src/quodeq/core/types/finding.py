@@ -18,6 +18,7 @@ class Totals:
     violation_count: int = 0
     compliance_count: int = 0
     severity: SeverityTally = field(default_factory=SeverityTally)
+    violations_per_100_files: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
