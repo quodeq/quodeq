@@ -12,7 +12,7 @@ class MockWS {
   _msg(data) { this.onmessage && this.onmessage({ data }); }
   _drop(code) { this.readyState = 3; this.onclose && this.onclose({ code }); }
 }
-beforeEach(() => { MockWS.instances = []; globalThis.WebSocket = MockWS; });
+beforeEach(() => { MockWS.instances = []; vi.stubGlobal('WebSocket', MockWS); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 it('reconnects (new socket) when restartKey changes', () => {

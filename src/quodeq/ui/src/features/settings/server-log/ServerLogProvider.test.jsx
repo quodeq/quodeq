@@ -38,7 +38,7 @@ function renderWithProviders(ui) {
 
 describe('ServerLogProvider', () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ lines: [] }) });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ lines: [] }) }));
   });
   afterEach(() => {
     vi.restoreAllMocks();

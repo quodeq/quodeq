@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { registerProject, getOmlxModels, getLlamacppLogAvailable } from './index.js';
 
 beforeEach(() => {
-  global.fetch = vi.fn();
+  vi.stubGlobal('fetch', vi.fn());
 });
 
 describe('getOmlxModels', () => {
@@ -112,7 +112,7 @@ describe('cancelEvaluation / deleteEvaluation intent', () => {
   // The server routes DELETE by declared intent; without these flags a run
   // finishing mid-dialog used to get permanently purged by a cancel click.
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) }));
   });
 
   it('cancelEvaluation declares intent=cancel', async () => {

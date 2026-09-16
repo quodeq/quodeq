@@ -179,7 +179,7 @@ it('falls back to the newest session when the stored selection no longer exists'
 it('copy button copies the active session selection to the clipboard', async () => {
   const { userEvent } = await import('@testing-library/user-event').then((m) => ({ userEvent: m.default }));
   const writeText = vi.fn(async () => {});
-  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
   fakeTerm.getSelection.mockReturnValue('picked text');
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
@@ -188,7 +188,7 @@ it('copy button copies the active session selection to the clipboard', async () 
 });
 
 it('copy button does not throw when navigator.clipboard is unavailable', async () => {
-  Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  vi.stubGlobal('navigator', { ...navigator, clipboard: undefined });
   fakeTerm.getSelection.mockReturnValue('picked text');
   render(<TerminalPane active />);
   await screen.findByTestId('tty-root');
@@ -204,7 +204,7 @@ it('routes OSC 8 hyperlink clicks through the pywebview bridge, not window.open'
   const { Terminal } = await import('@xterm/xterm');
   Terminal.mockClear();
   const open_browser = vi.fn();
-  window.pywebview = { api: { open_browser } };
+  vi.stubGlobal('pywebview', { api: { open_browser } });
   const windowOpen = vi.spyOn(window, 'open').mockReturnValue(null);
   try {
     render(<TerminalPane active />);

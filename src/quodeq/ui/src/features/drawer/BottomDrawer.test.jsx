@@ -1,4 +1,4 @@
-import { it, expect, vi } from 'vitest';
+import { it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
@@ -19,6 +19,10 @@ vi.mock('../side-pane/index.js', () => ({
 }));
 import { BottomDrawer } from './BottomDrawer.jsx';
 
+afterEach(() => {
+  drawer.openPanels = ['assistant', 'terminal'];
+});
+
 it('shows a tab for each OPEN panel (both, since both are open)', () => {
   render(<BottomDrawer uiState={{}} />);
   expect(screen.getByRole('tab', { name: /Assistant/ })).toBeInTheDocument();
@@ -30,7 +34,6 @@ it('hides the switcher entirely when only one panel is open (identity icon inste
   const { container } = render(<BottomDrawer uiState={{}} />);
   expect(screen.queryByRole('tab')).toBeNull();
   expect(container.querySelector('.assistant-panel-header .assistant-compass-block')).not.toBeNull();
-  drawer.openPanels = ['assistant', 'terminal'];  // restore for other tests
 });
 
 it('hides the identity icon when both panels are open (the switcher already carries the glyph)', () => {

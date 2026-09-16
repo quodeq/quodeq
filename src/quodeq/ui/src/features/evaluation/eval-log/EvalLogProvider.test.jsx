@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePaneProvider } from '../../side-pane/index.js';
@@ -53,13 +53,10 @@ function renderWithProviders(ui) {
 }
 
 describe('EvalLogProvider', () => {
-  let originalEventSource;
   beforeEach(() => {
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
   });
-  afterEach(() => { globalThis.EventSource = originalEventSource; });
 
   it('initial state: no active job, dock empty', () => {
     renderWithProviders(<Probe />);

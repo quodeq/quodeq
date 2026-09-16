@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { useOllamaLogStream } from './useOllamaLogStream.js';
@@ -41,14 +41,9 @@ function Probe({ active }) {
 }
 
 describe('useOllamaLogStream', () => {
-  let originalEventSource;
   beforeEach(() => {
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
-  });
-  afterEach(() => {
-    globalThis.EventSource = originalEventSource;
   });
 
   it('does not open EventSource when active=false', () => {

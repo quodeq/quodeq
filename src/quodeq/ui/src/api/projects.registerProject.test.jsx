@@ -7,14 +7,14 @@ describe('registerProject', () => {
   beforeEach(async () => {
     // Reset fetch tracking
     fetchCalls = [];
-    global.fetch = vi.fn(async (url, opts) => {
+    vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
       fetchCalls.push(url);
       return {
         ok: true,
         status: 201,
         json: async () => ({ projectId: 'p1', scanData: {} }),
       };
-    });
+    }));
   });
 
   afterEach(() => {

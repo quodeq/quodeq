@@ -51,15 +51,12 @@ function Probe({ jobId }) {
 }
 
 describe('useJobLogStream', () => {
-  let originalEventSource;
   beforeEach(() => {
     vi.useFakeTimers();
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
   });
   afterEach(() => {
-    globalThis.EventSource = originalEventSource;
     vi.useRealTimers();
   });
 

@@ -11,7 +11,7 @@ vi.mock('../../../api/index.js', () => ({
 
 describe('useHistoryRunLive', () => {
   beforeEach(() => {
-    global.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.last = null;
     vi.stubEnv('VITE_USE_SSE_EVENTS', 'true');
     getEvaluationProgress.mockReset();
