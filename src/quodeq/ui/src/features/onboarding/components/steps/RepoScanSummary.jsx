@@ -1,6 +1,8 @@
 import { StatStrip, Stat } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
 
+const TOP_LANGUAGES_LIMIT = 8; // the chip row stays one glance; the rest is noise for a summary
+
 /**
  * RepoScanStep.jsx's post-scan summary (file/code/language/branch stats,
  * top languages). Extracted verbatim.
@@ -11,7 +13,7 @@ export function RepoScanSummary({ scan }) {
   const langs = scan?.languages || {};
   const langCount = Object.keys(langs).length;
   const branchCount = scan?.branches?.length ?? 0;
-  const topLangs = Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const topLangs = Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, TOP_LANGUAGES_LIMIT);
   return (
     <div className="onboarding-scan-summary">
       <StatStrip cards>

@@ -1,10 +1,10 @@
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
-
-const SKIPPED_STEPS_KEY = 'quodeq_onboarding_skipped';
+import { removeKey } from '../../../adapters/storage.js';
+import { SKIPPED_KEY } from '../hooks/useWizardDraft.js';
 
 function clearSkip() {
-  try { localStorage.removeItem(SKIPPED_STEPS_KEY); } catch { /* ignore */ }
+  removeKey(SKIPPED_KEY);
 }
 
 export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = null, isEvaluating = false }) {

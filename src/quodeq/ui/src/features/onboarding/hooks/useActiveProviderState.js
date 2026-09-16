@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { getProviderConfigs } from '../../../api/index.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
+// Poll interval for mirroring localStorage: ProviderTabs and its children
+// write directly and the `storage` event only fires cross-tab. Short enough
+// to feel live while the user picks; the picker is interactive and on screen.
+const ACTIVE_PROVIDER_POLL_MS = 400;
+
 export function readActiveProviderState() {
   try {
     const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;
@@ -31,12 +36,9 @@ export function useActiveProviderState() {
     getProviderConfigs().then(setProviderConfigs).catch(() => setProviderConfigs({}));
   }, []);
 
-  // Poll localStorage for changes — ProviderTabs / its children write directly,
-  // and the `storage` event only fires for cross-tab writes. A short interval
-  // is enough; the picker is interactive and the user is on the screen.
   useEffect(() => {
     const tick = () => setActiveProvider(readActiveProviderState());
-    const interval = setInterval(tick, 400);
+    const interval = setInterval(tick, ACTIVE_PROVIDER_POLL_MS);
     window.addEventListener('storage', tick);
     return () => { clearInterval(interval); window.removeEventListener('storage', tick); };
   }, []);

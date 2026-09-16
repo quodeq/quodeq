@@ -1,6 +1,12 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
 
-const STEP_ORDER = ['welcome', 'repo-scan', 'provider', 'standard-launch'];
+// Wizard step ids: the `step` state value, goToStep's argument and the
+// startStep an entry point opens on. STEP_ORDER is the forward path.
+export const STEP_WELCOME = 'welcome';
+export const STEP_REPO_SCAN = 'repo-scan';
+export const STEP_PROVIDER = 'provider';
+export const STEP_STANDARD_LAUNCH = 'standard-launch';
+const STEP_ORDER = [STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH];
 
 /**
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
@@ -45,7 +51,7 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
     const i = STEP_ORDER.indexOf(wizard.state.step);
     let next = STEP_ORDER[i + 1] || wizard.state.step;
     // Auto-skip Provider if already configured.
-    if (next === 'provider' && providerConfigured) next = 'standard-launch';
+    if (next === STEP_PROVIDER && providerConfigured) next = STEP_STANDARD_LAUNCH;
     wizard.goToStep(next);
   }
 

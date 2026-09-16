@@ -85,7 +85,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
 
   const clampSubagents = (raw) => {
     const n = parseInt(raw, 10);
-    if (Number.isNaN(n)) return '1';
+    if (Number.isNaN(n)) return String(MIN_SUBAGENTS);
     return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
   };
 

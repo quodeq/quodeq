@@ -2,21 +2,23 @@ import { useMemo, useState } from 'react';
 import { registerProject, getProjectInfo } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { useOnboardingEffects } from '../hooks/useOnboardingEffects.js';
-import { useOnboardingWizardHandlers } from '../hooks/useOnboardingWizardHandlers.js';
+import {
+  useOnboardingWizardHandlers, STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH,
+} from '../hooks/useOnboardingWizardHandlers.js';
 import { OnboardingStepSwitch } from './OnboardingStepSwitch.jsx';
 import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
 
 function visibleSteps(_currentStep, _isFirstProject, providerConfigured) {
   // Welcome is excluded from numeric counter.
-  const seen = ['repo-scan'];
-  if (!providerConfigured) seen.push('provider');
-  seen.push('standard-launch');
+  const seen = [STEP_REPO_SCAN];
+  if (!providerConfigured) seen.push(STEP_PROVIDER);
+  seen.push(STEP_STANDARD_LAUNCH);
   return seen;
 }
 
 export default function OnboardingWizard({ entry, onClose, onLaunch }) {
-  const initialStep = entry.startStep || 'welcome';
+  const initialStep = entry.startStep || STEP_WELCOME;
   const wizard = useWizardState({ initial: { step: initialStep, isFirstProject: entry.isFirstProject ?? true } });
   const [standards, setStandards] = useState([]);
 

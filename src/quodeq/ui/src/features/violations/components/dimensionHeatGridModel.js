@@ -5,6 +5,7 @@
  */
 
 export const DEFAULT_SEVERITY = 'minor';
+const UNKNOWN_PRINCIPLE = '(unknown)'; // findings that name no principle share one synthetic row
 
 export function getSortValue(row, col) {
   switch (col) {
@@ -64,7 +65,7 @@ export function buildDimensionGroup(dim) {
   for (const v of violations) {
     const sev = (v.severity || DEFAULT_SEVERITY).toLowerCase();
     if (dimSev[sev] !== undefined) dimSev[sev]++;
-    const pName = v.principle || '(unknown)';
+    const pName = v.principle || UNKNOWN_PRINCIPLE;
     if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
     const p = principleMap.get(pName);
     p.violations++;
@@ -73,7 +74,7 @@ export function buildDimensionGroup(dim) {
   }
 
   for (const c of compliance) {
-    const pName = c.principle || '(unknown)';
+    const pName = c.principle || UNKNOWN_PRINCIPLE;
     if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
     principleMap.get(pName).compliance++;
     principleMap.get(pName).complianceItems.push(c);
