@@ -17,6 +17,7 @@ from pathlib import Path
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services._run_status_readers import _status_json_terminal
+from quodeq.core.utils.io import is_within
 
 
 def _merge_internal_jobs(
@@ -67,13 +68,9 @@ def _remove_run_directory(
     ``reports_dir`` for a ``run_uuid`` match.
     """
     removed_dir = False
-    resolved_reports = reports_dir.resolve() if reports_dir.is_dir() else None
     if output_project and reports_dir.is_dir():
         candidate = reports_dir / output_project / run_uuid
-        try:
-            if resolved_reports and not candidate.resolve().is_relative_to(resolved_reports):
-                candidate = None
-        except (OSError, ValueError):
+        if not is_within(candidate, reports_dir):
             candidate = None
         if candidate and candidate.is_dir():
             shutil.rmtree(candidate, ignore_errors=True)
@@ -83,10 +80,7 @@ def _remove_run_directory(
     if not removed_dir and reports_dir.is_dir():
         for project_dir in reports_dir.iterdir():
             candidate = project_dir / run_uuid
-            try:
-                if resolved_reports and not candidate.resolve().is_relative_to(resolved_reports):
-                    continue
-            except (OSError, ValueError):
+            if not is_within(candidate, reports_dir):
                 continue
             if candidate.is_dir():
                 shutil.rmtree(candidate, ignore_errors=True)
@@ -101,15 +95,11 @@ def _scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path |
     """Scan *reports_root* for ``<project>/<run_id>/``, jailed to *reports_root*."""
     if reports_root is None or not reports_root.is_dir():
         return None
-    resolved_root = reports_root.resolve()
     for project_dir in reports_root.iterdir():
         if not project_dir.is_dir():
             continue
         candidate = project_dir / run_id
-        try:
-            if not candidate.resolve().is_relative_to(resolved_root):
-                continue
-        except (OSError, ValueError):
+        if not is_within(candidate, reports_root):
             continue
         if candidate.is_dir():
             return candidate

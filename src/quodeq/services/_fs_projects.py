@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry
+from quodeq.core.utils.io import is_within
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
@@ -175,7 +176,7 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
     """Update the path stored in a project's metadata."""
     reports_root = Path(reports_dir).resolve()
     project_dir = (reports_root / project).resolve()
-    if not project_dir.is_relative_to(reports_root):
+    if not is_within(project_dir, reports_root):
         return False
     if not repository_info_exists(project_dir):
         return False
@@ -229,7 +230,7 @@ def delete_project(reports_dir: str, project: str) -> bool:
     """
     reports_root = Path(reports_dir).resolve()
     project_path = (reports_root / project).resolve()
-    if not project_path.is_relative_to(reports_root):
+    if not is_within(project_path, reports_root):
         return False
     if not project_path.exists() or not project_path.is_dir():
         return False
@@ -272,7 +273,7 @@ def get_project_info(
     (``_list_available_dimensions_for_discipline``, ``_has_fingerprints``).
     """
     project_dir = (Path(reports_dir) / project).resolve()
-    if not project_dir.is_relative_to(Path(reports_dir).resolve()):
+    if not is_within(project_dir, reports_dir):
         return None
     info = read_repository_info(project_dir)
     if info is None:
