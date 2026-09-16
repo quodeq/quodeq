@@ -2,7 +2,7 @@ import WelcomeStep from './steps/WelcomeStep.jsx';
 import RepoScanStep from './steps/RepoScanStep.jsx';
 import ProviderStep from './steps/ProviderStep.jsx';
 import StandardLaunchStep from './steps/StandardLaunchStep.jsx';
-import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../hooks/useOnboardingWizardHandlers.js';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 
 /**
  * OnboardingWizard.jsx's step-switch JSX (which step component renders for

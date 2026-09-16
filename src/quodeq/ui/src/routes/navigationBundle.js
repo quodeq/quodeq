@@ -1,5 +1,5 @@
 import { t } from '../strings/index.js';
-import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboarding/hooks/useOnboardingWizardHandlers.js';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboarding/wizardSteps.js';
 
 /**
  * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every

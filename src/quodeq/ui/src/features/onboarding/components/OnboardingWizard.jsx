@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react';
 import { registerProject, getProjectInfo } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { useOnboardingEffects } from '../hooks/useOnboardingEffects.js';
-import {
-  useOnboardingWizardHandlers, STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH,
-} from '../hooks/useOnboardingWizardHandlers.js';
+import { useOnboardingWizardHandlers } from '../hooks/useOnboardingWizardHandlers.js';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 import { OnboardingStepSwitch } from './OnboardingStepSwitch.jsx';
 import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';

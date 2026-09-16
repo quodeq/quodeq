@@ -5,8 +5,8 @@
  * without mounting the whole App (which needs ~8 providers).
  */
 import { useEffect, useRef, useState } from 'react';
-import { wasWelcomeSkipped } from './hooks/useWizardDraft.js';
-import { STEP_WELCOME } from './hooks/useOnboardingWizardHandlers.js';
+import { readString } from '../../adapters/storage.js';
+import { STEP_WELCOME, SKIPPED_KEY } from './wizardSteps.js';
 
 /**
  * Whether the first-paint onboarding-wizard auto-open effect should fire.
@@ -117,7 +117,7 @@ export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }
       return;
     }
     autoOpenedRef.current = true;
-    if (!wasWelcomeSkipped()) {
+    if (readString(SKIPPED_KEY, null) !== 'true') {
       setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
     }
   }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps

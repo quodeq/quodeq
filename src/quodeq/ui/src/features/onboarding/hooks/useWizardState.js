@@ -1,5 +1,5 @@
 import { useReducer, useCallback } from 'react';
-import { STEP_WELCOME } from './useOnboardingWizardHandlers.js';
+import { STEP_WELCOME } from '../wizardSteps.js';
 
 const DEFAULT_TIME_LIMIT_S = 600; // 10 minutes
 

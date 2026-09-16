@@ -1,7 +1,7 @@
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { removeKey } from '../../../adapters/storage.js';
-import { SKIPPED_KEY } from '../hooks/useWizardDraft.js';
+import { SKIPPED_KEY } from '../wizardSteps.js';
 
 function clearSkip() {
   removeKey(SKIPPED_KEY);
