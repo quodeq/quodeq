@@ -15,6 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from quodeq.shared._env_paths import get_run_dir
 from quodeq.shared.frozen import is_frozen, subprocess_cmd
 
 _logger = logging.getLogger(__name__)
@@ -22,9 +23,7 @@ _PIDFILE_NAME = "menubar.pid"
 
 
 def _pidfile_path() -> Path:
-    run_dir = Path(os.environ.get("QUODEQ_RUN_DIR", Path.home() / ".quodeq" / "run"))
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / _PIDFILE_NAME
+    return get_run_dir() / _PIDFILE_NAME
 
 
 def is_supported() -> bool:

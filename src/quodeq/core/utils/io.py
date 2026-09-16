@@ -130,6 +130,19 @@ def resolve_child_dir(root: str | Path, name: str) -> str | None:
     return None
 
 
+def is_within(candidate: str | Path, root: str | Path) -> bool:
+    """True when *candidate* resolves to *root* or somewhere under it.
+
+    Same realpath form as ``contained_path`` (see its docstring for why),
+    but a predicate: callers that branch on containment use this; callers
+    that need the safe path use ``contained_path``. Never raises: realpath
+    is non-strict, so a missing candidate is judged by its lexical target.
+    """
+    real = os.path.realpath(str(candidate))
+    root_real = os.path.realpath(str(root))
+    return real == root_real or real.startswith(root_real + os.sep)
+
+
 def contained_path(candidate: str | Path, root: str | Path) -> str:
     """Return *candidate* resolved, guaranteed to sit inside *root*.
 
@@ -150,11 +163,9 @@ def contained_path(candidate: str | Path, root: str | Path) -> str:
        raises leaves the original tainted value flowing to the sink, so no
        amount of checking inside it registers as a barrier.
     """
-    real = os.path.realpath(str(candidate))
-    root_real = os.path.realpath(str(root))
-    if real != root_real and not real.startswith(root_real + os.sep):
+    if not is_within(candidate, root):
         raise ValueError(
             f"Path escapes its root directory: {candidate!r} is not inside {root!r}. "
             "Ensure the path has no '..' segments or symlinks leaving the root."
         )
-    return real
+    return os.path.realpath(str(candidate))

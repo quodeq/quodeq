@@ -3,11 +3,10 @@ import { SectionLabel } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
 import ProjectRow from './ProjectRow.jsx';
+import { nf, score1 } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 function CollapsedUnevaluated({ unevaluated, showUnevaluated, setShowUnevaluated }) {
   return (

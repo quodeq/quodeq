@@ -2,9 +2,9 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
+import { nf } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 
 /** Title/subtitle + the dimension tab bar (switches sideways between
  * dimensions without a local back button — the app breadcrumb walks back). */

@@ -7,6 +7,7 @@ I/O to complete.
 from __future__ import annotations
 
 import threading
+import time
 from unittest.mock import patch
 
 import pytest
@@ -141,7 +142,7 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
         client.get("/api/evaluations/j1")
         client.get("/api/evaluations/j1")
         # Give background threads time to finish.
-        import time; time.sleep(0.1)
+        time.sleep(0.1)
 
     assert call_count == 1, (
         f"Expected scoring to run exactly once (dedup via _scored_jobs), "

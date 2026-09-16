@@ -1,9 +1,12 @@
-import { useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { useLlamacppServerStatus } from './useLlamacppServerStatus.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { useInvalidateOnOnline } from './useInvalidateOnOnline.js';
+
+const MODELS_KEY = settingsKeys.llamacppModels();
 
 /**
  * LlamaCppTab.jsx's models query plus its two effects (invalidate on
@@ -14,25 +17,15 @@ export function useLlamaCppModels({ state, update }) {
   const { getLlamacppModels } = useApi();
   const llamacppStatus = useLlamacppServerStatus();
 
-  const queryClient = useQueryClient();
   const { data: models = [], error: modelsQueryError } = useQuery({
-    queryKey: settingsKeys.llamacppModels(),
+    queryKey: MODELS_KEY,
     queryFn: () => getLlamacppModels(),
   });
   const modelsError = modelsQueryError
     ? t('settings.llamacppLoadFailed')
     : null;
 
-  // When llama-server transitions offline -> online, refresh the models query
-  // so the loaded model populates as soon as the status pill flips to green.
-  const prevStatusRef = useRef(llamacppStatus?.status ?? 'offline');
-  useEffect(() => {
-    const status = llamacppStatus?.status ?? 'offline';
-    if (prevStatusRef.current !== 'online' && status === 'online') {
-      queryClient.invalidateQueries({ queryKey: settingsKeys.llamacppModels() });
-    }
-    prevStatusRef.current = status;
-  }, [llamacppStatus?.status, queryClient]);
+  useInvalidateOnOnline(llamacppStatus?.status, MODELS_KEY);
 
   // The model name comes from llama-server itself. Mirror it into provider
   // state so the analysis runner has a model to send.

@@ -18,6 +18,7 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
 from quodeq.services.base import ActionProvider, NewProjectSpec
+from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
 
 
@@ -58,7 +59,6 @@ def _parse_create_project_request(
     ephemeral = bool(data.get("ephemeral", False))
     reports_root = _reports_dir()
 
-    from quodeq.shared.utils import is_repo_url
     try:
         is_url = is_repo_url(repo)
     except ValueError:

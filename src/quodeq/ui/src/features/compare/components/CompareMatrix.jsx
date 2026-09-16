@@ -22,8 +22,8 @@ import { t } from '../../../strings/index.js';
 import { OVERALL, computeMatrixExtremes, sortMatrixRows } from './compareMatrixModel.js';
 import { useMatrixColumnChunks } from './useMatrixColumnChunks.js';
 import CompareMatrixTable from './CompareMatrixTable.jsx';
+import { score1 } from '../compareFormatters.js';
 
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 // Column headers hold 3-character numbers; full dimension or principle
 // names would set the column width instead. The primary code is the same

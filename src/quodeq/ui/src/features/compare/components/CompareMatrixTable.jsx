@@ -1,7 +1,7 @@
 import { t } from '../../../strings/index.js';
 import { scoreColorClass } from '../../../utils/formatters.js';
+import { score1 } from '../compareFormatters.js';
 
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 /** One chunk's table: project lead column, an overall column on the first
  * chunk only, then that chunk's score columns — header, body and a

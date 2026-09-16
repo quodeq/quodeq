@@ -9,15 +9,14 @@
  * that were never evaluated collapse into a single line.
  */
 import CompareMatrix from './CompareMatrix.jsx';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
 import CompareFleetHeader from './CompareFleetHeader.jsx';
 import CompareFleetStatCards from './CompareFleetStatCards.jsx';
 import CompareAttentionStrip from './CompareAttentionStrip.jsx';
 import CompareDimensionsBoard from './CompareDimensionsBoard.jsx';
 import CompareProjectsTable from './CompareProjectsTable.jsx';
+import { nf, score1 } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 function buildAttentionItems(attnAll, onOpenProject, openDimension) {
   return attnAll.map(({ row, level, reasons, worstDim }) => ({

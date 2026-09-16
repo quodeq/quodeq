@@ -7,6 +7,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 
 from quodeq.core.evidence._refs import RefsReader, enrich_judgment
+from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 from quodeq.core.events.models import Judgment, VALID_VERDICTS
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
@@ -14,28 +15,6 @@ from quodeq.core.utils.io import open_text
 # A malformed-line message is handed to this sink instead of logged directly,
 # so core never imports a logging framework -- see quodeq.core.observability.
 MalformedLineSink = Callable[[str], None]
-
-
-def _jsonl_confidence(value: object, default: int = 100) -> int:
-    """Clamp a JSONL confidence value to [0, 100]; missing/non-int → *default*."""
-    if value is None:
-        return default
-    try:
-        coerced = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(0, min(100, coerced))
-
-
-def _coerce_scope_downgrade(raw: object) -> dict[str, str] | None:
-    """Coerce a JSONL value to the scope-gate marker shape ({"rule",
-    "from", "to"}, all strings), dropping anything else rather than raising.
-    """
-    if not isinstance(raw, dict):
-        return None
-    if not all(isinstance(v, str) for v in raw.values()):
-        return None
-    return raw
 
 
 def parse_jsonl_line(
@@ -77,10 +56,10 @@ def parse_jsonl_line(
         violation_type_raw=obj.get("vt_raw") or None,
         req=obj.get("req"), title=obj.get("w") or None,
         context=obj.get("context") or None, scope=obj.get("scope") or None,
-        confidence=_jsonl_confidence(obj.get("confidence")),
+        confidence=coerce_confidence(obj.get("confidence")),
         req_refs=req_refs,
         provenance_downgrade=bool(obj.get("provenance_downgrade")),
-        scope_downgrade=_coerce_scope_downgrade(obj.get("scope_downgrade")),
+        scope_downgrade=coerce_scope_downgrade(obj.get("scope_downgrade")),
         carried_forward=bool(obj.get("carried_forward")),
     )
     return j, obj.get("refs")

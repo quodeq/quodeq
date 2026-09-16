@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import urllib.parse
 
 from quodeq.shared.ssrf import is_private_address
 
@@ -39,7 +40,6 @@ def _remote_host(repo_input: str) -> str:
     this it would reach git clone unguarded.
     """
     if repo_input.startswith("http"):
-        import urllib.parse
         return urllib.parse.urlparse(repo_input).hostname or ""
     if repo_input.startswith("git@"):
         return repo_input[len("git@"):].split(":", 1)[0].strip("[]")

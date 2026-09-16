@@ -20,6 +20,7 @@ import threading
 
 import rumps
 
+from quodeq.shared._env import env_int
 from quodeq.shared.frozen import source_user_path as _source_user_path
 from quodeq.menubar import control as _control
 from quodeq.menubar import state as _state
@@ -33,11 +34,7 @@ from quodeq.menubar._health import (
 from quodeq.menubar._process import find_running_port as _find_running_port_cached
 
 _DEFAULT_APP_PORT = 7863
-try:
-    _POLL_INTERVAL = int(os.environ.get("QUODEQ_POLL_INTERVAL", "5"))
-except ValueError:
-    _logging.getLogger(__name__).warning("Invalid QUODEQ_POLL_INTERVAL; using default 5")
-    _POLL_INTERVAL = 5
+_POLL_INTERVAL = env_int("QUODEQ_POLL_INTERVAL", 5)
 _DEFAULT_PORTS = "7863,7864,7865,7866,7867,7868,7869"
 
 
@@ -45,11 +42,7 @@ def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     _cfg_log = _logging.getLogger(__name__)
     env = env or os.environ
-    try:
-        app_port = int(env.get("QUODEQ_PORT", str(_DEFAULT_APP_PORT)))
-    except ValueError:
-        _cfg_log.warning("Invalid QUODEQ_PORT; using default %d", _DEFAULT_APP_PORT)
-        app_port = _DEFAULT_APP_PORT
+    app_port = env_int("QUODEQ_PORT", _DEFAULT_APP_PORT, env=env)
     raw_ports = env.get("QUODEQ_PORTS", _DEFAULT_PORTS)
     ports_list = []
     for p in raw_ports.split(","):

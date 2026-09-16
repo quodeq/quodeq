@@ -10,6 +10,7 @@ from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig, action_api_healthy, spawn_and_wait
 from quodeq.dashboard._networking import _is_port_open
+from quodeq.shared._env_paths import get_run_dir
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import IS_WIN32
@@ -29,12 +30,7 @@ def _get_pid_file(env: dict[str, str] | None = None) -> Path:
 
     Override the default location via ``QUODEQ_RUN_DIR``.
     """
-    env_run_dir = (env or os.environ).get("QUODEQ_RUN_DIR")
-    if env_run_dir and not Path(env_run_dir).is_absolute():
-        raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {env_run_dir!r}")
-    run_dir = Path(env_run_dir) if env_run_dir else Path.home() / ".quodeq" / "run"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / "action_api.pid"
+    return get_run_dir(env) / "action_api.pid"
 
 
 def _read_pid_record(pid_file: Path) -> dict | None:

@@ -3,11 +3,10 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import CompareTrendLine from './CompareTrendLine.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
 import { consequenceOf, consequenceLevel } from '../compareModel.js';
+import { nf, score1 } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 /* Score, 30-day spark + delta, violations split by severity, ratio and
    freshness — everything a row shows once it has a score. */

@@ -9,6 +9,8 @@ import threading
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared._env_paths import get_run_dir
+
 _logger = logging.getLogger(__name__)
 _SOCK_TIMEOUT = 0.5
 _RELOAD_PREFIX = "reload:"
@@ -26,15 +28,11 @@ _WIN_PORT_FILE = "dashboard.port"
 
 
 def _default_sock_path() -> Path:
-    run_dir = Path(os.environ.get("QUODEQ_RUN_DIR", Path.home() / ".quodeq" / "run"))
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / "dashboard.sock"
+    return get_run_dir() / "dashboard.sock"
 
 
 def _default_port_file() -> Path:
-    run_dir = Path(os.environ.get("QUODEQ_RUN_DIR", Path.home() / ".quodeq" / "run"))
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / _WIN_PORT_FILE
+    return get_run_dir() / _WIN_PORT_FILE
 
 
 class InstanceController:

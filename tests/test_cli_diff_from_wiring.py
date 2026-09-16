@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-from quodeq._cli_evaluation import _build_run_config
+from quodeq._cli_evaluation import _build_run_config, run_evaluate
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.analysis.manifest_models import SourceManifest
 
@@ -86,11 +86,9 @@ def test_no_diff_from_leaves_file_filter_unset(tmp_path: Path) -> None:
 
 def test_run_evaluate_fails_fast_on_unknown_diff_ref(tmp_path: Path, capsys) -> None:
     """An unresolvable --diff-from must return 1 BEFORE any run dir is created."""
-    from quodeq._cli_evaluation import run_evaluate
 
     repo = tmp_path / "repo"
     repo.mkdir()
-    import subprocess
     def run(cmd: list[str]) -> None:
         subprocess.run(cmd, cwd=str(repo), check=True, capture_output=True)
     run(["git", "init", "-q", "-b", "main"])

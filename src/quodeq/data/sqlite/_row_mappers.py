@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from quodeq.core.events.models import Judgment
+from quodeq.core.finding_coercions import coerce_confidence
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
 
@@ -19,21 +20,6 @@ _logger = logging.getLogger(__name__)
 
 def _dedup_key(practice_id: str, file: str, line: int, verdict: str) -> str:
     return f"{practice_id}|{file}|{line}|{verdict}"
-
-
-def _coerce_confidence(value: Any, default: int = 100) -> int:
-    """Clamp *value* to [0, 100]; fall back to *default* for missing/non-int."""
-    if value is None:
-        return default
-    try:
-        coerced = int(value)
-    except (TypeError, ValueError):
-        return default
-    if coerced < 0:
-        return 0
-    if coerced > 100:
-        return 100
-    return coerced
 
 
 def _scope_downgrade_json(raw: Any) -> str | None:
@@ -76,7 +62,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "scope": finding.get("scope", "") or "",
         "req_refs_json": json.dumps(refs) if refs is not None else None,
         "dedup_key": _dedup_key(practice_id, file, line, verdict),
-        "confidence": _coerce_confidence(finding.get("confidence")),
+        "confidence": coerce_confidence(finding.get("confidence")),
         "provenance_downgrade": 1 if finding.get("provenance_downgrade") else 0,
         "scope_downgrade_json": _scope_downgrade_json(finding.get("scope_downgrade")),
     }
@@ -108,7 +94,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
         "scope": j.scope or "",
         "req_refs_json": refs_json,
         "dedup_key": _dedup_key(j.practice_id, j.file, j.line, j.verdict),
-        "confidence": _coerce_confidence(j.confidence),
+        "confidence": coerce_confidence(j.confidence),
         "provenance_downgrade": 1 if j.provenance_downgrade else 0,
         "scope_downgrade_json": json.dumps(j.scope_downgrade) if j.scope_downgrade else None,
     }
@@ -158,7 +144,7 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
         title=row.get("title", ""),
         context=row.get("context", ""),
         scope=row.get("scope", ""),
-        confidence=_coerce_confidence(row.get("confidence")),
+        confidence=coerce_confidence(row.get("confidence")),
         provenance_downgrade=bool(row.get("provenance_downgrade")),
         scope_downgrade=scope_downgrade,
     )

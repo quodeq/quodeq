@@ -13,6 +13,7 @@ from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services.jobs import JobManager
+import os
 
 
 @pytest.fixture
@@ -53,7 +54,6 @@ def test_route_returns_text_event_stream(app: Flask):
 
 
 def test_route_emits_status_event_for_running_run(app: Flask):
-    import os
     os.environ["QUODEQ_SSE_TICK_MS"] = "0"
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
@@ -65,7 +65,6 @@ def test_route_emits_status_event_for_running_run(app: Flask):
 
 
 def test_route_honors_last_event_id_header(app: Flask):
-    import os
     os.environ["QUODEQ_SSE_TICK_MS"] = "0"
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))

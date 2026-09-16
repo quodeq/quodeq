@@ -19,20 +19,13 @@ from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
+from quodeq.shared._env import env_int
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
 
 _logger = logging.getLogger(__name__)
 
-try:
-    _EVALUATION_RATE_LIMIT_WINDOW = int(os.environ.get("QUODEQ_RATE_LIMIT_WINDOW", "300"))
-except ValueError:
-    _logger.warning("Invalid QUODEQ_RATE_LIMIT_WINDOW; using default 300")
-    _EVALUATION_RATE_LIMIT_WINDOW = 300
-try:
-    _EVALUATION_RATE_LIMIT_MAX = int(os.environ.get("QUODEQ_RATE_LIMIT_MAX", "10"))
-except ValueError:
-    _logger.warning("Invalid QUODEQ_RATE_LIMIT_MAX; using default 10")
-    _EVALUATION_RATE_LIMIT_MAX = 10
+_EVALUATION_RATE_LIMIT_WINDOW = env_int("QUODEQ_RATE_LIMIT_WINDOW", 300)
+_EVALUATION_RATE_LIMIT_MAX = env_int("QUODEQ_RATE_LIMIT_MAX", 10)
 
 
 def _default_provider() -> ActionProvider:

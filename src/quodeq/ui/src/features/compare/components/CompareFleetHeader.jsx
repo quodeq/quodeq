@@ -1,10 +1,10 @@
 import { TermHeader } from '../../../components/terminal/index.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
 import ScopePicker from './ScopePicker.jsx';
 import DuelTrigger from './DuelTrigger.jsx';
 import DimensionTrigger from './DimensionTrigger.jsx';
+import { nf } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 
 /** Title + subtitle, and the header controls: duel/dimension launchers,
  * the sort toggle, and the scope picker. */

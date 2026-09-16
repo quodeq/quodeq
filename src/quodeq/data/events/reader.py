@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Generator, List, Optional
 
-from quodeq.core.events.models import BaseEvent, EVENT_MODEL_MAP
+from quodeq.core.events.models import BaseEvent, EVENT_MODEL_MAP, EventType
 from quodeq.data.events.codec import EventDecodeError, event_from_dict
 
 
@@ -29,7 +29,6 @@ def _parse_event_line(
 
         # 2. Use the map to find the correct event model
         # We must convert the string to the Enum member
-        from quodeq.core.events.models import EventType
         event_type = EventType(event_type_str)
 
         model_cls = EVENT_MODEL_MAP.get(event_type)
