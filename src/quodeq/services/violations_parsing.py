@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from quodeq.core.finding_coercions import coerce_confidence
 from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.core.evidence.parser import resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
@@ -77,23 +78,12 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         req_refs=req_refs,
         context=obj.get("context"),
         scope=obj.get("scope"),
-        confidence=_coerce_confidence(obj.get("confidence")),
+        confidence=coerce_confidence(obj.get("confidence")),
         provenance_downgrade=bool(obj.get("provenance_downgrade")),
         scope_downgrade=obj.get("scope_downgrade") if isinstance(obj.get("scope_downgrade"), dict) else None,
         carried_forward=bool(obj.get("carried_forward")),
     ))
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))
-
-
-def _coerce_confidence(value: object, default: int = 100) -> int:
-    """Clamp a JSONL confidence to [0, 100]; missing/non-int → *default*."""
-    if value is None:
-        return default
-    try:
-        coerced = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(0, min(100, coerced))
 
 
 # ---------------------------------------------------------------------------
