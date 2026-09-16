@@ -151,13 +151,22 @@ def store_run_keys(
         conn.execute(
             "INSERT OR REPLACE INTO run_keys (project, run_id, dismiss_keys, class_keys) "
             "VALUES (?, ?, ?, ?)",
-            (project, run_id,
-             json.dumps(sorted(list(k) for k in dismiss_keys)),
-             json.dumps(sorted(list(k) for k in class_keys))),
+            (project, run_id, _keys_json(dismiss_keys), _keys_json(class_keys)),
         )
         conn.commit()
-    except sqlite3.Error:
+    except (sqlite3.Error, TypeError, ValueError):
         _logger.warning("run_keys write failed for %s/%s", project, run_id, exc_info=True)
+
+
+def _keys_json(keys: set[tuple]) -> str:
+    """JSON array of *keys*, in a deterministic order.
+
+    Ordered by each key's JSON form rather than by element comparison: a
+    dismiss key ends in an int line or a str fingerprint for the same finding
+    (``finding_dismiss_keys``), and Python refuses to order an int against a
+    str. ``load_run_keys`` rebuilds a set, so only determinism matters here.
+    """
+    return json.dumps(sorted((list(k) for k in keys), key=json.dumps))
 
 
 def load_run_keys(
