@@ -1,6 +1,6 @@
 """Per-run aggregate of API-runner parse drops (issue #606).
 
-``_api_runner._parse_findings`` counts finding-shaped objects the model
+``_api_schema._parse_findings`` counts finding-shaped objects the model
 emitted but validation rejected. Each call already logs that count as a
 WARNING, but a systemic output-shape problem (a prompt or model change that
 malformes findings across many files) drowns in thousands of per-call lines.

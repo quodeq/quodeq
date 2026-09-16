@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass, field
+from concurrent.futures import Future
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 

@@ -1,7 +1,6 @@
 """Data loading helpers for the accumulated (cross-run) view."""
 from __future__ import annotations
 
-import hashlib
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace

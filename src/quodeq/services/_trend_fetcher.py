@@ -147,7 +147,7 @@ def _make_heavy_trend_fetcher(
         base_fetcher=deps.base_fetcher_factory(reports_root, project),
         dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
     )
-    from quodeq.services.score_cache import load_run_keys_or_empty, open_score_cache  # noqa: PLC0415
+    from quodeq.services.score_cache import load_run_keys_or_empty  # noqa: PLC0415
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
     keys_cache = load_run_keys_or_empty(project)

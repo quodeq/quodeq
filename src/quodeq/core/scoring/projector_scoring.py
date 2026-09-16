@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
-from quodeq.core.scoring.engine import compute_tallies
+from quodeq.core.scoring._principle import compute_tallies
 from quodeq.core.scoring.internals import (
     finding_to_scoring_dict,
     principle_score_and_grade,

@@ -10,7 +10,6 @@ is the public surface via these re-exports.
 from __future__ import annotations
 
 from ._mapper_findings import (
-    _parse_finding_list,
     parse_finding,
     parse_req_ref,
     parse_severity_tally,
@@ -36,8 +35,6 @@ from ._mapper_plugins import (
     parse_plugin_info,
 )
 from ._mapper_violations import (
-    _parse_progress_info,
-    _parse_violation_file_entry,
     parse_trend_point,
     parse_violation_response,
     parse_violation_summary,

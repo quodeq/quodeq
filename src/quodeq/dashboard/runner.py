@@ -13,7 +13,7 @@ import sys
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
-from quodeq.dashboard._networking import _choose_ui_port, _is_port_open
+from quodeq.dashboard._networking import _choose_ui_port
 from quodeq.dashboard._probes import ApiProbes, DashboardHooks
 from quodeq.dashboard import _server as _server_mod
 from quodeq.dashboard._server import (

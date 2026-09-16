@@ -41,7 +41,6 @@ from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
     _register_cli_mcp,
-    _unregister_cli_mcp,
 )
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
@@ -97,10 +96,8 @@ def _run_cli_analysis(
     # For cli-register providers (e.g. Gemini), register MCP server before the run.
     # Registration is shared across all parallel agents — the first agent registers,
     # and we never unregister during the run (cleanup happens at pool level).
-    cli_mcp_registered = False
     if mcp_style == "cli-register" and cfg.jsonl_file is not None:
-        name = _register_cli_mcp(ai_cmd, cfg, work_dir)
-        cli_mcp_registered = name is not None
+        _register_cli_mcp(ai_cmd, cfg, work_dir)
 
     args, mcp_config_path = _build_ai_cmd(prompt, cfg, work_dir=work_dir)
     env = _build_analysis_env(ai_cmd)

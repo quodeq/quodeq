@@ -25,7 +25,7 @@ from pathlib import Path
 
 from quodeq.config.clone_env import git_clone_timeout_s
 from quodeq.config.paths import default_paths
-from quodeq.shared.utils import is_repo_url, project_name_from_repo, read_json
+from quodeq.shared.utils import is_repo_url, read_json
 from quodeq.shared.validation import validate_path_segment
 from quodeq.analysis.manifest import SourceManifest, build_manifest, detect_language
 from quodeq.analysis.manifest_models import AnalysisTarget
@@ -77,7 +77,7 @@ def _resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | N
     fields are non-None only when a temporary branch worktree was created,
     or ``None`` (with error printed to stderr) on failure.
     """
-    from quodeq.data.fs.repo_handler import cleanup_cloned_repo, prepare_repository
+    from quodeq.data.fs.repo_handler import prepare_repository
 
     repo_path = args.repo
     try:
