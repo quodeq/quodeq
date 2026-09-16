@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useDashboard } from "./useDashboard";
-import { withQueryClient, withStableQueryApi } from "../../../test-utils/withQueryClient.jsx";
+import { withStableQueryApi } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
 import { projectKeys } from "../../../api/queryKeys.js";
 
@@ -37,15 +36,6 @@ function makeFakeApi() {
     })),
     sharedGetProjectInfo: vi.fn(async (project) => ({ id: project, name: project, publishedBy: 'ana', publishedAt: 1752710400000 })),
   };
-}
-
-function wrap(fakeApi, children) {
-  const QC = withQueryClient();
-  return (
-    <QC>
-      <ApiProvider value={fakeApi}>{children}</ApiProvider>
-    </QC>
-  );
 }
 
 // Split from useDashboard.test.jsx: dashboard-object-identity stability

@@ -1,10 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import React from 'react';
+import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { usePublish } from './usePublish.js';
-import { useSharedProjects } from './useSharedProjects.js';
-import { withQueryClient, withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
+import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 
@@ -39,11 +37,6 @@ function wrap(fakeApi, children) {
     </QC>
   );
 }
-
-// Rerender-safe wrapper. See withStableQueryApi's doc comment for why the
-// inline `({ children }) => wrap(fakeApi, children)` idiom above must not be
-// used by any test that rerenders.
-const makeStableWrapper = withStableQueryApi;
 
 // Split from usePublish.test.jsx: publish() double-submit guard,
 // running-state transition, and the 2s status-poll to completion.

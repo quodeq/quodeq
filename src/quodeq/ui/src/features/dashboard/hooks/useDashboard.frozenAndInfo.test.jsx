@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, waitFor, act } from "@testing-library/react";
-import React from "react";
+import { describe, it, expect, vi } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useDashboard } from "./useDashboard";
 import { withQueryClient, withStableQueryApi } from "../../../test-utils/withQueryClient.jsx";

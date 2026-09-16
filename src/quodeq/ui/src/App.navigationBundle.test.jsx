@@ -1,14 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import {
-  buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
-  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
-  buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
-  shouldShowStartupLoader,
-} from './App.jsx';
-import Sidebar from './components/Sidebar.jsx';
+import { ROUTE_RENDERERS, buildNavigationBundle, resolveProjectDisplayName } from './App.jsx';
 
 // Split from App.test.jsx: resolveProjectDisplayName,
 // buildNavigationBundle, and the map/violations nav-stack view-state

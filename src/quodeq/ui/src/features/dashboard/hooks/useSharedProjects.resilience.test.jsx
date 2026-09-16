@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useSharedProjects, useSharedContentSignal } from './useSharedProjects.js';
+import { useSharedProjects } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';

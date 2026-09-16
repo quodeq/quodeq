@@ -1,6 +1,6 @@
-import { render, act, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import DashboardPage, { selectDashboardProjectInfo } from './DashboardPage.jsx';
+import DashboardPage from './DashboardPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
 // Split from DashboardPage.test.jsx: runMode's own loading gate, the
