@@ -4,13 +4,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from quodeq.core.types import DimensionResult
 from quodeq.data.mappers import parse_dimension_result
 from quodeq.services.accumulated import (
     _find_children,
-    _compute_parent_accumulated,
     compute_accumulated,
 )
 

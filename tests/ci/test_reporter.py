@@ -1,6 +1,5 @@
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 def test_load_evaluation_reports(tmp_path):

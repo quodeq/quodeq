@@ -7,7 +7,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from quodeq.analysis.mcp.args import parse_args
 from quodeq.analysis.mcp import findings_server as mcp_findings

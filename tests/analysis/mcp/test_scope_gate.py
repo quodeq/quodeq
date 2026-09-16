@@ -8,6 +8,7 @@ from quodeq.analysis.mcp.scope_gate import (
     apply_scope_gate,
 )
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
+from quodeq.analysis.mcp.enricher import CompiledContext, FindingEnricher
 
 LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
 LAN = TrustModel(multi_tenant=False, network_exposure="lan")
@@ -389,7 +390,6 @@ def test_stale_marker_on_major_finding_refreshed_not_cleared_when_rule_still_fir
 
 # --- integration: wired into FindingEnricher.enrich ------------------------
 
-from quodeq.analysis.mcp.enricher import CompiledContext, FindingEnricher
 
 
 def _enricher(model):

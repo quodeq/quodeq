@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -191,7 +190,7 @@ def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkey
         output=str(tmp_path / "out"), dry_run=True,
     )
 
-    rc = handle_review(args)
+    handle_review(args)
     # handle_review may exit 1 if no new runs are found (expected — we mock
     # snapshot_run_dirs to return empty both before and after). We don't care
     # about the exit code for this test; we care about the evaluation call.

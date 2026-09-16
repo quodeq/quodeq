@@ -10,7 +10,6 @@ consumer checks all candidates and returns the one that matches.
 from __future__ import annotations
 
 from pathlib import Path
-import pytest
 
 from quodeq.analysis.subagents.priority_fan_in import compute_fan_in
 

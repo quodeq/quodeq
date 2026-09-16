@@ -12,6 +12,12 @@ import pytest
 from quodeq.api._rate_limit_file_store import FileRateLimitStore
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore
 from quodeq.api._rate_limit_factory import _validated_rate_limit_path, _DEFAULT_RATE_LIMIT_FILE
+from quodeq.api._rate_limit_config import (
+    _DEFAULT_RATE_LIMIT_MAX,
+    _DEFAULT_RATE_LIMIT_WINDOW,
+    _rate_limit_max,
+    _rate_limit_window,
+)
 
 _skip_no_symlink = pytest.mark.skipif(
     sys.platform == "win32", reason="symlink/POSIX-mode semantics differ on Windows"
@@ -77,12 +83,6 @@ def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
 # (window <= 0) or blocking every client (max <= 0).
 # ---------------------------------------------------------------------------
 
-from quodeq.api._rate_limit_config import (
-    _DEFAULT_RATE_LIMIT_MAX,
-    _DEFAULT_RATE_LIMIT_WINDOW,
-    _rate_limit_max,
-    _rate_limit_window,
-)
 
 
 @pytest.mark.parametrize("raw", ["0", "-5", "abc", ""])
@@ -192,7 +192,6 @@ def test_file_store_still_enforces_limit_within_a_single_ttl_window(tmp_path: Pa
 def test_file_store_flushes_immediately_once_limited(tmp_path: Path):
     """Once a client is actually rate-limited, that state must be durable right
     away -- only the "still allowed" path is allowed to batch writes."""
-    import json
 
     path = tmp_path / "rl.json"
     store_a = FileRateLimitStore(path=path, window=60.0, max_requests=1)

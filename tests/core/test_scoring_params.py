@@ -8,7 +8,6 @@ import pytest
 
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
-    ScoringParams,
     dimension_weighted_average,
     params_error,
     params_from_dict,

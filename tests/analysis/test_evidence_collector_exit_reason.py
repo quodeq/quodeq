@@ -1,7 +1,6 @@
 """End-to-end: pool.exit_reason flows into the Evidence built by _collect_evidence."""
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from quodeq.analysis.subagents._evidence_collector import _CollectionContext, _collect_evidence

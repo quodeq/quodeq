@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig

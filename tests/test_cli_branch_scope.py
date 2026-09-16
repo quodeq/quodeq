@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import os
 from pathlib import Path
 
-import pytest
 
 
 def _make_git_repo(path: Path, branches: list[str] | None = None) -> None:

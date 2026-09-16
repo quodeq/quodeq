@@ -1,7 +1,6 @@
 """Local filesystem backend — atomic writes, sharding, corruption handling."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest

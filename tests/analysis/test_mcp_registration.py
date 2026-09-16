@@ -4,7 +4,6 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.analysis._command import (
     _register_cli_mcp,

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 
 from quodeq.update import source
-from quodeq.update.source import LatestInfo, fetch_latest
+from quodeq.update.source import fetch_latest
 
 _GH_RELEASE = {
     "tag_name": "v1.5.0",

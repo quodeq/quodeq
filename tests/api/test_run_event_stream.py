@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,6 +14,7 @@ from quodeq.api._run_event_stream import (
 )
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
+import json as _json
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +168,6 @@ def test_watcher_state_with_emitted_dimensions():
 # Helpers
 # ---------------------------------------------------------------------------
 
-import json as _json
 
 
 def _write_status(run_dir: Path, state: str = "running") -> None:

@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import json
-import time
-from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import pytest
 
 from quodeq.services._job_model import (
     Job,
@@ -21,7 +18,6 @@ from quodeq.services._job_file_store import (
     _default_persist_dir,
     _job_to_json,
     _job_from_json,
-    _STALE_JOB_AGE_S,
 )
 
 
@@ -419,8 +415,6 @@ class TestFileJobStore:
         store = FileJobStore(persist_dir=tmp_path)
         job = Job("j1", "done", ["echo"], "now", "later", 0)
         # Make the persist dir read-only to trigger OSError
-        import os
-        original_write = Path.write_text
 
         def fail_write(*a, **kw):
             raise OSError("disk full")

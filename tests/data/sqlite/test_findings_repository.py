@@ -9,7 +9,6 @@ from quodeq.core.events.models import (
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.actions_log import ActionLogWriter
 from quodeq.data.projection.projector import ProjectionResult, Projector
-from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 

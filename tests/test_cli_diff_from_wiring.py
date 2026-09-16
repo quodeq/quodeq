@@ -5,7 +5,6 @@ import argparse
 import subprocess
 from pathlib import Path
 
-import pytest
 
 from quodeq._cli_evaluation import _build_run_config
 from quodeq._cli_resolution import ResolvedInputs

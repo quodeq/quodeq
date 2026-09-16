@@ -5,7 +5,6 @@ OSError` handling in the same class.
 """
 from __future__ import annotations
 
-import subprocess
 import sys
 import threading
 

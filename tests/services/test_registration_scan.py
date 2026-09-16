@@ -10,7 +10,6 @@ See ``tests.conftest.RecordingLog`` / the ``recording_log`` fixture.
 """
 from __future__ import annotations
 
-from pathlib import Path
 
 from quodeq.services._registration_scan import _scan_parent_project
 

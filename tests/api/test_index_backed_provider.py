@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 

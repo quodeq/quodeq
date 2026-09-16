@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import threading
-import time as _time
 
-import pytest
 
 from quodeq.api.standards_read_routes import CweCache
 from tests._timeouts import budget

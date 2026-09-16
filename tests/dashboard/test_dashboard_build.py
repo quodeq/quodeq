@@ -1,12 +1,4 @@
-import hashlib
-import json
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
-
-_SHA256_HEX_LEN = 64
-
 from quodeq.dashboard._build import (
     compute_source_hash,
     needs_rebuild,
@@ -14,6 +6,10 @@ from quodeq.dashboard._build import (
     _HASH_FILE,
 )
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
+
+
+_SHA256_HEX_LEN = 64
+
 
 
 class TestComputeSourceHash:

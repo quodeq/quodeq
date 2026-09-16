@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from quodeq.core.events.models import (
-    BaseEvent,
     EventType,
     JudgmentCreatedEvent,
     JudgmentPayload,

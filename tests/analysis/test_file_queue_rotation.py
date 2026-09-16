@@ -1,7 +1,5 @@
 """Tests for file queue context rotation (max_files_per_agent)."""
-from pathlib import Path
 
-import pytest
 
 from quodeq.analysis.subagents.file_queue import FileQueue
 

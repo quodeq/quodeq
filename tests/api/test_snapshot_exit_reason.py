@@ -5,7 +5,6 @@ import os
 import time
 from pathlib import Path
 
-import pytest
 
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 

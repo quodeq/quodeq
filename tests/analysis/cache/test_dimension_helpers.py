@@ -439,7 +439,7 @@ class TestPersist:
         # JSONL might contain findings for files that weren't in misses
         # (e.g. carry-forward findings). We only cache entries for the
         # missed files we actually dispatched.
-        files = _write_files(tmp_path / "src", {"a.py": "x", "carried.py": "y"})
+        _write_files(tmp_path / "src", {"a.py": "x", "carried.py": "y"})
         config = _make_config(tmp_path / "src", work_dir=tmp_path / "work")
         miss_keys = {"a.py": build_cache_key_for_file(config, "a.py", "security")}
 
@@ -533,7 +533,7 @@ class TestPersist:
         )
 
     def test_handles_missing_jsonl(self, tmp_path: Path, cache: LocalFileBackend):
-        files = _write_files(tmp_path / "src", {"a.py": "x"})
+        _write_files(tmp_path / "src", {"a.py": "x"})
         config = _make_config(tmp_path / "src", work_dir=tmp_path / "work")
         miss_keys = {"a.py": build_cache_key_for_file(config, "a.py", "security")}
 

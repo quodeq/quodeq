@@ -12,9 +12,7 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 import httpx
-import openai
 
-from quodeq.analysis._api_call import _LOCAL_TIMEOUT
 from quodeq.analysis._api_runner import (
     ApiAnalysisRequest,
     ApiRunnerConfig,
@@ -23,7 +21,7 @@ from quodeq.analysis._api_runner import (
     _resolve_file_paths,
     run_api_analysis,
 )
-from quodeq.analysis._api_schema import _Finding, _FindingType, _Severity, _parse_findings
+from quodeq.analysis._api_schema import _parse_findings
 
 
 # ---------------------------------------------------------------------------

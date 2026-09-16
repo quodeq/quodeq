@@ -1,7 +1,6 @@
 """Tests for the reload URL guard that restricts webview navigation to localhost."""
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from quodeq.dashboard._webview_window import (

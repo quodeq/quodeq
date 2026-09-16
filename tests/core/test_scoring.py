@@ -4,6 +4,8 @@ from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.core.scoring.engine import score_evidence
 
 from tests._evidence_helpers import make_evidence_with_confidence
+import dataclasses
+from quodeq.core.scoring.params import DEFAULT_PARAMS
 
 _TEST_FILE = "a.ts"
 _TEST_SNIPPET = "eval(x)"
@@ -184,9 +186,7 @@ def test_all_insufficient_overall():
 
 
 # --- params threading through run_scoring ------------------------------------
-import dataclasses
 
-from quodeq.core.scoring.params import DEFAULT_PARAMS
 
 
 def test_run_scoring_with_strict_params_lowers_scores():

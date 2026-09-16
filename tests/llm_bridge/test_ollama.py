@@ -5,7 +5,6 @@ import json
 import logging
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from quodeq.llm_bridge._ollama import (
     get_ollama_status,

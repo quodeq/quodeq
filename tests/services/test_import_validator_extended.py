@@ -1,7 +1,6 @@
 """Extended tests for import_validator — edge cases and injection scanning."""
 from __future__ import annotations
 
-import pytest
 
 from quodeq.services.import_validator import (
     _MAX_DESCRIPTION,

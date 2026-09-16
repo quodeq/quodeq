@@ -3,6 +3,10 @@ import pytest
 
 from quodeq.assistant.tools import _web_tools
 from quodeq.assistant.tools._registry import ToolError
+from pathlib import Path
+from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+import quodeq.assistant.mcp.server as mcp_server
 
 _DDG_HTML = """
 <html><body>
@@ -308,11 +312,7 @@ def test_search_web_caps_title_length(monkeypatch):
     assert len(out["results"][0]["title"]) <= 300
 
 
-from pathlib import Path
 
-from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
-import quodeq.assistant.mcp.server as mcp_server
 
 
 @pytest.fixture()

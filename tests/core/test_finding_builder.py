@@ -9,7 +9,7 @@ from quodeq.core.finding_builder import (
     build_finding_base,
     format_file_line,
 )
-from quodeq.core.types import Finding, ReqRef
+from quodeq.core.types import Finding
 
 
 class TestBuildFindingBase:

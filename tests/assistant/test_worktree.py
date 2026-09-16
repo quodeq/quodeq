@@ -2,6 +2,9 @@ import pytest
 
 from quodeq.assistant.worktree import (
     WorktreeError, WorktreeManager, _run, diff_stats, diff_text)
+from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
+from quodeq.data.ports.assistant import SessionScope
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
 @pytest.fixture()
@@ -185,9 +188,6 @@ def test_commit_all_returns_committed(manager):
     assert manager.commit_all("m") is True
 
 
-from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
-from quodeq.data.ports.assistant import SessionScope
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
 def _store(tmp_path):

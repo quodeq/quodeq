@@ -1,6 +1,5 @@
 import subprocess
 import sys
-import time
 
 from quodeq.shared._process_kill import kill_proc_tree
 from tests._timeouts import budget

@@ -3,14 +3,11 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.runner import AnalysisOptions, RunConfig
 from quodeq.analysis.manifest import SourceManifest, AnalysisTarget

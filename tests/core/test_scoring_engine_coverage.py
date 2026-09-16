@@ -1,7 +1,6 @@
 """Tests for core.scoring.engine — scoring engine orchestration."""
 from __future__ import annotations
 
-import pytest
 
 from quodeq.core.scoring.engine import (
     confidence_label,

@@ -1,7 +1,6 @@
 """Cluster 37: UnixPty best-effort handlers log at debug."""
 from __future__ import annotations
 
-import os
 import subprocess
 from unittest.mock import patch
 

@@ -6,11 +6,9 @@ not clear them and leave the table empty/half-written.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 

@@ -60,7 +60,7 @@ def test_scoring_enabled_calls_run_full(tmp_path: Path) -> None:
     """Baseline: normal mode calls run_full (scoring)."""
     args = _args(tmp_path)
     config = _config(skip_scoring=False)
-    with patch("quodeq._cli_evaluation.run") as r, \
+    with patch("quodeq._cli_evaluation.run"), \
          patch("quodeq._cli_evaluation.run_full", return_value={}) as rf:
         exit_code = _execute_pipeline(args, config, tmp_path / "evi", tmp_path / "eval")
     assert exit_code == 0

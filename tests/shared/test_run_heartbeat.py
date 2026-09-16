@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import pytest
 
 from quodeq.shared.run_heartbeat import HeartbeatThread, HEARTBEAT_FILENAME
 from tests._timeouts import budget

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import signal
 import sys
-import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,7 +9,7 @@ import pytest
 
 from quodeq.core.run.dimensions import DimState
 from quodeq.data.fs.dimensions_state_store import write_dim_state
-from quodeq.data.fs.run_status_store import RunState, read_status
+from quodeq.data.fs.run_status_store import read_status
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
 # os.kill(pid, SIGTERM) on Windows calls TerminateProcess directly — it does
@@ -63,7 +62,7 @@ def test_systemexit_treated_as_cancelled(tmp_path: Path) -> None:
 @_POSIX_SIGNALS
 def test_signal_handler_writes_cancelled(tmp_path: Path) -> None:
     """Sending SIGTERM while in context writes cancelled with signal exit_reason."""
-    import os, time
+    import os
 
     with pytest.raises(SystemExit):
         with RunLifecycleContext(run_dir=tmp_path, job_id="ext-sigterm", dimensions=[]):

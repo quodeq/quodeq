@@ -16,7 +16,7 @@ from quodeq.analysis._api_runner import (
     _build_router_context,
     _call_api,
 )
-from quodeq.analysis._api_schema import _Finding, _FindingType, _Severity, _parse_findings
+from quodeq.analysis._api_schema import _Finding, _parse_findings
 
 
 def _mock_raw_client_finish(content: str, finish_reason: str) -> MagicMock:

@@ -1,6 +1,5 @@
 """Differential + correctness for the accumulated cache: identical to direct,
 run-set invalidation, and parent-project cache bypass."""
-from pathlib import Path
 
 import pytest
 

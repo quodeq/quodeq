@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from quodeq.analysis.mcp import findings_server as mcp_findings
 from quodeq.analysis.mcp.findings_server import CompiledContext

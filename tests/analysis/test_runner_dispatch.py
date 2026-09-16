@@ -1,10 +1,8 @@
 """Tests for runner dispatch based on provider type."""
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 from quodeq.analysis.subprocess import run_analysis
 from quodeq.analysis._config import AnalysisConfig

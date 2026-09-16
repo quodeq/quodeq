@@ -4,7 +4,6 @@ from __future__ import annotations
 import urllib.error
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.config._fetch_client_class import FetchClient
 
