@@ -4,8 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from quodeq.core.types import ScoringResult
-from quodeq.core.evidence.model import Evidence
-from quodeq.core.evidence.model import violations_per_100_files
+from quodeq.core.evidence.model import Evidence, violations_per_100_files
 from quodeq.data.fs.dimension_report._report_taxonomy import unmapped_types
 
 from quodeq.data.fs.dimension_report._report_constants import (
@@ -60,7 +59,7 @@ def _assemble_report_dict(data: _ReportData) -> dict:
             "mapping_file_hash": raw_meta.get("mapping_file_hash"),
             "quodeq_version": raw_meta.get("quodeq_version"),
             # Tags the taxonomy could not place (spec 2026-09-15, section 7).
-            "unmappedTypes": unmapped_types(data.evidence.get("principles", {})),
+            "unmappedTypes": unmapped_types(data.evidence.get("principles") or {}),
         },
         "overallScore": data.top_score,
         "overallGrade": data.top_grade,

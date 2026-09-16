@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.shared.serialization import to_camel_dict
+from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
@@ -52,7 +53,7 @@ def _severity_bucket(severity: str) -> str:
 
 
 def _build_totals_from_findings(
-    violations: list[Finding], compliance_count: int,
+    violations: list[Finding], compliance_count: int, files_read: int | None = None,
 ) -> Totals:
     """Build a Totals dataclass from a list of active (non-dismissed) violations."""
     critical = major = minor = unknown = 0
@@ -70,6 +71,7 @@ def _build_totals_from_findings(
         violation_count=len(violations),
         compliance_count=compliance_count,
         severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
+        violations_per100_files=violations_per_100_files(len(violations), files_read),
     )
 
 
@@ -97,7 +99,10 @@ def _build_dimension_dict(
         for p in p_rows
     ]
 
-    totals = _build_totals_from_findings(violations, compliance_count=len(compliance))
+    files_read = dim_row.get("files_read")
+    totals = _build_totals_from_findings(
+        violations, compliance_count=len(compliance), files_read=files_read,
+    )
 
     dim = DimensionResult(
         dimension=dim_row["dimension"],
@@ -107,6 +112,7 @@ def _build_dimension_dict(
         violations=violations,
         compliance=compliance,
         totals=totals,
+        files_read=files_read,
     )
     return to_camel_dict(dim)
 

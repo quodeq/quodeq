@@ -16,7 +16,7 @@ def test_rescore_recomputes_density_from_files_read():
                           source_file_count=10, files_read=8)
     rescored = _rescore_dimension(dim, dismissed={("R-1", "a.py", 1)})
     assert rescored.totals.violation_count == 3
-    assert rescored.totals.violations_per_100_files == 37.5
+    assert rescored.totals.violations_per100_files == 37.5
 
 
 def test_dismiss_filter_keeps_density(tmp_path):
@@ -31,7 +31,7 @@ def test_dismiss_filter_keeps_density(tmp_path):
                           source_file_count=10, files_read=8)
     rescored = filter_dismissed_from_dimensions([dim], project_dir)[0]
     assert rescored.totals.violation_count == 3
-    assert rescored.totals.violations_per_100_files == 37.5
+    assert rescored.totals.violations_per100_files == 37.5
 
 
 def test_delete_filter_keeps_density(tmp_path):
@@ -46,4 +46,4 @@ def test_delete_filter_keeps_density(tmp_path):
                           source_file_count=10, files_read=8)
     rescored = filter_deleted_from_dimensions([dim], project_dir)[0]
     assert rescored.totals.violation_count == 3
-    assert rescored.totals.violations_per_100_files == 37.5
+    assert rescored.totals.violations_per100_files == 37.5

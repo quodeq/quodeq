@@ -42,6 +42,7 @@ def test_wire_dict_and_finding_carry_vt_raw():
     assert j.violation_type_raw == "Empty_Catch"
     assert judgment_to_finding(j).violation_type_raw == "Empty_Catch"
     assert wire_dict_to_judgment(json.loads(_line())).violation_type_raw is None
+    assert wire_dict_to_judgment(json.loads(_line(vt_raw=""))).violation_type_raw is None
 
 
 def test_event_codec_round_trips_and_tolerates_old_events():

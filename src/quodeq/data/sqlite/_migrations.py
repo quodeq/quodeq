@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from quodeq.data.sqlite._migrations_additive import (  # noqa: F401
+from quodeq.data.sqlite._migrations_additive import (
     _upgrade_v5_to_v6,
     _upgrade_v6_to_v7,
     _upgrade_v7_to_v8,

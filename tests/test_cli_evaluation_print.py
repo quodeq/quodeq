@@ -1,10 +1,11 @@
 """`_print_scores` prints suppression-adjusted scores after a scan.
 
-Covers the target behaviour: with no active dismissals/deletions, output is
-byte-identical to the historical `  {dim}: {score}` line; when a dismissal
-matches a just-scanned run's evidence, the evidence-based rescore is printed
-instead with a `(N dismissed findings excluded)` suffix; a dimension whose
-evidence is missing from the run falls back to the original line.
+Covers the target behaviour: every line carries the report's violation
+count, major count and density (violations per 100 files read) when the
+report exists; when a dismissal matches a just-scanned run's evidence, the
+evidence-based rescore replaces the grade and a `(N dismissed findings
+excluded)` suffix is appended; a dimension without a report prints the
+plain `  {dim}: {score}` line.
 """
 from __future__ import annotations
 
@@ -196,3 +197,9 @@ def test_format_score_line_appends_suffix():
     totals = {"violationCount": 1, "severity": {}}
     line = _format_score_line("security", "7.9/10", totals, suffix=" (1 dismissed findings excluded)")
     assert line == "  security: 7.9/10  (1 violation, 0 major) (1 dismissed findings excluded)"
+
+
+def test_format_score_line_tolerates_corrupt_counts():
+    totals = {"violationCount": "many", "severity": {"major": None}}
+    line = _format_score_line("security", "8.0/10", totals)
+    assert line == "  security: 8.0/10  (0 violations, 0 major)"

@@ -68,7 +68,7 @@ def parse_totals(raw: dict[str, object]) -> Totals:
         violation_count=_int(raw, "violationCount"),
         compliance_count=_int(raw, "complianceCount"),
         severity=severity,
-        violations_per_100_files=_opt_float(raw.get("violationsPer100Files")),
+        violations_per100_files=_opt_float(raw.get("violationsPer100Files")),
     )
 
 

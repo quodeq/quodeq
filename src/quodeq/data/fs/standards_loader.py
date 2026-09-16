@@ -174,9 +174,7 @@ def load_taxonomy(
 ) -> Taxonomy:
     """Load the dimension's violation-type taxonomy; EMPTY_TAXONOMY when absent.
 
-    A malformed block is logged and treated as absent: a bad standards file
-    must not stop an evaluation, and the compiled-standards test catches it
-    before it ships.
+    A malformed `violation_types` block is logged and treated as absent.
     """
     data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if not data:

@@ -50,3 +50,22 @@ def test_unmapped_types_lists_untagged_and_other_by_requirement():
 def test_unmapped_types_is_capped_at_50_rows():
     report = _assemble_report_dict(_data([_violation(f"R-{i}") for i in range(60)]))
     assert len(report["meta"]["unmappedTypes"]) == 50
+
+
+def test_unmapped_types_none_principles_is_treated_as_absent():
+    data = _data([_violation("R-FT-1", vt="x")])
+    data.evidence["principles"] = None
+    report = _assemble_report_dict(data)
+    assert report["meta"]["unmappedTypes"] == []
+
+
+def test_unmapped_types_ties_are_ordered_by_key():
+    violations = [
+        _violation("R-B"),  # untagged, count 1
+        _violation("R-A"),  # untagged, count 1
+    ]
+    report = _assemble_report_dict(_data(violations))
+    assert report["meta"]["unmappedTypes"] == [
+        {"req": "R-A", "vtRaw": "", "count": 1},
+        {"req": "R-B", "vtRaw": "", "count": 1},
+    ]

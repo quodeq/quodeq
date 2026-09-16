@@ -33,6 +33,14 @@ _logger = logging.getLogger(__name__)
 _NUMERIC_SCORE_RE = re.compile(r"^-?\d+(?:\.\d+)?/\d+$")
 
 
+def _as_int(value: object) -> int:
+    """Coerce *value* to int, falling back to 0 on junk input."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
 def _count_excluded_findings(
     run_dir: Path, dim_id: str, dismissed: set[tuple], deleted: set[tuple],
 ) -> int:
@@ -111,8 +119,8 @@ def _format_score_line(dim: str, score: str, totals: dict, suffix: str = "") -> 
     """
     if not totals:
         return f"  {dim}: {score}{suffix}"
-    n = int(totals.get("violationCount") or 0)
-    major = int((totals.get("severity") or {}).get("major") or 0)
+    n = _as_int(totals.get("violationCount") or 0)
+    major = _as_int((totals.get("severity") or {}).get("major") or 0)
     parts = [f"{n} violation{'s' if n != 1 else ''}", f"{major} major"]
     per_100 = totals.get("violationsPer100Files")
     if per_100 is not None:

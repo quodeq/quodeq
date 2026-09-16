@@ -14,7 +14,10 @@ from quodeq.core.taxonomy import extract_taxonomy
 
 COMPILED = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "data" / "standards" / "compiled"
 
+_FILES = sorted(COMPILED.glob("*.json"))
+assert _FILES, f"no compiled standards under {COMPILED}"
 
-@pytest.mark.parametrize("path", sorted(COMPILED.glob("*.json")), ids=lambda p: p.stem)
+
+@pytest.mark.parametrize("path", _FILES, ids=lambda p: p.stem)
 def test_shipped_compiled_standards_have_valid_taxonomy(path):
     extract_taxonomy(json.loads(path.read_text(encoding="utf-8")))  # must not raise

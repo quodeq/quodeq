@@ -245,7 +245,7 @@ def recount_totals(
         violation_count=len(violations),
         compliance_count=cc,
         severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
-        violations_per_100_files=violations_per_100_files(len(violations), files_read),
+        violations_per100_files=violations_per_100_files(len(violations), files_read),
     )
 
 

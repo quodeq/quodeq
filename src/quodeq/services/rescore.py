@@ -72,7 +72,7 @@ def _rescore_from_evidence(
                        if overall.weighted_score is not None else None),
         overall_grade=overall.grade or overall.weighted_grade,
         totals=recount_totals(filtered_violations, compliance_count=compliance_count,
-                               files_read=dim.files_read),
+                              files_read=dim.files_read),
     )
 
 
@@ -94,7 +94,7 @@ def _rescore_legacy_fallback(
     overall_grade = overall.grade or overall.weighted_grade
 
     new_totals = recount_totals(filtered_violations, compliance_count=compliance_count,
-                                 files_read=dim.files_read)
+                                files_read=dim.files_read)
 
     return replace(
         dim,
