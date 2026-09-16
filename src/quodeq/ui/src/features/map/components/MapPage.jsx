@@ -11,12 +11,13 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 import { t } from '../../../strings/index.js';
+import { DATA_THEME_ATTR } from '../../../constants.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
 // daruma family in system mode; otherwise 'light' | 'dark' | '<family>-<mode>'.
 function getDarkThemeAttr() {
-  const attr = document.documentElement.getAttribute('data-theme') || '';
+  const attr = document.documentElement.getAttribute(DATA_THEME_ATTR) || '';
   const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
   return family === 'daruma' ? 'dark' : `${family}-dark`;
 }
@@ -133,7 +134,7 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
   const { onDrillDown, onFileClick, onNavigate, onBreadcrumbNav } = callbacks;
   const { showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, resetKey, projectName, standardTypes } = display;
   return (
-    <div className="map-viz-container" {...(darkMode && !appIsDark ? { 'data-theme': getDarkThemeAttr() } : {})}>
+    <div className="map-viz-container" {...(darkMode && !appIsDark ? { [DATA_THEME_ATTR]: getDarkThemeAttr() } : {})}>
       {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
       <div className="map-viz-toggles">
         <label className="map-label-toggle">

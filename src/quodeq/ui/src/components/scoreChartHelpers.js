@@ -1,4 +1,5 @@
 import { scoreColorClass } from '../utils/formatters.js';
+import { DATA_THEME_ATTR } from '../constants.js';
 
 /**
  * Shared helpers for the run/score history bar charts (Overview, History,
@@ -34,7 +35,7 @@ export function createCssVarStore({ doc = typeof document !== 'undefined' ? docu
   function observe() {
     if (observer || !doc) return;
     observer = new MutationObserver(clear);
-    observer.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    observer.observe(doc.documentElement, { attributes: true, attributeFilter: [DATA_THEME_ATTR] });
   }
 
   function disconnect() {
