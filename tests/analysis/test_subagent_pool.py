@@ -16,7 +16,7 @@ from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_co
 
 from tests._analysis_helpers import _fake_run_analysis  # noqa: F401 — shared helper
 
-# See test_adaptive_scaling_integration.py for the Windows skip rationale.
+# See test_scout_burst_integration.py for the Windows skip rationale.
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="SubagentPool FileQueue lock path needs Windows-specific work",

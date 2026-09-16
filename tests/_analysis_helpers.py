@@ -34,6 +34,16 @@ def _fake_run_analysis(work_dir, prompt, stream_file, config):
             }) + "\n")
 
 
+class _FixedRemainingQueue:
+    """WorkQueue stand-in for the spawn gate: reports a fixed remaining count."""
+
+    def __init__(self, remaining: int) -> None:
+        self._remaining = remaining
+
+    def remaining(self) -> int:
+        return self._remaining
+
+
 def _run_server(input_lines: list[str], findings_file: str) -> list[dict]:
     """Feed *input_lines* to the MCP server and return parsed response dicts."""
     stdin_text = "\n".join(input_lines) + "\n"
