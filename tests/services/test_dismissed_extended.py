@@ -105,7 +105,7 @@ class TestCollectDismissedDetails:
         assert item["reason"] == "new"
 
     def test_each_run_is_asked_only_for_still_missing_keys(self, tmp_path, monkeypatch):
-        from quodeq.services import dismissed as mod
+        from quodeq.services import _dismissed_listing as mod
 
         project_dir = tmp_path / "project"
         project_dir.mkdir()

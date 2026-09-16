@@ -13,6 +13,7 @@ from pathlib import Path
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
+from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys, load_dismissed
 
@@ -40,11 +41,15 @@ def test_dismiss_sticks_in_sql_under_prod_layout(tmp_path: Path) -> None:
     SqliteFindingsRepository(run_dir).list_by_dimension("Security")
 
     keys = dismissed_keys(project_dir)
-    assert keys == {("R1", "a.py", 10)}, (
-        f"Dismissal did not project to SQL under prod layout. "
+    assert keys.line_keys() == {("R1", "a.py", 10)}, (
+        f"Dismissal did not register under prod layout. "
         f"actions.jsonl exists at {project_dir / 'actions.jsonl'}, "
         f"but dismissed_keys returned {keys}"
     )
+    with open_evaluation_db(run_dir) as conn:
+        verdict = conn.execute(
+            "SELECT verdict FROM findings WHERE requirement='R1' AND file='a.py'").fetchone()[0]
+    assert verdict == "dismissed", "Dismissal did not project to SQL under prod layout"
 
 
 def test_load_dismissed_returns_entries_under_prod_layout(tmp_path: Path) -> None:

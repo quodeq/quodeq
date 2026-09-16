@@ -32,4 +32,8 @@ from __future__ import annotations
 # now live in the shared fetcher and the accumulated writer refuses
 # partial-coverage payloads; this bump rebuilds rows the prior writer may have
 # poisoned.
-CACHE_WRITER_EPOCH = "6"
+# "7": dismiss identity moved from (req, file, line) to (req, file, snippet
+# fingerprint) (#1165). Cached run_keys rows hold line keys only, so the
+# per-run scoped version could not see a fingerprinted dismissal touch a run;
+# this bump purges them so they rebuild with both key shapes.
+CACHE_WRITER_EPOCH = "7"

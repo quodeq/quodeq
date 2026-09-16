@@ -23,7 +23,9 @@ def test_writer_appends_event(tmp_path: Path) -> None:
     assert len(lines) == 1
     data = json.loads(lines[0])
     assert data["event_type"] == "FINDING_DISMISSED"
-    assert data["payload"] == {"req": "R1", "file": "a.py", "line": 1, "reason": None}
+    assert data["payload"] == {
+        "req": "R1", "file": "a.py", "line": 1, "reason": None, "fingerprint": None,
+    }
 
 
 def test_writer_appends_multiple_events_preserves_order(tmp_path: Path) -> None:

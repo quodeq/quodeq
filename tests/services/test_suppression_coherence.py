@@ -34,15 +34,18 @@ DIM = "maintainability"
 SFC, FILES_READ = 10, 5
 
 
-def _build_run(run_dir: Path) -> dict:
+SNIPPET = "class Foo : Bar, Baz, Qux, Quux"
+
+
+def _build_run(run_dir: Path, *, hard_case_line: int = 7) -> dict:
     """Real evidence + real scored report through the actual scan pipeline."""
     lines = [
         {"schema_version": 1, "req": "M-MOD-1", "t": "violation", "file": "a.kt",
          "line": 10, "severity": "major", "w": "t", "reason": "r",
          "p": "Modularity", "d": DIM},
         # The hard case: no req. The UI dismisses this under its principle.
-        {"schema_version": 1, "t": "violation", "file": "b.kt", "line": 7,
-         "severity": "critical", "w": "t", "reason": "r",
+        {"schema_version": 1, "t": "violation", "file": "b.kt", "line": hard_case_line,
+         "severity": "critical", "w": "t", "reason": "r", "snippet": SNIPPET,
          "p": "Modularity", "d": DIM},
         {"schema_version": 1, "req": "M-MOD-2", "t": "compliance", "file": "a.kt",
          "line": 1, "w": "t", "reason": "r", "p": "Modularity", "d": DIM},
@@ -96,4 +99,47 @@ def test_one_dismiss_every_surface_agrees(tmp_path, monkeypatch):
     filtered = filter_suppressed_violations(report, project_dir)
     kept_files = [(v.get("file"), v.get("line")) for v in filtered["violations"]]
     assert ("b.kt", 7) not in kept_files
+    assert ("a.kt", 10) in kept_files
+
+
+def test_one_dismiss_survives_a_line_shift_on_every_surface(tmp_path, monkeypatch):
+    """Issue #1165: the next run holds the same code twelve lines down. The
+    dismissal recorded at line 7 must still hide it everywhere."""
+    monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
+    project_dir = tmp_path / "proj"
+    run_dir = project_dir / "run-1"
+    _build_run(run_dir)
+    dismiss_finding(project_dir, {"req": "Modularity", "file": "b.kt", "line": 7,
+                                  "snippet": SNIPPET})
+
+    moved_dir = project_dir / "run-2"
+    moved_report = _build_run(moved_dir, hard_case_line=19)
+    dismissed = dismissed_keys(project_dir)
+    assert dismissed.entries[0].fingerprint, "dismissal was not fingerprinted"
+
+    # 1. Live-counter matcher hides the raw evidence row at its new line.
+    matcher = matcher_for(project_dir, DIM)
+    row = {"t": "violation", "p": "Modularity", "file": "b.kt", "line": 19, "snippet": SNIPPET}
+    assert matcher.is_suppressed(row)
+    assert not matcher.is_suppressed({**row, "snippet": "class Other : Bar"})
+
+    # 2. CLI counts exactly this one finding as excluded in the moved run.
+    assert _count_excluded_findings(moved_dir, DIM, dismissed, set()) == 1
+
+    # 3. The evidence rescore drops it from the moved run's grade.
+    base = score_dimension_from_evidence(
+        moved_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS))
+    out = score_dimension_from_evidence(
+        moved_dir, DIM, EvidenceScoreRequest(
+            dismissed=dismissed, deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS))
+    assert out.principles["Modularity"].deductions.critical_type_count \
+        == base.principles["Modularity"].deductions.critical_type_count - 1
+
+    # 4. The CI report/SARIF filter drops it from the moved run's report.
+    filtered = filter_suppressed_violations(moved_report, project_dir)
+    kept_files = [(v.get("file"), v.get("line")) for v in filtered["violations"]]
+    assert ("b.kt", 19) not in kept_files
     assert ("a.kt", 10) in kept_files

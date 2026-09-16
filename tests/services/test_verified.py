@@ -22,7 +22,7 @@ def test_unverify_removes_key(tmp_path):
 def test_verified_and_dismissed_coexist_in_one_log(tmp_path):
     dismiss_finding(tmp_path, {"req": "r2", "file": "b.py", "line": 9, "dismissReason": "fp"})
     verify_finding(tmp_path, {"req": "r1", "file": "a.py", "line": 3, "note": "n"})
-    assert dismissed_keys(tmp_path) == {("r2", "b.py", 9)}
+    assert dismissed_keys(tmp_path).line_keys() == {("r2", "b.py", 9)}
     assert [e["req"] for e in verified_entries(tmp_path)] == ["r1"]
 
 

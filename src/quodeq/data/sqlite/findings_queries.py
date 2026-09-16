@@ -15,6 +15,7 @@ import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
 
+from quodeq.core.finding_identity import DismissKey, finding_dismiss_keys
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME, open_evaluation_db
 
 _logger = logging.getLogger(__name__)
@@ -57,29 +58,20 @@ def read_active_findings(run_dir: Path, *, limit: int | None = None) -> Iterator
 
 
 # SQLite's compiled-in bind-parameter limit (SQLITE_MAX_VARIABLE_NUMBER)
-# defaults to ~999; 3 params per (requirement, file, line) triple keeps each
-# chunk's parameter count safely under that regardless of build.
+# defaults to ~999; one param per file keeps each chunk well under that
+# regardless of build.
 _DETAIL_CHUNK_SIZE = 300
 
 _DETAIL_COLUMNS = (
     "requirement, file, line, dimension, practice_id, severity, "
     "title, reason, snippet, context, scope, end_line, req_refs_json"
 )
-# requirement is nullable (a finding with no requirement id is stored with
-# requirement NULL, per state_store.update_verdict), but keys normalize a
-# missing requirement to "" -- mirroring how callers build these keys from
-# event payloads. Two WHERE shapes keep idx_findings_req_file_line seekable
-# for both: an exact 3-column match for keys with a requirement, and an
-# IS-NULL-OR-empty guard plus a (file, line) match for keys without one.
-_DETAIL_SELECT_WITH_REQ = (
-    f"SELECT {_DETAIL_COLUMNS} FROM findings "
-    "WHERE (requirement, file, line) IN (VALUES {values})"
-)
-_DETAIL_SELECT_WITHOUT_REQ = (
-    f"SELECT {_DETAIL_COLUMNS} FROM findings "
-    "WHERE (requirement IS NULL OR requirement = '') "
-    "AND (file, line) IN (VALUES {values})"
-)
+# Candidate rows are fetched per file (idx_findings_file) and matched in
+# Python through finding_dismiss_keys: a dismiss key is either (req, file,
+# line) or (req, file, snippet fingerprint), and a finding with no requirement
+# id may be keyed on "" or on its practice id, so the SQL side only narrows
+# to the files in question.
+_DETAIL_SELECT_BY_FILE = f"SELECT {_DETAIL_COLUMNS} FROM findings WHERE file IN ({{values}})"
 
 
 def _detail_row_to_dict(row: tuple) -> dict:
@@ -97,45 +89,47 @@ def _detail_row_to_dict(row: tuple) -> dict:
     }
 
 
+def _row_dismiss_keys(row: tuple) -> set[DismissKey]:
+    """Every dismiss key that would hide the finding in a detail row."""
+    return finding_dismiss_keys(
+        req=row[0], principle=row[4], file=row[1], line=row[2], snippet=row[8])
+
+
 def _fetch_detail_rows(
-    conn: sqlite3.Connection, sql_template: str, tuples: list[tuple], out: dict[tuple, dict],
+    conn: sqlite3.Connection, wanted: set[DismissKey], out: dict[DismissKey, dict],
 ) -> None:
-    for start in range(0, len(tuples), _DETAIL_CHUNK_SIZE):
-        chunk = tuples[start:start + _DETAIL_CHUNK_SIZE]
-        width = len(chunk[0])
-        values = ", ".join([f"({', '.join(['?'] * width)})"] * len(chunk))
-        params = [v for item in chunk for v in item]
-        for row in conn.execute(sql_template.format(values=values), params):
-            key = (str(row[0] or ""), str(row[1] or ""), int(row[2] or 0))
-            if key not in out:
-                out[key] = _detail_row_to_dict(row)
+    files = sorted({str(k[1] or "") for k in wanted})
+    for start in range(0, len(files), _DETAIL_CHUNK_SIZE):
+        chunk = files[start:start + _DETAIL_CHUNK_SIZE]
+        sql = _DETAIL_SELECT_BY_FILE.format(values=", ".join(["?"] * len(chunk)))
+        for row in conn.execute(sql, chunk):
+            for key in _row_dismiss_keys(row) & wanted:
+                out.setdefault(key, _detail_row_to_dict(row))
 
 
-def read_finding_details(run_dir: Path, keys: set[tuple]) -> dict[tuple, dict]:
-    """Return finding-detail dicts for the ``(requirement, file, line)``
-    *keys* present in *run_dir*'s findings table.
+def read_finding_details(run_dir: Path, keys: set[DismissKey]) -> dict[DismissKey, dict]:
+    """Return finding-detail dicts for the dismiss *keys* present in
+    *run_dir*'s findings table.
 
-    Keys not present are simply absent from the result. The SQL ``verdict``
-    column is ignored on purpose: actions.jsonl is the source of truth for
-    *which* findings are dismissed; the row only supplies *what* the finding
-    was. A corrupt database returns whatever was read before the error.
+    A key is ``(req, file, line)`` or ``(req, file, snippet fingerprint)``
+    (see ``core.finding_identity``); a finding matches on any identity a
+    dismissal of it may have been recorded under. Keys not present are simply
+    absent from the result. The SQL ``verdict`` column is ignored on
+    purpose: actions.jsonl is the source of truth for *which* findings are
+    dismissed; the row only supplies *what* the finding was. A corrupt
+    database returns whatever was read before the error.
 
-    The filter runs in SQL, keyed on the ``idx_findings_req_file_line``
-    index, instead of a full-table scan filtered in Python. *keys* is
-    chunked to stay under SQLite's per-statement bind-parameter limit.
+    Candidate rows are narrowed per file in SQL (``idx_findings_file``) and
+    matched in Python; the file list is chunked to stay under SQLite's
+    per-statement bind-parameter limit.
     """
     db_path = run_dir / "evaluation.db"
     if not db_path.is_file() or not keys:
         return {}
-    with_req = [k for k in keys if k[0]]
-    without_req = [(k[1], k[2]) for k in keys if not k[0]]
-    out: dict[tuple, dict] = {}
+    out: dict[DismissKey, dict] = {}
     try:
         with open_evaluation_db(run_dir) as conn:
-            if with_req:
-                _fetch_detail_rows(conn, _DETAIL_SELECT_WITH_REQ, with_req, out)
-            if without_req:
-                _fetch_detail_rows(conn, _DETAIL_SELECT_WITHOUT_REQ, without_req, out)
+            _fetch_detail_rows(conn, set(keys), out)
     except (sqlite3.DatabaseError, RuntimeError):
         return out
     return out
@@ -144,10 +138,13 @@ def read_finding_details(run_dir: Path, keys: set[tuple]) -> dict[tuple, dict]:
 def read_run_key_sets(run_dir: Path) -> tuple[set[tuple], set[tuple]]:
     """Return ``(dismiss_keys, class_keys)`` present in *run_dir*'s findings.
 
-    ``dismiss_keys``: ``{(requirement, file, line)}``.
-    ``class_keys``: ``{(dimension, practice_id, file)}``.
-    Keys come from ALL findings regardless of verdict, so a dismiss (which
-    only flips a verdict) never changes a run's key set.
+    ``dismiss_keys``: every key a dismissal of one of the run's findings may
+    be recorded under -- ``(req, file, line)`` and, for findings with a
+    snippet, ``(req, file, fingerprint)``, for each accepted identity of the
+    finding (``finding_dismiss_keys``). ``class_keys``:
+    ``{(dimension, practice_id, file)}``. Keys come from ALL findings
+    regardless of verdict, so a dismiss (which only flips a verdict) never
+    changes a run's key set.
     """
     db_path = run_dir / "evaluation.db"
     if not db_path.is_file():
@@ -156,10 +153,11 @@ def read_run_key_sets(run_dir: Path) -> tuple[set[tuple], set[tuple]]:
     cls: set[tuple] = set()
     try:
         with open_evaluation_db(run_dir) as conn:
-            for req, file, line, dim, pid in conn.execute(
-                "SELECT requirement, file, line, dimension, practice_id FROM findings"
+            for req, file, line, dim, pid, snippet in conn.execute(
+                "SELECT requirement, file, line, dimension, practice_id, snippet FROM findings"
             ):
-                dismiss.add((str(req or ""), str(file or ""), int(line or 0)))
+                dismiss |= finding_dismiss_keys(
+                    req=req, principle=pid, file=file, line=line, snippet=snippet)
                 cls.add((str(dim or ""), str(pid or ""), str(file or "")))
     except (sqlite3.DatabaseError, RuntimeError):
         return set(), set()
@@ -256,18 +254,20 @@ def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, s
 
 def find_dismissed_matching(
     run_dir: Path, *, dimension: str, practice_id: str, file: str,
-) -> list[tuple[str, str, int]]:
-    """Return ``(requirement, file, line)`` for every DISMISSED finding in
-    *run_dir* matching the ``(dimension, practice_id, file)`` deletion key."""
+) -> list[tuple[str, str, int, str, str]]:
+    """Return ``(requirement, file, line, practice_id, snippet)`` for every
+    DISMISSED finding in *run_dir* matching the ``(dimension, practice_id,
+    file)`` deletion key. The caller derives the dismiss identities from the
+    row (``finding_dismiss_keys``) to find the entries to undismiss."""
     db_path = run_dir / "evaluation.db"
     if not db_path.is_file():
         return []
     try:
         with open_evaluation_db(run_dir) as conn:
             return [
-                (row[0] or "", row[1] or "", int(row[2] or 0))
+                (row[0] or "", row[1] or "", int(row[2] or 0), row[3] or "", row[4] or "")
                 for row in conn.execute(
-                    "SELECT requirement, file, line FROM findings "
+                    "SELECT requirement, file, line, practice_id, snippet FROM findings "
                     "WHERE verdict = 'dismissed' AND dimension = ? "
                     "AND practice_id = ? AND file = ?",
                     (dimension, practice_id, file),

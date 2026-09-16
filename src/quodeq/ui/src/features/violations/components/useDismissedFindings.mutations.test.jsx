@@ -73,6 +73,23 @@ describe('useDismissedFindings — restore handlers', () => {
     expect(setRestoreError).not.toHaveBeenCalled();
   });
 
+  it('handleRestore forwards the fingerprint the listing carries', async () => {
+    // The listing shows the finding at its current line; the fingerprint is
+    // what names the dismissed entry when that line has moved.
+    const fingerprinted = { ...sampleA, line: 42, fingerprint: 'ab'.repeat(32) };
+    listDismissedFindings.mockResolvedValueOnce([fingerprinted]);
+    restoreFinding.mockResolvedValueOnce({ ok: true });
+    const { result } = renderHook(() => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile: vi.fn() }), withQueryClient());
+    await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
+
+    await act(async () => { await result.current.handleRestore(fingerprinted); });
+
+    expect(restoreFinding).toHaveBeenCalledWith('proj', {
+      req: 'A1', file: 'a.py', line: 42, fingerprint: 'ab'.repeat(32),
+    });
+    expect(result.current.dismissed).toEqual([]);
+  });
+
   it('handleRestore reports an error and leaves state unchanged on failure', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     restoreFinding.mockRejectedValueOnce(new Error('boom'));

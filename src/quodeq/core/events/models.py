@@ -120,21 +120,30 @@ class JudgmentCreatedEvent(BaseEvent[Judgment]):
 
 @dataclass(frozen=True, kw_only=True)
 class FindingDismissed:
-    """User dismissed a finding identified by (req, file, line)."""
+    """User dismissed a finding.
+
+    Identity is ``(req, file, fingerprint)`` when the finding has a snippet
+    (``fingerprint`` = ``core.finding_identity.snippet_fingerprint``), else
+    ``(req, file, line)``. ``line`` is always recorded: it is the display
+    hint and the identity of snippet-less findings. Entries written before
+    fingerprints existed carry None and are upgraded by the one-shot backfill.
+    """
 
     req: str
     file: str
     line: int
     reason: Optional[str] = None
+    fingerprint: Optional[str] = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class FindingUndismissed:
-    """User restored a previously dismissed finding."""
+    """User restored a previously dismissed finding (same identity rules)."""
 
     req: str
     file: str
     line: int
+    fingerprint: Optional[str] = None
 
 
 @dataclass(frozen=True, kw_only=True)

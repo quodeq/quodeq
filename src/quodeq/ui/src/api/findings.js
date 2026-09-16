@@ -37,7 +37,8 @@ export async function dismissFinding(projectId, finding) {
 /**
  * Restore a dismissed finding (include in scoring again).
  * @param {string} projectId - Project identifier
- * @param {object} finding - Finding key: { req, file, line }
+ * @param {object} finding - Finding key: { req, file, line, fingerprint? }
+ *   (fingerprint comes from the dismissed listing and names the entry exactly)
  * @returns {Promise<object>} Server response
  */
 export async function restoreFinding(projectId, finding) {

@@ -6,7 +6,9 @@ while the finding dicts carried practiceId, so the filter sat inert). Every
 reader that has to answer "would the dashboard hide this finding?" must use
 these predicates rather than re-deriving keys:
 
-- dismissed: ``(req, file, line)``            -- one finding, exact line
+- dismissed: ``(req, file, snippet fingerprint)``, falling back to
+  ``(req, file, line)`` for findings without a snippet and for legacy entries
+  the backfill could not resolve -- see ``core.finding_identity``
 - deleted:   ``(dimension, principle, file)`` -- whole principle in a file
 
 This module is import-leaf by design: ``suppression``, ``dismissed`` and
@@ -17,8 +19,22 @@ from __future__ import annotations
 
 from fnmatch import fnmatch
 
+from quodeq.core.dismissals import EMPTY_DISMISSED, DismissedKeys
 from quodeq.core.types.suppression_rule import SuppressionRule
-from quodeq.shared.serialization import coerce_line
+
+
+def as_dismissed_keys(dismissed: "DismissedKeys | frozenset | set | None") -> DismissedKeys:
+    """Accept the dismissed state or the legacy bare ``{(req, file, line)}`` set.
+
+    Production readers hand over the ``DismissedKeys`` that
+    ``services.dismissed.dismissed_keys`` returns; the bare set form stays
+    accepted for callers and tests that build line keys by hand.
+    """
+    if isinstance(dismissed, DismissedKeys):
+        return dismissed
+    if not dismissed:
+        return EMPTY_DISMISSED
+    return DismissedKeys.from_line_keys(dismissed)
 
 
 def matches_suppression_rule(
@@ -40,8 +56,9 @@ def matches_suppression_rule(
 
 
 def is_dismissed(
-    dismissed: frozenset | set, *, req: str | None, principle: str | None = "",
-    file: str | None = "", line: object = 0,
+    dismissed: "DismissedKeys | frozenset | set", *, req: str | None,
+    principle: str | None = "", file: str | None = "", line: object = 0,
+    snippet: str | None = None,
     rules: "tuple[SuppressionRule, ...]" = (),
 ) -> bool:
     """True when the dismiss store hides this finding.
@@ -50,11 +67,13 @@ def is_dismissed(
     when it has none -- the same ``req || principle`` the UI stores
     (buildDismissPayload). Every read side must apply the same fallback, or a
     no-req finding disappears from the counters while its grade never moves.
-
     For a no-req finding the assistant's draft/apply path records the key with
-    an empty req (``("", file, line)``, see tests/assistant/
-    test_dismiss_apply_e2e.py), and older stores may hold either form -- so
-    both are accepted.
+    an empty req (see tests/assistant/test_dismiss_apply_e2e.py), so both
+    forms are accepted.
+
+    Pass the finding's ``snippet``: with it the match runs on the snippet
+    fingerprint and survives the line shifts every refactor causes. Without
+    it only the line can identify the finding.
     """
     file_key = file or ""
     # Pattern rules are checked first and independently of the key store: a
@@ -63,10 +82,8 @@ def is_dismissed(
         return True
     if not dismissed:
         return False
-    line_key = coerce_line(line)
-    if (req or principle or "", file_key, line_key) in dismissed:
-        return True
-    return not req and ("", file_key, line_key) in dismissed
+    return as_dismissed_keys(dismissed).matches(
+        req=req, principle=principle, file=file_key, line=line, snippet=snippet)
 
 
 def is_deleted(

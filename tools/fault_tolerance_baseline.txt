@@ -9,7 +9,7 @@
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
 src/quodeq/_cli_lifecycle.py:70:broad-except
-src/quodeq/_cli_scoring.py:170:broad-except
+src/quodeq/_cli_scoring.py:171:broad-except
 src/quodeq/analysis/_api_call.py:291:broad-except
 src/quodeq/analysis/_api_runner.py:96:broad-except
 src/quodeq/analysis/_loop_steps.py:103:broad-except
@@ -111,8 +111,8 @@ src/quodeq/data/fs/standards_prefs.py:41:broad-except
 src/quodeq/data/fs/standards_prefs.py:86:broad-except
 src/quodeq/data/fs/suppression_rules.py:42:broad-except
 src/quodeq/data/migrations/dismissed_json_to_actions_log.py:51:broad-except
-src/quodeq/data/sqlite/findings_queries.py:204:broad-except
-src/quodeq/data/sqlite/findings_queries.py:252:broad-except
+src/quodeq/data/sqlite/findings_queries.py:202:broad-except
+src/quodeq/data/sqlite/findings_queries.py:250:broad-except
 src/quodeq/data/sqlite/run_index.py:111:broad-except
 src/quodeq/data/sqlite/run_index.py:179:broad-except
 src/quodeq/data/sqlite/run_index.py:88:broad-except
@@ -135,7 +135,7 @@ src/quodeq/services/active_evaluation.py:68:broad-except
 src/quodeq/services/background.py:43:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
-src/quodeq/services/evidence_rescore.py:155:broad-except
+src/quodeq/services/evidence_rescore.py:156:broad-except
 src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/mutation_rescore.py:180:broad-except
 src/quodeq/services/project_registration.py:178:broad-except

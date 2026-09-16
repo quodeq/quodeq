@@ -12,6 +12,12 @@ from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
+from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
+    SuppressionKeys,
+    _deleted_key_for_violation,
+    _filter_dismissed_from_result,
+    _violation_location,
+)
 from quodeq.services.deleted import deleted_keys as _deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _dismissed_keys
 from quodeq.services.violations_parsing import (
@@ -39,77 +45,6 @@ class _ResolveOptions:
     stat_fn: Callable[[Path], Any] = Path.stat
     compiled_dir: Path | None = None
     evaluators_dir: Path | None = None
-
-
-@dataclass(frozen=True)
-class SuppressionKeys:
-    """Dismissed and permanently-deleted violation keys for one project."""
-    dismissed: set[tuple]
-    deleted: set[tuple]
-
-
-def _dismissed_key_for_violation(v: dict) -> tuple:
-    """Build a (req, file, line) key from a violation dict.
-
-    Handles two formats:
-    - Separated: file="path/to/file.py", line=42
-    - Combined: file="path/to/file.py:42", line=None
-    """
-    req = v.get("req", "")
-    raw_file = v.get("file", "")
-    line = v.get("line")
-    if line is not None:
-        return (req, raw_file, line)
-    # Parse line from "file:line" format
-    if ":" in raw_file:
-        parts = raw_file.rsplit(":", 1)
-        try:
-            return (req, parts[0], int(parts[1]))
-        except (ValueError, IndexError) as exc:
-            _logger.debug("violation line could not be parsed for its dismissal key: %s", exc)
-    return (req, raw_file, 0)
-
-
-def _deleted_key_for_violation(v: dict, dimension: str, principle: str | None = None) -> tuple:
-    """Build a (dimension, principle, file) suppression key from a violation dict.
-
-    Parsed eval violations are camelCase (``practiceId``); ``principle`` is
-    kept as a fallback for pre-camelCase dicts. Principle-group entries carry
-    no principle field at all, so callers pass the group name as *principle*.
-    """
-    raw_file = v.get("file", "")
-    if v.get("line") is None and ":" in raw_file:
-        raw_file = raw_file.rsplit(":", 1)[0]
-    if principle is None:
-        principle = v.get("practiceId") or v.get("principle") or ""
-    return (dimension or "", principle or "", raw_file)
-
-
-def _filter_dismissed_from_result(
-    result: "ViolationResponse | dict[str, Any] | None",
-    dkeys: "set[tuple]",
-    delkeys: "set[tuple] | None" = None,
-    dimension: str = "",
-) -> "ViolationResponse | dict[str, Any] | None":
-    """Remove dismissed and permanently-deleted violations from any result format."""
-    if not result or (not dkeys and not delkeys):
-        return result
-    if isinstance(result, dict):
-        if "violations" in result:
-            result["violations"] = [
-                v for v in result["violations"]
-                if _dismissed_key_for_violation(v) not in dkeys
-                and (not delkeys or _deleted_key_for_violation(v, dimension) not in delkeys)
-            ]
-        for p in result.get("principles", []):
-            if "violations" in p:
-                group_principle = p.get("name", "") or ""
-                p["violations"] = [
-                    v for v in p["violations"]
-                    if _dismissed_key_for_violation(v) not in dkeys
-                    and (not delkeys or _deleted_key_for_violation(v, dimension, group_principle) not in delkeys)
-                ]
-    return result
 
 
 def _try_evidence_formats(

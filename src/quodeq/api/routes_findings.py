@@ -19,7 +19,8 @@ from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
-from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
+from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
 from quodeq.services.mutation_rescore import (
     delete_all_delta,
     delete_delta,
@@ -94,7 +95,8 @@ def _finding_target_or_error(
 ) -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
     """Parse and validate the project/req/file/line target shared by dismiss,
     restore, and unverify. Returns the target dict, or None plus the ready
-    error response.
+    error response. ``fingerprint`` (restore names a dismissed entry by it)
+    is optional and only type-checked here.
     """
     project = body.get("project", "")
     req = body.get("req", "")
@@ -102,7 +104,7 @@ def _finding_target_or_error(
     line = body.get("line")
     if not project or not req or not file or line is None:
         return None, (jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400)
-    type_err = _invalid_body_fields(body, ("project", "req", "file"), ("line",))
+    type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
         return None, (jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400)
     return {"project": project, "req": req, "file": file, "line": line}, None
@@ -141,7 +143,7 @@ def register_findings_routes(app: Flask) -> None:
         if err is not None:
             return err
         run_id = body.get("run_id") or body.get("runId")
-        dismiss_finding(_project_dir(_eval_dir(), target["project"]), body)
+        dismiss_finding(_project_dir(_eval_dir(), target["project"]), body, run_id=run_id)
         scores = _scores_with_fallback(target["project"], run_id)
         delta = dismiss_delta(
             _eval_dir(), target["project"], run_id,

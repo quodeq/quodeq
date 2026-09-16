@@ -132,11 +132,11 @@ def _apply_dismiss_finding(payload: dict, ctx: ActionContext) -> dict:
     validate_path_segment(payload["project"])
     evaluations_dir = str(ctx.evaluations_dir)
     project_dir = Path(evaluations_dir) / payload["project"]
+    run_id = payload.get("runId")
     dismiss_finding(project_dir, {
         "req": payload["req"], "file": payload["file"], "line": payload["line"],
         "dismissReason": payload["reason"],
-    })
-    run_id = payload.get("runId")
+    }, run_id=run_id)
     scores = rescore_with_fallback(evaluations_dir, payload["project"], run_id)
     # Mirror the manual /api/findings/dismiss route so the UI can patch its
     # caches from this response instead of waiting on a lazy invalidation.
