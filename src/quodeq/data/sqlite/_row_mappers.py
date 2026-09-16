@@ -71,6 +71,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
         # accept the long key too so both spellings survive this seam.
         "violation_type": finding.get("vt") or finding.get("violation_type") or "",
+        "violation_type_raw": finding.get("vt_raw") or "",
         "context": finding.get("context", "") or "",
         "scope": finding.get("scope", "") or "",
         "req_refs_json": json.dumps(refs) if refs is not None else None,
@@ -102,6 +103,7 @@ def judgment_to_row(j: Judgment) -> dict[str, Any]:
         "reason": j.reason,
         "snippet": j.snippet or "",
         "violation_type": j.violation_type or "",
+        "violation_type_raw": j.violation_type_raw or "",
         "context": j.context or "",
         "scope": j.scope or "",
         "req_refs_json": refs_json,
@@ -152,6 +154,7 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
         req=row.get("requirement"),
         req_refs=req_refs,
         violation_type=row.get("violation_type", ""),
+        violation_type_raw=row.get("violation_type_raw") or None,
         title=row.get("title", ""),
         context=row.get("context", ""),
         scope=row.get("scope", ""),

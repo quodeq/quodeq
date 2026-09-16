@@ -22,7 +22,7 @@ _logger = logging.getLogger(__name__)
 
 _SELECT_ACTIVE = (
     "SELECT id, practice_id, dimension, requirement, verdict, severity, "
-    "file, line, end_line, title, reason, snippet, violation_type, context, "
+    "file, line, end_line, title, reason, snippet, violation_type, violation_type_raw, context, "
     "scope, req_refs_json, confidence, provenance_downgrade, "
     "scope_downgrade_json "
     "FROM findings WHERE verdict != 'dismissed' ORDER BY id"

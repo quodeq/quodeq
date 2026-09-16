@@ -495,3 +495,43 @@ def test_apply_evaluation_schema_rejects_unknown_version_with_no_upgrade_path():
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 100}")
     with pytest.raises(SchemaVersionError):
         apply_evaluation_schema(conn)
+
+
+def test_fresh_db_is_v9_with_violation_type_raw():
+    conn = sqlite3.connect(":memory:")
+    apply_evaluation_schema(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 9
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    assert "violation_type_raw" in columns
+
+
+def _v8_db() -> sqlite3.Connection:
+    """A DB exactly as v8 left it: current DDL minus the v9 column, stamped 8."""
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(EVALUATION_DDL)
+    conn.execute("ALTER TABLE findings DROP COLUMN violation_type_raw")
+    conn.execute("PRAGMA user_version = 8")
+    conn.execute(
+        "INSERT INTO findings (practice_id, verdict, severity, file, line, dedup_key) "
+        "VALUES ('P1', 'violation', 'minor', 'a.py', 10, 'P1|a.py|10|violation')"
+    )
+    conn.commit()
+    return conn
+
+
+def test_upgrade_v8_to_v9_adds_column_and_keeps_rows():
+    conn = _v8_db()
+    apply_evaluation_schema(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert conn.execute("SELECT violation_type_raw FROM findings").fetchone() == ("",)
+
+
+def test_upgrade_v8_to_v9_idempotent_when_column_already_present():
+    """The ALTER and the user_version bump commit separately; a crash between
+    them leaves the column added and the version at 8. Re-running must not
+    raise 'duplicate column name'."""
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(EVALUATION_DDL)
+    conn.execute("PRAGMA user_version = 8")
+    apply_evaluation_schema(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 9

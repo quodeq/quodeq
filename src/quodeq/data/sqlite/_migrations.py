@@ -257,6 +257,27 @@ def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     )
 
 
+def _upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
+    """Add the violation_type_raw column to findings (default '').
+
+    Stores the model's violation-type tag as emitted so the taxonomy report
+    can list unmapped tags per requirement. Skip when findings does not
+    exist (very old DBs, mirrors _upgrade_v5_to_v6) and when the column is
+    already present: the ALTER and the user_version bump commit separately,
+    so a crash between them must not brick the run on re-run.
+    """
+    has_findings = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
+    ).fetchone() is not None
+    if not has_findings:
+        return
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if "violation_type_raw" not in columns:
+        conn.execute(
+            "ALTER TABLE findings ADD COLUMN violation_type_raw TEXT NOT NULL DEFAULT ''"
+        )
+
+
 _UPGRADES = {
     1: _upgrade_v1_to_v2,
     2: _upgrade_v2_to_v3,
@@ -265,6 +286,7 @@ _UPGRADES = {
     5: _upgrade_v5_to_v6,
     6: _upgrade_v6_to_v7,
     7: _upgrade_v7_to_v8,
+    8: _upgrade_v8_to_v9,
 }
 
 

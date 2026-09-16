@@ -1,7 +1,7 @@
 """DDL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 _DDL_BODY = """
 CREATE TABLE findings (
@@ -25,6 +25,9 @@ CREATE TABLE findings (
     reason          TEXT NOT NULL DEFAULT '',
     snippet         TEXT NOT NULL DEFAULT '',
     violation_type  TEXT NOT NULL DEFAULT '',
+    -- The model's violation-type tag as emitted, before taxonomy mapping
+    -- (spec 2026-09-15). '' for legacy rows and deterministic-checker findings.
+    violation_type_raw TEXT NOT NULL DEFAULT '',
     context         TEXT NOT NULL DEFAULT '',
     scope           TEXT NOT NULL DEFAULT '',
     req_refs_json   TEXT,
