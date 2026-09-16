@@ -8,6 +8,7 @@ import functools
 import logging
 import time
 from dataclasses import dataclass
+from http import HTTPStatus
 
 import httpx
 import openai
@@ -127,9 +128,9 @@ def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
     if isinstance(exc, openai.PermissionDeniedError):
         return "auth", "permission denied (403)"
     if isinstance(exc, openai.APIStatusError):
-        if exc.status_code == 402:
+        if exc.status_code == HTTPStatus.PAYMENT_REQUIRED:
             return "payment", "out of credits (402 payment required)"
-        if exc.status_code == 429:
+        if exc.status_code == HTTPStatus.TOO_MANY_REQUESTS:
             reason = classify_fatal_provider_message(str(exc))
             if reason in ("quota", "payment"):
                 return reason, "quota/credits exhausted (429)"

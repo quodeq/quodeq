@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from html.parser import HTMLParser
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -86,7 +87,7 @@ def _search_web(query: str, max_results: int = 5) -> dict:
                          headers={"User-Agent": _USER_AGENT}, timeout=_TIMEOUT)
     except httpx.HTTPError as exc:
         raise ToolError(f"web search failed: {exc}") from exc
-    if resp.status_code != 200:
+    if resp.status_code != HTTPStatus.OK:
         raise ToolError(f"web search unavailable right now (HTTP {resp.status_code}); "
                         "try fetch_url with a known URL instead")
     parser = _DdgResultParser()
@@ -145,7 +146,7 @@ def _fetch_url_redirect_payload(url: str, resp) -> dict | None:
 def _validate_fetch_response(url: str, resp) -> str:
     """Raise ToolError for a non-200 or unsupported content type; else return
     the lowercased content-type."""
-    if resp.status_code != 200:
+    if resp.status_code != HTTPStatus.OK:
         raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
     content_type = resp.headers.get("content-type", "").lower()
     # reject known-binary types before reading the body; empty

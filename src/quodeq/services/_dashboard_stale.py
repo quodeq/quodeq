@@ -8,6 +8,7 @@ from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.core.types import DimensionResult
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
+_PREVIOUS_SCORE_OCCURRENCE = 2  # the second valid score is the one before the current
 
 
 @dataclass
@@ -60,7 +61,8 @@ def track_stale_grade(entry: dict[str, Any], state: StaleDimState) -> None:
         return
     dim_name = entry["dim_name"]
     state.non_na_count[dim_name] = state.non_na_count.get(dim_name, 0) + 1
-    if state.non_na_count[dim_name] == 2 and dim_name not in state.stale_previous_by_dimension:
+    if (state.non_na_count[dim_name] == _PREVIOUS_SCORE_OCCURRENCE
+            and dim_name not in state.stale_previous_by_dimension):
         state.stale_previous_by_dimension[dim_name] = entry["dim"]
 
 

@@ -42,6 +42,8 @@ _STATS_TTL_S = 30.0
 # path-safe charset so a key can never contain '/', '\\', or '..' and
 # escape the cache root in _dir_for.
 _SAFE_KEY_RE = re.compile(r"[A-Za-z0-9_-]+")
+_SHARD_PREFIX_LEN = 2  # two-char <sha[:2]>/<sha[2:]> sharding, see the module docstring
+_MIN_KEY_LEN = _SHARD_PREFIX_LEN + 1  # at least one char left after the shard prefix
 
 
 def default_cache_root() -> Path:
@@ -83,11 +85,11 @@ class LocalFileBackend:
         return self._index
 
     def _dir_for(self, key: str) -> Path:
-        if len(key) < 3:
+        if len(key) < _MIN_KEY_LEN:
             raise ValueError(f"cache key too short: {key!r}")
         if not _SAFE_KEY_RE.fullmatch(key):
             raise ValueError(f"invalid cache key: {key!r}")
-        return self._root / key[:2] / key[2:]
+        return self._root / key[:_SHARD_PREFIX_LEN] / key[_SHARD_PREFIX_LEN:]
 
     def _entry_path(self, key: str) -> Path:
         return self._dir_for(key) / _ENTRY_FILENAME

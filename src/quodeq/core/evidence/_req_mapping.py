@@ -8,6 +8,7 @@ from pathlib import Path
 from quodeq.core.events.models import Judgment
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+_MIN_REQ_ID_SEGMENTS = 2  # ``<category>-<number>`` is the shortest ID we guess about
 
 # Reads ``<directory>/<dimension>.json`` into a req-id → principle-name map.
 # Injected by outer layers (see quodeq.data.fs.standards_loader.
@@ -83,7 +84,7 @@ def _id_shape(req_id: str) -> tuple[str, str] | None:
     a number, which is the only form we are willing to guess about.
     """
     parts = [p for p in (req_id or "").strip().split("-") if p]
-    if len(parts) < 2 or not parts[-1].isdigit():
+    if len(parts) < _MIN_REQ_ID_SEGMENTS or not parts[-1].isdigit():
         return None
     return parts[-2].upper(), parts[-1].lstrip("0") or "0"
 

@@ -72,6 +72,7 @@ _logger = logging.getLogger(__name__)
 _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
+_ARGV_API_PID = 3  # optional argv slot: pid of the API process to watch
 
 
 class _WindowApi:
@@ -193,7 +194,8 @@ def main() -> None:
     _set_app_icon()
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
-    api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
+    api_pid = (int(sys.argv[_ARGV_API_PID])
+               if len(sys.argv) > _ARGV_API_PID and sys.argv[_ARGV_API_PID] else 0)
     webview_token = read_token_from_stdin()
 
     instance = InstanceController(sock_path)

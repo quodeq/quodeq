@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import stat
 import uuid as _uuid
 import zipfile
 from http import HTTPStatus
@@ -25,6 +26,7 @@ _MAX_PER_MEMBER_BYTES = 1 * 1024 * 1024 * 1024  # 1 GiB uncompressed cap per fil
 _MAX_RATIO = 200  # uncompressed/compressed ratio per member (zip-bomb guard)
 _RATIO_GUARD_THRESHOLD = 1024  # only enforce ratio above this uncompressed size
 _MAX_PATH_DEPTH = 64  # limit on path components to bound recursion-style attacks
+_ZIP_CREATE_SYSTEM_UNIX = 3  # ZipInfo.create_system; only Unix writers encode symlinks
 
 
 class _ImportError(Exception):
@@ -61,10 +63,10 @@ def _is_symlink_entry(info: zipfile.ZipInfo) -> bool:
     ZIP entries created by Info-ZIP and most Python zipfile writers. The
     S_IFMT mask 0xF000 isolates the file type; symlinks have type 0xA000.
     """
-    if info.create_system != 3:  # 3 == Unix; non-Unix can't encode symlinks
+    if info.create_system != _ZIP_CREATE_SYSTEM_UNIX:
         return False
     mode = info.external_attr >> 16
-    return (mode & 0xF000) == 0xA000
+    return stat.S_ISLNK(mode)
 
 
 def _validate_member_name(name: str) -> list[str]:

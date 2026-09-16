@@ -17,6 +17,7 @@ from quodeq.core.scoring._constants import (
     _LIFT_COMPRESS,
     _SEVERITY_GRADE_FLOOR,
     _SEVERITY_WEIGHT,
+    MAX_SCORE,
 )
 
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
@@ -163,7 +164,7 @@ def validate_params(params: ScoringParams) -> list[str]:
     values = [t for t, _ in params.grade_thresholds]
     if any(b >= a for a, b in zip(values, values[1:])):
         errors.append(f"grade thresholds must be strictly decreasing, got {values}")
-    if any(not (0.0 < t < 10.0) for t in values):
+    if any(not (0.0 < t < MAX_SCORE) for t in values):
         errors.append(f"grade thresholds must be within (0, 10), got {values}")
     for dim, w in params.dimension_weights.items():
         if not (_DIMENSION_WEIGHT_RANGE[0] <= w <= _DIMENSION_WEIGHT_RANGE[1]):

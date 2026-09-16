@@ -101,6 +101,7 @@ class _Finding(BaseModel):
 # still always counted regardless of nesting.
 _DROPPED_FINDING_KEY = "req"
 _FINDING_FIELDS = frozenset(_Finding.model_fields)
+_MIN_FINDING_FIELD_OVERLAP = 2  # one shared short key (t/w) alone is not a finding attempt
 
 
 def _looks_like_finding(node: dict) -> bool:
@@ -108,7 +109,7 @@ def _looks_like_finding(node: dict) -> bool:
     attempt rather than a generic container. Two-field floor avoids false
     positives from generic short keys like ``t``/``w`` appearing alone.
     """
-    return len(_FINDING_FIELDS.intersection(node)) >= 2
+    return len(_FINDING_FIELDS.intersection(node)) >= _MIN_FINDING_FIELD_OVERLAP
 
 
 def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:

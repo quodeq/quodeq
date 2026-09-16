@@ -6,6 +6,7 @@ import re
 import threading
 from collections import deque
 from datetime import datetime, timezone
+from http import HTTPStatus
 
 _DEFAULT_MAX_LINES = 500
 
@@ -91,6 +92,11 @@ def _path_no_query(path: str) -> str:
     return path.split("?", 1)[0]
 
 
+def _is_success_or_redirect(status: int) -> bool:
+    """2xx/3xx: the poll or request succeeded, so the access line adds nothing."""
+    return HTTPStatus.OK <= status < HTTPStatus.BAD_REQUEST
+
+
 def _is_noisy_werkzeug_access(record: logging.LogRecord) -> bool:
     if record.name != "werkzeug":
         return False
@@ -101,7 +107,7 @@ def _is_noisy_werkzeug_access(record: logging.LogRecord) -> bool:
         status = int(m.group(1))
     except ValueError:
         return False
-    return 200 <= status < 400
+    return _is_success_or_redirect(status)
 
 
 def _is_noisy_poll(record: logging.LogRecord) -> bool:
@@ -123,7 +129,7 @@ def _is_noisy_poll(record: logging.LogRecord) -> bool:
             status = int(status_m.group(1))
         except ValueError:
             return False
-        return 200 <= status < 400
+        return _is_success_or_redirect(status)
     return False
 
 

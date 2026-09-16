@@ -29,6 +29,9 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
     "/api/findings/delete",
 })
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
+_BEARER_PREFIX = "Bearer "
+_KEY_SUFFIX_LEN = 4  # trailing key chars shown in the actor log tag
+_MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + _KEY_SUFFIX_LEN
 
 # Marker substring in the native webview's User-Agent (set by
 # quodeq.dashboard._webview_window_about). Kept for human-readable UA
@@ -206,8 +209,8 @@ def _same_origin_ws_sources(host: str) -> str:
 def _actor(api_key: str | None) -> str:
     if api_key:
         auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer ") and len(auth) > 11:
-            return f" (actor=key:***{auth[-4:]})"
+        if auth.startswith(_BEARER_PREFIX) and len(auth) > _MIN_BEARER_HEADER_LEN:
+            return f" (actor=key:***{auth[-_KEY_SUFFIX_LEN:]})"
     return ""
 
 
