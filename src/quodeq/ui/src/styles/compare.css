@@ -1459,7 +1459,8 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 /* Rendered through a portal at a FIXED position (the component computes
    top/bottom/left inline from the button's rect): the projects table is an
    overflow container that would clip an in-flow popover for rows near its
-   bottom edge. max-height must stay in sync with DUEL_MENU_MAX_H. */
+   bottom edge. max-height must stay in sync with LAUNCHER_MENU_MAX_H
+   (compareLauncherMenu.js). */
 .compare-dueltrigger__menu {
   position: fixed;
   z-index: 80;

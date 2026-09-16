@@ -6,6 +6,15 @@
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { consequenceOf, consequenceLevel } from './compareFleet.js';
 
+// Score drop over the delta window (0-10 scale) that earns a row the
+// "declining" reason. Deliberately not trendUtils.DECLINING_THRESHOLD:
+// that one drives the TrendBadge arrow on its own scale and is not
+// interchangeable with this cutoff.
+const DECLINING_DELTA = -0.3;
+// Analyzed-files share (percent) below which a row gets the coverage-gap
+// reason.
+const COVERAGE_GAP_PCT = 80;
+
 /** Union of dimensions across scope, each with fleet stats + per-project scores. */
 export function buildDimensionsBoard(rows, now, summariesById) {
   const byKey = new Map();
@@ -60,9 +69,9 @@ export function buildAttention(rows) {
         .reduce((acc, d) => (acc == null || d.score < acc.score ? d : acc), null);
       const reasons = [];
       if (worst) reasons.push({ type: 'worstDim', dim: worst.label, score: worst.score });
-      if (row.delta != null && row.delta <= -0.3) reasons.push({ type: 'declining', delta: row.delta });
+      if (row.delta != null && row.delta <= DECLINING_DELTA) reasons.push({ type: 'declining', delta: row.delta });
       if (row.stale) reasons.push({ type: 'stale', commits: row.commitsSince });
-      if (row.coveragePct != null && row.coveragePct < 80) {
+      if (row.coveragePct != null && row.coveragePct < COVERAGE_GAP_PCT) {
         reasons.push({ type: 'coverage', pct: row.coveragePct });
       }
       return { row, value, level: consequenceLevel(value), worstDim: worst?.key ?? null, reasons };

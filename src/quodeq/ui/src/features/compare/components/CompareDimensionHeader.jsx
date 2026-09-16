@@ -3,7 +3,7 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
-import { nf } from '../compareFormatters.js';
+import { nf, TAB_LABEL_CHARS } from '../compareFormatters.js';
 
 
 /** Title/subtitle + the dimension tab bar (switches sideways between
@@ -38,7 +38,7 @@ export default function CompareDimensionHeader({ view, board, onOpenDimension })
               className={`compare-sort__btn${b.key === view.key ? ' compare-sort__btn--on' : ''}`}
               onClick={() => onOpenDimension(b.key)}
             >
-              {b.label.slice(0, 5)}
+              {b.label.slice(0, TAB_LABEL_CHARS)}
             </button>
           ))}
         </span>

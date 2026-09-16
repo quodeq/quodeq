@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { useState } from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
+import { MS_PER_DAY } from '../../../utils/time.js';
 import ComparePage from './ComparePage.jsx';
 
 /**
@@ -14,7 +15,7 @@ import ComparePage from './ComparePage.jsx';
  * ../../../api/shared.js first.
  */
 
-export const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
+export const iso = (daysAgo) => new Date(Date.now() - daysAgo * MS_PER_DAY).toISOString();
 
 export const PROJECTS = [
   { id: 'alpha', name: 'alpha', displayName: 'alpha', languageStats: { py: 100 }, totalFiles: 200, analyzedFiles: 190, runsCount: 2, latestDate: iso(1) },

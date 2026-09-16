@@ -22,32 +22,14 @@ import { t } from '../../../strings/index.js';
 import { OVERALL, computeMatrixExtremes, sortMatrixRows } from './compareMatrixModel.js';
 import { useMatrixColumnChunks } from './useMatrixColumnChunks.js';
 import CompareMatrixTable from './CompareMatrixTable.jsx';
-import { score1 } from '../compareFormatters.js';
+import { score1, prefixOf, stemOf } from '../compareFormatters.js';
 
 
 // Column headers hold 3-character numbers; full dimension or principle
-// names would set the column width instead. The primary code is the same
-// one the dimension tab bar already uses - the label's first 5 characters
-// ("clean", "flexi", "maint") - so the matrix speaks the app's
-// established vocabulary. When two columns share a prefix (the
-// "independence from ..." principles), those fall back to a readable stem
-// ("inde fra", "inde ui") so every header stays unique. Full names live
-// in the tooltip and the sort button's aria-label.
-const STOPWORDS = new Set(['from', 'of', 'the', 'and', 'for']);
-
-const significantWords = (label) => String(label || '')
-  .trim()
-  .split(/[\s-]+/)
-  .filter((w) => w && !STOPWORDS.has(w));
-
-const prefixOf = (label) => String(label || '').trim().slice(0, 5);
-
-function stemOf(label) {
-  const words = significantWords(label);
-  if (words.length <= 1) return (words[0] || '').slice(0, 5);
-  return `${words[0].slice(0, 4)} ${words[words.length - 1].slice(0, 3)}`;
-}
-
+// names would set the column width instead. The code is the dimension tab
+// bar's prefix, or a readable stem when two columns share one (see
+// prefixOf/stemOf in compareFormatters). Full names live in the tooltip
+// and the sort button's aria-label.
 function makeShortLabels(columns) {
   const counts = new Map();
   for (const col of columns) {

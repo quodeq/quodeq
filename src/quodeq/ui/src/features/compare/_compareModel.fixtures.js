@@ -3,10 +3,11 @@
  *
  * Split out of compareModel.test.js.
  */
+import { MS_PER_DAY } from '../../utils/time.js';
 
 export const NOW = '2026-08-25T12:00:00Z';
 
-export const iso = (daysAgo) => new Date(Date.parse(NOW) - daysAgo * 86400000).toISOString();
+export const iso = (daysAgo) => new Date(Date.parse(NOW) - daysAgo * MS_PER_DAY).toISOString();
 
 export function makeSummary({ score = 7, dims = [], trend = [], lastRunDaysAgo = 1 } = {}) {
   return {
