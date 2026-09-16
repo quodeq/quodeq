@@ -16,6 +16,7 @@ from quodeq.core.standards.refs import (
     extract_requirement_checks,
     extract_requirements,
 )
+from quodeq.core.taxonomy import EMPTY_TAXONOMY, Taxonomy, TaxonomyError, extract_taxonomy
 from quodeq.core.utils.io import read_json
 from quodeq.shared.validation import validate_path_segment
 
@@ -165,6 +166,26 @@ def load_compiled_requirements(
     if not data:
         return {}
     return extract_requirements(data, overrides=overrides)
+
+
+def load_taxonomy(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> Taxonomy:
+    """Load the dimension's violation-type taxonomy; EMPTY_TAXONOMY when absent.
+
+    A malformed block is logged and treated as absent: a bad standards file
+    must not stop an evaluation, and the compiled-standards test catches it
+    before it ships.
+    """
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    if not data:
+        return EMPTY_TAXONOMY
+    try:
+        return extract_taxonomy(data)
+    except TaxonomyError as exc:
+        _logger.warning("Ignoring taxonomy for %s: %s", dimension, exc)
+        return EMPTY_TAXONOMY
 
 
 def load_requirement_checks(
