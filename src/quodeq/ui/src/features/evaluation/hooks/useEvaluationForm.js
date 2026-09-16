@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { usePluginDimensions } from './usePluginDimensions.js';
 import { t } from '../../../strings/index.js';
 import { buildEvaluationPayload } from '../components/evaluationFormHelpers.js';
+import { CLEAN_PERSIST } from '../components/scanModes.js';
 
 const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
@@ -21,9 +22,9 @@ function buildAndSubmit(onStart, formState) {
   setSelectedDims(new Set());
   setBranch(null);
   setScopePath(null);
-  if (cleanScan === 'once') {
+  if (cleanScan === CLEAN_PERSIST.ONCE) {
     Promise.resolve(result).then(
-      () => setCleanScan('off'),
+      () => setCleanScan(CLEAN_PERSIST.OFF),
       () => {},
     );
   }
@@ -36,7 +37,7 @@ export function useEvaluationForm(onStart, onValidationFail) {
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
-  const [cleanScan, setCleanScan] = useState('off');
+  const [cleanScan, setCleanScan] = useState(CLEAN_PERSIST.OFF);
 
   useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
 

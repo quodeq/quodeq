@@ -11,7 +11,7 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 import { t } from '../../../strings/index.js';
-import { DATA_THEME_ATTR } from '../../../constants.js';
+import { DATA_THEME_ATTR, PROJECT_SOURCE } from '../../../constants.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
@@ -191,7 +191,7 @@ function MapNoEvaluationsState({ selectedSource, selectedProject, projectName, i
   // locally, so "Start evaluation" has nowhere useful to send a
   // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
   // precedent this mirrors).
-  if (selectedSource === 'shared') {
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
     return (
       <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
         <EmptyState
@@ -257,7 +257,7 @@ function MapNoProjectSelectedState({ onNavigate }) {
 
 export default function MapPage(props) {
   const { data = {}, callbacks = {} } = props;
-  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching, error } = data;
+  const { projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, projectName, loading, isFetching, error } = data;
   const { onNavigate, onRetry } = callbacks;
 
   // Call the hook unconditionally to keep hook order stable across renders.
@@ -266,7 +266,7 @@ export default function MapPage(props) {
   const state = useMapPageState(props);
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0 && selectedSource !== 'shared') return <MapNoProjectsState onNavigate={onNavigate} />;
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) return <MapNoProjectsState onNavigate={onNavigate} />;
   if (!selectedProject) return <MapNoProjectSelectedState onNavigate={onNavigate} />;
   const isRefreshing = isFetching && !loading;
   if (state.allDimensions.length === 0) {
@@ -288,7 +288,7 @@ export default function MapPage(props) {
         <TermHeader
           name="map"
           sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
-          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+          badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
         />
         <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>

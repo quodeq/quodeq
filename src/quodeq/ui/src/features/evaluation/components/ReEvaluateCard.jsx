@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useReEvaluateCard } from '../hooks/useReEvaluateCard.js';
 import ScanModeCards from './ScanModeCards.jsx';
+import { CLEAN_PERSIST } from './scanModes.js';
 import DimensionSelector from './DimensionSelector.jsx';
 import { readActiveProviderModel } from './providerLabel.js';
 import { UrlRestoreSection, DetectedLine, BudgetChips, RunBar, IdentityHeader, ScopeBrowserOverlay } from './ReEvaluateCardParts.jsx';
@@ -116,7 +117,7 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
 function computeReEvalViewState({ info, scope, disabled, cleanScan, estimates }) {
   const isReadOnlyEphemeral = info?.ephemeral === true && info?.evaluable === false;
   const canStart = !disabled && !info.pathMissing && !isReadOnlyEphemeral;
-  const isClean = cleanScan !== 'off';
+  const isClean = cleanScan !== CLEAN_PERSIST.OFF;
   const dimMetas = buildDimMetas(estimates, isClean);
   const branchLabel = scope.isLocal ? (scope.scanData?.currentBranch || scope.branch) : null;
   const scopeValue = scope.scopePath

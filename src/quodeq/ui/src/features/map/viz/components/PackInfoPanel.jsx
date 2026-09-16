@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { t } from '../../../../strings/index.js';
+import { LevelInfoPanel } from './galaxyViewInfo.jsx';
 
 function computeLevelInfo(focusNode, root, onFileClick) {
   const fn = focusNode;
@@ -32,25 +32,5 @@ function computeLevelInfo(focusNode, root, onFileClick) {
 
 export default function PackInfoPanel({ focusNode, root, onFileClick }) {
   const levelInfo = useMemo(() => computeLevelInfo(focusNode, root, onFileClick), [focusNode, root, onFileClick]);
-
-  if (!levelInfo) return null;
-
-  return (
-    <div style={{ position: 'absolute', top: 12, right: 16, background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '12px 18px', fontSize: 12, zIndex: 2, backdropFilter: 'blur(8px)', minWidth: 160 }}>
-      <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 8, fontSize: 13 }}>{levelInfo.title}</div>
-      {levelInfo.lines.map((l, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, margin: '3px 0', color: l.color || 'var(--color-text-muted)' }}>
-          <span>{l.label}</span>
-          <span style={{ color: l.color || 'var(--color-text)', fontWeight: 500 }}>{l.value}</span>
-        </div>
-      ))}
-      {levelInfo.detailAction && (
-        <button type="button" onClick={levelInfo.detailAction}
-          style={{ marginTop: 10, width: '100%', padding: '6px 12px', background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', fontSize: 11, cursor: 'pointer', transition: 'all 0.2s' }}
-          onMouseEnter={e => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 35%, transparent)'; }}
-          onMouseLeave={e => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 20%, transparent)'; }}
-        >{t('map.viewDetails')}</button>
-      )}
-    </div>
-  );
+  return <LevelInfoPanel levelInfo={levelInfo} />;
 }

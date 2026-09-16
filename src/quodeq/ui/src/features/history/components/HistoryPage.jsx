@@ -70,7 +70,7 @@ function renderNoRowsEmptyState({
   // locally, so "Start evaluation" has nowhere useful to send a
   // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
   // precedent this mirrors).
-  if (selectedSource === 'shared') {
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
     return (
       <HistoryEmptyShell sub={t('violations.subNoEvals')} refreshing={isRefreshing}>
         <SharedNoEvalsEmptyContent />
@@ -97,7 +97,7 @@ function renderHistoryEmptyState({
   // viewing a shared project (they may have never added a local project of
   // their own) -- gate this wall on the local list only for local selections,
   // so a shared selection falls through to the normal shared data flow below.
-  if (projects.length === 0 && selectedSource !== 'shared') {
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) {
     return (
       <HistoryEmptyShell sub={t('violations.subNoProjects')}>
         <NoProjectsEmptyContent onNavigate={onNavigate} />

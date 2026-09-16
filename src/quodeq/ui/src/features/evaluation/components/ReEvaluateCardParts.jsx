@@ -9,6 +9,7 @@
 import FolderBrowser from './FolderBrowser.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { detectedLanguages, BUDGET_CHOICES_S, formatBudgetLabel } from './scanSummary.js';
+import { CLEAN_PERSIST } from './scanModes.js';
 import { t, LOCALE } from '../../../strings/index.js';
 
 const BUTTON_ROW_GAP = '8px';
@@ -112,7 +113,7 @@ function runBarLine1({ picked, scanFiles, isClean, budgetPart }) {
 
 export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates, cleanScan, timeLimitS }) {
   const picked = selectedDims.size;
-  const isClean = cleanScan !== 'off';
+  const isClean = cleanScan !== CLEAN_PERSIST.OFF;
   const scanFiles = estimates ? (isClean ? estimates.projectFiles : estimates.changedFiles) : null;
   const pickedSum = estimates?.dimensions
     ? [...selectedDims].reduce((sum, id) => {

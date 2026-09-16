@@ -1,7 +1,9 @@
+import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../constants.js';
+
 export const STORAGE_KEY = 'quodeq_selected_project';
 export const SOURCE_STORAGE_KEY = 'quodeq_selected_source';
-export const DEFAULT_SOURCE = 'local';
-export const VALID_SOURCES = ['local', 'shared'];
+export const DEFAULT_SOURCE = DEFAULT_PROJECT_SOURCE;
+export const VALID_SOURCES = Object.values(PROJECT_SOURCE);
 
 /**
  * useProjectState.js's localStorage read/write helpers and the boot-time

@@ -5,7 +5,7 @@ import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL } from '../core/galaxyTunabl
 
 // Dimension labels grow with the zoom up to this cap. Deliberately equal
 // to ZOOM_DIMENSION_LEVEL: once principles appear the label stops growing.
-const LABEL_SCALE_CAP = 1.5;
+const LABEL_SCALE_CAP = ZOOM_DIMENSION_LEVEL;
 // Zoom units past ZOOM_PRINCIPLE_LEVEL over which the selected principle's
 // particles and label hand off to its violation orbs, which fade in over
 // the same span.
