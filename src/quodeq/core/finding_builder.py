@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.types import Finding, ReqRef
 
 
@@ -31,7 +32,7 @@ class FindingSpec:
     context: str | None = None
     scope: str | None = None
     include_severity: bool = True
-    confidence: int = 100
+    confidence: int = FULL_CONFIDENCE
     provenance_downgrade: bool = False
     scope_downgrade: dict[str, str] | None = None
     carried_forward: bool = False

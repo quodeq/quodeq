@@ -21,7 +21,7 @@ from quodeq.context.precedent import (
 )
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
-from quodeq.core.evidence._constants import FULL_CONFIDENCE
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.observability import NULL_LOG, LogSink
 
 _FINDING_SCHEMA_VERSION = 1

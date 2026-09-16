@@ -1,4 +1,6 @@
 """Constants shared by the API route modules."""
+# House-standard, and it also keeps this import-less module indexed by
+# core/checks/framework_deps (edge-keyed; see the follow-up on ImportGraph.files).
 from __future__ import annotations
 
 # Machine-readable ``code`` values for ``helpers.error_response``. The UI

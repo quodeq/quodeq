@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-from quodeq.core.evidence._constants import FULL_CONFIDENCE
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.evidence._refs import RefsReader, enrich_judgment
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 from quodeq.core.events.models import Judgment, VALID_VERDICTS

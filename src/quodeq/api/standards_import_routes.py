@@ -58,7 +58,7 @@ def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
         return error_response("Invalid import data", HTTPStatus.BAD_REQUEST, "validation_error")
     except PermissionError as exc:
         logger.warning("standards.import permission error: %s", exc)
-        return error_response("Permission denied", 403, ERROR_CODE_FORBIDDEN)
+        return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)
     if result["status"] == "conflict":
         return jsonify({
             "status": "conflict",

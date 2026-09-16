@@ -1,4 +1,6 @@
 """Cross-layer constants shared across bounded contexts."""
+# House-standard, and it also keeps this import-less module indexed by
+# core/checks/framework_deps (edge-keyed; see the follow-up on ImportGraph.files).
 from __future__ import annotations
 
 # Pool / subagent defaults
@@ -18,3 +20,5 @@ SESSION_SOURCES = (SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED)
 # Ollama's default listening port and the base URL local providers fall back to.
 OLLAMA_DEFAULT_PORT = "11434"
 OLLAMA_DEFAULT_BASE_URL = f"http://localhost:{OLLAMA_DEFAULT_PORT}"
+
+SECRET_SUFFIX_CHARS = 4  # how many trailing credential characters a log or settings mask may show

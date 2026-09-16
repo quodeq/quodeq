@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.types.req_ref import ReqRef as ReqRef
 
 
@@ -43,7 +44,7 @@ class Finding:
     # 0..100. Default 100 means "scanner is fully sure this is real".
     # Lower values flag noise (path role, project shape, precedent) the
     # context-enricher pipeline downweights post-LLM.
-    confidence: int = 100
+    confidence: int = FULL_CONFIDENCE
     # True when the deterministic provenance gate (#639) de-escalated this
     # finding from critical to major. Audit marker surfaced in the DB/UI (#656).
     provenance_downgrade: bool = False

@@ -12,6 +12,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.dashboard_ports import alt_port_origins
 
 _logger = logging.getLogger(__name__)
@@ -30,8 +31,7 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
 })
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 _BEARER_PREFIX = "Bearer "
-_KEY_SUFFIX_LEN = 4  # trailing key chars shown in the actor log tag
-_MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + _KEY_SUFFIX_LEN
+_MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + SECRET_SUFFIX_CHARS
 
 # Marker substring in the native webview's User-Agent (set by
 # quodeq.dashboard._webview_window_about). Kept for human-readable UA
@@ -145,7 +145,7 @@ def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")
-        if not hmac.compare_digest(auth, f"Bearer {api_key}"):
+        if not hmac.compare_digest(auth, f"{_BEARER_PREFIX}{api_key}"):
             return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
     else:
         remote = request.remote_addr or ""
@@ -210,7 +210,7 @@ def _actor(api_key: str | None) -> str:
     if api_key:
         auth = request.headers.get("Authorization", "")
         if auth.startswith(_BEARER_PREFIX) and len(auth) > _MIN_BEARER_HEADER_LEN:
-            return f" (actor=key:***{auth[-_KEY_SUFFIX_LEN:]})"
+            return f" (actor=key:***{auth[-SECRET_SUFFIX_CHARS:]})"
     return ""
 
 
