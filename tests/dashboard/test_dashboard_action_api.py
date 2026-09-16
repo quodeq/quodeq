@@ -6,6 +6,11 @@ from quodeq.dashboard._api_spawn import spawn_action_api
 from quodeq.dashboard._probes import DashboardHooks
 
 from tests.conftest import DummyProcess
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 _TEST_PORT = 7863
 _TEST_HOST = "127.0.0.1"

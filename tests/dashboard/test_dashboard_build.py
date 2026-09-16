@@ -6,6 +6,11 @@ from quodeq.dashboard._build import (
     _HASH_FILE,
 )
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 
 _SHA256_HEX_LEN = 64

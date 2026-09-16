@@ -11,6 +11,10 @@ import pytest
 
 from quodeq.shared import _io, _process_kill, frozen, ssrf
 
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
+
 
 def test_configure_stdio_utf8_logs_each_unreconfigurable_stream(monkeypatch) -> None:
     class _Stream:

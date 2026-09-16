@@ -13,7 +13,6 @@ from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services.jobs import JobManager
-import os
 
 
 @pytest.fixture
@@ -53,8 +52,8 @@ def test_route_returns_text_event_stream(app: Flask):
     assert resp.headers.get("Cache-Control") == "no-cache"
 
 
-def test_route_emits_status_event_for_running_run(app: Flask):
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"
+def test_route_emits_status_event_for_running_run(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
     client = app.test_client()
@@ -64,8 +63,8 @@ def test_route_emits_status_event_for_running_run(app: Flask):
     assert "event: done" in body
 
 
-def test_route_honors_last_event_id_header(app: Flask):
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"
+def test_route_honors_last_event_id_header(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
 
