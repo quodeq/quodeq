@@ -1,6 +1,9 @@
 import { rgb } from '../core/galaxyCore.js';
+import { clampTooltipToViewport } from '../core/tooltipPlacement.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { t } from '../../../../strings/index.js';
+
+const CLUSTER_HIT_PADDING = 40; // world units of fat-finger slack around a constellation's spread
 
 /**
  * Build tooltip HTML and position it.
@@ -45,8 +48,9 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
     ${rows.join('')}
     <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(t('map.clickToExplore'))}</div>`;
   el.style.display = 'block';
-  el.style.left = Math.min(cx + 16, window.innerWidth - 200) + 'px';
-  el.style.top = Math.min(cy + 16, window.innerHeight - 160) + 'px';
+  const { left, top } = clampTooltipToViewport(cx, cy, window.innerWidth, window.innerHeight);
+  el.style.left = left + 'px';
+  el.style.top = top + 'px';
 }
 
 /**
@@ -83,7 +87,7 @@ export function handleCanvasClick(e, refs, { scene, size, navigateTo, startTrans
         const csc = w2s(size.w / 2 + con.cx, size.h / 2 + con.cy);
         const dx = cmx - csc.x, dy = cmy - csc.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const hitRadius = (con.spread + 40) * camRef.current.z;
+        const hitRadius = (con.spread + CLUSTER_HIT_PADDING) * camRef.current.z;
         if (dist < hitRadius) {
           if (nav.clusterCx === con.cx && nav.clusterCy === con.cy) {
             // Already in this cluster — zoom back to galaxy

@@ -6,7 +6,7 @@ import { buildLevelInfo } from './galaxyFolderScene.js';
 import { createEventHandlers } from './galaxyFolderEvents.js';
 import { useGalaxyFolderNav } from './useGalaxyFolderNav.js';
 import { useGalaxyFolderCamera } from './useGalaxyFolderCamera.js';
-import GalaxyFolderPanel from './GalaxyFolderPanel.jsx';
+import { LevelInfoPanel } from './galaxyViewInfo.jsx';
 import { t } from '../../../../strings/index.js';
 
 /** Breadcrumb parts for the current nav path — project name first, then
@@ -93,7 +93,7 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
         onClick: i < breadcrumb.length - 1 ? () => handlers.goToPathIndex(bc.idx) : undefined,
       }))} />
       <GalaxyFolderOverlays tooltipRef={refs.tooltipRef} />
-      <GalaxyFolderPanel levelInfo={levelInfo} />
+      <LevelInfoPanel levelInfo={levelInfo} />
     </div>
   );
 }

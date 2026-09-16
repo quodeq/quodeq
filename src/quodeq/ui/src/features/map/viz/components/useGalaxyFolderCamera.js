@@ -4,9 +4,18 @@ import {
   drawScene, drawNebula, drawStarfield, drawConstellationLines,
   drawStars, drawLabels,
 } from './galaxyFolderDraw.js';
+import { DEFAULT_CANVAS_W, DEFAULT_CANVAS_H } from '../core/galaxyTunables.js';
 
 const TRANS = 0.8;
 const FLY_DURATION = 1.4;
+// Idle star drift: sine on x, cosine on y. Speeds and phases are
+// intentionally unequal so the two axes never sync into a straight-line
+// wobble. One amplitude (world units) serves both axes.
+const DRIFT_SPEED_X = 0.015;
+const DRIFT_SPEED_Y = 0.012;
+const DRIFT_PHASE_X = 1.1;
+const DRIFT_PHASE_Y = 0.8;
+const DRIFT_AMPLITUDE = 2;
 
 /** Advance the fly transition (if one is running) and, once it's not, the
  * idle/focus camera lerp. Returns the alpha values the draw pass needs. */
@@ -35,9 +44,9 @@ function advanceFrameCamera(cam, fly, refs, scene, opts) {
  * the focused-folder/zoomed-file preview anchors glued to their star. */
 function updateStarPositions(activeScene, t, W, H, fly, refs) {
   activeScene.rootStars.forEach((s, i) => {
-    const drift = Math.sin(t * 0.015 + i * 1.1) * 2;
+    const drift = Math.sin(t * DRIFT_SPEED_X + i * DRIFT_PHASE_X) * DRIFT_AMPLITUDE;
     s.x = W / 2 + s.ox + drift;
-    s.y = H / 2 + s.oy + Math.cos(t * 0.012 + i * 0.8) * 2;
+    s.y = H / 2 + s.oy + Math.cos(t * DRIFT_SPEED_Y + i * DRIFT_PHASE_Y) * DRIFT_AMPLITUDE;
   });
   if (fly) return;
   const ff2 = refs.focusedFolderRef.current;
@@ -87,7 +96,7 @@ function renderFrame(ctx, activeScene, cam, refs, t, w2s, showLabels, W, H, alph
 /** Screen size (via a ResizeObserver on the canvas's parent) + the
  * world<->screen projection and fit-zoom math that depend on it. */
 function useFolderCameraSizing(refs) {
-  const [size, setSize] = useState({ w: 800, h: 600 });
+  const [size, setSize] = useState({ w: DEFAULT_CANVAS_W, h: DEFAULT_CANVAS_H });
 
   useEffect(() => {
     const el = refs.canvasRef.current?.parentElement;

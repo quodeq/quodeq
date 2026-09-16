@@ -1,4 +1,5 @@
 import { rgb } from '../core/galaxyCore.js';
+import { clampTooltipToViewport } from '../core/tooltipPlacement.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { countDescendants } from './galaxyFolderScene.js';
 import { t } from '../../../../strings/index.js';
@@ -52,7 +53,8 @@ export function createTooltipUpdater(refs) {
       : isFocused ? t('map.clickToEnterFolder') : t('map.clickToFocus');
     el.innerHTML = `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${escapeHtml(name)}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(hint)}</div>`;
     el.style.display = 'block';
-    el.style.left = Math.min(cx + 16, window.innerWidth - 200) + 'px';
-    el.style.top = Math.min(cy + 16, window.innerHeight - 160) + 'px';
+    const { left, top } = clampTooltipToViewport(cx, cy, window.innerWidth, window.innerHeight);
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
   };
 }

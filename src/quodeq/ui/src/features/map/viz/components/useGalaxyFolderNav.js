@@ -1,5 +1,6 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { buildFolderScene, buildNavPath } from './galaxyFolderScene.js';
+import { DEFAULT_CANVAS_W, DEFAULT_CANVAS_H } from '../core/galaxyTunables.js';
 
 /** Every long-lived ref GalaxyFolderView's nav/camera/event code shares —
  * one bundle so a click handler, the animation loop and this hook's own
@@ -50,7 +51,7 @@ function useCurrentSceneMemo(node, refs, navVersion) {
     if (refs.sceneRef.current && refs.sceneRef.current._node === currentNode) {
       return refs.sceneRef.current;
     }
-    const s = buildFolderScene(currentNode, 800, 600);
+    const s = buildFolderScene(currentNode, DEFAULT_CANVAS_W, DEFAULT_CANVAS_H);
     s._node = currentNode;
     refs.sceneRef.current = s;
     return s;
