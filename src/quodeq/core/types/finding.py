@@ -37,6 +37,7 @@ class Finding:
     context: str | None = None
     dimension: str | None = None
     violation_type: str | None = None
+    violation_type_raw: str | None = None
     scope: str | None = None
     # 0..100. Default 100 means "scanner is fully sure this is real".
     # Lower values flag noise (path role, project shape, precedent) the
