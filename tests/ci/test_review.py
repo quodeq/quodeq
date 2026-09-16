@@ -1,14 +1,27 @@
 """Tests for quodeq review (local PR review)."""
 from __future__ import annotations
 
+import argparse
 import json
+import subprocess as sp
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quodeq._cli_evaluation import run_diff_evaluation
+from quodeq.ci.review import (
+    ReviewError,
+    detect_pr,
+    get_github_token,
+    get_repo_info,
+    handle_review,
+    snapshot_run_dirs,
+)
+from quodeq.cli_parser import build_parser
+from quodeq.services.dismissed import dismiss_finding
+
 
 def test_detect_pr_reads_gh_output():
-    from quodeq.ci.review import detect_pr
     mock_result = MagicMock()
     mock_result.stdout = json.dumps({"number": 42, "baseRefName": "develop"})
     mock_result.returncode = 0
@@ -19,8 +32,6 @@ def test_detect_pr_reads_gh_output():
 
 
 def test_detect_pr_raises_when_no_pr_found():
-    from quodeq.ci.review import detect_pr, ReviewError
-    import subprocess as sp
     error = sp.CalledProcessError(1, ["gh"], stderr="no pull requests found for branch")
     with patch("quodeq.ci.review.subprocess.run", side_effect=error):
         with pytest.raises(ReviewError) as excinfo:
@@ -29,7 +40,6 @@ def test_detect_pr_raises_when_no_pr_found():
 
 
 def test_detect_pr_raises_when_gh_missing():
-    from quodeq.ci.review import detect_pr, ReviewError
     with patch("quodeq.ci.review.subprocess.run", side_effect=FileNotFoundError):
         with pytest.raises(ReviewError) as excinfo:
             detect_pr()
@@ -37,7 +47,6 @@ def test_detect_pr_raises_when_gh_missing():
 
 
 def test_get_github_token_reads_gh_output():
-    from quodeq.ci.review import get_github_token
     mock_result = MagicMock()
     mock_result.stdout = "ghp_test_token\n"
     mock_result.returncode = 0
@@ -46,8 +55,6 @@ def test_get_github_token_reads_gh_output():
 
 
 def test_get_github_token_raises_when_not_logged_in():
-    from quodeq.ci.review import get_github_token, ReviewError
-    import subprocess as sp
     error = sp.CalledProcessError(1, ["gh"], stderr="auth required")
     with patch("quodeq.ci.review.subprocess.run", side_effect=error):
         with pytest.raises(ReviewError) as excinfo:
@@ -56,7 +63,6 @@ def test_get_github_token_raises_when_not_logged_in():
 
 
 def test_get_repo_info_returns_owner_and_name():
-    from quodeq.ci.review import get_repo_info
     mock_result = MagicMock()
     mock_result.stdout = json.dumps({"owner": {"login": "quodeq"}, "name": "quodeq"})
     mock_result.returncode = 0
@@ -67,13 +73,11 @@ def test_get_repo_info_returns_owner_and_name():
 
 
 def test_snapshot_run_dirs_empty_when_nonexistent(tmp_path):
-    from quodeq.ci.review import snapshot_run_dirs
     result = snapshot_run_dirs(tmp_path / "does-not-exist")
     assert result == set()
 
 
 def test_snapshot_run_dirs_finds_run_dirs_by_evidence(tmp_path):
-    from quodeq.ci.review import snapshot_run_dirs
 
     (tmp_path / "project-a" / "run-1" / "evidence").mkdir(parents=True)
     (tmp_path / "project-a" / "run-2" / "evidence").mkdir(parents=True)
@@ -87,7 +91,6 @@ def test_snapshot_run_dirs_finds_run_dirs_by_evidence(tmp_path):
 
 def test_review_subcommand_parses(tmp_path):
     """The review subcommand should be registered in the top-level parser."""
-    from quodeq.cli_parser import build_parser
     parser = build_parser()
     args = parser.parse_args(["review", "--pr", "42", "--dry-run"])
     assert args.command == "review"
@@ -96,7 +99,6 @@ def test_review_subcommand_parses(tmp_path):
 
 
 def test_review_subcommand_defaults():
-    from quodeq.cli_parser import build_parser
     parser = build_parser()
     args = parser.parse_args(["review"])
     assert args.command == "review"
@@ -108,9 +110,6 @@ def test_review_subcommand_defaults():
 def test_handle_review_default_does_not_pass_dimensions(tmp_path):
     """When no --dimensions flag is given, handle_review must pass
     dimensions=None so the evaluate entry defaults to all dimensions."""
-    from unittest.mock import MagicMock, patch
-    import json
-    import argparse
 
     args = argparse.Namespace(
         pr=None,
@@ -135,9 +134,6 @@ def test_handle_review_default_does_not_pass_dimensions(tmp_path):
 
 def test_handle_review_expands_dimension_alias(tmp_path):
     """When --dimensions sec is given, handle_review expands it to 'security'."""
-    from unittest.mock import MagicMock, patch
-    import json
-    import argparse
 
     args = argparse.Namespace(
         pr=None,
@@ -162,8 +158,6 @@ def test_handle_review_expands_dimension_alias(tmp_path):
 
 def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkeypatch):
     """quodeq review must call evaluate --diff-from origin/<base>, not --incremental."""
-    import argparse
-    from quodeq.ci.review import handle_review
 
     captured_calls: list[dict] = []
 
@@ -205,9 +199,6 @@ def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys)
     review `quodeq review` builds from evidence JSONL -- same suppression
     contract as `ci report --from-evidence` (both read raw evidence, no
     scored reports)."""
-    import argparse
-    from quodeq.ci.review import handle_review
-    from quodeq.services.dismissed import dismiss_finding
 
     output_dir = tmp_path / "out"
     project_dir = output_dir / "proj"
@@ -248,9 +239,6 @@ def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys)
 def test_handle_review_time_limit_zero_means_unlimited(tmp_path):
     """--time-limit 0 is documented as unlimited; the `or 300` fallback must
     not swallow it (same falsy-drop bug as the dashboard's unlimited runs)."""
-    from unittest.mock import MagicMock, patch
-    import json
-    import argparse
 
     args = argparse.Namespace(
         pr=None,
@@ -276,8 +264,6 @@ def test_handle_review_time_limit_zero_means_unlimited(tmp_path):
 def test_run_diff_evaluation_builds_evaluate_namespace(tmp_path):
     """The typed entry hands the REAL parser an evaluate argv; assert the
     resulting namespace fields (argv round-trip stays inside the CLI pkg)."""
-    from unittest.mock import patch
-    from quodeq._cli_evaluation import run_diff_evaluation
 
     captured = {}
 
@@ -301,8 +287,6 @@ def test_run_diff_evaluation_builds_evaluate_namespace(tmp_path):
 
 
 def test_run_diff_evaluation_defaults(tmp_path):
-    from unittest.mock import patch
-    from quodeq._cli_evaluation import run_diff_evaluation
 
     captured = {}
 

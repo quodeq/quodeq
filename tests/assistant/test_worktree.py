@@ -5,6 +5,7 @@ from quodeq.assistant.worktree import (
 from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
+import shutil as _shutil
 
 
 @pytest.fixture()
@@ -92,7 +93,6 @@ def test_for_session_sanitizes_project_segment(repo, tmp_path):
 
 
 def test_remove_fallback_when_dir_deleted_out_of_band(manager, repo):
-    import shutil as _shutil
     _shutil.rmtree(manager.path)
     manager.remove()  # must not raise; prunes and deletes the branch
     out = _run(["git", "-C", str(repo), "branch", "--list", manager.branch])
