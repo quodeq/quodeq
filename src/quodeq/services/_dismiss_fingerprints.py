@@ -36,6 +36,7 @@ from quodeq.services._wiring import (
     read_finding_details_from_json_eval,
     read_run_status_json,
 )
+from quodeq.shared.validation import resolve_child_dir
 
 #: Sentinel written once the legacy entries of a project have been upgraded.
 BACKFILL_MARKER = ".dismiss_fingerprints_backfilled"
@@ -94,14 +95,20 @@ def _candidate_runs(
     known, runs started after it are tried last: the user dismissed what a
     run of that time showed, and a later run may hold different code at the
     same line.
+
+    *run_id* comes from the request body. It is matched against the
+    project's real run directories (``resolve_child_dir``), never joined onto
+    the path, so a traversal value names nothing and the walk proceeds
+    without it.
     """
     ordered = run_dirs_newest_first(project_dir) if project_dir.is_dir() else []
     if at is not None:
         before = [r for r in ordered if (_started_at(r) or at) <= at]
         after = [r for r in ordered if r not in before]
         ordered = before + after
-    if run_id:
-        named = project_dir / run_id
+    resolved = resolve_child_dir(project_dir, run_id) if run_id and project_dir.is_dir() else None
+    if resolved is not None:
+        named = Path(resolved)
         ordered = [named] + [r for r in ordered if r != named]
     return ordered
 
