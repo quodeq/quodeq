@@ -1,10 +1,9 @@
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
+import { nf, score1 } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 /** The dimension-scoped stat cards: scope score, spread, violations, weakest
  * principle. */

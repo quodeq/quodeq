@@ -13,14 +13,14 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
 import CompareDuelTrend from './CompareDuelTrend.jsx';
 import CompareDuelDimensionsTable from './CompareDuelDimensionsTable.jsx';
 import CompareDuelShapePanel from './CompareDuelShapePanel.jsx';
 import CompareDuelPrinciples from './CompareDuelPrinciples.jsx';
 import { gapClass, score1, signed1 } from './compareDuelShared.jsx';
+import { nf } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 
 /* One half of the versus header: identity-coloured name, grade-coloured
    score, and the side's vitals. */

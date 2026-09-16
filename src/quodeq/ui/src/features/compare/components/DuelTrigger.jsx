@@ -4,8 +4,8 @@ import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { launcherMenuPos } from './compareLauncherMenu.js';
 import { useLauncherDismiss } from './useLauncherDismiss.js';
+import { score1 } from '../compareFormatters.js';
 
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 function DuelTriggerMenu({ menuRef, pos, pinned, list, setPinned, pick }) {
   return createPortal(

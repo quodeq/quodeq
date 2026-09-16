@@ -14,8 +14,8 @@ import CompareAttentionStrip from './CompareAttentionStrip.jsx';
 import CompareStandingsList from './CompareStandingsList.jsx';
 import CompareRadarPanel from './CompareRadarPanel.jsx';
 import ComparePrincipleCards from './ComparePrincipleCards.jsx';
+import { score1 } from '../compareFormatters.js';
 
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 function buildAttentionItems(dimAttention, onOpenProject, onOpenPrinciple) {
   return dimAttention.map((item) => ({

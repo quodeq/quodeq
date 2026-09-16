@@ -2,8 +2,7 @@
  * Small helpers + the mirrored-bar component shared by CompareDuelView's
  * dimensions table and principles list.
  */
-export const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
-export const signed1 = (g) => (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1));
+export { score1, signed1 } from '../compareFormatters.js';
 
 export function gapClass(gap) {
   if (gap == null || gap === 0) return 'compare-duel__gap--even';

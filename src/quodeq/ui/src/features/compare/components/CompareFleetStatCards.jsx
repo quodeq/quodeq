@@ -2,10 +2,9 @@ import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
+import { nf, score1 } from '../compareFormatters.js';
 
-const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 
 /** The fleet-wide stat cards: scope score, violations, compliance, spread. */
 export default function CompareFleetStatCards({ fleet }) {
