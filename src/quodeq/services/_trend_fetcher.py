@@ -89,20 +89,39 @@ def make_rescoring_fetcher(
 
 def _make_version_for(
     project_dir: Path, project: str, params: ScoringParams,
-    dismissed: set, deleted: set, keys_cache: dict,
+    dismissed: set, deleted: set, load_keys: Callable[[], dict],
     cacheable_run_ids: set[str] | None,
 ) -> Callable[[str], str]:
+    """Per-run scoped version for the cache-backed trend fetcher.
+
+    *load_keys* returns the project's persisted key sets and runs at most
+    once per fetcher, and only when some run's version is not already in
+    ``score_cache.memoized_run_version``: decoding every run's key blobs is
+    the expensive part, and a warm process rarely needs it.
+    """
     from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
     from quodeq.services.score_cache import (  # noqa: PLC0415
-        open_score_cache, run_scoped_version, store_run_keys,
+        memoized_run_version, open_score_cache, remember_run_version,
+        run_scoped_version, store_run_keys, suppression_state_fingerprint,
     )
 
+    state_fp = suppression_state_fingerprint(params, dismissed, deleted)
+    keys_cache: dict | None = None
+
     def version_for(run_id: str) -> str:
+        nonlocal keys_cache
+        cacheable = cacheable_run_ids is None or run_id in cacheable_run_ids
+        if cacheable:
+            memoized = memoized_run_version(project_dir, run_id, state_fp)
+            if memoized is not None:
+                return memoized
+        if keys_cache is None:
+            keys_cache = load_keys()
         keys = keys_cache.get(run_id)
         if keys is None:
             keys = read_run_key_sets(project_dir / run_id)
             keys_cache[run_id] = keys
-            if cacheable_run_ids is None or run_id in cacheable_run_ids:
+            if cacheable:
                 try:
                     with open_score_cache() as _c:
                         store_run_keys(_c, project, run_id, keys[0], keys[1])
@@ -111,7 +130,10 @@ def _make_version_for(
                         "Could not store run keys in score cache for %s/%s",
                         project, run_id, exc_info=True,
                     )
-        return run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
+        version = run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
+        if cacheable:
+            remember_run_version(project_dir, run_id, state_fp, version)
+        return version
 
     return version_for
 
@@ -150,10 +172,10 @@ def _make_heavy_trend_fetcher(
     from quodeq.services.score_cache import load_run_keys_or_empty  # noqa: PLC0415
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
-    keys_cache = load_run_keys_or_empty(project)
 
     version_for = _make_version_for(
-        project_dir, project, params, dismissed, deleted, keys_cache, cacheable_run_ids,
+        project_dir, project, params, dismissed, deleted,
+        lambda: load_run_keys_or_empty(project), cacheable_run_ids,
     )
     is_cacheable = (
         None if cacheable_run_ids is None

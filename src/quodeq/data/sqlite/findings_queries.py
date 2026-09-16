@@ -16,6 +16,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.core.finding_identity import DismissKey, finding_dismiss_keys
+from quodeq.data.sqlite._db_stamp_memo import memoized_by_db_stamp
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME, open_evaluation_db
 
 _logger = logging.getLogger(__name__)
@@ -145,10 +146,22 @@ def read_run_key_sets(run_dir: Path) -> tuple[set[tuple], set[tuple]]:
     ``{(dimension, practice_id, file)}``. Keys come from ALL findings
     regardless of verdict, so a dismiss (which only flips a verdict) never
     changes a run's key set.
+
+    Memoized in-process against the database's on-disk stamp
+    (``_db_stamp_memo``): the project list and every scores call re-read the
+    key sets of each run the score cache does not hold, and hashing every
+    snippet again per request cost more than the rest of the request. Callers
+    get fresh copies, so the memo can never be mutated through a result.
     """
-    db_path = run_dir / "evaluation.db"
-    if not db_path.is_file():
+    keys = memoized_by_db_stamp(
+        run_dir / EVALUATION_DB_FILENAME, lambda: _read_run_key_sets_from_db(run_dir))
+    if keys is None:
         return set(), set()
+    return set(keys[0]), set(keys[1])
+
+
+def _read_run_key_sets_from_db(run_dir: Path) -> tuple[set[tuple], set[tuple]] | None:
+    """Uncached read behind :func:`read_run_key_sets`; None when the db is unreadable."""
     dismiss: set[tuple] = set()
     cls: set[tuple] = set()
     try:
@@ -160,7 +173,7 @@ def read_run_key_sets(run_dir: Path) -> tuple[set[tuple], set[tuple]]:
                     req=req, principle=pid, file=file, line=line, snippet=snippet)
                 cls.add((str(dim or ""), str(pid or ""), str(file or "")))
     except (sqlite3.DatabaseError, RuntimeError):
-        return set(), set()
+        return None
     return dismiss, cls
 
 

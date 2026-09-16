@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,11 @@ from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.suppression_keys import as_dismissed_keys
+from quodeq.services._run_version_memo import (  # noqa: F401 — facade re-export
+    memoized_run_version,
+    remember_run_version,
+    suppression_state_fingerprint as _state_fingerprint,
+)
 from quodeq.services._wiring import load_suppression_rules
 
 # ---------------------------------------------------------------------------
@@ -187,21 +193,79 @@ def per_run_versions(
     and would silently under-invalidate. Non-terminal runs therefore compute
     their scoped version from a fresh ``read_run_key_sets`` each call and never
     write it back, mirroring ``_trend_fetcher.version_for``.
+
+    That immutability also makes a terminal run's version a pure function of
+    its keys and the suppression state, so :func:`memoized_run_version` serves
+    it while that state holds; ``_fill_pending_versions`` computes the rest.
     """
-    from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
     if dismissed is None:
         dismissed = dismissed_keys(project_dir)
     if deleted is None:
         deleted = deleted_keys(project_dir)
-    cached = load_run_keys_or_empty(project)
+    inputs = _VersionInputs.of(params, dismissed, deleted)
     out: list[tuple[str, str, str]] = []
-    for rid, status in runs:
+    pending: list[tuple[int, str, str]] = []
+    for idx, (rid, status) in enumerate(runs):
+        version = memoized_run_version(project_dir, rid, inputs.fingerprint) if status == "complete" else None
+        if version is None:
+            pending.append((idx, rid, status))
+        out.append((rid, status, version or ""))
+    if pending:
+        _fill_pending_versions(out, pending, project_dir, project, inputs)
+    return out
+
+
+@dataclass(frozen=True)
+class _VersionInputs:
+    """Everything but a run's own keys that ``run_scoped_version`` depends on."""
+
+    params: ScoringParams
+    dismissed: "DismissedKeys | set[tuple]"
+    deleted: set[tuple]
+    fingerprint: str
+
+    @classmethod
+    def of(
+        cls, params: ScoringParams, dismissed: "DismissedKeys | set[tuple]", deleted: set[tuple],
+    ) -> "_VersionInputs":
+        return cls(params, dismissed, deleted, suppression_state_fingerprint(params, dismissed, deleted))
+
+
+def _fill_pending_versions(
+    out: list[tuple[str, str, str]], pending: list[tuple[int, str, str]],
+    project_dir: Path, project: str, inputs: _VersionInputs,
+) -> None:
+    """Compute the versions per_run_versions could not serve from the memo.
+
+    Persisted key blobs are loaded only when a terminal run is among them:
+    ``load_run_keys_or_empty`` decodes every run of the project.
+    """
+    from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
+    cached = (
+        load_run_keys_or_empty(project)
+        if any(status == "complete" for _, _, status in pending) else {}
+    )
+    for idx, rid, status in pending:
         terminal = status == "complete"
         keys = cached.get(rid) if terminal else None
         if keys is None:
             keys = read_run_key_sets(project_dir / rid)
             if terminal:
                 store_run_keys_best_effort(project, rid, keys[0], keys[1])
-        out.append(
-            (rid, status, run_scoped_version(params, keys[0], keys[1], dismissed, deleted)))
-    return out
+        version = run_scoped_version(
+            inputs.params, keys[0], keys[1], inputs.dismissed, inputs.deleted)
+        if terminal:
+            remember_run_version(project_dir, rid, inputs.fingerprint, version)
+        out[idx] = (rid, status, version)
+
+
+def suppression_state_fingerprint(
+    params: ScoringParams,
+    dismissed_all: "DismissedKeys | set[tuple]",
+    deleted_all: set[tuple],
+) -> str:
+    """Hash of everything except a run's own keys that feeds run_scoped_version.
+
+    See ``services._run_version_memo``; this facade folds in the params hash.
+    """
+    return _state_fingerprint(_params_fingerprint(params), dismissed_all, deleted_all)
