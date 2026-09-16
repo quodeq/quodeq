@@ -39,4 +39,28 @@ export default [
       'max-params': ['error', { max: 5 }],
     },
   },
+  {
+    // M-TST-9: a plain reassignment of a global in a test survives the test.
+    // vi.stubGlobal is undone after each test by `unstubGlobals: true` in
+    // vitest.config.js; Object.defineProperty and `globalThis.x = ...` are not.
+    files: ['src/**/*.test.jsx'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "AssignmentExpression > MemberExpression.left[object.name=/^(globalThis|global|window)$/]",
+          message: "Use vi.stubGlobal('<name>', value); plain global assignment leaks into later tests.",
+        },
+        {
+          selector: "CallExpression[callee.object.name='Object'][callee.property.name='defineProperty'] > Identifier.arguments:first-child[name=/^(navigator|window|globalThis|document)$/]",
+          message: "Use vi.stubGlobal('<name>', { ...<name>, prop: value }); defineProperty on a global leaks into later tests.",
+        },
+      ],
+    },
+  },
 ];

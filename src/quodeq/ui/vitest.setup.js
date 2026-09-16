@@ -1,3 +1,4 @@
+import { afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 // Stub window.matchMedia — not implemented in JSDOM but required by xterm.js
@@ -29,3 +30,10 @@ if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'func
     clear: () => { Object.keys(store).forEach(k => delete store[k]); },
   };
 }
+
+// Every test starts with an empty localStorage. Tests that seed keys in a
+// beforeEach keep working; tests that forgot to clean up no longer leak
+// into the next file's assertions.
+afterEach(() => {
+  try { localStorage.clear(); } catch { /* storage shim absent */ }
+});

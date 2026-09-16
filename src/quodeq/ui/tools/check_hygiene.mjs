@@ -18,11 +18,11 @@ const UI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BASELINE_PATH = path.join(UI_ROOT, 'tools', 'hygiene_baseline.json');
 const CONFIG_PATH = path.join(UI_ROOT, 'eslint.hygiene.config.js');
 
-const RATCHET_RULES = new Set(['no-unused-vars', 'max-params']);
+const RATCHET_RULES = new Set(['no-unused-vars', 'max-params', 'no-restricted-syntax']);
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 157; // set to the total printed by --update; lower it as entries burn down
+const TOTAL_CEILING = 155; // set to the total printed by --update; lower it as entries burn down
 
 async function collectCounts() {
   const eslint = new ESLint({

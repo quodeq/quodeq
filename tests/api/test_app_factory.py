@@ -6,6 +6,11 @@ from unittest.mock import MagicMock, patch
 
 
 from quodeq.api.app import create_app, _default_provider
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 
 class _StubProvider:

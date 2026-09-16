@@ -42,14 +42,11 @@ function Probe() {
 }
 
 describe('OllamaLogProvider openLog fresh spec', () => {
-  let originalEventSource;
   beforeEach(() => {
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     addWindowSpy.mockClear();
   });
   afterEach(() => {
-    globalThis.EventSource = originalEventSource;
     vi.restoreAllMocks();
   });
 

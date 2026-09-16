@@ -15,6 +15,10 @@ from tests.conftest import DummyProcess
 from tests.dashboard._runner_helpers import TEST_PORT as _TEST_PORT
 from tests.dashboard._runner_helpers import _make_config, _setup_dashboard
 
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
+
 
 def test_validate_paths_missing_reports(tmp_path: Path):
     cfg = _make_config(tmp_path, reports_dir=tmp_path / "missing")

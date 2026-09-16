@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -15,7 +14,7 @@ from quodeq.data.events.writer import EventLogWriter
 
 
 @pytest.fixture
-def app(tmp_path: Path) -> Flask:
+def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Flask:
     app = Flask(__name__)
     provider = MagicMock()
     run_dir = tmp_path / "run-e2e"
@@ -24,7 +23,7 @@ def app(tmp_path: Path) -> Flask:
     app.config["_provider"] = provider
     app.config["_run_dir"] = run_dir
     register_run_events_routes(app)
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"  # drain-once mode for fast tests
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")  # drain-once mode for fast tests
     return app
 
 

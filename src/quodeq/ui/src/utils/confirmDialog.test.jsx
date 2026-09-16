@@ -24,14 +24,16 @@ describe('confirmDialog', () => {
     expect(await promise).toBe(false);
   });
 
-  it('resolves false on Escape and true on Enter', async () => {
-    const p1 = confirmDialog({ title: 't', message: 'm' });
+  it('resolves false on Escape', async () => {
+    const promise = confirmDialog({ title: 't', message: 'm' });
     pressKey('Escape');
-    expect(await p1).toBe(false);
+    expect(await promise).toBe(false);
+  });
 
-    const p2 = confirmDialog({ title: 't', message: 'm' });
+  it('resolves true on Enter', async () => {
+    const promise = confirmDialog({ title: 't', message: 'm' });
     pressKey('Enter');
-    expect(await p2).toBe(true);
+    expect(await promise).toBe(true);
   });
 
   it('resolves false on outside (overlay) click', async () => {

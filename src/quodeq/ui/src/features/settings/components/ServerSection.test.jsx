@@ -20,7 +20,7 @@ function makeWrapper() {
 
 describe('ServerSection', () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    vi.stubGlobal('fetch', vi.fn());
   });
   afterEach(() => {
     vi.restoreAllMocks();

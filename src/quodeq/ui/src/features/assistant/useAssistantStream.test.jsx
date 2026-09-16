@@ -13,7 +13,7 @@ class MockES {
   close() { this.readyState = 2; this.closed = true; }
 }
 
-beforeEach(() => { vi.useFakeTimers(); MockES.instances = []; globalThis.EventSource = MockES; });
+beforeEach(() => { vi.useFakeTimers(); MockES.instances = []; vi.stubGlobal('EventSource', MockES); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 function flush() { act(() => { vi.advanceTimersByTime(200); }); }

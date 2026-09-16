@@ -10,7 +10,7 @@ let calls;
 
 beforeEach(() => {
   calls = [];
-  globalThis.fetch = vi.fn(async (url, opts) => {
+  vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
     calls.push({ url, opts });
     return {
       ok: true,
@@ -25,7 +25,7 @@ beforeEach(() => {
         stale: false,
       }),
     };
-  });
+  }));
 });
 
 afterEach(() => {
@@ -143,7 +143,7 @@ describe('shared repo API client', () => {
     // Error carries status/kind/existingProjectId, which the generic
     // request() helper does not attach.
     it('pullSharedProject throws an Error carrying status/kind/existingProjectId on a 409 collision', async () => {
-      globalThis.fetch = vi.fn(async () => ({
+      vi.stubGlobal('fetch', vi.fn(async () => ({
         ok: false,
         status: 409,
         json: async () => ({
@@ -153,7 +153,7 @@ describe('shared repo API client', () => {
           existingProjectId: 'abc-123',
           projectName: 'demo-repo',
         }),
-      }));
+      })));
       await expect(shared.pullSharedProject('proj1')).rejects.toMatchObject({
         status: 409,
         code: 'PROJECT_EXISTS',
@@ -168,7 +168,7 @@ describe('shared repo API client', () => {
       expect(calls[0].opts.signal).toBeInstanceOf(AbortSignal);
       const timeoutErr = new Error('signal timed out');
       timeoutErr.name = 'TimeoutError';
-      globalThis.fetch = vi.fn(async () => { throw timeoutErr; });
+      vi.stubGlobal('fetch', vi.fn(async () => { throw timeoutErr; }));
       await expect(shared.pullSharedProject('proj1')).rejects.toThrow(/timed out/i);
     });
   });

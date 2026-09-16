@@ -9,6 +9,23 @@ vi.mock('../../api/assistant.js', () => ({
 }));
 import { applyAssistantAction, rejectAssistantAction } from '../../api/assistant.js';
 
+// Each test that listens for the applied event registers through this helper;
+// the afterEach below removes whatever is still registered.
+const appliedListeners = [];
+function listenForApplied() {
+  const events = [];
+  const handler = (e) => events.push(e);
+  window.addEventListener('quodeq:assistant-action-applied', handler);
+  appliedListeners.push(handler);
+  return events;
+}
+afterEach(() => {
+  for (const handler of appliedListeners.splice(0)) {
+    window.removeEventListener('quodeq:assistant-action-applied', handler);
+  }
+});
+
+
 const action = { actionId: 'a1', actionType: 'create_standard',
   summary: { id: 'rfc7807', name: 'RFC7807 Errors', principleCount: 3 } };
 
@@ -50,9 +67,7 @@ it('renders a verify_finding summary', () => {
 });
 
 it('dispatches quodeq:assistant-action-applied on successful apply', async () => {
-  const events = [];
-  const handler = (e) => events.push(e);
-  window.addEventListener('quodeq:assistant-action-applied', handler);
+  const events = listenForApplied();
   const dismissAction = { actionId: 'a3', actionType: 'dismiss_finding',
     summary: { req: 'r1', file: 'a.py', line: 3, reason: 'fp' } };
   render(<ActionPreviewCard action={dismissAction} />);
@@ -60,13 +75,10 @@ it('dispatches quodeq:assistant-action-applied on successful apply', async () =>
   await waitFor(() => expect(applyAssistantAction).toHaveBeenCalledWith('a3'));
   await waitFor(() => expect(events.length).toBe(1));
   expect(events[0].detail.actionType).toBe('dismiss_finding');
-  window.removeEventListener('quodeq:assistant-action-applied', handler);
 });
 
 it('includes the scores and delta from the apply response in the dispatched event', async () => {
-  const events = [];
-  const handler = (e) => events.push(e);
-  window.addEventListener('quodeq:assistant-action-applied', handler);
+  const events = listenForApplied();
   const scores = { dimensions: [{ dimension: 'security', overallScore: 80 }] };
   const delta = {
     kind: 'dismiss', dismissed: { req: 'R1', file: 'a.py', line: 3 },
@@ -81,5 +93,4 @@ it('includes the scores and delta from the apply response in the dispatched even
   await waitFor(() => expect(events.length).toBe(1));
   expect(events[0].detail.delta).toEqual(delta);
   expect(events[0].detail.scores).toEqual(scores);
-  window.removeEventListener('quodeq:assistant-action-applied', handler);
 });

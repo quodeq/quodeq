@@ -11,7 +11,7 @@ let calls;
 
 beforeEach(() => {
   calls = [];
-  globalThis.fetch = vi.fn(async (url, opts) => {
+  vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
     calls.push({ url, opts });
     return {
       ok: true,
@@ -26,7 +26,7 @@ beforeEach(() => {
         stale: false,
       }),
     };
-  });
+  }));
 });
 
 afterEach(() => {
@@ -45,7 +45,7 @@ describe('shared repo API client', () => {
     // milliseconds -- relativeTime()/`new Date()` expect ms, so passing
     // seconds straight through renders as a 1970 date ("57 years ago").
     it('getSharedStatus converts lastSynced from epoch seconds to epoch milliseconds', async () => {
-      globalThis.fetch = vi.fn(async () => ({
+      vi.stubGlobal('fetch', vi.fn(async () => ({
         ok: true,
         json: async () => ({
           configured: true,
@@ -54,7 +54,7 @@ describe('shared repo API client', () => {
           syncing: false,
           publish: { state: 'idle' },
         }),
-      }));
+      })));
 
       const result = await shared.getSharedStatus();
 
@@ -62,10 +62,10 @@ describe('shared repo API client', () => {
     });
 
     it('getSharedStatus normalizes a null/absent lastSynced to null', async () => {
-      globalThis.fetch = vi.fn(async () => ({
+      vi.stubGlobal('fetch', vi.fn(async () => ({
         ok: true,
         json: async () => ({ configured: false, url: null, lastSynced: null, publish: {} }),
-      }));
+      })));
 
       const result = await shared.getSharedStatus();
 
@@ -117,7 +117,7 @@ describe('shared repo API client', () => {
       // expected to convert these to epoch-milliseconds before returning.
       const publishedAtSeconds = 1752750000;
       const lastSyncedSeconds = 1752751800;
-      globalThis.fetch = vi.fn(async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => {
         return {
           ok: true,
           json: async () => ({
@@ -136,7 +136,7 @@ describe('shared repo API client', () => {
             stale: true,
           }),
         };
-      });
+      }));
 
       const result = await shared.sharedListProjects();
 
@@ -163,14 +163,14 @@ describe('shared repo API client', () => {
     });
 
     it('sharedListProjects normalizes a null/absent publishedAt and lastSynced to null', async () => {
-      globalThis.fetch = vi.fn(async () => ({
+      vi.stubGlobal('fetch', vi.fn(async () => ({
         ok: true,
         json: async () => ({
           projects: [{ id: 'proj1', name: 'Test Project', publishedAt: null, source: 'shared' }],
           lastSynced: null,
           stale: false,
         }),
-      }));
+      })));
 
       const result = await shared.sharedListProjects();
 
@@ -197,12 +197,12 @@ describe('shared repo API client', () => {
     // epoch-seconds -> epoch-milliseconds conversion as every other shared
     // timestamp.
     it('sharedGetProjectInfo passes through publishedBy and converts publishedAt to epoch milliseconds', async () => {
-      globalThis.fetch = vi.fn(async () => ({
+      vi.stubGlobal('fetch', vi.fn(async () => ({
         ok: true,
         json: async () => ({
           id: 'proj1', name: 'proj1', publishedBy: 'ana', publishedAt: 1752751800, source: 'shared',
         }),
-      }));
+      })));
 
       const result = await shared.sharedGetProjectInfo('proj1');
 
@@ -212,10 +212,10 @@ describe('shared repo API client', () => {
     });
 
     it('sharedGetProjectInfo normalizes a missing publishedBy/publishedAt to null', async () => {
-      globalThis.fetch = vi.fn(async () => ({
+      vi.stubGlobal('fetch', vi.fn(async () => ({
         ok: true,
         json: async () => ({ id: 'proj1', name: 'proj1' }),
-      }));
+      })));
 
       const result = await shared.sharedGetProjectInfo('proj1');
 

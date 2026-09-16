@@ -36,7 +36,7 @@ function renderStreamAndQuery(jobId, key) {
 
 describe("useRunEventStream (cache-writer)", () => {
   beforeEach(() => {
-    global.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.last = null;
   });
 

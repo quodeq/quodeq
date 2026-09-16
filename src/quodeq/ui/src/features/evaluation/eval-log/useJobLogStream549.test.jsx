@@ -45,15 +45,12 @@ function Probe({ jobId }) {
 }
 
 describe('#549 useJobLogStream inactivity timer', () => {
-  let originalEventSource;
   beforeEach(() => {
     vi.useFakeTimers();
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
   });
   afterEach(() => {
-    globalThis.EventSource = originalEventSource;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

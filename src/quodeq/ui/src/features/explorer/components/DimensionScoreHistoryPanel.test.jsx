@@ -12,12 +12,12 @@ const TREND = [
 // *direct* JSX children; ResponsiveContainer needs a ResizeObserver and a
 // non-zero container size to actually lay the bars out under jsdom.
 function stubChartLayout() {
-  global.ResizeObserver = class {
+  vi.stubGlobal('ResizeObserver', class {
     constructor(cb) { this.cb = cb; }
     observe(el) { this.cb([{ target: el, contentRect: { width: 400, height: 160 } }]); }
     unobserve() {}
     disconnect() {}
-  };
+  });
   Element.prototype.getBoundingClientRect = function () {
     return { width: 400, height: 160, top: 0, left: 0, bottom: 160, right: 400, x: 0, y: 0, toJSON() {} };
   };

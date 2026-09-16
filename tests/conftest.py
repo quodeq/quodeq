@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Iterator
 
 import pytest
+from unittest import mock
 
 from quodeq.data.cache_store.index import close_all_for_tests
 from quodeq.data.fs._index_cache import clear_index_cache
@@ -40,6 +43,41 @@ def deeply_nested_json() -> str:
         f"this interpreter parses {_STACK_OVERFLOW_NESTING} levels of JSON "
         "nesting without overflowing; the RecursionError regression cannot be "
         "exercised here")
+
+
+@pytest.fixture(autouse=True)
+def _env_leak_guard() -> Iterator[None]:
+    """Fail any test that leaves os.environ different from how it found it.
+
+    Set env through ``monkeypatch.setenv`` / ``monkeypatch.delenv`` (undone
+    before this teardown runs) or ``unittest.mock.patch.dict``; a bare
+    ``os.environ[...] = ...`` in one test silently reconfigures every test
+    that runs after it in the same process.
+    """
+    # pytest rewrites PYTEST_CURRENT_TEST for every phase (setup/call/teardown).
+    before = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
+    yield
+    after = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
+    added = sorted(set(after) - set(before))
+    removed = sorted(set(before) - set(after))
+    changed = sorted(k for k in set(before) & set(after) if before[k] != after[k])
+    assert not (added or removed or changed), (
+        "Test leaked os.environ changes; use monkeypatch.setenv/delenv, or request "
+        "the restore_environ fixture when the code under test sets variables itself.\n"
+        f"  added: {added}\n  removed: {removed}\n  changed: {changed}"
+    )
+
+
+@pytest.fixture
+def restore_environ() -> Iterator[None]:
+    """Restore os.environ wholesale after the test.
+
+    For tests whose code under test adds variables itself (PYTHONUTF8 from
+    configure_stdio_utf8, QUODEQ_WEBVIEW_TOKEN from the dashboard server).
+    monkeypatch cannot undo a key that was absent at setup, patch.dict can.
+    """
+    with mock.patch.dict(os.environ):
+        yield
 
 
 @pytest.fixture(autouse=True)

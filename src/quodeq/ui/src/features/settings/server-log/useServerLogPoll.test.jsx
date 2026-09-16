@@ -25,7 +25,7 @@ function renderProbe(active) {
 
 describe('useServerLogPoll', () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    vi.stubGlobal('fetch', vi.fn());
   });
   afterEach(() => {
     vi.restoreAllMocks();

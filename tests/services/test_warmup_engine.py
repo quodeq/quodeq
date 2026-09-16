@@ -10,6 +10,27 @@ import threading
 import time
 
 from quodeq.services._warmup import WarmupEngine
+import pytest
+
+
+@pytest.fixture
+def make_engine():
+    """Build engines and stop every worker thread at teardown.
+
+    ``WarmupEngine.start`` spawns a daemon thread; a test that never stops it
+    leaves the thread polling until the process exits, which under xdist
+    means for the rest of the worker's life.
+    """
+    created: list[WarmupEngine] = []
+
+    def _make(**kwargs) -> WarmupEngine:
+        eng = WarmupEngine(**kwargs)
+        created.append(eng)
+        return eng
+
+    yield _make
+    for eng in created:
+        eng.reset_for_tests()
 
 
 def _wait_until(pred, timeout=5.0):
@@ -21,7 +42,7 @@ def _wait_until(pred, timeout=5.0):
     return False
 
 
-def test_start_enumerates_newest_first_and_processes_all(tmp_path):
+def test_start_enumerates_newest_first_and_processes_all(tmp_path, make_engine):
     order = []
     done = threading.Event()
 
@@ -31,7 +52,7 @@ def test_start_enumerates_newest_first_and_processes_all(tmp_path):
             done.set()
 
     listing = [("old", "2026-01-01"), ("newest", "2026-08-01"), ("mid", "2026-05-01")]
-    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: listing)
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: listing)
     eng.start(str(tmp_path))
 
     assert done.wait(5)
@@ -41,12 +62,12 @@ def test_start_enumerates_newest_first_and_processes_all(tmp_path):
     assert snap == {"active": False, "projectsDone": 3, "projectsTotal": 3, "currentProjectName": None}
 
 
-def test_snapshot_is_none_before_start(tmp_path):
-    eng = WarmupEngine(warm_fn=lambda *_: None, list_fn=lambda _rd: [])
+def test_snapshot_is_none_before_start(tmp_path, make_engine):
+    eng = make_engine(warm_fn=lambda *_: None, list_fn=lambda _rd: [])
     assert eng.snapshot() is None
 
 
-def test_enqueue_is_noop_before_start_and_dedupes_while_queued(tmp_path):
+def test_enqueue_is_noop_before_start_and_dedupes_while_queued(tmp_path, make_engine):
     release = threading.Event()
     seen = []
 
@@ -54,7 +75,7 @@ def test_enqueue_is_noop_before_start_and_dedupes_while_queued(tmp_path):
         seen.append(pid)
         release.wait(5)
 
-    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: [])
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [])
     eng.enqueue("p1")  # before start: no-op, no crash
     eng.start(str(tmp_path))
     eng.enqueue("p1")
@@ -66,7 +87,7 @@ def test_enqueue_is_noop_before_start_and_dedupes_while_queued(tmp_path):
     assert seen == ["p1"]
 
 
-def test_failing_project_does_not_stop_the_queue(tmp_path):
+def test_failing_project_does_not_stop_the_queue(tmp_path, make_engine):
     seen = []
 
     def warm(reports_dir, pid):
@@ -74,20 +95,20 @@ def test_failing_project_does_not_stop_the_queue(tmp_path):
         if pid == "bad":
             raise RuntimeError("boom")
 
-    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: [("bad", "2026-08-01"), ("good", "2026-07-01")])
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [("bad", "2026-08-01"), ("good", "2026-07-01")])
     eng.start(str(tmp_path))
     assert _wait_until(lambda: eng.snapshot() is not None and eng.snapshot()["projectsDone"] == 2)
     assert seen == ["bad", "good"]
 
 
-def test_failed_id_is_backed_off_from_reenqueue(tmp_path):
+def test_failed_id_is_backed_off_from_reenqueue(tmp_path, make_engine):
     calls = []
 
     def warm(reports_dir, pid):
         calls.append(pid)
         raise RuntimeError("boom")
 
-    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: [])
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [])
     eng.start(str(tmp_path))
     eng.enqueue("p1")
     assert _wait_until(lambda: len(calls) == 1)
@@ -97,7 +118,7 @@ def test_failed_id_is_backed_off_from_reenqueue(tmp_path):
     assert calls == ["p1"]
 
 
-def test_progress_shows_current_project_while_working(tmp_path):
+def test_progress_shows_current_project_while_working(tmp_path, make_engine):
     entered = threading.Event()
     release = threading.Event()
 
@@ -105,7 +126,7 @@ def test_progress_shows_current_project_while_working(tmp_path):
         entered.set()
         release.wait(5)
 
-    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: [("p1", "2026-08-01")])
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [("p1", "2026-08-01")])
     eng.start(str(tmp_path))
     assert entered.wait(5)
     snap = eng.snapshot()
@@ -115,7 +136,7 @@ def test_progress_shows_current_project_while_working(tmp_path):
     release.set()
 
 
-def test_reset_for_tests_stops_worker_and_allows_restart(tmp_path):
+def test_reset_for_tests_stops_worker_and_allows_restart(tmp_path, make_engine):
     """Verify reset_for_tests() actually joins the worker thread and allows restart."""
     calls = []
     release1 = threading.Event()
@@ -128,7 +149,7 @@ def test_reset_for_tests_stops_worker_and_allows_restart(tmp_path):
         else:
             release2.wait(5)
 
-    eng = WarmupEngine(warm_fn=warm, list_fn=lambda _rd: [])
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [])
     eng.start(str(tmp_path))
     eng.enqueue("p1")
     assert _wait_until(lambda: calls == ["p1"])
@@ -147,9 +168,9 @@ def test_reset_for_tests_stops_worker_and_allows_restart(tmp_path):
     assert calls == ["p1", "p2"]
 
 
-def test_start_is_a_noop_when_score_cache_disabled(tmp_path, monkeypatch):
+def test_start_is_a_noop_when_score_cache_disabled(tmp_path, monkeypatch, make_engine):
     monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
-    eng = WarmupEngine(warm_fn=lambda *_: None, list_fn=lambda _rd: [("p1", "2026-08-01")])
+    eng = make_engine(warm_fn=lambda *_: None, list_fn=lambda _rd: [("p1", "2026-08-01")])
     eng.start(str(tmp_path))
     assert eng.snapshot() is None
 
@@ -170,7 +191,7 @@ def test_default_warm_project_runs_against_a_real_project_dir(tmp_path, monkeypa
     _warm_project(str(tmp_path), "proj")  # must not raise
 
 
-def test_bad_repository_info_json_does_not_kill_worker(tmp_path):
+def test_bad_repository_info_json_does_not_kill_worker(tmp_path, make_engine):
     """Verify that invalid repository_info.json doesn't crash the worker."""
     import json
 
@@ -184,7 +205,7 @@ def test_bad_repository_info_json_does_not_kill_worker(tmp_path):
     def warm(reports_dir, pid):
         seen.append(pid)
 
-    eng = WarmupEngine(
+    eng = make_engine(
         warm_fn=warm,
         list_fn=lambda _rd: [("bad_project", "2026-08-01"), ("good_project", "2026-07-01")],
     )
