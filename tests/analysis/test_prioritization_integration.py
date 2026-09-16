@@ -12,7 +12,7 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
-# See test_adaptive_scaling_integration.py for the Windows skip rationale.
+# See test_scout_burst_integration.py for the Windows skip rationale.
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="SubagentPool FileQueue lock path needs Windows-specific work",

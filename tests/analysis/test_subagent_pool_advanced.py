@@ -16,11 +16,12 @@ from quodeq.analysis.subagents._pool_scaling import (
     compute_scale_up,
     maybe_scale_up,
 )
+from quodeq.shared import cancellation
 
 
-from tests._analysis_helpers import _fake_run_analysis  # noqa: F401 — shared helper
+from tests._analysis_helpers import _FixedRemainingQueue, _fake_run_analysis  # noqa: F401 — shared helper
 
-# See test_adaptive_scaling_integration.py for the Windows skip rationale.
+# See test_scout_burst_integration.py for the Windows skip rationale.
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="SubagentPool FileQueue lock path needs Windows-specific work",
@@ -30,73 +31,89 @@ _TEST_DIMENSION = "security"
 
 
 class TestComputeScaleUp:
-    """Once the scout gate opens, every free slot launches; only the queue
-    size bounds the burst, never a files-per-agent estimate."""
+    """Once the scout gate opens, every free slot launches; only the files
+    left in the queue bound the count, never a files-per-agent estimate."""
 
     def test_no_remaining_returns_zero(self):
-        assert compute_scale_up(0, 5) == 0
+        assert compute_scale_up(0, 4) == 0
 
     def test_small_queue_still_fills_every_slot(self):
         # 25 files used to fit "one batch" and spawn nothing; now all 4
         # free slots launch and share the queue.
-        assert compute_scale_up(25, 5) == 4
+        assert compute_scale_up(25, 4) == 4
 
-    def test_burst_never_exceeds_remaining_files(self):
-        assert compute_scale_up(2, 5) == 2
+    def test_never_exceeds_remaining_files(self):
+        assert compute_scale_up(2, 4) == 2
 
-    def test_burst_capped_by_max_agents(self):
-        assert compute_scale_up(200, 3) == 2
+    def test_capped_by_free_slots(self):
+        assert compute_scale_up(200, 2) == 2
 
-    def test_max_agents_1_never_scales(self):
-        assert compute_scale_up(500, 1) == 0
-
-
-class _FixedQueue:
-    """WorkQueue stand-in that reports a fixed remaining count."""
-
-    def __init__(self, remaining: int) -> None:
-        self._remaining = remaining
-
-    def remaining(self) -> int:
-        return self._remaining
+    def test_no_free_slot_never_scales(self):
+        assert compute_scale_up(500, 0) == 0
 
 
 class TestMaybeScaleUp:
     """The scout gate: nothing launches until the scout finishes or times
-    out; then the burst fills every free slot the queue can feed."""
+    out; then every free slot the queue can feed launches at once. The
+    only brakes are the ones should_respawn already enforces."""
 
-    def _ctx(self, tmp_path, remaining: int, submits: list[int]) -> ScaleUpContext:
+    def _ctx(self, tmp_path, remaining: int, submits: list[int], **kw) -> ScaleUpContext:
         return ScaleUpContext(
-            queue=_FixedQueue(remaining), queue_path=tmp_path / "queue.json",
-            submit_fn=lambda: submits.append(1),
+            queue=_FixedRemainingQueue(remaining), queue_path=tmp_path / "queue.json",
+            submit_fn=lambda: submits.append(1), **kw,
         )
 
     def test_scout_still_running_launches_nothing(self, tmp_path):
         submits: list[int] = []
         state = ScaleUpState(pool_start=time.monotonic(), max_duration=0, scout_timeout=30)
 
-        scout_done = maybe_scale_up(set(), state, 5, self._ctx(tmp_path, 15, submits))
+        scout_done = maybe_scale_up(set(), state, 5, self._ctx(tmp_path, 15, submits), running=1)
 
         assert scout_done is False
         assert submits == []
 
-    def test_scout_done_bursts_every_free_slot(self, tmp_path):
+    def test_scout_done_fills_every_slot_including_the_scouts(self, tmp_path):
+        # The scout's slot is free again once it finished: 5 launches, not 4.
         submits: list[int] = []
         state = ScaleUpState(pool_start=time.monotonic(), max_duration=0, scout_timeout=30)
 
-        scout_done = maybe_scale_up({object()}, state, 5, self._ctx(tmp_path, 15, submits))
+        scout_done = maybe_scale_up({object()}, state, 5, self._ctx(tmp_path, 15, submits), running=0)
 
         assert scout_done is True
-        assert len(submits) == 4
+        assert len(submits) == 5
 
-    def test_scout_timeout_bursts_without_waiting_for_scout(self, tmp_path):
+    def test_scout_timeout_fills_the_slots_beside_the_running_scout(self, tmp_path):
         submits: list[int] = []
         state = ScaleUpState(pool_start=time.monotonic() - 31, max_duration=0, scout_timeout=30)
 
-        scout_done = maybe_scale_up(set(), state, 3, self._ctx(tmp_path, 100, submits))
+        scout_done = maybe_scale_up(set(), state, 3, self._ctx(tmp_path, 100, submits), running=1)
 
         assert scout_done is True
         assert len(submits) == 2
+
+    def test_passed_deadline_opens_the_gate_but_launches_nothing(self, tmp_path):
+        submits: list[int] = []
+        state = ScaleUpState(pool_start=time.monotonic(), max_duration=0, scout_timeout=30)
+        ctx = self._ctx(tmp_path, 15, submits, deadline_at=time.monotonic() - 1)
+
+        scout_done = maybe_scale_up({object()}, state, 5, ctx, running=0)
+
+        assert scout_done is True
+        assert submits == []
+
+    def test_cancelled_run_opens_the_gate_but_launches_nothing(self, tmp_path):
+        # A fatal scout error cancels the run before its future resolves;
+        # the gate must then open to zero launches, not n.
+        submits: list[int] = []
+        state = ScaleUpState(pool_start=time.monotonic(), max_duration=0, scout_timeout=30)
+        cancellation.request_cancel()
+        try:
+            scout_done = maybe_scale_up({object()}, state, 5, self._ctx(tmp_path, 15, submits), running=0)
+        finally:
+            cancellation.reset()
+
+        assert scout_done is True
+        assert submits == []
 
 
 def _recording_fake(seen: list[AnalysisConfig]):

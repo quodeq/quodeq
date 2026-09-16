@@ -160,19 +160,12 @@ def check_agent_failure_streak(results: list[SubagentResult]) -> None:
         cancellation.request_cancel(reason="agent_failure_streak")
 
 
-def compute_scale_up(remaining: int, n_agents: int) -> int:
-    """How many overflow agents to launch once the scout gate opens.
-
-    The scout exists to surface entry problems (auth, quota, oversized
-    prompt) on one agent before the run commits to N. Once it has been
-    running healthily for the scout timeout, or finished, every free slot
-    launches at once. Agents draw files from the shared queue in small
-    batches, so the only cap is the number of files left: a slot with
-    nothing to take would exit immediately.
-    """
-    if remaining <= 0 or n_agents <= 1:
-        return 0
-    return min(remaining, n_agents - 1)
+def compute_scale_up(remaining: int, free_slots: int) -> int:
+    """Agents to launch when the scout gate opens: every free slot the
+    queue can still feed. No files-per-agent estimate; a slot launched for
+    a file that another agent takes first exits on its empty take (one
+    turn for a CLI agent, nothing for the API runner)."""
+    return max(0, min(remaining, free_slots))
 
 
 def collect_done(
@@ -205,8 +198,20 @@ def collect_done(
 
 def maybe_scale_up(
     done: set, state: ScaleUpState, n_agents: int, ctx: ScaleUpContext,
+    *, running: int,
 ) -> bool:
-    """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
+    """Open the scout gate and fill the pool. Returns the updated scout_done.
+
+    The scout is one agent sent ahead to surface entry problems (auth,
+    quota, oversized prompt) before the run commits to *n_agents*. The gate
+    opens when its future resolves, whatever the outcome, or after the
+    scout timeout while it is still running. A fatal provider error cancels
+    the run from the worker thread before the future resolves, so
+    ``should_respawn`` then reports nothing left and no agent launches; a
+    non-fatal scout failure is left to ``check_agent_failure_streak``.
+    *running* is the number of agents still in flight; the free slots are
+    the rest of the pool, including the scout's own slot once it finished.
+    """
     if state.scout_done:
         return True
     elapsed = time.monotonic() - state.pool_start
@@ -218,6 +223,6 @@ def maybe_scale_up(
         ctx.queue, ctx.queue_path, state.pool_start, state.max_duration,
         deadline_at=ctx.deadline_at,
     )
-    for _ in range(compute_scale_up(remaining, n_agents)):
+    for _ in range(compute_scale_up(remaining, n_agents - running)):
         ctx.submit_fn()
     return True

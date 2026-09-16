@@ -30,6 +30,8 @@ from quodeq.analysis.subagents._pool_worker import WorkerContext, run_single_age
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared import cancellation
 
+from tests._analysis_helpers import _FixedRemainingQueue
+
 
 @pytest.fixture(autouse=True)
 def _reset_cancellation():
@@ -183,21 +185,13 @@ class TestCheckProcessResult:
         _check_process_result(self._process(0), tmp_path / "missing.err")
 
 
-class _FakeQueue:
-    def __init__(self, remaining: int):
-        self._remaining = remaining
-
-    def remaining(self) -> int:
-        return self._remaining
-
-
 class TestSpawnGate:
     def test_should_respawn_returns_zero_when_cancelled(self, tmp_path):
         cancellation.request_cancel()
-        assert should_respawn(_FakeQueue(5), tmp_path / "q.json", 0.0, 0) == 0
+        assert should_respawn(_FixedRemainingQueue(5), tmp_path / "q.json", 0.0, 0) == 0
 
     def test_should_respawn_returns_remaining_when_not_cancelled(self, tmp_path):
-        assert should_respawn(_FakeQueue(5), tmp_path / "q.json", 0.0, 0) == 5
+        assert should_respawn(_FixedRemainingQueue(5), tmp_path / "q.json", 0.0, 0) == 5
 
 
 def _result(success: bool, error: str = "") -> SubagentResult:
