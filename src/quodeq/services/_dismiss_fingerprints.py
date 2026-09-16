@@ -18,7 +18,6 @@ marker-file idempotency as ``data/migrations/dismissed_json_to_actions_log``.
 from __future__ import annotations
 
 import threading
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,7 +40,9 @@ from quodeq.shared.validation import resolve_child_dir
 #: Sentinel written once the legacy entries of a project have been upgraded.
 BACKFILL_MARKER = ".dismiss_fingerprints_backfilled"
 
-_backfill_locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+# One lock for every project: the backfill runs once per project, off the
+# request hot path, so per-path locks would only add state to reason about.
+_backfill_lock = threading.Lock()
 
 
 def _in_shared_results_clone(project_dir: Path) -> bool:
@@ -159,7 +160,7 @@ def backfill_if_needed(
     if not (project_dir / "actions.jsonl").is_file() or _in_shared_results_clone(project_dir):
         return 0
 
-    with _backfill_locks[project_dir]:
+    with _backfill_lock:
         if marker.exists():
             return 0
         state: DismissedKeys = fold_dismissals(read_action_events(project_dir))
