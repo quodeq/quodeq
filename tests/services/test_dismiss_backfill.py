@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from quodeq.services._dismiss_fingerprints import BACKFILL_MARKER, backfill_if_needed
+from quodeq.services._dismiss_fingerprints import BACKFILL_MARKER, _backfill_locks, backfill_if_needed
 from quodeq.services.dismissed import dismissed_keys, restore_finding
 from quodeq.services.suppression import is_dismissed
 from tests.services.test_dismissed_fingerprint import FP, SNIP, _project, _seed_run, _verdict
@@ -76,6 +76,18 @@ class TestBackfill:
         # A run appearing later does not re-run the one-shot backfill.
         _seed_run(project_dir, "r1", line=10)
         assert backfill_if_needed(project_dir) == 0
+
+    def test_lock_entry_is_evicted_once_the_project_is_done(self, tmp_path: Path) -> None:
+        """Only in-flight projects hold a lock: a dashboard listing many
+        projects must not keep one per project for the life of the process."""
+        project_dir = tmp_path / "proj"
+        _seed_run(project_dir, "r1", line=10)
+        self._legacy_dismiss(project_dir, line=10, when=datetime(2026, 1, 2, tzinfo=timezone.utc))
+
+        assert backfill_if_needed(project_dir) == 1
+        assert not _backfill_locks
+        assert backfill_if_needed(project_dir) == 0  # marker short-circuit
+        assert not _backfill_locks
 
     def test_restored_legacy_entry_is_not_resurrected(self, tmp_path: Path) -> None:
         project_dir = tmp_path / "proj"
