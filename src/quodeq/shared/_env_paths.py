@@ -77,3 +77,18 @@ def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
     if "QUODEQ_GRADE_FORMULA_PATH" in environ:
         return _sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
     return str(Path.home() / ".quodeq" / "grade_formula.json")
+
+
+def get_run_dir(env: dict[str, str] | None = None) -> Path:
+    """Return the user-private runtime directory, creating it if needed.
+
+    ``QUODEQ_RUN_DIR`` overrides the default ``~/.quodeq/run``; it must be
+    absolute so two processes reading it from different working directories
+    agree on the same sockets and pid files.
+    """
+    raw = (env or os.environ).get("QUODEQ_RUN_DIR")
+    if raw and not Path(raw).is_absolute():
+        raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {raw!r}")
+    run_dir = Path(raw) if raw else Path.home() / ".quodeq" / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
