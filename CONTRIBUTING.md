@@ -54,6 +54,10 @@ Keep pull requests focused on a single change. If you are fixing a bug and also 
       uv run ruff check --fix src/quodeq tests tools   # autofix the safe ones
 - No need to add docstrings or type annotations to code you did not change
 - Tests go in `tests/` mirroring the `src/` structure
+- Constants: a literal with meaning gets a name where it is used, with a one-line comment saying why it has that value.
+  - Python: module-level `_UPPER_SNAKE = value  # reason`. Shared inside a package: that package's `_constants.py`. Shared across packages: `quodeq/shared/constants.py` (`core` may not import `shared`, so anything `core` needs lives under `core/`). HTTP statuses use `http.HTTPStatus`. Ruff `PLR2004` fails the build on a bare number in a comparison; a `len(x) == N` check before an unpack is not a constant, unpack instead or `# noqa: PLR2004  # reason`.
+  - UI: module-level `const UPPER_SNAKE = value; // reason`. Shared inside a feature: that feature's constants module. App-wide storage keys, event names, DOM attributes, media queries and breakpoints: `src/constants.js`; unit conversions: `src/utils/time.js`. `npm run lint:magic` ratchets bare numbers per file (`tools/magic_baseline.json` may only shrink).
+  - Tests keep asserting the literal value: the literal is the contract, the constant is the implementation.
 
 ## Branch Model
 

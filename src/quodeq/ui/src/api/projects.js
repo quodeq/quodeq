@@ -21,6 +21,10 @@ export function getHealth() {
 // wider window lets one request wait it out instead of churning.
 const PROJECTS_LIST_TIMEOUT_MS = 120000;
 
+// Generous: registration may clone a large repository server-side, but a
+// hung backend must not leave onboarding pending forever.
+const REGISTER_PROJECT_TIMEOUT_MS = 600000; // 10 min
+
 /** @returns {Promise<{ projects: import('../models/project.js').Project[], warmup: object | null }>} */
 export async function listProjects() {
   const data = await request('/projects', { timeout: PROJECTS_LIST_TIMEOUT_MS });
@@ -172,9 +176,7 @@ export async function registerProject(payload) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      // Generous: registration may clone a large repository server-side,
-      // but a hung backend must not leave onboarding pending forever.
-      signal: AbortSignal.timeout(600000), // 10 min
+      signal: AbortSignal.timeout(REGISTER_PROJECT_TIMEOUT_MS),
     });
   } catch (e) {
     if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {

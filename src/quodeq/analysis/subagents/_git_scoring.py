@@ -9,6 +9,7 @@ from quodeq.data.git_cli import stream_log_names
 
 _GIT_LOG_TIMEOUT_S = 10
 _GIT_HASH_LENGTH = 40
+_GIT_DATE_PREFIX_LEN = 10  # YYYY-MM-DD
 _DEFAULT_CHURN_DIVISOR = 4
 _DEFAULT_CHURN_MAX = 5
 _DEFAULT_RECENCY_DAYS = 14
@@ -17,7 +18,7 @@ _DEFAULT_RECENCY_MULTIPLIER = 1.5
 
 def _is_date_line(line: str) -> bool:
     """Check if a line looks like a git date: ``YYYY-MM-DD ...``."""
-    return len(line) >= 10 and line[4:5] == "-" and line[7:8] == "-" and " " in line
+    return len(line) >= _GIT_DATE_PREFIX_LEN and line[4:5] == "-" and line[7:8] == "-" and " " in line
 
 
 def _has_git(src: Path) -> bool:

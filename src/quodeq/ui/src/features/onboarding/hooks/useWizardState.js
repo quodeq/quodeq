@@ -1,10 +1,11 @@
 import { useReducer, useCallback } from 'react';
+import { STEP_WELCOME } from '../wizardSteps.js';
 
 const DEFAULT_TIME_LIMIT_S = 600; // 10 minutes
 
 function initialState(initial = {}) {
   return {
-    step: initial.step || 'welcome',
+    step: initial.step || STEP_WELCOME,
     repoScanSubState: 'idle',
     repo: { source: 'url', value: '', branch: null, scopePath: null },
     projectId: null,

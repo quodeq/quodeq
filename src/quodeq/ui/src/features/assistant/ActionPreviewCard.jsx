@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { applyAssistantAction, rejectAssistantAction } from '../../api/assistant.js';
+import { notifyAssistantActionApplied } from '../../constants.js';
 import { t } from '../../strings/index.js';
 
 function CardSummary({ actionType, summary }) {
@@ -48,9 +49,7 @@ async function applyAction({ actionId, actionType, setStatus }) {
   setStatus('pending');
   try {
     const res = await applyAssistantAction(actionId);
-    window.dispatchEvent(new CustomEvent('quodeq:assistant-action-applied', {
-      detail: { actionType, scores: res?.result?.scores, delta: res?.result?.delta },
-    }));
+    notifyAssistantActionApplied({ actionType, scores: res?.result?.scores, delta: res?.result?.delta });
     setStatus('applied');
   } catch {
     setStatus('error');

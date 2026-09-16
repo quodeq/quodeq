@@ -5,6 +5,8 @@
  * without mounting the whole App (which needs ~8 providers).
  */
 import { useEffect, useRef, useState } from 'react';
+import { readString } from '../../adapters/storage.js';
+import { STEP_WELCOME, SKIPPED_KEY } from './wizardSteps.js';
 
 /**
  * Whether the first-paint onboarding-wizard auto-open effect should fire.
@@ -114,11 +116,9 @@ export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }
       // permanently skipped.
       return;
     }
-    let skipped = false;
-    try { skipped = localStorage.getItem('quodeq_onboarding_skipped') === 'true'; } catch { /* ignore */ }
     autoOpenedRef.current = true;
-    if (!skipped) {
-      setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+    if (readString(SKIPPED_KEY, null) !== 'true') {
+      setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
     }
   }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps
 

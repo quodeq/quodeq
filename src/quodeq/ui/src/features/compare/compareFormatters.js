@@ -1,8 +1,32 @@
-// Number formatting shared by the compare feature's tables, cards and
-// pickers. Kept in one place so every surface renders scores and counts
-// the same way.
+// Number and label formatting shared by the compare feature's tables,
+// cards and pickers. Kept in one place so every surface renders scores,
+// counts and short labels the same way.
 import { LOCALE } from '../../strings/index.js';
 
 export const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 export const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 export const signed1 = (g) => (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1));
+
+// Short labels: the dimension tab bar and the matrix column headers speak
+// the same shorthand, the label's first characters ("clean", "flexi",
+// "maint"). When two labels share that prefix (the "independence from ..."
+// principles) the matrix falls back to a readable stem built from the first
+// and last significant words ("inde fra", "inde ui") so every header stays
+// unique.
+export const TAB_LABEL_CHARS = 5; // "clean", "flexi", "maint": the app's established shorthand
+const STEM_HEAD_CHARS = 4; // "inde" of "independence"
+const STEM_TAIL_CHARS = 3; // "fra" of "frameworks"
+const STOPWORDS = new Set(['from', 'of', 'the', 'and', 'for']);
+
+const significantWords = (label) => String(label || '')
+  .trim()
+  .split(/[\s-]+/)
+  .filter((w) => w && !STOPWORDS.has(w));
+
+export const prefixOf = (label) => String(label || '').trim().slice(0, TAB_LABEL_CHARS);
+
+export function stemOf(label) {
+  const words = significantWords(label);
+  if (words.length <= 1) return (words[0] || '').slice(0, TAB_LABEL_CHARS);
+  return `${words[0].slice(0, STEM_HEAD_CHARS)} ${words[words.length - 1].slice(0, STEM_TAIL_CHARS)}`;
+}

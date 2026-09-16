@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Dict, Generic, List, Optional, TypeVar
 from uuid import uuid4, UUID
 
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.types.req_ref import ReqRef
 
 
@@ -69,7 +70,7 @@ class Judgment:
     title: Optional[str] = None
     context: Optional[str] = None
     scope: Optional[str] = None
-    confidence: int = 100
+    confidence: int = FULL_CONFIDENCE
     req: Optional[str] = None
     req_refs: List[ReqRef] = field(default_factory=list)
     cwe: Optional[str] = None

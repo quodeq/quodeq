@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
+from http import HTTPStatus
 
 import httpx
 
@@ -71,9 +72,9 @@ def fetch_latest(
         headers["If-None-Match"] = etag
     try:
         gh = httpx.get(_GH_LATEST_URL, headers=headers, timeout=_TIMEOUT)
-        if gh.status_code == 304:
+        if gh.status_code == HTTPStatus.NOT_MODIFIED:
             return LatestInfo(not_modified=True, etag=etag)
-        if gh.status_code != 200:
+        if gh.status_code != HTTPStatus.OK:
             return None
         release = gh.json()
         if not isinstance(release, dict):
@@ -94,7 +95,7 @@ def fetch_latest(
     if channel == "wheel":
         try:
             pypi = httpx.get(_PYPI_URL, headers={"User-Agent": _user_agent()}, timeout=_TIMEOUT)
-            if pypi.status_code == 200:
+            if pypi.status_code == HTTPStatus.OK:
                 pypi_data = pypi.json()
                 if not isinstance(pypi_data, dict):
                     raise ValueError("unexpected non-dict PyPI response")

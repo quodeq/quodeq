@@ -76,9 +76,10 @@ extend-exclude = ["tests/fixtures/discipline_corpus"]
 [tool.ruff.lint]
 # Deliberately narrow. Each rule here maps to a maintainability
 # violation type the self-eval flags (M-ANA-10 dead code, M-ANA-9
-# import placement). Widen one rule at a time, with the tree clean
-# for that rule in the same PR, so the gate never grandfathers.
-select = ["F401", "F841", "E402"]
+# import placement, M-MDF-1 magic literals). Widen one rule at a
+# time, with the tree clean for that rule in the same PR, so the gate
+# never grandfathers.
+select = ["F401", "F841", "E402", "PLR2004"]
 
 [tool.ruff.lint.per-file-ignores]
 # Re-export blocks placed after the accessors they depend on; moving
@@ -87,6 +88,10 @@ select = ["F401", "F841", "E402"]
 "src/quodeq/shared/utils.py" = ["E402"]
 # Standalone scripts that insert the repo root into sys.path first.
 "tools/*.py" = ["E402"]
+# Tests assert literal expectations; the literal is the contract.
+"tests/**" = ["PLR2004"]
+# Standalone scripts outside the layer rules.
+"tools/**" = ["PLR2004"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

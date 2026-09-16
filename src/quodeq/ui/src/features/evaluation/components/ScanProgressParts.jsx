@@ -11,6 +11,7 @@ import ConsoleButton from '../../../components/ConsoleButton.jsx';
 import DimRow from './DimRow.jsx';
 import { computeCoverageView, computeRunBudget } from './scanProgressCoverage.js';
 import { deriveScanMode } from './buildJobStatCells.js';
+import { SCAN_MODE } from './scanModes.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { formatDuration, formatDurationCoarse } from '../../../utils/formatters.js';
 import { exitReasonInfo, exitReasonWarn } from '../../../models/exitReason.js';
@@ -171,7 +172,7 @@ export function buildSummary({ showCoverage, totalFiles, takenFiles, overallPct,
       : <>{t('evaluate.nothingNew')}{clockPart}</>;
   }
   if (totalFiles > 0) {
-    return scanMode === 'clean'
+    return scanMode === SCAN_MODE.CLEAN
       ? <>{t('evaluate.reanalyzesPrefix')} <strong>{totalFiles}</strong> {t('evaluate.filesLabel')} · {t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>
       : <><strong>{t('evaluate.countOf', { taken: takenFiles, total: totalFiles })}</strong> {t('evaluate.checksLabel')} · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
   }

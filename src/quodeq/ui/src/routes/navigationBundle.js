@@ -1,4 +1,5 @@
 import { t } from '../strings/index.js';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboarding/wizardSteps.js';
 
 /**
  * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
@@ -21,7 +22,7 @@ function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects })
       showToast(t('evaluate.busyAddProject'));
       return;
     }
-    setWizardEntry({ startStep: 'repo-scan', isFirstProject: projects.length === 0 });
+    setWizardEntry({ startStep: STEP_REPO_SCAN, isFirstProject: projects.length === 0 });
   };
 }
 
@@ -41,7 +42,7 @@ function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry }) {
       showToast(t('evaluate.busyStartTour'));
       return;
     }
-    setWizardEntry({ startStep: 'welcome', isFirstProject: true });
+    setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
   };
 }
 
@@ -52,7 +53,7 @@ function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
       return;
     }
     setWizardEntry({
-      startStep: 'provider',
+      startStep: STEP_PROVIDER,
       isFirstProject: false,
       presetProjectId: projectId,
     });

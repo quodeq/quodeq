@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+_MIN_PATH_SEGMENTS = 2  # a directory plus a file name; a bare file name has no layer
+
 # Directory names that conventionally hold enterprise/application logic --
 # the layers Clean Architecture requires to stay free of outer concerns.
 #
@@ -80,7 +82,7 @@ def _segments(path: str) -> list[str]:
 def is_entity_layer_path(path: str) -> bool:
     """True when *path* sits under a conventional entity/domain directory."""
     segments = _segments(path)
-    if len(segments) < 2:
+    if len(segments) < _MIN_PATH_SEGMENTS:
         return False
     return any(s.lower() in ENTITY_LAYER_DIRS for s in segments[:-1])
 
@@ -106,7 +108,7 @@ def is_inner_layer_path(path: str) -> bool:
     The final segment is the file name and never counts as a directory.
     """
     segments = _segments(path)
-    if len(segments) < 2:
+    if len(segments) < _MIN_PATH_SEGMENTS:
         return False
     return any(s.lower() in INNER_LAYER_DIRS for s in segments[:-1])
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from quodeq.core.scoring._constants import MAX_SCORE
 from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence, violations_per_100_files
 from quodeq.data.fs.dimension_report._report_taxonomy import unmapped_types
@@ -18,8 +19,6 @@ from quodeq.data.fs.dimension_report._report_scoring import (
     grade_from_score,
 )
 from quodeq.data.fs.dimension_report._report_findings import build_principle_rows
-
-_MAX_SCORE = 10
 
 
 @dataclass
@@ -93,7 +92,7 @@ def build_report_json(
 
     weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
     if weighted is not None:
-        top_score = f"{round(weighted, 1)}/{_MAX_SCORE}"
+        top_score = f"{round(weighted, 1)}/{MAX_SCORE}"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)
     else:
         top_score = None

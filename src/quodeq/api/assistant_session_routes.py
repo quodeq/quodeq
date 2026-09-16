@@ -18,6 +18,11 @@ from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
+from quodeq.shared.constants import (
+    SESSION_SOURCE_LOCAL,
+    SESSION_SOURCE_SHARED,
+    SESSION_SOURCES,
+)
 
 
 def _validate_session_request(body: dict) -> tuple[Response | tuple[Response, int] | None, str]:
@@ -30,10 +35,10 @@ def _validate_session_request(body: dict) -> tuple[Response | tuple[Response, in
     provider_cfg = _assistant_routes._known_provider(str(body.get("provider", "")))
     if provider_cfg is None:
         return (jsonify({"error": "unknown or unsupported provider"}), 400), ""
-    source = str(body.get("source") or "local")
-    if source not in ("local", "shared"):
+    source = str(body.get("source") or SESSION_SOURCE_LOCAL)
+    if source not in SESSION_SOURCES:
         return (jsonify({"error": "invalid source"}), 400), source
-    if source == "shared":
+    if source == SESSION_SOURCE_SHARED:
         shared_error = _assistant_routes._shared_source_error()
         if shared_error is not None:
             return shared_error, source
@@ -41,7 +46,7 @@ def _validate_session_request(body: dict) -> tuple[Response | tuple[Response, in
 
 
 def _compute_write_available(source: str, repo_root: str | None, provider: str) -> bool:
-    return (source == "local"
+    return (source == SESSION_SOURCE_LOCAL
             and bool(repo_root)
             and (Path(repo_root) / ".git").exists()
             and write_safe_provider(provider))
@@ -66,7 +71,7 @@ def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | N
       project_id + reports_dir.
     """
     project_id = body.get("projectId")
-    if source == "shared":
+    if source == SESSION_SOURCE_SHARED:
         run_dir = None
         if project_id and body.get("runId"):
             run_dir = _assistant_helpers.resolve_shared_run_location(
@@ -105,7 +110,7 @@ def register_assistant_session_routes(app: Flask) -> None:
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,
-                        "readOnly": source == "shared",
+                        "readOnly": source == SESSION_SOURCE_SHARED,
                         "writeAvailable": write_available}), 201
 
     @app.get("/api/assistant/skills")

@@ -14,6 +14,10 @@ const DEFAULT_THRESHOLDS = Object.freeze([
   Object.freeze([5, 'Adequate']),
   Object.freeze([3, 'Poor']),
 ]);
+// Label below the lowest row. Unlike the rows it is not server-overridable:
+// GET /api/grade-formula ships [threshold, label] pairs only, so the floor
+// stays a client constant.
+const LOWEST_GRADE_LABEL = 'Critical';
 
 /**
  * Build an independent thresholds store: get/set/reset plus a
@@ -45,7 +49,7 @@ export function createGradeThresholdsStore() {
       for (const [threshold, label] of thresholds) {
         if (n >= threshold) return label;
       }
-      return 'Critical';
+      return LOWEST_GRADE_LABEL;
     },
   };
 }

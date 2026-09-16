@@ -35,9 +35,10 @@ function Logo() {
 // Cap the count badge text so the absolutely-positioned chip can't grow
 // past the rail edge. Thousands collapse to a compact "k" form (1200 -> "1k",
 // 12500 -> "13k"), and the title carries the exact number.
+const COUNT_K_THRESHOLD = 1000; // four digits is where the chip overflows the rail
 function formatNavCount(count) {
   if (count == null) return null;
-  if (count >= 1000) return `${Math.round(count / 1000)}k`;
+  if (count >= COUNT_K_THRESHOLD) return `${Math.round(count / COUNT_K_THRESHOLD)}k`;
   return String(count);
 }
 
@@ -53,7 +54,7 @@ function NavButton({ id, label, icon, activeTab, onNavTab, count }) {
       {icon}
       <span className="sidebar-nav-label">{label}</span>
       {countLabel != null && (
-        <span className="sidebar-nav-count" title={count >= 1000 ? String(count) : undefined}>
+        <span className="sidebar-nav-count" title={count >= COUNT_K_THRESHOLD ? String(count) : undefined}>
           {countLabel}
         </span>
       )}

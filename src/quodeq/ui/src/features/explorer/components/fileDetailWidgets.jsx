@@ -26,13 +26,18 @@ export function LowConfidenceToggle({ count, expanded, onToggle }) {
   );
 }
 
+// Virtual-list row estimates for the file detail pane. The severity and
+// compliance headers and the low-confidence toggle are all one header row;
+// FALLBACK covers an item the list has not materialised yet.
+const ROW_HEIGHT_PX = Object.freeze({ FALLBACK: 140, HEADER: 36, VIOLATION: 160 });
+
 export function estimateItemSize(items) {
   return (i) => {
     const item = items[i];
-    if (!item) return 140;
-    if (item.kind === 'sev-header' || item.kind === 'compliance-header') return 36;
-    if (item.kind === 'low-conf-toggle') return 36;
-    return 160;
+    if (!item) return ROW_HEIGHT_PX.FALLBACK;
+    if (item.kind === 'sev-header' || item.kind === 'compliance-header') return ROW_HEIGHT_PX.HEADER;
+    if (item.kind === 'low-conf-toggle') return ROW_HEIGHT_PX.HEADER;
+    return ROW_HEIGHT_PX.VIOLATION;
   };
 }
 

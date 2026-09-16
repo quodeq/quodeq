@@ -21,6 +21,7 @@ import {
   filterTrendByVisibleStandards,
   filterAccumulatedByVisibleStandards,
 } from '../../utils/scoreFiltering.js';
+import { MS_PER_DAY } from '../../utils/time.js';
 
 // Staleness means "the code moved since the grade was measured". The real
 // signal is commitsSinceLastRun from the backend (git commits since the last
@@ -73,7 +74,7 @@ export function daysBetween(isoA, isoB) {
   const a = new Date(isoA).getTime();
   const b = new Date(isoB).getTime();
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  return (b - a) / 86400000;
+  return (b - a) / MS_PER_DAY;
 }
 
 export function sortedByDate(trend) {
@@ -101,7 +102,7 @@ export function trendDelta(trend, now, pick = (e) => e.numericAverage) {
   const latest = entries[entries.length - 1];
   const previous = entries[entries.length - 2];
   const lastDelta = Math.round((latest.value - previous.value) * 10) / 10;
-  const cutoff = new Date(now).getTime() - DELTA_WINDOW_DAYS * 86400000;
+  const cutoff = new Date(now).getTime() - DELTA_WINDOW_DAYS * MS_PER_DAY;
   let baseline = entries[0];
   for (const e of entries) {
     if (new Date(e.dateISO).getTime() <= cutoff) baseline = e;

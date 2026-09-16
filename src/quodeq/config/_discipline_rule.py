@@ -9,7 +9,7 @@ _DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
 
 
 def _strip_quotes(value: str) -> str:
-    if len(value) >= 2 and (
+    if len(value) >= 2 and (  # noqa: PLR2004  # the two quote characters
         (value[0] == value[-1] == '"') or (value[0] == value[-1] == "'")
     ):
         return value[1:-1]

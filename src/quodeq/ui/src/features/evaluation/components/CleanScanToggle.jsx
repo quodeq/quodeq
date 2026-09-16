@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { readString, removeKey, writeString } from '../../../adapters/storage.js';
+import { CLEAN_PERSIST } from './scanModes.js';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
@@ -27,20 +28,20 @@ function ToggleButton({ value, isOn, disabled, onClick }) {
   return (
     <button
       type="button"
-      className={`clean-scan-toggle${isOn ? ' clean-scan-toggle--on' : ''}${value === 'permanent' ? ' clean-scan-toggle--permanent' : ''}`}
+      className={`clean-scan-toggle${isOn ? ' clean-scan-toggle--on' : ''}${value === CLEAN_PERSIST.PERMANENT ? ' clean-scan-toggle--permanent' : ''}`}
       onClick={onClick}
       disabled={disabled}
       title={
-        value === 'permanent'
+        value === CLEAN_PERSIST.PERMANENT
           ? t('evaluate.cleanAlwaysTitle')
-          : value === 'once'
+          : value === CLEAN_PERSIST.ONCE
             ? t('evaluate.cleanOnceTitle')
             : t('evaluate.cleanOffTitle')
       }
       aria-pressed={isOn}
     >
       {t('evaluate.cleanScan')}
-      {value === 'permanent' && <span className="clean-scan-toggle__dot" aria-hidden="true" />}
+      {value === CLEAN_PERSIST.PERMANENT && <span className="clean-scan-toggle__dot" aria-hidden="true" />}
     </button>
   );
 }
@@ -73,18 +74,18 @@ export default function CleanScanToggle({ value, onChange, disabled = false }) {
     // First mount: hydrate 'permanent' from localStorage so the toggle reflects
     // the user's saved preference. We only do this when the parent passes
     // 'off' as the initial value (no in-flight 'once' state to clobber).
-    if (value === 'off' && readPermanent()) onChange('permanent');
+    if (value === CLEAN_PERSIST.OFF && readPermanent()) onChange(CLEAN_PERSIST.PERMANENT);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isOn = value === 'once' || value === 'permanent';
+  const isOn = value === CLEAN_PERSIST.ONCE || value === CLEAN_PERSIST.PERMANENT;
 
   function handleClick() {
     if (disabled) return;
     if (isOn) {
       // Turning off: clear localStorage too, regardless of which 'on' state.
       writePermanent(false);
-      onChange('off');
+      onChange(CLEAN_PERSIST.OFF);
       return;
     }
     setConfirmOpen(true);
@@ -92,12 +93,12 @@ export default function CleanScanToggle({ value, onChange, disabled = false }) {
 
   function pickOnce() {
     setConfirmOpen(false);
-    onChange('once');
+    onChange(CLEAN_PERSIST.ONCE);
   }
   function pickPermanent() {
     setConfirmOpen(false);
     writePermanent(true);
-    onChange('permanent');
+    onChange(CLEAN_PERSIST.PERMANENT);
   }
   function cancel() {
     setConfirmOpen(false);

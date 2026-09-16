@@ -6,10 +6,12 @@ import logging
 import os
 import threading
 import time as _time
+from http import HTTPStatus
 from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
 
@@ -106,5 +108,5 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
         try:
             detail = svc.get_standard(standard_id)
         except FileNotFoundError:
-            return error_response(f"Standard not found: {standard_id}", 404, "not_found")
+            return error_response(f"Standard not found: {standard_id}", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
         return jsonify(to_camel_dict(detail))

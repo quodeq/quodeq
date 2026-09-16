@@ -1,17 +1,21 @@
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../constants.js';
+import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 
 /**
- * HistoryPage.jsx's run-delete handler, extracted verbatim.
+ * HistoryPage.jsx's run-delete handler, extracted verbatim. A failed delete
+ * surfaces through the side pane's toast, like every other mutation failure.
  */
 export function useHistoryDeleteRun({ selectedSource, deleteEvaluation, onRunDeleted }) {
+  const { showToast } = useSidePane();
   async function handleDeleteRun(runId, dateLabel) {
     // Defense in depth: shared-repo runs have no delete route on the backend
     // (mutation is local-only by design, same as dismiss/restore/verify). The
     // real gate is the wiring below (onDeleteRun is undefined when source is
     // 'shared', so the row never renders a delete button), but this early
     // return covers any caller that reaches the handler directly.
-    if (selectedSource !== 'local') return;
+    if (selectedSource !== PROJECT_SOURCE.LOCAL) return;
     const label = dateLabel || runId;
     const ok = await confirmDialog({
       title: t('history.deleteRunConfirmTitle'),
@@ -25,7 +29,7 @@ export function useHistoryDeleteRun({ selectedSource, deleteEvaluation, onRunDel
     try {
       await deleteEvaluation(jobId);
     } catch (err) {
-      alert(t('history.deleteRunFailed', { message: err.message || t('history.unknownError') }));
+      showToast(t('history.deleteRunFailed', { message: err.message || t('history.unknownError') }));
       return;
     }
     onRunDeleted?.(runId);

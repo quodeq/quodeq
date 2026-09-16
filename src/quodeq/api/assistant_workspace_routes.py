@@ -19,6 +19,8 @@ from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
 _logger = logging.getLogger(__name__)
 
+_MAX_DIFF_CHARS = 2_000_000  # a diff this size is pathological; the UI never shows more
+
 
 def register_assistant_workspace_routes(app: Flask) -> None:
     def _lookup(sid: str):
@@ -62,8 +64,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return jsonify({"error": "no active worktree"}), 404
         try:
             text = diff_text(Path(row["path"]))
-            truncated = len(text) > 2_000_000  # a diff this size is pathological
-            return jsonify({"diff": text[:2_000_000], "truncated": truncated,
+            truncated = len(text) > _MAX_DIFF_CHARS
+            return jsonify({"diff": text[:_MAX_DIFF_CHARS], "truncated": truncated,
                             "stats": diff_stats(Path(row["path"]))})
         except WorktreeError as exc:
             _logger.warning("workspace diff failed for %s: %s", sid, exc)

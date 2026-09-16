@@ -12,6 +12,12 @@ vi.mock('./HistoryChartPanel.jsx', () => ({
   default: () => null,
 }));
 
+// The delete handler reports failures through the side pane's toast; these
+// tests never reach a failure, so a bare stub keeps them provider-free.
+vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
+  useSidePane: () => ({ showToast: vi.fn() }),
+}));
+
 // Shared-repo runs have no delete route on the backend (mutation is
 // local-only by design, same as dismiss/restore/verify). HistoryPage must
 // only wire onDeleteRun into the table when selectedSource is 'local' —

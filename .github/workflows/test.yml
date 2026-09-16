@@ -140,3 +140,11 @@ jobs:
         # or a baseline total above its committed ceiling. Shrunk counts are
         # locked in with `npm run lint:hygiene:update`.
         run: npm run lint:hygiene
+
+      - name: Check UI magic numbers (magic ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on unexplained numeric literals in production code beyond the
+        # per-file counts in tools/magic_baseline.json, or a baseline total
+        # above its committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:magic:update`.
+        run: npm run lint:magic

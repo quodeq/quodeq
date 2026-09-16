@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.events.models import Judgment
 from quodeq.core.finding_coercions import coerce_scope_downgrade
 from quodeq.core.types.finding import Finding
@@ -59,7 +60,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         title=d.get("w"),
         context=d.get("context"),
         scope=d.get("scope"),
-        confidence=_safe_int(d.get("confidence") if d.get("confidence") is not None else 100, 100),
+        confidence=_safe_int(d.get("confidence") if d.get("confidence") is not None else FULL_CONFIDENCE, FULL_CONFIDENCE),
         req=d.get("req"),
         req_refs=_coerce_req_refs(d.get("req_refs")),
         cwe=d.get("cwe"),

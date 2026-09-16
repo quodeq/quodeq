@@ -1,6 +1,7 @@
 """Numerical-mode scoring helpers: deduction computation and grade drops."""
 from __future__ import annotations
 
+from quodeq.core.scoring._constants import MAX_SCORE
 from quodeq.core.types import Deductions
 
 # Progressive drop tables: (min_type_count_inclusive, levels_to_drop).
@@ -17,7 +18,6 @@ _DEFAULT_MINOR_PENALTY = 0.25
 
 _CRITICAL_SCORE_CAP = 3
 _MAJOR_SCORE_CAP = 5
-_MAX_SCORE = 10
 
 
 def _compute_severity_deduction(
@@ -29,7 +29,7 @@ def _compute_severity_deduction(
     """
     effective = min(count, type_cap)
     deduction = effective * penalty
-    cap = score_cap if count >= type_cap else _MAX_SCORE
+    cap = score_cap if count >= type_cap else MAX_SCORE
     return deduction, cap
 
 

@@ -9,6 +9,8 @@
  * compare.css.
  */
 import { t, LOCALE } from '../../../strings/index.js';
+import { MS_PER_DAY } from '../../../utils/time.js';
+import { DELTA_WINDOW_DAYS } from '../compareModel.js';
 import { trendDomain, monotonePath } from '../compareTrendModel.js';
 
 const W = 640;
@@ -58,7 +60,7 @@ function DuelTrendLine({ series, variant, x, y }) {
    visibly correspond to this slice of the chart. */
 function DuelTrendWindow({ t0, t1, span }) {
   if (span <= 0) return null;
-  const windowStart = Math.max(t0, t1 - 30 * 86400000);
+  const windowStart = Math.max(t0, t1 - DELTA_WINDOW_DAYS * MS_PER_DAY);
   const xw = PAD.left + ((windowStart - t0) / span) * (W - PAD.left - PAD.right);
   return (
     <rect

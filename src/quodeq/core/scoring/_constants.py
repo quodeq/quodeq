@@ -6,6 +6,9 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 _SEVERITY_WEIGHT: dict[str, float] = {"critical": 4.0, "major": 1.5, "minor": 0.25}
 
+# Top of the score scale; an int so caps built from it keep their type.
+MAX_SCORE = 10
+
 # Base score curve: base = 10 / (1 + K * weighted_violations)
 _BASE_K: float = 0.12
 

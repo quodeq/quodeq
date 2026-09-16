@@ -4,9 +4,10 @@ from __future__ import annotations
 import os
 
 from quodeq.shared._env_db import _SQLITE_DISABLE_TRUTHY
+from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
 
 _DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
-_DEFAULT_EMBEDDING_BASE_URL = "http://localhost:11434"
+_DEFAULT_EMBEDDING_BASE_URL = OLLAMA_DEFAULT_BASE_URL
 _DEFAULT_PRECEDENT_SIMILARITY = 0.85
 
 

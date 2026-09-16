@@ -10,6 +10,12 @@ import { ApiProvider } from '../../../api/ApiContext.jsx';
 // Suspense fallback (HistoryChartPanelPlaceholder) is what ends up on screen.
 vi.mock('./HistoryChartPanel.jsx', () => new Promise(() => {}));
 
+// The delete handler reports failures through the side pane's toast; this
+// test never reaches a failure, so a bare stub keeps it provider-free.
+vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
+  useSidePane: () => ({ showToast: vi.fn() }),
+}));
+
 const trend = [
   {
     runId: 'r1',

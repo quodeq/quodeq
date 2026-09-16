@@ -7,6 +7,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { t, LOCALE } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../constants.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
 import {
@@ -69,7 +70,7 @@ function renderNoRowsEmptyState({
   // locally, so "Start evaluation" has nowhere useful to send a
   // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
   // precedent this mirrors).
-  if (selectedSource === 'shared') {
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
     return (
       <HistoryEmptyShell sub={t('violations.subNoEvals')} refreshing={isRefreshing}>
         <SharedNoEvalsEmptyContent />
@@ -96,7 +97,7 @@ function renderHistoryEmptyState({
   // viewing a shared project (they may have never added a local project of
   // their own) -- gate this wall on the local list only for local selections,
   // so a shared selection falls through to the normal shared data flow below.
-  if (projects.length === 0 && selectedSource !== 'shared') {
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) {
     return (
       <HistoryEmptyShell sub={t('violations.subNoProjects')}>
         <NoProjectsEmptyContent onNavigate={onNavigate} />
@@ -122,7 +123,7 @@ function renderHistoryEmptyState({
   return null;
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = 'local', loading, isFetching, error, onRetry }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
@@ -164,7 +165,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
         // local-only by design). Passing undefined here — rather than always
         // handleDeleteRun — is what makes the row's delete button vanish,
         // since HistoryRow already gates on `{onDelete && ...}`.
-        onDeleteRun: selectedSource === 'local' ? handleDeleteRun : undefined,
+        onDeleteRun: selectedSource === PROJECT_SOURCE.LOCAL ? handleDeleteRun : undefined,
       }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}

@@ -3,6 +3,7 @@ import { buildScene, updateSceneLiveData } from './galaxyViewScene.js';
 import { updateTooltip, handleCanvasClick, createKeyboardHandlers } from './galaxyViewEvents.js';
 import { computeLevelInfo, buildBreadcrumb } from './galaxyViewInfo.jsx';
 import { useGalaxyCamera } from './useGalaxyCamera.js';
+import { DEFAULT_CANVAS_W, DEFAULT_CANVAS_H } from '../core/galaxyTunables.js';
 
 /* ── The scene: layout build + live-data refresh ── */
 
@@ -11,7 +12,7 @@ function useGalaxyScene({ dimensions, standardTypes }) {
   const typesKey = useMemo(() => Object.keys(standardTypes).sort().join('|'), [standardTypes]);
   const scene = useMemo(() => {
     if (dimensions.length === 0) return null;
-    return buildScene(dimensions, 800, 600, standardTypes);
+    return buildScene(dimensions, DEFAULT_CANVAS_W, DEFAULT_CANVAS_H, standardTypes);
   }, [dimKey, typesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useMemo(() => {
@@ -24,7 +25,7 @@ function useGalaxyScene({ dimensions, standardTypes }) {
 /* ── Canvas box size, observed from the parent element ── */
 
 function useCanvasSize(canvasRef) {
-  const [size, setSize] = useState({ w: 800, h: 600 });
+  const [size, setSize] = useState({ w: DEFAULT_CANVAS_W, h: DEFAULT_CANVAS_H });
   useEffect(() => {
     const el = canvasRef.current?.parentElement;
     if (!el) return;

@@ -12,6 +12,7 @@ from typing import Literal
 
 from quodeq.assistant.tools._actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
 from quodeq.data.ports.assistant import AssistantStore
+from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ def apply_drafted_action(
     if action is None:
         return ApplyOutcome("unknown_action")
     owner = repo.get_session(action["session_id"])
-    if owner is not None and (owner.get("source") or "local") == "shared":
+    if owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
         # Defense in depth: read-only sessions never draft actions
         # (draft_action is not registered), so nothing legitimate reaches
         # here. Refuse rather than mutate the local store under a shared
@@ -76,7 +77,7 @@ def reject_drafted_action(repo: AssistantStore, action_id: str) -> RejectOutcome
     if action is None:
         return RejectOutcome("unknown_action")
     owner = repo.get_session(action["session_id"])
-    if owner is not None and (owner.get("source") or "local") == "shared":
+    if owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
         # Defense in depth: read-only sessions never draft actions
         # (draft_action is not registered), so nothing legitimate reaches
         # here. Refuse rather than mutate the local store under a shared

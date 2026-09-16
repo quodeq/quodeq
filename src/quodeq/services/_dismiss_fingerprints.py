@@ -18,7 +18,8 @@ marker-file idempotency as ``data/migrations/dismissed_json_to_actions_log``.
 from __future__ import annotations
 
 import threading
-from collections import defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,7 +42,28 @@ from quodeq.shared.validation import resolve_child_dir
 #: Sentinel written once the legacy entries of a project have been upgraded.
 BACKFILL_MARKER = ".dismiss_fingerprints_backfilled"
 
-_backfill_locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+# Per-project single-flight, bounded. The backfill runs inside
+# ``dismissed_keys()``, which is on the dashboard request path (GET
+# /api/projects fans out over projects from a thread pool), so one lock for
+# every project would serialize each project's first touch behind the slowest
+# walk. ``_backfill_locks`` holds only the projects whose backfill is in
+# flight: ``_single_flight`` evicts the entry once the project is done, marker
+# written or skipped.
+_locks_guard = threading.Lock()
+_backfill_locks: dict[Path, threading.Lock] = {}
+
+
+@contextmanager
+def _single_flight(project_dir: Path) -> Iterator[None]:
+    with _locks_guard:
+        lock = _backfill_locks.setdefault(project_dir, threading.Lock())
+    with lock:
+        try:
+            yield
+        finally:
+            with _locks_guard:
+                if _backfill_locks.get(project_dir) is lock:
+                    del _backfill_locks[project_dir]
 
 
 def _in_shared_results_clone(project_dir: Path) -> bool:
@@ -159,7 +181,7 @@ def backfill_if_needed(
     if not (project_dir / "actions.jsonl").is_file() or _in_shared_results_clone(project_dir):
         return 0
 
-    with _backfill_locks[project_dir]:
+    with _single_flight(project_dir):
         if marker.exists():
             return 0
         state: DismissedKeys = fold_dismissals(read_action_events(project_dir))

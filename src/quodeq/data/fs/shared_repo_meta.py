@@ -157,7 +157,7 @@ def _parse_attribution_log(out: str, wanted: set[str]) -> dict[str, dict]:
                 meta = None
             continue
         parts = token.lstrip("\n").split("/", 2)
-        if meta is None or len(parts) < 2 or parts[0] != "evaluations":
+        if meta is None or len(parts) < 2 or parts[0] != "evaluations":  # noqa: PLR2004  # the "evaluations" and project segments
             continue
         if parts[1] in wanted and parts[1] not in result:
             result[parts[1]] = meta

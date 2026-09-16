@@ -5,6 +5,7 @@
 
 import { computeOverallProgress } from '../scanProgressTotals.js';
 import { t } from '../../../../strings/index.js';
+import { SCAN_MODE } from '../scanModes.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -14,6 +15,7 @@ import { t } from '../../../../strings/index.js';
 // rather than a startup-biased lifetime average.
 export const RATE_WINDOW_MS = 120000;  // 2-min sliding window the buffer is trimmed to
 const RATE_MIN_SPAN_MS = 30000;        // refuse to estimate from < this much data
+const ETA_FINISHING_SEC = 45;          // below this, "finishing" reads truer than a rounded "~1 min left"
 
 /**
  * Files/sec from a buffer of {t, taken} samples (t = epoch ms, ascending).
@@ -55,7 +57,7 @@ export function formatEta(remainingFiles, rate) {
   if (!(rate > 0) || !Number.isFinite(rate)) return 'estimating…';
   if (remainingFiles <= 0) return 'finishing';
   const etaSec = remainingFiles / rate;
-  if (etaSec <= 45) return 'finishing';
+  if (etaSec <= ETA_FINISHING_SEC) return 'finishing';
   if (etaSec < 3600) {
     const rawMin = etaSec / 60;
     let min = rawMin < 10 ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / 5) * 5;
@@ -189,7 +191,7 @@ export function deriveScanMode(progress) {
   if (!progress) return null;
   const { cachedFiles, projectTotal } = computeOverallProgress(progress);
   if (cachedFiles == null || !(projectTotal > 0)) return null;
-  return cachedFiles > 0 ? 'incremental' : 'clean';
+  return cachedFiles > 0 ? SCAN_MODE.INCREMENTAL : SCAN_MODE.CLEAN;
 }
 
 /**

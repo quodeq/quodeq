@@ -62,7 +62,7 @@ def kill_proc_tree(proc: Any) -> None:
         if sys.platform == "win32":
             try:
                 result = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                                        capture_output=True, timeout=10)
+                                        capture_output=True, timeout=_TERMINATE_TIMEOUT_S)
                 # A non-zero exit (access denied, no such process, ...) means
                 # the tree was NOT killed; fall through to proc.kill().
                 if result.returncode == 0:

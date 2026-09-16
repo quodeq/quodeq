@@ -10,6 +10,7 @@
  */
 
 import { getGradeThresholds } from '../../../../utils/gradeThresholds.js';
+import { DATA_THEME_ATTR } from '../../../../constants.js';
 
 export const TAU = Math.PI * 2;
 
@@ -67,7 +68,7 @@ export function getThemeColors(sourceEl, { cache } = {}) {
   };
   if (!_themeObserver) {
     _themeObserver = new MutationObserver(() => { _themeColors = null; });
-    _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', DATA_THEME_ATTR] });
   }
   // Also watch the source element itself for class changes (e.g. map-viz-dark toggle)
   if (el !== document.documentElement && el._themeObs === undefined) {

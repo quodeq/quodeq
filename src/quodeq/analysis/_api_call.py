@@ -8,6 +8,7 @@ import functools
 import logging
 import time
 from dataclasses import dataclass
+from http import HTTPStatus
 
 import httpx
 import openai
@@ -16,15 +17,14 @@ from quodeq.analysis._api_schema import _SYSTEM_PROMPT, _parse_findings
 from quodeq.analysis._drop_stats import record as _record_drop_stats
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.analysis_env import (
-    api_read_timeout_override,
-    context_size_override,
-    max_output_tokens_override,
+    api_read_timeout_override, context_size_override, max_output_tokens_override,
 )
+from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL, OLLAMA_DEFAULT_PORT
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
+_OLLAMA_DEFAULT_BASE = f"{OLLAMA_DEFAULT_BASE_URL}/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 _OPENAI_API_HOST = "api.openai.com"
 _LOCAL_TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
@@ -127,9 +127,9 @@ def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
     if isinstance(exc, openai.PermissionDeniedError):
         return "auth", "permission denied (403)"
     if isinstance(exc, openai.APIStatusError):
-        if exc.status_code == 402:
+        if exc.status_code == HTTPStatus.PAYMENT_REQUIRED:
             return "payment", "out of credits (402 payment required)"
-        if exc.status_code == 429:
+        if exc.status_code == HTTPStatus.TOO_MANY_REQUESTS:
             reason = classify_fatal_provider_message(str(exc))
             if reason in ("quota", "payment"):
                 return reason, "quota/credits exhausted (429)"
@@ -156,7 +156,7 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
         # API; direct Ollama ignores it on /v1, hence the warning.
         extra_body["num_ctx"] = ctx_size
         base = config.api_base or _OLLAMA_DEFAULT_BASE
-        if ":11434" in base:
+        if f":{OLLAMA_DEFAULT_PORT}" in base:
             _warn_ollama_ctx_noop(base)
 
     create_kwargs: dict = dict(

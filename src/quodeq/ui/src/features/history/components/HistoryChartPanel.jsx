@@ -23,6 +23,7 @@ import {
   HISTORY_CHART_HEIGHT,
 } from '../../../components/scoreChartHelpers.js';
 import { computeHistoryChartStats, buildHistoryKbdItems } from './historyChartStats.js';
+import { DATA_THEME_ATTR } from '../../../constants.js';
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = HISTORY_CHART_HEIGHT;
@@ -147,7 +148,7 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
   const [, setThemeVersion] = useState(0);
   useEffect(() => {
     const obs = new MutationObserver(() => setThemeVersion((v) => v + 1));
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: [DATA_THEME_ATTR] });
     return () => obs.disconnect();
   }, []);
 

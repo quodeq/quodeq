@@ -11,8 +11,8 @@ export function buildAssistantSessionPayload({ provider, model, projectId, runId
 }
 
 /**
- * Handler for the `quodeq:assistant-action-applied` window event, which the
- * assistant's ActionPreviewCard dispatches after a successful apply.
+ * Handler for the ASSISTANT_ACTION_APPLIED_EVENT window event (constants.js),
+ * which the assistant's ActionPreviewCard dispatches after a successful apply.
  *
  * Extracted and exported so the post-dismiss convergence contract can be
  * pinned without mounting App (which needs ~8 providers). An assistant

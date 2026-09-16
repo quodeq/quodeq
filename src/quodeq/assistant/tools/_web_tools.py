@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from html.parser import HTMLParser
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -26,6 +27,8 @@ _MAX_FETCH_BYTES = 2 * 1024 * 1024
 _MAX_FETCH_SECONDS = 60.0  # total budget: read=30.0 is per-read-op, so a slow
 # drip (1 byte per 29s) would otherwise wedge the turn thread indefinitely
 _MAX_TEXT_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
+_MAX_TITLE_CHARS = 300  # per search result; keeps _MAX_RESULTS results well under the fence
+_MAX_SNIPPET_CHARS = 500  # per search result, same budget
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
 
@@ -86,14 +89,14 @@ def _search_web(query: str, max_results: int = 5) -> dict:
                          headers={"User-Agent": _USER_AGENT}, timeout=_TIMEOUT)
     except httpx.HTTPError as exc:
         raise ToolError(f"web search failed: {exc}") from exc
-    if resp.status_code != 200:
+    if resp.status_code != HTTPStatus.OK:
         raise ToolError(f"web search unavailable right now (HTTP {resp.status_code}); "
                         "try fetch_url with a known URL instead")
     parser = _DdgResultParser()
     parser.feed(resp.text)
     parser.close()  # convert_charrefs buffers a trailing run near a bare &
-    results = [{"title": r["title"].strip()[:300], "url": r["url"],
-                "snippet": " ".join(r["snippet"].split())[:500]}
+    results = [{"title": r["title"].strip()[:_MAX_TITLE_CHARS], "url": r["url"],
+                "snippet": " ".join(r["snippet"].split())[:_MAX_SNIPPET_CHARS]}
                for r in parser.results if r["url"].startswith("http")]
     if not results:
         raise ToolError("web search returned no results; the search service may be "
@@ -145,7 +148,7 @@ def _fetch_url_redirect_payload(url: str, resp) -> dict | None:
 def _validate_fetch_response(url: str, resp) -> str:
     """Raise ToolError for a non-200 or unsupported content type; else return
     the lowercased content-type."""
-    if resp.status_code != 200:
+    if resp.status_code != HTTPStatus.OK:
         raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
     content_type = resp.headers.get("content-type", "").lower()
     # reject known-binary types before reading the body; empty

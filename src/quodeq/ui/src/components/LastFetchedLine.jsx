@@ -1,4 +1,5 @@
 import { t } from '../strings/index.js';
+import { MS_PER_DAY } from '../utils/time.js';
 // Exported so other "N ago" displays (e.g. the Projects page's online-tab
 // sync status and published-by lines) reuse this exact formatter instead of
 // growing a second one.
@@ -12,7 +13,7 @@ export function relativeTime(iso) {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return null;
   const diffMs = Date.now() - then;
-  const days = Math.floor(diffMs / 86400000);
+  const days = Math.floor(diffMs / MS_PER_DAY);
   if (days <= 0) return t('common.today');
   if (days === 1) return t('common.yesterday');
   if (days < 60) return t('common.daysAgo', { days });

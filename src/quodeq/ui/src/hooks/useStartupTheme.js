@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { syncNativeTitlebar } from '../utils/nativeTitlebar.js';
 import { useOneShotGate } from './useOneShotGate.js';
 import { useLinger } from './useLinger.js';
+import { PREFERS_DARK_QUERY, PYWEBVIEW_READY_EVENT } from '../constants.js';
 
 // How long the startup loader stays opaque after its data-hold releases,
 // covering the overview's final commit (lazy chart first render).
@@ -21,11 +22,11 @@ export const STARTUP_LOADER_LINGER_MS = 250;
 export function useEffectiveDark(themeMode) {
   const [prefersDark, setPrefersDark] = useState(() =>
     typeof window !== 'undefined'
-      && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+      && window.matchMedia?.(PREFERS_DARK_QUERY).matches
   );
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const mql = window.matchMedia(PREFERS_DARK_QUERY);
     const handler = (e) => setPrefersDark(e.matches);
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
@@ -44,8 +45,8 @@ export function useNativeTitlebarSync(effectiveDark) {
   useEffect(() => {
     syncNativeTitlebar(effectiveDark);
     const onReady = () => syncNativeTitlebar(effectiveDark);
-    window.addEventListener('pywebviewready', onReady);
-    return () => window.removeEventListener('pywebviewready', onReady);
+    window.addEventListener(PYWEBVIEW_READY_EVENT, onReady);
+    return () => window.removeEventListener(PYWEBVIEW_READY_EVENT, onReady);
   }, [effectiveDark]);
 }
 

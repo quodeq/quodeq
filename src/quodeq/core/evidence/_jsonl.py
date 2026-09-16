@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.evidence._refs import RefsReader, enrich_judgment
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 from quodeq.core.events.models import Judgment, VALID_VERDICTS
@@ -89,7 +90,7 @@ def judgment_to_dict(j: Judgment) -> dict:
     # Carry confidence forward only when it's not the default 100. Keeps the
     # PrincipleEvidence dicts compact for the common case where every finding
     # has full confidence; producers writing < 100 surface in the output.
-    if j.confidence != 100:
+    if j.confidence != FULL_CONFIDENCE:
         d["confidence"] = j.confidence
     # Carry the provenance-gate marker forward only when set, mirroring
     # confidence -- keeps the common (un-downgraded) finding dict compact.

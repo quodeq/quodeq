@@ -1,6 +1,17 @@
 import {
   TAU, getThemeColors, drawGlow, drawParticles, rgba, rgb,
 } from '../core/galaxyCore.js';
+import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL } from '../core/galaxyTunables.js';
+
+// Dimension labels grow with the zoom up to this cap. Deliberately equal
+// to ZOOM_DIMENSION_LEVEL: once principles appear the label stops growing.
+const LABEL_SCALE_CAP = ZOOM_DIMENSION_LEVEL;
+// Zoom units past ZOOM_PRINCIPLE_LEVEL over which the selected principle's
+// particles and label hand off to its violation orbs, which fade in over
+// the same span.
+const PRINCIPLE_FADE_SPAN = 20;
+// The other principles' labels get out of the way faster than that.
+const SIBLING_LABEL_FADE_SPAN = 15;
 
 /**
  * Render one animation frame on the galaxy canvas.
@@ -128,17 +139,17 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
   const clusterDim = inFocusedCluster ? 1 : Math.max(0.08, 1 - (cam.z - 1) / 2);
   // All dim-level decorations fade out once we zoom past galaxy level
-  const dimFade = isSelected ? 1 : Math.max(0, 1 - (cam.z - 1.5) / 3) * clusterDim;
+  const dimFade = isSelected ? 1 : Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 3) * clusterDim;
 
   // Principle particles orbiting this dimension — fade out as principle planets fade in
-  const particleAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
+  const particleAlpha = isSelected ? Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 2) : dimFade;
   drawDimParticles(ctx, scene, i, sc, cam, t, particleAlpha);
 
   drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: isSelected ? clusterDim : dimFade });
   // Hide dimension label when zoomed past galaxy level
-  const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
+  const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 2) : dimFade;
   if (showLabels && labelAlpha > 0.01) {
-    const fs = Math.min(cam.z, 1.5);
+    const fs = Math.min(cam.z, LABEL_SCALE_CAP);
     ctx.font = `600 ${Math.max(11, 14 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
     ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * labelAlpha);
     ctx.fillText(s.name, sc.x, sc.y - sr - 24 * fs);
@@ -186,11 +197,11 @@ function drawFocusRing(ctx, cx, cy, r, tc) {
  * Returns the hovered principle element, or null.
  */
 function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
-  if (!(cam.z > 1.5 && rDim !== null)) return null;
+  if (!(cam.z > ZOOM_DIMENSION_LEVEL && rDim !== null)) return null;
   const { t, mx, my, showLabels, animating, w2s } = opts;
   const dim = scene.stars[rDim];
   const dsc = w2s(dim.x, dim.y);
-  const pAlpha = Math.min(1, (cam.z - 1.5) / 3);
+  const pAlpha = Math.min(1, (cam.z - ZOOM_DIMENSION_LEVEL) / 3);
   const pScale = cam.z * 0.12;
   let newHovered = null;
   (scene.principles[rDim] || []).forEach((p, pi) => {
@@ -204,7 +215,7 @@ function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
     ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
     ctx.strokeStyle = rgba(dim.col, 0.04 * pAlpha); ctx.lineWidth = 0.8; ctx.stroke();
     // Violation/compliance particles — fade out on selected (large orbs take over), shrink on others
-    const particleFade = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : 1;
+    const particleFade = isSelectedPrin ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : 1;
     // Non-selected: smaller particles but keep orbit wide so they don't collide with planet
     const cappedScale = Math.min(0.8, 5 * 0.12 / Math.max(pScale, 0.01));
     const particleDrawScale = isSelectedPrin ? pScale * 0.8 : pScale * cappedScale;
@@ -212,7 +223,7 @@ function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
     if (particleFade > 0.01) drawParticles(ctx, p.particles, { cx: sc.x, cy: sc.y, scale: particleOrbitScale, alpha: pAlpha * particleFade, t, drawScale: particleDrawScale });
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: p.col, alpha: pAlpha });
     // Only fade labels/scores — hide on non-selected when zoomed into a principle
-    const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - 12) / 15) : 1);
+    const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / SIBLING_LABEL_FADE_SPAN) : 1);
     if (showLabels && prinLabelAlpha > 0.01) {
       const la = pAlpha * prinLabelAlpha;
       ctx.font = `600 14px -apple-system,BlinkMacSystemFont,sans-serif`;
@@ -236,10 +247,10 @@ function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
 /** Phase 5: violation/compliance orbs when zoomed deeply into a principle. */
 function drawZoomedPrinciple(ctx, scene, cam, opts) {
   const { t, showLabels, w2s, rDim, rPrin } = opts;
-  if (!(cam.z > 12 && rDim !== null && rPrin !== null)) return;
+  if (!(cam.z > ZOOM_PRINCIPLE_LEVEL && rDim !== null && rPrin !== null)) return;
   const prin = scene.principles[rDim][rPrin];
   const psc = w2s(prin.x, prin.y);
-  const vAlpha = Math.min(1, (cam.z - 12) / 20);
+  const vAlpha = Math.min(1, (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN);
   const vScale = cam.z * 0.06;
   prin.particles.forEach((p) => {
     const a = t * p.os + p.op;

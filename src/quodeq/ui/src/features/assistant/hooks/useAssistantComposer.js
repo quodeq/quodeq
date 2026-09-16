@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildMetaResponse, matchCommands, parseMetaCommand } from '../commands.js';
 
+// Must equal the `.assistant-drawer-input` max-height in assistant.css: the
+// auto-grow below stops where the CSS cap would clip anyway.
+const COMPOSER_MAX_HEIGHT_PX = 120;
+
 /**
  * AssistantDrawer.jsx (AssistantPane)'s composer state: the draft text, the
  * slash-command menu, and the send/keydown/change handlers. Extracted
@@ -26,7 +30,7 @@ function useComposerFocusEffects({ active, streaming, draft, inputRef }) {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT_PX)}px`;
   }, [draft]);
 }
 

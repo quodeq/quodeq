@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
 
+_WRITE_FAILED = (-1, -1)  # migrate_file's result when the patched JSON could not be written
+
 
 def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
     """Parse a JSONL evidence file into a (principle, file, line) -> cwe_id map."""
@@ -96,7 +98,7 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
             eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {eval_path}: {exc}")
-            return -1, -1
+            return _WRITE_FAILED
 
     return v_count, c_count
 
@@ -126,7 +128,7 @@ def main() -> None:
             files_skipped += 1
             print(f"  skip     {path.relative_to(root)}  (no JSONL found)")
             continue
-        if result == (-1, -1):
+        if result == _WRITE_FAILED:
             had_errors = True
             continue
         v, c = result

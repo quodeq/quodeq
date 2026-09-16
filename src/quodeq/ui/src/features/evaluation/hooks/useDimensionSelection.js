@@ -10,6 +10,7 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { t } from '../../../strings/index.js';
+import { CLEAN_PERSIST } from '../components/scanModes.js';
 
 const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
@@ -18,7 +19,7 @@ export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanS
   payload.dimensions = [...selectedDims];
   if (branch) payload.branch = branch;
   if (scopePath) payload.scopePath = scopePath;
-  payload.cleanScan = cleanScan !== 'off';
+  payload.cleanScan = cleanScan !== CLEAN_PERSIST.OFF;
   // Per-run budget override (seconds; 0 = no limit). preparePayload treats a
   // present timeLimit as authoritative over the provider's Settings value.
   if (timeLimitS != null) payload.timeLimit = timeLimitS;
@@ -54,7 +55,7 @@ function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
 
 export function useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null, timeLimitS = null }) {
   const [selectedDims, setSelectedDims] = useState(new Set());
-  const [cleanScan, setCleanScan] = useState('off');
+  const [cleanScan, setCleanScan] = useState(CLEAN_PERSIST.OFF);
 
   useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims);
 
@@ -78,9 +79,9 @@ export function useDimensionSelection({ allDimensions, info, branch, scopePath, 
     // through. A blocked start (another evaluation running) returns false;
     // a failed start rejects. Eating the toggle in either case makes the
     // user's retry silently run incremental.
-    if (cleanScan === 'once' && result !== false) {
+    if (cleanScan === CLEAN_PERSIST.ONCE && result !== false) {
       Promise.resolve(result).then(
-        () => setCleanScan('off'),
+        () => setCleanScan(CLEAN_PERSIST.OFF),
         () => {},
       );
     }

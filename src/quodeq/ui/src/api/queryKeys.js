@@ -18,6 +18,8 @@
  * (no source) still prefix-matches every subkey for the *local* source only;
  * pass the caller's source explicitly if it should also match shared entries.
  */
+import { DEFAULT_PROJECT_SOURCE } from '../constants.js';
+
 export const evaluationKeys = {
   all: () => ["evaluation"],
   evaluation: (jobId) => ["evaluation", jobId],
@@ -28,25 +30,25 @@ export const evaluationKeys = {
 
 export const projectKeys = {
   all: () => ["project"],
-  project: (projectId, source = "local") => ["project", projectId, source],
-  scores: (projectId, asOf, source = "local") => ["project", projectId, source, "scores", asOf || "latest"],
-  dashboard: (projectId, run, source = "local") => ["project", projectId, source, "dashboard", run || "latest"],
-  runs: (projectId, source = "local") => ["project", projectId, source, "runs"],
-  info: (projectId, source = "local") => ["project", projectId, source, "info"],
+  project: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source],
+  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "scores", asOf || "latest"],
+  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "dashboard", run || "latest"],
+  runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "runs"],
+  info: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "info"],
   // Explorer (dimension detail) queries. Distinct from `scores`: that one is
   // GET /projects/<p>/scores?as_of= (full payload incl. trend/availableRuns),
   // runScores is the slim GET /projects/<p>/scores/<run> used for the rescore
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
-  runScores: (projectId, run, source = "local") => ["project", projectId, source, "runScores", run || "latest"],
+  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "runScores", run || "latest"],
   // Compare tab's slim per-project payload. Lives inside the project subtree
   // on purpose: dismiss/delete/formula invalidations must reach it, or the
   // fleet table would keep showing pre-dismissal scores.
-  compareSummary: (projectId, source = "local") => ["project", projectId, source, "compareSummary"],
+  compareSummary: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "compareSummary"],
   // Per-project enabled-standards set, fetched by Compare so every row is
   // filtered to that project's own visible dimensions (as Overview does).
-  standardsVisibility: (projectId, source = "local") => ["project", projectId, source, "standardsVisibility"],
-  dimensionEval: (projectId, run, dimension, source = "local") => ["project", projectId, source, "dimensionEval", run || "latest", dimension],
+  standardsVisibility: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "standardsVisibility"],
+  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "dimensionEval", run || "latest", dimension],
 };
 
 /**
@@ -71,7 +73,7 @@ export const projectKeys = {
  * Relies on the [scope, projectId, source, ...] layout the factories above
  * build; keep the two in step.
  */
-export function samePlaceholderScope(previousQuery, projectId, source = "local") {
+export function samePlaceholderScope(previousQuery, projectId, source = DEFAULT_PROJECT_SOURCE) {
   const key = previousQuery?.queryKey;
   if (!Array.isArray(key)) return false;
   return key[1] === projectId && key[2] === source;

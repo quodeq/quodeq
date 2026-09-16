@@ -7,6 +7,7 @@ import { formatDuration } from '../../../../utils/formatters.js';
 import { isTimeLimitExit } from '../../../../models/exitReason.js';
 import { t } from '../../../../strings/index.js';
 import { suppressedSuffix, carriedSuffix, formatSevHint } from './derivations.js';
+import { SCAN_MODE } from '../scanModes.js';
 
 const STATUS_TONE = {
   running: 'warning',
@@ -75,8 +76,8 @@ function buildRunningCells(inputs) {
   // progress data instead of repeating "running".
   const dc = inputs.dimCycle ?? null;
   const runKnown = inputs.totalFiles > 0;
-  const modeHint = inputs.scanMode === 'incremental' ? t('evaluate.modeIncremental')
-    : inputs.scanMode === 'clean' ? t('evaluate.modeFullRescan') : '';
+  const modeHint = inputs.scanMode === SCAN_MODE.INCREMENTAL ? t('evaluate.modeIncremental')
+    : inputs.scanMode === SCAN_MODE.CLEAN ? t('evaluate.modeFullRescan') : '';
   return [
     {
       // The counter lives in the hint, not the label. Tile labels are a

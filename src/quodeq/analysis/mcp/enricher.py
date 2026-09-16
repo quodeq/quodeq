@@ -21,6 +21,7 @@ from quodeq.context.precedent import (
 )
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
+from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.observability import NULL_LOG, LogSink
 
 _FINDING_SCHEMA_VERSION = 1
@@ -77,7 +78,7 @@ def _apply_path_role_downweight(finding: dict[str, object]) -> None:
     if role not in NON_PROD_ROLES:
         return
     existing = finding.get("confidence")
-    if existing is None or existing == 100:
+    if existing is None or existing == FULL_CONFIDENCE:
         finding["confidence"] = _NON_PROD_DOWNWEIGHT
 
 
@@ -109,7 +110,7 @@ def _apply_shape_downweight(
     if not any(kw in haystack for kw in _HOSTED_SERVICE_KEYWORDS):
         return
     existing = finding.get("confidence")
-    if existing is None or existing == 100:
+    if existing is None or existing == FULL_CONFIDENCE:
         finding["confidence"] = _SHAPE_DOWNWEIGHT
 
 
@@ -164,7 +165,7 @@ def _apply_precedent_downweight(
     if not matched:
         return
     existing = finding.get("confidence")
-    if existing is None or existing == 100:
+    if existing is None or existing == FULL_CONFIDENCE:
         finding["confidence"] = _PRECEDENT_DOWNWEIGHT
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 from quodeq.analysis._provider_cache import get_provider_configs as _get_cached_configs
+from quodeq.shared.constants import OLLAMA_DEFAULT_PORT
 
 
 def get_provider_configs() -> dict[str, dict]:
@@ -24,7 +25,7 @@ LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 
 
 # Default markers detect common local LLM server patterns.
-_LOCAL_API_MARKERS_DEFAULT = frozenset({"11434", "localhost", "127.0.0.1", "ollama"})
+_LOCAL_API_MARKERS_DEFAULT = frozenset({OLLAMA_DEFAULT_PORT, "localhost", "127.0.0.1", "ollama"})
 
 
 def _local_api_markers(env: dict[str, str] | None = None) -> frozenset[str]:

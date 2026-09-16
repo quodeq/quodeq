@@ -1,6 +1,5 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
-
-const STEP_ORDER = ['welcome', 'repo-scan', 'provider', 'standard-launch'];
+import { STEP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 
 /**
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
@@ -45,7 +44,7 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
     const i = STEP_ORDER.indexOf(wizard.state.step);
     let next = STEP_ORDER[i + 1] || wizard.state.step;
     // Auto-skip Provider if already configured.
-    if (next === 'provider' && providerConfigured) next = 'standard-launch';
+    if (next === STEP_PROVIDER && providerConfigured) next = STEP_STANDARD_LAUNCH;
     wizard.goToStep(next);
   }
 

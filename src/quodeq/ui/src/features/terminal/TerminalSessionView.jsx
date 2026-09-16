@@ -4,6 +4,12 @@ import { useTerminalSocket } from './useTerminalSocket.js';
 import { createTerminalInstance, isReservedChord } from './terminalSetup.js';
 import { themeFromCss } from './xtermTheme.js';
 import { t } from '../../strings/index.js';
+import { DATA_THEME_ATTR } from '../../constants.js';
+
+// Refit debounce: during the sidebar-expand transition (and manual drag) the
+// container resizes every frame, and refitting each frame SIGWINCHes the PTY
+// ~12x so a running TUI "scratches". One refit after the size settles.
+const FIT_DEBOUNCE_MS = 150;
 
 // True when the element isn't laid out (display:none / zero-size). Fitting xterm
 // to a hidden box measures a 0x0 cell and drives the PTY to a bogus size, so the
@@ -76,11 +82,8 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
     if (!isHidden(rootRef.current)) {
       try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
     }
-    // Debounce refits: during the sidebar-expand transition (and manual drag)
-    // the container resizes every frame; refitting each frame thrashes xterm
-    // and SIGWINCHes the PTY ~12x, so a running TUI redraws repeatedly and
-    // "scratches". Fit ONCE after the size settles. (ResizeObserver isn't in
-    // JSDOM; guard so tests and any lacking environment don't crash.)
+    // Fit ONCE after the size settles (FIT_DEBOUNCE_MS). ResizeObserver isn't
+    // in JSDOM; guard so tests and any lacking environment don't crash.
     const scheduleFit = () => {
       if (box.fitTimer) clearTimeout(box.fitTimer);
       box.fitTimer = setTimeout(() => {
@@ -90,13 +93,13 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
         // floods the prompt with cursor-position replies (the "14;3R…" garbage).
         if (isHidden(rootRef.current)) return;
         try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
-      }, 150);
+      }, FIT_DEBOUNCE_MS);
     };
     box.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleFit) : null;
     box.ro?.observe(rootRef.current);
     const onTheme = () => { term.options.theme = themeFromCss(); };
     box.mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(onTheme) : null;
-    box.mo?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    box.mo?.observe(document.documentElement, { attributes: true, attributeFilter: [DATA_THEME_ATTR] });
   };
 }
 

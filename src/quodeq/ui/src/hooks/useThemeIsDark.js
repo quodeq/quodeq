@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
+import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
 
 // Resolves whether the ACTIVE theme is dark by observing the applied
-// `data-theme` attribute on <html> rather than re-reading settings state.
+// DATA_THEME_ATTR attribute on <html> rather than re-reading settings state.
 // useAppSettings owns the attribute; observing it keeps every consumer in
 // sync no matter which code path applied the theme (TopBar toggle, Settings,
 // initial paint). Attribute values: absent = daruma family in system mode
 // (the OS preference decides); otherwise 'light' | 'dark' | '<family>-<mode>'.
 function computeIsDark() {
-  const attr = document.documentElement.getAttribute('data-theme');
+  const attr = document.documentElement.getAttribute(DATA_THEME_ATTR);
   if (attr) return attr === 'dark' || attr.endsWith('-dark');
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return window.matchMedia(PREFERS_DARK_QUERY).matches;
 }
 
 export function useThemeIsDark() {
@@ -21,9 +22,9 @@ export function useThemeIsDark() {
     const observer = new MutationObserver(update);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme'],
+      attributeFilter: [DATA_THEME_ATTR],
     });
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const mql = window.matchMedia(PREFERS_DARK_QUERY);
     mql.addEventListener('change', update);
     return () => {
       observer.disconnect();

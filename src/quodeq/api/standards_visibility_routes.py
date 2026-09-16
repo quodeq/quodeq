@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._assistant_helpers import resolve_repo_root
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.core.standards.visibility import DEFAULT_VISIBLE_STANDARDS, validate_visible_ids
 from quodeq.services.standards_prefs import (
@@ -62,11 +63,11 @@ def register_visibility_routes(app: Flask) -> None:
         try:
             validate_path_segment(project_id)
         except ValueError:
-            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
+            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
         root = _repo_root(project_id)
         if root is None:
             return error_response("Project has no local repository",
-                                  HTTPStatus.NOT_FOUND, "not_found")
+                                  HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
         return jsonify(_payload(app, root))
 
     @app.put("/api/projects/<project_id>/standards-visibility")
@@ -74,16 +75,16 @@ def register_visibility_routes(app: Flask) -> None:
         try:
             validate_path_segment(project_id)
         except ValueError:
-            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
+            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
         root = _repo_root(project_id)
         if root is None:
             return error_response("Project has no local repository",
-                                  HTTPStatus.NOT_FOUND, "not_found")
+                                  HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
         body = request.get_json(force=True, silent=True)
         raw = body.get("visibleStandardIds") if isinstance(body, dict) else None
         if raw is None:
             return error_response('Body must be {"visibleStandardIds": [...]}',
-                                  HTTPStatus.BAD_REQUEST, "bad_request")
+                                  HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
         clean, errors = validate_visible_ids(raw, _known_ids(app))
         if errors:
             resp = jsonify({"error": "Invalid visibility selection",

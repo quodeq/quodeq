@@ -17,6 +17,9 @@ import threading
 _logger = logging.getLogger(__name__)
 
 _macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
+_DWMWA_USE_IMMERSIVE_DARK_MODE = 20  # DWMWINDOWATTRIBUTE id, Windows 10 20H1 and later
+_DWMWA_USE_IMMERSIVE_DARK_MODE_PRE_20H1 = 19  # the undocumented id builds before 20H1 used
+_S_OK = 0  # HRESULT success
 
 
 def _set_macos_titlebar_appearance(window: object, dark: bool) -> None:
@@ -58,6 +61,9 @@ def _show_macos_traffic_lights(window: object) -> None:
     if sys.platform != "darwin":
         return
     try:
+        from AppKit import (  # noqa: PLC0415
+            NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton,
+        )
         from PyObjCTools import AppHelper  # noqa: PLC0415
     except ImportError:
         return
@@ -66,8 +72,7 @@ def _show_macos_traffic_lights(window: object) -> None:
         return
 
     def _apply() -> None:
-        # NSWindowCloseButton=0, NSWindowMiniaturizeButton=1, NSWindowZoomButton=2
-        for button_id in (0, 1, 2):
+        for button_id in (NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton):
             try:
                 btn = nswindow.standardWindowButton_(button_id)
                 if btn is not None:
@@ -90,10 +95,10 @@ def _apply_unified_toolbar(nswindow: object) -> None:
     toolbar = AppKit.NSToolbar.alloc().initWithIdentifier_("quodeq-titlebar")
     toolbar.setShowsBaselineSeparator_(False)
     nswindow.setToolbar_(toolbar)
-    nswindow.setToolbarStyle_(4)  # NSWindowToolbarStyleUnifiedCompact
+    nswindow.setToolbarStyle_(AppKit.NSWindowToolbarStyleUnifiedCompact)
     # Remove the 1px separator line under the toolbar (most visible in
-    # fullscreen). NSTitlebarSeparatorStyleNone = 1 (macOS 11+).
-    nswindow.setTitlebarSeparatorStyle_(1)
+    # fullscreen); macOS 11+.
+    nswindow.setTitlebarSeparatorStyle_(AppKit.NSTitlebarSeparatorStyleNone)
 
 
 def _set_macos_unified_toolbar(window: object) -> None:
@@ -153,12 +158,12 @@ def _set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
             return
         value = ctypes.c_int(1 if dark else 0)
         size = ctypes.sizeof(value)
-        for attr in (20, 19):
+        for attr in (_DWMWA_USE_IMMERSIVE_DARK_MODE, _DWMWA_USE_IMMERSIVE_DARK_MODE_PRE_20H1):
             res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
                 wintypes.HWND(hwnd), wintypes.DWORD(attr),
                 ctypes.byref(value), wintypes.DWORD(size),
             )
-            if res == 0:
+            if res == _S_OK:
                 return
     except (AttributeError, OSError):
         _logger.debug("Windows titlebar DWM configuration failed", exc_info=True)

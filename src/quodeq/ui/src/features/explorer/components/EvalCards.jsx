@@ -11,6 +11,11 @@ import { t } from '../../../strings/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
+// Line heights pretext measures with. They mirror the rendered line height of
+// `.vlive-detail--terminal .vlive-detail-title` / `.vlive-detail-reason`
+// (terminal.css); a font change there must be reflected here.
+const TITLE_LINE_HEIGHT_PX = 18;
+const REASON_LINE_HEIGHT_PX = 20;
 
 function filterValidRefs(refs) {
   return (refs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
@@ -42,8 +47,8 @@ function ViolationDetail({ item }) {
   // `min-height` on the element to reserve space before layout.
   const titleRef = useRef(null);
   const reasonRef = useRef(null);
-  const titleMeasure = usePretextHeight(titleRef, item.title, { lineHeight: 18 });
-  const reasonMeasure = usePretextHeight(reasonRef, item.reason, { lineHeight: 20 });
+  const titleMeasure = usePretextHeight(titleRef, item.title, { lineHeight: TITLE_LINE_HEIGHT_PX });
+  const reasonMeasure = usePretextHeight(reasonRef, item.reason, { lineHeight: REASON_LINE_HEIGHT_PX });
 
   return (
     <div className="vlive-detail vlive-detail--terminal">

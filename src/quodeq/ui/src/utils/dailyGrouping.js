@@ -1,3 +1,5 @@
+import { MS_PER_DAY } from './time.js';
+
 /**
  * Local calendar-day key (YYYY-MM-DD) for a trend entry's dateISO.
  *
@@ -43,7 +45,7 @@ export function isoWeekKey(dateISO) {
   date.setUTCDate(date.getUTCDate() + 4 - dayNum); // shift to this week's Thursday
   const isoYear = date.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+  const weekNo = Math.ceil(((date - yearStart) / MS_PER_DAY + 1) / 7);
   return `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
 }
 

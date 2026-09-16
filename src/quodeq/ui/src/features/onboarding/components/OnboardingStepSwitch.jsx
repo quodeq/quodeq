@@ -2,6 +2,7 @@ import WelcomeStep from './steps/WelcomeStep.jsx';
 import RepoScanStep from './steps/RepoScanStep.jsx';
 import ProviderStep from './steps/ProviderStep.jsx';
 import StandardLaunchStep from './steps/StandardLaunchStep.jsx';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 
 /**
  * OnboardingWizard.jsx's step-switch JSX (which step component renders for
@@ -14,11 +15,11 @@ export function OnboardingStepSwitch({
 }) {
   return (
     <>
-      {wizard.state.step === 'welcome' && (
-        <WelcomeStep onStart={() => wizard.goToStep('repo-scan')} onSkip={handleSkipWelcome} />
+      {wizard.state.step === STEP_WELCOME && (
+        <WelcomeStep onStart={() => wizard.goToStep(STEP_REPO_SCAN)} onSkip={handleSkipWelcome} />
       )}
 
-      {wizard.state.step === 'repo-scan' && (
+      {wizard.state.step === STEP_REPO_SCAN && (
         <RepoScanStep
           state={wizard.state}
           actions={wizard}
@@ -31,7 +32,7 @@ export function OnboardingStepSwitch({
         />
       )}
 
-      {wizard.state.step === 'provider' && (
+      {wizard.state.step === STEP_PROVIDER && (
         <ProviderStep
           state={wizard.state}
           actions={wizard}
@@ -42,7 +43,7 @@ export function OnboardingStepSwitch({
         />
       )}
 
-      {wizard.state.step === 'standard-launch' && (
+      {wizard.state.step === STEP_STANDARD_LAUNCH && (
         <StandardLaunchStep
           state={wizard.state}
           actions={wizard}

@@ -14,6 +14,7 @@ import ComparePage from './ComparePage.jsx';
  * ../../../api/shared.js first.
  */
 
+// The test anchors the day length independently of utils/time.js.
 export const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
 
 export const PROJECTS = [

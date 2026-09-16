@@ -75,12 +75,13 @@ def diff_stats(worktree: Path) -> list[dict]:
     out = _run(["git", "-C", str(worktree), "diff", "HEAD", "--numstat"])
     stats = []
     for line in out.splitlines():
-        parts = line.split("\t")
-        if len(parts) == 3:
-            added, deleted, name = parts
-            stats.append({"file": name,
-                          "added": 0 if added == "-" else int(added),
-                          "deleted": 0 if deleted == "-" else int(deleted)})
+        try:
+            added, deleted, name = line.split("\t")
+        except ValueError:
+            continue
+        stats.append({"file": name,
+                      "added": 0 if added == "-" else int(added),
+                      "deleted": 0 if deleted == "-" else int(deleted)})
     return stats
 
 
