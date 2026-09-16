@@ -26,3 +26,8 @@ export function filterViolations(dimension, selectedSeverities, selectedPrincipl
     return true;
   });
 }
+
+/** Density tile text: one decimal, '-' when the report has no files read. */
+export function formatPer100Files(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '-';
+}

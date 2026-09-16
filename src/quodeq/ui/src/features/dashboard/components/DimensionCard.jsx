@@ -15,7 +15,7 @@ import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
-import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations } from './dimensionCardModel.js';
+import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 
@@ -157,6 +157,7 @@ function DimKpiGrid({ dimension }) {
       <div className="mini-kpi"><p>{t('dimension.kpiTotalCompliance')}</p><strong>{dimension.totals?.complianceCount ?? 0}</strong></div>
       <div className="mini-kpi"><p>{t('dimension.kpiCritical')}</p><strong>{dimension.totals?.severity?.critical ?? 0}</strong></div>
       <div className="mini-kpi"><p>{t('dimension.kpiMajor')}</p><strong>{dimension.totals?.severity?.major ?? 0}</strong></div>
+      <div className="mini-kpi"><p>{t('dimension.kpiPer100Files')}</p><strong>{formatPer100Files(dimension.totals?.violationsPer100Files)}</strong></div>
     </div>
   );
 }

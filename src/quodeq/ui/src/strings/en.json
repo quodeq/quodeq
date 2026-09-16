@@ -305,6 +305,7 @@
   "dimension.fullFixPlan": "Full fix plan",
   "dimension.kpiCritical": "Critical",
   "dimension.kpiMajor": "Major",
+  "dimension.kpiPer100Files": "Per 100 files",
   "dimension.kpiTotalCompliance": "Total Compliance",
   "dimension.kpiTotalViolations": "Total Violations",
   "dimension.noViolationsMatch": "No violations match current filters.",
