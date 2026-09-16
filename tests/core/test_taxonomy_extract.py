@@ -45,6 +45,7 @@ def test_empty_dict_gives_empty_taxonomy():
 
 @pytest.mark.parametrize("block, message", [
     ([{"code": "other"}], "reserved"),
+    ([{"code": "a", "aliases": ["Other"]}], "reserved"),
     ([{"code": "Empty_Catch"}], "kebab-case"),
     ([{"code": "a"}, {"code": "a"}], "duplicate"),
     ([{"code": "a", "aliases": ["x"]}, {"code": "b", "aliases": ["x"]}], "maps to both"),

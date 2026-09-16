@@ -32,6 +32,8 @@ def _code_entry(req_id: str, entry: object) -> tuple[str, list[str]]:
 def _add_aliases(req_id: str, code: str, aliases: list[str], alias_map: dict[str, str]) -> None:
     for alias in aliases:
         folded = fold(alias)
+        if folded == OTHER:
+            raise TaxonomyError(f"{req_id}: alias {alias!r} of {code!r} uses the reserved code 'other'")
         if not folded or not _KEBAB.match(folded):
             raise TaxonomyError(f"{req_id}: alias {alias!r} of {code!r} is not kebab-case")
         if folded in alias_map and alias_map[folded] != code:
