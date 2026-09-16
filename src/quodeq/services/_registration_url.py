@@ -6,20 +6,11 @@ Split out of project_registration.py (Task 12).
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from quodeq.services._wiring import remote_origin_url_raw
-from quodeq.shared._repo import _looks_like_authority
+from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
 
-# Mirrors _SCHEME_RE in quodeq.api._evaluation_helpers. Not imported from
-# there: services must not depend on the api layer (no other services module
-# does), so this scheme-match pattern is duplicated here rather than layered
-# across. _looks_like_authority is imported from shared/_repo.py instead of
-# duplicated: it's a pure predicate with no shape coupling to this module,
-# and this codebase already imports private helpers from shared._repo
-# elsewhere (e.g. data/git_cli.py, shared/utils.py).
-_SCHEME_RE = re.compile(r"^(https?://)")
 
 
 def _strip_credentials(url: str) -> str:
@@ -37,7 +28,7 @@ def _strip_credentials(url: str) -> str:
     bounding the search by the first "/" would then hide the real "@" and
     let the whole credential through unstripped.
     """
-    match = _SCHEME_RE.match(url)
+    match = SCHEME_RE.match(url)
     if not match:
         return url
     scheme = match.group(1)

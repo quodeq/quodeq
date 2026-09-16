@@ -5,7 +5,12 @@ stays importable from the core-only ``shared`` layer.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
+
+# Leading http(s) scheme of a repository URL. Shared by the api and services
+# URL normalizers so both layers agree on what counts as a scheme.
+SCHEME_RE = re.compile(r"^(https?://)")
 
 
 def is_repo_url(repo_input: str) -> bool:
