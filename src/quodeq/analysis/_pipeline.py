@@ -33,7 +33,7 @@ def _warn_if_local_api_oversubscribed(config: RunConfig) -> None:
     Local model servers (Ollama, llama.cpp, omlx) default to serving one
     request per loaded model, so with ``--n-subagents > 1`` the extra agents
     queue behind the first. The read timeout scales with the subagent count
-    (see ``_api_runner._resolve_timeout``) so queued calls no longer die, but
+    (see ``_api_call._resolve_timeout``) so queued calls no longer die, but
     throughput is still capped at the server's parallelism until it is raised
     (e.g. ``OLLAMA_NUM_PARALLEL``). Cloud API providers don't have this
     constraint, so we narrow the warning to loopback bases.

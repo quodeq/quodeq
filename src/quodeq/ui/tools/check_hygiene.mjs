@@ -22,7 +22,7 @@ const RATCHET_RULES = new Set(['no-unused-vars', 'max-params']);
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 317; // set to the total printed by --update; lower it as entries burn down
+const TOTAL_CEILING = 157; // set to the total printed by --update; lower it as entries burn down
 
 async function collectCounts() {
   const eslint = new ESLint({

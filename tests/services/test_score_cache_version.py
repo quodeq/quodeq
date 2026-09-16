@@ -1,5 +1,4 @@
 import dataclasses
-from pathlib import Path
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.score_cache import score_cache_version

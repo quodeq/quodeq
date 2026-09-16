@@ -2,7 +2,6 @@
 import json
 import uuid
 from quodeq.data.projection.engine import ProjectionEngine
-from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 
 def _write_event(project_dir, event_type, req, file="a.kt", line=1):

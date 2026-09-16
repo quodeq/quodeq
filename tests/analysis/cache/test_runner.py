@@ -13,12 +13,10 @@ property is observable and deterministic:
 """
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.cache.entry import CacheEntry
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.cache.runner import (
     DispatchResult,

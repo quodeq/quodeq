@@ -66,7 +66,6 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/subagents/_pool_scaling.py': 'Scaling logic: respawn decisions, scale-up computation, future collection - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/_pool_worker.py': 'Worker logic: building agent configs and running single subagents - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/_queue_state.py': 'Queue state persistence: atomic JSON read/write with file locking - out of scope for this sweep (not a flagged per-site conversion)',
-    'analysis/subagents/_source_files.py': 'Source file listing and filtering for subagent queues - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/_verify_io.py': 'Finding verification I/O - evidence path resolution and JSONL parsing - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/jsonl_utils.py': 'JSONL merge and deduplication utilities for subagent pool output - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/subagents/priority_config.py': 'Priority configuration loading - Task C6 (usability sweep) added a warning log for a previously-silent malformed/missing file_priority.json fallback; out of scope for the SEP-06 sweep (not a flagged per-site conversion)',

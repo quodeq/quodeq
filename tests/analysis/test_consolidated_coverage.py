@@ -1,12 +1,10 @@
 """Tests for subagents/_consolidated.py — config building, prompt, result collection."""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 from quodeq.analysis.subagents._consolidated import (
     _build_consolidated_config,

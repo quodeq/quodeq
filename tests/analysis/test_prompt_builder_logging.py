@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from quodeq.analysis.prompts.builder import _load_evaluation_rules
 

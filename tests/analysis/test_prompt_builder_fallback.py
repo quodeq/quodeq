@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from quodeq.analysis.prompts.builder import _load_dimension_data
 
 def test_load_dimension_data_from_compiled(tmp_path):

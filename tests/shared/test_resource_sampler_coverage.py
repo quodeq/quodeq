@@ -5,7 +5,6 @@ The sampler loop's bare `except (OSError, ValueError)` must be broadened to
 """
 from __future__ import annotations
 
-import threading
 import time
 from unittest.mock import patch
 
@@ -20,7 +19,6 @@ class TestSamplerLoopBreadth:
         After the fix, the loop continues and the thread stays alive past the first tick.
         """
         tick_count = [0]
-        errors_seen = [0]
 
         def _bad_sample_once():
             tick_count[0] += 1

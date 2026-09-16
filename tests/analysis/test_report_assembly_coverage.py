@@ -1,9 +1,8 @@
 """Tests for _report_assembly.py — report building from evidence and scores."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from quodeq.analysis._report_assembly import (
     _ReportData,

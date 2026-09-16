@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.api.app import create_app, _default_provider
 

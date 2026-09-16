@@ -88,7 +88,6 @@ class TestGatherSourceFiles:
             (tmp_path / f"mod{i}.py").write_text("x" * 10_000)
         (tmp_path / "style.css").write_text("b" * 10_000)
         result = _gather_source_files(tmp_path)
-        names = {f.name for f in result}
         # Code files should be prioritized over markup
         code_count = sum(1 for f in result if f.suffix == ".py")
         markup_count = sum(1 for f in result if f.suffix == ".css")

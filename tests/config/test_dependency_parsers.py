@@ -16,6 +16,13 @@ from quodeq.config._dependency_parsers import (
     has_pyproject_dependency,
     has_requirements_txt_dependency,
 )
+from quodeq.config._dependency_parsers import (
+    has_gemfile_gem, has_gradle_dependency, has_julia_dependency,
+    has_mix_dep, has_pom_xml_dependency, has_pubspec_dependency,
+)
+from quodeq.config import _dependency_parsers as _dp
+from quodeq.config import _dependency_parsers_compiled as _dpc
+from quodeq.config import _dependency_parsers_python as _dpp
 
 
 # --- pyproject.toml ----------------------------------------------------------
@@ -173,10 +180,6 @@ def test_composer(body: str, needle: str, expected: bool) -> None:
 # --- pom.xml -----------------------------------------------------------------
 
 
-from quodeq.config._dependency_parsers import (
-    has_gemfile_gem, has_gradle_dependency, has_julia_dependency,
-    has_mix_dep, has_pom_xml_dependency, has_pubspec_dependency,
-)
 
 
 @pytest.mark.parametrize("body, needle, expected", [
@@ -376,9 +379,6 @@ def test_julia_project_toml(body: str, needle: str, expected: bool) -> None:
 # --- memoization -------------------------------------------------------------
 
 
-from quodeq.config import _dependency_parsers as _dp
-from quodeq.config import _dependency_parsers_compiled as _dpc
-from quodeq.config import _dependency_parsers_python as _dpp
 
 
 @pytest.mark.parametrize("module, parser, matcher, body", [

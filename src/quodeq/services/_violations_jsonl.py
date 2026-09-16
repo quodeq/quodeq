@@ -19,7 +19,6 @@ from quodeq.services.violations_parsing import (
     _build_violation_response,
     _ResponseOptions,
     _FINDING_TYPES,
-    _TYPE_COMPLIANCE,
     _TYPE_VIOLATION,
 )
 from quodeq.shared.utils import open_text

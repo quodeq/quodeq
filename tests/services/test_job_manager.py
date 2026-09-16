@@ -8,7 +8,6 @@ import subprocess
 import threading
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import InMemoryJobStore, Job

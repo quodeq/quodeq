@@ -57,7 +57,7 @@ def test_fetch_standard():
 def test_import_standard(tmp_path):
     http = FakeHttpClient({"https://example.com/standards/clean-arch.json": STANDARD_DATA})
     client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
-    result = client.import_standard("standards/clean-arch.json", tmp_path)
+    client.import_standard("standards/clean-arch.json", tmp_path)
     assert (tmp_path / "clean-arch.json").is_file()
     saved = json.loads((tmp_path / "clean-arch.json").read_text())
     assert saved["managed"] is True

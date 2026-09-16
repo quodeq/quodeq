@@ -1,4 +1,4 @@
-from quodeq.core.events.models import Judgment
-from quodeq.core.evidence.model import Evidence, PrincipleEvidence
-from quodeq.core.evidence.merge import merge_evidence
+"""Evidence package. ``QuarantinedFinding`` is re-exported for the log sink."""
 from quodeq.core.evidence._req_mapping import QuarantinedFinding
+
+__all__ = ["QuarantinedFinding"]

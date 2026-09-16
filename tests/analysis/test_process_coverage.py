@@ -4,8 +4,7 @@ from __future__ import annotations
 import signal
 import subprocess
 import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -25,7 +24,7 @@ class TestKillTree:
     @patch("os.killpg")
     @patch("os.getpgid", return_value=1234)
     def test_unix_kills_process_group(self, mock_getpgid, mock_killpg):
-        from quodeq.analysis._process import _kill_tree
+        from quodeq.shared._process_kill import kill_tree as _kill_tree
         _kill_tree(1234)
         mock_killpg.assert_called_once_with(1234, signal.SIGTERM)
 
@@ -35,7 +34,7 @@ class TestKillTree:
     @patch("os.getpgid", return_value=1234)
     @patch("os.kill")
     def test_unix_fallback_to_kill(self, mock_kill, mock_getpgid, mock_killpg):
-        from quodeq.analysis._process import _kill_tree
+        from quodeq.shared._process_kill import kill_tree as _kill_tree
         _kill_tree(1234)
         mock_kill.assert_called_once_with(1234, signal.SIGTERM)
 
@@ -45,13 +44,13 @@ class TestKillTree:
     @patch("os.getpgid", return_value=1234)
     @patch("os.kill", side_effect=ProcessLookupError)
     def test_unix_both_fail(self, mock_kill, mock_getpgid, mock_killpg):
-        from quodeq.analysis._process import _kill_tree
+        from quodeq.shared._process_kill import kill_tree as _kill_tree
         _kill_tree(1234)  # should not raise
 
     @patch("sys.platform", "win32")
     @patch("subprocess.run")
     def test_windows_taskkill(self, mock_run):
-        from quodeq.analysis._process import _kill_tree
+        from quodeq.shared._process_kill import kill_tree as _kill_tree
         _kill_tree(5678)
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]

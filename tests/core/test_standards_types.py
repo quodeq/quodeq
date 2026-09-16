@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from quodeq.config.paths import ConfigPaths
-from quodeq.core.types.standard import StandardMeta, StandardDetail, StandardReference
+from quodeq.core.types.standard import StandardMeta, StandardReference
 
 
 def test_standard_meta_creation():

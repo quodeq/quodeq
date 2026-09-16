@@ -48,6 +48,10 @@ Keep pull requests focused on a single change. If you are fixing a bug and also 
 ### Code Style
 
 - Follow the existing patterns in the codebase
+- Lint with ruff before pushing. The rule set lives in `pyproject.toml` and the test suite fails on any finding:
+
+      uv run ruff check src/quodeq tests tools
+      uv run ruff check --fix src/quodeq tests tools   # autofix the safe ones
 - No need to add docstrings or type annotations to code you did not change
 - Tests go in `tests/` mirroring the `src/` structure
 

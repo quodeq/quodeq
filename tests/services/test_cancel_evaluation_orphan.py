@@ -12,7 +12,6 @@ import os
 import signal
 from pathlib import Path
 
-import pytest
 
 from quodeq.services.filesystem import FilesystemActionProvider
 from quodeq.services.jobs import JobManager

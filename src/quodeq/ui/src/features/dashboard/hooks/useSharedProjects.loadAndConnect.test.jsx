@@ -1,11 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useSharedProjects, useSharedContentSignal } from './useSharedProjects.js';
+import { useSharedProjects } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
-import { sharedKeys } from '../../../api/queryKeys.js';
 
 function makeFakeApi(overrides = {}) {
   return {
@@ -20,16 +17,6 @@ function makeFakeApi(overrides = {}) {
     pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
     ...overrides,
   };
-}
-
-// A promise the test controls the settlement of, so we can assert on
-// behaviour while a call is genuinely still in flight (the double-submit
-// window), rather than a promise that resolves on the same microtask tick.
-function deferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-  return { promise, resolve, reject };
 }
 
 function wrap(fakeApi, children) {

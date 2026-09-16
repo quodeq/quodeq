@@ -5,7 +5,6 @@ from __future__ import annotations
 from http import HTTPStatus
 from pathlib import Path
 
-import pytest
 
 from quodeq.api.app import create_app
 

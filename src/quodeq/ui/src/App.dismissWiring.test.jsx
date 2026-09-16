@@ -1,14 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
-  buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
-  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
-  buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
-  shouldShowStartupLoader,
+  buildEvalPrincipal,
+  ROUTE_RENDERERS,
+  isSharedSource,
+  shouldBounceToEvaluate,
+  shouldShowEvaluateButton,
 } from './App.jsx';
-import Sidebar from './components/Sidebar.jsx';
 
 // Split from App.test.jsx: buildEvalPrincipal, source-gating helpers
 // (isSharedSource/shouldShowEvaluateButton/shouldBounceToEvaluate), and

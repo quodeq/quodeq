@@ -1,4 +1,6 @@
 from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant import AssistantRepository
+from quodeq.assistant.tools import ToolContext, build_registry
 
 
 def _echo_spec():
@@ -51,10 +53,7 @@ def test_openai_tools_shape_and_duplicate_rejected():
         pass
 
 
-from pathlib import Path
 
-from quodeq.assistant import AssistantRepository
-from quodeq.assistant.tools import ToolContext, build_registry
 
 
 def _ctx(tmp_path, **kw):

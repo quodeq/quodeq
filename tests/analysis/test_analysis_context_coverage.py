@@ -5,7 +5,6 @@ import json
 import logging
 from pathlib import Path
 
-import pytest
 
 from quodeq.analysis._analysis_context import _load_custom_dimensions, load_analysis_context
 from quodeq.analysis._types import AnalysisOptions, RunConfig

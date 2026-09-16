@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.services.violations import (
     _deleted_key_for_violation,
@@ -264,7 +262,7 @@ class TestResolveDimensionEvalExtended:
         md_content = "# Security Evaluation\n\nOverall Grade: B\n\n## Principle 1\n\nGrade: B\n"
         (eval_dir / "security_eval.md").write_text(md_content)
 
-        result = resolve_dimension_eval(base, "proj", "run", "security")
+        resolve_dimension_eval(base, "proj", "run", "security")
         # Should attempt markdown parse; result depends on parser
         # The key thing is it doesn't return None when markdown exists
 
@@ -297,7 +295,7 @@ class TestResolveDimensionEvalExtended:
 
         (evidence_dir / "security_live.stream").write_text("some stream data\n")
 
-        result = resolve_dimension_eval(base, "proj", "run", "security")
+        resolve_dimension_eval(base, "proj", "run", "security")
         # Stream parsing may or may not produce violations, but code path is exercised
 
     def test_custom_exists_fn(self, tmp_path):
@@ -352,5 +350,5 @@ class TestResolveDimensionEvalExtended:
         opts = _ResolveOptions(exists_fn=custom_exists, stat_fn=lambda p: FakeStat())
         # This exercises the jsonl path; actual parsing may vary
         with patch("quodeq.services.violations.parse_violations_from_jsonl", return_value=MagicMock()) as mock_parse:
-            result = resolve_dimension_eval(base, "proj", "run", "security", options=opts)
+            resolve_dimension_eval(base, "proj", "run", "security", options=opts)
             mock_parse.assert_called_once()

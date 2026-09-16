@@ -1,7 +1,6 @@
 """Tests for core scoring formula internals."""
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -16,10 +15,16 @@ from quodeq.core.scoring.internals import (
     weight_as_multiplier,
 )
 from quodeq.core.scoring._constants import (
-    GRADE_LADDER,
-    _BASE_K,
-    _CEIL_SCALE,
     _MAX_PENALTY_MULTIPLIER,
+)
+import dataclasses
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+from quodeq.core.scoring.internals import (
+    violation_base as _vb,
+    compliance_lift as _cl,
+    violation_ceiling as _vc,
+    severity_grade_floor as _sgf,
+    score_to_grade_label as _stgl,
 )
 
 
@@ -169,16 +174,7 @@ class TestWeightAsMultiplier:
 
 
 # --- ScoringParams threading -------------------------------------------------
-import dataclasses
 
-from quodeq.core.scoring.params import DEFAULT_PARAMS
-from quodeq.core.scoring.internals import (
-    violation_base as _vb,
-    compliance_lift as _cl,
-    violation_ceiling as _vc,
-    severity_grade_floor as _sgf,
-    score_to_grade_label as _stgl,
-)
 
 
 def test_violation_base_with_custom_k():

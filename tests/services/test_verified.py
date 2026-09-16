@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from quodeq.services.dismissed import dismissed_keys, dismiss_finding
 from quodeq.services.verified import unverify_finding, verified_entries, verify_finding

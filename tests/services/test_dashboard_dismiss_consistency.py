@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 import pytest
 
 from quodeq.analysis._report_io import write_dimension_report

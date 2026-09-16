@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import signal
-import sys
 
 from flask import Flask, Response, jsonify
 

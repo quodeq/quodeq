@@ -67,7 +67,7 @@ def _reset_mcp_registry() -> None:
         _cli_mcp_registered.clear()
 
 
-def _mcp_server_name(config: AnalysisConfig) -> str:
+def _mcp_server_name() -> str:
     """Return the MCP server name.
 
     All agents share one global server so that each ``codex exec`` process
@@ -139,7 +139,7 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
     if not _is_known_cli_provider(cmd):
         _log.warning("Refusing to register MCP server: unknown CLI provider %r", cmd)
         return None
-    name = _mcp_server_name(config)
+    name = _mcp_server_name()
     key = f"{cmd}:{name}"
     with _cli_mcp_lock:
         if key in _cli_mcp_registered:

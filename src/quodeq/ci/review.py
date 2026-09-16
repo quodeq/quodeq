@@ -66,7 +66,7 @@ def get_github_token() -> str:
         )
     except FileNotFoundError:
         raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
-    except subprocess.CalledProcessError as exc:
+    except subprocess.CalledProcessError:
         raise ReviewError(
             "Not authenticated with GitHub. Run 'gh auth login' first."
         )
@@ -83,7 +83,7 @@ def get_repo_info() -> tuple[str, str]:
             ["gh", "repo", "view", "--json", "owner,name"],
             capture_output=True, text=True, encoding="utf-8", check=True,
         )
-    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+    except (FileNotFoundError, subprocess.CalledProcessError):
         raise ReviewError(
             "Could not determine GitHub repo. "
             "Run from inside a GitHub-connected git repo, or use 'gh repo set-default'."

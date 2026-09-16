@@ -1,7 +1,6 @@
 """Tests for known model suggestions."""
 from __future__ import annotations
 
-import pytest
 
 from quodeq.llm_bridge._models import get_known_models
 

@@ -8,6 +8,11 @@ from quodeq.data.sqlite.run_index import (
     SCHEMA_VERSION,
     open_index,
 )
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
+from quodeq.data.sqlite.run_index import (
+    get_run, list_runs, rebuild_index, sync_index, sync_index_for_run,
+)
+from quodeq.services._run_index_fs import _remove_run_directory
 
 
 def test_open_creates_schema_on_fresh_path(tmp_path: Path) -> None:
@@ -127,10 +132,6 @@ def test_get_index_db_path_default_and_env(tmp_path, monkeypatch) -> None:
     assert Path(get_index_db_path()) == tmp_path / "custom.db"
 
 
-from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
-from quodeq.data.sqlite.run_index import (
-    get_run, list_runs, rebuild_index, sync_index, sync_index_for_run,
-)
 
 
 def _seed_plan_a_run(root: Path, project: str, run_id: str, state: RunState) -> Path:
@@ -308,7 +309,6 @@ def test_sync_index_issues_one_status_mtime_query_not_one_per_run(tmp_path: Path
         wrapped.close()
 
 
-from quodeq.services._run_index_fs import _remove_run_directory
 
 
 def test_remove_run_directory_rejects_path_traversal_in_run_uuid(tmp_path: Path):

@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 from quodeq.analysis._command import (
     _build_ai_cmd,
@@ -327,8 +326,7 @@ class TestBuildMcpServerArgs:
 
 class TestMcpServerName:
     def test_returns_prefix(self):
-        config = AnalysisConfig()
-        name = _mcp_server_name(config)
+        name = _mcp_server_name()
         assert name == "quodeq-findings"
 
 

@@ -8,7 +8,7 @@ _rescore_from_evidence in rescore.py is preferred whenever a run's
 from __future__ import annotations
 
 from quodeq.core.evidence.model import classify_confidence_level
-from quodeq.core.scoring.engine import compute_tallies
+from quodeq.core.scoring._principle import compute_tallies
 from quodeq.core.scoring.internals import finding_to_scoring_dict, principle_score_and_grade
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.finding import Finding

@@ -10,11 +10,11 @@ import httpx
 import openai
 import pytest
 
+from quodeq.analysis._api_call import _classify_fatal_api_error
 from quodeq.analysis._api_runner import (
     ApiAnalysisRequest,
     ApiRunnerConfig,
     _call_api,
-    _classify_fatal_api_error,
     run_api_analysis,
 )
 from quodeq.analysis._loops import _interruption_reason, _raise_on_fatal_cancel
@@ -116,7 +116,7 @@ class TestCallApiFatal:
         client.chat.completions.create.side_effect = _openai_error(
             openai.AuthenticationError, 401, "invalid key"
         )
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             with pytest.raises(FatalProviderError) as exc_info:
                 _call_api("prompt", self._config())
@@ -127,7 +127,7 @@ class TestCallApiFatal:
         client.chat.completions.create.side_effect = _openai_error(
             openai.RateLimitError, 429, "retry shortly"
         )
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             findings, was_lossy = _call_api("prompt", self._config())
         assert findings == []
@@ -139,7 +139,7 @@ class TestCallApiFatal:
         client.chat.completions.create.side_effect = _openai_error(
             openai.AuthenticationError, 401, "invalid key"
         )
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             with pytest.raises(FatalProviderError):
                 run_api_analysis(

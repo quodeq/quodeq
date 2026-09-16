@@ -1,9 +1,10 @@
 """Tests for the `quodeq ci` CLI subcommand."""
 from __future__ import annotations
 
+from quodeq.cli_parser import build_parser
+
 
 def test_ci_report_args_parsed():
-    from quodeq.cli_parser import build_parser
 
     parser = build_parser()
     args = parser.parse_args([
@@ -20,7 +21,6 @@ def test_ci_report_args_parsed():
 
 
 def test_ci_report_baseline_dir_parsed():
-    from quodeq.cli_parser import build_parser
 
     parser = build_parser()
     args = parser.parse_args([
@@ -35,7 +35,6 @@ def test_ci_report_baseline_dir_parsed():
 
 
 def test_ci_report_baseline_dir_optional():
-    from quodeq.cli_parser import build_parser
 
     parser = build_parser()
     args = parser.parse_args([
@@ -49,7 +48,6 @@ def test_ci_report_baseline_dir_optional():
 
 
 def test_ci_report_artifact_url_parsed():
-    from quodeq.cli_parser import build_parser
 
     parser = build_parser()
     args = parser.parse_args([
@@ -64,7 +62,6 @@ def test_ci_report_artifact_url_parsed():
 
 
 def test_ci_report_artifact_url_optional():
-    from quodeq.cli_parser import build_parser
 
     parser = build_parser()
     args = parser.parse_args([

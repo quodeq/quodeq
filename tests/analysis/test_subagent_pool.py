@@ -1,7 +1,6 @@
 """Tests for SubagentPool — parallel agent orchestration and JSONL merging."""
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from unittest.mock import patch

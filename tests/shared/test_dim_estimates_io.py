@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import pytest
 
 from quodeq.shared.dim_estimates_io import (
     DIM_ESTIMATES_FILENAME,

@@ -1,5 +1,4 @@
 from pathlib import Path
-import pytest
 from quodeq.services._ephemeral_cleanup import delete_ephemeral_clone, sweep_orphaned_clones
 
 

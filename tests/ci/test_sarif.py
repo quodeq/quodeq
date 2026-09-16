@@ -5,6 +5,11 @@ from quodeq.ci.sarif import (
     _slug,
     _rule_id,
 )
+from quodeq.ci.sarif import _cwe_tags, _safe_uri
+from quodeq.ci.sarif import build_sarif
+import json as _json
+from pathlib import Path
+import pytest
 
 
 def test_severity_level_maps_canonical_severities():
@@ -41,7 +46,6 @@ def test_rule_id_joins_dimension_and_principle_slug():
     assert _rule_id("reliability", "Fault Tolerance") == "reliability/fault-tolerance"
 
 
-from quodeq.ci.sarif import _cwe_tags, _safe_uri
 
 
 def test_cwe_tags_extracts_github_form_from_req_refs():
@@ -73,7 +77,6 @@ def test_safe_uri_rejects_blank_and_escaping():
     assert _safe_uri("a/../../b.py") is None
 
 
-from quodeq.ci.sarif import build_sarif
 
 
 def _report(dimension, violations, **extra):
@@ -222,7 +225,6 @@ def test_with_snippets_toggles_snippet_text():
     assert region_on["snippet"]["text"] == "secret = 'x'"
 
 
-import json as _json
 
 
 def test_no_absolute_paths_or_project_field_anywhere():
@@ -255,8 +257,6 @@ def test_windows_style_path_is_relativized():
     assert uri == "src/api/x.py"
 
 
-from pathlib import Path
-import pytest
 
 _SCHEMA_PATH = Path(__file__).parent / "fixtures" / "sarif-schema-2.1.0.json"
 

@@ -1,7 +1,6 @@
 """Tests for config._discipline_conf_loader — INI-style discipline file loading."""
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 

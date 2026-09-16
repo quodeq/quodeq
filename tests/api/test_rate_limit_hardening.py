@@ -8,10 +8,17 @@ import sys
 from pathlib import Path
 
 import pytest
+from unittest.mock import patch
 
 from quodeq.api._rate_limit_file_store import FileRateLimitStore
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore
 from quodeq.api._rate_limit_factory import _validated_rate_limit_path, _DEFAULT_RATE_LIMIT_FILE
+from quodeq.api._rate_limit_config import (
+    _DEFAULT_RATE_LIMIT_MAX,
+    _DEFAULT_RATE_LIMIT_WINDOW,
+    _rate_limit_max,
+    _rate_limit_window,
+)
 
 _skip_no_symlink = pytest.mark.skipif(
     sys.platform == "win32", reason="symlink/POSIX-mode semantics differ on Windows"
@@ -77,12 +84,6 @@ def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
 # (window <= 0) or blocking every client (max <= 0).
 # ---------------------------------------------------------------------------
 
-from quodeq.api._rate_limit_config import (
-    _DEFAULT_RATE_LIMIT_MAX,
-    _DEFAULT_RATE_LIMIT_WINDOW,
-    _rate_limit_max,
-    _rate_limit_window,
-)
 
 
 @pytest.mark.parametrize("raw", ["0", "-5", "abc", ""])
@@ -125,7 +126,6 @@ def test_load_treats_scalar_json_as_empty(tmp_path: Path):
 
 
 def test_file_store_check_and_record_does_one_load_one_save(tmp_path: Path):
-    from unittest.mock import patch
 
     store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=5)
 
@@ -149,7 +149,6 @@ def test_record_and_check_cache_within_ttl_window(tmp_path: Path):
     """record()/check() are not on the enforcement path and keep the old
     TTL-cached behavior; check_and_record() no longer does (see the test
     below) since it must reload fresh from disk under the OS lock."""
-    from unittest.mock import patch
 
     store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
 
@@ -168,7 +167,6 @@ def test_check_and_record_bypasses_cache_and_reloads_every_call(tmp_path: Path):
     disk every call rather than trust the TTL cache, even inside one TTL
     window, since two processes could otherwise each act on their own stale
     in-memory snapshot within the same lock-free window."""
-    from unittest.mock import patch
 
     store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
 
@@ -192,7 +190,6 @@ def test_file_store_still_enforces_limit_within_a_single_ttl_window(tmp_path: Pa
 def test_file_store_flushes_immediately_once_limited(tmp_path: Path):
     """Once a client is actually rate-limited, that state must be durable right
     away -- only the "still allowed" path is allowed to batch writes."""
-    import json
 
     path = tmp_path / "rl.json"
     store_a = FileRateLimitStore(path=path, window=60.0, max_requests=1)

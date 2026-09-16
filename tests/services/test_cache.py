@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from collections import OrderedDict
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -315,12 +315,6 @@ class TestSelfHealingGuards:
 
 def test_make_lru_dimension_fetcher_uses_custom_reader():
     """A custom reader is invoked instead of read_run_data, and results cache."""
-    import threading
-    from collections import OrderedDict
-
-    from quodeq.core.types import DimensionResult
-    from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
-
     calls: list[str] = []
 
     def fake_reader(reports_root, project, run_id):

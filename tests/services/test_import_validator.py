@@ -1,6 +1,5 @@
 # tests/test_import_validator.py
 """Tests for evaluator import validation pipeline."""
-import pytest
 from quodeq.services.import_validator import validate_import, scan_injection, scan_text, _MAX_NAME, _MAX_DESCRIPTION, _MAX_REQ_TEXT
 
 

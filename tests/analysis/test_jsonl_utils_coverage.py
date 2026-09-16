@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
 
 from quodeq.analysis.subagents.jsonl_utils import (
     FindingTally,

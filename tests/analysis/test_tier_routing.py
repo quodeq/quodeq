@@ -1,10 +1,13 @@
 """Tests for model tier routing through the analysis pipeline."""
 from __future__ import annotations
 from unittest.mock import MagicMock
-from pathlib import Path
-import pytest
 
 from quodeq.analysis._types import AnalysisOptions
+from unittest.mock import patch
+from quodeq.analysis._types import RunConfig, AnalysisOptions, _AnalysisContext
+from quodeq.analysis._dimension_steps import _run_dimension_analysis
+from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
 
 
 class TestAnalysisOptionsAiModel:
@@ -67,10 +70,6 @@ class TestBuildRunConfigAiModel:
         assert config.options.ai_model == "sonnet"
 
 
-from unittest.mock import patch
-from quodeq.analysis._types import RunConfig, AnalysisOptions, _AnalysisContext
-from quodeq.analysis._dimension_steps import _run_dimension_analysis
-from quodeq.analysis._config import AnalysisConfig
 
 
 class TestDimensionAnalysisModel:
@@ -138,7 +137,6 @@ class TestDimensionAnalysisModel:
             assert analysis_config.ai_model is None
 
 
-from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
 
 
 class TestSubagentModelEnvVar:

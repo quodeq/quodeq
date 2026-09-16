@@ -20,40 +20,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-# Kept so `patch("...._api_runner.openai.OpenAI")` still resolves -- the
-# real call site (`_call_api`) lives in `_api_call`, but patching an
-# attribute on this shared module object affects it there too.
-import openai
 
 from quodeq.analysis._api_call import (
     ApiRunnerConfig,
-    _CLOUD_TIMEOUT,
-    _DEFAULT_LOCAL_MAX_TOKENS,
-    _LOCAL_TIMEOUT,
-    _OLLAMA_DEFAULT_API_KEY,
-    _OLLAMA_DEFAULT_BASE,
-    _OPENAI_API_HOST,
-    _build_create_kwargs,
     _call_api,
-    _classify_fatal_api_error,
-    _log_call_outcome,
-    _resolve_max_tokens,
-    _resolve_timeout,
-    _warn_ollama_ctx_noop,
 )
 from quodeq.analysis._api_enrichment import (
     _derive_run_paths,
     _infer_end_line,
     _resolve_file_paths,
-)
-from quodeq.analysis._api_schema import (
-    _SYSTEM_PROMPT,
-    _Finding,
-    _FindingType,
-    _Severity,
-    _extract_finding_dicts,
-    _looks_like_finding,
-    _parse_findings,
 )
 from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter

@@ -1,14 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {
-  buildEvalPrincipal, ROUTE_RENDERERS, isSharedSource, shouldBounceToEvaluate, shouldShowEvaluateButton,
-  resolveSelectionAfterSharedDisconnect, shouldAutoOpenOnboardingWizard, shouldRedirectToRemoteRepositories, shouldShowProjectTabs,
-  buildNavigationBundle, buildDashboardDataBundle, shouldWallEmptyProjects, buildWizardHandlers, buildAssistantSessionPayload,
-  buildAssistantActionAppliedHandler, resolveProjectDisplayName, selectSidebarCounts,
+  ROUTE_RENDERERS,
+  buildNavigationBundle,
+  buildDashboardDataBundle,
   shouldShowStartupLoader,
 } from './App.jsx';
-import Sidebar from './components/Sidebar.jsx';
 
 // Split from App.test.jsx: history route onRunDeleted wiring,
 // projects-load-failure threading, and shouldShowStartupLoader.

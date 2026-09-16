@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from quodeq.services._fs_project_index import build_project_index
 from quodeq.services._fs_projects import (

@@ -11,7 +11,7 @@
 src/quodeq/_cli_lifecycle.py:70:broad-except
 src/quodeq/_cli_scoring.py:170:broad-except
 src/quodeq/analysis/_api_call.py:291:broad-except
-src/quodeq/analysis/_api_runner.py:121:broad-except
+src/quodeq/analysis/_api_runner.py:96:broad-except
 src/quodeq/analysis/_loop_steps.py:103:broad-except
 src/quodeq/analysis/_loop_steps.py:146:broad-except
 src/quodeq/analysis/_loop_steps.py:148:broad-except
@@ -48,8 +48,8 @@ src/quodeq/api/_sse_log_helpers.py:55:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:71:broad-except
-src/quodeq/api/app.py:116:broad-except
-src/quodeq/api/app.py:206:broad-except
+src/quodeq/api/app.py:115:broad-except
+src/quodeq/api/app.py:205:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_runs.py:30:broad-except

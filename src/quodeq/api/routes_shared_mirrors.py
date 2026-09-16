@@ -15,7 +15,7 @@ from __future__ import annotations
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services import _fs_projects, _fs_reports

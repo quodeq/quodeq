@@ -1,5 +1,4 @@
 """Tests for the /api/rescore endpoint."""
-import json
 import os
 from unittest.mock import patch, MagicMock
 

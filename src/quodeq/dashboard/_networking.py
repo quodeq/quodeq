@@ -1,7 +1,6 @@
 """Networking helpers — host resolution, port scanning, and plaintext-HTTP guard."""
 from __future__ import annotations
 
-import logging
 import os
 import socket
 

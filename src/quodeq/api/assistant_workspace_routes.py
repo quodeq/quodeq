@@ -11,6 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
+from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
 from quodeq.api.helpers import error_response
 from quodeq.assistant.workspace_actions import (
     apply_workspace, create_workspace_pr, discard_workspace)
@@ -77,7 +78,6 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return err
         if row is None:
             return jsonify({"error": "no worktree"}), 404
-        from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
         outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
                                   release_turn=_release_turn)
         if outcome.kind == "turn_busy":
@@ -101,7 +101,6 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return err
         if row is None:
             return jsonify({"error": "no worktree"}), 404
-        from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
         req_body = request.get_json(silent=True) or {}
         outcome = create_workspace_pr(
             repo, sid, str(req_body.get("title", "")), str(req_body.get("body", "")),
@@ -125,7 +124,6 @@ def register_assistant_workspace_routes(app: Flask) -> None:
             return err
         if row is None:
             return jsonify({"error": "no worktree"}), 404
-        from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
         # Claim the turn slot like apply/pr: without this, discard raced an
         # in-flight apply (overwriting "applied" with "discarded" while the
         # changes sat in the user's real tree) and pulled the worktree out

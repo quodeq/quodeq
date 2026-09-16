@@ -78,9 +78,8 @@ def test_non_integer_line_value_is_skipped_gracefully(tmp_path: Path) -> None:
         # valid row with integer line — should survive
         {"p": "SEC", "t": "violation", "d": "security", "file": "c.py", "line": 5},
     ]
-    import json as _json
     (evidence_dir / "security_evidence.jsonl").write_text(
-        "\n".join(_json.dumps(r) for r in rows) + "\n"
+        "\n".join(json.dumps(r) for r in rows) + "\n"
     )
     result = load_violations_from_evidence(evidence_dir)
     files = {v["file"] for v in result}

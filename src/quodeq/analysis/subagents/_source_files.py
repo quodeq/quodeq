@@ -4,7 +4,6 @@ from __future__ import annotations
 from quodeq.analysis import dispatch_policy
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
-from quodeq.shared.logging import log_warning
 
 
 def _resolve_source_files(config: RunConfig) -> tuple[list[str], set[str]] | None:

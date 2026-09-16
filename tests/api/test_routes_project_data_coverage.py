@@ -1,7 +1,6 @@
 """Tests for quodeq.api.routes_project_data — dashboard/accumulated/eval/violation routes."""
 from __future__ import annotations
 
-from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
 import pytest

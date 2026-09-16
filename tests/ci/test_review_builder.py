@@ -1,4 +1,3 @@
-import json
 
 
 def test_violation_to_review_comment():

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import plistlib
 import shutil
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

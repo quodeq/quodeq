@@ -1,7 +1,6 @@
 import { render, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import DashboardPage, { selectDashboardProjectInfo } from './DashboardPage.jsx';
-import { SidePaneProvider } from '../../side-pane/index.js';
+import DashboardPage from './DashboardPage.jsx';
 
 // Split from DashboardPage.test.jsx: the first-load skeleton gate,
 // no-completed-evaluation empty state, and the fetch-failure state.

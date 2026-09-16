@@ -10,11 +10,13 @@ import pytest
 
 pytest.importorskip("openai", reason="requires the openai SDK")
 
+from quodeq.analysis._api_call import _LOCAL_TIMEOUT
 from quodeq.analysis._api_runner import (
     run_api_analysis, ApiAnalysisRequest, ApiRunnerConfig,
     _build_router_context,
-    _call_api, _parse_findings, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
+    _call_api,
 )
+from quodeq.analysis._api_schema import _Finding, _parse_findings
 
 
 def _mock_raw_client_finish(content: str, finish_reason: str) -> MagicMock:
@@ -69,12 +71,12 @@ class TestResolveTimeout:
     """
 
     def test_local_single_agent_keeps_default(self):
-        from quodeq.analysis._api_runner import _resolve_timeout
+        from quodeq.analysis._api_call import _resolve_timeout
         cfg = ApiRunnerConfig(model="m", api_base="http://localhost:11434/v1")
         assert _resolve_timeout(cfg, is_openai=False) == _LOCAL_TIMEOUT
 
     def test_local_read_budget_scales_with_subagents(self):
-        from quodeq.analysis._api_runner import _resolve_timeout
+        from quodeq.analysis._api_call import _resolve_timeout
         cfg = ApiRunnerConfig(
             model="m", api_base="http://localhost:11434/v1", n_subagents=3,
         )
@@ -85,14 +87,14 @@ class TestResolveTimeout:
         assert t.pool == _LOCAL_TIMEOUT.pool
 
     def test_cloud_budget_ignores_subagents(self):
-        from quodeq.analysis._api_runner import _resolve_timeout, _CLOUD_TIMEOUT
+        from quodeq.analysis._api_call import _resolve_timeout, _CLOUD_TIMEOUT
         cfg = ApiRunnerConfig(
             model="m", api_base="https://api.openai.com/v1", n_subagents=3,
         )
         assert _resolve_timeout(cfg, is_openai=True) == _CLOUD_TIMEOUT
 
     def test_env_override_wins(self, monkeypatch):
-        from quodeq.analysis._api_runner import _resolve_timeout
+        from quodeq.analysis._api_call import _resolve_timeout
         monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
         cfg = ApiRunnerConfig(
             model="m", api_base="http://localhost:11434/v1", n_subagents=2,
@@ -100,7 +102,7 @@ class TestResolveTimeout:
         assert _resolve_timeout(cfg, is_openai=False).read == 900.0
 
     def test_env_override_garbage_is_ignored(self, monkeypatch):
-        from quodeq.analysis._api_runner import _resolve_timeout
+        from quodeq.analysis._api_call import _resolve_timeout
         monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "soon")
         cfg = ApiRunnerConfig(
             model="m", api_base="http://localhost:11434/v1", n_subagents=2,
@@ -113,7 +115,7 @@ class TestResolveTimeout:
             api_key="k", n_subagents=2,
         )
         raw_client = _mock_raw_client('{"findings":[]}')
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             _call_api("prompt", cfg)
         timeout = mock_oa.call_args.kwargs["timeout"]
@@ -131,7 +133,7 @@ class TestRunApiAnalysis:
         )
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
@@ -150,7 +152,7 @@ class TestRunApiAnalysis:
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
@@ -168,7 +170,7 @@ class TestRunApiAnalysis:
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
@@ -186,7 +188,7 @@ class TestRunApiAnalysis:
         content = _make_findings_json(("X-1", "violation", "app.py", 1, "minor", "test"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -202,7 +204,7 @@ class TestRunApiAnalysis:
         assert findings[0]["file"] == "src/myproject/app.py"
 
     def test_client_disables_sdk_retries(self, tmp_path, api_config):
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             client = MagicMock()
             client.chat.completions.create.return_value = MagicMock(
                 choices=[MagicMock(message=MagicMock(content='{"findings":[]}'))]
@@ -214,7 +216,7 @@ class TestRunApiAnalysis:
 
 def _create_kwargs(cfg):
     raw_client = _mock_raw_client('{"findings":[]}')
-    with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+    with patch("openai.OpenAI") as mock_oa:
         mock_oa.return_value.__enter__.return_value = raw_client
         _call_api("prompt", cfg)
     return raw_client.chat.completions.create.call_args.kwargs
@@ -274,7 +276,7 @@ class TestOllamaCtxNoopWarning:
 
     @pytest.fixture(autouse=True)
     def _reset_warn_cache(self):
-        from quodeq.analysis._api_runner import _warn_ollama_ctx_noop
+        from quodeq.analysis._api_call import _warn_ollama_ctx_noop
         _warn_ollama_ctx_noop.cache_clear()
         yield
         _warn_ollama_ctx_noop.cache_clear()
@@ -373,7 +375,7 @@ class TestTruncationDetection:
             ("R1", "violation", "a.py", 5, "minor", "x"),
         )
         client = _mock_raw_client_finish(content, "length")
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             _findings, was_lossy = _call_api("prompt", api_config)
         assert was_lossy is True
@@ -383,7 +385,7 @@ class TestTruncationDetection:
             ("R1", "violation", "a.py", 5, "minor", "x"),
         )
         client = _mock_raw_client_finish(content, "stop")
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             findings, was_lossy = _call_api("prompt", api_config)
         assert was_lossy is False
@@ -416,7 +418,7 @@ class TestMarkerContract:
         content = _make_findings_json(("M-MOD-1", "violation", "src/a.py", 5, "major", "x"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -437,7 +439,7 @@ class TestMarkerContract:
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -467,7 +469,7 @@ class TestMarkerContract:
         raw_client = MagicMock()
         raw_client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -492,7 +494,7 @@ class TestMarkerContract:
         content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
         raw_client = _mock_raw_client_finish(content, "length")
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -517,7 +519,7 @@ class TestMarkerContract:
         content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -571,7 +573,7 @@ class TestSyncCacheWrite:
         content = _make_findings_json(("M-MOD-1", "violation", "Foo.kt", 1, "minor", "x"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
                 request=ApiAnalysisRequest(
@@ -615,7 +617,7 @@ class TestDropStatsRecording:
                      "snippet": "code", "reason": "bad"}  # no req -> dropped
         content = json.dumps({"findings": [valid, malformed]})
         client = _mock_raw_client(content)
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             _call_api("prompt", api_config)
         stats = _drop_stats.consume()
@@ -626,7 +628,7 @@ class TestDropStatsRecording:
         from quodeq.analysis import _drop_stats
         client = MagicMock()
         client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             _call_api("prompt", api_config)
         assert _drop_stats.consume().parsed == 0

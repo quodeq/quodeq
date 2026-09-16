@@ -54,7 +54,7 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     if repo is None:
         return ConnectOutcome(status="clone_failed", url=url)
     if pre_existing:
-        ok, _ = refresh_shared_clone(url)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
+        refresh_shared_clone(url)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
     # Format validation only makes sense once the clone actually exists,
     # so it runs AFTER ensure_shared_clone, not before -- a foreign or
     # too-new repo must never reach write_settings (that would connect

@@ -12,7 +12,6 @@ rapidly. These tests pin the new behaviour:
 """
 from __future__ import annotations
 
-import os
 import pytest
 
 from quodeq.api.app import create_app

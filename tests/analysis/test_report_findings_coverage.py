@@ -1,7 +1,6 @@
 """Tests for analysis._report_findings — findings flattening and principle rows."""
 from __future__ import annotations
 
-import pytest
 
 from quodeq.analysis._report_findings import (
     _build_principle_row,

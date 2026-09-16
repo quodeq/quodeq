@@ -7,7 +7,6 @@ I/O to complete.
 from __future__ import annotations
 
 import threading
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -19,7 +18,7 @@ from quodeq.api._evaluation_routes import (
     _scored_jobs_lock,
     _SCORED_JOBS_MAX,
 )
-from quodeq.services.base import ActionProvider, EvaluationOptions
+from quodeq.services.base import ActionProvider
 from quodeq.services._job_model import JobSnapshot
 from tests._timeouts import budget
 

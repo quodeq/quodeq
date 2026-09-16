@@ -14,7 +14,7 @@ from quodeq.services.deleted import (
     is_finding_deleted,
     load_deleted,
 )
-from quodeq.services.dismissed import dismiss_finding, load_dismissed
+from quodeq.services.dismissed import dismiss_finding
 
 
 def _finding(*, req="M-MOD-1", file="foo.py", line=10, dimension="maintainability", principle="Modularity"):

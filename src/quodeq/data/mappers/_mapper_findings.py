@@ -9,7 +9,6 @@ from __future__ import annotations
 from quodeq.core.types.finding import Finding, ReqRef, SeverityTally, Totals
 
 from ._mapper_helpers import (
-    _bool,
     _int,
     _opt_float,
     _opt_str,
