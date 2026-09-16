@@ -4,12 +4,13 @@ import { setGradeThresholds } from '../utils/gradeThresholds.js';
 import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
 import { shouldBounceToEvaluate, shouldRedirectToRemoteRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
+import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 
 // App.jsx's boot-time and navigation-guard effects, extracted verbatim (see
 // App.jsx history for the original inline effects and their rationale
 // comments, preserved below on each hook).
 
-// Bridges quodeq:assistant-action-applied window events into the
+// Bridges ASSISTANT_ACTION_APPLIED_EVENT window events into the
 // dashboard/scores cache patch + dismissed-list refresh, mirroring the
 // manual dismiss handlers (dismissWithReconcile callers in
 // routes/renderers.jsx).
@@ -23,8 +24,8 @@ export function useAssistantActionAppliedEffect({
       scheduleDashboardReconcile: scheduleReconcileForApply,
       selectedProject,
     });
-    window.addEventListener('quodeq:assistant-action-applied', handler);
-    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
+    window.addEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
+    return () => window.removeEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
   }, [scheduleReconcileForApply, selectedProject]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 

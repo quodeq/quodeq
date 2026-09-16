@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MOBILE_BREAKPOINT_QUERY } from '../constants.js';
 
 /**
  * Sidebar.jsx's pin state (controlled or internal) plus the toggle/nav
@@ -18,7 +19,7 @@ export function useSidebarPin({ controlledPinned, onPinChange, onNavTab }) {
   // covering the just-navigated-to page.
   const handleNav = (id) => {
     onNavTab(id);
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+    if (typeof window !== 'undefined' && window.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
       setPinned(false);
     }
   };

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { resolveDataTheme } from '../utils/themeResolver.js';
 import { readString, removeKey, writeString } from '../adapters/storage.js';
+import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
@@ -46,9 +47,9 @@ export { resolveDataTheme };
 
 function applyDataTheme(value) {
   if (value === null) {
-    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute(DATA_THEME_ATTR);
   } else {
-    document.documentElement.setAttribute('data-theme', value);
+    document.documentElement.setAttribute(DATA_THEME_ATTR, value);
   }
 }
 
@@ -65,7 +66,7 @@ export function useAppSettings() {
 
   // Listen for OS color scheme changes when in system mode
   useEffect(() => {
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const mql = window.matchMedia(PREFERS_DARK_QUERY);
     const handler = (e) => {
       if (themeMode === 'system') {
         applyDataTheme(resolveDataTheme('system', themeFamily, e.matches));
@@ -79,7 +80,7 @@ export function useAppSettings() {
     if (!VALID_MODES.includes(value)) return;
     setThemeMode(value);
     writeString(MODE_KEY, value, storage);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = window.matchMedia(PREFERS_DARK_QUERY).matches;
     applyDataTheme(resolveDataTheme(value, themeFamily, prefersDark));
   }
 
@@ -87,7 +88,7 @@ export function useAppSettings() {
     if (!VALID_FAMILIES.includes(value)) return;
     setThemeFamily(value);
     writeString(FAMILY_KEY, value, storage);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = window.matchMedia(PREFERS_DARK_QUERY).matches;
     applyDataTheme(resolveDataTheme(themeMode, value, prefersDark));
   }
 

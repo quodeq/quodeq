@@ -7,6 +7,7 @@ import { renderViolationsEmptyState } from './ViolationsEmptyStates.jsx';
 import { useViolationsPageState } from '../hooks/useViolationsPageState.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../constants.js';
 
 // buildFileTree nests one node per path segment with no cap, so every walker
 // below guards its own recursion depth; past it the path is treated as absent.
@@ -182,7 +183,7 @@ export function ViolationsSubTabContent(props) {
 }
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0, subTab = 'dimension', onSubTabChange }) {
-  const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = 'local' } = data;
+  const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
   const { onNavigate, onRefresh, onReconcile, onRetry } = callbacks;
 

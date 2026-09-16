@@ -7,6 +7,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { t, LOCALE } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../constants.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
 import {
@@ -122,7 +123,7 @@ function renderHistoryEmptyState({
   return null;
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = 'local', loading, isFetching, error, onRetry }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
@@ -164,7 +165,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
         // local-only by design). Passing undefined here — rather than always
         // handleDeleteRun — is what makes the row's delete button vanish,
         // since HistoryRow already gates on `{onDelete && ...}`.
-        onDeleteRun: selectedSource === 'local' ? handleDeleteRun : undefined,
+        onDeleteRun: selectedSource === PROJECT_SOURCE.LOCAL ? handleDeleteRun : undefined,
       }}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}

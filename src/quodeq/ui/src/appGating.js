@@ -4,6 +4,7 @@
  * sidebar/topbar/landing wiring. All exported so they stay unit-testable
  * without mounting the whole App (which needs ~8 providers).
  */
+import { PROJECT_SOURCE } from './constants.js';
 
 // Project-data tabs (overview/violations/map/history) — module scope so both
 // the App component's bounce effect and the exported shouldBounceToEvaluate
@@ -24,7 +25,7 @@ export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selected
   if (!projectsLoaded) return false;
   if (!projectsCount) return false;
   if (!selectedProjectInfo) return false;
-  if (selectedSource !== 'local') return false;
+  if (selectedSource !== PROJECT_SOURCE.LOCAL) return false;
   return !hasCurrentProjectRuns && PROJECT_DATA_TABS.includes(activeTab);
 }
 
@@ -35,7 +36,7 @@ export function shouldBounceToEvaluate({ projectsLoaded, projectsCount, selected
  * local) is evaluatable.
  */
 export function isEvaluatableSource(selectedSource) {
-  return selectedSource !== 'shared';
+  return selectedSource !== PROJECT_SOURCE.SHARED;
 }
 
 /**
@@ -64,7 +65,7 @@ export function resolveProjectDisplayName({
 }) {
   return selectedProjectInfo?.displayName
     || selectedProjectInfo?.name
-    || (selectedSource === 'shared' ? sharedProjectInfo?.name : null)
+    || (selectedSource === PROJECT_SOURCE.SHARED ? sharedProjectInfo?.name : null)
     || (selectedDisplayName && selectedDisplayName !== selectedProject
           ? selectedDisplayName
           : null);
@@ -83,7 +84,7 @@ export function resolveProjectDisplayName({
  * source-gating contract is testable without mounting the whole App.
  */
 export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }) {
-  if (selectedSource === 'shared') return !!sharedProjectInfo;
+  if (selectedSource === PROJECT_SOURCE.SHARED) return !!sharedProjectInfo;
   return hasCurrentProjectRuns;
 }
 
@@ -129,7 +130,7 @@ export function shouldShowCompareTab({ projects, sharedHasContent }) {
 export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
   if (!projectsLoaded || !sharedSettled) return false;
   if ((projectsCount ?? 0) > 0) return false;
-  if (selectedSource === 'shared') return false;
+  if (selectedSource === PROJECT_SOURCE.SHARED) return false;
   if (!sharedHasContent) return false;
   return activeTab === 'overview';
 }

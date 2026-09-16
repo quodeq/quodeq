@@ -58,3 +58,32 @@ export const DEFAULT_VISIBLE_STANDARDS = [
 export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granularity';
 export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
 export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';
+
+// Where a selected project's data lives: this machine's evaluations or the
+// shared repository mirror. Wire value and the cache-key segment (queryKeys).
+export const PROJECT_SOURCE = Object.freeze({ LOCAL: 'local', SHARED: 'shared' });
+// What every source-taking factory and hook falls back to when none is passed.
+export const DEFAULT_PROJECT_SOURCE = PROJECT_SOURCE.LOCAL;
+
+// Fired (same-tab) by the assistant's ActionPreviewCard after a successful
+// apply, with { actionType, scores, delta } as detail. App-level effects and
+// the verified-findings context listen so caches converge like a manual dismiss.
+export const ASSISTANT_ACTION_APPLIED_EVENT = 'quodeq:assistant-action-applied';
+
+export function notifyAssistantActionApplied(detail) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ASSISTANT_ACTION_APPLIED_EVENT, { detail }));
+  }
+}
+
+// <html> attribute carrying the applied theme; every theme CSS selector keys on it.
+export const DATA_THEME_ATTR = 'data-theme';
+// OS dark-mode media query, consulted whenever the theme mode is 'system'.
+export const PREFERS_DARK_QUERY = '(prefers-color-scheme: dark)';
+// Mobile layout breakpoint. Mirrors the 900px @media rules in terminal.css,
+// assistant.css, standards.css, help.css and base.css; change them together.
+const MOBILE_BREAKPOINT_PX = 900;
+export const MOBILE_BREAKPOINT_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`;
+// Third-party contract: pywebview dispatches this on window once its JS
+// bridge is injected. Never rename.
+export const PYWEBVIEW_READY_EVENT = 'pywebviewready';

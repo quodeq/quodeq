@@ -11,6 +11,7 @@ import ExplorerRadialPanel from './ExplorerRadialPanel.jsx';
 import { useExplorerPageSpecs } from './useExplorerPageSpecs.jsx';
 import { buildRadialPrinciples, buildEnrichedPrinciples } from './explorerPrincipleView.js';
 import { t } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../constants.js';
 
 /** Empty/loading/error states, checked in order — extracted so the main
  * render stays a single happy-path return. */
@@ -180,7 +181,7 @@ export default function ExplorerPage({
   runId,
   dateLabel,
   sourceTab,
-  selectedSource = 'local',
+  selectedSource = PROJECT_SOURCE.LOCAL,
   onNavigate,
   refreshSignal,
   trend = [],
