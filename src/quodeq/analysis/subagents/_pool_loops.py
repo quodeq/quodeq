@@ -43,7 +43,6 @@ class LoopContext:
     evidence_dir: Path
     dimension_key: str
     submit_fn: Callable[[], None]
-    max_files_per_agent: int | None = None
     deadline_at: float | None = None
     # Injectable cancellation check; the default binds the process-wide
     # signal here (the composition seam) so the loops never touch the
@@ -69,10 +68,7 @@ def scout_loop(ctx: LoopContext) -> None:
             ctx.queue, ctx.queue_path, ctx.submit_fn,
             deadline_at=ctx.deadline_at,
         )
-        state.scout_done = maybe_scale_up(
-            done, state, ctx.n_agents, ctx.max_files_per_agent,
-            scale_ctx,
-        )
+        state.scout_done = maybe_scale_up(done, state, ctx.n_agents, scale_ctx)
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)
             continue

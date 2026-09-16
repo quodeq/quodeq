@@ -15,7 +15,6 @@ from quodeq.analysis.subagents._pool_models import (
     _AGENT_ID_PREFIX,
     _HEARTBEAT_JOIN_TIMEOUT_S,
 )
-from quodeq.analysis.subagents._pool_scaling import compute_scale_up
 from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_config, run_single_agent
 from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
@@ -68,9 +67,6 @@ class SubagentPool:
 
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         return build_agent_config(idx, self._base_config, self._worker_ctx)
-
-    def _compute_scale_up(self, remaining: int) -> int:
-        return compute_scale_up(remaining, self._n, self._base_config.max_files_per_agent)
 
     def _run_single(self, idx: int) -> SubagentResult:
         return run_single_agent(
@@ -153,7 +149,6 @@ class SubagentPool:
                     shared_jsonl_path=self._shared_jsonl_path(),
                     evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
                     submit_fn=lambda: self._submit_agent(pool),
-                    max_files_per_agent=self._base_config.max_files_per_agent,
                     deadline_at=self._base_config.deadline_at,
                 )
                 if self._scout_first:
