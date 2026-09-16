@@ -48,8 +48,8 @@ src/quodeq/api/_sse_log_helpers.py:55:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:71:broad-except
-src/quodeq/api/app.py:115:broad-except
-src/quodeq/api/app.py:205:broad-except
+src/quodeq/api/app.py:108:broad-except
+src/quodeq/api/app.py:198:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_runs.py:30:broad-except
@@ -118,10 +118,10 @@ src/quodeq/data/sqlite/run_index.py:179:broad-except
 src/quodeq/data/sqlite/run_index.py:88:broad-except
 src/quodeq/data/sqlite/run_index.py:94:broad-except
 src/quodeq/llm_bridge/_cloud.py:60:broad-except
-src/quodeq/menubar/app.py:122:broad-except
-src/quodeq/menubar/app.py:141:broad-except
-src/quodeq/menubar/app.py:203:broad-except
-src/quodeq/menubar/app.py:219:broad-except
+src/quodeq/menubar/app.py:115:broad-except
+src/quodeq/menubar/app.py:134:broad-except
+src/quodeq/menubar/app.py:196:broad-except
+src/quodeq/menubar/app.py:212:broad-except
 src/quodeq/services/_mutation_projection.py:101:broad-except
 src/quodeq/services/_mutation_scoring.py:108:broad-except
 src/quodeq/services/_mutation_scoring.py:86:broad-except
