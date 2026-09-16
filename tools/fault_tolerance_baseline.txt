@@ -111,8 +111,8 @@ src/quodeq/data/fs/standards_prefs.py:41:broad-except
 src/quodeq/data/fs/standards_prefs.py:86:broad-except
 src/quodeq/data/fs/suppression_rules.py:42:broad-except
 src/quodeq/data/migrations/dismissed_json_to_actions_log.py:51:broad-except
-src/quodeq/data/sqlite/findings_queries.py:202:broad-except
-src/quodeq/data/sqlite/findings_queries.py:250:broad-except
+src/quodeq/data/sqlite/findings_queries.py:215:broad-except
+src/quodeq/data/sqlite/findings_queries.py:263:broad-except
 src/quodeq/data/sqlite/run_index.py:111:broad-except
 src/quodeq/data/sqlite/run_index.py:179:broad-except
 src/quodeq/data/sqlite/run_index.py:88:broad-except
