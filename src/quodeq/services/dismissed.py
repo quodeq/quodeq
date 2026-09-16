@@ -274,6 +274,6 @@ def filter_dismissed_from_dimensions(
             result.append(replace(
                 dim,
                 violations=filtered,
-                totals=recount_totals(filtered, old_totals=dim.totals),
+                totals=recount_totals(filtered, old_totals=dim.totals, files_read=dim.files_read),
             ))
     return result

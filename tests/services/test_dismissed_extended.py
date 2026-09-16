@@ -211,6 +211,7 @@ class _FakeDimension:
     """Simulates DimensionResult for testing filter_dismissed_from_dimensions."""
     violations: list[Finding] = field(default_factory=list)
     totals: Totals = field(default_factory=Totals)
+    files_read: int | None = None
 
 
 class TestFilterDismissedFromDimensions:
