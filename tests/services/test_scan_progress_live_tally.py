@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import json
 import threading
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+
+from tests._timeouts import budget
 
 from quodeq.data.fs.evidence_tally import FindingTally, tally_unique_findings
+from quodeq.data.fs.run_files import dimension_evidence_file
 from quodeq.services._scan_progress_dims import (
     _LIVE_TALLIES,
     _dim_evidence_tally,
@@ -136,7 +139,7 @@ def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
 
         def advance(self):
             if "blocked" in str(self.path):
-                assert gate.wait(timeout=5), "advance() was never released"
+                assert gate.wait(timeout=budget(5)), "advance() was never released"
             return FindingTally()
 
     import quodeq.services._scan_progress_dims as dims
@@ -155,11 +158,12 @@ def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
 
         other = threading.Thread(target=_other_poll)
         other.start()
-        assert done.wait(timeout=2), "a second run's poll waited on the first run's read"
+        assert done.wait(timeout=budget(2)), \
+            "a second run's poll waited on the first run's read"
     finally:
         gate.set()
-        slow.join(timeout=5)
-        other.join(timeout=5)
+        slow.join(timeout=budget(5))
+        other.join(timeout=budget(5))
         dims.IncrementalTally = original
 
 
@@ -200,3 +204,28 @@ def test_forget_live_tallies_drops_only_the_given_run(tmp_path):
     forget_live_tallies(dropped)
 
     assert len(_LIVE_TALLIES) == 1
+    surviving = _LIVE_TALLIES.keys()[0][0]
+    assert Path(surviving) == dimension_evidence_file(kept, "security")
+
+
+def test_forget_live_tallies_matches_keys_whatever_the_separator(tmp_path):
+    """The memo key is str(dimension_evidence_file(...)), so it carries the
+    platform's separator. Matching it against a "/"-joined prefix made the
+    eviction a no-op on Windows.
+
+    The native half above goes through _dim_evidence_tally; this one feeds the
+    matcher a backslash-separated key with a PureWindowsPath run_dir, which is
+    exactly the shape Windows produces, on any platform.
+    """
+    _LIVE_TALLIES.clear()
+    win_run = PureWindowsPath(r"C:\runs\run-1")
+    win_key = (str(win_run / "evidence" / "security_evidence.jsonl"), ("security",))
+    other_key = (str(PureWindowsPath(r"C:\runs\run-2\evidence\security_evidence.jsonl")),
+                 ("security",))
+    assert "\\" in win_key[0], "the key under test must be backslash-separated"
+    _LIVE_TALLIES.put(win_key, object())
+    _LIVE_TALLIES.put(other_key, object())
+
+    forget_live_tallies(win_run)
+
+    assert _LIVE_TALLIES.keys() == [other_key]

@@ -15,6 +15,7 @@ import pytest
 
 from quodeq.services._job_model import InMemoryJobStore
 from quodeq.services.jobs import JobManager, STATUS_FAILED
+from tests._timeouts import budget
 
 
 class _NeverExitsProcess:
@@ -94,7 +95,7 @@ class TestConcurrencyCap:
             created.append(proc)
             if first:
                 in_first_spawn.set()
-                assert release.wait(timeout=5), "spawn was never released"
+                assert release.wait(timeout=budget(5)), "spawn was never released"
             return proc
 
         manager = JobManager(spawn_impl=spawn, job_store=InMemoryJobStore())
@@ -102,11 +103,12 @@ class TestConcurrencyCap:
         racer = threading.Thread(target=lambda: first_result.append(manager.start_job(["x"])))
         racer.start()
         try:
-            assert in_first_spawn.wait(timeout=5), "the first start never reached spawn"
+            assert in_first_spawn.wait(timeout=budget(5)), \
+                "the first start never reached spawn"
             second = manager.start_job(["x"])
         finally:
             release.set()
-            racer.join(timeout=5)
+            racer.join(timeout=budget(5))
             for proc in created:
                 proc.kill()
 

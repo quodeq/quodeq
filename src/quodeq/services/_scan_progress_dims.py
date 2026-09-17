@@ -120,10 +120,13 @@ def forget_live_tallies(run_dir: Path) -> None:
     evidence, so its dedup sets are dead weight until 256 other keys evict
     them.
     """
-    prefix = f"{run_dir}/"
     with _LIVE_TALLIES_LOCK:
         for key in _LIVE_TALLIES.keys():
-            if key[0].startswith(prefix):
+            # Compared as paths, never as a "/"-prefixed string: a key is
+            # str(dimension_evidence_file(...)) and carries the platform's
+            # separator, so a hardcoded slash evicts nothing on Windows.
+            # with_segments parses the key in run_dir's own flavour.
+            if run_dir.with_segments(key[0]).is_relative_to(run_dir):
                 _LIVE_TALLIES.discard(key)
 
 
