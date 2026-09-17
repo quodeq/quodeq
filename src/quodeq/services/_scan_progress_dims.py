@@ -36,8 +36,13 @@ _LIVE_TALLIES: LRUDict = LRUDict(256)
 _LIVE_TALLIES_LOCK = threading.Lock()
 
 
-def _suppression_stamp(dismissed, deleted) -> object:
+def _suppression_stamp(dismissed, deleted) -> tuple:
     """A hashable stamp of the current suppression state, for the memo key.
+
+    Returns the ``(dismissed, frozenset(deleted))`` tuple itself rather than
+    its hash: a dict key relies on hash *and* equality to tell states apart,
+    and collapsing to a bare hash first would let two different states that
+    happen to collide onto the same 64-bit hash silently share one entry.
 
     A poll with an unchanged dismissed/deleted state resumes the existing
     tally; a changed one starts a fresh tally under a new key -- no worse
@@ -45,10 +50,12 @@ def _suppression_stamp(dismissed, deleted) -> object:
     ``set`` (see ``SuppressionMatcher``); such a caller falls back to object
     identity, so a poll handed fresh objects each time simply never resumes.
     """
+    stamp = (dismissed, frozenset(deleted))
     try:
-        return hash((dismissed, frozenset(deleted)))
+        hash(stamp)
     except TypeError:
         return (id(dismissed), id(deleted))
+    return stamp
 
 
 def live_tally(path: Path, *, suppressed, resolver, memo_key: tuple) -> FindingTally:
