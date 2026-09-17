@@ -28,14 +28,13 @@ from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.core.finding_identity import snippet_fingerprint
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.ports.actions_log import ActionLog
-from quodeq.services._run_recency import run_dirs_newest_first
+from quodeq.services._run_recency import run_dirs_newest_first, run_started_at
 from quodeq.services._wiring import (
     MARKER_FILENAME,
     ActionLogWriter,
     read_action_events,
     read_finding_details,
     read_finding_details_from_json_eval,
-    read_run_status_json,
 )
 from quodeq.shared.validation import resolve_child_dir
 
@@ -110,22 +109,19 @@ def _parse_iso(value: object) -> datetime | None:
     return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
 
 
-def _started_at(run_dir: Path) -> datetime | None:
-    status = read_run_status_json(run_dir)
-    return _parse_iso(status.get("started_at")) if isinstance(status, dict) else None
-
-
 def _resolve_fingerprints(
     project_dir: Path, targets: Iterable[DismissedEntry], *, run_id: str | None = None,
-) -> dict[LineKey, str | None]:
+) -> dict[LineKey, str]:
     """The fingerprint of every target whose snippet one of the project's runs holds.
 
     Each run is read once, for every target still unresolved, in two waves:
     first the runs started before a target's dismissal (newest first), so the
     target matches what the user saw when they dismissed it, then the runs
     started after it, which may hold different code at the same line. A run
-    with no recorded start counts as started before. The run *run_id* names
-    is read first for every target. Targets no run holds are absent.
+    with no recorded start counts as started before; a dismissal timestamp
+    without a zone is read as UTC. The run *run_id* names is read first for
+    every target. A blank stored snippet has no fingerprint and does not end
+    its target's search. Targets no run holds are absent.
 
     *run_id* comes from the request body. It is matched against the
     project's real run directories (``resolve_child_dir``), never joined onto
@@ -135,19 +131,22 @@ def _resolve_fingerprints(
     if not project_dir.is_dir():
         return {}
     pending = {target.line_key: target for target in targets}
-    found: dict[LineKey, str | None] = {}
+    dismissed_at = {key: _parse_iso(target.dismissed_at) for key, target in pending.items()}
+    found: dict[LineKey, str] = {}
     started: dict[Path, datetime | None] = {}
 
     def started_before(run_dir: Path, at: datetime | None) -> bool:
         if at is None:
             return True
         if run_dir not in started:
-            started[run_dir] = _started_at(run_dir)
+            started[run_dir] = _parse_iso(run_started_at(run_dir))
         return (started[run_dir] or at) <= at
 
     def read(run_dir: Path, keys: set[LineKey]) -> None:
         for key, snippet in _snippets_in_run(run_dir, keys).items():
-            found[key] = snippet_fingerprint(pending[key].req, snippet)
+            fingerprint = snippet_fingerprint(pending[key].req, snippet)
+            if fingerprint is not None:
+                found[key] = fingerprint
 
     runs = run_dirs_newest_first(project_dir)
     resolved = resolve_child_dir(project_dir, run_id) if run_id else None
@@ -157,9 +156,11 @@ def _resolve_fingerprints(
         runs = [run_dir for run_dir in runs if run_dir != named]
     for before in (True, False):
         for run_dir in runs:
+            if len(found) == len(pending):
+                return found
             keys = {
-                key for key, target in pending.items()
-                if key not in found and started_before(run_dir, target.dismissed_at) is before
+                key for key in pending
+                if key not in found and started_before(run_dir, dismissed_at[key]) is before
             }
             if keys:
                 read(run_dir, keys)
@@ -179,9 +180,7 @@ def resolve_fingerprint(
     then keeps its line as identity.
     """
     found = _resolve_fingerprints(project_dir, [target], run_id=run_id)
-    if target.line_key in found:
-        return found[target.line_key]
-    return snippet_fingerprint(target.req, snippet)
+    return found.get(target.line_key) or snippet_fingerprint(target.req, snippet)
 
 
 def _upgraded(entry: DismissedEntry, fingerprint: str) -> FindingDismissedEvent:
@@ -217,7 +216,7 @@ def backfill_if_needed(
             fingerprints = _resolve_fingerprints(project_dir, pending)
             events = [
                 _upgraded(entry, fingerprint) for entry in pending
-                if (fingerprint := fingerprints.get(entry.line_key)) is not None
+                if (fingerprint := fingerprints.get(entry.line_key))
             ]
             (writer or ActionLogWriter(project_dir)).emit_many(events)
             count = len(events)

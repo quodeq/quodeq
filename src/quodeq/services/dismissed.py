@@ -47,6 +47,12 @@ def _target_of(finding: dict) -> DismissedEntry:
     return DismissedEntry(str(finding.get("req", "")), str(finding.get("file", "")), line)
 
 
+def undismiss_event(entry: DismissedEntry) -> FindingUndismissedEvent:
+    """The event that releases *entry*: by fingerprint when it has one, else by line."""
+    return FindingUndismissedEvent(payload=FindingUndismissed(
+        req=entry.req, file=entry.file, line=entry.line, fingerprint=entry.fingerprint))
+
+
 def dismiss_finding(
     project_dir: Path, finding: dict, *, writer: ActionLog | None = None,
     run_id: str | None = None,
@@ -75,10 +81,10 @@ def dismiss_finding(
     log.emit(FindingDismissedEvent(payload=payload))
 
 
-def _undismiss_payloads(
+def _undismiss_targets(
     project_dir: Path, state: DismissedKeys, finding: dict,
-) -> list[FindingUndismissed]:
-    """The undismiss event(s) that restore the finding the client named.
+) -> list[DismissedEntry]:
+    """The entries whose release restores the finding the client named.
 
     The client's ``fingerprint`` (from the dismissed listing) names the entry
     exactly. Without it, the entries recorded at ``(req, file, line)`` are
@@ -93,27 +99,24 @@ def _undismiss_payloads(
     if client_fp:
         for entry in state.entries:
             if entry.req == req and entry.file == file and entry.fingerprint == client_fp:
-                return [FindingUndismissed(
-                    req=req, file=file, line=entry.line, fingerprint=client_fp)]
+                return [DismissedEntry(req, file, entry.line, client_fp)]
     at_line = state.entries_at(req, file, line)
     fingerprinted = [e.fingerprint for e in at_line if e.fingerprint]
     if fingerprinted:
-        return [FindingUndismissed(req=req, file=file, line=line, fingerprint=fp)
-                for fp in fingerprinted]
+        return [DismissedEntry(req, file, line, fp) for fp in fingerprinted]
     if at_line:
-        return [FindingUndismissed(req=req, file=file, line=line)]
+        return [DismissedEntry(req, file, line)]
     fp = resolve_fingerprint(project_dir, target, snippet=finding.get("snippet"))
-    return [FindingUndismissed(req=req, file=file, line=line, fingerprint=fp)]
+    return [DismissedEntry(req, file, line, fp)]
 
 
 def restore_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
-    """Append FindingUndismissed event(s) to project_dir/actions.jsonl."""
+    """Append the FindingUndismissed event(s) to project_dir/actions.jsonl in one write."""
     # dismissed_keys folds legacy dismissals in before the restore is recorded,
     # otherwise the migration would re-dismiss this finding after the fact.
     state = dismissed_keys(project_dir)
     log = writer or ActionLogWriter(project_dir)
-    for payload in _undismiss_payloads(project_dir, state, finding):
-        log.emit(FindingUndismissedEvent(payload=payload))
+    log.emit_many([undismiss_event(e) for e in _undismiss_targets(project_dir, state, finding)])
 
 
 def dismissed_keys(project_dir: Path) -> DismissedKeys:
@@ -170,11 +173,7 @@ def restore_all_findings(project_dir: Path, *, writer: ActionLog | None = None) 
     if not state:
         return 0
     log = writer or ActionLogWriter(project_dir)
-    log.emit_many([
-        FindingUndismissedEvent(payload=FindingUndismissed(
-            req=entry.req, file=entry.file, line=entry.line, fingerprint=entry.fingerprint))
-        for entry in state.entries
-    ])
+    log.emit_many([undismiss_event(entry) for entry in state.entries])
     return len(state)
 
 

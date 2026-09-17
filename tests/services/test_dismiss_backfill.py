@@ -137,7 +137,7 @@ class TestBackfill:
         _seed_run(project_dir, "r2", line=10, started_at="2026-03-01T00:00:00+00:00")
         _seed_run(project_dir, "r3", line=10, started_at="2026-04-01T00:00:00+00:00")
         detail_reads = _count_calls_per_run(monkeypatch, "read_finding_details")
-        status_reads = _count_calls_per_run(monkeypatch, "read_run_status_json")
+        status_reads = _count_calls_per_run(monkeypatch, "run_started_at")
 
         assert backfill_if_needed(project_dir) == 2
 
@@ -147,6 +147,19 @@ class TestBackfill:
         assert fingerprints == {
             10: FP, 30: snippet_fingerprint("R1", "return cache[key]"), 50: None,
         }
+
+    def test_naive_dismissal_timestamp_still_orders_the_runs(self, tmp_path: Path) -> None:
+        """A legacy line written without a zone offset is read as UTC and
+        compared against the runs' aware start times instead of raising."""
+        project_dir = tmp_path / "proj"
+        _seed_run(project_dir, "r1", line=10, started_at="2026-01-01T00:00:00+00:00")
+        self._legacy_dismiss(project_dir, line=10, when=datetime(2026, 1, 2))
+        _seed_run(project_dir, "r2", line=10, snippet="return cache[key]",
+                  started_at="2026-03-01T00:00:00+00:00")
+
+        (entry,) = dismissed_keys(project_dir).entries
+
+        assert entry.fingerprint == FP
 
     def test_backfill_keeps_each_entry_s_own_run_preference(self, tmp_path: Path) -> None:
         """One entry's code exists only in a run started after the dismissal;

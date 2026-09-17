@@ -158,7 +158,8 @@ class TestDeleteAllDismissed:
         assert len(load_deleted(project_dir)) == 1
 
 
-def test_sweep_emits_per_run_instead_of_accumulating_all_runs_first(tmp_path: Path):
+def test_sweep_releases_an_entry_once_however_many_runs_hold_it(tmp_path: Path):
+    """Two runs hold the same dismissed row; one undismiss event releases it in both."""
     from quodeq.services.deleted import _sweep_dismissed_matching
     from quodeq.services.dismissed import dismiss_finding
 
@@ -183,8 +184,8 @@ def test_sweep_emits_per_run_instead_of_accumulating_all_runs_first(tmp_path: Pa
         project_dir, ("maintainability", "Modularity", "a.py"),
         writer=_RecordingLog(),
     )
-    assert count == 2
-    assert len(emitted_after_first_run) == 2
+    assert count == 1
+    assert len(emitted_after_first_run) == 1
 
 
 def test_sweep_never_holds_more_than_one_runs_matches_at_once(tmp_path: Path, monkeypatch):

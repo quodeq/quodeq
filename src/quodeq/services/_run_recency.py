@@ -21,7 +21,8 @@ _STARTED_AT_MEMO_MAX = 4096
 _started_at_memo: dict[Path, str] = {}
 
 
-def _run_started_at(run_dir: Path) -> str | None:
+def run_started_at(run_dir: Path) -> str | None:
+    """The run's ``started_at`` as status.json records it, remembered per run dir."""
     started = _started_at_memo.get(run_dir)
     if started is not None:
         return started
@@ -45,7 +46,7 @@ def run_dirs_newest_first(project_dir: Path) -> list[Path]:
     mid-scan, and only ``started_at`` is safe to remember.
     """
     def recency(run_dir: Path) -> tuple:
-        started = _run_started_at(run_dir)
+        started = run_started_at(run_dir)
         if started:
             return (1, started, run_dir.name)
         return (0, file_mtime(run_dir) or 0.0, run_dir.name)

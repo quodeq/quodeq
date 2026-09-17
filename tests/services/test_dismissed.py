@@ -162,11 +162,10 @@ def test_restore_finding_uses_injected_writer(tmp_path: Path) -> None:
     finding = {"req": "R1", "file": "a.py", "line": 10}
     restore_finding(project_dir, finding, writer=mock_writer)
 
-    # Verify the mock writer's emit method was called
-    assert mock_writer.emit.called
-    assert mock_writer.emit.call_count == 1
-    # Verify the event was called with the right type
-    event = mock_writer.emit.call_args[0][0]
+    # The undismiss events for the finding go to the writer as one batch.
+    mock_writer.emit_many.assert_called_once()
+    (events,) = mock_writer.emit_many.call_args[0]
+    (event,) = list(events)
     assert "FindingUndismissedEvent" in str(type(event))
 
 

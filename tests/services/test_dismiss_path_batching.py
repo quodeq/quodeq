@@ -9,6 +9,7 @@ looks up finding detail for the page it was asked for.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from quodeq.core.events.models import (
@@ -51,10 +52,14 @@ def _finding(req: str, file: str, line: int) -> dict:
     return {"req": req, "file": file, "line": line, "dimension": DIMENSION, "principle": PRINCIPLE}
 
 
-def _seed_run(project_dir: Path, run_id: str, findings: list[dict]) -> Path:
+def _seed_run(
+    project_dir: Path, run_id: str, findings: list[dict], *, started_at: str | None = None,
+) -> Path:
     """One projected run holding *findings*, each with its own snippet."""
     run_dir = project_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+    if started_at:
+        (run_dir / "status.json").write_text(json.dumps({"started_at": started_at}), encoding="utf-8")
     log = EventLogWriter(run_dir / "events.jsonl")
     for finding in findings:
         log.emit(JudgmentCreatedEvent(payload=JudgmentPayload(
@@ -102,22 +107,26 @@ def test_delete_all_dismissed_appends_every_undismiss_in_one_batch(tmp_path: Pat
     assert log.undismissed_reqs() == ["R1", "R2"]
 
 
-def test_delete_sweep_appends_one_batch_per_run_that_holds_a_match(tmp_path: Path) -> None:
+def test_delete_sweep_appends_one_batch_per_run_and_releases_each_entry_once(
+    tmp_path: Path,
+) -> None:
+    """Runs are swept newest first. An entry two runs hold is released by the
+    first run's batch only; the log grows by entries, not by rows."""
     project_dir = tmp_path / "proj"
-    hit = [_finding("R1", "a.py", 1), _finding("R2", "a.py", 2)]
+    shared = [_finding("R1", "a.py", 1), _finding("R2", "a.py", 2)]
+    only_old = [_finding("R4", "a.py", 4)]
     miss = [_finding("R3", "other.py", 3)]
-    run_a = _seed_run(project_dir, "run-a", hit)
-    run_b = _seed_run(project_dir, "run-b", hit)
-    run_c = _seed_run(project_dir, "run-c", miss)
-    _dismiss_and_project(project_dir, hit + miss, run_a, run_b, run_c)
+    newest = _seed_run(project_dir, "run-new", shared, started_at="2026-02-01T00:00:00+00:00")
+    older = _seed_run(project_dir, "run-old", shared + only_old, started_at="2026-01-01T00:00:00+00:00")
+    other = _seed_run(project_dir, "run-other", miss, started_at="2026-01-15T00:00:00+00:00")
+    _dismiss_and_project(project_dir, shared + only_old + miss, newest, older, other)
     log = _BatchLog()
 
     count = _sweep_dismissed_matching(project_dir, (DIMENSION, PRINCIPLE, "a.py"), writer=log)
 
-    assert count == 4
+    assert count == 3
     assert log.kinds() == ["emit_many", "emit_many"]
-    assert [len(batch) for _, batch in log.calls] == [2, 2]
-    assert log.undismissed_reqs() == ["R1", "R1", "R2", "R2"]
+    assert [sorted(e.payload.req for e in batch) for _, batch in log.calls] == [["R1", "R2"], ["R4"]]
 
 
 def _spy_detail_reads(monkeypatch) -> list[set]:
