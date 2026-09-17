@@ -24,7 +24,24 @@ from quodeq.services._scan_progress_dims import (
     forget_live_tallies,
     live_tally,
 )
+from quodeq.services._scan_progress_types import _ProgressContext
 from quodeq.services.scan_progress import build_scan_progress
+
+
+def _ctx(run_dir: Path, evaluators_dir=None, compiled_dir=None) -> _ProgressContext:
+    """The run-level context `_dim_evidence_tally` reads.
+
+    It only touches `run_dir`, `evaluators_dir` and `compiled_dir`; the rest
+    are filled with inert values. These used to be separate positional args
+    and were bundled into `_ProgressContext` by the parameter-count ratchet.
+    """
+    return _ProgressContext(
+        run_dir=run_dir, status={}, state="running", is_terminal=False,
+        total_elapsed_s=None, run_budget_s=None, project_files=0,
+        dim_estimates={}, dim_records={}, dim_ids=[],
+        evidence_dir=run_dir / "evidence",
+        evaluators_dir=evaluators_dir, compiled_dir=compiled_dir,
+    )
 
 
 def _row(p, file, line, t="violation"):
@@ -51,14 +68,15 @@ def test_dim_progress_polls_reuse_one_incremental_tally_per_file(tmp_path):
     compiled_dir = tmp_path / "no_such_compiled"
     path = _seed_evidence(run_dir, dim_id)
     dismissed, deleted = frozenset(), frozenset()
+    ctx = _ctx(run_dir, evaluators_dir, compiled_dir)
 
-    first = _dim_evidence_tally(dim_id, run_dir, dismissed, deleted, evaluators_dir, compiled_dir)
+    first = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
     assert first == tally_unique_findings(path)
 
     with path.open("a") as f:
         f.write(_row("P3", "c.py", 3))
 
-    second = _dim_evidence_tally(dim_id, run_dir, dismissed, deleted, evaluators_dir, compiled_dir)
+    second = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
     assert second == tally_unique_findings(path)
 
     assert len(_LIVE_TALLIES) == 1
@@ -75,12 +93,13 @@ def test_a_changed_suppression_state_starts_a_fresh_tally(tmp_path):
     evaluators_dir = tmp_path / "no_such_evaluators"
     compiled_dir = tmp_path / "no_such_compiled"
     _seed_evidence(run_dir, dim_id)
+    ctx = _ctx(run_dir, evaluators_dir, compiled_dir)
 
-    _dim_evidence_tally(dim_id, run_dir, frozenset(), frozenset(), evaluators_dir, compiled_dir)
+    _dim_evidence_tally(dim_id, ctx, frozenset(), frozenset())
     assert len(_LIVE_TALLIES) == 1
 
     changed = frozenset({("security", "a.py", 1)})
-    _dim_evidence_tally(dim_id, run_dir, changed, frozenset(), evaluators_dir, compiled_dir)
+    _dim_evidence_tally(dim_id, ctx, changed, frozenset())
     assert len(_LIVE_TALLIES) == 2
 
 
@@ -95,10 +114,9 @@ def test_an_unhashable_suppression_state_is_never_memoized(tmp_path):
     compiled_dir = tmp_path / "no_such_compiled"
     path = _seed_evidence(run_dir, dim_id)
 
-    first = _dim_evidence_tally(
-        dim_id, run_dir, {("security", "a.py", 1)}, set(), evaluators_dir, compiled_dir)
-    second = _dim_evidence_tally(
-        dim_id, run_dir, {("security", "b.py", 2)}, set(), evaluators_dir, compiled_dir)
+    ctx = _ctx(run_dir, evaluators_dir, compiled_dir)
+    first = _dim_evidence_tally(dim_id, ctx, {("security", "a.py", 1)}, set())
+    second = _dim_evidence_tally(dim_id, ctx, {("security", "b.py", 2)}, set())
 
     assert len(_LIVE_TALLIES) == 0
     assert first == second == tally_unique_findings(path)
@@ -115,14 +133,17 @@ def test_a_new_standard_on_disk_starts_a_fresh_tally(tmp_path):
     compiled_dir = tmp_path / "no_such_compiled"
     _seed_evidence(run_dir, dim_id)
 
-    _dim_evidence_tally(dim_id, run_dir, frozenset(), frozenset(), evaluators_dir, compiled_dir)
+    _dim_evidence_tally(dim_id, _ctx(run_dir, evaluators_dir, compiled_dir),
+                        frozenset(), frozenset())
     assert len(_LIVE_TALLIES) == 1
 
     before = evaluators_dir.stat().st_mtime_ns
     (evaluators_dir / "custom.json").write_text("{}")
     assert evaluators_dir.stat().st_mtime_ns != before, "dir mtime did not move"
 
-    _dim_evidence_tally(dim_id, run_dir, frozenset(), frozenset(), evaluators_dir, compiled_dir)
+    # A fresh _ctx on purpose: the stamp is re-read from disk, not cached.
+    _dim_evidence_tally(dim_id, _ctx(run_dir, evaluators_dir, compiled_dir),
+                        frozenset(), frozenset())
     assert len(_LIVE_TALLIES) == 2
 
 
@@ -198,7 +219,7 @@ def test_forget_live_tallies_drops_only_the_given_run(tmp_path):
     dropped = tmp_path / "run"
     for run_dir in (kept, dropped):
         _seed_evidence(run_dir, "security")
-        _dim_evidence_tally("security", run_dir, frozenset(), frozenset(), None, None)
+        _dim_evidence_tally("security", _ctx(run_dir), frozenset(), frozenset())
     assert len(_LIVE_TALLIES) == 2
 
     forget_live_tallies(dropped)

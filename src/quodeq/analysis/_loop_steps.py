@@ -17,14 +17,45 @@ from dataclasses import dataclass, replace
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._loop_state import _interruption_reason, _run_dir_for, _safe_write_dim_state, _silence_broken_stdout
+from quodeq.analysis._drop_stats import DropStatsCounter
+from quodeq.analysis._loop_state import (
+    DimTransition,
+    _interruption_reason,
+    _run_dir_for,
+    _safe_write_dim_state,
+    _silence_broken_stdout,
+)
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.core.evidence.model import Evidence
-from quodeq.core.observability import LogSink
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.shared import cancellation
+
+
+@dataclass(frozen=True, slots=True)
+class LoopDeps:
+    """Loop-invariant collaborators for one dimension loop.
+
+    ``runner`` analyses a dimension; ``on_dimension_done`` receives each
+    finished dimension's Evidence (scoring, in production); ``log`` is the
+    loop's sink and ``drop_counter`` the per-run drop-stats aggregate the
+    loop reports once it finishes.
+    """
+
+    runner: DimensionRunner
+    on_dimension_done: Callable[[str, Evidence], None] | None = None
+    log: LogSink = NULL_LOG
+    drop_counter: DropStatsCounter | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _LoopRun:
+    """One loop's collaborators plus the Evidence accumulator it returns."""
+
+    deps: LoopDeps
+    result: dict[str, Evidence]
 
 
 def _loop_should_stop(config: RunConfig, dimension: str, log: LogSink) -> bool:
@@ -43,11 +74,7 @@ def _loop_should_stop(config: RunConfig, dimension: str, log: LogSink) -> bool:
     return False
 
 
-def _retry_dim_callback(
-    dimension: str, ev: Evidence,
-    on_dimension_done: Callable[[str, Evidence], None] | None,
-    result: dict[str, Evidence], log: LogSink,
-) -> None:
+def _retry_dim_callback(dimension: str, ev: Evidence, run: _LoopRun) -> None:
     """Retry ``on_dimension_done`` once after a BrokenPipeError.
 
     Stdout pipe to parent died mid-callback. Silence stdout/stderr, then
@@ -56,8 +83,10 @@ def _retry_dim_callback(
     previous "result kept" message was misleading - only the in-memory
     Evidence stayed, the persistent file write was lost with the exception.
     """
+    log = run.deps.log
+    on_dimension_done = run.deps.on_dimension_done
     _silence_broken_stdout()
-    result.setdefault(dimension, ev)
+    run.result.setdefault(dimension, ev)
     if not on_dimension_done:
         log.warning(f"[loop] {dimension} - callback broken pipe, no retry needed, continuing loop")
         return
@@ -75,9 +104,7 @@ def _retry_dim_callback(
 
 
 def _finalize_dim_result(
-    run_dir: Path | None, dimension: str, ev: Evidence,
-    on_dimension_done: Callable[[str, Evidence], None] | None,
-    result: dict[str, Evidence], log: LogSink,
+    run_dir: Path | None, dimension: str, ev: Evidence, run: _LoopRun,
     *, log_result: Callable[[], None] | None = None,
 ) -> None:
     """Write the DONE dim-state and run the ``on_dimension_done`` callback.
@@ -88,29 +115,28 @@ def _finalize_dim_result(
     the runner with ``emit_log=False``); the per-dimension loop passes None
     because the runner already logged with ``emit_log=True``.
     """
+    log = run.deps.log
     _safe_write_dim_state(
-        run_dir, dimension, DimState.DONE,
-        exit_reason=ev.exit_reason, log=log,
+        run_dir, dimension, DimTransition(DimState.DONE, exit_reason=ev.exit_reason), log=log,
     )
     try:
         if log_result:
             log_result()
-        result[dimension] = ev
-        if on_dimension_done:
-            on_dimension_done(dimension, ev)
+        run.result[dimension] = ev
+        if run.deps.on_dimension_done:
+            run.deps.on_dimension_done(dimension, ev)
     except BrokenPipeError:
-        _retry_dim_callback(dimension, ev, on_dimension_done, result, log)
+        _retry_dim_callback(dimension, ev, run)
     except Exception as exc:  # noqa: BLE001
         log.warning(
             f"[loop] {dimension} - callback raised "
             f"{type(exc).__name__}: {exc} - result kept, continuing loop",
         )
-        result.setdefault(dimension, ev)
+        run.result.setdefault(dimension, ev)
 
 
 def _dispatch_incremental_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
-    *, runner: DimensionRunner, log: LogSink,
+    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, deps: LoopDeps,
 ) -> tuple[Evidence | None, BaseException | None]:
     """Run one dimension incrementally, falling back to a full scan on failure.
 
@@ -119,6 +145,7 @@ def _dispatch_incremental_dim(
     the most recent exception encountered (or None on success), used to
     pick the dim-state ``INCOMPLETE`` reason.
     """
+    runner, log = deps.runner, deps.log
     try:
         return runner.run(config, dimension, idx, ctx, emit_log=False), None
     except BrokenPipeError as exc:
@@ -158,19 +185,8 @@ def _dispatch_incremental_dim(
         return None, exc
 
 
-@dataclass(frozen=True)
-class _IncrementalDimDeps:
-    """Loop-invariant collaborators for one incremental-loop iteration."""
-
-    runner: DimensionRunner
-    on_dimension_done: Callable[[str, Evidence], None] | None
-    result: dict[str, Evidence]
-    log: LogSink
-
-
 def _run_one_incremental_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
-    deps: _IncrementalDimDeps,
+    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, run: _LoopRun,
 ) -> bool:
     """Run one incremental-loop iteration for *dimension*.
 
@@ -178,21 +194,24 @@ def _run_one_incremental_dim(
     or cancellation reached), in which case the caller must break the loop
     without counting the iteration as completed.
     """
-    log = deps.log
+    log = run.deps.log
     log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
     if _loop_should_stop(config, dimension, log):
         return True
     run_dir = _run_dir_for(config)
-    _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=log)
+    _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
     emit_marker("analyzing", dimension=dimension)
     log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-    ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, runner=deps.runner, log=log)
+    ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, run.deps)
     if ev:
         _finalize_dim_result(
-            run_dir, dimension, ev, deps.on_dimension_done, deps.result, log,
+            run_dir, dimension, ev, run,
             log_result=lambda ev=ev: _log_dimension_result(ev, dimension, idx, ctx.total, log=log),
         )
     else:
-        _safe_write_dim_state(run_dir, dimension, DimState.INCOMPLETE, reason=_interruption_reason(last_exc), log=log)
+        _safe_write_dim_state(
+            run_dir, dimension,
+            DimTransition(DimState.INCOMPLETE, reason=_interruption_reason(last_exc)), log=log,
+        )
     log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
     return False

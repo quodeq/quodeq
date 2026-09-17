@@ -5,7 +5,7 @@ from pathlib import Path
 
 from quodeq.core.events.models import Judgment, JudgmentPayload
 from quodeq.data.sqlite.connection import open_evaluation_db
-from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.data.sqlite.state_store import PrincipleGradeRow, SQLiteStateStore
 
 
 def _payload(**kw) -> JudgmentPayload:
@@ -203,10 +203,10 @@ def test_record_dimension_score_upserts(tmp_path: Path) -> None:
 
 def test_record_principle_grade_round_trip(tmp_path: Path) -> None:
     store = SQLiteStateStore(tmp_path)
-    store.record_principle_grade(
+    store.record_principle_grade(PrincipleGradeRow(
         dimension="Security", principle_id="P1",
         score=6.0, grade="C", finding_count=3, dismissed_count=1,
-    )
+    ))
 
     rows = store.read_principle_grades()
     assert len(rows) == 1
@@ -221,10 +221,10 @@ def test_record_principle_grade_round_trip(tmp_path: Path) -> None:
 def test_clear_grades_truncates_both_tables(tmp_path: Path) -> None:
     store = SQLiteStateStore(tmp_path)
     store.record_dimension_score(dimension="S", score=1.0, grade="F")
-    store.record_principle_grade(
+    store.record_principle_grade(PrincipleGradeRow(
         dimension="S", principle_id="P", score=1.0, grade="F",
         finding_count=1, dismissed_count=0,
-    )
+    ))
 
     store.clear_grades()
 

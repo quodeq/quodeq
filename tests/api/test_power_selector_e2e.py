@@ -193,8 +193,8 @@ class _StubJobManager:
     def __init__(self):
         self.captured_env: dict = {}
 
-    def start_job(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
-        self.captured_env = env
+    def start_job(self, cmd, launch=None):
+        self.captured_env = launch.env
         return {"jobId": "test"}
 
 

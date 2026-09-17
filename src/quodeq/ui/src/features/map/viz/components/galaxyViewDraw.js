@@ -35,14 +35,12 @@ const SIBLING_LABEL_FADE_SPAN = 15;
  * @returns {{ hovered: object|null }} - Hovered element info for hit testing
  */
 export function drawFrame(ctx, scene, cam, nav, opts) {
-  const { rDim, parentEl } = opts;
-
-  const tc = getThemeColors(parentEl);
+  const tc = getThemeColors(opts.parentEl);
 
   drawBackground(ctx, scene, opts, tc);
   drawConstellations(ctx, scene, { cam, nav }, opts, tc);
   const dimHovered = drawDimStars(ctx, scene, { cam, nav }, opts, tc);
-  const prinHovered = drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim);
+  const prinHovered = drawPrinciples(ctx, scene, { cam, nav }, opts, tc);
   drawZoomedPrinciple(ctx, scene, cam, opts);
 
   return { hovered: prinHovered ?? dimHovered };
@@ -106,10 +104,13 @@ function drawConstellations(ctx, scene, view, opts, tc) {
  * Phase 3: dimension stars with principle particles, glow, labels, and hit-test.
  * Returns the currently hovered element (or null).
  */
-/** Orbiting principle particles around one dimension star (part of phase 3). */
-function drawDimParticles(ctx, scene, i, sc, cam, t, particleAlpha) {
+/** Orbiting principle particles around one dimension star (part of phase 3).
+ * `orbit` is { sc, cam, t, particleAlpha }: the star's screen centre and the
+ * frame's camera/time/fade. */
+function drawDimParticles(ctx, principles, orbit) {
+  const { sc, cam, t, particleAlpha } = orbit;
   if (particleAlpha <= 0.01) return;
-  (scene.principles[i] || []).forEach(p => {
+  (principles || []).forEach(p => {
     const dp = p.dimParticle;
     const a = t * dp.os + dp.op;
     const px = sc.x + Math.cos(a) * dp.or * dp.ec * cam.z;
@@ -143,7 +144,7 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
 
   // Principle particles orbiting this dimension — fade out as principle planets fade in
   const particleAlpha = isSelected ? Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 2) : dimFade;
-  drawDimParticles(ctx, scene, i, sc, cam, t, particleAlpha);
+  drawDimParticles(ctx, scene.principles[i], { sc, cam, t, particleAlpha });
 
   drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: isSelected ? clusterDim : dimFade });
   // Hide dimension label when zoomed past galaxy level
@@ -196,9 +197,10 @@ function drawFocusRing(ctx, cx, cy, r, tc) {
  * Phase 4: principle planets visible when zoomed into a dimension.
  * Returns the hovered principle element, or null.
  */
-function drawPrinciples(ctx, scene, cam, nav, opts, tc, rDim) {
+function drawPrinciples(ctx, scene, view, opts, tc) {
+  const { cam, nav } = view;
+  const { t, mx, my, showLabels, animating, w2s, rDim } = opts;
   if (!(cam.z > ZOOM_DIMENSION_LEVEL && rDim !== null)) return null;
-  const { t, mx, my, showLabels, animating, w2s } = opts;
   const dim = scene.stars[rDim];
   const dsc = w2s(dim.x, dim.y);
   const pAlpha = Math.min(1, (cam.z - ZOOM_DIMENSION_LEVEL) / 3);

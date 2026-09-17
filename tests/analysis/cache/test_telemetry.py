@@ -17,7 +17,7 @@ from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache import (
     CacheEntry, LocalFileBackend, build_cache_key_for_file,
 )
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 
 
@@ -91,8 +91,8 @@ class TestCacheStatsMarker:
             new=fake_emit,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -137,8 +137,8 @@ class TestCacheStatsMarker:
             new=fake_emit,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache, dispatcher=fake_dispatch,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -178,8 +178,8 @@ class TestCacheStatsMarker:
             new=fake_emit,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache, dispatcher=fake_dispatch,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -210,8 +210,8 @@ class TestCacheStatsMarker:
             new=fake_emit,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
             )
 
         # Round-trip the cache_stats payload through JSON.

@@ -173,12 +173,11 @@ def _build_diff_report_and_payload(evidence_dir: Path, duration: int) -> tuple[d
         "overallGrade": "N/A",
     }, project_dir)
 
-    from quodeq.ci.reporter import build_review_payload
+    from quodeq.ci.reporter import ReviewOptions, build_review_payload
     payload = build_review_payload(
         [report],
         baseline_violations=[],
-        duration_seconds=duration,
-        baseline_available=False,
+        options=ReviewOptions(duration_seconds=duration, baseline_available=False),
     )
     return report, payload
 

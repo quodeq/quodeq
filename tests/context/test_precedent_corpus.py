@@ -26,7 +26,7 @@ def test_backfill_scans_the_corpus_once_not_per_chunk(monkeypatch) -> None:
     Rescanning every fingerprint per chunk made the backfill quadratic in
     the corpus size. A dict that counts its own iterations proves one pass.
     """
-    from quodeq.context.precedent_store import _backfill_missing
+    from quodeq.context.precedent_store import Embedder, _backfill_missing
 
     monkeypatch.setattr("quodeq.context.precedent._BACKFILL_CHUNK", 1)
     iterations = [0]
@@ -57,7 +57,9 @@ def test_backfill_scans_the_corpus_once_not_per_chunk(monkeypatch) -> None:
         release_backfill_claim=lambda conn: None,
     )
 
-    n = _backfill_missing(store, object(), "m", texts, embed, batch_timeout=None)
+    n = _backfill_missing(
+        store, object(), texts, Embedder(model="m", embed_fn=embed, batch_timeout=None),
+    )
 
     assert n == 3
     assert batches == [["t1"], ["t2"], ["t3"]]

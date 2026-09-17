@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.config.evidence_env import cwe_url_template
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
@@ -86,12 +87,13 @@ def _score_one_dimension(
         evidence = deps.parser(jsonl_path, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=ctx.source_file_count, files_read=files_read,
-        ), compiled_dir=ctx.compiled_dir, evaluators_dir=ctx.evaluators_dir,
+        ), EvidenceParseOptions(
+            compiled_dir=ctx.compiled_dir, evaluators_dir=ctx.evaluators_dir,
             req_map_reader=read_req_to_principle_map,
             refs_reader=load_compiled_refs,
             cwe_url_template=cwe_url_template(),
             on_quarantine=log_quarantined_findings,
-            on_malformed_line=log_malformed_jsonl_line)
+            on_malformed_line=log_malformed_jsonl_line))
         if evidence is None:
             return
         scores = deps.scorer(evidence, mode="numerical", params=ctx.params)

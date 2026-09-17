@@ -77,9 +77,8 @@ class PrecedentCorpus:
             start = time.monotonic()
             queries = self._embed(list(texts))
             if len(queries) != len(texts):
-                raise RuntimeError(
-                    f"embedding returned {len(queries)} vectors for {len(texts)} texts"
-                )
+                raise RuntimeError(f"embedding returned {len(queries)} vectors "
+                                   f"for {len(texts)} texts")
             self._elapsed += time.monotonic() - start
             scores: list[float | None] = []
             for query in queries:
@@ -137,15 +136,14 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     overrides the query-time default for backfill chunks.
     """
     from quodeq.llm_bridge._embeddings import (  # noqa: PLC0415
-        BATCH_TIMEOUT,
-        QUERY_TIMEOUT,
-        embed_texts,
-        embedding_model_available,
-    )
+        BATCH_TIMEOUT, QUERY_TIMEOUT, EmbeddingEndpoint, embed_texts,
+        embedding_model_available)
+
+    endpoint = EmbeddingEndpoint(base_url=base_url)
 
     def _embed(texts: list[str], **kw: object) -> list[list[float]]:
         timeout = kw.get("timeout", QUERY_TIMEOUT)
-        return embed_texts(texts, model=model, base_url=base_url, timeout=timeout)  # type: ignore[arg-type]
+        return embed_texts(texts, model=model, endpoint=endpoint, timeout=timeout)  # type: ignore[arg-type]
 
     return _embed, embedding_model_available, BATCH_TIMEOUT
 

@@ -26,7 +26,7 @@ from quodeq.services._wiring import (
     migrate_if_needed,
     read_action_events,
 )
-from quodeq.services.suppression_keys import is_dismissed
+from quodeq.services.suppression_keys import FindingRef, is_dismissed
 from quodeq.core.events.models import (
     FindingDismissed,
     FindingDismissedEvent,
@@ -220,8 +220,9 @@ def filter_dismissed_from_dimensions(
     for dim in dimensions:
         filtered = [
             v for v in dim.violations
-            if not is_dismissed(keys, req=v.req, principle=v.practice_id,
-                                file=v.file, line=v.line, snippet=v.snippet, rules=rules)
+            if not is_dismissed(keys, FindingRef(
+                req=v.req, principle=v.practice_id, file=v.file, line=v.line,
+                snippet=v.snippet), rules=rules)
         ]
         if len(filtered) == len(dim.violations):
             result.append(dim)

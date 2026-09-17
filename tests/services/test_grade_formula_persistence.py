@@ -60,6 +60,7 @@ def test_load_falls_back_on_wrong_shape_json(formula_path, payload):
 def test_rescore_dimensions_uses_saved_params(formula_path, monkeypatch):
     """rescore_dimensions with no explicit params picks up the saved file."""
     from quodeq.services.rescore import rescore_dimensions
+    from quodeq.services.suppression_keys import SuppressionKeys
 
     seen = {}
     def fake_load():
@@ -67,5 +68,5 @@ def test_rescore_dimensions_uses_saved_params(formula_path, monkeypatch):
         return dataclasses.replace(DEFAULT_PARAMS, base_k=0.3)
     monkeypatch.setattr(grade_formula, "load_params", fake_load)
 
-    rescore_dimensions([], set())
+    rescore_dimensions([], SuppressionKeys(set()))
     assert seen.get("called") is True

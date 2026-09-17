@@ -151,29 +151,42 @@ def _resolve_import_conflict(
     return top_dir
 
 
+@dataclass(frozen=True, slots=True)
+class _ImportTarget:
+    """Where an incoming archive lands once its collisions are resolved.
+
+    ``top_dir`` is the UUID directory inside the archive; ``target_uuid`` is
+    the directory it is materialized under (differs on a "copy" import).
+    """
+
+    reports_root: Path
+    top_dir: str
+    target_uuid: str
+    identity: ProjectIdentity
+
+
 def _stage_and_commit(
-    zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], reports_root: Path,
-    top_dir: str, target_uuid: str, identity: ProjectIdentity,
+    zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], target: _ImportTarget,
 ) -> None:
     """Extract into a staging dir, atomically rename into place, then update
     the repository_info.json UUID (if renamed) and the project index."""
-    staging = Path(tempfile.mkdtemp(prefix="quodeq_import_", dir=str(reports_root)))
+    staging = Path(tempfile.mkdtemp(prefix="quodeq_import_", dir=str(target.reports_root)))
     try:
         _safe_extract(zf, members, staging)
-        staged_project = staging / top_dir
+        staged_project = staging / target.top_dir
         if not staged_project.is_dir():
             raise _bad_request("Archive missing top-level project directory.", "BAD_LAYOUT")
-        final_path = reports_root / target_uuid
+        final_path = target.reports_root / target.target_uuid
         if final_path.exists():  # extremely narrow race window after the replace check above
             raise _bad_request("Target project directory already exists.", "RACE")
         staged_project.rename(final_path)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
-    if target_uuid != top_dir:
-        _rewrite_repository_info(final_path, target_uuid)
+    if target.target_uuid != target.top_dir:
+        _rewrite_repository_info(final_path, target.target_uuid)
 
-    _update_index(reports_root, identity, target_uuid)
+    _update_index(target.reports_root, target.identity, target.target_uuid)
 
 
 def _read_and_validate_member_payloads(
@@ -199,19 +212,18 @@ def _read_and_validate_member_payloads(
 
 
 def _build_success_outcome(
-    top_dir: str, target_uuid: str, action: str | None, remote_addr: str | None,
-    identity: ProjectIdentity,
+    target: _ImportTarget, action: str | None, remote_addr: str | None,
 ) -> ImportOutcome:
     _logger.info(
         "import_project: source_uuid=%s target_uuid=%s action=%s remote_addr=%s",
-        top_dir, target_uuid, action, remote_addr,
+        target.top_dir, target.target_uuid, action, remote_addr,
     )
     return ImportOutcome(HTTPStatus.OK, {
         "imported": True,
-        "projectId": target_uuid,
-        "sourceProjectId": top_dir,
-        "renamed": target_uuid != top_dir,
-        "projectName": identity.project_name,
+        "projectId": target.target_uuid,
+        "sourceProjectId": target.top_dir,
+        "renamed": target.target_uuid != target.top_dir,
+        "projectName": target.identity.project_name,
     })
 
 
@@ -248,8 +260,8 @@ def import_zip_stream(
             resolution = _resolve_import_conflict(reports_root, top_dir, action, identity)
             if isinstance(resolution, ImportOutcome):
                 return resolution
-            target_uuid = resolution
-            _stage_and_commit(zf, members, reports_root, top_dir, target_uuid, identity)
+            target = _ImportTarget(reports_root, top_dir, resolution, identity)
+            _stage_and_commit(zf, members, target)
     except _ImportError as exc:
         return _error_outcome(exc.public_message, exc.status, exc.code)
     except zipfile.BadZipFile:
@@ -264,7 +276,7 @@ def import_zip_stream(
             HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
         )
 
-    return _build_success_outcome(top_dir, target_uuid, action, remote_addr, identity)
+    return _build_success_outcome(target, action, remote_addr)
 
 
 # Re-export for routing module.

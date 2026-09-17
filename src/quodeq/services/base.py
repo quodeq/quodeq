@@ -41,13 +41,14 @@ class NewProjectSpec:
     The route builds this after its own request-boundary checks (repo-URL
     shape, cloneDest containment under home, local-path allowlist); the
     provider's ``create_project`` owns everything from here on (duplicate
-    detection, clone + scan, rollback on failure).
+    detection, clone + scan, rollback on failure). ``register_project`` takes
+    the same spec; a local path needs only ``repo`` and ``discipline``.
     """
     repo: str
     discipline: str | None
-    scope_path: str | None
-    clone_dest: str | None
-    ephemeral: bool
+    scope_path: str | None = None
+    clone_dest: str | None = None
+    ephemeral: bool = False
 
 
 @dataclass(frozen=True)

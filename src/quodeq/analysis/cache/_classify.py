@@ -59,10 +59,9 @@ class ClassifyResult:
 
 def _classify_one_file(
     config: RunConfig, dimension: str, f: str, cache: CacheBackend, *, bypass_reads: bool,
-    current_prov: dict | None,
-) -> tuple[str, str, CacheEntry | None, dict | None, bool]:
+) -> tuple[str, str, CacheEntry | None, bool]:
     """Classify one file against the cache. Returns (key, content_hash, hit,
-    current_prov, adopted); ``adopted`` marks a ``try_adopt`` hit."""
+    adopted); ``adopted`` marks a ``try_adopt`` hit."""
     struct = build_cache_key_struct(config, f, dimension)
     key = compute_key(struct)
     hit = None if bypass_reads else cache.get(key)
@@ -70,9 +69,7 @@ def _classify_one_file(
     if hit is None and not bypass_reads:
         hit = try_adopt(cache, struct, key, language=config.language or "")
         adopted = hit is not None
-    if hit is not None and current_prov is None:
-        current_prov = _current_provenance(config, dimension)
-    return key, struct.file_content_hash, hit, current_prov, adopted
+    return key, struct.file_content_hash, hit, adopted
 
 
 def _partition_files_by_cache(
@@ -95,8 +92,8 @@ def _partition_files_by_cache(
         # between the two then carries a stamp older than its hash, and the
         # write path re-hashes rather than trusting a stale hash.
         stamp = _stat_key(config.src / f)
-        key, content_hash, hit, current_prov, was_adopted = _classify_one_file(
-            config, dimension, f, cache, bypass_reads=bypass_reads, current_prov=current_prov,
+        key, content_hash, hit, was_adopted = _classify_one_file(
+            config, dimension, f, cache, bypass_reads=bypass_reads,
         )
         if hit is None:
             misses.append(f)
@@ -104,6 +101,8 @@ def _partition_files_by_cache(
             if stamp is not None:
                 miss_stamps[f] = stamp
         else:
+            if current_prov is None:
+                current_prov = _current_provenance(config, dimension)
             adopted += int(was_adopted)
             if hit.consolidated:
                 cached_findings.extend(hit.findings)

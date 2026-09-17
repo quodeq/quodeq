@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.core.evidence.model import Evidence
 
 from tests.analysis.cache._clean_scan_honor_fixtures import (  # noqa: F401 -- cache is a pytest fixture
@@ -63,8 +63,8 @@ class TestDispatchBypassesCacheOnCleanScan:
             )
 
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _callbacks(), cache=cache,
-            dispatcher=fake_dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_callbacks(), cache=cache, dispatcher=fake_dispatcher),
         )
 
         # All files re-dispatched, NOT served from cache.
@@ -101,8 +101,8 @@ class TestDispatchBypassesCacheOnCleanScan:
             )
 
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _callbacks(), cache=cache,
-            dispatcher=fake_dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_callbacks(), cache=cache, dispatcher=fake_dispatcher),
         )
 
         # Cache entry was overwritten with the fresh dispatch result.
@@ -140,8 +140,8 @@ class TestCleanScanInvalidates:
             )
 
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _callbacks(), cache=cache,
-            dispatcher=fake_dispatch,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_callbacks(), cache=cache, dispatcher=fake_dispatch),
         )
 
         # a.py: re-dispatched, ok marker, repopulated under same key with FRESH content.
@@ -179,8 +179,8 @@ class TestCleanScanInvalidates:
             )
 
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _callbacks(), cache=cache,
-            dispatcher=noop_dispatch,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_callbacks(), cache=cache, dispatcher=noop_dispatch),
         )
 
         # All-hits path; entry survives untouched.

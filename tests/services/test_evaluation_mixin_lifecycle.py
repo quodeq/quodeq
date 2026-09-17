@@ -50,7 +50,7 @@ class TestStartEvaluation:
         m = self._setup_mixin()
         opts = EvaluationOptions(time_limit=900)
         m.start_evaluation(str(tmp_path), str(tmp_path / "reports"), opts)
-        assert m._dispatcher.dispatch.call_args.kwargs["time_limit_s"] == 900
+        assert m._dispatcher.dispatch.call_args.args[1].time_limit_s == 900
 
     def test_nonexistent_local_path_raises(self):
         m = self._setup_mixin()
@@ -72,8 +72,7 @@ class TestStartEvaluation:
         m = self._setup_mixin()
         opts = EvaluationOptions()
         m.start_evaluation(str(f), str(tmp_path / "reports"), opts)
-        call_kwargs = m._dispatcher.dispatch.call_args
-        assert call_kwargs.kwargs["cwd"] == str(git_root) or call_kwargs[1]["cwd"] == str(git_root)
+        assert m._dispatcher.dispatch.call_args.args[1].cwd == str(git_root)
 
 
 # ---------------------------------------------------------------------------

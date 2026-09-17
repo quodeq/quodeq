@@ -25,7 +25,7 @@ from quodeq.services.dismissed import (
     restore_all_findings,
     restore_finding,
 )
-from quodeq.services.suppression import is_dismissed
+from quodeq.services.suppression import FindingRef, is_dismissed
 
 SNIP = "except Exception:\n    pass"
 FP = snippet_fingerprint("R1", SNIP)
@@ -118,8 +118,8 @@ def test_snippet_less_finding_keeps_its_line_identity(tmp_path: Path) -> None:
 
     state = dismissed_keys(project_dir)
     assert state.entries[0].fingerprint is None
-    assert is_dismissed(state, req="R1", file="a.py", line=10)
-    assert not is_dismissed(state, req="R1", file="a.py", line=11)
+    assert is_dismissed(state, FindingRef(req="R1", file="a.py", line=10))
+    assert not is_dismissed(state, FindingRef(req="R1", file="a.py", line=11))
 
 
 def test_dismissal_follows_the_finding_to_its_new_line(tmp_path: Path) -> None:
@@ -131,7 +131,7 @@ def test_dismissal_follows_the_finding_to_its_new_line(tmp_path: Path) -> None:
     r2 = _seed_run(project_dir, "r2", line=22)
 
     state = dismissed_keys(project_dir)
-    assert is_dismissed(state, req="R1", file="a.py", line=22, snippet=SNIP)
+    assert is_dismissed(state, FindingRef(req="R1", file="a.py", line=22, snippet=SNIP))
     assert _verdict(r1, 10) == "dismissed"
     assert _verdict(r2, 22) == "dismissed"
 
@@ -144,7 +144,8 @@ def test_different_code_at_the_old_line_is_not_hidden(tmp_path: Path) -> None:
     r2 = _seed_run(project_dir, "r2", line=10, snippet="return cache[key]")
 
     state = dismissed_keys(project_dir)
-    assert not is_dismissed(state, req="R1", file="a.py", line=10, snippet="return cache[key]")
+    assert not is_dismissed(
+        state, FindingRef(req="R1", file="a.py", line=10, snippet="return cache[key]"))
     assert _verdict(r2, 10) == "violation"
 
 

@@ -6,6 +6,7 @@ and evaluation rules.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.prompts._template import load_template
@@ -163,37 +164,52 @@ def _format_shape_block(
     return f"## Project Shape\n\n**{summary}**.{note}"
 
 
+@dataclass(frozen=True, slots=True)
+class ProjectBrief:
+    """What the model is told about the project under evaluation.
+
+    ``name`` labels the repo in the prompt; ``root`` anchors the relative
+    file paths and, when ``shape`` is not supplied, drives shape detection;
+    ``trust_model`` is the trust boundary the deterministic scope gate
+    enforces, resolved by the caller and briefed here so both agree.
+    """
+
+    name: str
+    root: Path | None = None
+    shape: ProjectShape | None = None
+    trust_model: TrustModel | None = None
+
+
 def assemble_api_prompt(
     *,
     source_files: list[Path],
     standards_text: str,
     dimension: str,
-    repo_name: str,
-    repo_root: Path | None = None,
-    project_shape: ProjectShape | None = None,
-    trust_model: TrustModel | None = None,
+    project: ProjectBrief,
 ) -> str:
     """Assemble a complete evaluation prompt for the API runner.
 
-    *project_shape* is computed from *repo_root* when not supplied; pass an
-    explicit shape to skip detection (e.g. when a cached shape is being
-    reused across dimensions). *trust_model* is never detected here -- it is
-    resolved by the caller (declared profile, then detection, then the
-    conservative default) and threaded through so the model is briefed on
-    the same trust boundary the deterministic scope gate enforces.
+    ``project.shape`` is computed from ``project.root`` when not supplied;
+    pass an explicit shape to skip detection (e.g. when a cached shape is
+    being reused across dimensions). ``project.trust_model`` is never
+    detected here -- it is resolved by the caller (declared profile, then
+    detection, then the conservative default) and threaded through so the
+    model is briefed on the same trust boundary the deterministic scope
+    gate enforces.
     """
     template = load_template(template_name="api_prompt.md")
     rules = _load_evaluation_rules()
-    files_block = _build_files_block(source_files, repo_root=repo_root)
-    if project_shape is None and repo_root is not None:
-        project_shape = detect_shape(repo_root)
+    files_block = _build_files_block(source_files, repo_root=project.root)
+    project_shape = project.shape
+    if project_shape is None and project.root is not None:
+        project_shape = detect_shape(project.root)
     # Fall back to an UNKNOWN shape rather than skipping the block outright:
     # a declared trust model must still be briefed even without a shape
     # verdict. _format_shape_block itself returns "" when nothing is known.
-    shape_block = _format_shape_block(project_shape or ProjectShape(), trust_model)
+    shape_block = _format_shape_block(project_shape or ProjectShape(), project.trust_model)
     return render_template(template, {
         "DIMENSION": dimension,
-        "REPO_NAME": repo_name,
+        "REPO_NAME": project.name,
         "STANDARDS_TEXT": standards_text,
         "PROJECT_SHAPE": shape_block,
         "EVALUATION_RULES": rules,

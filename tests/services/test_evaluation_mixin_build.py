@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from quodeq.core.types import JobSnapshot
+from quodeq.services._job_model import JobLaunchOptions
 from quodeq.services.base import (
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
@@ -213,19 +214,17 @@ class TestSubprocessDispatcher:
         expected = JobSnapshot(job_id="j1", status="running")
         mock_mgr.start_job.return_value = expected
         dispatcher = SubprocessDispatcher(mock_mgr)
-        result = dispatcher.dispatch(["cmd"], cwd="/tmp", env={"A": "1"})
+        launch = JobLaunchOptions(cwd="/tmp", env={"A": "1"})
+        result = dispatcher.dispatch(["cmd"], launch)
         assert result == expected
-        mock_mgr.start_job.assert_called_once_with(
-            ["cmd"], cwd="/tmp", env={"A": "1"}, ai_provider=None, ai_model=None,
-            time_limit_s=None,
-        )
+        mock_mgr.start_job.assert_called_once_with(["cmd"], launch)
 
     def test_forwards_time_limit(self):
         mock_mgr = MagicMock()
         mock_mgr.start_job.return_value = JobSnapshot(job_id="j1", status="running")
         dispatcher = SubprocessDispatcher(mock_mgr)
-        dispatcher.dispatch(["cmd"], time_limit_s=0)
-        assert mock_mgr.start_job.call_args.kwargs["time_limit_s"] == 0
+        dispatcher.dispatch(["cmd"], JobLaunchOptions(time_limit_s=0))
+        assert mock_mgr.start_job.call_args.args[1].time_limit_s == 0
 
 
 # ---------------------------------------------------------------------------

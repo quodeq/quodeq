@@ -155,7 +155,7 @@ class TestStaleCacheSelfHeal:
         from collections import OrderedDict
 
         from quodeq.data.fs.report_parser import RunInfo as _RI
-        from quodeq.services.dashboard import _make_status_aware_fetcher
+        from quodeq.services.dashboard import DashboardCacheConfig, _make_status_aware_fetcher
 
         # Build a real on-disk eval/ with 3 files for r-stale.
         eval_dir = tmp_path / "proj" / "r-stale" / "evaluation"
@@ -190,7 +190,7 @@ class TestStaleCacheSelfHeal:
         )
 
         fetcher = _make_status_aware_fetcher(
-            tmp_path, "proj", runs, cache=cache,
+            tmp_path, "proj", runs, DashboardCacheConfig(cache=cache),
         )
         result = fetcher("r-stale")
 
@@ -214,7 +214,7 @@ class TestStaleCacheSelfHeal:
         from collections import OrderedDict
 
         from quodeq.data.fs.report_parser import RunInfo as _RI
-        from quodeq.services.dashboard import _make_status_aware_fetcher
+        from quodeq.services.dashboard import DashboardCacheConfig, _make_status_aware_fetcher
 
         eval_dir = tmp_path / "proj" / "r-fresh" / "evaluation"
         eval_dir.mkdir(parents=True)
@@ -239,7 +239,7 @@ class TestStaleCacheSelfHeal:
         )
 
         fetcher = _make_status_aware_fetcher(
-            tmp_path, "proj", runs, cache=cache,
+            tmp_path, "proj", runs, DashboardCacheConfig(cache=cache),
         )
         fetcher("r-fresh")
         fetcher("r-fresh")

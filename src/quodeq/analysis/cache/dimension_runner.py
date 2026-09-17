@@ -29,7 +29,6 @@ import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from pathlib import Path
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis._types import RunConfig, _AnalysisContext
@@ -60,10 +59,25 @@ from quodeq.analysis.subagents.runner import (
 )
 from quodeq.config.analysis_env import failure_streak_override
 from quodeq.core.evidence.model import Evidence
-from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.data.ports.events import EventEmitter
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class CacheRunOptions:
+    """How ``process_dimension_with_cache`` dispatches and persists one run.
+
+    ``callbacks`` carries the single-agent fallback steps and the log sink
+    the dispatcher writes to; ``cache`` is the run's shared backend (None
+    lets the cache context default to its own ``LocalFileBackend``);
+    ``dispatcher`` and ``persist_interval_s`` are the test seams for the
+    miss path and the periodic-persist watcher.
+    """
+
+    callbacks: DimensionCallbacks
+    cache: CacheBackend | None = None
+    dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents
+    persist_interval_s: float = _PERSIST_INTERVAL_S
 
 
 @dataclass(frozen=True)
@@ -77,22 +91,16 @@ class _MissDispatch:
     ctx: _AnalysisContext
     callbacks: DimensionCallbacks
     dispatcher: Callable[..., Evidence | None]
-    log: LogSink
 
 
 def _handle_all_hits(
     config: RunConfig, dim_id: str, ctx: _AnalysisContext, cctx: _CacheContext,
-    writer_factory: Callable[[Path], EventEmitter] | None,
 ) -> Evidence | None:
     """All-hits short-circuit: no dispatch needed. Appends (not overwrites)
     since a dim may run multiple times in the same run (e.g. V1's backfill
     phase); dedup after handles overlap from a same-run repeat."""
     from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
-    _write_findings(
-        cctx.jsonl, cctx.classify.cached_findings, append=True,
-        unconsolidated=cctx.classify.unconsolidated_findings,
-        trust_model=cctx.trust_model, writer_factory=writer_factory,
-    )
+    _write_findings(cctx.jsonl, cctx.classify, append=True, trust_model=cctx.trust_model)
     if cctx.jsonl.exists():
         deduplicate_jsonl(cctx.jsonl)
     return parse_evidence_from_jsonl(
@@ -101,21 +109,14 @@ def _handle_all_hits(
     )
 
 
-def _prepare_miss_dispatch(
-    config: RunConfig, dim_id: str, cctx: _CacheContext,
-    writer_factory: Callable[[Path], EventEmitter] | None,
-) -> RunConfig:
+def _prepare_miss_dispatch(config: RunConfig, dim_id: str, cctx: _CacheContext) -> RunConfig:
     """Build the dispatcher's file-filtered config, pre-write any cached
     findings, and persist the miss-key sidecar the discard path needs."""
     classify = cctx.classify
     miss_options = replace(config.options, incremental_file_filter=set(classify.misses))
     miss_config = replace(config, options=miss_options)
     if classify.cached_findings or classify.unconsolidated_findings:
-        _write_findings(
-            cctx.jsonl, classify.cached_findings, append=True,
-            unconsolidated=classify.unconsolidated_findings,
-            trust_model=cctx.trust_model, writer_factory=writer_factory,
-        )
+        _write_findings(cctx.jsonl, classify, append=True, trust_model=cctx.trust_model)
     sidecar = _evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
@@ -130,9 +131,7 @@ def _start_watchers(
     Creates the evidence JSONL up front, when absent, so the breaker's
     first poll doesn't warn about a missing file."""
     stop_event = threading.Event()
-    persist_fn = _make_persist_fn(
-        config, dim_id, cctx.jsonl, cctx.classify, cctx.cache, stop_event,
-    )
+    persist_fn = _make_persist_fn(config, dim_id, cctx, stop_event)
     watcher = threading.Thread(
         target=_periodic_persist,
         args=(stop_event, persist_fn, persist_interval_s, _logger.warning),
@@ -207,8 +206,7 @@ def _dispatch_misses_with_watchers(
     )
     try:
         miss_evidence = dispatch.dispatcher(
-            dispatch.miss_config, dim_id, dispatch.idx, dispatch.ctx,
-            dispatch.callbacks, log=dispatch.log,
+            dispatch.miss_config, dim_id, dispatch.idx, dispatch.ctx, dispatch.callbacks,
         )
     finally:
         # No join timeout (c88be50e regression: a capped join dropped the
@@ -224,29 +222,22 @@ def _dispatch_misses_with_watchers(
 
 
 def process_dimension_with_cache(
-    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
-    callbacks: DimensionCallbacks,
-    *,
-    cache: CacheBackend | None = None,
-    dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents,
-    persist_interval_s: float = _PERSIST_INTERVAL_S,
-    writer_factory: Callable[[Path], EventEmitter] | None = None,
-    log: LogSink = NULL_LOG,
+    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext, opts: CacheRunOptions,
 ) -> Evidence | None:
     """V2 entry point — content-addressed cache replaces V1 change
-    detection. Falls through to *dispatcher* when there's no source-file
-    list to classify (matches V1's no-files fallback)."""
-    cctx = _prepare_cache_context(config, dim_id, cache)
+    detection. Falls through to ``opts.dispatcher`` when there's no
+    source-file list to classify (matches V1's no-files fallback)."""
+    cctx = _prepare_cache_context(config, dim_id, opts.cache)
     if cctx is None:
-        return dispatcher(config, dim_id, idx, ctx, callbacks, log=log)
+        return opts.dispatcher(config, dim_id, idx, ctx, opts.callbacks)
 
     if not cctx.classify.misses:
-        return _handle_all_hits(config, dim_id, ctx, cctx, writer_factory)
+        return _handle_all_hits(config, dim_id, ctx, cctx)
 
     dispatch = _MissDispatch(
-        miss_config=_prepare_miss_dispatch(config, dim_id, cctx, writer_factory),
-        idx=idx, ctx=ctx, callbacks=callbacks, dispatcher=dispatcher, log=log,
+        miss_config=_prepare_miss_dispatch(config, dim_id, cctx),
+        idx=idx, ctx=ctx, callbacks=opts.callbacks, dispatcher=opts.dispatcher,
     )
     return _dispatch_misses_with_watchers(
-        config, dim_id, cctx, dispatch, persist_interval_s,
+        config, dim_id, cctx, dispatch, opts.persist_interval_s,
     )

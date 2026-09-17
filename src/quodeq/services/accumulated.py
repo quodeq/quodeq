@@ -10,6 +10,7 @@ copies) to keep identity intact for tests that reach in directly
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -86,7 +87,6 @@ def _build_accumulated_for_runs(
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> _AccumulatedResult:
     """Read run data and assemble the accumulated result for *run_infos*."""
-    runs = [r.run_id for r in run_infos]
     _cache, _lock, _max = _resolve_cache(cache_config)
     ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, ctx)
@@ -100,7 +100,7 @@ def _build_accumulated_for_runs(
         reports_root, project, walk_cache, walk_lock, walk_max,
     )
     latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, run_infos, runs, get_run_data, get_run_slim=get_run_slim,
+        reports_root, project, run_infos, get_run_data, get_run_slim=get_run_slim,
     )
     project_dir = reports_root / project
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)
@@ -111,23 +111,29 @@ def _build_accumulated_for_runs(
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
-def _compute_parent_accumulated(
-    reports_root: Path,
-    children: list[str],
-    parent_id: str,
-    cache_config: AccumulatedCacheConfig | None,
-    extra_dims: list[DimensionResult] | None = None,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, Any] | None:
-    """Merge latest findings from all children (and optional own dims) and score.
+@dataclass(frozen=True, slots=True)
+class _ParentScope:
+    """A parent project's id, its scoped child projects, and its own dimensions.
 
-    *extra_dims* are dimensions from the parent's own runs, included when the
+    ``extra_dims`` are dimensions from the parent's own runs, present when the
     parent has both its own evaluation runs and scoped children.
     """
-    all_dims: list[DimensionResult] = list(extra_dims) if extra_dims else []
+    parent_id: str
+    children: list[str]
+    extra_dims: list[DimensionResult] | None = None
+
+
+def _compute_parent_accumulated(
+    reports_root: Path,
+    scope: _ParentScope,
+    cache_config: AccumulatedCacheConfig | None,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> dict[str, Any] | None:
+    """Merge latest findings from all children (and optional own dims) and score."""
+    all_dims: list[DimensionResult] = list(scope.extra_dims) if scope.extra_dims else []
     # Track which child each dimension came from
     dim_source: dict[str, str] = {}  # dimension_name -> child_project_id
-    for child in children:
+    for child in scope.children:
         child_runs = list_runs(reports_root, child, limit=50)
         if not child_runs:
             continue
@@ -140,7 +146,7 @@ def _compute_parent_accumulated(
     severity = _aggregate_severity_counts(all_dims)
     avg, _ = _compute_accumulated_scores(all_dims, [], params)
     merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
-    response = _build_accumulated_response(parent_id, merged_result, params)
+    response = _build_accumulated_response(scope.parent_id, merged_result, params)
     # Tag each dimension with its source child project for navigation
     for dim_dict in response.get("dimensions", []):
         dim_name = dim_dict.get("dimension", "")
@@ -179,7 +185,9 @@ def compute_accumulated(
 
     # Pure parent (no own runs) — aggregate children only
     if not all_run_infos and children:
-        return _compute_parent_accumulated(reports_root, children, project, cache_config, params=params)
+        return _compute_parent_accumulated(
+            reports_root, _ParentScope(project, children), cache_config, params,
+        )
 
     # Has own runs — check if also has children to merge
     own_result = _compute_result(reports_root, project, all_run_infos, cache_config, params)
@@ -188,7 +196,6 @@ def compute_accumulated(
 
     # Has both own runs AND children — merge everything
     return _compute_parent_accumulated(
-        reports_root, children, project, cache_config,
-        extra_dims=own_result.all_dimensions,
-        params=params,
+        reports_root, _ParentScope(project, children, own_result.all_dimensions),
+        cache_config, params,
     )

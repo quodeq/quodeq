@@ -29,6 +29,7 @@ from quodeq.llm_bridge._omlx import (
 )
 from quodeq.llm_bridge._cloud import check_cloud_connection
 from quodeq.llm_bridge._embeddings import (
+    EmbeddingEndpoint,
     embed_texts,
     embedding_model_available,
     reset_embedding_availability_cache,
@@ -53,6 +54,7 @@ __all__ = [
     "list_omlx_models",
     "run_omlx_concurrency_test",
     "check_cloud_connection",
+    "EmbeddingEndpoint",
     "embed_texts",
     "embedding_model_available",
     "reset_embedding_availability_cache",

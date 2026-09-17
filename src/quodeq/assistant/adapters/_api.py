@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 import queue
@@ -57,6 +57,16 @@ class ApiTurnConfig:
     model: str
     native_tools: bool
     max_tool_iterations: int = MAX_TOOL_ITERATIONS
+
+
+@dataclass(frozen=True, slots=True)
+class ApiTurnSession:
+    """Per-turn wiring for :func:`run_api_turn`: the tool registry the model
+    may call, the frame sink, and the stop token (a fresh one when omitted)."""
+
+    registry: ToolRegistry
+    emit: Callable[[dict], None]
+    cancel: CancelToken = field(default_factory=CancelToken)
 
 
 # Placeholder the OpenAI SDK requires for local OpenAI-compatible servers
@@ -118,25 +128,25 @@ def _iter_with_cancel(stream, cancel):
         yield item
 
 
-def _stream_once(client, config, messages, registry, emit, cancel):
+def _stream_once(client, config, messages, session: ApiTurnSession):
     """One streamed completion. Returns (text, tool_calls) where tool_calls is
     a list of {"id", "name", "arguments"} assembled from streamed deltas."""
     kwargs = {"model": config.model, "messages": messages, "stream": True}
     if config.native_tools:
-        kwargs["tools"] = registry.openai_tools()
+        kwargs["tools"] = session.registry.openai_tools()
     extra = _extra_body(config)
     if extra:
         kwargs["extra_body"] = extra
     text_parts: list[str] = []
     calls: dict[int, dict] = {}
     try:
-        for chunk in _iter_with_cancel(client.chat.completions.create(**kwargs), cancel):
+        for chunk in _iter_with_cancel(client.chat.completions.create(**kwargs), session.cancel):
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
             if getattr(delta, "content", None):
                 text_parts.append(delta.content)
-                emit({"type": "token", "text": delta.content})
+                session.emit({"type": "token", "text": delta.content})
             for tc in getattr(delta, "tool_calls", None) or []:
                 slot = calls.setdefault(tc.index, {"id": None, "name": None, "arguments": ""})
                 if tc.id:
@@ -148,7 +158,7 @@ def _stream_once(client, config, messages, registry, emit, cancel):
     except Exception:
         # cancel() closes the client to interrupt a stalled read; the read
         # then raises here. That's the stop succeeding, not a turn failure.
-        if cancel.cancelled:
+        if session.cancel.cancelled:
             raise TurnCancelled("".join(text_parts)) from None
         raise
     return "".join(text_parts), [calls[i] for i in sorted(calls)]
@@ -188,9 +198,8 @@ def _dispatch_tool_calls(
 
 
 def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
-                 registry: ToolRegistry, emit: Callable[[dict], None],
-                 client_factory=None, cancel: CancelToken | None = None) -> str:
-    cancel = cancel or CancelToken()
+                 session: ApiTurnSession, client_factory=None) -> str:
+    registry, emit, cancel = session.registry, session.emit, session.cancel
     convo = list(messages)
     if not config.native_tools:
         contract = fallback_contract(registry.openai_tools())
@@ -208,7 +217,7 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
         for _ in range(config.max_tool_iterations):
             if cancel.cancelled:
                 raise TurnCancelled(text)
-            text, tool_calls = _stream_once(client, config, convo, registry, emit, cancel)
+            text, tool_calls = _stream_once(client, config, convo, session)
             if cancel.cancelled:
                 raise TurnCancelled(text)
             if not config.native_tools:

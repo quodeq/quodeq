@@ -77,9 +77,10 @@ class TestParseJsonlFindings:
 
     def test_dismissed_key_filtering(self):
         from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        from quodeq.services.suppression_keys import SuppressionKeys
         line = json.dumps({"p": "P1", "req": "M-MOD-3", "t": "violation", "file": "a.py", "line": 1})
-        dismissed = {("M-MOD-3", "a.py", 1)}
-        v, c = _parse_jsonl_findings([line], "security", dismissed_keys=dismissed)
+        keys = SuppressionKeys({("M-MOD-3", "a.py", 1)})
+        v, c = _parse_jsonl_findings([line], "security", keys=keys)
         assert len(v) == 0
 
     def test_req_to_principle_mapping(self):

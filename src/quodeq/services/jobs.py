@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import threading
 import uuid
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 import subprocess
 
@@ -18,6 +18,8 @@ from quodeq.shared._process_kill import kill_tree as _kill_tree, terminate_proce
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,
+    JobLaunchOptions,
+    JobProcessSeams,
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
@@ -34,13 +36,10 @@ from quodeq.services._job_file_store import (
 )
 from quodeq.services._job_capacity_mixin import _JobCapacityMixin
 
-if TYPE_CHECKING:
-    from quodeq.services._external_jobs import ProcessControl
-
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
-    "Job", "JobStore", "InMemoryJobStore", "FileJobStore", "create_job_store",
-    "REPORT_PATH_RE", "JobManager",
+    "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
+    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager",
     "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
 ]
 
@@ -95,15 +94,14 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
 
     def __init__(
         self,
-        spawn_impl: Callable[..., subprocess.Popen] | None = None,
+        seams: JobProcessSeams | None = None,
         job_store: JobStore | None = None,
         on_job_complete: Callable[[str, Job], None] | None = None,
         reports_root: Path | None = None,
-        job_timeout_cap_s: float | None = None,
         *, log: LogSink = NULL_LOG,
-        process_control: "ProcessControl | None" = None,
     ) -> None:
-        self._spawn = spawn_impl or subprocess.Popen
+        seams = seams if seams is not None else JobProcessSeams()
+        self._spawn = seams.spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
         # Job ids past the capacity check but not yet spawned, counted
@@ -113,10 +111,10 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
         self._log = log
-        self._process_control = process_control
+        self._process_control = seams.process_control
         # Injection seam for the hard job-duration cap; None means "fall back
         # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
-        self._job_timeout_cap_s_override = job_timeout_cap_s
+        self._job_timeout_cap_s_override = seams.job_timeout_cap_s
         # _run_log_writers and _pre_marker_buffer are owned exclusively by the
         # per-job _consume_stream thread started in start_job(). No other code
         # path may read or mutate these dicts — doing so reintroduces the
@@ -132,8 +130,9 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         """
         self._reports_root = path
 
-    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None, ai_provider: str | None = None, ai_model: str | None = None, time_limit_s: int | None = None) -> JobSnapshot:
+    def start_job(self, cmd: list[str], launch: JobLaunchOptions | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
+        launch = launch if launch is not None else JobLaunchOptions()
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
@@ -142,9 +141,9 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
             started_at=datetime.now(timezone.utc).isoformat(),
             ended_at=None,
             exit_code=None,
-            ai_provider=ai_provider,
-            ai_model=ai_model,
-            time_limit_s=time_limit_s,
+            ai_provider=launch.ai_provider,
+            ai_model=launch.ai_model,
+            time_limit_s=launch.time_limit_s,
         )
         refusal = self._reserve_slot_or_refuse(job)
         if refusal is not None:
@@ -156,8 +155,8 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                cwd=cwd,
-                env=env,
+                cwd=launch.cwd,
+                env=launch.env,
                 start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:

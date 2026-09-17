@@ -29,7 +29,7 @@ from quodeq.services.score_cache import score_cache_path_override
 from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 
-def _start_turn_worker(state: AssistantTurnState, sid: str, turn: TurnRequest,
+def _start_turn_worker(state: AssistantTurnState, turn: TurnRequest,
                        repo, tool_ctx, cancel: CancelToken) -> None:
     """Run the turn on a daemon thread, freeing the session's turn slot when it
     ends however it ends. Takes *state* directly: the worker thread has no app
@@ -43,7 +43,7 @@ def _start_turn_worker(state: AssistantTurnState, sid: str, turn: TurnRequest,
             else:
                 _assistant_routes.run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
         finally:
-            state.release_turn(sid)
+            state.release_turn(turn.session_id)
 
     threading.Thread(target=_worker, daemon=True).start()
 
@@ -133,7 +133,7 @@ def register_assistant_turn_routes(app: Flask) -> None:
                                and (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_LOCAL),
             )
             tool_ctx = _assistant_routes.build_tool_context(app, session)
-            _start_turn_worker(state, sid, turn, repo, tool_ctx, cancel)
+            _start_turn_worker(state, turn, repo, tool_ctx, cancel)
         except SharedSourceUnavailable:
             # Race between the pre-check above and this build_tool_context
             # call. Constant body, not str(exc): the pre-check already

@@ -26,7 +26,7 @@ from pathlib import Path
 
 from quodeq.data.cache_store.backend import CacheStats
 from quodeq.data.cache_store.entry import CacheEntry
-from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexRow
+from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexEntry, IndexRow
 
 _logger = logging.getLogger(__name__)
 
@@ -134,11 +134,11 @@ class LocalFileBackend:
             os.replace(tmp, target)
             self._mark_mutated()
             if index and self._index is not None:
-                self._index.record(
-                    key, content_hash=entry.file_content_hash, dimension=entry.dimension,
+                self._index.record(IndexEntry(
+                    key=key, content_hash=entry.file_content_hash, dimension=entry.dimension,
                     params_hash=entry.params_hash, file_path=entry.file_path,
                     created_at=entry.created_at,
-                )
+                ))
         except OSError as exc:
             _logger.warning("cache write failed for %s: %s", key, exc)
             try:

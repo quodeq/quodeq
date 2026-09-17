@@ -59,14 +59,13 @@ def get_dimension_eval(
     dimension: str,
     *,
     compiled_dir: Path | None = None,
-    evaluators_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     """Return parsed evaluation data for a single dimension in a run."""
     base = (Path(reports_dir) / project / run_id).resolve()
     if not base.is_relative_to(Path(reports_dir).resolve()):
         return None
     effective_compiled = compiled_dir or default_paths().standards_dir / "compiled"
-    effective_evaluators = evaluators_dir or default_paths().evaluators_dir
+    effective_evaluators = default_paths().evaluators_dir
     result = resolve_dimension_eval(
         base, project, run_id, dimension,
         options=_ResolveOptions(

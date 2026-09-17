@@ -6,6 +6,7 @@ from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult
 
 from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
+from quodeq.services.suppression_keys import SuppressionKeys
 
 
 def _make_violation(practice_id="P1", severity="major", req="R1", file="a.py", line=1, reason="bug"):
@@ -49,7 +50,7 @@ def test_rescore_dimension_matches_string_line():
     typed int|str|None, so the read side must coerce too or a string-lined finding
     never matches its own dismissal."""
     dim = _make_dimension(violations=[_make_violation(req="R1", file="a.py", line="10")])
-    rescored = _rescore_dimension(dim, {("R1", "a.py", 10)})
+    rescored = _rescore_dimension(dim, SuppressionKeys({("R1", "a.py", 10)}))
     assert rescored.violations == []  # string-lined finding filtered out
 
 
@@ -59,7 +60,7 @@ def test_rescore_no_dismissals_returns_rescored_data():
         violations=[_make_violation(severity="major")],
         compliance=[_make_compliance()],
     )
-    result = rescore_dimensions([dim], dismissed_keys=set())
+    result = rescore_dimensions([dim], SuppressionKeys(set()))
     assert len(result["dimensions"]) == 1
     assert result["dimensions"][0]["overallScore"] is not None
     assert result["dimensions"][0]["overallGrade"] is not None
@@ -85,8 +86,8 @@ def test_rescore_dismissing_violation_changes_score():
     ]
     dim = _make_dimension(violations=[v1, *extra_violations], compliance=compliance)
 
-    result_all = rescore_dimensions([dim], dismissed_keys=set())
-    result_dismissed = rescore_dimensions([dim], dismissed_keys={("R1", "a.py", 1)})
+    result_all = rescore_dimensions([dim], SuppressionKeys(set()))
+    result_dismissed = rescore_dimensions([dim], SuppressionKeys({("R1", "a.py", 1)}))
 
     score_all = result_all["dimensions"][0]["overallScore"]
     score_dismissed = result_dismissed["dimensions"][0]["overallScore"]
@@ -105,7 +106,7 @@ def test_rescore_dismiss_all_violations():
     v1 = _make_violation(severity="major", req="R1", file="a.py", line=1)
     dim = _make_dimension(violations=[v1], compliance=[_make_compliance()])
 
-    result = rescore_dimensions([dim], dismissed_keys={("R1", "a.py", 1)})
+    result = rescore_dimensions([dim], SuppressionKeys({("R1", "a.py", 1)}))
     dim_result = result["dimensions"][0]
 
     # No violations left — score should be high
@@ -118,7 +119,7 @@ def test_rescore_summary_reflects_dimension_changes():
     dim1 = _make_dimension(name="Reliability", violations=[v1], compliance=[_make_compliance()])
     dim2 = _make_dimension(name="Security", violations=[], compliance=[_make_compliance()])
 
-    result = rescore_dimensions([dim1, dim2], dismissed_keys=set())
+    result = rescore_dimensions([dim1, dim2], SuppressionKeys(set()))
     summary = result["summary"]
     assert summary["dimensionsCount"] == 2
     assert summary["overallGrade"] is not None
@@ -154,7 +155,7 @@ def test_rescore_dimension_uses_evidence_when_run_dir_given(tmp_path):
         ],
         source_file_count=1000, files_read=10,
     )
-    out = _rescore_dimension(dim, {("R-1", "a.kt", 10)}, set(), run_dir=tmp_path)
+    out = _rescore_dimension(dim, SuppressionKeys({("R-1", "a.kt", 10)}, set()), run_dir=tmp_path)
 
     # Violations list is filtered as before...
     assert [v.req for v in out.violations] == ["R-2"]
@@ -194,16 +195,16 @@ def test_rescore_dimension_without_run_dir_keeps_legacy_fallback():
         for i in range(5)
     ]
     dim = _make_dimension(violations=[v1, *extra_violations], compliance=compliance)
-    dismissed = {("R1", "a.py", 1)}
+    keys = SuppressionKeys({("R1", "a.py", 1)})
 
-    omitted = _rescore_dimension(dim, dismissed)
-    explicit_none = _rescore_dimension(dim, dismissed, run_dir=None)
+    omitted = _rescore_dimension(dim, keys)
+    explicit_none = _rescore_dimension(dim, keys, run_dir=None)
 
     assert explicit_none == omitted
     assert explicit_none.overall_score is not None
 
-    result_omitted = rescore_dimensions([dim], dismissed_keys=dismissed)
-    result_explicit_none = rescore_dimensions([dim], dismissed_keys=dismissed, run_dir=None)
+    result_omitted = rescore_dimensions([dim], keys)
+    result_explicit_none = rescore_dimensions([dim], keys, run_dir=None)
     assert result_explicit_none == result_omitted
 
 
@@ -213,7 +214,7 @@ def test_untouched_dimension_passthrough_even_with_run_dir(tmp_path):
     is supplied.
     """
     dim = _make_dimension(violations=[_make_violation(req="R-9", file="z.kt", line=1)])
-    out = _rescore_dimension(dim, {("OTHER", "x.kt", 5)}, set(), run_dir=tmp_path)
+    out = _rescore_dimension(dim, SuppressionKeys({("OTHER", "x.kt", 5)}, set()), run_dir=tmp_path)
     assert out is dim  # early return preserved: no filtering -> no rescoring
 
 
@@ -227,5 +228,5 @@ def test_rescore_dismiss_by_principle_key_matches_no_req_finding():
         _make_violation(req=None, practice_id="P1", file="a.py", line=3),
         _make_violation(req="R2", practice_id="P1", file="b.py", line=9),
     ])
-    rescored = _rescore_dimension(dim, {("P1", "a.py", 3)})
+    rescored = _rescore_dimension(dim, SuppressionKeys({("P1", "a.py", 3)}))
     assert [v.req for v in rescored.violations] == ["R2"]

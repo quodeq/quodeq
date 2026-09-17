@@ -12,6 +12,7 @@ from quodeq.api.terminal_routes import register_terminal_routes
 from quodeq.terminal.sessions import TerminalSessionRegistry
 from quodeq.terminal.links import (
     Editor,
+    PathOps,
     build_open_argv,
     child_cwd,
     detect_editor,
@@ -43,20 +44,20 @@ def _pcommonpath(paths):
 
 # --- resolve_path -----------------------------------------------------------
 
+def _posix_ops(isfile) -> PathOps:
+    return PathOps(isabs=_pisabs, isfile=isfile, join=_pjoin, normpath=_ident, expanduser=_ident)
+
+
 def test_resolve_absolute_existing():
     abs_path, exists = resolve_path(
-        "/proj/a.py", ["/base"], isfile=lambda p: p == "/proj/a.py",
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+        "/proj/a.py", ["/base"], ops=_posix_ops(lambda p: p == "/proj/a.py"),
     )
     assert abs_path == "/proj/a.py"
     assert exists is True
 
 
 def test_resolve_absolute_missing():
-    abs_path, exists = resolve_path(
-        "/nope.py", ["/base"], isfile=lambda p: False,
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
-    )
+    abs_path, exists = resolve_path("/nope.py", ["/base"], ops=_posix_ops(lambda p: False))
     assert abs_path == "/nope.py"
     assert exists is False
 
@@ -65,8 +66,7 @@ def test_resolve_relative_picks_first_existing_base():
     # Exists only under the second base.
     real = "/second/rel.py"
     abs_path, exists = resolve_path(
-        "rel.py", ["/first", "/second"], isfile=lambda p: p == real,
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+        "rel.py", ["/first", "/second"], ops=_posix_ops(lambda p: p == real),
     )
     assert abs_path == real
     assert exists is True
@@ -74,8 +74,7 @@ def test_resolve_relative_picks_first_existing_base():
 
 def test_resolve_relative_none_exist_falls_back_to_first_base():
     abs_path, exists = resolve_path(
-        "rel.py", ["/first", "/second"], isfile=lambda p: False,
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+        "rel.py", ["/first", "/second"], ops=_posix_ops(lambda p: False),
     )
     assert abs_path == "/first/rel.py"
     assert exists is False

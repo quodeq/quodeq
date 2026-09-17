@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.evidence._options import EvidenceParseOptions
 from quodeq.core.evidence._refs import enrich_judgment
 from quodeq.core.events.models import Judgment
 
@@ -24,7 +25,8 @@ class TestEnrichJudgmentRefsReader:
         cache: dict[str, dict[str, list[dict]]] = {}
 
         enriched = enrich_judgment(
-            _judgment(), ["CISQ-1"], Path("/does/not/matter"), cache,
+            _judgment(), ["CISQ-1"], cache,
+            EvidenceParseOptions(compiled_dir=Path("/does/not/matter")),
         )
 
         assert enriched.req_refs == []
@@ -40,8 +42,8 @@ class TestEnrichJudgmentRefsReader:
         cache: dict[str, dict[str, list[dict]]] = {}
         compiled_dir = Path("/compiled")
         enriched = enrich_judgment(
-            _judgment(), ["CISQ-1"], compiled_dir, cache,
-            refs_reader=fake_reader,
+            _judgment(), ["CISQ-1"], cache,
+            EvidenceParseOptions(compiled_dir=compiled_dir, refs_reader=fake_reader),
         )
 
         assert calls == [(str(compiled_dir), "security")]
@@ -57,9 +59,8 @@ class TestEnrichJudgmentRefsReader:
             return {}
 
         cache: dict[str, dict[str, list[dict]]] = {}
-        enrich_judgment(_judgment(), ["CWE-1"], Path("/compiled"), cache,
-                        refs_reader=fake_reader)
-        enrich_judgment(_judgment(), ["CWE-1"], Path("/compiled"), cache,
-                        refs_reader=fake_reader)
+        options = EvidenceParseOptions(compiled_dir=Path("/compiled"), refs_reader=fake_reader)
+        enrich_judgment(_judgment(), ["CWE-1"], cache, options)
+        enrich_judgment(_judgment(), ["CWE-1"], cache, options)
 
         assert calls == ["security"]

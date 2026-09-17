@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis.cache import CacheEntry, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
     _make_callbacks,
@@ -33,7 +33,7 @@ class TestWiring:
         config, src = _setup(tmp_path, {"a.py": "x"})
 
         called = {"hit": False}
-        def fake_cache(config, dim_id, idx, ctx, callbacks, cache=None, **_):
+        def fake_cache(config, dim_id, idx, ctx, opts):
             called["hit"] = True
             return _make_dummy_evidence(files_read=1)
 
@@ -54,8 +54,7 @@ class TestDispatchKeysSidecar:
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         sidecar = (config.work_dir or config.src) / "security_dispatch_keys.json"
@@ -84,8 +83,7 @@ class TestDispatchKeysSidecar:
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         assert dispatcher.calls == []  # confirm we hit the all-hits path
@@ -150,8 +148,7 @@ class TestCarryOrder:
 
         process_dimension_with_cache(
             config, "security", 1, _make_ctx(),
-            _make_callbacks(), cache=cache,
-            dispatcher=fake_dispatch,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
         )
 
         jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
@@ -223,8 +220,7 @@ class TestCachedFindingsReachEventLog:
 
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         assert dispatcher.calls == [], "all-hits path must not dispatch"
@@ -281,8 +277,7 @@ class TestCachedFindingsReachEventLog:
 
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=fake_dispatch,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
         )
 
         events = self._read_events(events_log)

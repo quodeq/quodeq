@@ -7,6 +7,7 @@ _fs_project_parents.py, re-exported here for _fs_projects.py's import.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +34,34 @@ from quodeq.services._registration_url import _strip_credentials
 from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _ListingOptions:
+    """How a project listing treats each record it hydrates.
+
+    ``backfill`` allows the lazy ``onboardingCompletedAt`` rewrite (False for
+    the shared-repo route, which must never dirty a clone's worktree);
+    ``inline_summaries`` computes a missing card summary inline instead of
+    reporting it pending (True where no warm-up engine exists).
+    """
+    backfill: bool = True
+    inline_summaries: bool = False
+
+
+_DEFAULT_LISTING = _ListingOptions()
+
+
+@dataclass(frozen=True, slots=True)
+class _KnownProjectIds:
+    """Directory names a listing keeps even when they have no runs.
+
+    ``registered`` have a project record, ``parents`` are named as a parent by
+    some record, ``subprojects`` carry a parent themselves.
+    """
+    registered: set[str] = field(default_factory=set)
+    parents: set[str] = field(default_factory=set)
+    subprojects: set[str] = field(default_factory=set)
 
 
 def _backfill_onboarding_field(
@@ -108,24 +137,24 @@ def _backfill_and_read_meta(
 
 
 def _build_project_entry(
-    reports_root: Path, entry_name: str, runs: list[RunInfo], *,
-    backfill: bool = True, inline_summaries: bool = False,
+    reports_root: Path, entry_name: str, runs: list[RunInfo],
+    options: _ListingOptions = _DEFAULT_LISTING, *,
     pre_read_info: dict | None = None,
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
-    *inline_summaries* mirrors ``build_project_list``'s parameter of the same
-    name, forwarded to ``_read_accumulated_summary`` as ``compute_on_miss``:
-    the shared-repo route has no warm-up engine, so it keeps computing a
-    missing summary inline instead of reporting it pending. See
-    ``_backfill_and_read_meta`` for the *backfill* rationale.
+    ``options.inline_summaries`` mirrors ``build_project_list``'s parameter of
+    the same name, forwarded to ``_read_accumulated_summary`` as
+    ``compute_on_miss``: the shared-repo route has no warm-up engine, so it
+    keeps computing a missing summary inline instead of reporting it pending.
+    See ``_backfill_and_read_meta`` for the ``options.backfill`` rationale.
     *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
     info, meta = _backfill_and_read_meta(
-        reports_root, entry_name, runs, backfill=backfill, pre_read_info=pre_read_info,
+        reports_root, entry_name, runs, backfill=options.backfill, pre_read_info=pre_read_info,
     )
     latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
-        reports_root, entry_name, runs, compute_on_miss=inline_summaries,
+        reports_root, entry_name, runs, compute_on_miss=options.inline_summaries,
     )
     latest_done_run_id = _derive_latest_done_run_id(runs)
     return ProjectEntry(

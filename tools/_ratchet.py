@@ -9,12 +9,31 @@ file, and the `[--update-baseline]` command line.
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterator, Sequence, TypeVar
+from typing import Callable, Generic, Iterator, Sequence, TypeVar
 
 V = TypeVar("V")
 
 EXCLUDE_DIRS = frozenset({"node_modules", "dist", "generated", "__pycache__"})
+
+
+@dataclass(frozen=True, slots=True)
+class RatchetSpec(Generic[V]):
+    """What one checker hands `run_cli`: its identity plus the four callables
+    that make it a ratchet (scan, key, baseline writer, violation printer).
+
+    `script_name` and `noun` only shape the messages; `baseline_path` is
+    where `load_baseline` reads and `update_baseline` is expected to write.
+    """
+
+    script_name: str
+    noun: str
+    baseline_path: Path
+    scan: Callable[[], list[V]]
+    violation_key: Callable[[V], str]
+    update_baseline: Callable[[], int]
+    describe: Callable[[V], str]
 
 
 def read_text(path: Path) -> str | None:
@@ -51,40 +70,32 @@ def write_baseline(path: Path, header: str, keys: Sequence[str]) -> int:
     return len(keys)
 
 
-def run_cli(
-    argv: Sequence[str] | None,
-    *,
-    script_name: str,
-    baseline_path: Path,
-    scan: Callable[[], list[V]],
-    violation_key: Callable[[V], str],
-    update_baseline: Callable[[], int],
-    describe: Callable[[V], str],
-    noun: str,
-) -> int:
+def run_cli(argv: Sequence[str] | None, spec: RatchetSpec[V]) -> int:
     """Standard `check_x.py [--update-baseline]` entry point.
 
     Returns 0 when there are no violations outside the baseline, 1 when new
-    violations exist (each printed via `describe`), 2 on unknown arguments.
+    violations exist (each printed via `spec.describe`), 2 on unknown
+    arguments.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
     unknown = [a for a in args if a != "--update-baseline"]
     if unknown:
-        print(f"Unknown argument(s): {' '.join(unknown)}. Usage: {script_name} [--update-baseline]")
+        print(f"Unknown argument(s): {' '.join(unknown)}. "
+              f"Usage: {spec.script_name} [--update-baseline]")
         return 2
     if "--update-baseline" in args:
-        n = update_baseline()
-        print(f"Wrote {n} violation(s) to {baseline_path}")
+        n = spec.update_baseline()
+        print(f"Wrote {n} violation(s) to {spec.baseline_path}")
         return 0
 
-    baseline = load_baseline(baseline_path)
-    all_violations = scan()
-    new = [v for v in all_violations if violation_key(v) not in baseline]
+    baseline = load_baseline(spec.baseline_path)
+    all_violations = spec.scan()
+    new = [v for v in all_violations if spec.violation_key(v) not in baseline]
     grandfathered = len(all_violations) - len(new)
     if not new:
-        print(f"OK: no new {noun} violations ({grandfathered} grandfathered).")
+        print(f"OK: no new {spec.noun} violations ({grandfathered} grandfathered).")
         return 0
-    print(f"Found {len(new)} NEW {noun} violation(s) ({grandfathered} grandfathered):\n")
+    print(f"Found {len(new)} NEW {spec.noun} violation(s) ({grandfathered} grandfathered):\n")
     for v in new:
-        print(f"  {describe(v)}")
+        print(f"  {spec.describe(v)}")
     return 1

@@ -81,9 +81,9 @@ class TestListProjects:
         calls: list[str] = []
         original = _fs_projects._build_project_entry
 
-        def _counting_build(reports_root, entry_name, runs, **kwargs):
+        def _counting_build(reports_root, entry_name, runs, options, **kwargs):
             calls.append(entry_name)
-            return original(reports_root, entry_name, runs, **kwargs)
+            return original(reports_root, entry_name, runs, options, **kwargs)
 
         monkeypatch.setattr(_fs_projects, "_build_project_entry", _counting_build)
 

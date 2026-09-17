@@ -13,11 +13,11 @@ from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSu
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
-    SuppressionKeys,
     _deleted_key_for_violation,
     _filter_dismissed_from_result,
     _violation_location,
 )
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.services.deleted import deleted_keys as _deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _dismissed_keys
 from quodeq.services.violations_parsing import (
@@ -62,8 +62,7 @@ def _try_evidence_formats(
     stream_path = base / "evidence" / f"{dimension}_live.stream"
     if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(
-            jsonl_path, stream_path, ctx, compiled_dir=opts.compiled_dir,
-            dismissed_keys=keys.dismissed, deleted_keys=keys.deleted,
+            jsonl_path, stream_path, ctx, compiled_dir=opts.compiled_dir, keys=keys,
         )
 
     if opts.exists_fn(stream_path):

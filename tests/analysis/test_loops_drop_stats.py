@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from quodeq.analysis import _drop_stats
-from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
+from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +44,10 @@ def test_per_dimension_loop_reports_drop_stats_at_end(caplog):
     counter = _drop_stats.DropStatsCounter()
     counter.record(dropped=1, kept=9)
     with caplog.at_level(logging.INFO):
-        run_per_dimension_loop(_loop_config(), [], MagicMock(), runner=MagicMock(), drop_counter=counter)
+        run_per_dimension_loop(
+            _loop_config(), [], MagicMock(),
+            LoopDeps(runner=MagicMock(), drop_counter=counter),
+        )
     assert "dropped 1 of 10" in caplog.text
     # The loop's report consumed the accumulator.
     assert counter.consume().parsed == 0
@@ -54,6 +57,9 @@ def test_incremental_loop_reports_drop_stats_at_end(caplog):
     counter = _drop_stats.DropStatsCounter()
     counter.record(dropped=1, kept=9)
     with caplog.at_level(logging.INFO):
-        run_incremental_loop(_loop_config(), [], MagicMock(), runner=MagicMock(), drop_counter=counter)
+        run_incremental_loop(
+            _loop_config(), [], MagicMock(),
+            LoopDeps(runner=MagicMock(), drop_counter=counter),
+        )
     assert "dropped 1 of 10" in caplog.text
     assert counter.consume().parsed == 0

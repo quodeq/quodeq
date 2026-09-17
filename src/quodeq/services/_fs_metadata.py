@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -105,12 +106,11 @@ def _apply_dismiss_delete_rescore(
     if not (dismissed or deleted):
         return list(latest_by_dim.values())
     from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+    from quodeq.services.suppression_keys import SuppressionKeys  # noqa: PLC0415
 
+    keys = SuppressionKeys(dismissed, deleted)
     return [
-        _rescore_dimension(
-            d, dismissed, deleted, params=params,
-            run_dir=run_dir_by_dim.get(dim_name),
-        )
+        _rescore_dimension(d, keys, params=params, run_dir=run_dir_by_dim.get(dim_name))
         for dim_name, d in latest_by_dim.items()
     ]
 
@@ -144,9 +144,21 @@ def _compute_summary(
     return {"grade": summary.overall_grade, "score": summary.numeric_average, "files": files_count}
 
 
+@dataclass(frozen=True, slots=True)
+class _SummaryScope:
+    """What a project-card summary is keyed and filtered by.
+
+    ``version`` is the score-cache version folding the runs' status, the
+    formula params, and the visible-standards selection; ``visible_set`` is
+    that selection as lowercase dimension ids.
+    """
+    version: str
+    visible_set: set[str]
+
+
 def _summary_version(
     reports_root: Path, entry_name: str, runs: list[RunInfo], params: "ScoringParams",
-) -> tuple[str, set[str]]:
+) -> _SummaryScope:
     from quodeq.services.score_cache import accumulated_cache_version, per_run_versions  # noqa: PLC0415
 
     project_dir = reports_root / entry_name
@@ -156,12 +168,12 @@ def _summary_version(
         project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
     version = accumulated_cache_version(
         project_dir, params, run_versions, as_of=None, visible_dims=visible)
-    return version, visible_set
+    return _SummaryScope(version, visible_set)
 
 
 def _compute_on_miss_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
-    params: "ScoringParams", visible_set: set[str], version: str,
+    params: "ScoringParams", scope: _SummaryScope,
 ) -> tuple[str | None, float | None, int | None, bool]:
     """Compute-and-cache branch of ``_read_accumulated_summary``.
 
@@ -176,8 +188,8 @@ def _compute_on_miss_summary(
     from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
 
     payload = cached_project_summary(
-        entry_name, version,
-        lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+        entry_name, scope.version,
+        lambda: _compute_summary(reports_root, entry_name, runs, params, scope.visible_set),
         log=SHARED_LOG,
     )
     return payload["grade"], payload["score"], payload["files"], False
@@ -235,10 +247,10 @@ def _read_accumulated_summary(
         params = grade_formula.load_params()
 
     from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
-    version, visible_set = _summary_version(reports_root, entry_name, runs, params)
+    scope = _summary_version(reports_root, entry_name, runs, params)
     if compute_on_miss or score_cache_disabled():
-        return _compute_on_miss_summary(reports_root, entry_name, runs, params, visible_set, version)
-    return _read_settled_or_pending_summary(entry_name, runs, version)
+        return _compute_on_miss_summary(reports_root, entry_name, runs, params, scope)
+    return _read_settled_or_pending_summary(entry_name, runs, scope.version)
 
 
 def warm_project_summary(reports_root: Path, entry_name: str) -> None:
@@ -259,9 +271,9 @@ def warm_project_summary(reports_root: Path, entry_name: str) -> None:
     if not runs:
         return
     params = grade_formula.load_params()
-    version, visible_set = _summary_version(reports_root, entry_name, runs, params)
+    scope = _summary_version(reports_root, entry_name, runs, params)
     cached_project_summary(
-        entry_name, version,
-        lambda: _compute_summary(reports_root, entry_name, runs, params, visible_set),
+        entry_name, scope.version,
+        lambda: _compute_summary(reports_root, entry_name, runs, params, scope.visible_set),
         log=SHARED_LOG,
     )

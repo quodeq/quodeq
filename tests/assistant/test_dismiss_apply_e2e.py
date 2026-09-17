@@ -13,13 +13,13 @@ from quodeq.assistant.tools._actions import ACTIONS, ActionContext
 from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.suppression import is_dismissed
+from quodeq.services.suppression import FindingRef, is_dismissed
 
 
 def _suppresses(keys, finding) -> bool:
     """The read-side predicate hides *finding* given the recorded keys."""
-    return is_dismissed(keys, req=finding.req, principle=finding.practice_id,
-                        file=finding.file, line=finding.line)
+    return is_dismissed(keys, FindingRef(
+        req=finding.req, principle=finding.practice_id, file=finding.file, line=finding.line))
 
 
 def _ctx(tmp_path, violations):

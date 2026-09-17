@@ -12,6 +12,7 @@ from quodeq.data.fs.standards_loader import build_req_refs_lookup, read_req_to_p
 from quodeq.data.fs.stream_files import count_files_in_stream
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.config.paths import default_paths
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services.violations_parsing import (
@@ -59,15 +60,14 @@ def _resolve_and_dedupe(
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
     resolver: PrincipleResolver | None = None,
-    dismissed_keys: "set[tuple] | None" = None,
-    deleted_keys: "set[tuple] | None" = None,
+    keys: SuppressionKeys | None = None,
 ) -> tuple[list[Finding], list[Finding]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists.
 
     Two exclusions keep this live view from showing more findings than the
-    persisted evaluation: rows the dashboard suppresses (dismissed/deleted), and
-    rows whose principle is not in the dimension's standard, which the report
-    path quarantines in ``_group_judgments``.
+    persisted evaluation: rows the dashboard suppresses (the dismissed/deleted
+    sets in *keys*), and rows whose principle is not in the dimension's
+    standard, which the report path quarantines in ``_group_judgments``.
     """
     violations: list[Finding] = []
     compliance: list[Finding] = []
@@ -76,8 +76,8 @@ def _parse_jsonl_findings(
     # tally -- see quodeq.services.suppression for the key shapes.
     matcher = SuppressionMatcher(
         dimension=dimension,
-        dismissed=frozenset(dismissed_keys or ()),
-        deleted=frozenset(deleted_keys or ()),
+        dismissed=frozenset(keys.dismissed or ()) if keys else frozenset(),
+        deleted=frozenset(keys.deleted or ()) if keys else frozenset(),
         # Same table the quarantine check uses, so the delete key and the
         # scored report can never map a req ID to different principles.
         req_to_principle=resolver.req_to_principle if resolver else {},
@@ -128,8 +128,7 @@ def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResol
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
-    dismissed_keys: "set[tuple] | None" = None,
-    deleted_keys: "set[tuple] | None" = None,
+    keys: SuppressionKeys | None = None,
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
@@ -137,8 +136,7 @@ def parse_violations_from_jsonl(
     try:
         with open_text(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(
-                _f, ctx.dimension, req_refs_lookup, resolver,
-                dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+                _f, ctx.dimension, req_refs_lookup, resolver, keys=keys,
             )
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)

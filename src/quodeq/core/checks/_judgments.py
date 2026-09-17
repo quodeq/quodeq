@@ -6,17 +6,18 @@ all. Those are exactly the fields that decide how a finding scores.
 """
 from __future__ import annotations
 
+from quodeq.core.checks.model import SourceLocation
 from quodeq.core.events.models import Judgment, VERDICT_COMPLIANCE, VERDICT_VIOLATION
 from quodeq.core._constants import FULL_CONFIDENCE
 
 SEVERITY = "major"
 
 
-def violation(*, req: str, dimension: str, file: str, line: int,
+def violation(*, req: str, dimension: str, at: SourceLocation,
               title: str, reason: str) -> Judgment:
     return Judgment(
         practice_id=req, req=req, verdict=VERDICT_VIOLATION, dimension=dimension,
-        file=file, line=line, title=title, reason=reason,
+        file=at.file, line=at.line, title=title, reason=reason,
         severity=SEVERITY, confidence=FULL_CONFIDENCE,  # a static fact is not a guess
     )
 

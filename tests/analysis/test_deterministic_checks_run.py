@@ -18,6 +18,13 @@ from tests.analysis._deterministic_checks_fixtures import (  # noqa: F401 -- pro
 )
 
 
+def _scope(project, compiled_dir):
+    from quodeq.analysis.checks.runner import CheckScope
+
+    return CheckScope(root=project, source_files=SOURCES,
+                      dimension="clean-architecture", compiled_dir=compiled_dir)
+
+
 class TestApplyToARun:
     def _evidence(self):
         return Evidence(repository="r", language="python", date="2026-08-02",
@@ -31,8 +38,7 @@ class TestApplyToARun:
         jsonl.touch()
         evidence = self._evidence()
         added = apply_deterministic_checks(
-            evidence, root=project, source_files=SOURCES,
-            dimension="clean-architecture", compiled_dir=compiled_dir, jsonl_path=jsonl,
+            evidence, _scope(project, compiled_dir), jsonl_path=jsonl,
         )
         return added, evidence, jsonl
 
@@ -67,9 +73,7 @@ class TestApplyToARun:
         )
 
         apply_deterministic_checks(
-            evidence, root=project, source_files=SOURCES,
-            dimension="clean-architecture", compiled_dir=compiled(STANDARD),
-            jsonl_path=jsonl,
+            evidence, _scope(project, compiled(STANDARD)), jsonl_path=jsonl,
         )
 
         assert len(evidence.principles["Dependency Rule"].violations) == 2
@@ -122,8 +126,7 @@ class TestApplyToARun:
         evidence = self._evidence()
 
         added = apply_deterministic_checks(
-            evidence, root=project, source_files=SOURCES,
-            dimension="clean-architecture", compiled_dir=compiled(STANDARD),
+            evidence, _scope(project, compiled(STANDARD)),
             jsonl_path=tmp_path / "nonexistent" / "deep" / "x.jsonl",
         )
 

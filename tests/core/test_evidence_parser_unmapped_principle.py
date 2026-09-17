@@ -15,6 +15,7 @@ from pathlib import Path
 from quodeq.core.evidence._req_mapping import QuarantinedFinding, _group_judgments
 from quodeq.core.evidence.parser import (
     EvidenceContext,
+    EvidenceParseOptions,
     parse_jsonl_to_evidence,
     parse_jsonl_to_evidence_by_dimension,
 )
@@ -77,8 +78,9 @@ def test_unmappable_finding_not_grouped_as_phantom_principle(tmp_path):
     ]
     jsonl.write_text("\n".join(json.dumps(f) for f in findings) + "\n", encoding="utf-8")
 
-    result = parse_jsonl_to_evidence_by_dimension(jsonl, _ctx(), evaluators_dir=compiled,
-                                                   req_map_reader=_read_map)
+    result = parse_jsonl_to_evidence_by_dimension(
+        jsonl, _ctx(), EvidenceParseOptions(evaluators_dir=compiled, req_map_reader=_read_map),
+    )
 
     maint = result["maintainability"]
     assert "N/A" not in maint.principles
@@ -97,8 +99,10 @@ def test_unmappable_finding_is_reported_to_quarantine_sink(tmp_path):
 
     captured: list[list[QuarantinedFinding]] = []
     parse_jsonl_to_evidence_by_dimension(
-        jsonl, _ctx(), evaluators_dir=compiled, req_map_reader=_read_map,
-        on_quarantine=captured.append,
+        jsonl, _ctx(), EvidenceParseOptions(
+            evaluators_dir=compiled, req_map_reader=_read_map,
+            on_quarantine=captured.append,
+        ),
     )
 
     assert len(captured) == 1
@@ -136,8 +140,10 @@ def test_empty_evaluators_dir_falls_back_to_compiled_standard(tmp_path):
 
     captured: list[list[QuarantinedFinding]] = []
     result = parse_jsonl_to_evidence_by_dimension(
-        jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
-        req_map_reader=_read_map, on_quarantine=captured.append,
+        jsonl, _ctx(), EvidenceParseOptions(
+            compiled_dir=compiled, evaluators_dir=evaluators,
+            req_map_reader=_read_map, on_quarantine=captured.append,
+        ),
     )
 
     maint = result["maintainability"]
@@ -191,8 +197,9 @@ def test_single_dimension_parse_falls_back_to_compiled_standard(tmp_path):
     jsonl.write_text("\n".join(json.dumps(f) for f in findings) + "\n", encoding="utf-8")
 
     evidence = parse_jsonl_to_evidence(
-        jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
-        req_map_reader=_read_map,
+        jsonl, _ctx(), EvidenceParseOptions(
+            compiled_dir=compiled, evaluators_dir=evaluators, req_map_reader=_read_map,
+        ),
     )
 
     assert "N/A" not in evidence.principles
@@ -219,8 +226,9 @@ def test_custom_evaluator_standard_takes_precedence_over_compiled(tmp_path):
     jsonl.write_text("\n".join(json.dumps(f) for f in findings) + "\n", encoding="utf-8")
 
     result = parse_jsonl_to_evidence_by_dimension(
-        jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
-        req_map_reader=_read_map,
+        jsonl, _ctx(), EvidenceParseOptions(
+            compiled_dir=compiled, evaluators_dir=evaluators, req_map_reader=_read_map,
+        ),
     )
 
     assert set(result["maintainability"].principles.keys()) == {"CustomP"}
@@ -241,8 +249,9 @@ def test_permissive_when_neither_source_has_standard(tmp_path):
     }) + "\n", encoding="utf-8")
 
     result = parse_jsonl_to_evidence_by_dimension(
-        jsonl, _ctx(), compiled_dir=compiled, evaluators_dir=evaluators,
-        req_map_reader=_read_map,
+        jsonl, _ctx(), EvidenceParseOptions(
+            compiled_dir=compiled, evaluators_dir=evaluators, req_map_reader=_read_map,
+        ),
     )
 
     assert set(result["maintainability"].principles.keys()) == {"Modularity"}

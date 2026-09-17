@@ -34,6 +34,13 @@ class ImportGraph:
         return frozenset(e.file for e in self.edges)
 
 
+@dataclass(frozen=True, slots=True)
+class SourceLocation:
+    """Where a finding points: a *file* and the *line* the checker singled out."""
+    file: str
+    line: int
+
+
 @dataclass(frozen=True)
 class SymbolUse:
     """One use of a watched symbol, resolved to its canonical dotted name.

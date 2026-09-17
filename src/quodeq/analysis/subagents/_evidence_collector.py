@@ -13,7 +13,8 @@ from typing import Any
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.config.evidence_env import cwe_url_template
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.subagents.pool import SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
@@ -52,12 +53,14 @@ def _collect_evidence(
             module=config.target.name if config.target else "",
             exit_reason=collection.exit_reason,
         ),
-        compiled_dir=compiled_dir,
-        evaluators_dir=config.evaluators_dir,
-        req_map_reader=read_req_to_principle_map,
-        refs_reader=load_compiled_refs,
-        cwe_url_template=cwe_url_template(),
-        on_quarantine=log_quarantined_findings,
-        on_malformed_line=log_malformed_jsonl_line,
+        EvidenceParseOptions(
+            compiled_dir=compiled_dir,
+            evaluators_dir=config.evaluators_dir,
+            req_map_reader=read_req_to_principle_map,
+            refs_reader=load_compiled_refs,
+            cwe_url_template=cwe_url_template(),
+            on_quarantine=log_quarantined_findings,
+            on_malformed_line=log_malformed_jsonl_line,
+        ),
     )
     return ev

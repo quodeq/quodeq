@@ -233,19 +233,17 @@ def _dim_exit_reason(record: dict | None) -> str | None:
     return None
 
 
-def _dim_evidence_tally(
-    dim_id: str, run_dir: Path, dismissed, deleted,
-    evaluators_dir: Path | None, compiled_dir: Path | None,
-):
+def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
     matcher = build_matcher(dim_id, dismissed, deleted)
     stamp = _suppression_stamp(dismissed, deleted)
     memo_key = None if stamp is None else (
-        dim_id, stamp, _standards_stamp(evaluators_dir), _standards_stamp(compiled_dir),
+        dim_id, stamp,
+        _standards_stamp(ctx.evaluators_dir), _standards_stamp(ctx.compiled_dir),
     )
     return live_tally(
-        dimension_evidence_file(run_dir, dim_id),
+        dimension_evidence_file(ctx.run_dir, dim_id),
         suppressed=matcher.is_suppressed if matcher.active else None,
-        resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir,
+        resolver=build_principle_resolver(dim_id, ctx.evaluators_dir, ctx.compiled_dir,
                                           req_map_reader=read_req_to_principle_map),
         memo_key=memo_key,
     )
@@ -269,7 +267,7 @@ def _build_dim_progress(
     files_project_total = estimate_meta["total"] if estimate_meta else None
     files_excluded = estimate_meta["excluded"] if estimate_meta else None
 
-    tally = _dim_evidence_tally(dim_id, ctx.run_dir, dismissed, deleted, ctx.evaluators_dir, ctx.compiled_dir)
+    tally = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
     elapsed = _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record)
     active = _active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0
 

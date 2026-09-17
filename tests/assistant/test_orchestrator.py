@@ -1,6 +1,7 @@
 import pytest
 
-from quodeq.assistant.orchestrator import TurnRequest, _mcp_server_args, run_turn
+from quodeq.assistant.orchestrator import (
+    TurnEngines, TurnRequest, _mcp_server_args, run_turn)
 from quodeq.assistant.tools import ToolContext
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -26,14 +27,14 @@ def _request(text="hello", ui_state=None, **kw):
 def test_turn_persists_messages_and_emits_done(setup):
     repo, ctx = setup
 
-    def fake_turn(*, messages, config, registry, emit, **_):
+    def fake_turn(*, messages, config, session, **_):
         assert messages[0]["role"] == "system"
         assert messages[-1] == {"role": "user", "content": "hello"}
-        emit({"type": "token", "text": "hi"})
+        session.emit({"type": "token", "text": "hi"})
         return "hi"
 
     run_turn(_request(), repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     msgs = repo.list_messages("s1")
     assert [(m["role"], m["content"]) for m in msgs] == [("user", "hello"), ("assistant", "hi")]
     frames = [f for _, f in repo.events_after("s1", 0)]
@@ -49,7 +50,7 @@ def test_ui_state_prepended_to_user_message(setup):
         return "ok"
 
     run_turn(_request(ui_state={"activeTab": "standards"}), repository=repo,
-             tool_ctx=ctx, turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             tool_ctx=ctx, engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     assert seen["user"].startswith("[ui-state]")
 
 
@@ -63,7 +64,7 @@ def test_skill_prefix_injects_instructions(setup):
         return "ok"
 
     run_turn(_request(text="/create-standard RFC7807 errors"), repository=repo,
-             tool_ctx=ctx, turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             tool_ctx=ctx, engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     assert "Active skill: create-standard" in seen["system"]
     assert seen["user"] == "RFC7807 errors"
 
@@ -75,7 +76,7 @@ def test_unknown_skill_emits_error_without_model_call(setup):
         raise AssertionError("model must not be called")
 
     run_turn(_request(text="/nope do it"), repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "error"
 
@@ -87,7 +88,7 @@ def test_turn_exception_becomes_error_frame(setup):
         raise RuntimeError("connection refused")
 
     run_turn(_request(), repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "error"
     assert "connection refused" not in frames[-1]["message"]
@@ -107,7 +108,7 @@ def test_history_replayed_on_second_turn(setup):
         return "second answer"
 
     run_turn(_request(text="second"), repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     roles = [m["role"] for m in seen["messages"]]
     assert roles == ["system", "user", "assistant", "user"]
 
@@ -197,13 +198,13 @@ def test_web_enabled_registers_web_tools_for_local_provider(setup):
     repo, ctx = setup
     seen = {}
 
-    def fake_turn(*, messages, config, registry, emit, **_):
-        seen["names"] = registry.names()
+    def fake_turn(*, messages, config, session, **_):
+        seen["names"] = session.registry.names()
         seen["system"] = messages[0]["content"]
         return "ok"
 
     run_turn(_request(web_enabled=True), repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     assert "search_web" in seen["names"] and "fetch_url" in seen["names"]
     assert "# Web access" in seen["system"]
 
@@ -212,13 +213,13 @@ def test_web_tools_absent_by_default(setup):
     repo, ctx = setup
     seen = {}
 
-    def fake_turn(*, messages, config, registry, emit, **_):
-        seen["names"] = registry.names()
+    def fake_turn(*, messages, config, session, **_):
+        seen["names"] = session.registry.names()
         seen["system"] = messages[0]["content"]
         return "ok"
 
     run_turn(_request(), repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     assert "search_web" not in seen["names"] and "fetch_url" not in seen["names"]
     assert "# Web access" not in seen["system"]
 
@@ -227,15 +228,15 @@ def test_web_enabled_ignored_for_cloud_api_provider(setup):
     repo, ctx = setup
     seen = {}
 
-    def fake_turn(*, messages, config, registry, emit, **_):
-        seen["names"] = registry.names()
+    def fake_turn(*, messages, config, session, **_):
+        seen["names"] = session.registry.names()
         return "ok"
 
     req = TurnRequest(session_id="s1", text="hi", ui_state=None,
                       api_base="https://openrouter.ai/api/v1", api_key="k",
                       provider="openrouter", model="m", web_enabled=True)
     run_turn(req, repository=repo, tool_ctx=ctx,
-             turn_fn=fake_turn, capability_fn=lambda *a, **k: True)
+             engines=TurnEngines(turn_fn=fake_turn, capability_fn=lambda *a, **k: True))
     assert "search_web" not in seen["names"] and "fetch_url" not in seen["names"]
 
 
@@ -268,7 +269,7 @@ def test_cli_config_carries_system_prompt_and_skill_block(setup):
     request = TurnRequest(session_id="s1", text="/explain-score security",
                           ui_state=None, api_base="", api_key=None,
                           provider="claude", model="sonnet")
-    run_turn(request, repository=repo, tool_ctx=ctx, cli_turn_fn=fake_cli)
+    run_turn(request, repository=repo, tool_ctx=ctx, engines=TurnEngines(cli_turn_fn=fake_cli))
     cfg = captured["config"]
     assert "# Active skill: explain-score" in cfg.system_prompt
     assert cfg.skill_block.startswith("[skill:explain-score]\n")
@@ -285,7 +286,7 @@ def test_cli_config_skill_block_empty_without_skill(setup):
     request = TurnRequest(session_id="s1", text="hello",
                           ui_state=None, api_base="", api_key=None,
                           provider="claude", model="sonnet")
-    run_turn(request, repository=repo, tool_ctx=ctx, cli_turn_fn=fake_cli)
+    run_turn(request, repository=repo, tool_ctx=ctx, engines=TurnEngines(cli_turn_fn=fake_cli))
     assert captured["config"].skill_block == ""
     assert captured["config"].system_prompt  # context always present
 
@@ -294,20 +295,20 @@ def test_skill_turns_get_extra_iterations(setup):
     repo, ctx = setup
     captured = {}
 
-    def fake_api(*, messages, config, registry, emit, **_):
+    def fake_api(*, messages, config, session, **_):
         captured["config"] = config
         return "ok"
 
     request = TurnRequest(session_id="s1", text="/explain-score security",
                           ui_state=None, api_base="http://x", api_key=None,
                           provider="ollama", model="m")
-    run_turn(request, repository=repo, tool_ctx=ctx, turn_fn=fake_api)
+    run_turn(request, repository=repo, tool_ctx=ctx, engines=TurnEngines(turn_fn=fake_api))
     assert captured["config"].max_tool_iterations == 12
 
     request = TurnRequest(session_id="s1", text="hello", ui_state=None,
                           api_base="http://x", api_key=None,
                           provider="ollama", model="m")
-    run_turn(request, repository=repo, tool_ctx=ctx, turn_fn=fake_api)
+    run_turn(request, repository=repo, tool_ctx=ctx, engines=TurnEngines(turn_fn=fake_api))
     assert captured["config"].max_tool_iterations == 6
 
 
@@ -341,8 +342,8 @@ def test_cancelled_turn_without_partial_persists_no_assistant_message(setup):
     def cancelled_turn(**_):
         raise TurnCancelled("")
 
-    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=cancelled_turn,
-             capability_fn=lambda *a, **k: True)
+    run_turn(_request(), repository=repo, tool_ctx=ctx, engines=TurnEngines(turn_fn=cancelled_turn,
+             capability_fn=lambda *a, **k: True))
     assert [m["role"] for m in repo.list_messages("s1")] == ["user"]
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "stopped"
@@ -354,8 +355,8 @@ def test_turn_failure_emits_generic_message_not_raw_exception(setup):
     def failing_turn(**_):
         raise ValueError("api key file /home/x/.secret missing")
 
-    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=failing_turn,
-             capability_fn=lambda *a, **k: True)
+    run_turn(_request(), repository=repo, tool_ctx=ctx, engines=TurnEngines(turn_fn=failing_turn,
+             capability_fn=lambda *a, **k: True))
     frames = [f for _, f in repo.events_after("s1", 0)]
     error_events = [f for f in frames if f["type"] == "error"]
     assert len(error_events) == 1
@@ -370,22 +371,23 @@ def test_run_turn_threads_cancel_token_to_adapter(setup):
     repo, ctx = setup
     seen = {}
 
-    def fake_turn(*, cancel, **_):
-        seen["default"] = cancel
+    def fake_turn(*, session, **_):
+        seen["default"] = session.cancel
         return "hi"
 
-    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=fake_turn,
-             capability_fn=lambda *a, **k: True)
+    run_turn(_request(), repository=repo, tool_ctx=ctx, engines=TurnEngines(turn_fn=fake_turn,
+             capability_fn=lambda *a, **k: True))
     assert isinstance(seen["default"], CancelToken)
 
     token = CancelToken()
 
-    def fake_turn2(*, cancel, **_):
-        seen["explicit"] = cancel
+    def fake_turn2(*, session, **_):
+        seen["explicit"] = session.cancel
         return "hi"
 
-    run_turn(_request(), repository=repo, tool_ctx=ctx, turn_fn=fake_turn2,
-             capability_fn=lambda *a, **k: True, cancel=token)
+    run_turn(_request(), repository=repo, tool_ctx=ctx,
+             engines=TurnEngines(turn_fn=fake_turn2, capability_fn=lambda *a, **k: True),
+             cancel=token)
     assert seen["explicit"] is token
 
 

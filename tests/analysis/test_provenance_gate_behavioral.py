@@ -48,7 +48,7 @@ pytest.importorskip("openai", reason="requires the openai SDK")
 
 import quodeq
 from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
-from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
+from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
 from quodeq.analysis.subprocess import _load_standards_text
 from quodeq.llm_bridge._ollama import get_ollama_status, list_ollama_models
 from tests.analysis._provenance_gate_support import discover_cases, target_severity
@@ -110,11 +110,8 @@ def _run(case):
     dimension = case.expected["dimension"]
     standards = _load_standards_text(_COMPILED_DIR, dimension)
     prompt = assemble_api_prompt(
-        source_files=[case.source_file],
-        standards_text=standards,
-        dimension=dimension,
-        repo_name="provenance-gate-fixture",
-        repo_root=case.repo_dir,
+        source_files=[case.source_file], standards_text=standards, dimension=dimension,
+        project=ProjectBrief(name="provenance-gate-fixture", root=case.repo_dir),
     )
     # Fail fast on the role-label confound: the production path must render the
     # fixture as PROD code (no "tone down" label), else a de-escalation could come

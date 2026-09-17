@@ -7,7 +7,7 @@ nothing here reads history or resolves runs. Declared in
 """
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from quodeq.core.types import DimensionResult
@@ -15,6 +15,20 @@ from quodeq.shared.serialization import to_camel_dict
 
 from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services._dashboard_history import _DashboardPayload
+
+
+@dataclass(frozen=True, slots=True)
+class _DimensionAnnotations:
+    """Selected-run values stamped onto each serialized dimension.
+
+    ``exit_reason`` is the run-level ``status.json`` exit reason (also reported
+    on ``selectedRun``); the two count maps are keyed by dimension name and
+    explain how many scan findings the dismissed filter alone, and dismissals
+    plus deletions together, hid from the response.
+    """
+    exit_reason: str | None = None
+    dismissed_counts: dict[str, int] = field(default_factory=dict)
+    suppressed_counts: dict[str, int] = field(default_factory=dict)
 
 
 def _attach_exit_reason_to_dim(
@@ -86,17 +100,15 @@ def _build_dashboard_result(
     runs: list[RunInfo],
     selected_run: RunInfo,
     payload: _DashboardPayload,
-    *,
-    exit_reason: str | None = None,
-    dismissed_counts: dict[str, int] | None = None,
-    suppressed_counts: dict[str, int] | None = None,
+    annotations: _DimensionAnnotations,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
+    exit_reason = annotations.exit_reason
     dim_dicts = [
         _attach_dismissed_count_to_dim(
             _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
-            dismissed_counts or {},
-            suppressed_counts or {},
+            annotations.dismissed_counts,
+            annotations.suppressed_counts,
         )
         for d in payload.dimensions_with_trend
     ]

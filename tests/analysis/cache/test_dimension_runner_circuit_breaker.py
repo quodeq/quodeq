@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.cache._failure_streak import CircuitBreakerError
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from tests.analysis.cache.conftest import (
     _ListHandler,
     _make_callbacks,
@@ -57,8 +57,7 @@ class TestCircuitBreakerWiring:
             with pytest.raises(CircuitBreakerError) as excinfo:
                 process_dimension_with_cache(
                     config, "security", idx=1, ctx=_make_ctx(),
-                    callbacks=_make_callbacks(), cache=cache,
-                    dispatcher=err_dispatcher,
+                    opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=err_dispatcher),
                 )
             assert excinfo.value.reason == "circuit_breaker"
             assert cancellation.is_cancelled()
@@ -92,8 +91,7 @@ class TestCircuitBreakerWiring:
             # Should NOT raise CircuitBreakerError.
             ev = process_dimension_with_cache(
                 config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-                dispatcher=err_dispatcher,
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=err_dispatcher),
             )
             assert ev is not None
             assert not cancellation.is_cancelled()
@@ -163,8 +161,7 @@ class TestEvidenceFileCreatedBeforeBreaker:
         try:
             process_dimension_with_cache(
                 config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-                dispatcher=silent_dispatcher,
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=silent_dispatcher),
             )
         finally:
             breaker_logger.removeHandler(handler)
@@ -251,7 +248,9 @@ class TestBreakerSalvage:
         config = replace(
             config, options=replace(config.options, failure_streak_threshold=3))
         ev = process_dimension_with_cache(
-            config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache, dispatcher=_SalvageDispatcher(n_errors=3))
+            config, "flexibility", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=_SalvageDispatcher(n_errors=3)),
+        )
         assert ev is not None, "breaker trip should salvage collected findings, not discard"
         assert ev.exit_reason == "failure_streak"
         assert ev.principles, "salvaged Evidence should carry the collected findings"
@@ -262,4 +261,6 @@ class TestBreakerSalvage:
             config, options=replace(config.options, failure_streak_threshold=3))
         with pytest.raises(CircuitBreakerError):
             process_dimension_with_cache(
-                config, "flexibility", 1, _make_ctx(), _make_callbacks(), cache=cache, dispatcher=_AllErrorsDispatcher(n_errors=3))
+                config, "flexibility", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=_AllErrorsDispatcher(n_errors=3)),
+            )

@@ -17,13 +17,14 @@ from pathlib import Path
 
 from quodeq.config.paths import default_paths
 from quodeq.config.evidence_env import cwe_url_template
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
 from quodeq.services._wiring import evidence_file_size
-from quodeq.services.suppression import is_deleted, is_dismissed
+from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
@@ -73,9 +74,9 @@ def _apply_suppressions(
     for pe in evidence.principles.values():
         kept = [
             v for v in pe.violations
-            if not is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
-                                file=v.get("file"), line=v.get("line"),
-                                snippet=v.get("snippet"))
+            if not is_dismissed(dismissed, FindingRef(
+                req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
+                line=v.get("line"), snippet=v.get("snippet")))
             and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
                                file=v.get("file"))
         ]
@@ -94,23 +95,21 @@ def _recompute_metrics(evidence, source_file_count: int) -> None:
         pe.compute_metrics(source_file_count=source_file_count)
 
 
-def _parse_evidence_jsonl(
-    jsonl: Path, run_dir: Path, dim_id: str,
-    compiled_dir: Path | None, evaluators_dir: Path | None,
-    source_file_count: int, files_read: int,
-):
+def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest):
     """Parse the evidence jsonl into an Evidence object, or None on any
     parse failure (logged at debug)."""
+    compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
     try:
         return parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
-            source_file_count=source_file_count, files_read=files_read,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+            source_file_count=request.source_file_count, files_read=request.files_read,
+        ), EvidenceParseOptions(
+            compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
             refs_reader=load_compiled_refs,
             cwe_url_template=cwe_url_template(),
             on_quarantine=log_quarantined_findings,
-            on_malformed_line=log_malformed_jsonl_line)
+            on_malformed_line=log_malformed_jsonl_line))
     except (OSError, ValueError, KeyError) as exc:
         _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None
@@ -166,11 +165,7 @@ def rescore_dimension_from_evidence(
     jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
     if jsonl is None or evidence_file_size(jsonl) == 0:
         return EvidenceRescore(None, 0)
-    compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
-    evidence = _parse_evidence_jsonl(
-        jsonl, run_dir, dim_id, compiled_dir, evaluators_dir,
-        request.source_file_count, request.files_read,
-    )
+    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request)
     if evidence is None:
         return EvidenceRescore(None, 0)
 

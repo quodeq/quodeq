@@ -31,7 +31,7 @@ from quodeq.services._project_registration_steps import (
     _materialize_and_scan,
     _resolve_project_slot,
 )
-from quodeq.services._repo_index import add_repo_index_entry
+from quodeq.services._repo_index import RepoIdentity, add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 
@@ -58,50 +58,49 @@ def _validate_clone_target(
 
 
 def register_project(
-    repo: str,
-    discipline: str | None,
     reports_dir: str,
-    scope_path: str | None = None,
+    spec: NewProjectSpec,
     *,
-    clone_dest: str | None = None,
-    ephemeral: bool = False,
     clones_dir: Path | None = None,
     log: LogSink = NULL_LOG,
 ) -> str:
     """Resolve/register project and run a scan.
 
-    For URL inputs, clones the repo before scanning. Either *clone_dest* (a
-    user-chosen parent directory) or *ephemeral=True* must be set when *repo*
-    is a URL. Ephemeral clones land under ``~/.quodeq/clones/<uuid>/`` by
-    default; pass *clones_dir* to use a different (already-resolved) base
-    directory instead of re-reading QUODEQ_CLONES_DIR here.
+    For URL inputs, clones the repo before scanning. Either ``spec.clone_dest``
+    (a user-chosen parent directory) or ``spec.ephemeral=True`` must be set
+    when ``spec.repo`` is a URL. Ephemeral clones land under
+    ``~/.quodeq/clones/<uuid>/`` by default; pass *clones_dir* to use a
+    different (already-resolved) base directory instead of re-reading
+    QUODEQ_CLONES_DIR here.
 
-    For local path inputs, scans in place; *clone_dest* and *ephemeral* are
-    ignored.
+    For local path inputs, scans in place; ``clone_dest`` and ``ephemeral``
+    are ignored.
 
     Returns the project's UUID.
     """
-    is_url = is_repo_url(repo)
-    _validate_clone_target(repo, is_url, ephemeral, clone_dest)
+    is_url = is_repo_url(spec.repo)
+    _validate_clone_target(spec.repo, is_url, spec.ephemeral, spec.clone_dest)
     reports_path = Path(reports_dir)
 
     project_uuid, project_dir, project_name, repo_resolved = _resolve_project_slot(
-        repo, discipline, reports_path, scope_path,
+        spec.repo, spec.discipline, reports_path, spec.scope_path,
     )
 
     _materialize_and_scan(_MaterializeRequest(
-        repo=repo, repo_resolved=repo_resolved, project_name=project_name,
+        repo=spec.repo, repo_resolved=repo_resolved, project_name=project_name,
         project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
-        scope_path=scope_path, is_url=is_url, ephemeral=ephemeral,
-        clone_dest=clone_dest, clones_dir=clones_dir, log=log,
+        scope_path=spec.scope_path, is_url=is_url, ephemeral=spec.ephemeral,
+        clone_dest=spec.clone_dest, clones_dir=clones_dir, log=log,
     ))
 
-    _sync_repo_index_on_create(reports_path, project_name, repo_resolved, scope_path, project_uuid)
+    _sync_repo_index_on_create(
+        reports_path, RepoIdentity(project_name, repo_resolved, spec.scope_path), project_uuid,
+    )
     return project_uuid
 
 
 def _sync_repo_index_on_create(
-    reports_path: Path, project_name: str, repo_resolved: str, scope_path: str | None, project_uuid: str,
+    reports_path: Path, identity: RepoIdentity, project_uuid: str,
 ) -> None:
     """Register this identity in find_existing_project's duplicate-check index.
 
@@ -109,7 +108,7 @@ def _sync_repo_index_on_create(
     back by the caller via plain directory removal, which would leave a
     dangling index entry if this ran any earlier.
     """
-    add_repo_index_entry(reports_path, project_name, repo_resolved, scope_path, project_uuid)
+    add_repo_index_entry(reports_path, identity, project_uuid)
 
 
 def _rollback_new_dirs(reports_root: str, before: set[str], *, log: LogSink = NULL_LOG) -> None:
@@ -159,16 +158,7 @@ def register_project_with_rollback(
     rollback = functools.partial(_rollback_new_dirs, reports_dir, before, log=log)
 
     try:
-        project_uuid = register_project(
-            spec.repo,
-            spec.discipline,
-            reports_dir,
-            scope_path=spec.scope_path,
-            clone_dest=spec.clone_dest,
-            ephemeral=spec.ephemeral,
-            clones_dir=clones_dir,
-            log=log,
-        )
+        project_uuid = register_project(reports_dir, spec, clones_dir=clones_dir, log=log)
     except (FileNotFoundError, ValueError) as exc:
         return _rollback_and_report(rollback, "invalid_repo", str(exc))
     except CloneError as exc:

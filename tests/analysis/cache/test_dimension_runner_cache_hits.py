@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from quodeq.analysis.cache import CacheEntry, build_cache_key_for_file
 from quodeq.analysis.cache._key_provenance import build_cache_key_struct
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.cache.key import compute_key
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
@@ -45,8 +45,7 @@ class TestAllHits:
         dispatcher = FakeDispatcher(src)
         ev = process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         # No dispatch happened.
@@ -87,8 +86,7 @@ class TestProvenanceSurfacing:
         try:
             process_dimension_with_cache(
                 config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-                dispatcher=dispatcher,
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
             )
         finally:
             logger.removeHandler(handler)
@@ -113,8 +111,7 @@ class TestModelSwitchReuse:
         d1 = FakeDispatcher(src)
         process_dimension_with_cache(
             config_a, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=d1,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d1),
         )
         assert len(d1.calls) == 1  # cold cache -> dispatched the misses
 
@@ -130,8 +127,7 @@ class TestModelSwitchReuse:
         try:
             ev = process_dimension_with_cache(
                 config_b, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache,
-                dispatcher=d2,
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d2),
             )
         finally:
             logger.removeHandler(handler)
@@ -164,8 +160,7 @@ class TestAllMisses:
         dispatcher = FakeDispatcher(src)
         ev = process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         # Dispatch happened with all files (file filter == all source files).
@@ -187,14 +182,14 @@ class TestAllMisses:
 
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
         # Run 2 — should not dispatch.
         dispatcher.calls.clear()
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
         assert dispatcher.calls == []
 
@@ -214,8 +209,8 @@ class TestPartialHits:
 
         dispatcher = FakeDispatcher(src)
         ev = process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         # Dispatcher saw only the misses.
@@ -243,8 +238,8 @@ class TestDispatchFailure:
             return None
 
         ev = process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            dispatcher=failing_dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=failing_dispatcher),
         )
         assert ev is None
 
@@ -260,8 +255,8 @@ class TestNoSourceFiles:
 
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
         # Dispatcher was called (even with no files — same as V1 behaviour).
         assert len(dispatcher.calls) == 1
@@ -285,8 +280,8 @@ class TestAdoptedReporting:
         try:
             with patch("quodeq.analysis.cache._dimension_context.emit_marker") as marker:
                 process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(), callbacks=_make_callbacks(),
-                    cache=cache, dispatcher=dispatcher,
+                    config, "security", idx=1, ctx=_make_ctx(),
+                    opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
                 )
         finally:
             logger.removeHandler(handler)

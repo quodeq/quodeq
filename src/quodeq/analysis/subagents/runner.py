@@ -37,10 +37,13 @@ from quodeq.analysis.subagents._consolidated import (
 
 @dataclass
 class DimensionCallbacks:
-    """Grouped callbacks for single-agent dimension processing fallback."""
+    """Collaborators a dimension dispatch is handed: the single-agent
+    fallback steps (prompt, analysis, evidence parse) and the log sink.
+    """
     build_prompt: Callable[..., str]
     run_analysis: Callable[..., tuple[Any, Any]]
     parse_evidence: Callable[..., Evidence | None]
+    log: LogSink = NULL_LOG
 
 
 @dataclass
@@ -107,13 +110,13 @@ def _execute_pool_and_collect(
 def process_dimension_with_subagents(
     config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
     callbacks: DimensionCallbacks,
-    *, log: LogSink = NULL_LOG,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents.
 
     Falls back to single-agent path (via provided callbacks) when no source
     files are detected for the queue.
     """
+    log = callbacks.log
     evidence_dir = config.work_dir or config.src
 
     files, extensions, _excluded = _list_source_files(config, dim_id)

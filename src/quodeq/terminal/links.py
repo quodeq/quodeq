@@ -20,6 +20,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 
 # Well-known CLI locations to probe IN ADDITION to $PATH. A macOS app launched
@@ -149,16 +150,21 @@ def safe_editor_path(
     return None
 
 
-def resolve_path(
-    token: str,
-    bases: list[str],
-    *,
-    isabs=os.path.isabs,
-    isfile=os.path.isfile,
-    join=os.path.join,
-    normpath=os.path.normpath,
-    expanduser=os.path.expanduser,
-) -> tuple[str, bool]:
+@dataclass(frozen=True, slots=True)
+class PathOps:
+    """The ``os.path`` functions ``resolve_path`` relies on, injectable for tests."""
+
+    isabs: Callable[[str], bool] = os.path.isabs
+    isfile: Callable[[str], bool] = os.path.isfile
+    join: Callable[..., str] = os.path.join
+    normpath: Callable[[str], str] = os.path.normpath
+    expanduser: Callable[[str], str] = os.path.expanduser
+
+
+_OS_PATH_OPS = PathOps()
+
+
+def resolve_path(token: str, bases: list[str], *, ops: PathOps = _OS_PATH_OPS) -> tuple[str, bool]:
     """Resolve a candidate path token to ``(abs_path, exists)``.
 
     Absolute (incl. ``~``) tokens are used as-is. Relative tokens are tried
@@ -166,15 +172,15 @@ def resolve_path(
     exist, the first base is used so the client still gets a canonical path
     (with ``exists=False``, so it never becomes a link).
     """
-    token = expanduser(token)
-    if isabs(token):
-        p = normpath(token)
-        return p, isfile(p)
+    token = ops.expanduser(token)
+    if ops.isabs(token):
+        p = ops.normpath(token)
+        return p, ops.isfile(p)
     for base in bases:
-        cand = normpath(join(base, token))
-        if isfile(cand):
+        cand = ops.normpath(ops.join(base, token))
+        if ops.isfile(cand):
             return cand, True
-    fallback = normpath(join(bases[0], token)) if bases else token
+    fallback = ops.normpath(ops.join(bases[0], token)) if bases else token
     return fallback, False
 
 

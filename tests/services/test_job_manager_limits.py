@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.services._job_model import InMemoryJobStore
+from quodeq.services._job_model import InMemoryJobStore, JobProcessSeams
 from quodeq.services.jobs import JobManager, STATUS_FAILED
 from tests._timeouts import budget
 
@@ -59,7 +59,7 @@ def fake_spawn():
 class TestConcurrencyCap:
     def test_start_job_refuses_past_the_concurrency_cap(self, monkeypatch, fake_spawn):
         monkeypatch.setenv("QUODEQ_MAX_CONCURRENT_JOBS", "2")
-        manager = JobManager(spawn_impl=fake_spawn, job_store=InMemoryJobStore())
+        manager = JobManager(JobProcessSeams(spawn_impl=fake_spawn), job_store=InMemoryJobStore())
         manager.start_job(["x"])
         manager.start_job(["x"])
         third = manager.start_job(["x"])
@@ -68,7 +68,7 @@ class TestConcurrencyCap:
 
     def test_start_job_uses_a_default_cap_of_eight_when_env_unset(self, monkeypatch, fake_spawn):
         monkeypatch.delenv("QUODEQ_MAX_CONCURRENT_JOBS", raising=False)
-        manager = JobManager(spawn_impl=fake_spawn, job_store=InMemoryJobStore())
+        manager = JobManager(JobProcessSeams(spawn_impl=fake_spawn), job_store=InMemoryJobStore())
         for _ in range(8):
             snap = manager.start_job(["x"])
             assert snap.status != STATUS_FAILED
@@ -98,7 +98,7 @@ class TestConcurrencyCap:
                 assert release.wait(timeout=budget(5)), "spawn was never released"
             return proc
 
-        manager = JobManager(spawn_impl=spawn, job_store=InMemoryJobStore())
+        manager = JobManager(JobProcessSeams(spawn_impl=spawn), job_store=InMemoryJobStore())
         first_result: list = []
         racer = threading.Thread(target=lambda: first_result.append(manager.start_job(["x"])))
         racer.start()
@@ -119,7 +119,7 @@ class TestConcurrencyCap:
 
     def test_start_job_allows_a_new_job_once_a_slot_frees_up(self, monkeypatch, fake_spawn):
         monkeypatch.setenv("QUODEQ_MAX_CONCURRENT_JOBS", "1")
-        manager = JobManager(spawn_impl=fake_spawn, job_store=InMemoryJobStore())
+        manager = JobManager(JobProcessSeams(spawn_impl=fake_spawn), job_store=InMemoryJobStore())
         first = manager.start_job(["x"])
         refused = manager.start_job(["x"])
         assert refused.status == STATUS_FAILED

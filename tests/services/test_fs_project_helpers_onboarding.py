@@ -15,9 +15,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.services import _fs_project_helpers as helpers
-from quodeq.services._fs_project_helpers import _build_project_entry, find_existing_project
+from quodeq.services._fs_project_helpers import _ListingOptions, _build_project_entry, find_existing_project
 from quodeq.services._fs_projects import update_project_path
 from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
+from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project
 from quodeq.data.fs.report_parser.runs import RunInfo
 
@@ -95,7 +96,7 @@ def test_entry_backfill_false_never_writes(tmp_path):
     entry = _build_project_entry(
         tmp_path, "proj-1",
         [_run("2025-12-02_00-00-00", "2025-12-02T00:00:00")],
-        backfill=False,
+        _ListingOptions(backfill=False),
     )
 
     assert entry.onboarding_completed_at is None
@@ -117,7 +118,7 @@ def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_
     reports = tmp_path / "reports"
     reports.mkdir()
     repos = [_make_repo(tmp_path, name) for name in ("alpha", "beta", "gamma")]
-    uuids = [register_project(str(repo), None, str(reports)) for repo in repos]
+    uuids = [register_project(str(reports), NewProjectSpec(str(repo), None)) for repo in repos]
 
     index_path = reports / ".repo_index.json"
     assert index_path.exists()
@@ -161,7 +162,7 @@ def test_find_existing_project_ignores_index_entry_left_by_a_path_move(tmp_path)
     reports = tmp_path / "reports"
     reports.mkdir()
     repo = _make_repo(tmp_path, "alpha")
-    uuid = register_project(str(repo), None, str(reports))
+    uuid = register_project(str(reports), NewProjectSpec(str(repo), None))
 
     moved_to = tmp_path / "moved" / "alpha"
     moved_to.mkdir(parents=True)
@@ -178,7 +179,7 @@ def test_find_existing_project_drops_an_index_hit_its_record_contradicts(tmp_pat
     reports = tmp_path / "reports"
     reports.mkdir()
     repo = _make_repo(tmp_path, "alpha")
-    uuid = register_project(str(repo), None, str(reports))
+    uuid = register_project(str(reports), NewProjectSpec(str(repo), None))
 
     unclaimed = tmp_path / "repos" / "unclaimed"
     unclaimed.mkdir(parents=True)
@@ -214,7 +215,7 @@ def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
         (Path(dest) / ".git").mkdir()
 
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
-        uuid = register_project(url, None, str(reports), clone_dest=str(clone_dest))
+        uuid = register_project(str(reports), NewProjectSpec(url, None, clone_dest=str(clone_dest)))
 
     key = _repo_index_key("repo", url, None)
     assert _load_repo_index(reports).get(key) == uuid
@@ -241,7 +242,7 @@ def test_find_existing_project_resolves_a_scoped_registration(tmp_path):
     (repo / "src").mkdir()
     (repo / "src" / "mod.py").write_text("y = 2\n")
 
-    uuid = register_project(str(repo), None, str(reports), "src")
+    uuid = register_project(str(reports), NewProjectSpec(str(repo), None, "src"))
 
     key = _repo_index_key("alpha", str(repo.resolve()), "src")
     assert _load_repo_index(reports).get(key) == uuid
@@ -267,7 +268,7 @@ def test_scoped_project_stays_findable_after_a_path_move(tmp_path):
     (repo / "src").mkdir()
     (repo / "src" / "mod.py").write_text("y = 2\n")
 
-    uuid = register_project(str(repo), None, str(reports), "src")
+    uuid = register_project(str(reports), NewProjectSpec(str(repo), None, "src"))
 
     moved_to = tmp_path / "moved" / "alpha"
     moved_to.mkdir(parents=True)
@@ -284,7 +285,7 @@ def test_find_existing_project_survives_a_corrupt_index_file(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
     repo = _make_repo(tmp_path, "alpha")
-    uuid = register_project(str(repo), None, str(reports))
+    uuid = register_project(str(reports), NewProjectSpec(str(repo), None))
 
     (reports / ".repo_index.json").write_text("{ this is not json", encoding="utf-8")
 

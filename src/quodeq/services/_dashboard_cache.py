@@ -19,12 +19,19 @@ from quodeq.core.types import DimensionResult
 from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class DashboardCacheConfig:
-    """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
+    """Run-dimension cache settings for the dashboard fetchers.
+
+    ``cache``/``lock``/``max_size`` are optional overrides of the module-level
+    shared cache (mirrors AccumulatedCacheConfig); tests pass them to isolate
+    state. ``version`` scopes the cache key to the project's suppression state
+    so a dismiss/delete invalidates warmed entries.
+    """
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None
     lock: threading.Lock | None = None
     max_size: int | None = None
+    version: str = ""
 
 
 _DEFAULT_RUN_DIM_CACHE_MAX = 256
@@ -98,24 +105,22 @@ def clear_shared_dimension_cache(cache: DimensionCache | None = None) -> None:
 def _make_run_dimension_fetcher(
     reports_root: Path,
     project: str,
-    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
-    lock: threading.Lock | None = None,
-    max_size: int | None = None,
-    version: str = "",
+    config: DashboardCacheConfig | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded).
 
     Defaults to the module-level shared cache so reads of the same run's
-    dimensions across requests reuse work. *version* scopes the cache key to the
-    project's suppression state so a dismiss/delete invalidates it. Tests pass
-    explicit cache/lock to isolate state.
+    dimensions across requests reuse work. ``config.version`` scopes the cache
+    key to the project's suppression state so a dismiss/delete invalidates it.
+    Tests pass an explicit cache/lock to isolate state.
     """
+    cc = config if config is not None else DashboardCacheConfig()
     ctx = DimensionCacheContext(
-        cache=cache if cache is not None else _shared_dimension_cache.data,
-        lock=lock if lock is not None else _shared_dimension_cache.lock,
-        max_size=max_size if max_size is not None else _run_dim_cache_max(),
+        cache=cc.cache if cc.cache is not None else _shared_dimension_cache.data,
+        lock=cc.lock if cc.lock is not None else _shared_dimension_cache.lock,
+        max_size=cc.max_size if cc.max_size is not None else _run_dim_cache_max(),
     )
-    return make_lru_dimension_fetcher(reports_root, project, ctx, version=version)
+    return make_lru_dimension_fetcher(reports_root, project, ctx, version=cc.version)
 
 
 __all__ = [

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator
 
@@ -18,6 +19,20 @@ from quodeq.data.sqlite._row_mappers import judgment_to_row
 from quodeq.data.sqlite._state_store_meta import _StateStoreMetaMixin
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class PrincipleGradeRow:
+    """One ``principle_grades`` row: a principle's score, grade and finding counts."""
+
+    dimension: str
+    principle_id: str
+    score: float | None
+    grade: str | None
+    finding_count: int
+    dismissed_count: int
+
+
 _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
@@ -157,15 +172,7 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             )
             conn.commit()
 
-    def record_principle_grade(
-        self, *,
-        dimension: str,
-        principle_id: str,
-        score: float | None,
-        grade: str | None,
-        finding_count: int,
-        dismissed_count: int,
-    ) -> None:
+    def record_principle_grade(self, row: PrincipleGradeRow) -> None:
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO principle_grades "
@@ -175,7 +182,8 @@ class SQLiteStateStore(_StateStoreMetaMixin):
                 "score=excluded.score, grade=excluded.grade, "
                 "finding_count=excluded.finding_count, dismissed_count=excluded.dismissed_count, "
                 "completed_at=excluded.completed_at",
-                (dimension, principle_id, score, grade, finding_count, dismissed_count),
+                (row.dimension, row.principle_id, row.score, row.grade,
+                 row.finding_count, row.dismissed_count),
             )
             conn.commit()
 

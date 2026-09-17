@@ -30,6 +30,8 @@ from pathlib import Path
 from quodeq.core.types import ProjectEntry
 from quodeq.services._fs_metadata import _extract_project_metadata
 from quodeq.services._fs_project_helpers import (
+    _KnownProjectIds,
+    _ListingOptions,
     _auto_detect_parents,
     _backfill_onboarding_field,
     _max_projects_listed,
@@ -92,6 +94,6 @@ def build_project_entries(
         for name in ids:
             _backfill_onboarding_field(reports_root / name)
     return _build_project_entries_threaded(
-        reports_root, ids, set(ids), set(), set(),
-        backfill=backfill, inline_summaries=inline_summaries,
+        reports_root, ids, _KnownProjectIds(registered=set(ids)),
+        _ListingOptions(backfill=backfill, inline_summaries=inline_summaries),
     )

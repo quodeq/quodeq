@@ -10,6 +10,9 @@ from quodeq.services.score_cache import (
     open_score_cache,
     per_run_versions,
 )
+from quodeq.services.suppression_keys import SuppressionKeys
+
+_NO_KEYS = SuppressionKeys(set(), set())
 
 
 def test_version_changes_with_run_set(tmp_path):
@@ -74,9 +77,9 @@ def test_per_run_versions_status_flip_reinvalidates(tmp_path, monkeypatch):
     pd = tmp_path / "proj"; pd.mkdir()
 
     in_progress = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")], dismissed=set(), deleted=set())
+        pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")], keys=_NO_KEYS)
     complete = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], dismissed=set(), deleted=set())
+        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
     assert in_progress != complete  # status carried in the tuple
 
     v_ip = accumulated_cache_version(pd, DEFAULT_PARAMS, in_progress, None)
@@ -95,13 +98,11 @@ def test_per_run_versions_does_not_persist_in_progress_keys(tmp_path, monkeypatc
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     pd = tmp_path / "proj"; pd.mkdir()
 
-    per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")], dismissed=set(), deleted=set())
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "in_progress")], keys=_NO_KEYS)
     with open_score_cache() as conn:
         assert load_run_keys(conn, "proj") == {}  # nothing persisted
 
-    per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r2", "complete")], dismissed=set(), deleted=set())
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r2", "complete")], keys=_NO_KEYS)
     with open_score_cache() as conn:
         assert "r2" in load_run_keys(conn, "proj")  # terminal run persisted
 
@@ -121,8 +122,7 @@ def test_per_run_versions_degrades_on_unopenable_cache(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(ro_dir / "sc.db"))
     os.chmod(ro_dir, 0o500)  # read+execute only: the db file can never be created
     try:
-        out = per_run_versions(
-            pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], dismissed=set(), deleted=set())
+        out = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
     finally:
         os.chmod(ro_dir, 0o700)
     assert [(rid, status) for rid, status, _ in out] == [("r1", "complete")]

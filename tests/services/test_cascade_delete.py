@@ -7,7 +7,7 @@ from pathlib import Path
 
 import quodeq.services._fs_projects as fs_projects
 from quodeq.services._fs_projects import delete_project
-from quodeq.services._repo_index import _load_repo_index, add_repo_index_entry
+from quodeq.services._repo_index import RepoIdentity, _load_repo_index, add_repo_index_entry
 
 
 def _make_project(reports_root: Path, name: str, parent: str | None = None) -> Path:
@@ -73,9 +73,9 @@ def test_delete_parent_purges_index_entries_for_parent_and_children(tmp_path: Pa
     _make_project(tmp_path, child_id, parent=parent_id)
     _make_project(tmp_path, other_id)
 
-    add_repo_index_entry(tmp_path, "parent", "/repo/parent", None, parent_id)
-    add_repo_index_entry(tmp_path, "parent", "/repo/parent", "sub", child_id)
-    add_repo_index_entry(tmp_path, "other", "/repo/other", None, other_id)
+    add_repo_index_entry(tmp_path, RepoIdentity("parent", "/repo/parent"), parent_id)
+    add_repo_index_entry(tmp_path, RepoIdentity("parent", "/repo/parent", "sub"), child_id)
+    add_repo_index_entry(tmp_path, RepoIdentity("other", "/repo/other"), other_id)
 
     result = delete_project(str(tmp_path), parent_id)
 
@@ -98,8 +98,8 @@ def test_delete_purges_child_index_entries_even_when_parent_removal_fails(
     _make_project(tmp_path, parent_id)
     _make_project(tmp_path, child_id, parent=parent_id)
 
-    add_repo_index_entry(tmp_path, "parent", "/repo/parent", None, parent_id)
-    add_repo_index_entry(tmp_path, "parent", "/repo/parent", "sub", child_id)
+    add_repo_index_entry(tmp_path, RepoIdentity("parent", "/repo/parent"), parent_id)
+    add_repo_index_entry(tmp_path, RepoIdentity("parent", "/repo/parent", "sub"), child_id)
 
     real_remove = fs_projects.remove_project_dir
 
