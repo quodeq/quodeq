@@ -12,7 +12,10 @@ from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.services import run_keys as run_keys_mod
 from quodeq.services import score_cache as sc
 from quodeq.services._trend_fetcher import _make_version_for
-from quodeq.services.score_cache import per_run_versions
+from quodeq.services.score_cache import VersionInputs, per_run_versions
+from quodeq.services.suppression_keys import SuppressionKeys
+
+_NO_KEYS = SuppressionKeys(set(), set())
 
 
 @pytest.fixture(autouse=True)
@@ -50,33 +53,30 @@ def test_unchanged_state_serves_complete_runs_from_memory(tmp_path, monkeypatch)
     _run_with_finding(pd, "r1")
     _run_with_finding(pd, "r2", file="b.py")
     runs = [("r1", "complete"), ("r2", "complete")]
-    first = per_run_versions(pd, "proj", DEFAULT_PARAMS, runs, dismissed=set(), deleted=set())
+    first = per_run_versions(pd, "proj", DEFAULT_PARAMS, runs, keys=_NO_KEYS)
 
     _forbid_key_reads(monkeypatch)
-    again = per_run_versions(pd, "proj", DEFAULT_PARAMS, runs, dismissed=set(), deleted=set())
+    again = per_run_versions(pd, "proj", DEFAULT_PARAMS, runs, keys=_NO_KEYS)
     assert again == first
 
 
 def test_a_dismissal_touching_the_run_changes_its_version(tmp_path):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    base = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], dismissed=set(), deleted=set())
+    base = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
     touched = per_run_versions(
         pd, "proj", DEFAULT_PARAMS, [("r1", "complete")],
-        dismissed={("R1", "a.py", 1)}, deleted=set())
+        keys=SuppressionKeys({("R1", "a.py", 1)}, set()))
     assert base[0][2] != touched[0][2]
     # Back to the earlier state: the earlier version, not a third one.
-    back = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], dismissed=set(), deleted=set())
+    back = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
     assert back == base
 
 
 def test_non_complete_runs_are_still_read_every_call(tmp_path, monkeypatch):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], dismissed=set(), deleted=set())
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], keys=_NO_KEYS)
 
     seen = []
     real = run_keys_mod.read_run_key_sets
@@ -86,24 +86,22 @@ def test_non_complete_runs_are_still_read_every_call(tmp_path, monkeypatch):
         return real(run_dir)
 
     monkeypatch.setattr(run_keys_mod, "read_run_key_sets", counting)
-    per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], dismissed=set(), deleted=set())
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], keys=_NO_KEYS)
     assert seen == [pd / "r1"]
 
 
 def test_trend_version_for_reuses_the_memo_for_cacheable_runs(tmp_path, monkeypatch):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    first = _make_version_for(
-        pd, "proj", DEFAULT_PARAMS, set(), set(), lambda: {}, {"r1"})("r1")
+    inputs = VersionInputs.of(DEFAULT_PARAMS, set(), set())
+    first = _make_version_for(pd, "proj", inputs, lambda: {}, {"r1"})("r1")
 
     _forbid_key_reads(monkeypatch)
 
     def _no_load():
         raise AssertionError("cached run keys loaded although every run was memoized")
 
-    again = _make_version_for(
-        pd, "proj", DEFAULT_PARAMS, set(), set(), _no_load, {"r1"})("r1")
+    again = _make_version_for(pd, "proj", inputs, _no_load, {"r1"})("r1")
     assert again == first
 
 
@@ -118,7 +116,8 @@ def test_trend_version_for_loads_keys_lazily_and_once(tmp_path):
         return {}
 
     # Not cacheable: nothing memoized, so the loader runs, but only once per fetcher.
-    version_for = _make_version_for(pd, "proj", DEFAULT_PARAMS, set(), set(), load, set())
+    version_for = _make_version_for(
+        pd, "proj", VersionInputs.of(DEFAULT_PARAMS, set(), set()), load, set())
     assert loads == []
     version_for("r1")
     version_for("r2")

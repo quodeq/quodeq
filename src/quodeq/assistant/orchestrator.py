@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant._context import build_system_prompt, build_turn_message
-from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
+from quodeq.assistant.adapters._api import ApiTurnConfig, ApiTurnSession, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, CliTurnSession, run_cli_turn
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
@@ -35,6 +35,17 @@ class TurnRequest:
     model: str
     web_enabled: bool = False
     write_enabled: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class TurnEngines:
+    """Injection points for :func:`run_turn`: the API turn runner, the
+    native-tool capability probe, and the CLI turn runner. ``None`` selects
+    the production implementation, so tests override only what they fake."""
+
+    turn_fn: Callable | None = None
+    capability_fn: Callable | None = None
+    cli_turn_fn: Callable | None = None
 
 
 @dataclass(frozen=True)
@@ -171,20 +182,20 @@ def _run_api_engine(request: TurnRequest, messages: list[dict], skill,
         register_web_tools(registry)
     if grants.write_on:
         register_write_tools(registry, grants.tool_ctx)
-    return deps.turn_fn(messages=messages, config=config,
-                        registry=registry, emit=deps.emit, cancel=deps.cancel)
+    session = ApiTurnSession(registry=registry, emit=deps.emit, cancel=deps.cancel)
+    return deps.turn_fn(messages=messages, config=config, session=session)
 
 
 def run_turn(request: TurnRequest, *, repository: AssistantStore,
-             tool_ctx: ToolContext, turn_fn=None, capability_fn=None,
-             cli_turn_fn=None, cancel: CancelToken | None = None) -> None:
-    turn_fn = turn_fn or run_api_turn
-    capability_fn = capability_fn or supports_native_tools
-    cli_turn_fn = cli_turn_fn or run_cli_turn
+             tool_ctx: ToolContext, engines: TurnEngines | None = None,
+             cancel: CancelToken | None = None) -> None:
+    engines = engines or TurnEngines()
     cancel = cancel or CancelToken()
     emit = lambda frame: repository.append_event(request.session_id, frame)  # noqa: E731
-    deps = _EngineDeps(repository=repository, emit=emit, cancel=cancel, turn_fn=turn_fn,
-                      capability_fn=capability_fn, cli_turn_fn=cli_turn_fn)
+    deps = _EngineDeps(repository=repository, emit=emit, cancel=cancel,
+                      turn_fn=engines.turn_fn or run_api_turn,
+                      capability_fn=engines.capability_fn or supports_native_tools,
+                      cli_turn_fn=engines.cli_turn_fn or run_cli_turn)
     try:
         skill_name, text = _split_skill(request.text)
         skill = None

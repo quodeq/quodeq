@@ -190,10 +190,10 @@ class TestBuildProjectListFailSoft:
         import quodeq.services._fs_projects as mod
         real_build = mod._build_project_entry
 
-        def side_effect(reports_root, entry_name, runs, **kwargs):
+        def side_effect(reports_root, entry_name, runs, options, **kwargs):
             if entry_name == "bad-uuid":
                 raise OSError("simulated disk error reading bad-uuid")
-            return real_build(reports_root, entry_name, runs, **kwargs)
+            return real_build(reports_root, entry_name, runs, options, **kwargs)
 
         with patch("quodeq.services._fs_projects._build_project_entry", side_effect=side_effect):
             with caplog.at_level("WARNING", logger="quodeq.services._fs_projects"):

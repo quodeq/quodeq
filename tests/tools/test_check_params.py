@@ -63,3 +63,34 @@ def test_function_inside_class_level_if_is_still_a_method():
 
 def test_violation_key_ignores_count():
     assert check_params.violation_key(("src/quodeq/x.py", "Foo.m", 9)) == "src/quodeq/x.py:Foo.m"
+
+
+def test_scan_roots_include_tools():
+    assert check_params.REPO_ROOT / "tools" in check_params.SCAN_ROOTS
+
+
+def test_scan_walks_tools_with_repo_relative_keys(tmp_path, monkeypatch):
+    src = tmp_path / "src" / "quodeq"
+    src.mkdir(parents=True)
+    (src / "ok.py").write_text("def narrow(a, b):\n    pass\n", encoding="utf-8")
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    (tools / "helper.py").write_text(
+        "def wide(a, b, c, d, e, f):\n    pass\n", encoding="utf-8",
+    )
+    monkeypatch.setattr(check_params, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(check_params, "SCAN_ROOTS", (src, tools))
+
+    assert check_params._scan() == [("tools/helper.py", "wide", 6)]
+    assert check_params.collect_violations() == ["tools/helper.py:wide"]
+
+
+def test_update_baseline_with_no_violations_writes_header_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(check_params, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(check_params, "SCAN_ROOTS", ())
+    baseline = tmp_path / "param_baseline.txt"
+
+    assert check_params.write_baseline(baseline) == 0
+    lines = baseline.read_text(encoding="utf-8").splitlines()
+    assert lines and all(line.startswith("#") for line in lines)
+    assert check_params.load_baseline(baseline) == set()

@@ -16,6 +16,7 @@ from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult
 
 import quodeq.services.scoring as scoring
+from quodeq.services.suppression_keys import SuppressionKeys
 
 
 def _make_violation(practice_id="P1", severity="major", req="R1", file="a.py", line=1):
@@ -107,7 +108,7 @@ def test_scored_run_dimensions_passes_the_run_dir_to_rescore():
     raw_dim = _make_dimension([_make_violation()], [_make_compliance()])
     seen: list[Path | None] = []
 
-    def fake_rescore(dim, dismissed, deleted=None, params=None, *, run_dir=None, rules=()):
+    def fake_rescore(dim, keys, params=None, *, run_dir=None):
         seen.append(run_dir)
         return dim
 
@@ -145,11 +146,11 @@ def test_rescore_runs_by_dimension_validates_path_segments():
     validation, so a traversal value must still be rejected before the join."""
     dims = [{"dimension": "security", "fromRunId": "../../etc/passwd"}]
     with pytest.raises(ValueError):
-        scoring._rescore_runs_by_dimension(dims, Path("/reports"), "proj", dismissed=set())
+        scoring._rescore_runs_by_dimension(dims, Path("/reports"), "proj", SuppressionKeys(set()))
     with pytest.raises(ValueError):
         scoring._rescore_runs_by_dimension(
             [{"dimension": "security", "fromRunId": "run1"}],
-            Path("/reports"), "../etc", dismissed=set(),
+            Path("/reports"), "../etc", SuppressionKeys(set()),
         )
 
 

@@ -17,7 +17,8 @@ import json
 from pathlib import Path
 
 from quodeq.analysis._report_io import write_dimension_report
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq._cli_evaluation import _count_excluded_findings
@@ -58,7 +59,7 @@ def _build_run(run_dir: Path, *, hard_case_line: int = 7) -> dict:
     evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
         language="", repository="", date_str="",
         source_file_count=SFC, files_read=FILES_READ,
-    ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir)
+    ), EvidenceParseOptions(compiled_dir=compiled_dir, evaluators_dir=evaluators_dir))
     scores = score_evidence(evidence, mode="numerical", params=DEFAULT_PARAMS)
     write_dimension_report(evidence, scores, DIM, run_dir / "evaluation")
     return json.loads((run_dir / "evaluation" / f"{DIM}.json").read_text())

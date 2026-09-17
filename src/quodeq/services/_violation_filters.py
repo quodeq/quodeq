@@ -7,21 +7,13 @@ this view agrees with every other suppression surface. Deletions match on
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.dismissals import DismissedKeys
 from quodeq.core.finding_identity import coerce_line
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import ViolationResponse
-from quodeq.services.suppression_keys import is_dismissed
-
-
-@dataclass(frozen=True)
-class SuppressionKeys:
-    """Dismissed state and permanently-deleted violation keys for one project."""
-    dismissed: "DismissedKeys | set[tuple]"
-    deleted: set[tuple]
+from quodeq.services.suppression_keys import FindingRef, is_dismissed
 
 
 def _violation_location(v: dict, *, log: LogSink = NULL_LOG) -> tuple[str, int]:
@@ -50,11 +42,11 @@ def _violation_dismissed(
 ) -> bool:
     """The shared predicate on a violation dict (snippet-aware, ``req || principle``)."""
     file, line = _violation_location(v)
-    return is_dismissed(
-        dismissed, req=v.get("req"),
+    return is_dismissed(dismissed, FindingRef(
+        req=v.get("req"),
         principle=principle or v.get("practiceId") or v.get("principle"),
         file=file, line=line, snippet=v.get("snippet"),
-    )
+    ))
 
 
 def _deleted_key_for_violation(v: dict, dimension: str, principle: str | None = None) -> tuple:

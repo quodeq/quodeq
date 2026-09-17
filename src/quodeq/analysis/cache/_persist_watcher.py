@@ -24,10 +24,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.cache._dimension_context import _CacheContext
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
 from quodeq.analysis.cache.backend import CacheBackend
-from quodeq.analysis.cache.dimension_helpers import ClassifyResult, persist_dispatch_results
+from quodeq.analysis.cache.dimension_helpers import persist_dispatch_results
 from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
 
 # How often the watcher thread persists in-flight cache entries during
@@ -89,10 +90,12 @@ def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> CachePers
 
 
 def _make_persist_fn(
-    config: RunConfig, dim_id: str, jsonl: Path, classify: ClassifyResult,
-    cache: CacheBackend, stop_event: threading.Event,
+    config: RunConfig, dim_id: str, cctx: _CacheContext, stop_event: threading.Event,
 ) -> Callable[[], None]:
     """Build the watcher's persist callable for one dispatch.
+
+    ``cctx`` supplies the evidence JSONL, the hit/miss classification and
+    the cache backend the entries land in.
 
     One ``DispatchJsonlState`` for the whole dispatch means each tick reads
     only the JSONL lines appended since the previous call and rewrites only
@@ -108,13 +111,13 @@ def _make_persist_fn(
     """
     provenance = _compute_persist_hash_inputs(config, dim_id)
     state = DispatchJsonlState()
-    target = CachePersistTarget(jsonl_path=jsonl, cache=cache, state=state)
+    target = CachePersistTarget(jsonl_path=cctx.jsonl, cache=cctx.cache, state=state)
 
     def _persist_now() -> None:
         if stop_event.is_set():
             state.reset()
         persist_dispatch_results(
-            config, dim_id, classify=classify, provenance=provenance, target=target,
+            config, dim_id, classify=cctx.classify, provenance=provenance, target=target,
         )
 
     return _persist_now

@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
-from quodeq.analysis._loop_state import _run_dir_for, _safe_write_dim_state
-from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
+from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
+from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
@@ -75,7 +75,7 @@ def _run_dry_run(
         # Dim states must move to DONE here just like the real loops: the
         # lifecycle flips anything still pending at exit to INCOMPLETE and
         # stamps the run exit_reason=incomplete_dimensions.
-        _safe_write_dim_state(run_dir, dimension, DimState.RUNNING, log=SHARED_LOG)
+        _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=SHARED_LOG)
         log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
         emit_marker("analyzing", dimension=dimension)
         ev = Evidence(
@@ -94,7 +94,7 @@ def _run_dry_run(
             jsonl_path.touch()
         emit_marker("scoring", dimension=dimension)
         result[dimension] = ev
-        _safe_write_dim_state(run_dir, dimension, DimState.DONE, log=SHARED_LOG)
+        _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.DONE), log=SHARED_LOG)
         if on_dimension_done:
             on_dimension_done(dimension, ev)
     return result
@@ -216,9 +216,7 @@ def _dispatch_fixed_mode(
         emit_marker("setup", dimensions=dimensions)
         return run_per_dimension_loop(
             config, dimensions, ctx,
-            runner=runner,
-            on_dimension_done=on_dimension_done,
-            log=SHARED_LOG,
+            LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
         )
     if config.options.incremental:
         # Default path. AnalysisOptions.incremental defaults to True so
@@ -228,9 +226,7 @@ def _dispatch_fixed_mode(
         emit_marker("setup", dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
-            runner=runner,
-            on_dimension_done=on_dimension_done,
-            log=SHARED_LOG,
+            LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
         )
     return None
 
@@ -263,9 +259,7 @@ def _run_dimensions(
 
     return run_per_dimension_loop(
         config, dimensions, ctx,
-        runner=runner,
-        on_dimension_done=on_dimension_done,
-        log=SHARED_LOG,
+        LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
     )
 
 

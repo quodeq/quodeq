@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from quodeq.ci._suppressions import filter_suppressed_violations
 from quodeq.ci.review_builder import (
+    ReviewOptions,
     build_review_summary,
     classify_violations,
     determine_verdict,
@@ -220,9 +221,7 @@ def _build_comments_and_outside_diff(
 def build_review_payload(
     reports: list[dict],
     baseline_violations: list[dict] | None = None,
-    duration_seconds: int | None = None,
-    baseline_available: bool = True,
-    artifact_url: str | None = None,
+    options: ReviewOptions | None = None,
     changed_lines: dict[str, set[int]] | None = None,
 ) -> dict:
     """Build the full GitHub PR review API payload from evaluation reports.
@@ -230,9 +229,10 @@ def build_review_payload(
     baseline_violations: violations from the last nightly evaluation on the base
     branch. When provided, current violations are classified as NEW or EXISTING.
     When omitted, all violations are treated as NEW.
-    baseline_available: when False, a note is added to the summary explaining
-    that no baseline comparison was made (first-run scenario).
-    artifact_url: when provided, a download link is appended to the summary.
+    options: run-level summary details (:class:`ReviewOptions`):
+    ``baseline_available`` False adds a note that no baseline comparison was
+    made (first-run scenario); ``artifact_url`` appends a download link;
+    ``duration_seconds`` adds the completion-time footer.
     changed_lines: when provided, review comments are filtered to only those
     whose path+line fall within the PR's changed hunks (GitHub rejects
     comments outside the diff with HTTP 422) -- see
@@ -255,9 +255,7 @@ def build_review_payload(
         reports,
         new_violations,
         existing_violations,
-        duration_seconds=duration_seconds,
-        baseline_available=baseline_available,
-        artifact_url=artifact_url,
+        options=options,
         outside_diff_violations=outside_diff_new,
     )
     verdict = determine_verdict(new_violations)

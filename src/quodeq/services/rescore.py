@@ -21,26 +21,29 @@ from quodeq.services import grade_formula
 from quodeq.services._rescore_legacy import _group_by_principle, _score_all_principles
 from quodeq.services.dismissed import recount_totals
 from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
-from quodeq.services.suppression import is_deleted, is_dismissed
+from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
+from quodeq.services.suppression_keys import SuppressionKeys
 
 
-def _filter_excluded_violations(
-    dim: DimensionResult, dismissed: set[tuple], deleted: set[tuple], rules: tuple,
-) -> list[Finding]:
+def _filter_excluded_violations(dim: DimensionResult, keys: SuppressionKeys) -> list[Finding]:
     """Violations minus anything dismissed or deleted."""
     dim_id = dim.dimension or ""
     return [
         v for v in dim.violations
-        if not is_dismissed(dismissed, req=v.req, principle=v.practice_id, rules=rules,
-                            file=v.file, line=v.line, snippet=v.snippet)
-        and not is_deleted(deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
+        if not is_dismissed(keys.dismissed, FindingRef(
+            req=v.req, principle=v.practice_id, file=v.file, line=v.line,
+            snippet=v.snippet), rules=keys.rules)
+        and not is_deleted(keys.deleted, dimension=dim_id, principle=v.practice_id, file=v.file)
     ]
+
+
+def _compliance_count(dim: DimensionResult) -> int:
+    return dim.totals.compliance_count if dim.totals else len(dim.compliance)
 
 
 def _rescore_from_evidence(
     dim: DimensionResult, filtered_violations: list[Finding],
-    dismissed: set[tuple], deleted: set[tuple],
-    run_dir: Path, params: ScoringParams, compliance_count: int,
+    keys: SuppressionKeys, run_dir: Path, params: ScoringParams,
 ) -> DimensionResult | None:
     """Recompute a dimension's score from its run evidence (single scoring
     basis, shared with the scan-time engine). Returns None when the run has
@@ -48,7 +51,7 @@ def _rescore_from_evidence(
     dim_id = dim.dimension or ""
     scores = score_dimension_from_evidence(
         run_dir, dim_id, EvidenceScoreRequest(
-            dismissed=dismissed, deleted=deleted,
+            dismissed=keys.dismissed, deleted=keys.deleted,
             source_file_count=dim.source_file_count or 0,
             files_read=dim.files_read or 0, params=params,
         ),
@@ -71,14 +74,13 @@ def _rescore_from_evidence(
         overall_score=(f"{overall.weighted_score}/10"
                        if overall.weighted_score is not None else None),
         overall_grade=overall.grade or overall.weighted_grade,
-        totals=recount_totals(filtered_violations, compliance_count=compliance_count,
+        totals=recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
                               files_read=dim.files_read),
     )
 
 
 def _rescore_legacy_fallback(
-    dim: DimensionResult, filtered_violations: list[Finding],
-    params: ScoringParams, compliance_count: int,
+    dim: DimensionResult, filtered_violations: list[Finding], params: ScoringParams,
 ) -> DimensionResult:
     """In-place rescore for a run/dimension with no evidence basis."""
     principles_violations = _group_by_principle(filtered_violations)
@@ -93,7 +95,7 @@ def _rescore_legacy_fallback(
     overall_score_str = f"{overall.weighted_score}/10" if overall.weighted_score is not None else None
     overall_grade = overall.grade or overall.weighted_grade
 
-    new_totals = recount_totals(filtered_violations, compliance_count=compliance_count,
+    new_totals = recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
                                 files_read=dim.files_read)
 
     return replace(
@@ -108,47 +110,38 @@ def _rescore_legacy_fallback(
 
 def _rescore_dimension(
     dim: DimensionResult,
-    dismissed: set[tuple],
-    deleted: set[tuple] | None = None,
+    keys: SuppressionKeys,
     params: ScoringParams = DEFAULT_PARAMS,
     *,
     run_dir: Path | None = None,
-    rules: tuple = (),
 ) -> DimensionResult:
-    """Rescore a single dimension after filtering dismissed and deleted findings.
+    """Rescore a single dimension after filtering the findings *keys* suppress.
 
     When *run_dir* is given and the run still has `<dim>_evidence.jsonl`, the
     score is recomputed by the scan-time engine over the evidence minus the
     excluded findings (single scoring basis). The legacy in-place formula
     (_rescore_legacy_fallback) is only a fallback for runs without evidence.
     """
-    deleted = deleted or set()
-    filtered_violations = _filter_excluded_violations(dim, dismissed, deleted, rules)
+    filtered_violations = _filter_excluded_violations(dim, keys)
     if len(filtered_violations) == len(dim.violations):
         return dim
 
-    compliance_count = dim.totals.compliance_count if dim.totals else len(dim.compliance)
-
     if run_dir is not None:
-        rescored = _rescore_from_evidence(
-            dim, filtered_violations, dismissed, deleted, run_dir, params, compliance_count,
-        )
+        rescored = _rescore_from_evidence(dim, filtered_violations, keys, run_dir, params)
         if rescored is not None:
             return rescored
 
-    return _rescore_legacy_fallback(dim, filtered_violations, params, compliance_count)
+    return _rescore_legacy_fallback(dim, filtered_violations, params)
 
 
 def rescore_dimensions(
     dimensions: list[DimensionResult],
-    dismissed_keys: set[tuple],
-    deleted_keys: set[tuple] | None = None,
+    keys: SuppressionKeys,
     params: ScoringParams | None = None,
     *,
     run_dir: Path | None = None,
-    rules: tuple = (),
 ) -> dict[str, Any]:
-    """Rescore all dimensions after filtering dismissed and deleted findings.
+    """Rescore all dimensions after filtering the findings *keys* suppress.
 
     Returns a dict with 'dimensions' (list of camelCase dicts) and 'summary' (camelCase dict).
     When *params* is None, the saved grade-formula params are loaded. When
@@ -158,8 +151,7 @@ def rescore_dimensions(
     if params is None:
         params = grade_formula.load_params()
     rescored = [
-        _rescore_dimension(dim, dismissed_keys, deleted_keys, params=params,
-                           run_dir=run_dir, rules=rules)
+        _rescore_dimension(dim, keys, params=params, run_dir=run_dir)
         for dim in dimensions
     ]
     summary = summarize_dimensions(rescored, params=params)

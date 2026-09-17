@@ -31,8 +31,8 @@ def test_scored_run_dimensions_uses_injected_deps(tmp_path):
     rescored = replace(raw, overall_score="9.0/10")
     calls = {}
 
-    def fake_rescore(d, dismissed, deleted, *, params, run_dir, rules=()):
-        calls["args"] = (d, dismissed, deleted, run_dir)
+    def fake_rescore(d, keys, *, params, run_dir):
+        calls["args"] = (d, keys.dismissed, keys.deleted, run_dir)
         return rescored
 
     deps = ScoringDeps(
@@ -71,7 +71,7 @@ def test_rescore_accumulated_uses_injected_rescorer(tmp_path):
     }
     seen = {}
 
-    def fake_runs_rescore(dims, root, project, dismissed, deleted, *, params):
+    def fake_runs_rescore(dims, root, project, keys, *, params):
         seen["dims"] = dims
         return {"security": {"overallScore": "8.0/10", "overallGrade": "Good"}}
 

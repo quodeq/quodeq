@@ -88,8 +88,6 @@ def _resolve_paths_and_build(
 
 def _start_action_api(
     config: DashboardConfig,
-    action_api_host: str,
-    action_api_port: int,
     api_config: ApiConfig,
     *,
     probes: ApiProbes | None = None,
@@ -97,10 +95,14 @@ def _start_action_api(
 ) -> tuple[str, "subprocess.Popen | None"]:
     """Resolve and start the action API, returning (url, process).
 
-    Handles both forced-port and auto-scan modes, including killing stale
-    processes when not in forced mode.
+    The API host and port come from ``config.server``: the host falls back to
+    the configured default, the port to the UI port. Handles both forced-port
+    and auto-scan modes, including killing stale processes when not in forced
+    mode.
     """
     hooks = hooks or DashboardHooks()
+    action_api_host = config.server.api_host or _get_default_host()
+    action_api_port = config.server.api_port or config.server.port
     if config.server.api_forced:
         return _ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=api_config.static_dist,
@@ -200,13 +202,9 @@ def _log_startup_banner(config: DashboardConfig) -> None:
 def _start_action_api_for(
     config: DashboardConfig, probes: ApiProbes | None, hooks: DashboardHooks,
 ) -> tuple[str, "subprocess.Popen | None"]:
-    action_api_host = config.server.api_host or _get_default_host()
-    action_api_port = config.server.api_port or config.server.port
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
     ensure_api = hooks.ensure_api or _start_action_api
-    return ensure_api(
-        config, action_api_host, action_api_port, api_config, probes=probes, hooks=hooks,
-    )
+    return ensure_api(config, api_config, probes=probes, hooks=hooks)
 
 
 def run_dashboard(

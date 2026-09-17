@@ -205,31 +205,30 @@ def _stamp_and_write_findings(
 
 
 def _write_findings(
-    jsonl: Path, findings: list[dict], *, append: bool,
+    jsonl: Path, classify: ClassifyResult, *, append: bool,
     emit_events: bool = True,
-    unconsolidated: list[dict] | None = None,
     trust_model: TrustModel | None = None,
-    writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
     """Replay cached findings into this run's evidence JSONL.
 
-    *findings* come from consolidated cache entries: a completed run already
-    put them in its report and the user has seen them in an Overview. Those
-    are stamped ``carried_forward`` so the live feed can hide them.
+    ``classify.cached_findings`` come from consolidated cache entries: a
+    completed run already put them in its report and the user has seen them
+    in an Overview. Those are stamped ``carried_forward`` so the live feed
+    can hide them.
 
-    *unconsolidated* come from entries no completed run has consolidated yet,
-    because the run that produced them was cancelled with "keep findings",
-    failed, or was killed. The user was never shown those in an Overview, so
-    they are written verbatim and read as this scan's own findings.
+    ``classify.unconsolidated_findings`` come from entries no completed run
+    has consolidated yet, because the run that produced them was cancelled
+    with "keep findings", failed, or was killed. The user was never shown
+    those in an Overview, so they are written verbatim and read as this
+    scan's own findings.
 
     Both groups are re-gated and both are mirrored to events.jsonl. Skipping
     the unconsolidated group in the event log would resurrect the UI-vs-CLI
     score disagreement that _emit_cached_findings exists to prevent.
     """
-    pending = list(unconsolidated or [])
+    findings = classify.cached_findings
+    pending = list(classify.unconsolidated_findings)
     _regate_replayed_findings(findings, pending, trust_model)
     stamped = _stamp_and_write_findings(jsonl, findings, pending, append=append)
     if emit_events:
-        _emit_cached_findings(
-            _events_log_path(jsonl), stamped, writer_factory=writer_factory,
-        )
+        _emit_cached_findings(_events_log_path(jsonl), stamped)

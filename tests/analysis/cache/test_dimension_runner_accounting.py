@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 
 from quodeq.analysis.cache import CacheEntry, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
     _make_callbacks,
@@ -59,8 +59,7 @@ class TestFilesReadReflectsAnalyzedCount:
         dispatcher = FakeDispatcher(src)
         ev = process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
 
         assert dispatcher.calls == [], "all-hits path must not dispatch"
@@ -109,8 +108,7 @@ class TestFilesReadReflectsAnalyzedCount:
 
         ev = process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=mixed_dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=mixed_dispatcher),
         )
 
         assert ev is not None
@@ -148,8 +146,7 @@ class TestFilesReadReflectsAnalyzedCount:
 
         ev = process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=failing_dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=failing_dispatcher),
         )
 
         assert ev is not None, (

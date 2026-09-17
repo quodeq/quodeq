@@ -14,16 +14,49 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
+
+if TYPE_CHECKING:
+    import subprocess
+
+    from quodeq.services._external_jobs import ProcessControl
 
 _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
+
+
+@dataclass(frozen=True, slots=True)
+class JobLaunchOptions:
+    """How ``JobManager.start_job`` spawns a command and what it records on the job.
+
+    ``cwd``/``env`` go to the subprocess; ``ai_provider``, ``ai_model`` and
+    ``time_limit_s`` are stored on the job so status readers (progress route,
+    UI) can report the run's client and budget.
+    """
+    cwd: str | None = None
+    env: dict[str, str] | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    time_limit_s: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class JobProcessSeams:
+    """Injection points for how ``JobManager`` spawns, probes and caps subprocesses.
+
+    Every field defaults to the production collaborator: ``subprocess.Popen``,
+    the signal-based ``ProcessControl``, and the ``QUODEQ_JOB_TIMEOUT_S``
+    env var for the hard duration cap.
+    """
+    spawn_impl: Callable[..., subprocess.Popen] | None = None
+    process_control: ProcessControl | None = None
+    job_timeout_cap_s: float | None = None
 
 
 @dataclass

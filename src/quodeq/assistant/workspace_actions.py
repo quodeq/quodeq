@@ -74,6 +74,14 @@ def apply_workspace(
         release_turn(sid)
 
 
+@dataclass(frozen=True, slots=True)
+class PrDraft:
+    """The pull request the user asked for: its title and body text."""
+
+    title: str
+    body: str
+
+
 @dataclass(frozen=True)
 class PrOutcome:
     """Result of a PR-creation attempt.
@@ -90,7 +98,7 @@ class PrOutcome:
 
 
 def create_workspace_pr(
-    repo: AssistantStore, sid: str, title: str, body: str,
+    repo: AssistantStore, sid: str, draft: PrDraft,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
 ) -> PrOutcome:
     """Commit, push, and open a PR from the worktree; advance the row to
@@ -104,7 +112,7 @@ def create_workspace_pr(
             return PrOutcome("not_active", detail=row["status"] if row else "gone")
         manager = _manager(row)
         try:
-            result = manager.create_pr(title, body)
+            result = manager.create_pr(draft.title, draft.body)
         except WorktreeError as exc:
             return PrOutcome("failed", detail=str(exc))
         if result.get("prUrl"):

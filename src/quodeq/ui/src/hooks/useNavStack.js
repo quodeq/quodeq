@@ -59,7 +59,7 @@ function makeNavPush(setNavStack, navStackRef, history, rememberEntry, startNavT
   };
 }
 
-function makeNavSwapAt(setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition) {
+function makeNavSwapAt({ setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition }) {
   return function navSwapAt(index, entry) {
     // Lateral move within one level of the path (the breadcrumb's sibling
     // menus): replace the entry at `index` and drop everything deeper.
@@ -130,7 +130,7 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     const steps = navStackRef.current.length - 1 - index;
     if (steps > 0) history.go(-steps);
   };
-  const navSwapAt = makeNavSwapAt(setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition);
+  const navSwapAt = makeNavSwapAt({ setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition });
   const navReset = makeNavReset(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
   const navTab = makeNavTab(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
 

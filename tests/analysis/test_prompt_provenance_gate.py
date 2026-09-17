@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
+from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
 from quodeq.analysis.mcp.provenance_gate import (
     EXTERNAL_SOURCE_TERMS,
     OPERATOR_CONTROLLED_TERMS,
@@ -94,11 +94,8 @@ def test_api_prompt_renders_provenance_gate_end_to_end(tmp_path):
     src = tmp_path / "sample.py"
     src.write_text("def f(x):\n    return open(x)\n", encoding="utf-8")
     prompt = assemble_api_prompt(
-        source_files=[src],
-        standards_text="",
-        dimension="security",
-        repo_name="sample",
-        repo_root=tmp_path,
+        source_files=[src], standards_text="", dimension="security",
+        project=ProjectBrief(name="sample", root=tmp_path),
     ).lower()
     assert "provenance" in prompt
     assert "attacker-controlled" in prompt
@@ -169,11 +166,8 @@ def test_internal_fixture_prompt_has_no_role_label(case):
     `(role:` label that would instruct the model to discount the finding.
     """
     prompt = assemble_api_prompt(
-        source_files=[case.source_file],
-        standards_text="",
-        dimension=case.expected["dimension"],
-        repo_name="provenance-gate-fixture",
-        repo_root=case.repo_dir,
+        source_files=[case.source_file], standards_text="", dimension=case.expected["dimension"],
+        project=ProjectBrief(name="provenance-gate-fixture", root=case.repo_dir),
     )
     assert "(role:" not in prompt
     assert "test_fixture" not in prompt

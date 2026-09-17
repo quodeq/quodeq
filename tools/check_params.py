@@ -8,11 +8,12 @@ gate runs green today while preventing NEW ones. Regenerate the baseline
 (only with justification) via:
     python tools/check_params.py --update-baseline
 
-Scans src/quodeq/**/*.py with `ast`, excluding vendored/generated dirs
-(see tools/_ratchet.py:EXCLUDE_DIRS). Positional, keyword-only, *args and
-**kwargs all count; `self`/`cls` on methods do not. Keys are
-`relpath:qualname` (e.g. `src/quodeq/x.py:Foo.m`, `src/quodeq/y.py:outer.inner`),
-not line-keyed, so edits above a grandfathered function do not churn the
+Scans src/quodeq/**/*.py and tools/**/*.py with `ast`, excluding
+vendored/generated dirs (see tools/_ratchet.py:EXCLUDE_DIRS). Positional,
+keyword-only, *args and **kwargs all count; `self`/`cls` on methods do not.
+Keys are `relpath:qualname` (e.g. `src/quodeq/x.py:Foo.m`,
+`src/quodeq/y.py:outer.inner`, `tools/_ratchet.py:run_cli`), not
+line-keyed, so edits above a grandfathered function do not churn the
 baseline. JS parameter counts are enforced separately by
 src/quodeq/ui/eslint.hygiene.config.js (`max-params`).
 """
@@ -28,6 +29,7 @@ import _ratchet
 MAX_PARAMS = 5
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PY_ROOT = REPO_ROOT / "src" / "quodeq"
+SCAN_ROOTS = (PY_ROOT, REPO_ROOT / "tools")
 BASELINE_PATH = Path(__file__).resolve().parent / "param_baseline.txt"
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
@@ -74,10 +76,15 @@ def iter_functions(tree: ast.Module) -> Iterator[tuple[str, FunctionNode, bool]]
     yield from visit(tree, "", False)
 
 
+def _iter_scan_files() -> Iterator[Path]:
+    for root in SCAN_ROOTS:
+        yield from _ratchet.iter_python_files(root)
+
+
 def _scan() -> list[Violation]:
     """Return sorted (relpath, qualname, count) for every over-limit function."""
     found: list[Violation] = []
-    for py in _ratchet.iter_python_files(PY_ROOT):
+    for py in _iter_scan_files():
         text = _ratchet.read_text(py)
         if text is None:
             continue
@@ -120,16 +127,15 @@ def write_baseline(path: Path = BASELINE_PATH) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    return _ratchet.run_cli(
-        argv,
+    return _ratchet.run_cli(argv, _ratchet.RatchetSpec(
         script_name="check_params.py",
+        noun="parameter-count",
         baseline_path=BASELINE_PATH,
         scan=_scan,
         violation_key=violation_key,
         update_baseline=write_baseline,
         describe=lambda v: f"{v[0]}:{v[1]} has {v[2]} parameters (max {MAX_PARAMS})",
-        noun="parameter-count",
-    )
+    ))
 
 
 if __name__ == "__main__":

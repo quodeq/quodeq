@@ -17,6 +17,7 @@ from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.run_reports import list_runs, read_run_data
 from quodeq.services.suppression import load_suppression_rules
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 RescoreStatus = Literal["ok", "invalid_param", "project_not_found", "run_not_found"]
@@ -94,6 +95,6 @@ def rescore_project_run(reports_root: Path, project: str, run_id: str) -> Rescor
     # *dimensions* were read from this one run, so its directory is the
     # evidence basis for the rescore.
     result = rescore_dimensions(
-        dimensions, dismissed, deleted, run_dir=Path(resolved_run_dir),
-        rules=load_suppression_rules(project_dir))
+        dimensions, SuppressionKeys(dismissed, deleted, load_suppression_rules(project_dir)),
+        run_dir=Path(resolved_run_dir))
     return RescoreOutcome("ok", result)

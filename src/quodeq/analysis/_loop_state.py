@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
@@ -12,10 +13,21 @@ from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
 
 
+@dataclass(frozen=True, slots=True)
+class DimTransition:
+    """Target dim state plus the reason fields ``write_dim_state`` records.
+
+    ``reason`` explains an INCOMPLETE transition; ``exit_reason`` qualifies a
+    DONE one. Both are optional and never used together.
+    """
+
+    state: DimState
+    reason: str | None = None
+    exit_reason: str | None = None
+
+
 def _safe_write_dim_state(
-    run_dir: Path | None, dim: str, state: DimState, *,
-    reason: str | None = None, exit_reason: str | None = None,
-    log: LogSink = NULL_LOG,
+    run_dir: Path | None, dim: str, transition: DimTransition, *, log: LogSink = NULL_LOG,
 ) -> None:
     """Best-effort dim-state write. Never raises into the loop.
 
@@ -32,7 +44,10 @@ def _safe_write_dim_state(
     except (TypeError, ValueError):
         return
     try:
-        write_dim_state(run_dir, dim, state, reason=reason, exit_reason=exit_reason)
+        write_dim_state(
+            run_dir, dim, transition.state,
+            reason=transition.reason, exit_reason=transition.exit_reason,
+        )
     except IllegalDimTransitionError as exc:
         log.warning(f"[loop] dim-state transition rejected: {exc}")
     except (OSError, AttributeError, TypeError) as exc:

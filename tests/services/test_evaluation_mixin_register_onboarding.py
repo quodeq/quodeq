@@ -6,6 +6,7 @@ _make_mixin) lives in tests/services/_evaluation_fixtures.py.
 import json
 from pathlib import Path
 
+from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project as _register_project
 from tests.services._evaluation_fixtures import _make_mixin
 
@@ -25,7 +26,7 @@ def test_start_evaluation_stamps_onboarding_completed(tmp_path):
     (repo / "main.py").write_text("print('hi')\n")
     reports = tmp_path / "reports"
     reports.mkdir()
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
     assert _read_info(reports, uuid)["onboardingCompletedAt"] is None
 
     _make_mixin().start_evaluation(str(repo), str(reports), EvaluationOptions())
@@ -43,7 +44,7 @@ def test_start_evaluation_preserves_existing_onboarding_stamp(tmp_path):
     (repo / "main.py").write_text("print('hi')\n")
     reports = tmp_path / "reports"
     reports.mkdir()
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
     info_path = reports / uuid / "repository_info.json"
     data = json.loads(info_path.read_text())
     data["onboardingCompletedAt"] = "2025-12-01T00:00:00Z"

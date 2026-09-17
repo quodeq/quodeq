@@ -7,7 +7,7 @@ helpers live in tests/analysis/_loops_safety_fixtures.py.
 """
 from __future__ import annotations
 
-from quodeq.analysis._loops import run_per_dimension_loop
+from quodeq.analysis._loops import LoopDeps, run_per_dimension_loop
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
 
@@ -38,7 +38,7 @@ class TestPerDimLoopSafety:
 
         result = run_per_dimension_loop(
             cfg, ["security", "usability", "flexibility"], _ctx(3),
-            runner=_runner_from(process_fn), on_dimension_done=on_done,
+            LoopDeps(runner=_runner_from(process_fn), on_dimension_done=on_done),
         )
         # All three dims iterated despite usability's callback raising.
         assert seen_dims == ["security", "usability", "flexibility"]
@@ -61,7 +61,7 @@ class TestPerDimLoopSafety:
 
         result = run_per_dimension_loop(
             cfg, ["security", "reliability", "performance"], _ctx(3),
-            runner=_runner_from(process_fn), on_dimension_done=on_done,
+            LoopDeps(runner=_runner_from(process_fn), on_dimension_done=on_done),
         )
         assert seen == ["security", "reliability", "performance"]
         assert set(result) == {"security", "reliability", "performance"}
@@ -78,7 +78,7 @@ class TestPerDimLoopSafety:
 
         result = run_per_dimension_loop(
             cfg, ["security", "reliability"], _ctx(2),
-            runner=_runner_from(process_fn),
+            LoopDeps(runner=_runner_from(process_fn)),
         )
         # Both iterations attempted; security skipped, reliability succeeds.
         assert seen == ["security", "reliability"]
@@ -89,8 +89,7 @@ class TestPerDimLoopSafety:
         cfg = _config()
         run_per_dimension_loop(
             cfg, ["a", "b"], _ctx(2),
-            runner=_runner_from(lambda *a: _FakeEvidence()),
-            log=recording_log,
+            LoopDeps(runner=_runner_from(lambda *a: _FakeEvidence()), log=recording_log),
         )
         messages = recording_log.info_messages
         # Loop start banner

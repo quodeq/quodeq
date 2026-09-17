@@ -9,6 +9,7 @@ model per process). All failures raise; callers own graceful degradation.
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 import httpx
@@ -25,6 +26,18 @@ BATCH_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
 QUERY_TIMEOUT = httpx.Timeout(connect=10.0, read=10.0, write=30.0, pool=10.0)
 
 ClientFactory = Callable[[], Any]
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingEndpoint:
+    """Where embeddings are served: the OpenAI-compatible base URL and its key.
+
+    *api_key* is optional because local providers ignore it; the client
+    falls back to the ``"ollama"`` placeholder the SDK requires.
+    """
+
+    base_url: str
+    api_key: str | None = None
 
 
 def _v1_base(base_url: str) -> str:
@@ -50,8 +63,7 @@ def embed_texts(
     texts: Sequence[str],
     *,
     model: str,
-    base_url: str,
-    api_key: str | None = None,
+    endpoint: EmbeddingEndpoint,
     timeout: httpx.Timeout | None = None,
     client_factory: ClientFactory | None = None,
 ) -> list[list[float]]:
@@ -68,7 +80,8 @@ def embed_texts(
             raise RuntimeError("openai package not installed")
 
         def client_factory() -> Any:
-            return openai.OpenAI(**_client_kwargs(base_url, api_key, timeout))
+            return openai.OpenAI(
+                **_client_kwargs(endpoint.base_url, endpoint.api_key, timeout))
 
     with client_factory() as client:
         resp = client.embeddings.create(model=model, input=list(texts))

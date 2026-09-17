@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexRow
+from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexEntry, IndexRow
 
 
 @pytest.fixture
@@ -20,8 +20,8 @@ def index(tmp_path: Path) -> ContentIndex:
 
 def _rec(index: ContentIndex, key: str, *, path: str, created: str, hash_: str = "aa" * 32,
          dim: str = "security", params: str = "") -> None:
-    index.record(key, content_hash=hash_, dimension=dim, params_hash=params,
-                 file_path=path, created_at=created)
+    index.record(IndexEntry(key=key, content_hash=hash_, dimension=dim, params_hash=params,
+                            file_path=path, created_at=created))
 
 
 def test_record_then_find_newest_first(index: ContentIndex):

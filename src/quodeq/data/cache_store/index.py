@@ -62,6 +62,22 @@ class IndexRow:
     created_at: str
 
 
+@dataclass(frozen=True, slots=True)
+class IndexEntry:
+    """One row to record: an entry's key plus the inputs it was written with."""
+
+    key: str
+    content_hash: str
+    dimension: str
+    params_hash: str
+    file_path: str
+    created_at: str
+
+    def as_row(self) -> tuple[str, str, str, str, str, str]:
+        return (self.key, self.content_hash, self.dimension, self.params_hash,
+                self.file_path, self.created_at)
+
+
 class ContentIndex:
     """Best-effort sqlite index over cache entries. See module docstring."""
 
@@ -123,11 +139,8 @@ class ContentIndex:
 
     # -- writes -----------------------------------------------------------
 
-    def record(
-        self, key: str, *, content_hash: str, dimension: str, params_hash: str,
-        file_path: str, created_at: str,
-    ) -> None:
-        self.record_many([(key, content_hash, dimension, params_hash, file_path, created_at)])
+    def record(self, entry: IndexEntry) -> None:
+        self.record_many([entry.as_row()])
 
     def record_many(self, rows: Iterable[tuple[str, str, str, str, str, str]]) -> None:
         """Insert or replace rows ``(key, content_hash, dimension, params_hash,

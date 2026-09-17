@@ -124,7 +124,7 @@ class TestProductionCallerReachesRealSink:
         monkeypatch.setattr(_md, "SHARED_LOG", log)
 
         result = _md._compute_on_miss_summary(
-            tmp_path, "proj", runs=[], params=None, visible_set=set(), version="v1",
+            tmp_path, "proj", runs=[], params=None, scope=_md._SummaryScope("v1", set()),
         )
 
         assert result == ("Good", 7.0, 3, False)

@@ -129,15 +129,12 @@ def _dim_exit_reason(record: dict | None) -> str | None:
     return None
 
 
-def _dim_evidence_tally(
-    dim_id: str, run_dir: Path, dismissed, deleted,
-    evaluators_dir: Path | None, compiled_dir: Path | None,
-):
+def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
     matcher = build_matcher(dim_id, dismissed, deleted)
     return tally_unique_findings(
-        dimension_evidence_file(run_dir, dim_id),
+        dimension_evidence_file(ctx.run_dir, dim_id),
         suppressed=matcher.is_suppressed if matcher.active else None,
-        resolver=build_principle_resolver(dim_id, evaluators_dir, compiled_dir,
+        resolver=build_principle_resolver(dim_id, ctx.evaluators_dir, ctx.compiled_dir,
                                           req_map_reader=read_req_to_principle_map),
     )
 
@@ -160,7 +157,7 @@ def _build_dim_progress(
     files_project_total = estimate_meta["total"] if estimate_meta else None
     files_excluded = estimate_meta["excluded"] if estimate_meta else None
 
-    tally = _dim_evidence_tally(dim_id, ctx.run_dir, dismissed, deleted, ctx.evaluators_dir, ctx.compiled_dir)
+    tally = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
     elapsed = _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record)
     active = _active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0
 

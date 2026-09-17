@@ -118,7 +118,6 @@ class RunLifecycleContext:
         job_id: str,
         dimensions: list[str],
         *,
-        heartbeat_interval: float = 5.0,
         ai_provider: str | None = None,
         ai_model: str | None = None,
     ) -> None:
@@ -129,7 +128,7 @@ class RunLifecycleContext:
             run_dir, job_id, dimensions,
             ai_provider=ai_provider, ai_model=ai_model,
         )
-        self._heartbeat = HeartbeatThread(run_dir, interval=heartbeat_interval)
+        self._heartbeat = HeartbeatThread(run_dir)
         self._resources = ResourceSampler()
         self._signals = _SignalGuard(self._handle_signal, log=_logger)
         self._atexit = _AtexitGuard(self._finalize_on_atexit)
@@ -287,10 +286,7 @@ class RunLifecycleContext:
 
     def _handle_signal(self, signum: int, frame: Any) -> None:
         """Write CANCELLED status, close out unfinished dims, then re-raise as SystemExit."""
-        _run_signal_shutdown(
-            self._run_dir, self._heartbeat, self._resources, self._status,
-            self._status.deadline_at, signum, log=_logger,
-        )
+        _run_signal_shutdown(self._heartbeat, self._resources, self._status, signum, log=_logger)
         self._current_state = RunState.CANCELLED
         raise SystemExit(128 + signum)
 

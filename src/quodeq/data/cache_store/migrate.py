@@ -30,7 +30,7 @@ import logging
 import os
 import shutil
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from quodeq.core.standards.overrides import (
@@ -96,10 +96,8 @@ def derive_params_hash(
         return ""
 
 def _index_row(entry: CacheEntry) -> tuple[str, str, str, str, str, str]:
-    return (
-        entry.key, entry.file_content_hash, entry.dimension, entry.params_hash,
-        entry.file_path, entry.created_at,
-    )
+    return (entry.key, entry.file_content_hash, entry.dimension, entry.params_hash,
+            entry.file_path, entry.created_at)
 
 def _remove_dir(entry_dir: Path) -> bool:
     try:
@@ -116,31 +114,39 @@ def _read_entry(entry_path: Path) -> CacheEntry | None:
         _logger.debug("cache maintenance: skipping unreadable entry %s: %s", entry_path, exc)
         return None
 
-def _migrate_v3(
-    entry: CacheEntry, entry_dir: Path, backend: LocalFileBackend,
-    standards_dir: Path | None, batch: list[tuple],
-    _cache: dict[tuple[str, str], dict] | None = None,
-) -> tuple[int, int]:
+@dataclass(frozen=True, slots=True)
+class _MigrationPass:
+    """State one ``migrate_entries`` walk shares with every ``_migrate_v3`` call."""
+    backend: LocalFileBackend
+    standards_dir: Path | None
+    batch: list[tuple] = field(default_factory=list)
+    cache: dict[tuple[str, str], dict] = field(default_factory=dict)
+
+    def flush(self) -> None:
+        if self.batch and self.backend.index is not None:
+            self.backend.index.record_many(self.batch)
+        self.batch.clear()
+
+def _migrate_v3(entry: CacheEntry, entry_dir: Path, run: _MigrationPass) -> tuple[int, int]:
     """Re-key one schema-3 entry. Returns (migrated, deduplicated) as 0/1."""
     params_hash = entry.params_hash or derive_params_hash(
-        entry.dimension, (entry.provenance or {}).get("effective_params") or {}, standards_dir,
-        _cache=_cache,
-    )
+        entry.dimension, (entry.provenance or {}).get("effective_params") or {},
+        run.standards_dir, _cache=run.cache)
     new_key = compute_key(CacheKey(
         schema_version=SCHEMA_VERSION, file_content_hash=entry.file_content_hash,
         file_path=entry.file_path, dimension=entry.dimension, params_hash=params_hash,
     ))
-    if backend.has(new_key):
+    if run.backend.has(new_key):
         _remove_dir(entry_dir)
         return 0, 1
     new_entry = replace(
         entry, key=new_key, schema_version=SCHEMA_VERSION, params_hash=params_hash,
         cache_format_version=ENTRY_FORMAT_VERSION,
     )
-    backend.put(new_key, new_entry, index=False)
-    if not backend.has(new_key):
+    run.backend.put(new_key, new_entry, index=False)
+    if not run.backend.has(new_key):
         return 0, 0  # write failed (logged by the backend); keep the old entry
-    batch.append(_index_row(new_entry))
+    run.batch.append(_index_row(new_entry))
     _remove_dir(entry_dir)
     return 1, 0
 
@@ -150,16 +156,8 @@ def migrate_entries(
     """Walk *root* once: migrate v3, index v4, reclaim older. See module doc."""
     if not root.exists():
         return MigrationStats()
-    backend = backend or LocalFileBackend(root=root)
-    index = backend.index
+    run = _MigrationPass(backend or LocalFileBackend(root=root), standards_dir)
     migrated = deduplicated = indexed = removed = skipped = 0
-    batch: list[tuple] = []
-    cache: dict[tuple[str, str], dict] = {}
-
-    def _flush() -> None:
-        if batch and index is not None:
-            index.record_many(batch)
-        batch.clear()
 
     for entry_path in list(root.rglob(_ENTRY_FILENAME)):
         entry = _read_entry(entry_path)
@@ -167,17 +165,17 @@ def migrate_entries(
             skipped += 1
             continue
         if entry.schema_version == SCHEMA_VERSION:
-            batch.append(_index_row(entry))
+            run.batch.append(_index_row(entry))
             indexed += 1
         elif entry.schema_version == SCHEMA_VERSION - 1:
-            m, d = _migrate_v3(entry, entry_path.parent, backend, standards_dir, batch, _cache=cache)
+            m, d = _migrate_v3(entry, entry_path.parent, run)
             migrated += m
             deduplicated += d
         elif _remove_dir(entry_path.parent):
             removed += 1
-        if len(batch) >= _BATCH:
-            _flush()
-    _flush()
+        if len(run.batch) >= _BATCH:
+            run.flush()
+    run.flush()
     return MigrationStats(
         migrated=migrated, deduplicated=deduplicated, indexed=indexed,
         removed=removed, skipped=skipped,

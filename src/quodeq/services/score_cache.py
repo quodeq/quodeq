@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.suppression_keys import as_dismissed_keys
+from quodeq.services.suppression_keys import SuppressionKeys, as_dismissed_keys
 from quodeq.services._run_version_memo import (  # noqa: F401 — facade re-export
     memoized_run_version,
     remember_run_version,
@@ -171,8 +171,7 @@ def per_run_versions(
     project_dir: Path, project: str, params: ScoringParams,
     runs: list[tuple[str, str]],
     *,
-    dismissed: set[tuple] | None = None,
-    deleted: set[tuple] | None = None,
+    keys: SuppressionKeys | None = None,
 ) -> list[tuple[str, str, str]]:
     """``(run_id, status, scoped_version)`` per run, from persisted/lazy run_keys.
 
@@ -180,10 +179,11 @@ def per_run_versions(
     folded into the accumulated version so a status transition invalidates the
     cache (see :func:`accumulated_cache_version`).
 
-    *dismissed* and *deleted* default to a fresh lookup (``dismissed_keys`` /
-    ``deleted_keys``) when omitted — an injection seam for tests, in place of
-    patching those module attributes (this function used to re-import both
-    names in its body on every call, which made such a patch a no-op).
+    *keys* (the project's dismissed and deleted sets) defaults to a fresh
+    lookup (``dismissed_keys`` / ``deleted_keys``) when omitted — an injection
+    seam for tests, in place of patching those module attributes (this
+    function used to re-import both names in its body on every call, which
+    made such a patch a no-op).
 
     Only TERMINAL runs persist their key sets: an in-progress run's findings
     table is still being written as dimensions finish, so its key set is partial.
@@ -198,11 +198,9 @@ def per_run_versions(
     its keys and the suppression state, so :func:`memoized_run_version` serves
     it while that state holds; ``_fill_pending_versions`` computes the rest.
     """
-    if dismissed is None:
-        dismissed = dismissed_keys(project_dir)
-    if deleted is None:
-        deleted = deleted_keys(project_dir)
-    inputs = _VersionInputs.of(params, dismissed, deleted)
+    if keys is None:
+        keys = SuppressionKeys(dismissed_keys(project_dir), deleted_keys(project_dir))
+    inputs = VersionInputs.of(params, keys.dismissed, keys.deleted)
     out: list[tuple[str, str, str]] = []
     pending: list[tuple[int, str, str]] = []
     for idx, (rid, status) in enumerate(runs):
@@ -216,7 +214,7 @@ def per_run_versions(
 
 
 @dataclass(frozen=True)
-class _VersionInputs:
+class VersionInputs:
     """Everything but a run's own keys that ``run_scoped_version`` depends on."""
 
     params: ScoringParams
@@ -227,13 +225,13 @@ class _VersionInputs:
     @classmethod
     def of(
         cls, params: ScoringParams, dismissed: "DismissedKeys | set[tuple]", deleted: set[tuple],
-    ) -> "_VersionInputs":
+    ) -> "VersionInputs":
         return cls(params, dismissed, deleted, suppression_state_fingerprint(params, dismissed, deleted))
 
 
 def _fill_pending_versions(
     out: list[tuple[str, str, str]], pending: list[tuple[int, str, str]],
-    project_dir: Path, project: str, inputs: _VersionInputs,
+    project_dir: Path, project: str, inputs: VersionInputs,
 ) -> None:
     """Compute the versions per_run_versions could not serve from the memo.
 

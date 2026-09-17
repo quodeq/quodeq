@@ -17,10 +17,35 @@ import cycle.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from fnmatch import fnmatch
 
 from quodeq.core.dismissals import EMPTY_DISMISSED, DismissedKeys
 from quodeq.core.types.suppression_rule import SuppressionRule
+
+
+@dataclass(frozen=True)
+class SuppressionKeys:
+    """Dismissed state, deleted violation keys and pattern rules for one project."""
+    dismissed: "DismissedKeys | frozenset | set[tuple]"
+    deleted: "frozenset | set[tuple]" = frozenset()
+    rules: "tuple[SuppressionRule, ...]" = ()
+
+
+@dataclass(frozen=True, slots=True)
+class FindingRef:
+    """The identity the dismiss store matches a finding on.
+
+    ``req`` falls back to ``principle`` when the finding has none. With a
+    ``snippet`` the match runs on its fingerprint; without one only ``line``
+    identifies the finding.
+    """
+
+    req: str | None
+    principle: str | None = ""
+    file: str | None = ""
+    line: object = 0
+    snippet: str | None = None
 
 
 def as_dismissed_keys(dismissed: "DismissedKeys | frozenset | set | None") -> DismissedKeys:
@@ -56,12 +81,10 @@ def matches_suppression_rule(
 
 
 def is_dismissed(
-    dismissed: "DismissedKeys | frozenset | set", *, req: str | None,
-    principle: str | None = "", file: str | None = "", line: object = 0,
-    snippet: str | None = None,
+    dismissed: "DismissedKeys | frozenset | set", ref: FindingRef, *,
     rules: "tuple[SuppressionRule, ...]" = (),
 ) -> bool:
-    """True when the dismiss store hides this finding.
+    """True when the dismiss store hides the finding *ref* describes.
 
     A finding's dismiss identity is its ``req``, falling back to its principle
     when it has none -- the same ``req || principle`` the UI stores
@@ -71,19 +94,20 @@ def is_dismissed(
     an empty req (see tests/assistant/test_dismiss_apply_e2e.py), so both
     forms are accepted.
 
-    Pass the finding's ``snippet``: with it the match runs on the snippet
-    fingerprint and survives the line shifts every refactor causes. Without
-    it only the line can identify the finding.
+    Pass the finding's ``snippet`` in *ref*: with it the match runs on the
+    snippet fingerprint and survives the line shifts every refactor causes.
+    Without it only the line can identify the finding.
     """
-    file_key = file or ""
+    file_key = ref.file or ""
     # Pattern rules are checked first and independently of the key store: a
     # rule stays true after a refactor shifts the line the exact key pinned.
-    if matches_suppression_rule(rules, req or principle or "", file_key):
+    if matches_suppression_rule(rules, ref.req or ref.principle or "", file_key):
         return True
     if not dismissed:
         return False
     return as_dismissed_keys(dismissed).matches(
-        req=req, principle=principle, file=file_key, line=line, snippet=snippet)
+        req=ref.req, principle=ref.principle, file=file_key, line=ref.line,
+        snippet=ref.snippet)
 
 
 def is_deleted(

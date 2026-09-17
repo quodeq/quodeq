@@ -42,7 +42,8 @@ function advanceFrameCamera(cam, fly, refs, scene, opts) {
 
 /** Drift the stars' world positions, then (outside a fly transition) keep
  * the focused-folder/zoomed-file preview anchors glued to their star. */
-function updateStarPositions(activeScene, t, W, H, fly, refs) {
+function updateStarPositions(activeScene, frame, fly, refs) {
+  const { t, W, H } = frame;
   activeScene.rootStars.forEach((s, i) => {
     const drift = Math.sin(t * DRIFT_SPEED_X + i * DRIFT_PHASE_X) * DRIFT_AMPLITUDE;
     s.x = W / 2 + s.ox + drift;
@@ -64,11 +65,13 @@ function updateStarPositions(activeScene, t, W, H, fly, refs) {
 /** The whole draw pass for one frame: background, nebula, starfield,
  * constellation lines, stars + labels. Skips drawing (but not scheduling
  * the next frame — the caller always does that) while a fly transition is
- * still nearly invisible. */
-function renderFrame(ctx, activeScene, cam, refs, t, w2s, showLabels, W, H, alphas) {
+ * still nearly invisible. `frame` is { W, H, t, cam, w2s, showLabels }, the
+ * per-frame bundle every draw* helper reads from. */
+function renderFrame(ctx, activeScene, frame, refs, alphas) {
+  const { w2s } = frame;
   const { sceneAlpha, bloomAlpha } = alphas;
   const { tc } = drawScene(ctx, activeScene, {
-    W, H, t, cam, w2s, showLabels, mouseRef: refs.mouseRef, flyRef: refs.flyRef,
+    ...frame, mouseRef: refs.mouseRef, flyRef: refs.flyRef,
     focusedFolderRef: refs.focusedFolderRef, canvasRef: refs.canvasRef,
   });
   const activeFly = refs.flyRef.current;
@@ -79,12 +82,12 @@ function renderFrame(ctx, activeScene, cam, refs, t, w2s, showLabels, W, H, alph
   ctx.globalAlpha = effectiveAlpha;
 
   const curNode = refs.navRef.current.path[refs.navRef.current.path.length - 1];
-  drawNebula(ctx, curNode, tc, W, H, t);
-  drawStarfield(ctx, activeScene.bg, tc, W, H, t);
+  drawNebula(ctx, curNode, tc, frame);
+  drawStarfield(ctx, activeScene.bg, tc, frame);
   drawConstellationLines(ctx, activeScene, tc, w2s);
 
   const { pendingLabels, newHovered } = drawStars(ctx, activeScene, {
-    t, cam, w2s, showLabels, mouseRef: refs.mouseRef, flyRef: refs.flyRef,
+    ...frame, mouseRef: refs.mouseRef, flyRef: refs.flyRef,
     focusedFolderRef: refs.focusedFolderRef, animRef: refs.animRef, tc,
   });
   drawLabels(ctx, pendingLabels, tc);
@@ -181,8 +184,9 @@ export function useGalaxyFolderCamera({ refs, scene, showLabels, saveNav, setNav
       const alphas = advanceFrameCamera(cam, fly, refs, scene, { W, H, getFitZoom, computeFocusCamera, saveNav, setNavVersion });
 
       const activeScene = refs.sceneRef.current || scene;
-      updateStarPositions(activeScene, t, W, H, fly, refs);
-      renderFrame(ctx, activeScene, cam, refs, t, w2s, showLabels, W, H, alphas);
+      const frameCtx = { W, H, t, cam, w2s, showLabels };
+      updateStarPositions(activeScene, frameCtx, fly, refs);
+      renderFrame(ctx, activeScene, frameCtx, refs, alphas);
 
       refs.frameRef.current = requestAnimationFrame(frame);
     }

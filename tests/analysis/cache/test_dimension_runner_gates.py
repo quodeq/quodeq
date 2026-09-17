@@ -12,7 +12,7 @@ from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache import CacheEntry, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
     _make_callbacks,
@@ -64,8 +64,7 @@ class TestCacheReplayAppliesProvenanceGate:
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
         assert dispatcher.calls == [], "all-hits path must not dispatch"
         return config, dispatcher
@@ -183,8 +182,7 @@ class TestCacheReplayAppliesScopeGate:
         dispatcher = FakeDispatcher(src)
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
         )
         assert dispatcher.calls == [], "all-hits path must not dispatch"
         return config

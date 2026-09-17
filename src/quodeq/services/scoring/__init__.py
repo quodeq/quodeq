@@ -30,6 +30,7 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._wiring import read_run_data
 from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 — facade re-export
 
@@ -95,10 +96,8 @@ def scored_run_dimensions(
         return dims
     run_dir = project_dir / run_id
     rescore = d.rescore_dimension or _rescore_dimension
-    return [
-        rescore(dim, dismissed, deleted, params=params, run_dir=run_dir, rules=rules)
-        for dim in dims
-    ]
+    keys = SuppressionKeys(dismissed, deleted, rules)
+    return [rescore(dim, keys, params=params, run_dir=run_dir) for dim in dims]
 
 
 def _make_rescoring_fetcher(
@@ -112,12 +111,9 @@ def _make_rescoring_fetcher(
     suppression readers come from *deps* (production defaults when None),
     plus the full-data base fetcher.
     """
-    d = deps or _NO_DEPS
     return make_rescoring_fetcher(
         reports_root, project, params=params,
-        base_fetcher=_make_run_dimension_fetcher(reports_root, project),
-        dismissed_keys=d.dismissed_keys or dismissed_keys,
-        deleted_keys=d.deleted_keys or deleted_keys,
+        base_fetcher=_make_run_dimension_fetcher(reports_root, project), deps=deps,
     )
 
 

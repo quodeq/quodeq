@@ -184,19 +184,29 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
         _logger.warning("checks: could not mirror findings to the event log", exc_info=True)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class CheckScope:
+    """What one deterministic-check pass covers: the project (``root``,
+    ``source_files``) and the standard it is judged against (``dimension``,
+    its ``compiled_dir`` and the optional ``evaluators_dir`` overlay).
+    """
+
+    root: Path
+    source_files: Sequence[str]
+    dimension: str
+    compiled_dir: Path | None
+    evaluators_dir: Path | None = None
+
+
 def apply_deterministic_checks(
     evidence: Evidence,
+    scope: CheckScope,
     *,
-    root: Path,
-    source_files: Sequence[str],
-    dimension: str,
-    compiled_dir: Path | None,
     jsonl_path: Path | None,
-    evaluators_dir: Path | None = None,
     trust_model: TrustModel | None = None,
     persist_fn: Callable[[Path, list[Judgment], list[dict]], None] | None = None,
 ) -> int:
-    """Run *dimension*'s checkers and fold the findings into *evidence*.
+    """Run ``scope.dimension``'s checkers and fold the findings into *evidence*.
 
     Returns how many findings were added. The evidence is updated before
     anything is written, so a persistence failure costs the run's record of
@@ -206,8 +216,9 @@ def apply_deterministic_checks(
     :func:`_persist`, the default): callers can substitute their own
     writer without this module touching it.
     """
+    dimension, compiled_dir, evaluators_dir = scope.dimension, scope.compiled_dir, scope.evaluators_dir
     judgments = deterministic_judgments(
-        root=root, source_files=source_files, dimension=dimension,
+        root=scope.root, source_files=scope.source_files, dimension=dimension,
         compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
     )
     if not judgments:
@@ -269,13 +280,15 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
         # keeps apply_scope_gate's no-op explicit -- resolve_trust_model would
         # degrade to CONSERVATIVE on None, which is a different statement.
         trust_model = resolve_trust_model(config.src) if config.src is not None else None
-        return apply_deterministic_checks(
-            evidence,
+        scope = CheckScope(
             root=Path(config.src),
             source_files=source_files,
             dimension=dimension,
             compiled_dir=(Path(standards_dir) / "compiled") if standards_dir else None,
             evaluators_dir=config.evaluators_dir,
+        )
+        return apply_deterministic_checks(
+            evidence, scope,
             jsonl_path=Path(evidence_dir) / f"{dimension}_evidence.jsonl",
             trust_model=trust_model,
         )

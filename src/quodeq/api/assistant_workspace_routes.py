@@ -14,7 +14,7 @@ from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
 from quodeq.api.helpers import error_response
 from quodeq.assistant.workspace_actions import (
-    apply_workspace, create_workspace_pr, discard_workspace)
+    PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
 _logger = logging.getLogger(__name__)
@@ -104,9 +104,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if row is None:
             return jsonify({"error": "no worktree"}), 404
         req_body = request.get_json(silent=True) or {}
+        draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
         outcome = create_workspace_pr(
-            repo, sid, str(req_body.get("title", "")), str(req_body.get("body", "")),
-            claim_turn=_try_claim_turn, release_turn=_release_turn)
+            repo, sid, draft, claim_turn=_try_claim_turn, release_turn=_release_turn)
         if outcome.kind == "turn_busy":
             return jsonify({"error": "a turn or workspace action is in progress;"
                             " wait for it to finish"}), 409

@@ -97,14 +97,13 @@ class FindingsRouter:
         self,
         output_fh: TextIO,
         context: CompiledContext | None = None,
-        seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
         event_log: "EventLogWriter | None" = None,
         on_file_done: "Callable[[str, list[dict]], None] | None" = None,
     ):
         self._fh = output_fh
         self._enricher = FindingEnricher(context or CompiledContext(), file_reader, log=SHARED_LOG)
-        self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
+        self._seen: DeduplicationStore = set()
         self._event_log: EventLogWriter | None = event_log
         self._on_file_done: "Callable[[str, list[dict]], None] | None" = on_file_done
         self._findings_by_file: dict[str, list[dict]] = {}

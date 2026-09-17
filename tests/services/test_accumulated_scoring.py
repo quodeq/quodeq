@@ -31,7 +31,7 @@ class TestZeroCoverageStubExcluded:
         fetch = {"r2": [stub], "r1": [real]}
         latest, _prev, _prev_run = _read_all_run_data(
             Path("/x"), "proj", [self._info("r2"), self._info("r1")],
-            ["r2", "r1"], get_run_data=lambda rid: fetch[rid],
+            get_run_data=lambda rid: fetch[rid],
         )
         assert latest["security"].overall_score == "6.0"
 
@@ -41,7 +41,7 @@ class TestZeroCoverageStubExcluded:
         legacy = _dim("security", "8.0", "A")  # no filesRead field
         fetch = {"r1": [legacy]}
         latest, _p, _pr = _read_all_run_data(
-            Path("/x"), "proj", [self._info("r1")], ["r1"],
+            Path("/x"), "proj", [self._info("r1")],
             get_run_data=lambda rid: fetch[rid],
         )
         assert latest["security"].overall_score == "8.0"

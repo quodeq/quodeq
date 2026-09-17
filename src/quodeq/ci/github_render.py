@@ -2,8 +2,22 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from quodeq.shared.serialization import coerce_line
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewOptions:
+    """Run-level details the review summary renders around the findings.
+
+    ``duration_seconds`` adds the "completed in" footer, ``baseline_available``
+    False adds the first-run note, ``artifact_url`` adds the download link.
+    """
+
+    duration_seconds: int | None = None
+    baseline_available: bool = True
+    artifact_url: str | None = None
 
 # Markdown and HTML control characters that untrusted finding text may carry.
 _MD_SPECIAL = re.compile(r"([\\`*_#\[\]<>|~])")
@@ -147,13 +161,13 @@ def build_review_summary(
     reports: list[dict],
     new_violations: list[dict],
     existing_violations: list[dict],
-    duration_seconds: int | None = None,
-    baseline_available: bool = True,
-    artifact_url: str | None = None,
+    options: ReviewOptions | None = None,
     outside_diff_violations: list[dict] | None = None,
 ) -> str:
     """Build the review body summarizing all dimension results.
 
+    options: run-level footer/note details (see :class:`ReviewOptions`);
+    omitted means defaults.
     outside_diff_violations: NEW violations whose file:line falls outside the
     PR's changed hunks. GitHub can't anchor an inline comment there, so they're
     listed in a dedicated section with file:line + description instead of being
@@ -161,6 +175,8 @@ def build_review_summary(
     only the in-diff (inline-anchorable) violations, so the number shown agrees
     with the inline comments actually posted.
     """
+    if options is None:
+        options = ReviewOptions()
     outside = outside_diff_violations or []
     _outside_ids = {id(v) for v in outside}
     # Count and break down only the violations shown as inline comments; the
@@ -175,18 +191,18 @@ def build_review_summary(
     )
 
     lines = ["## Quodeq Evaluation", ""]
-    lines += _score_summary_lines(reports, is_diff_mode, baseline_available)
+    lines += _score_summary_lines(reports, is_diff_mode, options.baseline_available)
     lines += _violation_breakdown_lines(new_violations, existing_violations, is_diff_mode)
     lines += _outside_diff_lines(outside)
 
-    if duration_seconds is not None:
-        minutes = duration_seconds // 60
-        seconds = duration_seconds % 60
+    if options.duration_seconds is not None:
+        minutes = options.duration_seconds // 60
+        seconds = options.duration_seconds % 60
         lines.append(f"_Evaluation completed in {minutes}m {seconds}s_")
 
-    if artifact_url is not None:
+    if options.artifact_url is not None:
         lines.append("")
-        lines.append(f"[Download full report]({artifact_url})")
+        lines.append(f"[Download full report]({options.artifact_url})")
 
     return "\n".join(lines)
 

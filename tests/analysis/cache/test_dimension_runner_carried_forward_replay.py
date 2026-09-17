@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.cache.entry import CacheEntry
 from tests.analysis.cache.conftest import (
     _make_callbacks,
@@ -50,8 +50,8 @@ def test_only_cache_replays_are_flagged(tmp_path: Path, cache):
         return _make_dummy_evidence(files_read=1)
 
     process_dimension_with_cache(
-        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        dispatcher=fake_dispatch,
+        config, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
     )
 
     jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
@@ -86,8 +86,8 @@ def test_all_unconsolidated_hits_are_still_written(tmp_path: Path, cache):
         return _make_dummy_evidence(files_read=1)
 
     process_dimension_with_cache(
-        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        dispatcher=fake_dispatch,
+        config, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
     )
 
     jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
@@ -122,8 +122,8 @@ def test_salvage_path_keeps_unconsolidated_hits_when_dispatch_returns_none(
         return None
 
     evidence = process_dimension_with_cache(
-        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        dispatcher=fake_dispatch,
+        config, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
     )
 
     assert evidence is not None, (
@@ -162,8 +162,8 @@ def test_three_way_split_carried_pending_and_fresh(tmp_path: Path, cache):
         return _make_dummy_evidence(files_read=1)
 
     process_dimension_with_cache(
-        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
-        dispatcher=fake_dispatch,
+        config, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
     )
 
     jsonl_path = (config.work_dir or config.src) / "security_evidence.jsonl"
@@ -192,7 +192,8 @@ def test_replayed_unconsolidated_keys_sidecar_is_written_on_the_all_hits_path(
     ))
 
     process_dimension_with_cache(
-        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        config, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
     )
 
     sidecar = (config.work_dir or config.src) / "security_replayed_unconsolidated_keys.json"
@@ -213,7 +214,8 @@ def test_no_sidecar_when_every_hit_is_already_consolidated(tmp_path: Path, cache
     ))
 
     process_dimension_with_cache(
-        config, "security", 1, _make_ctx(), _make_callbacks(), cache=cache,
+        config, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
     )
 
     sidecar = (config.work_dir or config.src) / "security_replayed_unconsolidated_keys.json"
@@ -266,8 +268,8 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
     # A cancelled run never calls mark_run_consolidated.
     config1, run_dir1 = _run_config("run1")
     process_dimension_with_cache(
-        config1, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
-        dispatcher=fake_dispatch,
+        config1, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=shared_cache, dispatcher=fake_dispatch),
     )
     (run_dir1 / "status.json").write_text(json.dumps({"state": "cancelled"}))
     mark_run_consolidated(run_dir1, shared_cache)  # no-op: not done
@@ -275,7 +277,8 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
     # Run 2: a.py is now a cache hit, but an UNCONSOLIDATED one.
     config2, run_dir2 = _run_config("run2")
     process_dimension_with_cache(
-        config2, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
+        config2, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=shared_cache),
     )
     assert _titles_with_flag(config2) == {"found-a": False}, (
         "a cancelled run's findings must still read as new"
@@ -288,7 +291,8 @@ def test_cancelled_run_findings_stay_new_until_a_run_completes(tmp_path: Path):
     # Run 3: the same hit now reads as carried forward.
     config3, _run_dir3 = _run_config("run3")
     process_dimension_with_cache(
-        config3, "security", 1, _make_ctx(), _make_callbacks(), cache=shared_cache,
+        config3, "security", 1, _make_ctx(),
+        opts=CacheRunOptions(callbacks=_make_callbacks(), cache=shared_cache),
     )
     assert _titles_with_flag(config3) == {"found-a": True}, (
         "a completed run consolidated these findings; they are carried now"

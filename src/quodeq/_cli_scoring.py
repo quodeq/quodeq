@@ -18,14 +18,15 @@ import re
 from pathlib import Path
 
 from quodeq.config.evidence_env import cwe_url_template
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.evidence_rescore import EvidenceScoreRequest, standard_dirs
-from quodeq.services.suppression import is_deleted, is_dismissed
+from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 _logger = logging.getLogger(__name__)
@@ -63,12 +64,13 @@ def _count_excluded_findings(
         evidence = parse_jsonl_to_evidence(jsonl, EvidenceContext(
             language="", repository="", date_str="",
             source_file_count=0, files_read=0,
-        ), compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
+        ), EvidenceParseOptions(
+            compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
             req_map_reader=read_req_to_principle_map,
             refs_reader=load_compiled_refs,
             cwe_url_template=cwe_url_template(),
             on_quarantine=log_quarantined_findings,
-            on_malformed_line=log_malformed_jsonl_line)
+            on_malformed_line=log_malformed_jsonl_line))
     except (OSError, ValueError, KeyError):
         return 0
     if evidence is None:
@@ -77,9 +79,9 @@ def _count_excluded_findings(
     count = 0
     for pe in evidence.principles.values():
         for v in pe.violations:
-            if is_dismissed(dismissed, req=v.get("req"), principle=pe.practice_id,
-                            file=v.get("file"), line=v.get("line"),
-                            snippet=v.get("snippet")) \
+            if is_dismissed(dismissed, FindingRef(
+                    req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
+                    line=v.get("line"), snippet=v.get("snippet"))) \
                     or is_deleted(deleted, dimension=dim_id,
                                   principle=pe.practice_id, file=v.get("file")):
                 count += 1

@@ -151,10 +151,12 @@ def _seed_dimension_states(
 
 
 def _run_signal_shutdown(
-    run_dir: Path, heartbeat: Any, resources: Any, status: Any,
-    deadline_at: str | None, signum: int, *, log: LogSink,
+    heartbeat: Any, resources: Any, status: Any, signum: int, *, log: LogSink,
 ) -> None:
     """Write CANCELLED status and close out unfinished dims for a caught signal.
+
+    ``status`` is the run's ``_StatusWriter``: it supplies the run dir the
+    dim states live in and the deadline the signal is judged against.
 
     A signal landing AFTER the run's own deadline is the watchdog enforcing
     the time budget (SIGTERM at deadline+grace), not a user cancel. Label it
@@ -179,14 +181,14 @@ def _run_signal_shutdown(
         name = signal.Signals(signum).name
     except ValueError:
         name = f"signal_{signum}"
-    deadline_enforced = _deadline_has_passed(deadline_at)
+    deadline_enforced = _deadline_has_passed(status.deadline_at)
     exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
     cancellation.request_cancel()
     heartbeat.stop()
     resources.stop()
     status.write(RunState.CANCELLED, exit_reason=exit_reason)
     _mark_unfinished_dims_incomplete(
-        run_dir, "time_limit" if deadline_enforced else "cancelled", log=log)
+        status.run_dir, "time_limit" if deadline_enforced else "cancelled", log=log)
 
 
 def _finalize_run_on_atexit(

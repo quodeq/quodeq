@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import DEFAULT_PARAMS
@@ -122,9 +123,11 @@ def test_quarantined_findings_stay_excluded_from_rescore(tmp_path, monkeypatch):
             tmp_path / "evidence" / f"{DIM}_evidence.jsonl",
             EvidenceContext(language="", repository="", date_str="",
                             source_file_count=10, files_read=5),
-            compiled_dir=default_paths().standards_dir / "compiled",
-            evaluators_dir=default_paths().evaluators_dir,
-            req_map_reader=read_req_to_principle_map,
+            EvidenceParseOptions(
+                compiled_dir=default_paths().standards_dir / "compiled",
+                evaluators_dir=default_paths().evaluators_dir,
+                req_map_reader=read_req_to_principle_map,
+            ),
         ),
         mode="numerical", params=DEFAULT_PARAMS,
     )

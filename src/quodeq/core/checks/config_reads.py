@@ -16,7 +16,7 @@ from collections.abc import Sequence
 
 from quodeq.core.checks._judgments import compliance, violation
 from quodeq.core.checks.layers import inner_layer_files
-from quodeq.core.checks.model import ImportGraph, SymbolUse, top_level
+from quodeq.core.checks.model import ImportGraph, SourceLocation, SymbolUse, top_level
 from quodeq.core.events.models import Judgment
 
 REQ = "CLEA-DEP-07"
@@ -62,7 +62,7 @@ def _build_config_read_judgments(
 ) -> list[Judgment]:
     judgments = [
         violation(
-            req=REQ, dimension=dimension, file=file, line=line,
+            req=REQ, dimension=dimension, at=SourceLocation(file, line),
             title=f"Inner layer reads configuration via '{source}'",
             reason=(
                 f"This file is in an inner layer and reads configuration "

@@ -99,8 +99,9 @@ describe('galaxyFolderDraw smoke coverage (pre-refactor baseline)', () => {
     const ctx = makeMockCtx(calls);
     const scene = makeScene();
     const tc = { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } };
-    expect(() => drawNebula(ctx, scene.rootStars[0], tc, 800, 600, 0)).not.toThrow();
-    expect(() => drawStarfield(ctx, scene.bg, tc, 800, 600, 0)).not.toThrow();
+    const frame = { W: 800, H: 600, t: 0 };
+    expect(() => drawNebula(ctx, scene.rootStars[0], tc, frame)).not.toThrow();
+    expect(() => drawStarfield(ctx, scene.bg, tc, frame)).not.toThrow();
     expect(() => drawConstellationLines(ctx, scene, tc, makeW2s())).not.toThrow();
     expect(calls.length).toBeGreaterThan(0);
   });

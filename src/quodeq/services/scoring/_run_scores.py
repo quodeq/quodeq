@@ -30,15 +30,16 @@ def _resolve_cache_max(env: dict[str, str] | None = None) -> int:
 
 def get_run_dimensions(
     reports_root: Path, project: str, run_id: str,
-    *, cache: OrderedDict | None = None,
-    cache_lock: threading.Lock | None = None,
-    cache_max: int | None = None,
+    *, ctx: DimensionCacheContext | None = None,
     env: dict[str, str] | None = None,
 ) -> list[DimensionResult]:
-    """Return dimension data for a single run, using the shared LRU cache."""
-    c = cache if cache is not None else _cache
-    lk = cache_lock if cache_lock is not None else _cache_lock
-    ceiling = cache_max if cache_max is not None else _resolve_cache_max(env)
-    ctx = DimensionCacheContext(cache=c, lock=lk, max_size=ceiling)
+    """Return dimension data for a single run, using the shared LRU cache.
+
+    *ctx* replaces the module-level cache, lock and ceiling with the caller's
+    own; without it the ceiling comes from ``QUODEQ_DEFAULT_CACHE_MAX`` in
+    *env* (``os.environ`` when None).
+    """
+    if ctx is None:
+        ctx = DimensionCacheContext(cache=_cache, lock=_cache_lock, max_size=_resolve_cache_max(env))
     fetcher = make_lru_dimension_fetcher(reports_root, project, ctx)
     return fetcher(run_id)

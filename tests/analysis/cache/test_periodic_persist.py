@@ -26,7 +26,7 @@ import pytest
 
 from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache import LocalFileBackend, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
 from quodeq.core.evidence.model import Evidence
@@ -111,8 +111,8 @@ class TestWatcherStartsAndStops:
             )
 
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(),
-            cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05),
         )
 
         # Final state: cache entry exists (final persist after dispatch).
@@ -167,8 +167,8 @@ class TestHashInputsHoistedOncePerDispatch:
             ),
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05),
             )
 
         # Multiple ticks (~0.3s / 0.05s interval) plus the final persist all
@@ -198,8 +198,8 @@ class TestWatcherSurvivesDispatchException:
 
         with pytest.raises(RuntimeError, match="simulated cancel"):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache, dispatcher=crashing_dispatcher, persist_interval_s=60.0,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=crashing_dispatcher, persist_interval_s=60.0),
             )
 
         # No ok marker emitted → orphaned findings must NOT be cached.
@@ -241,8 +241,8 @@ class TestNoWatcherWhenNoMisses:
             new=tracking_thread,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
             )
 
         # All-hits path → no watcher thread started.
@@ -306,9 +306,8 @@ class TestTicksAreIncremental:
         counting = _FirstPutCache(cache)
 
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=counting,
-            dispatcher=_dispatch_after_first_put(_FINDING_A + _OK_A, counting.first_put),
-            persist_interval_s=0.05,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=counting, dispatcher=_dispatch_after_first_put(_FINDING_A + _OK_A, counting.first_put), persist_interval_s=0.05),
         )
 
         assert counting.put_count == 2
@@ -321,9 +320,8 @@ class TestFinalPersistIsFullReread:
         config = _setup(tmp_path, {"a.py": "x"})
         wrapped = _FirstPutCache(cache, swallow_first=swallow_first)
         process_dimension_with_cache(
-            config, "security", 1, _make_ctx(), _make_callbacks(), cache=wrapped,
-            dispatcher=_dispatch_after_first_put(text, wrapped.first_put, after_tick),
-            persist_interval_s=0.05,
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=wrapped, dispatcher=_dispatch_after_first_put(text, wrapped.first_put, after_tick), persist_interval_s=0.05),
         )
         return cache.get(build_cache_key_for_file(config, "a.py", "security"))
 
