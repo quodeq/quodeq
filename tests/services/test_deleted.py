@@ -175,6 +175,10 @@ def test_sweep_emits_per_run_instead_of_accumulating_all_runs_first(tmp_path: Pa
         def emit(self, event):
             emitted_after_first_run.append(event)
 
+        def emit_many(self, events):
+            for event in events:
+                self.emit(event)
+
     count = _sweep_dismissed_matching(
         project_dir, ("maintainability", "Modularity", "a.py"),
         writer=_RecordingLog(),
@@ -223,6 +227,10 @@ def test_sweep_never_holds_more_than_one_runs_matches_at_once(tmp_path: Path, mo
             # Tag emit with the req from the event payload for identification.
             req = getattr(event.payload, "req", "?")
             event_order.append(("emit", req))
+
+        def emit_many(self, events):
+            for event in events:
+                self.emit(event)
 
     deleted_mod._sweep_dismissed_matching(
         project_dir, ("maintainability", "Modularity", "a.py"), writer=_RecordingLog(),

@@ -182,10 +182,10 @@ def test_restore_all_findings_uses_injected_writer(tmp_path: Path) -> None:
     mock_writer = Mock()
     count = restore_all_findings(project_dir, writer=mock_writer)
 
-    # Verify the mock writer's emit method was called for each dismissed finding
+    # One batch carries every undismiss; nothing goes through the default writer.
     assert count == 2
-    assert mock_writer.emit.call_count == 2
-    # Verify all events were called with the right type
-    for call in mock_writer.emit.call_args_list:
-        event = call[0][0]
+    mock_writer.emit_many.assert_called_once()
+    (events,) = mock_writer.emit_many.call_args[0]
+    assert len(list(events)) == 2
+    for event in events:
         assert "FindingUndismissedEvent" in str(type(event))

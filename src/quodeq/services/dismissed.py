@@ -170,10 +170,11 @@ def restore_all_findings(project_dir: Path, *, writer: ActionLog | None = None) 
     if not state:
         return 0
     log = writer or ActionLogWriter(project_dir)
-    for entry in state.entries:
-        payload = FindingUndismissed(
-            req=entry.req, file=entry.file, line=entry.line, fingerprint=entry.fingerprint)
-        log.emit(FindingUndismissedEvent(payload=payload))
+    log.emit_many([
+        FindingUndismissedEvent(payload=FindingUndismissed(
+            req=entry.req, file=entry.file, line=entry.line, fingerprint=entry.fingerprint))
+        for entry in state.entries
+    ])
     return len(state)
 
 

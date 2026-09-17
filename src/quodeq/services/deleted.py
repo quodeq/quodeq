@@ -109,18 +109,18 @@ def delete_all_dismissed(project_dir: Path, *, writer: ActionLog | None = None) 
             existing.append(_entry_from_finding(entry))
             existing_keys.add(k)
         write_deleted_entries(project_dir, existing)
-        # Undismiss all via the action log.
-        count = len(dismissed_entries)
+        # Undismiss all via the action log, in one write.
         log = writer or ActionLogWriter(project_dir)
-        for entry in dismissed_entries:
-            payload = FindingUndismissed(
+        log.emit_many([
+            FindingUndismissedEvent(payload=FindingUndismissed(
                 req=entry.get("req", ""),
                 file=entry.get("file", ""),
                 line=int(entry.get("line", 0)),
                 fingerprint=entry.get("fingerprint") or None,
-            )
-            log.emit(FindingUndismissedEvent(payload=payload))
-        return count
+            ))
+            for entry in dismissed_entries
+        ])
+        return len(dismissed_entries)
 
 
 def _sweep_dismissed_matching(
@@ -130,10 +130,11 @@ def _sweep_dismissed_matching(
 
     Reads from each run's evaluation.db (via the data layer's
     ``find_dismissed_matching``) to find dismissed findings that match the
-    deletion key, emitting events per run as they're found instead of
-    accumulating every run's matches in memory before emitting any —
-    bounds peak memory to one run's matches at a time on projects with a
-    large run history.
+    deletion key, appending one batch of events per run as its matches are
+    found instead of accumulating every run's matches in memory before
+    writing any -- bounds peak memory to one run's matches at a time on
+    projects with a large run history, and opens the log once per run
+    rather than once per row.
 
     Each dismissed row is mapped back to the actions-log entries that hide
     it (any identity form, see ``finding_dismiss_keys``) so the undismiss
@@ -150,6 +151,7 @@ def _sweep_dismissed_matching(
     for run_dir in project_dir.iterdir():
         if not run_dir.is_dir():
             continue
+        events: list[FindingUndismissedEvent] = []
         for req, f, line, practice_id, snippet in find_dismissed_matching(
             run_dir, dimension=dimension, practice_id=principle, file=file,
         ):
@@ -160,12 +162,15 @@ def _sweep_dismissed_matching(
                 # SQL says dismissed but the log has no entry (stale
                 # projection): release the row by its own identity.
                 targets = [DismissedEntry(req, f, line, snippet_fingerprint(req, snippet))]
-            for entry in targets:
-                payload = FindingUndismissed(
+            events.extend(
+                FindingUndismissedEvent(payload=FindingUndismissed(
                     req=entry.req, file=entry.file, line=entry.line,
-                    fingerprint=entry.fingerprint)
-                log.emit(FindingUndismissedEvent(payload=payload))
-                count += 1
+                    fingerprint=entry.fingerprint))
+                for entry in targets
+            )
+        if events:
+            log.emit_many(events)
+            count += len(events)
     return count
 
 
