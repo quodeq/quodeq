@@ -8,6 +8,4 @@
 // file size). Paths are relative to src/quodeq/ui, posix-separated. The
 // list may only shrink: split a file, then remove its entry here
 // (tools/check_size_grandfather.mjs enforces the ceiling).
-export const SIZE_GRANDFATHER = [
-  "src/hooks/useAppState.js",
-];
+export const SIZE_GRANDFATHER = [];

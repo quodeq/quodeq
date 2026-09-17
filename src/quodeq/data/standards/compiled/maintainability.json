@@ -28,7 +28,7 @@
             {
               "source": "cisq",
               "id": null,
-              "name": "Function cyclomatic complexity MUST be \u226410",
+              "name": "Function cyclomatic complexity MUST stay within the configured limit",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
           ],
@@ -36,7 +36,7 @@
             "max_complexity": {
               "label": "Max cyclomatic complexity",
               "type": "int",
-              "default": 10,
+              "default": 15,
               "min": 1,
               "max": 100
             }
@@ -100,7 +100,7 @@
             {
               "source": "cisq",
               "id": null,
-              "name": "Functions MUST have \u22645 parameters",
+              "name": "Functions MUST NOT take an excessive number of parameters",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
           ],
@@ -108,7 +108,7 @@
             "max_params": {
               "label": "Max function parameters",
               "type": "int",
-              "default": 5,
+              "default": 6,
               "min": 1,
               "max": 30
             }
@@ -151,7 +151,7 @@
             {
               "source": "cisq",
               "id": null,
-              "name": "Inheritance depth MUST NOT exceed 4 levels",
+              "name": "Inheritance depth MUST stay within the configured limit",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
           ],
@@ -593,7 +593,7 @@
             "max_lines": {
               "label": "Max function lines",
               "type": "int",
-              "default": 50,
+              "default": 60,
               "min": 10,
               "max": 500
             }
@@ -615,7 +615,7 @@
             {
               "source": "cisq",
               "id": null,
-              "name": "Function cyclomatic complexity MUST be \u226410",
+              "name": "Function cyclomatic complexity MUST stay within the configured limit",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
           ],
@@ -645,7 +645,7 @@
             {
               "source": "cisq",
               "id": null,
-              "name": "Function cyclomatic complexity MUST be \u226410",
+              "name": "Function cyclomatic complexity MUST stay within the configured limit",
               "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]

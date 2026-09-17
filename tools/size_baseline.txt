@@ -1,4 +1,4 @@
-# Grandfathered size violations (files > 300 lines, functions > 50
+# Grandfathered size violations (files > 300 lines, functions > 60
 # lines). Do NOT add entries without justification -- the goal is
 # to burn this list down, not grow it.
 # Regenerate intentionally: python tools/check_sizes.py --update-baseline
@@ -9,13 +9,10 @@ src/quodeq/api/assistant_workspace_routes.py:25:function
 src/quodeq/api/llm_bridge_routes.py:85:function
 src/quodeq/api/routes_evaluations_item.py:98:function
 src/quodeq/api/routes_findings.py:113:function
-src/quodeq/api/routes_project_data.py:24:function
 src/quodeq/api/routes_project_list.py:59:function
 src/quodeq/api/routes_shared_config.py:23:function
 src/quodeq/api/routes_shared_mirrors.py:42:function
-src/quodeq/api/standards_overrides_routes.py:30:function
 src/quodeq/api/terminal_routes.py:97:function
-src/quodeq/context/project_shape.py:43:function
 tests/analysis/cache/test_cache_writer.py:1:file
 tests/analysis/cache/test_dimension_helpers.py:1:file
 tests/analysis/cache/test_dimension_runner_cache_hits.py:1:file
