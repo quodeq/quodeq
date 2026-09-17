@@ -6,12 +6,33 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
+
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
     """Build a standardized error response tuple for Flask endpoints."""
     return {"error": message, "code": code}, status
+
+
+def _json_object_or_error(
+    code: str = ERROR_CODE_BAD_REQUEST,
+) -> dict[str, Any] | tuple[dict[str, Any], int]:
+    """Return the request's JSON object body, or a 400 error tuple.
+
+    A bare ``request.get_json(force=True)`` raises on an unparseable body
+    (answering with Werkzeug's default HTML 400 page) and hands back a list
+    for ``[]``, whose ``.get`` then raises AttributeError and answers 500.
+    The POST handlers share this so a non-JSON and a non-object body both
+    come back through their own ``{"error", "code"}`` shape.
+    """
+    payload = request.get_json(force=True, silent=True)
+    if payload is None:
+        return error_response("request body must be JSON", HTTPStatus.BAD_REQUEST, code)
+    if not isinstance(payload, dict):
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, code)
+    return payload
 
 
 def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:

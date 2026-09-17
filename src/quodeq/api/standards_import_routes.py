@@ -6,11 +6,11 @@ import logging
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN
-from quodeq.api.helpers import _sanitize_for_log, error_response
-from quodeq.services.import_validator import validate_import
+from quodeq.api.helpers import _json_object_or_error, _sanitize_for_log, error_response
+from quodeq.services.import_validator import StandardImportValidationError
 from quodeq.services.standards_library import StandardImportConflictError
 from quodeq.shared.serialization import to_camel_dict
 
@@ -21,7 +21,9 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
     library = get_library_client(app)
     if library is None:
         return error_response("Standards library not configured", HTTPStatus.BAD_REQUEST, "library_not_configured")
-    payload = request.get_json(force=True)
+    payload = _json_object_or_error()
+    if not isinstance(payload, dict):
+        return payload
     file_path = payload.get("file")
     if not file_path:
         return error_response("file is required", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
@@ -54,29 +56,38 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
 
 def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     svc = get_service(app)
-    payload = request.get_json(force=True)
+    payload = _json_object_or_error()
+    if not isinstance(payload, dict):
+        return payload
     data = payload.get("data")
     if not data or not isinstance(data, dict):
         return error_response("'data' field is required and must be an object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     force = payload.get("force", False)
-    logger.info("standards.import id=%s", _sanitize_for_log(str(data.get("id", "<unknown>"))))
+    imported_id = data.get("id", "<unknown>")
+    logger.info("standards.import id=%s", _sanitize_for_log(str(imported_id)))
     try:
         result = svc.import_from_file(data, force=force)
-    except ValueError as exc:
-        # import_from_file's ValueError text is exactly "; ".join(the same
-        # validate_import(data)["errors"] list) -- but this module never
-        # echoes caught-exception text into a response (see
-        # tests/api/test_no_exception_echo.py). Re-run the same pure,
-        # non-raising checker import_from_file uses internally to get the
-        # specific field-level reasons directly from `data`, not from
-        # `exc`, instead of the bare "Invalid import data" this used to be.
+    except StandardImportValidationError as exc:
+        # The validator's own field-level reasons, carried on the error
+        # itself. Re-running validate_import in this handler reported every
+        # ValueError raised AFTER validation passed (scan_injection, a
+        # corrupt existing file) as "schema validation failed".
+        # ``public_message`` is the hand-written text, not str(exc): this
+        # module never echoes caught-exception text into a response (see
+        # tests/api/test_no_exception_echo.py).
         logger.warning("standards.import validation error: %s", exc)
-        imported_id = data.get("id", "<unknown>")
-        validation = validate_import(data)
-        reasons = "; ".join(validation["errors"]) if validation["errors"] else "schema validation failed"
         return error_response(
-            f"Invalid import data for standard {imported_id!r}: {reasons}",
+            f"Invalid import data for standard {imported_id!r}: {exc.public_message}",
             HTTPStatus.BAD_REQUEST, "validation_error",
+        )
+    except ValueError as exc:
+        # Anything else that went wrong after validation passed: a fixed,
+        # generic message, with the reason only in the log.
+        logger.warning("standards.import failed: %s", exc)
+        return error_response(
+            f"Could not import standard {imported_id!r}. Check the standard file and the "
+            "existing standard with that id, then retry.",
+            HTTPStatus.BAD_REQUEST, "import_error",
         )
     except PermissionError as exc:
         logger.warning("standards.import permission error: %s", exc)

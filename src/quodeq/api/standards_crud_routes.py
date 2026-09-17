@@ -7,7 +7,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN, ERROR_CODE_NOT_FOUND
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import _json_object_or_error, error_response
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -16,25 +16,27 @@ logger = logging.getLogger(__name__)
 def _handle_create(get_service, app: Flask) -> tuple[Response, int]:
     """Handle POST /api/standards -- create a new standard."""
     svc = get_service(app)
-    # silent=True: an unparseable body must still answer through this
-    # module's own {"error", "code"} shape, not Werkzeug's default HTML
-    # 400 page that a bare `get_json(force=True)` would raise on.
-    payload = request.get_json(force=True, silent=True)
-    if payload is None:
-        return error_response("request body must be JSON", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    payload = _json_object_or_error()
     if not isinstance(payload, dict):
-        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
-    logger.info("standards.create id=%s", payload.get("id", "<unknown>"))
+        return payload
+    standard_id = payload.get("id")
+    if not isinstance(standard_id, str) or not standard_id:
+        # create_standard reads data["id"] and tests `"/" in standard_id`,
+        # so a missing id raised KeyError and a non-string id TypeError --
+        # both 500s -- before its own ValueError could answer 400.
+        return error_response(
+            "id must be a non-empty string", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST,
+        )
+    logger.info("standards.create id=%s", standard_id)
     try:
         detail = svc.create_standard(payload)
     except ValueError as exc:
         # create_standard raises ValueError for exactly two reasons: an
-        # invalid id (contains '/', '\\', '..', or is empty) or an id
-        # that's already in use. Name the id from `payload` (not from
-        # `exc`) -- this module never echoes caught-exception text into a
-        # response, see tests/api/test_no_exception_echo.py.
+        # invalid id (contains '/', '\\', '..') or an id that's already in
+        # use. Name the id from `payload` (not from `exc`) -- this module
+        # never echoes caught-exception text into a response, see
+        # tests/api/test_no_exception_echo.py.
         logger.debug("standards.create validation error: %s", exc)
-        standard_id = payload.get("id", "<unknown>")
         return error_response(
             f"Invalid standard data: standard id {standard_id!r} is invalid, or already exists",
             HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST,

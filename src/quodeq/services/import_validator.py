@@ -25,6 +25,24 @@ _INJECTION_PATTERNS = [
 ]
 
 
+class StandardImportValidationError(ValueError):
+    """Raised when an imported payload fails :func:`validate_import`.
+
+    Carries the validator's own field-level reasons so a caller can report
+    them without re-running validation: ``errors`` is that list and
+    ``public_message`` the joined text an API route may return to the client
+    verbatim (routes read that attribute, never ``str(exc)`` -- see
+    tests/api/test_no_exception_echo.py). Stays a ``ValueError`` so callers
+    that only distinguish "invalid payload" keep working.
+    """
+
+    def __init__(self, errors: list[str]) -> None:
+        message = "; ".join(errors)
+        super().__init__(message)
+        self.errors = list(errors)
+        self.public_message = message
+
+
 def _truncate(value: str, limit: int) -> str:
     return value[:limit] if len(value) > limit else value
 
