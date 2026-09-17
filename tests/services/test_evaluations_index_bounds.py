@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
@@ -84,6 +85,38 @@ def test_get_status_resolves_an_indexed_external_run_without_scanning_projects(
     assert snapshot is not None
     assert snapshot.output_project == project
     assert snapshot.output_run_id == run_id
+
+
+def test_get_status_never_syncs_the_cwd_for_an_empty_indexed_run_dir(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Finding 5: Path('') is Path('.'), whose is_dir() is True, so a row with
+    a blank run_dir made the scoped sync run against the process cwd."""
+    reports_root = tmp_path / "reports"
+    project, run_id = "proj-uuid", "run-uuid"
+    _seed_status(reports_root, project, run_id, RunState.DONE)
+    index = _make_index(tmp_path, reports_root)
+    index.list(reports_dir=reports_root)
+
+    real_get_run = _run_index.get_run
+
+    def blank_run_dir(db, job_id):
+        row = real_get_run(db, job_id)
+        return replace(row, run_dir="") if row is not None else None
+
+    synced: list[Path] = []
+    real_sync = _run_index.sync_index_for_run
+
+    def spy_sync(db, run_dir):
+        synced.append(run_dir)
+        real_sync(db, run_dir)
+
+    monkeypatch.setattr(_run_index, "get_run", blank_run_dir)
+    monkeypatch.setattr(_run_index, "sync_index_for_run", spy_sync)
+
+    index.get_status(f"ext-{run_id}", reports_dir=reports_root)
+
+    assert synced == [reports_root / project / run_id]
 
 
 def test_get_status_falls_back_to_a_scan_when_the_run_is_not_yet_indexed(

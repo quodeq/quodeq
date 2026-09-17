@@ -152,7 +152,10 @@ class EvaluationsIndex:
                 if not is_safe_run_segment(run_id):
                     return None
                 known = _run_index.get_run(db, job_id)
-                run_dir = Path(known.run_dir) if known is not None else None
+                # A blank run_dir falls through to the scan: Path("") is
+                # Path("."), whose is_dir() is True, so it would sync the
+                # process cwd as if it were the run.
+                run_dir = Path(known.run_dir) if known is not None and known.run_dir else None
                 if run_dir is not None and run_dir.is_dir():
                     _run_index.sync_index_for_run(db, run_dir)
                 else:

@@ -116,12 +116,10 @@ def _sync_external_run_by_scan(db, reports_dir: Path, run_id: str) -> None:
     been indexed once, ``get_status`` resolves it straight from its stored
     ``run_dir`` instead of reaching this scan again.
     """
-    if reports_dir.is_dir():
-        for project_dir in reports_dir.iterdir():
-            candidate = project_dir / run_id
-            if candidate.is_dir():
-                _run_index.sync_index_for_run(db, candidate)
-                return
+    candidate = _scan_reports_root_for_run(reports_dir, run_id)
+    if candidate is not None:
+        _run_index.sync_index_for_run(db, candidate)
+        return
     _run_index.sync_index(db, reports_dir)
 
 

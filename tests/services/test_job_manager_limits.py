@@ -75,6 +75,46 @@ class TestConcurrencyCap:
         assert ninth.status == STATUS_FAILED
         assert "QUODEQ_MAX_CONCURRENT_JOBS" in ninth.error
 
+    def test_two_starts_racing_at_the_cap_produce_exactly_one_refusal(self, monkeypatch):
+        """Finding 6: the cap was read under the lock but the decision and the
+        spawn happened outside it, so two starts could both pass at cap-1.
+
+        The first start parks inside the spawn fake -- past the capacity
+        check, before the process is tracked -- which is exactly the window
+        the second start used to slip through.
+        """
+        monkeypatch.setenv("QUODEQ_MAX_CONCURRENT_JOBS", "1")
+        in_first_spawn = threading.Event()
+        release = threading.Event()
+        created: list[_NeverExitsProcess] = []
+
+        def spawn(*_args, **_kwargs):
+            first = not created
+            proc = _NeverExitsProcess()
+            created.append(proc)
+            if first:
+                in_first_spawn.set()
+                assert release.wait(timeout=5), "spawn was never released"
+            return proc
+
+        manager = JobManager(spawn_impl=spawn, job_store=InMemoryJobStore())
+        first_result: list = []
+        racer = threading.Thread(target=lambda: first_result.append(manager.start_job(["x"])))
+        racer.start()
+        try:
+            assert in_first_spawn.wait(timeout=5), "the first start never reached spawn"
+            second = manager.start_job(["x"])
+        finally:
+            release.set()
+            racer.join(timeout=5)
+            for proc in created:
+                proc.kill()
+
+        assert second.status == STATUS_FAILED
+        assert second.error and "QUODEQ_MAX_CONCURRENT_JOBS" in second.error
+        assert len(created) == 1, "the second start spawned a process past the cap"
+        assert first_result and first_result[0].status != STATUS_FAILED
+
     def test_start_job_allows_a_new_job_once_a_slot_frees_up(self, monkeypatch, fake_spawn):
         monkeypatch.setenv("QUODEQ_MAX_CONCURRENT_JOBS", "1")
         manager = JobManager(spawn_impl=fake_spawn, job_store=InMemoryJobStore())

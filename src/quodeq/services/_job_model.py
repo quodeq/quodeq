@@ -19,6 +19,14 @@ from typing import Protocol, runtime_checkable
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
 
+# Canonical job status strings. They live here, with the Job they describe,
+# so both jobs.py (which re-exports them for its importers) and the mixins
+# it composes can import them without reaching back into jobs.py.
+STATUS_RUNNING = "running"
+STATUS_CANCELLED = "cancelled"
+STATUS_DONE = "done"
+STATUS_FAILED = "failed"
+
 _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")

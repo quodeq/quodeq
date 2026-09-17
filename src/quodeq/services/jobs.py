@@ -21,6 +21,11 @@ from quodeq.services._job_model import (
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
+    # Status strings live with the Job in _job_model; re-exported below.
+    STATUS_CANCELLED,
+    STATUS_DONE,
+    STATUS_FAILED,
+    STATUS_RUNNING,
     _MAX_COMPLETED_JOBS,  # noqa: F401 — re-export (patch/import target)
 )
 from quodeq.services._job_file_store import (
@@ -34,13 +39,9 @@ if TYPE_CHECKING:
 
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
-    "Job",
-    "JobStore",
-    "InMemoryJobStore",
-    "FileJobStore",
-    "create_job_store",
-    "REPORT_PATH_RE",
-    "JobManager",
+    "Job", "JobStore", "InMemoryJobStore", "FileJobStore", "create_job_store",
+    "REPORT_PATH_RE", "JobManager",
+    "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
 ]
 
 _REPORT_PATH_MARKER = "Report path:"
@@ -59,12 +60,6 @@ _WATCHDOG_POLL_INTERVAL_S = 1.0
 # subagent, realistically up to 3), so the grace must exceed that or a
 # healthy drain gets SIGTERMed and the batch's work is lost.
 _WATCHDOG_DEADLINE_GRACE_S = 1800
-
-# Canonical job status strings.
-STATUS_RUNNING = "running"
-STATUS_CANCELLED = "cancelled"
-STATUS_DONE = "done"
-STATUS_FAILED = "failed"
 
 # status.json exit reasons that mean "the run hit its time budget" — the
 # user's own setting doing its job, not an error. Jobs ending this way are
@@ -111,6 +106,9 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
+        # Job ids past the capacity check but not yet spawned, counted
+        # against the cap; never in _processes, which cancel/shutdown read.
+        self._reserved: set[str] = set()
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
@@ -148,7 +146,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
             ai_model=ai_model,
             time_limit_s=time_limit_s,
         )
-        refusal = self._refuse_if_at_capacity(job)
+        refusal = self._reserve_slot_or_refuse(job)
         if refusal is not None:
             return refusal
 
@@ -164,6 +162,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
             )
         except (OSError, subprocess.SubprocessError) as exc:
             self._log.error(f"Failed to start job subprocess: {exc}")
+            self._release_slot(job_id)
             job.status = STATUS_FAILED
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.exit_code = _EXIT_CODE_SPAWN_FAILURE
@@ -175,6 +174,9 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
 
         with self._lock:
             self._store.put(job)
+            # The reservation becomes the tracked process under one lock hold,
+            # so the slot is never double-counted and never briefly free.
+            self._reserved.discard(job_id)
             self._processes[job_id] = process
 
         threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
