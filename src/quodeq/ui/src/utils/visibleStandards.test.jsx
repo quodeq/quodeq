@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
+import {
+  VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS, STANDARDS_CHANGED_EVENT, STANDARDS_CHANGED_REASON,
+} from '../constants.js';
 
 vi.mock('../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
@@ -22,6 +24,18 @@ function fakeStorage(initial = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+it('writeVisibleStandardIds broadcasts a visibility change for same-tab listeners', () => {
+  const seen = [];
+  const listener = (evt) => seen.push(evt.detail?.reason);
+  window.addEventListener(STANDARDS_CHANGED_EVENT, listener);
+  try {
+    writeVisibleStandardIds(['security'], fakeStorage());
+    expect(seen).toEqual([STANDARDS_CHANGED_REASON.VISIBILITY]);
+  } finally {
+    window.removeEventListener(STANDARDS_CHANGED_EVENT, listener);
+  }
 });
 
 it('caches the server selection into storage', async () => {

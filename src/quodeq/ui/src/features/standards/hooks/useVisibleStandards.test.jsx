@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import { VISIBLE_STANDARDS_STORAGE_KEY } from '../../../constants.js';
+import { VISIBLE_STANDARDS_STORAGE_KEY, STANDARDS_CHANGED_EVENT, STANDARDS_CHANGED_REASON } from '../../../constants.js';
 
 vi.mock('../../../api/standards.js', () => ({
   putStandardsVisibility: vi.fn(),
@@ -39,6 +39,20 @@ describe('useVisibleStandards', () => {
     expect(JSON.parse(storage._map[Object.keys(storage._map)[0]])).toContain('custom-standard');
     act(() => result.current.toggle('custom-standard'));
     expect(result.current.visibleIds).not.toContain('custom-standard');
+  });
+
+  it('toggle broadcasts a visibility change so a mounted Evaluate picker refilters', () => {
+    const storage = fakeStorage();
+    const seen = [];
+    const listener = (evt) => seen.push(evt.detail?.reason);
+    window.addEventListener(STANDARDS_CHANGED_EVENT, listener);
+    try {
+      const { result } = renderHook(() => useVisibleStandards({ storage }), { wrapper: withQueryClient() });
+      act(() => result.current.toggle('custom-standard'));
+      expect(seen).toEqual([STANDARDS_CHANGED_REASON.VISIBILITY]);
+    } finally {
+      window.removeEventListener(STANDARDS_CHANGED_EVENT, listener);
+    }
   });
 
   it('initialises from the injected storage, not the real localStorage', () => {

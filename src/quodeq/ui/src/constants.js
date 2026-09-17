@@ -50,6 +50,20 @@ export function notifyProviderSettingsChanged() {
   }
 }
 
+// Fired (same-tab) whenever the set of standards or their per-project
+// visibility changes. Screens that hold the merged dimension list (the
+// Evaluate picker) listen so a starred, created, imported or duplicated
+// standard shows up without a page reload. `detail.reason` says how much
+// moved: VISIBILITY (refilter the cached list) or LIST (refetch it).
+export const STANDARDS_CHANGED_EVENT = 'quodeq:standards-changed';
+export const STANDARDS_CHANGED_REASON = Object.freeze({ VISIBILITY: 'visibility', LIST: 'list' });
+
+export function notifyStandardsChanged(reason) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(STANDARDS_CHANGED_EVENT, { detail: { reason } }));
+  }
+}
+
 export const VISIBLE_STANDARDS_STORAGE_KEY = 'quodeq-visible-standards';
 export const DEFAULT_VISIBLE_STANDARDS = [
   'security', 'reliability', 'maintainability', 'performance', 'usability', 'flexibility',
