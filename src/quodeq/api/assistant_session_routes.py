@@ -16,7 +16,7 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api import _assistant_helpers
 from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
-from quodeq.assistant.skills import RESERVED_COMMANDS, load_skills
+from quodeq.assistant.skills import RESERVED_COMMANDS, cached_skills
 from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
 from quodeq.shared.constants import (
     SESSION_SOURCE_LOCAL,
@@ -123,7 +123,7 @@ def register_assistant_session_routes(app: Flask) -> None:
                 {"name": s.name, "description": s.description,
                  "argumentHint": s.argument_hint, "views": list(s.views),
                  "requiresWrite": s.requires_write}
-                for s in load_skills().values()
+                for s in cached_skills().values()
             ],
             "actions": [
                 {"type": t, "description": ACTION_DESCRIPTIONS.get(t, "")}

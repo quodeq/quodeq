@@ -152,7 +152,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     def _boom(*args, **kwargs):
         raise RuntimeError("scoring engine exploded")
 
-    monkeypatch.setattr("quodeq._cli_evaluation.score_dimension_from_evidence", _boom)
+    monkeypatch.setattr("quodeq._cli_evaluation.rescore_dimension_from_evidence", _boom)
 
     _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
@@ -166,7 +166,7 @@ def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
     an exclusion: the printed suffix would otherwise promise a score change
     the rescore does not deliver.
     """
-    from quodeq._cli_evaluation import _count_excluded_findings
+    from quodeq.services.evidence_rescore import rescore_dimension_from_evidence
 
     monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
     run_dir = tmp_path / "run"
@@ -179,9 +179,11 @@ def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
     (ev_dir / f"{DIM}_evidence.jsonl").write_text(
         "\n".join(json.dumps(l) for l in lines) + "\n", encoding="utf-8")
 
-    count = _count_excluded_findings(
-        run_dir, DIM, dismissed={("X-1", "z.kt", 3)}, deleted=set())
-    assert count == 0
+    rescored = rescore_dimension_from_evidence(
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed={("X-1", "z.kt", 3)}, deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS))
+    assert rescored.excluded == 0
 
 
 def test_format_score_line_without_totals_is_plain():

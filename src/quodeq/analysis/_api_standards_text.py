@@ -10,6 +10,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.analysis import dispatch_policy
@@ -33,6 +34,15 @@ _CODE_EXTS = frozenset({".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".r
 _MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
 
 
+def _walk_source_files(work_dir: Path, exts: frozenset[str]) -> Iterator[Path]:
+    """Source files under *work_dir*, never descending into skip dirs or dot dirs."""
+    for root, dirs, files in os.walk(work_dir):
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.startswith(".")]
+        for name in files:
+            if not name.startswith(".") and os.path.splitext(name)[1] in exts:
+                yield Path(root, name)
+
+
 def _gather_source_files(work_dir: Path) -> list[Path]:
     """Collect source files from work_dir for API prompt assembly.
 
@@ -40,12 +50,11 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     fit within local model context limits.
     """
     _ALL_EXTS = _CODE_EXTS | _MARKUP_EXTS
-    all_files: list[Path] = [
-        f for f in work_dir.rglob("*") if f.is_file() and f.suffix in _ALL_EXTS
-    ]
-    # Cache stat results to avoid repeated syscalls on the same files
+    # Cache stat results to avoid repeated syscalls on the same files. The
+    # walk itself prunes skip dirs and dot dirs, so stat() is only issued
+    # for files that already survived that pruning.
     stat_cache: dict[Path, int] = {}
-    for f in all_files:
+    for f in _walk_source_files(work_dir, _ALL_EXTS):
         try:
             stat_cache[f] = f.stat().st_size
         except OSError as exc:
@@ -54,14 +63,8 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     # Env-derived caps: read once per call, not once per candidate file.
     size_cap = dispatch_policy.api_file_size_cap()
     char_budget = _api_prompt_char_budget()
-    # Filter out non-source dirs, dotdirs, empty files, and oversized files
-    filtered = [
-        f for f in all_files
-        if f in stat_cache
-        and not any(p in f.parts for p in _SKIP_DIRS)
-        and not any(p.startswith(".") for p in f.relative_to(work_dir).parts)
-        and 0 < stat_cache[f] < size_cap
-    ]
+    # Filter out empty files and oversized files (skip dirs/dotdirs already pruned above)
+    filtered = [f for f, size in stat_cache.items() if 0 < size < size_cap]
     # Prioritize code files over markup
     code_files = [f for f in filtered if f.suffix in _CODE_EXTS]
     markup_files = [f for f in filtered if f.suffix in _MARKUP_EXTS]

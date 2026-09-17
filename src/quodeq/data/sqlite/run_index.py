@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time as _time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -194,27 +195,45 @@ def _row_to_runrow(row: tuple) -> RunRow:
     return RunRow(*row)
 
 
-def list_runs(db: sqlite3.Connection, *, limit: int = 0) -> list[RunRow]:
-    """Return runs ordered by started_at DESC. limit=0 means no limit."""
-    sql = f"SELECT {_LIST_COLS} FROM runs ORDER BY started_at DESC"
-    if limit > 0:
-        sql += f" LIMIT {int(limit)}"
-    return [_row_to_runrow(r) for r in db.execute(sql).fetchall()]
+def _limit_clause(limit: int | None) -> str:
+    """``LIMIT n`` for a positive *limit*, nothing for None; anything else is a caller bug."""
+    if limit is None:
+        return ""
+    if limit <= 0:
+        raise ValueError(f"limit must be positive or None, got {limit!r}")
+    return f" LIMIT {int(limit)}"
+
+
+def list_runs(
+    db: sqlite3.Connection, *, limit: int | None, states: Iterable[str] | None = None,
+) -> list[RunRow]:
+    """Return runs ordered by started_at DESC.
+
+    *limit* None returns every row; an int must be positive. *states*, when
+    given, narrows the query in SQL instead of fetching every row to filter
+    in Python.
+    """
+    where, params = "", ()
+    if states:
+        wanted = tuple(states)
+        where = " WHERE state IN (" + ",".join("?" * len(wanted)) + ")"
+        params = wanted
+    sql = f"SELECT {_LIST_COLS} FROM runs{where} ORDER BY started_at DESC{_limit_clause(limit)}"
+    return [_row_to_runrow(r) for r in db.execute(sql, params).fetchall()]
 
 
 def list_runs_for_project(
-    db: sqlite3.Connection, project_uuid: str, *, limit: int = 0,
+    db: sqlite3.Connection, project_uuid: str, *, limit: int | None,
 ) -> list[RunRow]:
-    """Return one project's runs ordered by started_at DESC. limit=0 = no limit.
+    """Return one project's runs ordered by started_at DESC.
 
-    Native indexed query — the replacement for walking the project's run dirs.
+    *limit* None returns every row; an int must be positive. Native indexed
+    query — the replacement for walking the project's run dirs.
     """
     sql = (
         f"SELECT {_LIST_COLS} FROM runs WHERE project_uuid = ? "
-        "ORDER BY started_at DESC"
+        f"ORDER BY started_at DESC{_limit_clause(limit)}"
     )
-    if limit > 0:
-        sql += f" LIMIT {int(limit)}"
     return [_row_to_runrow(r) for r in db.execute(sql, (project_uuid,)).fetchall()]
 
 

@@ -12,7 +12,8 @@ These are pure functions used by the V2 dimension processor (Phase B5):
     (with findings) and misses (need dispatch). A miss with a real content
     hash first tries adoption from an identical file under another path
     (``_adoption.py``). The miss-key mapping is returned so the caller can
-    write entries after dispatch without recomputing keys.
+    write entries after dispatch without recomputing keys. Lives in
+    ``_classify.py`` with ``ClassifyResult``; re-exported below.
 
   - ``persist_dispatch_results``: after a dispatch run writes its JSONL,
     group its findings by file and write per-file cache entries for the
@@ -31,26 +32,27 @@ Cache-key composition and provenance-drift tracking live in
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.cache._adoption import try_adopt
+from quodeq.analysis.cache._classify import (
+    ClassifyResult,
+    _classify_one_file,  # noqa: F401 -- re-export
+    _partition_files_by_cache,  # noqa: F401 -- re-export
+    classify_files_via_cache,  # noqa: F401 -- re-export
+)
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import (
     _SCHEMA_VERSION,
-    _accumulate_drift,
-    _current_provenance,
+    _content_hash_for,
+    _current_provenance,  # noqa: F401 -- re-export
     _hash_prompts_combined,  # noqa: F401 -- re-export
     _model_id_from,
     build_cache_key_for_file,  # noqa: F401 -- re-export
-    build_cache_key_struct,
     format_provenance_drift,  # noqa: F401 -- re-export
 )
-from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
-from quodeq.analysis.cache.key import compute_key
-from quodeq.analysis.fingerprint import _hash_file
 
 # CachePersistProvenance/CachePersistTarget live in _persist_watcher.py
 # (which imports from here); referenced below only as annotations.
@@ -66,126 +68,11 @@ class CacheEntryTarget:
     key: str
     model_id: str
     version: str
-
-
-@dataclass(frozen=True)
-class ClassifyResult:
-    """Result of splitting a file list against the cache."""
-
-    cached_findings: list[dict] = field(default_factory=list)
-    misses: list[str] = field(default_factory=list)
-    # Per-file cache key for the missed files, so the caller can write
-    # entries after dispatch without recomputing the key.
-    miss_keys: dict[str, str] = field(default_factory=dict)
-    # Per-field drift among cache hits: field -> {"count", "from", "to"}.
-    # Only fields that actually drifted appear. Lets the caller surface how
-    # many reused findings predate the current model / standards / prompts,
-    # so reuse across those boundaries is never silent.
-    provenance_drift: dict = field(default_factory=dict)
-    # Hits from entries no COMPLETED run has consolidated yet: the producing
-    # run was cancelled with "keep findings", failed, or was killed, so the
-    # user was never shown these findings in an Overview. Kept apart from
-    # cached_findings so the replay path leaves them unstamped and the live
-    # feed shows them as this scan's own.
-    unconsolidated_findings: list[dict] = field(default_factory=list)
-    # file -> cache key for those same entries, so a run that reaches done
-    # can flip them to consolidated.
-    unconsolidated_hit_keys: dict[str, str] = field(default_factory=dict)
-    # Hits served by adopting an entry with identical content from another
-    # path (a directory move). Counted so the cache log line and the
-    # cache_stats marker can surface the reuse.
-    adopted: int = 0
-
-
-def _classify_one_file(
-    config: RunConfig, dimension: str, f: str, cache: CacheBackend, *, bypass_reads: bool,
-) -> tuple[str, CacheEntry | None, bool]:
-    """Classify one file against the cache. Returns (key, hit, adopted),
-    where hit is None on a miss and adopted says the hit came from
-    ``try_adopt`` rather than a direct get."""
-    struct = build_cache_key_struct(config, f, dimension)
-    key = compute_key(struct)
-    hit = None if bypass_reads else cache.get(key)
-    adopted = False
-    if hit is None and not bypass_reads:
-        hit = try_adopt(cache, struct, key, language=config.language or "")
-        adopted = hit is not None
-    return key, hit, adopted
-
-
-def _partition_files_by_cache(
-    config: RunConfig, dimension: str, files: list[str], cache: CacheBackend,
-    *, bypass_reads: bool,
-) -> ClassifyResult:
-    """Partition ``files`` into cache hits and misses, building a ClassifyResult."""
-    cached_findings: list[dict] = []
-    misses: list[str] = []
-    miss_keys: dict[str, str] = {}
-    provenance_drift: dict = {}
-    unconsolidated_findings: list[dict] = []
-    unconsolidated_hit_keys: dict[str, str] = {}
-    adopted = 0
-    current_prov: dict | None = None  # computed lazily, only if there are hits
-    for f in files:
-        key, hit, was_adopted = _classify_one_file(
-            config, dimension, f, cache, bypass_reads=bypass_reads,
-        )
-        if hit is None:
-            misses.append(f)
-            miss_keys[f] = key
-        else:
-            if current_prov is None:
-                current_prov = _current_provenance(config, dimension)
-            adopted += int(was_adopted)
-            if hit.consolidated:
-                cached_findings.extend(hit.findings)
-            else:
-                unconsolidated_findings.extend(hit.findings)
-                unconsolidated_hit_keys[f] = key
-            assert current_prov is not None  # set on the first hit, above
-            _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
-    return ClassifyResult(
-        cached_findings=cached_findings,
-        misses=misses,
-        miss_keys=miss_keys,
-        provenance_drift=provenance_drift,
-        unconsolidated_findings=unconsolidated_findings,
-        unconsolidated_hit_keys=unconsolidated_hit_keys,
-        adopted=adopted,
-    )
-
-
-def classify_files_via_cache(
-    config: RunConfig, dimension: str, files: list[str],
-    cache: CacheBackend,
-    *, bypass_reads: bool = False,
-) -> ClassifyResult:
-    """Split ``files`` into cache hits (findings) and misses (need dispatch).
-
-    When ``bypass_reads`` is True (e.g. honoring ``--clean-scan``), every
-    file is forced into the misses bucket regardless of cache state. The
-    miss_keys map is still populated so callers can write fresh entries
-    after dispatch — clean-scan refreshes the cache rather than ignoring it.
-
-    The pipeline classifies twice per dim (estimates + dim runner). When
-    ``config._classify_cache`` is set to a dict, this function stashes
-    its result there on the first call for a given ``(dimension, files)``
-    pair and short-circuits the second call. The stash MUST NOT short-
-    circuit when ``bypass_reads`` is True — clean-scan deletes entries
-    immediately before this call, so an upfront classify's hits are
-    stale by the time the dim runner asks again.
-    """
-    files_tuple = tuple(files)
-    run_cache = config._classify_cache
-    if not bypass_reads and run_cache is not None:
-        stashed = run_cache.get(dimension)
-        if stashed is not None and stashed[0] == files_tuple:
-            return stashed[1]
-
-    result = _partition_files_by_cache(config, dimension, files, cache, bypass_reads=bypass_reads)
-    if not bypass_reads and run_cache is not None:
-        run_cache[dimension] = (files_tuple, result)
-    return result
+    content_hash: str = ""  # classify's hash for this file; "" re-hashes (legacy)
+    # The file's ``_stat_key`` when classify hashed it. The hash above is
+    # reused only while it still matches; None re-hashes. See
+    # ``_key_provenance._content_hash_for``.
+    content_stamp: tuple[int, int] | None = None
 
 
 def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
@@ -221,8 +108,10 @@ def _build_cache_entry_for_file(
     grouped: dict[str, list[dict]], provenance: CachePersistProvenance,
 ) -> CacheEntry:
     """Build the CacheEntry for one dispatched file's persisted result."""
-    content_hash = _hash_file(config.src / target.file_path)
-    if content_hash is None:
+    content_hash = _content_hash_for(
+        config.src / target.file_path, target.content_hash, target.content_stamp,
+    )
+    if not content_hash:
         _logger.debug("content hash unavailable for %s; cache entry stored without it", target.file_path)
     return CacheEntry(
         key=target.key,
@@ -232,7 +121,7 @@ def _build_cache_entry_for_file(
         file_path=target.file_path,
         dimension=dimension,
         model_id=target.model_id,
-        file_content_hash=content_hash or "",
+        file_content_hash=content_hash,
         language=config.language or "",
         params_hash=provenance.params_hash,
         provenance=build_provenance(
@@ -286,11 +175,12 @@ def persist_dispatch_results(
         if key is None:
             _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
             continue
-        entry = _build_cache_entry_for_file(
-            config, dimension,
-            CacheEntryTarget(file_path=f, key=key, model_id=model_id, version=version),
-            state.grouped, provenance,
+        entry_target = CacheEntryTarget(
+            file_path=f, key=key, model_id=model_id, version=version,
+            content_hash=classify.miss_hashes.get(f, ""),
+            content_stamp=classify.miss_stamps.get(f),
         )
+        entry = _build_cache_entry_for_file(config, dimension, entry_target, state.grouped, provenance)
         target.cache.put(key, entry)
     # A raising put keeps dirty for the next tick. A put that fails silently
     # (LocalFileBackend swallows OSError) is redone by the final full re-read.

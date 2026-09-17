@@ -14,7 +14,7 @@ from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
-from quodeq.assistant.skills import load_skills
+from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.assistant.tools._write_tools import register_write_tools
 from quodeq.assistant.worktree import ensure_session_worktree
@@ -205,7 +205,7 @@ def _resolve_skill(raw_text: str) -> tuple[object | None, str, str | None]:
     skill_name, text = _split_skill(raw_text)
     if skill_name is None:
         return None, text, None
-    skill = load_skills().get(skill_name)
+    skill = cached_skills().get(skill_name)
     return skill, text, (skill_name if skill is None else None)
 
 

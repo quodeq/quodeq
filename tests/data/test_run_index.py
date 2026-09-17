@@ -196,7 +196,7 @@ def test_list_runs_ordered_by_started_at_desc(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         sync_index(db, reports)
-        rows = list_runs(db)
+        rows = list_runs(db, limit=None)
         assert [r.job_id for r in rows] == ["ext-newer", "ext-older"]
     finally:
         db.close()

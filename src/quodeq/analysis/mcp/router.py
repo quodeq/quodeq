@@ -117,7 +117,33 @@ class FindingsRouter:
         self._seen.add(key)
 
         finding = self._enricher.enrich(args)
+        self._finish_finding(finding)
+        return f"Finding #{self.counter} recorded.", False
 
+    def receive_many(self, findings: list[dict]) -> list[dict]:
+        """Process a batch of findings (typically one file's), enriched with
+        one precedent lookup instead of one embedding call per finding.
+
+        Same dedup/write/event/counter contract as `receive`: a finding whose
+        dedup key was already seen (including an earlier one in this same
+        batch) is skipped. Returns the enriched dicts for every finding that
+        was written, in order.
+        """
+        pending: list[dict] = []
+        for args in findings:
+            key = self._enricher.dedup_key(args)
+            if key in self._seen:
+                continue
+            self._seen.add(key)
+            pending.append(args)
+
+        results = self._enricher.enrich_many(pending)
+        for finding in results:
+            self._finish_finding(finding)
+        return results
+
+    def _finish_finding(self, finding: dict) -> None:
+        """Write, event-emit, and file-track one already-enriched finding."""
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
         if self._event_log is not None:
@@ -125,7 +151,6 @@ class FindingsRouter:
         if self._on_file_done is not None:
             self._findings_by_file.setdefault(finding["file"], []).append(finding)
         self.counter += 1
-        return f"Finding #{self.counter} recorded.", False
 
     def _emit_event(self, finding: dict) -> None:
         """Emit a JudgmentCreatedEvent to the event log. Never raises."""

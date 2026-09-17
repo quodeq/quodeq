@@ -23,10 +23,12 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
-from quodeq.services._job_model import Job, REPORT_PATH_RE, _ANSI_RE, _CC_MARKER_PREFIX, _MAX_COMPLETED_JOBS
+from quodeq.services._job_model import (
+    Job, REPORT_PATH_RE, STATUS_CANCELLED, STATUS_DONE, STATUS_FAILED, STATUS_RUNNING,
+    _ANSI_RE, _CC_MARKER_PREFIX, _MAX_COMPLETED_JOBS,
+)
 from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
 from quodeq.services.jobs import (
-    STATUS_CANCELLED, STATUS_DONE, STATUS_FAILED, STATUS_RUNNING,
     _DEADLINE_EXIT_REASONS, _EXIT_CODE_TIMEOUT, _EXIT_REASON_DEADLINE,
     _REPORT_PATH_MARKER, _WATCHDOG_POLL_INTERVAL_S,
 )

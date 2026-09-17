@@ -15,6 +15,7 @@ def _bare_pty() -> "_pty_unix.UnixPty":
     pty = object.__new__(_pty_unix.UnixPty)
     pty._master_fd = 12345
     pty._proc = None
+    pty._selector = None
     return pty
 
 

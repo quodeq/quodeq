@@ -12,6 +12,7 @@ unbounded growth.
 """
 from __future__ import annotations
 
+import stat as _stat
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -30,7 +31,7 @@ def db_stamp(db_path: Path) -> tuple | None:
         st = db_path.stat()
     except OSError:
         return None
-    if not db_path.is_file():
+    if not _stat.S_ISREG(st.st_mode):
         return None
     wal = db_path.with_name(db_path.name + "-wal")
     try:

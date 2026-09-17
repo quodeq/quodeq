@@ -84,7 +84,7 @@ def build_runs_unit(reports_root: Path, index_db_path: Path, project: str) -> li
     db = open_index(index_db_path)
     try:
         sync_index(db, reports_root)
-        rows = list_runs_for_project(db, project)
+        rows = list_runs_for_project(db, project, limit=None)
     finally:
         db.close()
     entries = [_row_to_run_entry(r) for r in rows]

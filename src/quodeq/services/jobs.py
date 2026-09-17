@@ -23,6 +23,11 @@ from quodeq.services._job_model import (
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
+    # Status strings live with the Job in _job_model; re-exported below.
+    STATUS_CANCELLED,
+    STATUS_DONE,
+    STATUS_FAILED,
+    STATUS_RUNNING,
     _MAX_COMPLETED_JOBS,  # noqa: F401 — re-export (patch/import target)
     mark_spawn_failed,
     new_job,
@@ -31,18 +36,13 @@ from quodeq.services._job_file_store import (
     FileJobStore,
     create_job_store,
 )
+from quodeq.services._job_capacity_mixin import _JobCapacityMixin
 
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
-    "Job",
-    "JobLaunchOptions",
-    "JobProcessSeams",
-    "JobStore",
-    "InMemoryJobStore",
-    "FileJobStore",
-    "create_job_store",
-    "REPORT_PATH_RE",
-    "JobManager",
+    "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
+    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager",
+    "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
 ]
 
 _REPORT_PATH_MARKER = "Report path:"
@@ -62,12 +62,6 @@ _WATCHDOG_POLL_INTERVAL_S = 1.0
 # healthy drain gets SIGTERMed and the batch's work is lost.
 _WATCHDOG_DEADLINE_GRACE_S = 1800
 
-# Canonical job status strings.
-STATUS_RUNNING = "running"
-STATUS_CANCELLED = "cancelled"
-STATUS_DONE = "done"
-STATUS_FAILED = "failed"
-
 # status.json exit reasons that mean "the run hit its time budget" — the
 # user's own setting doing its job, not an error. Jobs ending this way are
 # marked cancelled (already in the salvage-scoring trigger list in
@@ -84,7 +78,7 @@ _EXIT_REASON_DEADLINE = "deadline"
 from quodeq.services._job_monitor_mixin import _JobMonitorMixin  # noqa: E402
 
 
-class JobManager(_JobMonitorMixin):
+class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
 
     NOTE: Job state is stored via a ``JobStore`` (defaulting to in-memory).
@@ -112,6 +106,9 @@ class JobManager(_JobMonitorMixin):
         self._spawn = seams.spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
+        # Job ids past the capacity check but not yet spawned, counted
+        # against the cap; never in _processes, which cancel/shutdown read.
+        self._reserved: set[str] = set()
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
@@ -139,6 +136,10 @@ class JobManager(_JobMonitorMixin):
         """Spawn a subprocess and return its initial job state."""
         launch = launch if launch is not None else JobLaunchOptions()
         job = new_job(str(uuid.uuid4()), cmd, launch, status=STATUS_RUNNING)
+        refusal = self._reserve_slot_or_refuse(job)
+        if refusal is not None:
+            return refusal
+
         try:
             process = self._spawn(
                 cmd,
@@ -154,6 +155,9 @@ class JobManager(_JobMonitorMixin):
 
         with self._lock:
             self._store.put(job)
+            # The reservation becomes the tracked process under one lock hold,
+            # so the slot is never double-counted and never briefly free.
+            self._reserved.discard(job.job_id)
             self._processes[job.job_id] = process
         self._start_watchers(job.job_id, process)
         return job.to_dict()
@@ -161,6 +165,7 @@ class JobManager(_JobMonitorMixin):
     def _record_spawn_failure(self, job: Job, exc: BaseException) -> JobSnapshot:
         """Persist *job* as failed to start and return the snapshot the caller reports."""
         self._log.error(f"Failed to start job subprocess: {exc}")
+        self._release_slot(job.job_id)
         mark_spawn_failed(job, exc, status=STATUS_FAILED, exit_code=_EXIT_CODE_SPAWN_FAILURE)
         with self._lock:
             self._store.put(job)
@@ -172,14 +177,15 @@ class JobManager(_JobMonitorMixin):
         threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
         threading.Thread(target=self._monitor_process, args=(job_id, process), daemon=True).start()
 
-    def cancel_job(self, job_id: str, reports_root: Path | None = None) -> bool:
+    def cancel_job(self, job_id: str, reports_root: Path | None = None, run_dir: Path | None = None) -> bool:
         """Terminate a running job. Return True if cancelled successfully.
 
         For external jobs (``ext-`` prefix), sends SIGTERM to the process that
-        owns the run.  For internal jobs, kills the tracked subprocess.
+        owns the run. For internal jobs, kills the tracked subprocess. *run_dir*
+        lets ``_cancel_external`` skip its project-directory scan.
         """
         if job_id.startswith("ext-") and reports_root is not None:
-            return self._cancel_external(job_id, reports_root)
+            return self._cancel_external(job_id, reports_root, run_dir=run_dir)
         return self._cancel_internal(job_id)
 
     def _cancel_internal(self, job_id: str) -> bool:
@@ -204,20 +210,16 @@ class JobManager(_JobMonitorMixin):
             _terminate_process(process)
         return True
 
-    def _cancel_external(self, job_id: str, reports_root: Path) -> bool:
-        """Send SIGTERM to an external run's process."""
-        from quodeq.services._external_jobs import cancel_external_run, is_safe_run_segment
+    def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None = None) -> bool:
+        """Send SIGTERM to an external run's process; *run_dir* skips the scan when valid."""
+        from quodeq.services._external_jobs import cancel_external_run, is_safe_run_segment, resolve_external_run_project
         run_id = job_id[len("ext-"):]
         if not is_safe_run_segment(run_id):
             return False
-        for project_dir in reports_root.iterdir():
-            if not project_dir.is_dir():
-                continue
-            if (project_dir / run_id).is_dir():
-                return cancel_external_run(
-                    project_dir.name, run_id, reports_root, control=self._process_control,
-                )
-        return False
+        project_uuid = resolve_external_run_project(reports_root, run_id, run_dir_hint=run_dir)
+        if project_uuid is None:
+            return False
+        return cancel_external_run(project_uuid, run_id, reports_root, control=self._process_control)
 
     def shutdown(self) -> None:
         """Kill all running job subprocesses. Called on server shutdown."""

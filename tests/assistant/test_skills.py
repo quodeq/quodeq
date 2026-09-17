@@ -1,4 +1,7 @@
-from quodeq.assistant.skills import load_skills
+import os
+
+from quodeq.assistant import skills as _skills_mod
+from quodeq.assistant.skills import cached_skills, load_skills
 
 
 def test_builtin_skills_load():
@@ -61,6 +64,38 @@ def test_verify_finding_skill_loads():
     # Still reachable as /verify-finding via the composer autocomplete.
     assert skill.views == ()
     assert skill.argument_hint
+
+
+def test_cached_skills_memoizes_until_directory_changes(tmp_path, monkeypatch):
+    (tmp_path / "a.md").write_text("---\nname: a\ndescription: D\n---\nBody.\n")
+
+    calls = {"n": 0}
+    real_load = _skills_mod.load_skills
+
+    def counting_load(directory=None):
+        calls["n"] += 1
+        return real_load(directory)
+
+    monkeypatch.setattr(_skills_mod, "load_skills", counting_load)
+
+    first = cached_skills(tmp_path)
+    second = cached_skills(tmp_path)
+    assert calls["n"] == 1, "second call within the same stamp must not re-parse"
+    assert first == second
+
+    path = tmp_path / "a.md"
+    text = path.read_text()
+    stat = path.stat()
+    path.write_text(text.replace("description: D", "description: Changed"))
+    os.utime(path, (stat.st_mtime + 5, stat.st_mtime + 5))
+    third = cached_skills(tmp_path)
+    assert calls["n"] == 2, "an edited file (bumped mtime) must re-parse"
+    assert third["a"].description == "Changed"
+
+    (tmp_path / "b.md").write_text("---\nname: b\ndescription: D2\n---\nBody.\n")
+    fourth = cached_skills(tmp_path)
+    assert calls["n"] == 3, "adding a file must re-parse"
+    assert "b" in fourth
 
 
 def test_verify_finding_skill_is_card_gated():
