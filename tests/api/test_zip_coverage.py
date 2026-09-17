@@ -1,6 +1,7 @@
 """Tests for quodeq.api.zip — zip export helpers."""
 from __future__ import annotations
 
+import logging
 import os
 import zipfile
 from unittest.mock import patch
@@ -30,6 +31,22 @@ class TestMaxZipSizeBytes:
         from quodeq.api.zip import _max_zip_size_bytes
         result = _max_zip_size_bytes(env={})
         assert result == 500 * 1024 * 1024
+
+    def test_invalid_env_logs_warning_naming_the_variable(self, caplog):
+        from quodeq.api.zip import _max_zip_size_bytes
+        with caplog.at_level(logging.WARNING, logger="quodeq.api.zip"):
+            result = _max_zip_size_bytes(env={"QUODEQ_MAX_ZIP_SIZE_MB": "bogus"})
+        assert result == 500 * 1024 * 1024
+        messages = [r.getMessage() for r in caplog.records]
+        assert any(
+            "QUODEQ_MAX_ZIP_SIZE_MB" in m and "bogus" in m and "500" in m for m in messages
+        )
+
+    def test_missing_env_stays_silent(self, caplog):
+        from quodeq.api.zip import _max_zip_size_bytes
+        with caplog.at_level(logging.WARNING, logger="quodeq.api.zip"):
+            _max_zip_size_bytes(env={})
+        assert caplog.records == []
 
 
 class TestBuildProjectZip:
@@ -140,7 +157,7 @@ class TestExportProjectZip:
                 assert status == 404
 
     def test_project_too_large(self, tmp_path):
-        from quodeq.api.zip import export_project_zip
+        from quodeq.api.zip import export_project_zip, _ZipSizeLimitError
         from flask import Flask
         project = tmp_path / "big"
         project.mkdir()
@@ -148,11 +165,36 @@ class TestExportProjectZip:
 
         app = Flask(__name__)
         with app.app_context():
-            with patch("quodeq.api.zip._build_project_zip", side_effect=ValueError("too big")):
+            with patch(
+                "quodeq.api.zip._build_project_zip",
+                side_effect=_ZipSizeLimitError("too big, see remediation"),
+            ):
                 resp = export_project_zip("big", str(tmp_path))
-                if isinstance(resp, tuple):
-                    _, status = resp
-                    assert status == 413
+                assert isinstance(resp, tuple)
+                response, status = resp
+                assert status == 413
+                assert response.get_json()["error"] == "too big, see remediation"
+
+    def test_project_too_large_keeps_the_limit_error_message(self, tmp_path):
+        """The response body must keep _ZipLimits' own message (MB figure +
+        remediation), not the generic "Project too large to export" text."""
+        from quodeq.api.zip import export_project_zip
+        from flask import Flask
+        project = tmp_path / "big"
+        project.mkdir()
+        (project / "file.txt").write_text("x" * 1000)
+
+        app = Flask(__name__)
+        with app.app_context():
+            with patch("quodeq.api.zip._max_zip_size_bytes", return_value=10):
+                resp = export_project_zip("big", str(tmp_path))
+                assert isinstance(resp, tuple)
+                response, status = resp
+                assert status == 413
+                message = response.get_json()["error"]
+                assert "MB" in message
+                assert "QUODEQ_MAX_ZIP_SIZE_MB" in message
+                assert message != "Project too large to export"
 
     def test_os_error(self, tmp_path):
         from quodeq.api.zip import export_project_zip

@@ -12,4 +12,6 @@ h1 {
   border-bottom: 1px solid #21262d;
 }
 #logs { white-space: pre-wrap; word-break: break-word; }
+#log-status { color: #d29922; font-size: 12px; margin-bottom: 8px; min-height: 1em; }
 .ts { color: #484f58; }
+.lvl { color: #6e7681; }

@@ -55,13 +55,14 @@ class LogBuffer:
         """Return a logging.Handler that feeds into this buffer."""
         return self._handler
 
-    def append(self, line: str) -> None:
-        """Add a log line to the buffer."""
+    def append(self, line: str, level: str = "INFO") -> None:
+        """Add a log line to the buffer, tagged with its severity level."""
         with self._lock:
             self._entries.append({
                 "index": self._index,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "line": line,
+                "level": level,
             })
             self._index += 1
 
@@ -146,7 +147,7 @@ class _BufferHandler(logging.Handler):
                 return
             if _is_noisy_werkzeug_access(record):
                 return
-            self._buffer.append(self.format(record))
+            self._buffer.append(self.format(record), level=record.levelname)
         except (ValueError, TypeError, KeyError):
             # A malformed format string or mismatched args must not reach the
             # code that logged; the stdlib contract for a failing handler is

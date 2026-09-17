@@ -38,6 +38,10 @@ def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = 
             try:
                 max_mb = int(raw)
             except ValueError:
+                _logger.warning(
+                    "Invalid QUODEQ_MAX_ZIP_SIZE_MB=%r; falling back to the default of %d MB.",
+                    raw, _DEFAULT_MAX_ZIP_SIZE_MB,
+                )
                 max_mb = _DEFAULT_MAX_ZIP_SIZE_MB
         else:
             max_mb = _DEFAULT_MAX_ZIP_SIZE_MB
@@ -70,23 +74,34 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
     }
 
 
+class _ZipSizeLimitError(ValueError):
+    """Raised when a zip export crosses its compressed or uncompressed size cap.
+
+    Subclasses ValueError so the existing ``except (..., ValueError)`` guards
+    around zip building still catch it, but gives the upload route a precise
+    type to key off of: the route wants to surface *this* error's own
+    actionable message (it carries the MB limits and the remediation), not a
+    generic one, without risking that treatment for an unrelated ValueError.
+    """
+
+
 @dataclass(frozen=True)
 class _ZipLimits:
     """Size caps for one zip export, plus the errors raised when either is crossed."""
 
     size_limit: int
     uncompressed_limit: int
-    compressed_error: ValueError
-    uncompressed_error: ValueError
+    compressed_error: _ZipSizeLimitError
+    uncompressed_error: _ZipSizeLimitError
 
     @staticmethod
     def build(size_limit: int, uncompressed_limit: int) -> "_ZipLimits":
         """Build a _ZipLimits with the (compressed, uncompressed) over-limit errors for these caps."""
-        compressed_error = ValueError(
+        compressed_error = _ZipSizeLimitError(
             f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
             f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
         )
-        uncompressed_error = ValueError(
+        uncompressed_error = _ZipSizeLimitError(
             f"Project exceeds maximum uncompressed size of "
             f"{uncompressed_limit // (1024 * 1024)} MB (it would be rejected on re-import). "
             f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
@@ -165,8 +180,8 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
         return jsonify(body), status
     try:
         tmp_path = _build_project_zip(project_path)
-    except ValueError:
-        body, status = error_response("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+    except _ZipSizeLimitError as exc:
+        body, status = error_response(str(exc), HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
     except (OSError, zipfile.BadZipFile):
         body, status = error_response(
