@@ -32,7 +32,7 @@ class ActionLogWriter:
         self._lock = get_file_lock()
 
     def emit(self, event: BaseEvent) -> None:
-        self._append([event_to_json(event) + "\n"], str(event.event_type))
+        self._append([event], str(event.event_type))
 
     def emit_many(self, events: Iterable[BaseEvent]) -> None:
         """Append every event under one open, one lock and one flush.
@@ -40,16 +40,17 @@ class ActionLogWriter:
         The batch is serialized before the log is opened, so a bad event
         leaves the file untouched. An empty batch opens nothing.
         """
-        lines = [event_to_json(event) + "\n" for event in events]
-        if lines:
-            self._append(lines, f"{len(lines)} events")
+        batch = list(events)
+        if batch:
+            self._append(batch, f"{len(batch)} events")
 
-    def _append(self, lines: list[str], what: str) -> None:
+    def _append(self, events: list[BaseEvent], what: str) -> None:
         try:
+            lines = [event_to_json(event) + "\n" for event in events]
             with open(self.log_path, mode="a", encoding="utf-8") as f:
                 self._lock.acquire(f)
                 try:
-                    f.write("".join(lines))
+                    f.writelines(lines)
                     f.flush()
                 finally:
                     self._lock.release(f)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -136,3 +137,11 @@ def test_emit_many_reads_back_as_typed_events(tmp_path: Path) -> None:
     events = list(read_action_events(tmp_path))
     assert [e.payload.req for e in events] == ["R1", "R2"]
     assert all(isinstance(e, FindingUndismissedEvent) for e in events)
+
+
+def test_a_failed_append_is_logged_with_the_log_path(tmp_path: Path, caplog) -> None:
+    writer = ActionLogWriter(tmp_path)
+    with caplog.at_level(logging.ERROR, logger="quodeq.data.actions_log"), pytest.raises(TypeError):
+        writer.emit_many([*_undismiss("R1"), object()])  # type: ignore[list-item]
+    assert "Failed to emit" in caplog.text
+    assert str(tmp_path / "actions.jsonl") in caplog.text
