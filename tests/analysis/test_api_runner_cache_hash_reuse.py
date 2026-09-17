@@ -13,7 +13,7 @@ from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.fingerprint import _hash_file
+from quodeq.analysis.fingerprint import _hash_file, _stat_key
 
 
 def _run_config(src_root, *, classify_cache=None):
@@ -27,8 +27,9 @@ def _run_config(src_root, *, classify_cache=None):
 def test_build_cache_writer_reuses_the_stashed_classify_time_hash(tmp_path, monkeypatch):
     """When classify_files_via_cache has already stashed a ClassifyResult for
     this dimension, the writer built for it must use miss_hashes rather than
-    re-hashing the file."""
-    from quodeq.analysis.cache import cache_writer as cache_writer_module
+    re-hashing the file -- as long as the stamp beside the hash still matches
+    the file on disk (finding 3)."""
+    from quodeq.analysis.cache import _key_provenance, cache_writer as cache_writer_module
 
     src_root = tmp_path / "src"
     src_root.mkdir()
@@ -40,9 +41,12 @@ def test_build_cache_writer_reuses_the_stashed_classify_time_hash(tmp_path, monk
     def _boom(*_args, **_kwargs):
         raise AssertionError("re-hashed")
 
-    monkeypatch.setattr(cache_writer_module, "_hash_file", _boom)
+    monkeypatch.setattr(_key_provenance, "_hash_file", _boom)
 
-    classify = ClassifyResult(misses=["Foo.kt"], miss_hashes={"Foo.kt": "stashed-hash"})
+    classify = ClassifyResult(
+        misses=["Foo.kt"], miss_hashes={"Foo.kt": "stashed-hash"},
+        miss_stamps={"Foo.kt": _stat_key(src_root / "Foo.kt")},
+    )
     run_config = _run_config(src_root, classify_cache={
         "flexibility": (("Foo.kt",), classify),
     })

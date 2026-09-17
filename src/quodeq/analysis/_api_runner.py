@@ -121,7 +121,9 @@ def _build_cache_writer(
     When ``classify_files_via_cache`` has already stashed this dimension's
     ClassifyResult on ``run_config._classify_cache`` (finding 5398), its
     ``miss_hashes`` is passed through so the writer reuses the hash classify
-    already computed instead of re-hashing every dispatched file.
+    already computed instead of re-hashing every dispatched file, together
+    with its ``miss_stamps`` so the writer can tell a stale hash from a
+    current one.
     """
     if run_config is None or dim_id is None:
         return None
@@ -130,14 +132,17 @@ def _build_cache_writer(
         build_cache_writer,
     )
     from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
-    content_hashes = None
+    content_hashes = content_stamps = None
     stash = run_config._classify_cache
     if stash is not None:
         stashed = stash.get(dim_id)
         if stashed is not None:
             content_hashes = stashed[1].miss_hashes
+            content_stamps = stashed[1].miss_stamps
     return build_cache_writer(
-        CacheWriterSpec.from_run_config(run_config, dim_id, _dcr(), content_hashes),
+        CacheWriterSpec.from_run_config(
+            run_config, dim_id, _dcr(), content_hashes, content_stamps,
+        ),
     )
 
 

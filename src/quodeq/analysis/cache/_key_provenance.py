@@ -24,6 +24,7 @@ from quodeq.analysis.fingerprint import (
     _hash_file,
     _hash_prompts_map,
     _hash_standards,
+    _stat_key,
     dimension_params_state,
 )
 
@@ -118,6 +119,30 @@ def _model_id_from(config: RunConfig) -> str:
     """Pick the most specific model identifier available."""
     opts = config.options
     return opts.subagent_model or opts.ai_model or "unknown"
+
+
+def _content_hash_for(
+    resolved: Path, stashed_hash: str | None, stashed_stamp: tuple[int, int] | None,
+) -> str:
+    """The content hash to key one file's cache entry on.
+
+    Both write paths (``cache_writer._write_cache_entry`` and
+    ``dimension_helpers._build_cache_entry_for_file``) go through here so
+    they key entries on the same rules.
+
+    Classify computes its hashes at run start, before any dimension is
+    dispatched, so a file edited in between is analysed with the new content
+    and would be cached under the old hash. Reuse is therefore conditional on
+    the file still being the one classify hashed: the stamp is its
+    ``_stat_key`` (size, mtime_ns), and a stat is cheap where a second SHA
+    over the file is exactly what the reuse saves. A missing or empty stashed
+    hash means "unknown" and is hashed here, as both paths did before the
+    reuse existed -- an entry keyed on "" is never adoptable and misses
+    forever.
+    """
+    if stashed_hash and stashed_stamp is not None and _stat_key(resolved) == stashed_stamp:
+        return stashed_hash
+    return _hash_file(resolved) or ""
 
 
 def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) -> CacheKey:
