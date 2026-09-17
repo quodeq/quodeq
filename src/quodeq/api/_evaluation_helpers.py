@@ -81,12 +81,17 @@ class InvalidEvaluationOption(ValueError):
 
 def _coerce_int(value: object, default: int, field: str) -> int:
     """Return int(*value*) when convertible; *default* when *value* is
-    ``None`` (absent). Raises ``InvalidEvaluationOption`` naming *field* and
-    the value received when *value* is present but not convertible to int,
-    so a malformed override surfaces as a 400 instead of silently falling
-    back to the default.
+    ``None`` (absent) or a blank/whitespace-only string. Raises
+    ``InvalidEvaluationOption`` naming *field* and the value received when
+    *value* is present but not convertible to int, so a malformed override
+    surfaces as a 400 instead of silently falling back to the default.
+
+    A blank string counts as absent: that is how a cleared form field
+    arrives, and it meant "use the default" before this validation existed.
     """
     if value is None:
+        return default
+    if isinstance(value, str) and not value.strip():
         return default
     try:
         return int(value)
@@ -226,8 +231,11 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS, "maxSubagents")
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
     # Read new key first; fall back to legacy `poolBudget` for back-compat.
+    # The label is the key the client actually sent, so a malformed legacy
+    # value is not reported against a field absent from the body.
+    time_limit_field = "poolBudget" if "poolBudget" in payload and "timeLimit" not in payload else "timeLimit"
     time_limit_raw = _coerce_int(
-        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT, "timeLimit",
+        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT, time_limit_field,
     )
     time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None

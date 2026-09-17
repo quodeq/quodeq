@@ -30,6 +30,12 @@ class TestCoerceInt:
         with pytest.raises(ValueError, match=r"got 'abc'"):
             _coerce_int("abc", 5, "maxSubagents")
 
+    def test_blank_value_is_treated_as_absent(self):
+        assert _coerce_int("", 5, "maxSubagents") == 5
+
+    def test_whitespace_only_value_is_treated_as_absent(self):
+        assert _coerce_int("  ", 5, "maxSubagents") == 5
+
 
 class TestBuildEvaluationOptionsIntFields:
     @staticmethod
@@ -59,6 +65,20 @@ class TestBuildEvaluationOptionsIntFields:
     def test_malformed_context_size_raises_400_worthy_error(self):
         with pytest.raises(ValueError, match="contextSize"):
             _build_evaluation_options(self._payload(contextSize="abc"))
+
+    def test_malformed_legacy_pool_budget_names_pool_budget(self):
+        """The label is the key the client actually sent: reporting the
+        legacy poolBudget as timeLimit named a field absent from the body."""
+        with pytest.raises(ValueError, match="poolBudget"):
+            _build_evaluation_options(self._payload(poolBudget="abc"))
+
+    def test_malformed_time_limit_still_names_time_limit_when_both_are_sent(self):
+        with pytest.raises(ValueError, match="timeLimit"):
+            _build_evaluation_options(self._payload(timeLimit="abc", poolBudget=600))
+
+    def test_blank_time_limit_keeps_the_default(self):
+        options = _build_evaluation_options(self._payload(timeLimit=""))
+        assert options.time_limit == DEFAULT_TIME_LIMIT
 
 
 class TestPostEvaluationsMalformedOption:
@@ -92,3 +112,24 @@ class TestPostEvaluationsMalformedOption:
             headers={"Origin": "http://localhost"},
         )
         assert resp.status_code == HTTPStatus.ACCEPTED
+
+    def test_blank_max_subagents_starts_normally(self, client):
+        """An empty string is how a cleared form field arrives: treat it as
+        absent and default, the way it behaved before the validation."""
+        resp = client.post(
+            "/api/evaluations",
+            json={"repo": "https://github.com/foo/bar", "maxSubagents": ""},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == HTTPStatus.ACCEPTED
+
+    def test_malformed_pool_budget_names_pool_budget_in_the_response(self, client):
+        resp = client.post(
+            "/api/evaluations",
+            json={"repo": "https://github.com/foo/bar", "poolBudget": "abc"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert "poolBudget" in body["error"]
