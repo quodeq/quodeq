@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from quodeq.core.types import JobSnapshot
+from quodeq.services._job_model import JobLaunchOptions
 from quodeq.services.base import EvaluationOptions, DEFAULT_MAX_SUBAGENTS
 from quodeq.shared.utils import is_repo_url
 
@@ -28,16 +29,7 @@ class EvaluationDispatcher(Protocol):
     scaling (e.g. Celery, cloud functions).
     """
 
-    def dispatch(
-        self,
-        cmd: list[str],
-        *,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        ai_provider: str | None = None,
-        ai_model: str | None = None,
-        time_limit_s: int | None = None,
-    ) -> JobSnapshot:
+    def dispatch(self, cmd: list[str], launch: JobLaunchOptions | None = None) -> JobSnapshot:
         """Submit an evaluation command and return the initial job state."""
         ...
 
@@ -48,21 +40,8 @@ class SubprocessDispatcher:
     def __init__(self, job_manager: "JobManager") -> None:
         self._jobs = job_manager
 
-    def dispatch(
-        self,
-        cmd: list[str],
-        *,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        ai_provider: str | None = None,
-        ai_model: str | None = None,
-        time_limit_s: int | None = None,
-    ) -> JobSnapshot:
-        return self._jobs.start_job(
-            cmd, cwd=cwd, env=env,
-            ai_provider=ai_provider, ai_model=ai_model,
-            time_limit_s=time_limit_s,
-        )
+    def dispatch(self, cmd: list[str], launch: JobLaunchOptions | None = None) -> JobSnapshot:
+        return self._jobs.start_job(cmd, launch)
 
 
 def _build_evaluate_cmd(

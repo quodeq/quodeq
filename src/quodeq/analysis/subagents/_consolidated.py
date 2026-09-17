@@ -10,7 +10,8 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
 from quodeq.config.evidence_env import cwe_url_template
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence_by_dimension)
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
@@ -101,7 +102,14 @@ def _collect_consolidated_results(
     )
 
     return parse_jsonl_to_evidence_by_dimension(
-        merged_jsonl, ev_ctx, compiled_dir=paths.compiled_dir,
+        merged_jsonl, ev_ctx, _parse_options(config, paths.compiled_dir),
+    )
+
+
+def _parse_options(config: "RunConfig", compiled_dir: "Path | None") -> EvidenceParseOptions:
+    """Production readers and log sinks for the consolidated evidence parse."""
+    return EvidenceParseOptions(
+        compiled_dir=compiled_dir,
         evaluators_dir=config.evaluators_dir,
         req_map_reader=read_req_to_principle_map,
         refs_reader=load_compiled_refs,

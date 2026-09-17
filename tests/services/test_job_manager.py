@@ -12,7 +12,9 @@ from unittest.mock import MagicMock, patch
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import InMemoryJobStore, Job
 from quodeq.services.jobs import (
+    JobLaunchOptions,
     JobManager,
+    JobProcessSeams,
     STATUS_RUNNING,
     STATUS_CANCELLED,
     STATUS_DONE,
@@ -64,7 +66,7 @@ class TestStartJobSpawnFailure:
         def bad_spawn(*args, **kwargs):
             raise OSError("No such file")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["nonexistent"])
         assert snap.status == STATUS_FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
@@ -74,7 +76,7 @@ class TestStartJobSpawnFailure:
         def bad_spawn(*args, **kwargs):
             raise subprocess.SubprocessError("spawn fail")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["bad"])
         assert snap.status == STATUS_FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
@@ -83,7 +85,7 @@ class TestStartJobSpawnFailure:
         def bad_spawn(*args, **kwargs):
             raise OSError(2, "No such file or directory", "/some/internal/path")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["nonexistent"])
 
         assert snap.error == "Failed to start the evaluation process. Check the server logs for details."
@@ -96,7 +98,7 @@ class TestStartJobSpawnFailure:
         def bad_spawn(*args, **kwargs):
             raise OSError(2, "No such file or directory", "/some/internal/path")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=store, log=log)
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=store, log=log)
         snap = mgr.start_job(["nonexistent"])
 
         job = store.get(snap.job_id)
@@ -235,16 +237,16 @@ class TestStartJobTimeLimit:
 
         # Spawn-failure path avoids threads; time_limit_s is set before spawn
         # so it must survive into the failure snapshot too.
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
-        snap = mgr.start_job(["cmd"], time_limit_s=600)
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
+        snap = mgr.start_job(["cmd"], JobLaunchOptions(time_limit_s=600))
         assert snap.time_limit_s == 600
 
     def test_time_limit_zero_carried(self):
         def bad_spawn(*args, **kwargs):
             raise OSError("boom")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
-        snap = mgr.start_job(["cmd"], time_limit_s=0)
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
+        snap = mgr.start_job(["cmd"], JobLaunchOptions(time_limit_s=0))
         assert snap.time_limit_s == 0
 
 

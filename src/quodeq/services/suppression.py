@@ -27,6 +27,7 @@ from quodeq.core.dismissals import DismissedKeys
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
+    FindingRef,
     is_deleted,
     is_dismissed,
 )
@@ -70,9 +71,9 @@ class SuppressionMatcher:
         if not raw:
             return False
         file = row.get("file") or ""
-        if is_dismissed(self.dismissed, req=row.get("req"), principle=raw,
-                        file=file, line=row.get("line"), snippet=row.get("snippet"),
-                        rules=self.rules):
+        ref = FindingRef(req=row.get("req"), principle=raw, file=file,
+                         line=row.get("line"), snippet=row.get("snippet"))
+        if is_dismissed(self.dismissed, ref, rules=self.rules):
             return True
         return is_deleted(self.deleted, dimension=self.dimension,
                           principle=self.principle_for(raw), file=file)

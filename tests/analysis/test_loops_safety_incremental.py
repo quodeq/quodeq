@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from quodeq.analysis._loops import run_incremental_loop
+from quodeq.analysis._loops import LoopDeps, run_incremental_loop
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
 
@@ -38,8 +38,7 @@ class TestIncrementalLoopSafety:
         with patch("quodeq.analysis._loop_steps._log_dimension_result", side_effect=log_result):
             result = run_incremental_loop(
                 cfg, ["security", "usability", "flexibility"], _ctx(3),
-                runner=_runner_from(fake_runner),
-                on_dimension_done=on_done,
+                LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=on_done),
             )
 
         # All three iterated — flexibility ran despite usability's callback dying.
@@ -64,7 +63,7 @@ class TestIncrementalLoopSafety:
         with patch("quodeq.analysis._loop_steps._log_dimension_result"):
             result = run_incremental_loop(
                 cfg, ["security", "reliability", "maintainability"], _ctx(3),
-                runner=_runner_from(fake_runner),
+                LoopDeps(runner=_runner_from(fake_runner)),
             )
         assert seen == ["security", "reliability", "maintainability"]
         assert set(result) == {"security", "maintainability"}
@@ -74,8 +73,7 @@ class TestIncrementalLoopSafety:
         with patch("quodeq.analysis._loop_steps._log_dimension_result"):
             run_incremental_loop(
                 cfg, ["security", "flexibility"], _ctx(2),
-                runner=_runner_from(lambda *a: _FakeEvidence()),
-                log=recording_log,
+                LoopDeps(runner=_runner_from(lambda *a: _FakeEvidence()), log=recording_log),
             )
         messages = recording_log.info_messages
         assert any("incremental: 2 dim(s) to process: security, flexibility" in m for m in messages)

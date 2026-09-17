@@ -394,7 +394,8 @@ class TestRunApiAnalysisBridge:
 
     def test_trust_model_reaches_assemble_api_prompt(self, tmp_path):
         """C2: ``_dispatch_one_batch`` in ``_api_batch.py`` passes
-        ``trust_model=ctx.trust_model``, fed from ``resolve_trust_model(work_dir)``
+        ``trust_model=ctx.trust_model`` in its ``ProjectBrief``, fed from
+        ``resolve_trust_model(work_dir)``
         in the same module's ``_build_api_batch_context``. That is one of three
         live wiring points for the declared trust model.
         Nothing failed when a reviewer set all three to None at once and the
@@ -428,7 +429,7 @@ class TestRunApiAnalysisBridge:
             _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
 
         mock_assemble.assert_called_once()
-        trust_model = mock_assemble.call_args.kwargs["trust_model"]
+        trust_model = mock_assemble.call_args.kwargs["project"].trust_model
         assert trust_model is not None
         assert trust_model.multi_tenant is False
         assert trust_model.network_exposure == "loopback"

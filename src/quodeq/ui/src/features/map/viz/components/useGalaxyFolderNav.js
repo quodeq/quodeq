@@ -63,7 +63,8 @@ function useCurrentSceneMemo(node, refs, navVersion) {
 
 /** Reset nav (back to the project root) whenever `resetKey` changes — a
  * fresh mount of the same project, distinct from an external path sync. */
-function useResetOnKeyChange(refs, node, resetKey, saveNav, savedFolderNavRef, savedFolderCamRef) {
+function useResetOnKeyChange(bundle, node, resetKey, saveNav) {
+  const { refs, savedFolderNavRef, savedFolderCamRef } = bundle;
   const prevResetKey = useRef(resetKey);
   useEffect(() => {
     if (resetKey !== prevResetKey.current) {
@@ -90,7 +91,8 @@ function useResetOnKeyChange(refs, node, resetKey, saveNav, savedFolderNavRef, s
  * `startTransition` arms the zoom/pan animation the camera hook advances.
  */
 export function useGalaxyFolderNav({ node, currentPath, onPathChange, resetKey }) {
-  const { refs, savedFolderNavRef, savedFolderCamRef } = useFolderRefsBundle(node, currentPath);
+  const bundle = useFolderRefsBundle(node, currentPath);
+  const { refs, savedFolderNavRef, savedFolderCamRef } = bundle;
   const [navVersion, setNavVersion] = useState(0);
   const { currentNode, scene } = useCurrentSceneMemo(node, refs, navVersion);
 
@@ -128,7 +130,7 @@ export function useGalaxyFolderNav({ node, currentPath, onPathChange, resetKey }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useResetOnKeyChange(refs, node, resetKey, saveNav, savedFolderNavRef, savedFolderCamRef);
+  useResetOnKeyChange(bundle, node, resetKey, saveNav);
 
   return { refs, currentNode, scene, navVersion, setNavVersion, saveNav, startTransition };
 }

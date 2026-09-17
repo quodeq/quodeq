@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions
+from quodeq.services._job_model import JobLaunchOptions
+from quodeq.services.base import EvaluationOptions, NewProjectSpec
 from quodeq.services.project_registration import mark_onboarding_complete, register_project
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url
@@ -89,7 +90,9 @@ class FsEvaluationMixin:
             )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
-        project_uuid = register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
+        project_uuid = register_project(
+            reports_dir, NewProjectSpec(repo, options.discipline, scope_path=options.scope_path),
+        )
         # Launching an evaluation is the terminal step of project setup, so
         # the 'Resume setup' badge must clear here. Without this stamp the
         # null written at registration persists forever (the lazy backfill
@@ -112,12 +115,12 @@ class FsEvaluationMixin:
                 candidate = candidate.parent
         else:
             cwd = str(resolved)
-        return self.dispatcher.dispatch(
-            cmd, cwd=cwd, env=env,
+        return self.dispatcher.dispatch(cmd, JobLaunchOptions(
+            cwd=cwd, env=env,
             ai_provider=options.ai_cmd,
             ai_model=options.ai_model,
             time_limit_s=options.time_limit,
-        )
+        ))
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return the current status of an evaluation job.

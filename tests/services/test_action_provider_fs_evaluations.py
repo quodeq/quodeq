@@ -18,12 +18,12 @@ class StubJobs:
     def __init__(self):
         self.captured: dict = {}
 
-    def start_job(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
+    def start_job(self, cmd, launch=None):
         self.captured["cmd"] = cmd
-        self.captured["cwd"] = cwd
-        self.captured["env"] = env
-        self.captured["ai_provider"] = ai_provider
-        self.captured["ai_model"] = ai_model
+        self.captured["cwd"] = launch.cwd
+        self.captured["env"] = launch.env
+        self.captured["ai_provider"] = launch.ai_provider
+        self.captured["ai_model"] = launch.ai_model
         return {"jobId": "test"}
 
 

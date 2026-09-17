@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -35,6 +36,23 @@ _INDEX_FILENAME = ".repo_index.json"
 def _repo_index_key(name: str, path: str, scope_path: str | None) -> str:
     """Stable string key for a (name, path, scopePath) identity tuple."""
     return f"{name}\x00{path}\x00{scope_path or ''}"
+
+
+@dataclass(frozen=True, slots=True)
+class RepoIdentity:
+    """The (name, path, scopePath) triple ``find_existing_project`` matches on.
+
+    ``name`` is the bare project name derived from the repo, ``path`` the
+    resolved local path or the URL as given, ``scope_path`` the optional
+    sub-tree a scoped child project is registered for.
+    """
+    name: str
+    path: str
+    scope_path: str | None = None
+
+    def key(self) -> str:
+        """The index key for this identity (see ``_repo_index_key``)."""
+        return _repo_index_key(self.name, self.path, self.scope_path)
 
 
 def _load_repo_index(reports_root: Path) -> dict[str, str]:
@@ -69,22 +87,22 @@ def _save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink 
 
 
 def add_repo_index_entry(
-    reports_root: Path, name: str, path: str, scope_path: str | None, project_uuid: str,
+    reports_root: Path, identity: RepoIdentity, project_uuid: str,
     *, log: LogSink = NULL_LOG,
 ) -> None:
     """Register a newly-created project in the repo-identity index (best-effort)."""
     index = _load_repo_index(reports_root)
-    index[_repo_index_key(name, path, scope_path)] = project_uuid
+    index[identity.key()] = project_uuid
     _save_repo_index(reports_root, index, log=log)
 
 
 def rekey_repo_index_entry(
-    reports_root: Path, project_uuid: str, name: str, path: str, scope_path: str | None,
+    reports_root: Path, project_uuid: str, identity: RepoIdentity,
     *, log: LogSink = NULL_LOG,
 ) -> None:
     """Re-point a project's index entry at its changed repo identity.
 
-    ``path`` is one third of the key, so a project whose stored path moves
+    ``identity.path`` is one third of the key, so a project whose stored path moves
     leaves the old key still mapped to its uuid. Drop every key pointing at
     the uuid, then register the new identity — one read-modify-write.
 
@@ -97,7 +115,7 @@ def rekey_repo_index_entry(
     """
     index = _load_repo_index(reports_root)
     updated = {key: value for key, value in index.items() if value != project_uuid}
-    updated[_repo_index_key(name, path, scope_path)] = project_uuid
+    updated[identity.key()] = project_uuid
     if updated != index:
         _save_repo_index(reports_root, updated, log=log)
 

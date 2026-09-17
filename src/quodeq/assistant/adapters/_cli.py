@@ -146,12 +146,12 @@ def _consume_stream_events(stdout, emit: Callable[[dict], None], parsed_sid: str
     return texts, errors, raw_errors, parsed_sid, partial_buf, saw_result
 
 
-def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, *, emit: Callable[[dict], None],
-                      spawn_fn, cancel: CancelToken):
+def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession):
     """Build the sandboxed argv, spawn the CLI, and stream its output.
 
     Returns ``(cwd, proc, timer, sandbox_cleanup, stream_result)`` — the
-    first four feed ``_run_once``'s ``finally`` cleanup.
+    first four feed ``_run_once``'s ``finally`` cleanup. *session* must
+    carry resolved ``spawn_fn``/``cancel`` (``run_cli_turn`` fills them in).
     """
     cwd = scratch_cwd(cfg.scratch_base)
     argv = spec.argv
@@ -166,15 +166,15 @@ def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, *, emit: Callable[[dict
                            *([str(cfg.worktree_dir)] if cfg.worktree_dir else [])],
             writable_files=[db, db + "-wal", db + "-shm", db + "-journal"])
         argv = prefix + argv
-    proc = spawn_fn(argv, cwd=cwd, env=build_chat_env())
+    proc = session.spawn_fn(argv, cwd=cwd, env=build_chat_env())
     # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
     timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
     timer.start()
     # Stop endpoint: cancelling the token kills the process tree, which
     # EOFs stdout below and lets the turn unwind (runs immediately if the
     # stop already landed).
-    cancel.register_kill(lambda: _kill_proc_tree(proc))
-    stream_result = _consume_stream_events(proc.stdout, emit, spec.session_id)
+    session.cancel.register_kill(lambda: _kill_proc_tree(proc))
+    stream_result = _consume_stream_events(proc.stdout, session.emit, spec.session_id)
     return cwd, proc, timer, sandbox_cleanup, stream_result
 
 
@@ -224,8 +224,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
             prior_session_id=session.prior_session_id, new_session_id=new_session_id)
         spec = build_turn_argv(cli_cfg, request)
         cwd, proc, timer, sandbox_cleanup, stream_result = _spawn_and_stream(
-            cfg, cli_cfg, spec, emit=session.emit, spawn_fn=session.spawn_fn,
-            cancel=session.cancel)
+            cfg, cli_cfg, spec, session)
         return _finalize_turn_result(proc, stream_result, repository=session.repository,
                                      session_id=session.session_id)
     finally:

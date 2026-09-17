@@ -65,8 +65,8 @@ class TestDimensionRunnerContract:
         callbacks = _noop_callbacks(ev)
         captured = {}
 
-        def fake_cache(config, dim_id, idx, ctx, cbs, **kw):
-            captured["callbacks"] = cbs
+        def fake_cache(config, dim_id, idx, ctx, opts):
+            captured["callbacks"] = opts.callbacks
             return ev
 
         with patch(
@@ -75,7 +75,10 @@ class TestDimensionRunnerContract:
         ):
             DimensionRunner(callbacks=callbacks).run(MagicMock(), "security", 1, _make_ctx())
 
-        assert captured["callbacks"] is callbacks
+        passed = captured["callbacks"]
+        assert passed.build_prompt is callbacks.build_prompt
+        assert passed.run_analysis is callbacks.run_analysis
+        assert passed.parse_evidence is callbacks.parse_evidence
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +203,8 @@ class TestInjectedLogSink:
     def test_log_is_threaded_into_cache_runner(self, recording_log):
         captured = {}
 
-        def fake_cache(config, dim_id, idx, ctx, cbs, **kw):
-            captured["log"] = kw.get("log")
+        def fake_cache(config, dim_id, idx, ctx, opts):
+            captured["log"] = opts.callbacks.log
             return _make_evidence()
 
         with patch(

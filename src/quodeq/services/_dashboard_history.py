@@ -109,16 +109,34 @@ class _DashboardPayload:
 
 @dataclass(frozen=True)
 class _SelectedRunContext:
-    """Pre-resolved data for the selected run in a dashboard request."""
+    """Pre-resolved data for the selected run in a dashboard request.
+
+    ``runs`` is the project's full run list (newest first) that ``run`` was
+    resolved from; ``index`` is its position in that list.
+    """
     run: RunInfo
     index: int
     dimensions: list[DimensionResult]
     summary: DimensionSummary
+    runs: list[RunInfo]
+
+
+@dataclass(frozen=True, slots=True)
+class _HistoryWindow:
+    """The scoreable runs a dashboard request walks, and where the selected run sits.
+
+    ``index`` is the selected run's position in ``runs`` (``len(runs)`` when the
+    selected run is not scoreable, so the whole window counts as older).
+    ``max_history`` is the scan ceiling the window was cut with.
+    """
+    runs: list[RunInfo]
+    index: int
+    max_history: int
 
 
 def _select_history_window(
     runs: list[RunInfo], selected_run_id: str, max_history: int,
-) -> tuple[list[RunInfo], int]:
+) -> _HistoryWindow:
     """Pick the history window and the selected run's index within it.
 
     Shared trend rule (scoring_view.select_trend_runs): cancelled/failed
@@ -140,13 +158,13 @@ def _select_history_window(
         # Selected run was cancelled/failed (so it's not in scoreable_runs).
         # Treat the entire scoreable history as "older" runs relative to it.
         history_runs = scoreable_runs[:max_history]
-        return history_runs, len(history_runs)
+        return _HistoryWindow(history_runs, len(history_runs), max_history)
     history_runs = scoreable_runs[:max(max_history, selected_in_scoreable + 1)]
-    return history_runs, selected_in_scoreable
+    return _HistoryWindow(history_runs, selected_in_scoreable, max_history)
 
 
 def _make_history_fetcher(
-    reports_root: Path, project: str, history_runs: list[RunInfo], max_history: int,
+    reports_root: Path, project: str, window: _HistoryWindow,
     params: ScoringParams, cc: DashboardCacheConfig,
 ) -> Callable[[str], list[DimensionResult]]:
     """Build the shared history dimension fetcher: cache-backed,
@@ -176,40 +194,37 @@ def _make_history_fetcher(
     here rather than a per-run scoped one -- per-run scoping only makes sense
     when a single run is in play, which this path is not.
     """
-    cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    cacheable_run_ids = {r.run_id for r in window.runs if r.status == "complete"}
     from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
-    dim_cache_version = score_cache_version(reports_root / project, params)
+    dim_cache_config = replace(cc, version=score_cache_version(reports_root / project, params))
     return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         deps=ScoringDeps(
-            max_history=max_history,
+            max_history=window.max_history,
             base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
-                rr, proj, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
-                version=dim_cache_version,
+                rr, proj, dim_cache_config,
             ),
         ),
     )
 
 
 def _compute_dashboard_payload(
-    reports_root: Path, project: str, runs: list[RunInfo],
-    ctx: _SelectedRunContext, cc: DashboardCacheConfig,
-    params: ScoringParams = DEFAULT_PARAMS,
+    reports_root: Path, project: str, ctx: _SelectedRunContext,
+    cc: DashboardCacheConfig, params: ScoringParams = DEFAULT_PARAMS,
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
-    max_history = _max_history_runs()
-    history_runs, history_index = _select_history_window(runs, ctx.run.run_id, max_history)
-    get_run_dimensions = _make_history_fetcher(reports_root, project, history_runs, max_history, params, cc)
+    window = _select_history_window(ctx.runs, ctx.run.run_id, _max_history_runs())
+    get_run_dimensions = _make_history_fetcher(reports_root, project, window, params, cc)
     previous_by_dimension = _collect_previous_scores(
-        history_runs, history_index, selected_dim_names, get_run_dimensions,
+        window.runs, window.index, selected_dim_names, get_run_dimensions,
     )
     stale_dimensions, stale_previous_by_dimension = collect_stale_dimensions(
-        history_runs, history_index, selected_dim_names, get_run_dimensions,
+        window.runs, window.index, selected_dim_names, get_run_dimensions,
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
-        trend=build_accumulated_trend(history_runs, get_run_dimensions, params=params),
+        trend=build_accumulated_trend(window.runs, get_run_dimensions, params=params),
         dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,

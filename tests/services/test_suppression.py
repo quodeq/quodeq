@@ -10,6 +10,7 @@ import json
 import pytest
 
 from quodeq.services.suppression import SuppressionMatcher, matcher_for
+from quodeq.services.suppression_keys import SuppressionKeys
 
 
 def _evidence(**over):
@@ -135,7 +136,7 @@ class TestParityWithTheDashboardParsePath:
 
         parsed, compliance = _parse_jsonl_findings(
             jsonl.read_text().splitlines(), "reliability",
-            deleted_keys=deleted_keys(project),
+            keys=SuppressionKeys(frozenset(), deleted_keys(project)),
         )
 
         assert tally.violations == len(parsed) == 1

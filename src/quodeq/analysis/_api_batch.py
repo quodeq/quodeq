@@ -30,7 +30,7 @@ from quodeq.analysis._api_standards_text import (
     _max_standards_chars,
 )
 from quodeq.analysis._config import AnalysisConfig
-from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
+from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.shared import cancellation
 
@@ -104,9 +104,9 @@ def _dispatch_one_batch(
         source_files=batch,
         standards_text=ctx.standards_text,
         dimension=cfg.dimension or "general",
-        repo_name=str(ctx.work_dir.name),
-        repo_root=ctx.work_dir,
-        trust_model=ctx.trust_model,
+        project=ProjectBrief(
+            name=str(ctx.work_dir.name), root=ctx.work_dir, trust_model=ctx.trust_model,
+        ),
     )
 
     # POSIX-style separators: the rest of the pipeline assumes forward

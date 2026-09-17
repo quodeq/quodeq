@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
+from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
 
@@ -40,8 +40,7 @@ class TestCallbackRetryPersistsSideEffects:
 
         run_per_dimension_loop(
             cfg, ["security", "reliability"], _ctx(2),
-            runner=_runner_from(lambda *a: _FakeEvidence()),
-            on_dimension_done=scoring_callback,
+            LoopDeps(runner=_runner_from(lambda *a: _FakeEvidence()), on_dimension_done=scoring_callback),
         )
         # security was retried once; reliability ran straight through.
         assert attempts == {"security": 2, "reliability": 1}
@@ -56,9 +55,7 @@ class TestCallbackRetryPersistsSideEffects:
 
         run_per_dimension_loop(
             cfg, ["security"], _ctx(1),
-            runner=_runner_from(lambda *a: _FakeEvidence()),
-            on_dimension_done=always_raises,
-            log=recording_log,
+            LoopDeps(runner=_runner_from(lambda *a: _FakeEvidence()), on_dimension_done=always_raises, log=recording_log),
         )
         warn_messages = recording_log.warning_messages
         assert any("retry after broken pipe raised" in m for m in warn_messages), warn_messages
@@ -86,8 +83,7 @@ class TestCallbackRetryPersistsSideEffects:
         with patch("quodeq.analysis._loop_steps._log_dimension_result", side_effect=log_result):
             run_incremental_loop(
                 cfg, ["security", "reliability"], _ctx(2),
-                runner=_runner_from(fake_runner),
-                on_dimension_done=scoring_callback,
+                LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=scoring_callback),
             )
 
         assert attempts == {"security": 1, "reliability": 1}
@@ -124,11 +120,8 @@ class TestProductionBugRegression:
 
         with patch("quodeq.analysis._loop_steps._log_dimension_result"):
             result = run_incremental_loop(
-                cfg,
-                ["security", "reliability", "maintainability", "performance", "usability", "flexibility"],
-                _ctx(6),
-                runner=_runner_from(fake_runner),
-                on_dimension_done=scoring_callback,
+                cfg, ["security", "reliability", "maintainability", "performance", "usability", "flexibility"], _ctx(6),
+                LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=scoring_callback),
             )
 
         # All six dims attempted, including flexibility which was the missing one in prod.

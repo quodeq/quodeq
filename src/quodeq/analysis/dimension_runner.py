@@ -9,9 +9,11 @@ emit_log behaviour) without calling real AI infrastructure.
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.backend import CacheBackend
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.checks.runner import apply_checks_for_run
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
@@ -54,8 +56,9 @@ class DimensionRunner:
         cache: CacheBackend | None = None,
         log: LogSink = NULL_LOG,
     ) -> None:
-        self._callbacks = callbacks or _default_callbacks()
-        self._cache = cache
+        self._opts = CacheRunOptions(
+            callbacks=replace(callbacks or _default_callbacks(), log=log), cache=cache,
+        )
         self._log = log
 
     def run(
@@ -72,10 +75,7 @@ class DimensionRunner:
             emit_marker("analyzing", dimension=dim_id)
             self._log.info(f"→ [{idx}/{ctx.total}] Analyzing {dim_id}")
 
-        ev = process_dimension_with_cache(
-            config, dim_id, idx, ctx, self._callbacks, cache=self._cache,
-            log=self._log,
-        )
+        ev = process_dimension_with_cache(config, dim_id, idx, ctx, self._opts)
 
         if ev is None:
             self._log.warning(f"[{idx}/{ctx.total}] {dim_id} — no valid evidence, skipping")

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from quodeq.core.checks._judgments import compliance, violation
 from quodeq.core.checks.layers import is_entity_layer_path, is_outer_layer_module
-from quodeq.core.checks.model import ImportGraph, top_level
+from quodeq.core.checks.model import ImportGraph, SourceLocation, top_level
 from quodeq.core.events.models import Judgment
 
 REQ = "CLEA-DEP-02"
@@ -49,7 +49,7 @@ def check_entity_imports(graph: ImportGraph, *, dimension: str) -> list[Judgment
 
     judgments = [
         violation(
-            req=REQ, dimension=dimension, file=file, line=line,
+            req=REQ, dimension=dimension, at=SourceLocation(file, line),
             title=f"Entity layer imports '{module}'",
             reason=(
                 f"This file is in the entity layer and imports '{module}', "

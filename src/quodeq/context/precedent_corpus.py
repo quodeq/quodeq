@@ -131,13 +131,16 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     from quodeq.llm_bridge._embeddings import (  # noqa: PLC0415
         BATCH_TIMEOUT,
         QUERY_TIMEOUT,
+        EmbeddingEndpoint,
         embed_texts,
         embedding_model_available,
     )
 
+    endpoint = EmbeddingEndpoint(base_url=base_url)
+
     def _embed(texts: list[str], **kw: object) -> list[list[float]]:
         timeout = kw.get("timeout", QUERY_TIMEOUT)
-        return embed_texts(texts, model=model, base_url=base_url, timeout=timeout)  # type: ignore[arg-type]
+        return embed_texts(texts, model=model, endpoint=endpoint, timeout=timeout)  # type: ignore[arg-type]
 
     return _embed, embedding_model_available, BATCH_TIMEOUT
 

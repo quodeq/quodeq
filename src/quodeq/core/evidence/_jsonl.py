@@ -2,20 +2,16 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable
-from contextlib import AbstractContextManager
+from collections.abc import Iterable
 from pathlib import Path
 
 from quodeq.core._constants import FULL_CONFIDENCE
-from quodeq.core.evidence._refs import RefsReader, enrich_judgment
+from quodeq.core.evidence._options import EvidenceParseOptions, MalformedLineSink
+from quodeq.core.evidence._refs import enrich_judgment
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 from quodeq.core.events.models import Judgment, VALID_VERDICTS
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
-
-# A malformed-line message is handed to this sink instead of logged directly,
-# so core never imports a logging framework -- see quodeq.core.observability.
-MalformedLineSink = Callable[[str], None]
 
 
 def parse_jsonl_line(
@@ -108,38 +104,23 @@ def judgment_to_dict(j: Judgment) -> dict:
     return d
 
 
-def parse_judgments(
-    lines: Iterable[str], compiled_dir: Path | None,
-    cwe_url_template: str | None = None,
-    *, refs_reader: RefsReader | None = None,
-    on_malformed_line: MalformedLineSink | None = None,
-) -> list[Judgment]:
+def parse_judgments(lines: Iterable[str], options: EvidenceParseOptions) -> list[Judgment]:
     """Parse JSONL lines and return enriched Judgment objects."""
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
     for line in lines:
-        result = parse_jsonl_line(line, on_malformed_line=on_malformed_line)
+        result = parse_jsonl_line(line, on_malformed_line=options.on_malformed_line)
         if result is not None:
             j, llm_refs = result
-            j = enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache,
-                                cwe_url_template=cwe_url_template,
-                                refs_reader=refs_reader)
+            j = enrich_judgment(j, llm_refs, req_refs_cache, options)
             judgments.append(j)
     return judgments
 
 
-def read_judgments(
-    jsonl_file: Path, compiled_dir: Path | None,
-    open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
-    cwe_url_template: str | None = None,
-    *, refs_reader: RefsReader | None = None,
-    on_malformed_line: MalformedLineSink | None = None,
-) -> list[Judgment]:
+def read_judgments(jsonl_file: Path, options: EvidenceParseOptions) -> list[Judgment]:
     """Read JSONL lines from a file and return enriched Judgment objects."""
     if not jsonl_file.exists():
         return []
-    opener = open_fn or open_text
+    opener = options.open_fn or open_text
     with opener(jsonl_file) as _jf:
-        return parse_judgments(_jf, compiled_dir, cwe_url_template=cwe_url_template,
-                                refs_reader=refs_reader,
-                                on_malformed_line=on_malformed_line)
+        return parse_judgments(_jf, options)

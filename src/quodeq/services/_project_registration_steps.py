@@ -35,21 +35,18 @@ from quodeq.shared.utils import is_repo_url, project_name_from_repo
 _LOCATION_LOCAL = "local"
 
 
-def _resolve_target_path(
-    repo: str, repo_resolved: str, project_name: str, project_uuid: str, *,
-    is_url: bool, ephemeral: bool, clone_dest: str | None, clones_dir: Path | None,
-) -> Path:
+def _resolve_target_path(request: _MaterializeRequest) -> Path:
     """Resolve/create the on-disk path the project will live at.
 
     For a URL input, clones into an ephemeral cache dir or the caller's
-    chosen *clone_dest*. For a local path input, resolves in place -- the
+    chosen ``clone_dest``. For a local path input, resolves in place -- the
     directory must already exist.
     """
-    if is_url:
-        if ephemeral:
-            target_path = (clones_dir or get_clones_dir()) / project_uuid
+    if request.is_url:
+        if request.ephemeral:
+            target_path = (request.clones_dir or get_clones_dir()) / request.project_uuid
         else:
-            target_path = Path(clone_dest).resolve() / project_name
+            target_path = Path(request.clone_dest).resolve() / request.project_name
         target_path.parent.mkdir(parents=True, exist_ok=True)
         # Re-validate immediately before the clone dispatch: the project-uuid
         # resolution between _validate_clone_target's check and here (index
@@ -60,12 +57,12 @@ def _resolve_target_path(
         # inside the subprocess below; only pinning the resolved IP through git's
         # own connection (a hosts-file override or proxy layer) would close it,
         # and that's out of scope here.
-        validate_remote_url(repo)
+        validate_remote_url(request.repo)
         # run_git_clone raises CloneError on failure (Task A8). We let it propagate.
-        run_git_clone(repo, target_path)
+        run_git_clone(request.repo, target_path)
         return target_path
 
-    target_path = Path(repo_resolved)
+    target_path = Path(request.repo_resolved)
     if not target_path.is_dir():
         # A path pointing at a FILE is a distinct user mistake from a
         # missing path (a real registration once slipped through as
@@ -151,11 +148,7 @@ class _MaterializeRequest:
 
 def _materialize_and_scan(request: _MaterializeRequest) -> None:
     """Resolve the on-disk path, persist repository_info.json, and scan."""
-    target_path = _resolve_target_path(
-        request.repo, request.repo_resolved, request.project_name, request.project_uuid,
-        is_url=request.is_url, ephemeral=request.ephemeral,
-        clone_dest=request.clone_dest, clones_dir=request.clones_dir,
-    )
+    target_path = _resolve_target_path(request)
     _persist_repository_info(
         request.project_dir, target_path,
         is_url=request.is_url, repo=request.repo, ephemeral=request.ephemeral,

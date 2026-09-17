@@ -44,8 +44,8 @@ def quiet_collaborators(monkeypatch) -> dict:
         calls["read_run_data"] = (root, project, run_id)
         return []
 
-    def fake_rescore(dimensions, dismissed, deleted, *, run_dir, rules):
-        calls["rescore"] = {"run_dir": run_dir, "rules": rules}
+    def fake_rescore(dimensions, keys, *, run_dir):
+        calls["rescore"] = {"run_dir": run_dir, "rules": keys.rules}
         return {"dimensions": [], "summary": {"dimensionsCount": 0}}
 
     monkeypatch.setattr(rescore_run, "read_run_data", fake_read_run_data)

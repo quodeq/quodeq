@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from quodeq.analysis._loops import run_per_dimension_loop, run_incremental_loop
+from quodeq.analysis._loops import LoopDeps, run_per_dimension_loop, run_incremental_loop
 from quodeq.analysis._types import RunConfig, AnalysisOptions
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import read_dimensions
@@ -51,7 +51,10 @@ class TestPerDimensionLoopTransitions:
         ev = MagicMock()
         ev.exit_reason = None  # DONE-write path forwards this into dimensions.json
 
-        run_per_dimension_loop(config, ["security"], ctx, runner=_runner_returning(ev))
+        run_per_dimension_loop(
+            config, ["security"], ctx,
+            LoopDeps(runner=_runner_returning(ev)),
+        )
 
         states = read_dimensions(tmp_path)["dimensions"]
         assert states["security"]["state"] == "done"
@@ -62,7 +65,7 @@ class TestPerDimensionLoopTransitions:
 
         run_per_dimension_loop(
             config, ["security"], ctx,
-            runner=_runner_raising(RuntimeError("boom")),
+            LoopDeps(runner=_runner_raising(RuntimeError("boom"))),
         )
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
@@ -79,7 +82,7 @@ class TestPerDimensionLoopTransitions:
 
         runner = MagicMock()
         runner.run.side_effect = cancel_then_raise
-        run_per_dimension_loop(config, ["security"], ctx, runner=runner)
+        run_per_dimension_loop(config, ["security"], ctx, LoopDeps(runner=runner))
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -89,7 +92,10 @@ class TestPerDimensionLoopTransitions:
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
 
-        run_per_dimension_loop(config, ["security"], ctx, runner=_runner_returning(None))
+        run_per_dimension_loop(
+            config, ["security"], ctx,
+            LoopDeps(runner=_runner_returning(None)),
+        )
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -108,7 +114,8 @@ class TestPerDimensionLoopTransitions:
         runner = MagicMock()
         runner.run.side_effect = proc
         run_per_dimension_loop(
-            config, ["security", "reliability"], ctx, runner=runner,
+            config, ["security", "reliability"], ctx,
+            LoopDeps(runner=runner),
         )
 
         states = read_dimensions(tmp_path)["dimensions"]
@@ -128,7 +135,8 @@ class TestIncrementalLoopTransitions:
         monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
 
         run_incremental_loop(
-            config, ["security"], ctx, runner=_runner_returning(ev),
+            config, ["security"], ctx,
+            LoopDeps(runner=_runner_returning(ev)),
         )
 
         assert read_dimensions(tmp_path)["dimensions"]["security"]["state"] == "done"
@@ -154,7 +162,7 @@ class TestIncrementalLoopTransitions:
         runner = MagicMock()
         runner.run.side_effect = [RuntimeError("inc failed"), ev]
 
-        run_incremental_loop(config, ["security"], ctx, runner=runner)
+        run_incremental_loop(config, ["security"], ctx, LoopDeps(runner=runner))
 
         assert read_dimensions(tmp_path)["dimensions"]["security"]["state"] == "done"
 
@@ -168,7 +176,7 @@ class TestIncrementalLoopTransitions:
         # RuntimeError) tuple, so the bare ``except Exception`` branch runs.
         runner = _runner_raising(TypeError("unexpected"))
 
-        run_incremental_loop(config, ["security"], ctx, runner=runner)
+        run_incremental_loop(config, ["security"], ctx, LoopDeps(runner=runner))
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
@@ -254,7 +262,7 @@ class TestRunDirResolution:
             ctx = MagicMock(total=1)
             run_per_dimension_loop(
                 config, ["security"], ctx,
-                runner=_runner_returning(ev),
+                LoopDeps(runner=_runner_returning(ev)),
             )
 
         # The loop's DONE write hit the SAME file the lifecycle seeded.

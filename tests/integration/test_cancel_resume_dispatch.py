@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
 from tests.integration._cancel_resume_fixtures import (  # noqa: F401 -- _reset_cancel is a pytest fixture
@@ -40,7 +40,7 @@ class TestResumeAfterCancel:
         d1 = _ScriptedDispatcher(work_dir, behavior="first_two_ok_then_cancel")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d1),
         )
         # First run dispatched all 4 files into the pool (cancel happens AFTER
         # the dispatcher returns). Two have ok markers, two don't.
@@ -53,7 +53,7 @@ class TestResumeAfterCancel:
         d2 = _ScriptedDispatcher(work_dir, behavior="ok_all")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d2),
         )
         # Second run only dispatched the two files that didn't get an ok marker.
         assert d2.calls[0] == {"c.py", "d.py"}
@@ -83,7 +83,7 @@ class TestDiscardForcesFullRedispatch:
         d1 = _ScriptedDispatcher(run_dir / "evidence", behavior="first_two_ok_then_cancel")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d1),
         )
         cancellation.reset()
 
@@ -108,7 +108,7 @@ class TestDiscardForcesFullRedispatch:
         d2 = _ScriptedDispatcher(run_dir / "evidence", behavior="ok_all")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d2),
         )
         assert d2.calls[0] == {"a.py", "b.py", "c.py", "d.py"}
 
@@ -124,14 +124,14 @@ class TestTokenOutMidFile:
         d1 = _ScriptedDispatcher(work_dir, behavior="first_one_token_limit")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d1),
         )
 
         # Second run: only the error-marked file should re-dispatch.
         d2 = _ScriptedDispatcher(work_dir, behavior="ok_all")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d2),
         )
         assert d2.calls[0] == {"a.py"}
 
@@ -162,7 +162,7 @@ class TestCrashPathPreservesLikeCancel:
         with pytest.raises(RuntimeError):
             process_dimension_with_cache(
                 config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache, dispatcher=d1,
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d1),
             )
 
         # Second run: a.py and b.py were cached (had ok markers); c.py
@@ -170,6 +170,6 @@ class TestCrashPathPreservesLikeCancel:
         d2 = _ScriptedDispatcher(work_dir, behavior="ok_all")
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=cache, dispatcher=d2,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d2),
         )
         assert d2.calls[0] == {"c.py"}

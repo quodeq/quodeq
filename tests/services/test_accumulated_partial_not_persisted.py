@@ -60,8 +60,8 @@ def persist_spy(monkeypatch):
 def test_partial_rescore_is_served_but_not_persisted(project, persist_spy):
     real = scoring._rescore_runs_by_dimension
 
-    def partial(dims, reports_root, project_name, dismissed, deleted=None, *, params=None):
-        full = real(dims, reports_root, project_name, dismissed, deleted, params=params)
+    def partial(dims, reports_root, project_name, keys, *, params=None):
+        full = real(dims, reports_root, project_name, keys, params=params)
         # Simulate the incident: only the first-finished dimension came back.
         return {k: v for k, v in full.items() if k == "security"}
 

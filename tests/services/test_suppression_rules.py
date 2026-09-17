@@ -13,7 +13,7 @@ import json
 import pytest
 
 from quodeq.core.types.suppression_rule import SuppressionRule
-from quodeq.services.suppression_keys import is_dismissed, matches_suppression_rule
+from quodeq.services.suppression_keys import FindingRef, SuppressionKeys, is_dismissed, matches_suppression_rule
 
 
 class TestMatchesSuppressionRule:
@@ -50,26 +50,29 @@ class TestIsDismissedHonoursRules:
     def test_rule_suppresses_without_an_exact_key(self):
         rules = (SuppressionRule(req="CLEA-DEP-01", file="src/quodeq/services/*", reason="WS1"),)
         assert is_dismissed(
-            set(), req="CLEA-DEP-01", file="src/quodeq/services/x.py", line=42, rules=rules,
+            set(), FindingRef(req="CLEA-DEP-01", file="src/quodeq/services/x.py", line=42),
+            rules=rules,
         )
 
     def test_rule_survives_a_line_shift(self):
         """The whole point: the same finding at a new line stays suppressed."""
         rules = (SuppressionRule(req="CLEA-DEP-01", file="src/quodeq/services/x.py", reason="WS1"),)
         for line in (10, 11, 9999):
-            assert is_dismissed(set(), req="CLEA-DEP-01", file="src/quodeq/services/x.py",
-                                line=line, rules=rules)
+            assert is_dismissed(
+                set(), FindingRef(req="CLEA-DEP-01", file="src/quodeq/services/x.py", line=line),
+                rules=rules)
 
     def test_exact_keys_still_work_with_no_rules(self):
         keys = {("R1", "a.py", 1)}
-        assert is_dismissed(keys, req="R1", file="a.py", line=1)
-        assert not is_dismissed(keys, req="R1", file="a.py", line=2)
+        assert is_dismissed(keys, FindingRef(req="R1", file="a.py", line=1))
+        assert not is_dismissed(keys, FindingRef(req="R1", file="a.py", line=2))
 
     def test_principle_fallback_applies_to_rules_too(self):
         """A no-req finding matches on its principle, mirroring the key path."""
         rules = (SuppressionRule(req="Independence", file="a.py", reason="r"),)
-        assert is_dismissed(set(), req=None, principle="Independence", file="a.py",
-                            line=3, rules=rules)
+        assert is_dismissed(
+            set(), FindingRef(req=None, principle="Independence", file="a.py", line=3),
+            rules=rules)
 
 
 class TestLoadSuppressionRules:
@@ -263,14 +266,14 @@ class TestRulesMoveTheGrade:
 
         rules = (SuppressionRule(req="CLEA-DEP-01", file="src/quodeq/services/*",
                                  reason="WS1"),)
-        out = rescore_dimensions([self._dim()], set(), set(), rules=rules)
+        out = rescore_dimensions([self._dim()], SuppressionKeys(set(), set(), rules))
 
         assert out["dimensions"][0]["violations"] == []
 
     def test_without_the_rule_the_violation_survives(self):
         from quodeq.services.rescore import rescore_dimensions
 
-        out = rescore_dimensions([self._dim()], set(), set())
+        out = rescore_dimensions([self._dim()], SuppressionKeys(set(), set()))
 
         assert len(out["dimensions"][0]["violations"]) == 1
 

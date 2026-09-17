@@ -16,15 +16,24 @@ one defect into dozens of findings and buries the single place to fix it.
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import dataclass
 
 from quodeq.core.checks._judgments import compliance, violation
 from quodeq.core.checks.layers import is_inner_layer_path
-from quodeq.core.checks.model import ImportEdge, ImportGraph, top_level
+from quodeq.core.checks.model import ImportEdge, ImportGraph, SourceLocation, top_level
 from quodeq.core.events.models import Judgment
 
 REQ_DIRECT = "CLEA-FRM-01"
 REQ_TRANSITIVE = "CLEA-DEP-06"
 _SOURCE_SUFFIXES = (".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
+
+
+@dataclass(frozen=True, slots=True)
+class _ImportIndex:
+    """The import graph indexed both ways: edges by importing file, and the
+    file each first-party dotted module name resolves to."""
+    by_file: dict[str, list[ImportEdge]]
+    by_module: dict[str, str]
 
 
 def _module_name(path: str, first_party: frozenset[str]) -> str | None:
@@ -49,8 +58,8 @@ def _module_name(path: str, first_party: frozenset[str]) -> str | None:
     return None
 
 
-def _index(graph: ImportGraph) -> tuple[dict[str, list[ImportEdge]], dict[str, str]]:
-    """Return (imports by file, file by module name)."""
+def _index(graph: ImportGraph) -> _ImportIndex:
+    """Index *graph* by importing file and by first-party module name."""
     by_file: dict[str, list[ImportEdge]] = {}
     for edge in graph.edges:
         by_file.setdefault(edge.file, []).append(edge)
@@ -59,7 +68,7 @@ def _index(graph: ImportGraph) -> tuple[dict[str, list[ImportEdge]], dict[str, s
         module = _module_name(path, graph.first_party)
         if module is not None:
             by_module[module] = path
-    return by_file, by_module
+    return _ImportIndex(by_file, by_module)
 
 
 def _resolve(module: str, by_module: dict[str, str]) -> str | None:
@@ -91,8 +100,7 @@ def _direct_frameworks(
 
 def _transitive_frameworks(
     origin: str,
-    by_file: dict[str, list[ImportEdge]],
-    by_module: dict[str, str],
+    index: _ImportIndex,
     framework_packages: frozenset[str],
     first_party: frozenset[str],
 ) -> dict[str, tuple[int, str]]:
@@ -105,10 +113,10 @@ def _transitive_frameworks(
     found: dict[str, tuple[int, str]] = {}
     seen = {origin}
     queue: deque[tuple[str, int, list[str]]] = deque()
-    for edge in by_file.get(origin, ()):
+    for edge in index.by_file.get(origin, ()):
         if top_level(edge.module) not in first_party:
             continue
-        target = _resolve(edge.module, by_module)
+        target = _resolve(edge.module, index.by_module)
         if target is None or target in seen or is_inner_layer_path(target):
             continue
         seen.add(target)
@@ -116,14 +124,14 @@ def _transitive_frameworks(
 
     while queue:
         current, origin_line, chain = queue.popleft()
-        edges = by_file.get(current, [])
+        edges = index.by_file.get(current, [])
         for package in _direct_frameworks(edges, framework_packages):
             if package not in found:
                 found[package] = (origin_line, " -> ".join([*chain, package]))
         for edge in edges:
             if top_level(edge.module) not in first_party:
                 continue
-            target = _resolve(edge.module, by_module)
+            target = _resolve(edge.module, index.by_module)
             if target is None or target in seen or is_inner_layer_path(target):
                 continue
             seen.add(target)
@@ -147,18 +155,17 @@ def _clean_report(req: str, dimension: str, anchor: str, checked: int) -> Judgme
 
 def _file_framework_judgments(
     file: str,
-    by_file: dict[str, list[ImportEdge]],
-    by_module: dict[str, str],
+    index: _ImportIndex,
     framework_packages: frozenset[str],
     first_party: frozenset[str],
     dimension: str,
 ) -> list[Judgment]:
     """Direct + transitive framework-dependency judgments for one inner file."""
     judgments: list[Judgment] = []
-    direct = _direct_frameworks(by_file[file], framework_packages)
+    direct = _direct_frameworks(index.by_file[file], framework_packages)
     for package in sorted(direct):
         judgments.append(violation(
-            req=REQ_DIRECT, dimension=dimension, file=file, line=direct[package],
+            req=REQ_DIRECT, dimension=dimension, at=SourceLocation(file, direct[package]),
             title=f"Inner layer imports framework package '{package}'",
             reason=(
                 f"This file is in an inner layer and imports the framework "
@@ -167,15 +174,13 @@ def _file_framework_judgments(
                 f"the delivery mechanism."
             ),
         ))
-    transitive = _transitive_frameworks(
-        file, by_file, by_module, framework_packages, first_party,
-    )
+    transitive = _transitive_frameworks(file, index, framework_packages, first_party)
     for package in sorted(transitive):
         if package in direct:
             continue  # already billed once, as a direct import
         line, path = transitive[package]
         judgments.append(violation(
-            req=REQ_TRANSITIVE, dimension=dimension, file=file, line=line,
+            req=REQ_TRANSITIVE, dimension=dimension, at=SourceLocation(file, line),
             title=f"Inner layer depends on framework '{package}' transitively",
             reason=(
                 f"This file is in an inner layer and reaches the framework "
@@ -202,15 +207,15 @@ def check_framework_dependencies(
     """
     if not graph.edges or not framework_packages:
         return []
-    by_file, by_module = _index(graph)
-    inner = sorted(f for f in by_file if is_inner_layer_path(f))
+    index = _index(graph)
+    inner = sorted(f for f in index.by_file if is_inner_layer_path(f))
     if not inner:
         return []
 
     judgments: list[Judgment] = []
     for file in inner:
         judgments += _file_framework_judgments(
-            file, by_file, by_module, framework_packages, graph.first_party, dimension,
+            file, index, framework_packages, graph.first_party, dimension,
         )
     # A requirement the traversal covered without finding anything is clean,
     # and saying so is the difference between "measured" and "never looked".

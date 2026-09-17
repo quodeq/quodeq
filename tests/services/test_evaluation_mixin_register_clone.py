@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import (
     _zero_run_scan_fallback,
 )
@@ -53,7 +54,7 @@ def test_register_local_path_scans_in_place(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
 
     info = _read_info(reports, uuid)
     assert info["location"] == "local"
@@ -74,10 +75,8 @@ def test_register_url_clones_to_dest_then_scans(tmp_path):
 
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(
-            "https://github.com/example/repo.git",
-            None,
             str(reports),
-            clone_dest=str(clone_dest),
+            NewProjectSpec("https://github.com/example/repo.git", None, clone_dest=str(clone_dest)),
         )
 
     info = _read_info(reports, uuid)
@@ -101,10 +100,8 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
 
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         uuid = _register_project(
-            "https://github.com/example/repo.git",
-            None,
             str(reports),
-            ephemeral=True,
+            NewProjectSpec("https://github.com/example/repo.git", None, ephemeral=True),
         )
 
     info = _read_info(reports, uuid)
@@ -129,10 +126,8 @@ def test_register_url_clone_failure_raises(tmp_path):
     ):
         with pytest.raises(CloneError):
             _register_project(
-                "https://github.com/example/repo.git",
-                None,
                 str(reports),
-                clone_dest=str(clone_dest),
+                NewProjectSpec("https://github.com/example/repo.git", None, clone_dest=str(clone_dest)),
             )
 
 
@@ -140,7 +135,7 @@ def test_register_url_without_dest_or_ephemeral_raises(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
     with pytest.raises(ValueError, match="clone_dest"):
-        _register_project("https://github.com/example/repo.git", None, str(reports))
+        _register_project(str(reports), NewProjectSpec("https://github.com/example/repo.git", None))
 
 
 def test_register_url_clone_dest_must_exist(tmp_path):
@@ -151,10 +146,8 @@ def test_register_url_clone_dest_must_exist(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="clone destination"):
         _register_project(
-            "https://github.com/example/repo.git",
-            None,
             str(reports),
-            clone_dest=str(nonexistent),
+            NewProjectSpec("https://github.com/example/repo.git", None, clone_dest=str(nonexistent)),
         )
 
     # Verify nothing was created under the missing path
@@ -181,10 +174,8 @@ def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         with pytest.raises(ValueError, match="private"):
             _register_project(
-                "https://169.254.169.254/latest/meta-data",
-                None,
                 str(reports),
-                ephemeral=True,
+                NewProjectSpec("https://169.254.169.254/latest/meta-data", None, ephemeral=True),
             )
 
     assert clone_calls == [], "git clone must not run for a private-host URL"
@@ -209,10 +200,8 @@ def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
         with pytest.raises(ValueError):
             _register_project(
-                "https://localhost/git/repo.git",
-                None,
                 str(reports),
-                ephemeral=True,
+                NewProjectSpec("https://localhost/git/repo.git", None, ephemeral=True),
             )
 
     assert clone_calls == []
@@ -253,10 +242,8 @@ def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch
     ):
         with pytest.raises(ValueError, match="private"):
             _register_project(
-                "https://github.com/example/repo.git",
-                None,
                 str(reports),
-                ephemeral=True,
+                NewProjectSpec("https://github.com/example/repo.git", None, ephemeral=True),
             )
 
     assert len(validate_calls) == 2

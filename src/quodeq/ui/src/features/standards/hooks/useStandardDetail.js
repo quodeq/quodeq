@@ -53,7 +53,7 @@ function useTreeMutations(setStandard, setDirty, setSelectedNode) {
   return { addPrinciple, removePrinciple, addRequirement, removeRequirement };
 }
 
-function useStandardMutations(standard, setStandard, setDirty, standardId, isNew, { createStandard, updateStandard }) {
+function useStandardMutations(standard, setStandard, setDirty, isNew, { createStandard, updateStandard }) {
   const [selectedNode, setSelectedNode] = useState(null);
 
   // updateStandardField deep-clones so React detects state changes via
@@ -88,7 +88,7 @@ export function useStandardDetail(standardId, isNew) {
   const [error, setError] = useState(null);
   const [dirty, setDirty] = useState(false);
 
-  const mutations = useStandardMutations(standard, setStandard, setDirty, standardId, isNew, { createStandard, updateStandard });
+  const mutations = useStandardMutations(standard, setStandard, setDirty, isNew, { createStandard, updateStandard });
 
   useEffect(() => {
     if (isNew) {

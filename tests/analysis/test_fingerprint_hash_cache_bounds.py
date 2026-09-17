@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis import fingerprint
-from quodeq.analysis.fingerprint import HashCache
+from quodeq.analysis.fingerprint import FileStat, HashCache
 
 
 def _touch(tmp_path: Path, name: str) -> tuple[Path, int, int]:
@@ -60,7 +60,7 @@ def test_override_and_params_maps_are_bounded_independently(tmp_path: Path):
         fingerprint, "_compute_dimension_params", wraps=fingerprint._compute_dimension_params,
     ) as params:
         for compiled in (root_a / "x.json", root_b / "x.json", root_a / "x.json"):
-            cache.dimension_params_state(compiled, 1, 1, None, 0, 0)
+            cache.dimension_params_state(FileStat(compiled, 1, 1), None)
     assert params.call_count == 3
 
 
@@ -69,7 +69,7 @@ def test_reset_empties_every_map(tmp_path: Path):
     a = _touch(tmp_path, "a")
     _file_reads(cache, a)
     cache.override_hash(tmp_path, 1, 1)
-    cache.dimension_params_state(tmp_path / "x.json", 1, 1, None, 0, 0)
+    cache.dimension_params_state(FileStat(tmp_path / "x.json", 1, 1), None)
     cache.reset()
     assert _file_reads(cache, a) == 1
     with patch.object(
@@ -78,6 +78,6 @@ def test_reset_empties_every_map(tmp_path: Path):
         fingerprint, "_compute_dimension_params", wraps=fingerprint._compute_dimension_params,
     ) as params:
         cache.override_hash(tmp_path, 1, 1)
-        cache.dimension_params_state(tmp_path / "x.json", 1, 1, None, 0, 0)
+        cache.dimension_params_state(FileStat(tmp_path / "x.json", 1, 1), None)
     assert overrides.call_count == 1
     assert params.call_count == 1

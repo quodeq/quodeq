@@ -18,7 +18,7 @@ from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.services._external_jobs import ProcessControl
 from quodeq.services.evaluation_mixin import _discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
-from quodeq.services.jobs import JobManager
+from quodeq.services.jobs import JobManager, JobProcessSeams
 
 
 def _seed_cache_entries(cache_root: Path, keys: list[str]) -> LocalFileBackend:
@@ -214,7 +214,7 @@ class TestProviderDiscardPurgesRun:
             return not pid_killed
 
         jm = JobManager(
-            process_control=ProcessControl(kill_tree=fake_kill_tree, pid_alive=fake_alive),
+            JobProcessSeams(process_control=ProcessControl(kill_tree=fake_kill_tree, pid_alive=fake_alive)),
         )
         provider = FilesystemActionProvider(job_manager=jm, index_db_path=db_path)
         provider.list_evaluations(limit=0, reports_dir=str(reports))

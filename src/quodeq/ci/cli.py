@@ -101,16 +101,18 @@ def _fetch_report_changed_lines(args: argparse.Namespace, token: str) -> dict[st
 
 def _post_report_review(args: argparse.Namespace, reports, baseline_violations, baseline_available, changed_lines) -> None:
     """Build the review payload, post it, and print the run summary."""
-    from quodeq.ci.reporter import build_review_payload, post_review
+    from quodeq.ci.reporter import ReviewOptions, build_review_payload, post_review
     from quodeq.ci.review_builder import classify_violations
 
     artifact_url: str | None = getattr(args, "artifact_url", None)
     payload = build_review_payload(
         reports,
         baseline_violations=baseline_violations,
-        duration_seconds=args.duration,
-        baseline_available=baseline_available,
-        artifact_url=artifact_url,
+        options=ReviewOptions(
+            duration_seconds=args.duration,
+            baseline_available=baseline_available,
+            artifact_url=artifact_url,
+        ),
         changed_lines=changed_lines,
     )
     post_review(

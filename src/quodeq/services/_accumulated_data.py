@@ -154,25 +154,23 @@ def _hydrate_latest_dimensions(
 
 
 def _read_all_run_data(
-    reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
+    reports_root: Path, project: str, run_infos: list[RunInfo],
     get_run_data: Callable[[str], list[DimensionResult]] | None = None,
     get_run_slim: Callable[[str], list[DimensionResult]] | None = None,
 ) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
-    """Build accumulated data structures from a walk over *runs*.
+    """Build accumulated data structures from a walk over *run_infos* (newest first).
 
     With *get_run_slim* the walk runs on findings-free dimensions and only the
     winning dimensions are re-read in full; without it the walk reads every run
     in full, as it always did.
     """
-    run_lookup = {r.run_id: r for r in all_run_infos}
     buckets = _DimensionBuckets()
     _fetch_full = get_run_data or (lambda rid: read_run_data(reports_root, project, rid))
     _fetch = get_run_slim or _fetch_full
 
-    for run_idx_i, run_id in enumerate(runs):
-        run_info = run_lookup.get(run_id)
-        for dim in _fetch(run_id):
-            _classify_dimension(dim, run_id, run_info, run_idx_i == 0, buckets)
+    for run_idx_i, run_info in enumerate(run_infos):
+        for dim in _fetch(run_info.run_id):
+            _classify_dimension(dim, run_info.run_id, run_info, run_idx_i == 0, buckets)
 
     if get_run_slim is not None:
         _hydrate_latest_dimensions(buckets, _fetch_full)

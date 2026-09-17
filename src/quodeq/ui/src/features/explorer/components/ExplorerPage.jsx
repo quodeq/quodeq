@@ -42,7 +42,7 @@ function explorerPageStatus(d) {
  * navigates here from elsewhere; local state takes over once the user
  * starts clicking bars.
  */
-function useExplorerPageData(project, dimension, runId, dateLabel, refreshSignal, selectedSource) {
+function useExplorerPageData({ project, dimension, runId, dateLabel, refreshSignal, selectedSource }) {
   const [activeRunId, setActiveRunId] = useState(runId);
   const [activeDateLabel, setActiveDateLabel] = useState(dateLabel);
   useEffect(() => { setActiveRunId(runId); }, [runId]);
@@ -189,7 +189,7 @@ export default function ExplorerPage({
   onGranularityChange,
 }) {
   const { d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel, buildEvalPrincipal } =
-    useExplorerPageData(project, dimension, runId, dateLabel, refreshSignal, selectedSource);
+    useExplorerPageData({ project, dimension, runId, dateLabel, refreshSignal, selectedSource });
 
   useExplorerPageSpecs({
     evalData: d.evalData, principleGrades: d.principleGrades, allViolations: d.allViolations,

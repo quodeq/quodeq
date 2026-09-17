@@ -9,6 +9,7 @@ take effect here.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,42 +29,49 @@ from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.services.scoring._rescoring import _rescore_accumulated_with_coverage
 
 
-def _compute_accumulated_payload(
-    reports_root: Path, project: str, as_of: str | None, params: ScoringParams,
-    deps: ScoringDeps | None, rescore_complete: list[bool],
-) -> dict:
+@dataclass(frozen=True, slots=True)
+class _ScoresRequest:
+    """One ``get_project_scores`` call's inputs, shared by its accumulated steps."""
+
+    reports_root: Path
+    project: str
+    as_of: str | None
+    params: ScoringParams
+    deps: ScoringDeps
+
+
+def _compute_accumulated_payload(req: _ScoresRequest, rescore_complete: list[bool]) -> dict:
     """Compute accumulated dims + summary, rescored, tracking coverage in
     *rescore_complete* (a 1-element list used as an outparam) so the caller's
     cache-eligibility check can see it."""
-    acc = compute_accumulated(str(reports_root), project, as_of, params=params)
+    acc = compute_accumulated(str(req.reports_root), req.project, req.as_of, params=req.params)
     if acc is None:
         acc = {"dimensions": [], "summary": {}}
     payload, complete = _rescore_accumulated_with_coverage(
-        acc, reports_root, project, params=params, deps=deps,
+        acc, req.reports_root, req.project, params=req.params, deps=req.deps,
     )
     rescore_complete[0] = complete
     return payload
 
 
 def _resolve_accumulated(
-    reports_root: Path, project: str, as_of: str | None, params: ScoringParams,
-    deps: ScoringDeps, all_runs: list, rescore_complete: list[bool],
+    req: _ScoresRequest, all_runs: list, rescore_complete: list[bool],
 ) -> dict:
     """Compute (or fetch from cache) the accumulated dims + summary."""
-    if find_children(reports_root, project):
+    if find_children(req.reports_root, req.project):
         # Parent aggregation pulls child projects' dismissals/runs into the
         # payload, which the project-scoped cache version can't see -- bypass
         # the cache for parents to avoid serving stale data.
-        return _compute_accumulated_payload(reports_root, project, as_of, params, deps, rescore_complete)
+        return _compute_accumulated_payload(req, rescore_complete)
     acc_version = accumulated_cache_version(
-        reports_root / project, params,
-        per_run_versions(reports_root / project, project, params,
+        req.reports_root / req.project, req.params,
+        per_run_versions(req.reports_root / req.project, req.project, req.params,
                          [(r.run_id, r.status) for r in all_runs]),
-        as_of,
+        req.as_of,
     )
-    return (deps.cached_accumulated or cached_accumulated)(
-        project, acc_version,
-        lambda: _compute_accumulated_payload(reports_root, project, as_of, params, deps, rescore_complete),
+    return (req.deps.cached_accumulated or cached_accumulated)(
+        req.project, acc_version,
+        lambda: _compute_accumulated_payload(req, rescore_complete),
         cacheable=lambda _payload: rescore_complete[0],
     )
 
@@ -135,7 +143,8 @@ def get_project_scores(
     # it: a payload whose rescore missed dimensions must be served but never
     # persisted (its version hash can't self-invalidate).
     rescore_complete = [True]
-    accumulated = _resolve_accumulated(reports_root, project, as_of, params, d, all_runs, rescore_complete)
+    accumulated = _resolve_accumulated(
+        _ScoresRequest(reports_root, project, as_of, params, d), all_runs, rescore_complete)
     trend = _resolve_trend(reports_root, project, params, deps, all_runs)
 
     return {

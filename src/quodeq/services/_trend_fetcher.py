@@ -33,13 +33,14 @@ from typing import Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
 from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.services._scoring_deps import ScoringDeps
+from quodeq.services._scoring_deps import ScoringDeps, _NO_DEPS
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.data.fs.report_parser.runs import read_run_scalars as _default_read_run_scalars
 from quodeq.services._wiring import load_suppression_rules
 from quodeq.services.rescore import _rescore_dimension
-from quodeq.services.score_cache import make_cache_backed_fetcher
+from quodeq.services.score_cache import VersionInputs, make_cache_backed_fetcher
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import validate_path_segment
 
@@ -54,23 +55,25 @@ def make_rescoring_fetcher(
     params: ScoringParams = DEFAULT_PARAMS,
     *,
     base_fetcher: _Fetcher,
-    dismissed_keys: Callable[[Path], set] = _default_dismissed_keys,
-    deleted_keys: Callable[[Path], set] = _default_deleted_keys,
+    deps: ScoringDeps | None = None,
 ) -> _Fetcher:
     """Return a dimension fetcher that applies dismiss/delete rescore to results.
 
     Wraps *base_fetcher* (a full-data run-dimension fetcher) so consumers get
     dismiss-adjusted data. Identity when the project has no active
-    dismissals/deletions.
+    dismissals/deletions. The suppression readers come from *deps*
+    (production defaults when None or unset).
     """
     validate_path_segment(project)
+    d = deps or _NO_DEPS
     project_dir = reports_root / project
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
+    dismissed = (d.dismissed_keys or _default_dismissed_keys)(project_dir)
+    deleted = (d.deleted_keys or _default_deleted_keys)(project_dir)
     rules = load_suppression_rules(project_dir)
     # Rules count as suppression state; see scored_run_dimensions.
     if not dismissed and not deleted and not rules:
         return base_fetcher
+    keys = SuppressionKeys(dismissed, deleted, rules)
 
     def rescoring_fetcher(run_id: str) -> list[DimensionResult]:
         dims = base_fetcher(run_id)
@@ -78,34 +81,30 @@ def make_rescoring_fetcher(
         # the evidence basis for the rescore.
         validate_path_segment(run_id)
         run_dir = project_dir / run_id
-        return [
-            _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir,
-                               rules=rules)
-            for d in dims
-        ]
+        return [_rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
 
     return rescoring_fetcher
 
 
 def _make_version_for(
-    project_dir: Path, project: str, params: ScoringParams,
-    dismissed: set, deleted: set, load_keys: Callable[[], dict],
-    cacheable_run_ids: set[str] | None,
+    project_dir: Path, project: str, inputs: VersionInputs,
+    load_keys: Callable[[], dict], cacheable_run_ids: set[str] | None,
 ) -> Callable[[str], str]:
     """Per-run scoped version for the cache-backed trend fetcher.
 
-    *load_keys* returns the project's persisted key sets and runs at most
-    once per fetcher, and only when some run's version is not already in
-    ``score_cache.memoized_run_version``: decoding every run's key blobs is
-    the expensive part, and a warm process rarely needs it.
+    *inputs* is the params + suppression state every run's version hashes
+    against. *load_keys* returns the project's persisted key sets and runs
+    at most once per fetcher, and only when some run's version is not
+    already in ``score_cache.memoized_run_version``: decoding every run's
+    key blobs is the expensive part, and a warm process rarely needs it.
     """
     from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
     from quodeq.services.score_cache import (  # noqa: PLC0415
         memoized_run_version, open_score_cache, remember_run_version,
-        run_scoped_version, store_run_keys, suppression_state_fingerprint,
+        run_scoped_version, store_run_keys,
     )
 
-    state_fp = suppression_state_fingerprint(params, dismissed, deleted)
+    state_fp = inputs.fingerprint
     keys_cache: dict | None = None
 
     def version_for(run_id: str) -> str:
@@ -130,7 +129,8 @@ def _make_version_for(
                         "Could not store run keys in score cache for %s/%s",
                         project, run_id, exc_info=True,
                     )
-        version = run_scoped_version(params, keys[0], keys[1], dismissed, deleted)
+        version = run_scoped_version(
+            inputs.params, keys[0], keys[1], inputs.dismissed, inputs.deleted)
         if cacheable:
             remember_run_version(project_dir, run_id, state_fp, version)
         return version
@@ -166,15 +166,14 @@ def _make_heavy_trend_fetcher(
     deleted_keys = deps.deleted_keys or _default_deleted_keys
     base = make_rescoring_fetcher(
         reports_root, project, params=params,
-        base_fetcher=deps.base_fetcher_factory(reports_root, project),
-        dismissed_keys=dismissed_keys, deleted_keys=deleted_keys,
+        base_fetcher=deps.base_fetcher_factory(reports_root, project), deps=deps,
     )
     from quodeq.services.score_cache import load_run_keys_or_empty  # noqa: PLC0415
     dismissed = dismissed_keys(project_dir)
     deleted = deleted_keys(project_dir)
 
     version_for = _make_version_for(
-        project_dir, project, params, dismissed, deleted,
+        project_dir, project, VersionInputs.of(params, dismissed, deleted),
         lambda: load_run_keys_or_empty(project), cacheable_run_ids,
     )
     is_cacheable = (

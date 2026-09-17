@@ -15,7 +15,7 @@ from quodeq.core.finding_identity import snippet_fingerprint
 from quodeq.services import _dismiss_fingerprints as fingerprints_mod
 from quodeq.services._dismiss_fingerprints import BACKFILL_MARKER, _backfill_locks, backfill_if_needed
 from quodeq.services.dismissed import dismissed_keys, restore_finding
-from quodeq.services.suppression import is_dismissed
+from quodeq.services.suppression import FindingRef, is_dismissed
 from tests.services.test_dismissed_fingerprint import FP, SNIP, _project, _seed_run, _verdict
 
 
@@ -43,7 +43,7 @@ class TestBackfill:
         (entry,) = state.entries
         assert entry.fingerprint == FP
         assert entry.reason == "legacy"
-        assert is_dismissed(state, req="R1", file="a.py", line=22, snippet=SNIP)
+        assert is_dismissed(state, FindingRef(req="R1", file="a.py", line=22, snippet=SNIP))
         _project(project_dir, r2)
         assert _verdict(r2, 22) == "dismissed"
         assert (project_dir / BACKFILL_MARKER).exists()

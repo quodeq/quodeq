@@ -178,20 +178,17 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
     return create_kwargs, is_openai
 
 
-def _log_call_outcome(
-    config: ApiRunnerConfig,
-    finish_reason: str | None,
-    text: str,
-    findings: list[dict],
-    dropped: int,
-    start: float,
+def _finish_call(
+    config: ApiRunnerConfig, finish_reason: str | None, text: str, start: float,
 ) -> tuple[list[dict], bool]:
-    """Record drop stats and log the call's outcome; returns ``(findings, was_lossy)``.
+    """Parse *text*, record drop stats and log the call's outcome.
 
-    ``was_lossy`` is True when the response was truncated by the output
-    budget (``finish_reason == "length"``), so findings past the cut are
-    lost. See ``_call_api`` for the full lossy-vs-dropped contract.
+    Returns ``(findings, was_lossy)``. ``was_lossy`` is True when the
+    response was truncated by the output budget (``finish_reason ==
+    "length"``), so findings past the cut are lost. See ``_call_api`` for
+    the full lossy-vs-dropped contract.
     """
+    findings, dropped = _parse_findings(text)
     elapsed = time.monotonic() - start
     # Feed the per-run aggregate so the dimension loops can report ONE
     # drop-ratio signal at end of run instead of N scattered per-call lines.
@@ -295,5 +292,4 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     choice = response.choices[0] if response.choices else None
     finish_reason = getattr(choice, "finish_reason", None)
     text = (choice.message.content or "") if choice else ""
-    findings, dropped = _parse_findings(text)
-    return _log_call_outcome(config, finish_reason, text, findings, dropped, start)
+    return _finish_call(config, finish_reason, text, start)

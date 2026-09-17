@@ -192,16 +192,15 @@ def write_baseline(path: Path = BASELINE_PATH) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    return _ratchet.run_cli(
-        argv,
+    return _ratchet.run_cli(argv, _ratchet.RatchetSpec(
         script_name="check_fault_tolerance.py",
+        noun="fault-tolerance",
         baseline_path=BASELINE_PATH,
         scan=_scan,
         violation_key=violation_key,
         update_baseline=write_baseline,
         describe=lambda v: f"{v[0]}:{v[1]}:{v[2]}",
-        noun="fault-tolerance",
-    )
+    ))
 
 
 if __name__ == "__main__":

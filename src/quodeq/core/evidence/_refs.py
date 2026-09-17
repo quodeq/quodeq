@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.core.types.req_ref import ReqRef
 
 if TYPE_CHECKING:
     from quodeq.core.events.models import Judgment
+    from quodeq.core.evidence._options import EvidenceParseOptions
 
 # Reads ``{req_id: [{label, url, ...}, ...]}`` for (compiled_dir, dimension).
 # Mirrors the ``ReqMapReader`` seam in ``_req_mapping``: *compiled_dir* is
@@ -64,11 +64,8 @@ def resolve_llm_refs(
 def enrich_judgment(
     j: "Judgment",
     llm_refs: list[str] | None,
-    compiled_dir: Path | None,
     req_refs_cache: dict[str, dict[str, list[dict]]],
-    cwe_url_template: str | None = None,
-    *,
-    refs_reader: RefsReader | None = None,
+    options: "EvidenceParseOptions",
 ) -> "Judgment":
     """Resolve req_refs for a Judgment, returning the (possibly new) Judgment.
 
@@ -76,20 +73,21 @@ def enrich_judgment(
     something new to attach. When the judgment already carries refs, or no
     refs were resolved, the original instance is returned unchanged.
 
-    *refs_reader* loads compiled refs for (compiled_dir, dimension); without
-    a reader the lookup map is empty -- same "permissive without a reader"
-    contract as ``_resolve_req_to_principle_map``.
+    ``options.refs_reader`` loads compiled refs for (compiled_dir, dimension);
+    without a reader the lookup map is empty -- same "permissive without a
+    reader" contract as ``_resolve_req_to_principle_map``.
     """
     if j.req_refs:
         return j  # MCP server already enriched
     all_req_refs = None
+    compiled_dir, refs_reader = options.compiled_dir, options.refs_reader
     if compiled_dir and j.req and j.dimension:
         if j.dimension not in req_refs_cache:
             req_refs_cache[j.dimension] = (
                 refs_reader(str(compiled_dir), j.dimension) if refs_reader else {}
             )
         all_req_refs = req_refs_cache[j.dimension].get(j.req)
-    resolved = resolve_llm_refs(llm_refs, all_req_refs, cwe_url_template)
+    resolved = resolve_llm_refs(llm_refs, all_req_refs, options.cwe_url_template)
     if not resolved:
         return j
     refs = [ReqRef(label=r.get("label", ""), url=r.get("url", "")) for r in resolved]

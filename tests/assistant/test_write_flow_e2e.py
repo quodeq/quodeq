@@ -2,7 +2,7 @@
 """Full write flow: granted turn edits the worktree, apply lands it in the repo."""
 from pathlib import Path
 
-from quodeq.assistant.orchestrator import TurnRequest, run_turn
+from quodeq.assistant.orchestrator import TurnEngines, TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
 from quodeq.assistant.worktree import WorktreeManager, _run
 from quodeq.data.ports.assistant import SessionScope
@@ -29,12 +29,12 @@ def test_edit_diff_apply_roundtrip(tmp_path, monkeypatch):
         evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
         dimensions_file=tmp_path / "d.json", project_id="proj")
 
-    def scripted_model_turn(*, messages, config, registry, emit, **_):
+    def scripted_model_turn(*, messages, config, session, **_):
         # the "model": edit a file, self-review the diff, report done
-        out = registry.dispatch("edit_repo_file", {
+        out = session.registry.dispatch("edit_repo_file", {
             "path": "app.py", "old_string": "x = 1", "new_string": "x = 2"})
         assert out["ok"], out
-        diff = registry.dispatch("get_worktree_diff", {})
+        diff = session.registry.dispatch("get_worktree_diff", {})
         assert "+x = 2" in diff["result"]["diff"]
         return "fixed"
 
@@ -42,8 +42,7 @@ def test_edit_diff_apply_roundtrip(tmp_path, monkeypatch):
         TurnRequest(session_id="s1", text="fix it", ui_state=None,
                     api_base="http://x", api_key=None, provider="ollama",
                     model="m", write_enabled=True),
-        repository=store, tool_ctx=ctx, turn_fn=scripted_model_turn,
-        capability_fn=lambda *a: True)
+        repository=store, tool_ctx=ctx, engines=TurnEngines(turn_fn=scripted_model_turn, capability_fn=lambda *a: True))
 
     # the user's tree is still untouched
     assert (repo / "app.py").read_bytes() == b"x = 1\n"

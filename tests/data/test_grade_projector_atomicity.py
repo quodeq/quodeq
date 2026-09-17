@@ -9,28 +9,28 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.data.sqlite.state_store import PrincipleGradeRow, SQLiteStateStore
 
 
 def _seed_existing_grades(run_dir: Path) -> None:
     """Write two principle_grades and one dimension_scores row as pre-existing data."""
     store = SQLiteStateStore(run_dir)
-    store.record_principle_grade(
+    store.record_principle_grade(PrincipleGradeRow(
         dimension="Security",
         principle_id="P1",
         score=8.0,
         grade="Good",
         finding_count=1,
         dismissed_count=0,
-    )
-    store.record_principle_grade(
+    ))
+    store.record_principle_grade(PrincipleGradeRow(
         dimension="Security",
         principle_id="P2",
         score=6.0,
         grade="Adequate",
         finding_count=2,
         dismissed_count=0,
-    )
+    ))
     store.record_dimension_score(dimension="Security", score=7.0, grade="Good")
 
 

@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 
 from quodeq.analysis.cache import LocalFileBackend, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
     _make_callbacks,
@@ -46,8 +46,7 @@ class TestGcWiring:
         # cache=None -> production default-backend path -> GC fires.
         process_dimension_with_cache(
             config, "security", idx=1, ctx=_make_ctx(),
-            callbacks=_make_callbacks(), cache=None,
-            dispatcher=dispatcher,
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=None, dispatcher=dispatcher),
         )
 
         assert not (legacy_dir / "entry.json").exists()
@@ -83,8 +82,8 @@ class TestSlowFinalPersistIsNotAbandoned:
 
         def run() -> None:
             result["evidence"] = process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=slow_cache, dispatcher=dispatcher, persist_interval_s=60.0,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=slow_cache, dispatcher=dispatcher, persist_interval_s=60.0),
             )
 
         runner_thread = threading.Thread(target=run)

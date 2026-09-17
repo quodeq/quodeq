@@ -15,12 +15,14 @@ from quodeq.services._filesystem_helpers import _list_available_dimensions_for_d
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_project_helpers import (
+    _KnownProjectIds,
+    _ListingOptions,
     _auto_detect_parents,
     _backfill_onboarding_field,
     _build_project_entry,
     _max_projects_listed,
 )
-from quodeq.services._repo_index import rekey_repo_index_entry, remove_repo_index_entries
+from quodeq.services._repo_index import RepoIdentity, rekey_repo_index_entry, remove_repo_index_entries
 from quodeq.services._wiring import (
     find_children,
     is_valid_repo_url,
@@ -92,10 +94,8 @@ def _collect_candidate_dirs(reports_root: Path, max_listed: int) -> list[str]:
 
 
 def _build_project_entries_threaded(
-    reports_root: Path, dir_names: list[str],
-    registered_ids: set[str], parent_ids: set[str], subproject_ids: set[str],
-    *, backfill: bool, inline_summaries: bool,
-    info_by_name: dict[str, dict] | None = None,
+    reports_root: Path, dir_names: list[str], known: _KnownProjectIds,
+    options: _ListingOptions, info_by_name: dict[str, dict] | None = None,
 ) -> list[ProjectEntry]:
     """Build a ProjectEntry per candidate dir in parallel, dropping stray dirs.
 
@@ -110,11 +110,10 @@ def _build_project_entries_threaded(
     def _build_one(name: str) -> ProjectEntry | None:
         try:
             runs = list_runs(reports_root, name)
-            if not runs and name not in registered_ids and name not in parent_ids and name not in subproject_ids:
+            if not runs and name not in known.registered and name not in known.parents and name not in known.subprojects:
                 return None
             return _build_project_entry(
-                reports_root, name, runs, backfill=backfill, inline_summaries=inline_summaries,
-                pre_read_info=info_by_name.get(name),
+                reports_root, name, runs, options, pre_read_info=info_by_name.get(name),
             )
         except (OSError, ValueError, KeyError) as exc:  # JSONDecodeError is a ValueError
             _logger.warning("Skipping project dir %r: could not build entry: %s", name, exc)
@@ -164,9 +163,8 @@ def build_project_list(
         if repository_info_exists(reports_root / name)
     }
     projects = _build_project_entries_threaded(
-        reports_root, dir_names, registered_ids, parent_ids, subproject_ids,
-        backfill=backfill, inline_summaries=inline_summaries,
-        info_by_name=info_by_name,
+        reports_root, dir_names, _KnownProjectIds(registered_ids, parent_ids, subproject_ids),
+        _ListingOptions(backfill=backfill, inline_summaries=inline_summaries), info_by_name,
     )
     projects.sort(key=lambda p: p.name)
     return _auto_detect_parents(projects)
@@ -217,8 +215,8 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
     # once found, so a wrongly-keyed rekey is exactly as damaging as the
     # staleness it replaces.
     rekey_repo_index_entry(
-        reports_root, project_dir.name, project_name_from_repo(resolved_path),
-        resolved_path, info.get("scopePath"),
+        reports_root, project_dir.name,
+        RepoIdentity(project_name_from_repo(resolved_path), resolved_path, info.get("scopePath")),
     )
     return True
 

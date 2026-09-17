@@ -80,10 +80,8 @@ def _resolve_vector_store() -> VectorStoreFns:
 def _backfill_missing(
     store: VectorStoreFns,
     conn: object,
-    model: str,
     texts: dict[str, str],
-    embed_fn: EmbedFn,
-    batch_timeout: object,
+    embedder: Embedder,
 ) -> int:
     """Embed still-missing fingerprints up to the time/size budget.
 
@@ -110,11 +108,11 @@ def _backfill_missing(
             break
         chunk = missing[start:start + chunk_size]
         try:
-            vecs = embed_fn([texts[fp] for fp in chunk], timeout=batch_timeout)
+            vecs = embedder.embed_fn([texts[fp] for fp in chunk], timeout=embedder.batch_timeout)
         except Exception as exc:  # noqa: BLE001 -- partial corpus is fine
             _logger.warning("Precedent backfill stopped: %s", exc)
             break
-        if not store.insert_vectors(conn, model, list(zip(chunk, vecs))):
+        if not store.insert_vectors(conn, embedder.model, list(zip(chunk, vecs))):
             break
         embedded_new += len(chunk)
     return embedded_new
@@ -140,9 +138,7 @@ def _load_or_backfill_vectors(
             return None
         if store.try_claim_backfill(conn):
             try:
-                embedded_new = _backfill_missing(
-                    store, conn, embedder.model, texts, embedder.embed_fn, embedder.batch_timeout,
-                )
+                embedded_new = _backfill_missing(store, conn, texts, embedder)
             finally:
                 store.release_backfill_claim(conn)
         pairs = store.load_vectors(conn)

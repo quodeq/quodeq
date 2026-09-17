@@ -20,9 +20,11 @@ export function drawScene(ctx, activeScene, params) {
 
 /**
  * Draw background nebula for the current folder's compliance score.
+ * `frame` is the per-frame bundle renderFrame builds: { W, H, t, ... }.
  */
-export function drawNebula(ctx, curNode, tc, W, H, t) {
+export function drawNebula(ctx, curNode, tc, frame) {
   if (!curNode) return;
+  const { W, H, t } = frame;
   const nbCol = scoreRGB((curNode.complianceRate || 0) * 10);
   const { r: nr, g: ng, b: nb } = nbCol;
   const nbR = Math.max(W, H) * 0.7;
@@ -48,7 +50,8 @@ export function drawNebula(ctx, curNode, tc, W, H, t) {
 /**
  * Draw background starfield.
  */
-export function drawStarfield(ctx, bg, tc, W, H, t) {
+export function drawStarfield(ctx, bg, tc, frame) {
+  const { W, H, t } = frame;
   const { r: mr, g: mg, b: mb } = tc.textMuted;
   bg.forEach(s => {
     const a = 0.15 + 0.15 * Math.sin(t * s.sp + s.tw);
@@ -129,8 +132,10 @@ function drawFileParticles(ctx, s, sc, cam, t) {
   drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
 }
 
-/** Labeled violation orbs around a file star, shown only at high zoom. */
-function drawLabeledOrbs(ctx, s, sc, cam, t, showLabels) {
+/** Labeled violation orbs around a file star, shown only at high zoom.
+ * `view` is the drawStars params bundle: { cam, t, showLabels, ... }. */
+function drawLabeledOrbs(ctx, s, sc, view) {
+  const { cam, t, showLabels } = view;
   if (s.isFolder || cam.z <= 2.5 || s.particles.length === 0) return;
   const vAlpha = Math.min(1, (cam.z - 2.5) / 2);
   const vScale = cam.z * 0.06;
@@ -205,7 +210,7 @@ export function drawStars(ctx, activeScene, params) {
 
     if (s.isFolder) drawFolderNebula(ctx, { s, i, sc, sr }, { cam, t, curFly });
     drawFileParticles(ctx, s, sc, cam, t);
-    drawLabeledOrbs(ctx, s, sc, cam, t, showLabels);
+    drawLabeledOrbs(ctx, s, sc, params);
 
     const label = collectStarLabel(s, sc, sr, cam, showLabels);
     if (label) pendingLabels.push(label);

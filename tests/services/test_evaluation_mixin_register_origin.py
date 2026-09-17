@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.services.base import NewProjectSpec
+from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project as _register_project
 from quodeq.services.project_registration import register_project_with_rollback
 
@@ -29,7 +30,7 @@ def test_register_url_repo_persists_origin_url(tmp_path, monkeypatch):
         (dest / "main.py").write_text("print('hi')\n")
 
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
-        uuid = _register_project(url, None, str(reports), ephemeral=True)
+        uuid = _register_project(str(reports), NewProjectSpec(url, None, ephemeral=True))
 
     assert _read_info(reports, uuid)["originUrl"] == url
 
@@ -46,7 +47,7 @@ def test_register_local_repo_persists_origin_remote(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
 
     assert _read_info(reports, uuid)["originUrl"] == "https://github.com/example/myrepo.git"
 
@@ -69,7 +70,7 @@ def test_register_local_repo_strips_credentials_from_origin_url(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
 
     persisted = _read_info(reports, uuid)["originUrl"]
     assert persisted == "https://github.com/example/myrepo.git"
@@ -93,7 +94,7 @@ def test_register_local_repo_strips_token_only_credential_from_origin_url(tmp_pa
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
 
     persisted = _read_info(reports, uuid)["originUrl"]
     assert persisted == "https://github.com/example/myrepo.git"
@@ -117,7 +118,7 @@ def test_register_local_repo_preserves_scp_style_origin_url(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
 
     assert _read_info(reports, uuid)["originUrl"] == "git@github.com:example/myrepo.git"
 
@@ -129,7 +130,7 @@ def test_register_local_repo_without_remote_omits_origin_url(tmp_path):
     reports = tmp_path / "reports"
     reports.mkdir()
 
-    uuid = _register_project(str(repo), None, str(reports))
+    uuid = _register_project(str(reports), NewProjectSpec(str(repo), None))
 
     assert "originUrl" not in _read_info(reports, uuid)
 

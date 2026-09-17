@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.cache._failure_streak import CircuitBreakerError
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
 from tests.integration._cancel_resume_fixtures import (  # noqa: F401 -- _reset_cancel is a pytest fixture
@@ -40,7 +40,7 @@ class TestBreakerTrip:
         with pytest.raises(CircuitBreakerError):
             process_dimension_with_cache(
                 config, "security", idx=1, ctx=_make_ctx(),
-                callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher,
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
             )
         assert cancellation.is_cancelled()
 

@@ -15,6 +15,7 @@ import hashlib
 import json
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar, cast
 
@@ -98,6 +99,16 @@ _StatKey = tuple[Path, int, int]
 _MISS = object()
 
 
+@dataclass(frozen=True, slots=True)
+class FileStat:
+    """A file's memoization identity: its path plus the stat fields
+    (size, mtime_ns) that change whenever it is edited."""
+
+    path: Path
+    size: int
+    mtime_ns: int
+
+
 class HashCache:
     """Lock-guarded, bounded LRU cache backing the fingerprint hash memoizers.
 
@@ -121,7 +132,7 @@ class HashCache:
         self._file_hashes: LRUDict[_StatKey, str | None] = LRUDict(file_capacity)
         self._override_hashes: LRUDict[_StatKey, str] = LRUDict(override_capacity)
         self._dimension_params: LRUDict[
-            tuple[Path, int, int, Path | None, int, int], tuple[str, dict]
+            tuple[FileStat, FileStat | None], tuple[str, dict]
         ] = LRUDict(params_capacity)
 
     def _memo(self, table: LRUDict[_K, _V], key: _K, compute: Callable[[], _V]) -> _V:
@@ -147,14 +158,17 @@ class HashCache:
         )
 
     def dimension_params_state(
-        self, compiled: Path, c_size: int, c_mtime_ns: int,
-        project_root: Path | None, o_size: int, o_mtime_ns: int,
+        self, compiled: FileStat, overrides: FileStat | None,
     ) -> tuple[str, dict]:
-        """Memoized :func:`_compute_dimension_params`, keyed by both files' stats."""
-        key = (compiled, c_size, c_mtime_ns, project_root, o_size, o_mtime_ns)
+        """Memoized :func:`_compute_dimension_params`, keyed by both files' stats.
+
+        ``overrides`` carries the project root plus the stat of its overrides
+        file (zeros when absent), or None when there is no project root.
+        """
+        project_root = overrides.path if overrides is not None else None
         return self._memo(
-            self._dimension_params, key,
-            lambda: _compute_dimension_params(compiled, project_root),
+            self._dimension_params, (compiled, overrides),
+            lambda: _compute_dimension_params(compiled.path, project_root),
         )
 
     def reset(self) -> None:
@@ -200,8 +214,8 @@ def dimension_params_state(
     if ckey is None:
         return "", {}
     root = Path(project_root) if project_root else None
-    okey = (_stat_key(root / OVERRIDES_RELPATH) if root else None) or (0, 0)
-    return (cache or _hash_cache).dimension_params_state(compiled, *ckey, root, *okey)
+    overrides = FileStat(root, *(_stat_key(root / OVERRIDES_RELPATH) or (0, 0))) if root else None
+    return (cache or _hash_cache).dimension_params_state(FileStat(compiled, *ckey), overrides)
 
 
 def _hash_standards(

@@ -12,8 +12,6 @@ Their symbols are re-exported below so existing import paths keep resolving.
 """
 from __future__ import annotations
 
-import threading
-from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 
@@ -31,6 +29,7 @@ from quodeq.services._wiring import (
     summarize_dimensions,
 )
 from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
@@ -53,6 +52,7 @@ from quodeq.services._dashboard_history import (  # noqa: F401
     _read_run_exit_reason,
 )
 from quodeq.services._dashboard_response import (  # noqa: F401
+    _DimensionAnnotations,
     _attach_dismissed_count_to_dim,
     _attach_exit_reason_to_dim,
     _build_dashboard_result,
@@ -88,21 +88,15 @@ def _rescore_run_dimensions(
         return dims
     validate_path_segment(run_id)
     run_dir = project_dir / run_id
-    return [
-        _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir,
-                           rules=rules)
-        for d in dims
-    ]
+    keys = SuppressionKeys(dismissed, deleted, rules)
+    return [_rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
 
 
 def _make_status_aware_fetcher(
     reports_root: Path,
     project: str,
     runs: list[RunInfo],
-    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
-    lock: threading.Lock | None = None,
-    max_size: int | None = None,
-    version: str = "",
+    config: DashboardCacheConfig | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher that reads in-progress runs fresh, never from cache.
 
@@ -112,10 +106,7 @@ def _make_status_aware_fetcher(
     PID-liveness check that status.json alone can't see), so a run whose
     process is still alive reads fresh even before its state flips.
     """
-    cached = _make_run_dimension_fetcher(
-        reports_root, project,
-        cache=cache, lock=lock, max_size=max_size, version=version,
-    )
+    cached = _make_run_dimension_fetcher(reports_root, project, config)
     status_by_id = {r.run_id: r.status for r in runs}
 
     def fetch(run_id: str) -> list[DimensionResult]:
@@ -260,14 +251,15 @@ def build_dashboard(
         index=selected_index,
         dimensions=selected_dims,
         summary=summarize_dimensions(selected_dims, params),
+        runs=runs,
     )
-    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
-    exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
-    return _build_dashboard_result(
-        project, runs, selected_run, payload,
-        exit_reason=exit_reason, dismissed_counts=dismissed_counts,
+    payload = _compute_dashboard_payload(reports_root, project, ctx, cc, params)
+    annotations = _DimensionAnnotations(
+        exit_reason=_read_run_exit_reason(reports_root, project, selected_run.run_id),
+        dismissed_counts=dismissed_counts,
         suppressed_counts=suppressed_counts,
     )
+    return _build_dashboard_result(project, runs, selected_run, payload, annotations)
 
 
 __all__ = [

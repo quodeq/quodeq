@@ -53,16 +53,16 @@ class TestSeverityGates:
         monkeypatch.setitem(registry.CHECKERS, "fake-gated", fake)
 
     def _apply(self, project, compiled, tmp_path, *, trust_model=None):
-        from quodeq.analysis.checks.runner import apply_deterministic_checks
+        from quodeq.analysis.checks.runner import CheckScope, apply_deterministic_checks
 
         jsonl = tmp_path / "run" / "evidence" / "security_evidence.jsonl"
         jsonl.parent.mkdir(parents=True, exist_ok=True)
         evidence = Evidence(repository="r", language="python", date="d",
                             source_file_count=3, files_read=3, coverage_pct=100.0)
+        scope = CheckScope(root=project, source_files=SOURCES, dimension="security",
+                           compiled_dir=compiled(self.GATED, "security"))
         added = apply_deterministic_checks(
-            evidence, root=project, source_files=SOURCES, dimension="security",
-            compiled_dir=compiled(self.GATED, "security"), jsonl_path=jsonl,
-            trust_model=trust_model,
+            evidence, scope, jsonl_path=jsonl, trust_model=trust_model,
         )
         return added, evidence, jsonl
 
