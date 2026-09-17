@@ -11,6 +11,8 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from quodeq.core.finding_identity import snippet_fingerprint
+from quodeq.services import _dismiss_fingerprints as fingerprints_mod
 from quodeq.services._dismiss_fingerprints import BACKFILL_MARKER, _backfill_locks, backfill_if_needed
 from quodeq.services.dismissed import dismissed_keys, restore_finding
 from quodeq.services.suppression import FindingRef, is_dismissed
@@ -120,3 +122,72 @@ class TestBackfill:
         assert entry.fingerprint is None
         assert (project_dir / "actions.jsonl").read_text() == before
         assert not (project_dir / BACKFILL_MARKER).exists()
+
+    def test_backfill_reads_each_run_once_for_all_pending_entries(
+        self, tmp_path: Path, monkeypatch,
+    ) -> None:
+        """Three legacy entries, three runs: one detail read and at most one
+        status read per run, not one per entry per run."""
+        project_dir = tmp_path / "proj"
+        _seed_run(project_dir, "r1", line=10, started_at="2026-01-01T00:00:00+00:00")
+        _seed_run(project_dir, "r1", line=30, snippet="return cache[key]")
+        when = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        for line in (10, 30, 50):
+            self._legacy_dismiss(project_dir, line=line, when=when)
+        _seed_run(project_dir, "r2", line=10, started_at="2026-03-01T00:00:00+00:00")
+        _seed_run(project_dir, "r3", line=10, started_at="2026-04-01T00:00:00+00:00")
+        detail_reads = _count_calls_per_run(monkeypatch, "read_finding_details")
+        status_reads = _count_calls_per_run(monkeypatch, "run_started_at")
+
+        assert backfill_if_needed(project_dir) == 2
+
+        assert max(detail_reads.values()) == 1
+        assert max(status_reads.values(), default=0) <= 1
+        fingerprints = {e.line: e.fingerprint for e in dismissed_keys(project_dir).entries}
+        assert fingerprints == {
+            10: FP, 30: snippet_fingerprint("R1", "return cache[key]"), 50: None,
+        }
+
+    def test_naive_dismissal_timestamp_still_orders_the_runs(self, tmp_path: Path) -> None:
+        """A legacy line written without a zone offset is read as UTC and
+        compared against the runs' aware start times instead of raising."""
+        project_dir = tmp_path / "proj"
+        _seed_run(project_dir, "r1", line=10, started_at="2026-01-01T00:00:00+00:00")
+        self._legacy_dismiss(project_dir, line=10, when=datetime(2026, 1, 2))
+        _seed_run(project_dir, "r2", line=10, snippet="return cache[key]",
+                  started_at="2026-03-01T00:00:00+00:00")
+
+        (entry,) = dismissed_keys(project_dir).entries
+
+        assert entry.fingerprint == FP
+
+    def test_backfill_keeps_each_entry_s_own_run_preference(self, tmp_path: Path) -> None:
+        """One entry's code exists only in a run started after the dismissal;
+        the other's line holds different code there. Each resolves from the
+        run that showed what the user dismissed."""
+        project_dir = tmp_path / "proj"
+        _seed_run(project_dir, "r1", line=10, started_at="2026-01-01T00:00:00+00:00")
+        when = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        self._legacy_dismiss(project_dir, line=10, when=when)
+        self._legacy_dismiss(project_dir, line=40, when=when)
+        _seed_run(project_dir, "r2", line=10, snippet="return cache[key]",
+                  started_at="2026-03-01T00:00:00+00:00")
+        _seed_run(project_dir, "r2", line=40, snippet="del cache[key]")
+
+        assert backfill_if_needed(project_dir) == 2
+
+        fingerprints = {e.line: e.fingerprint for e in dismissed_keys(project_dir).entries}
+        assert fingerprints == {10: FP, 40: snippet_fingerprint("R1", "del cache[key]")}
+
+
+def _count_calls_per_run(monkeypatch, name: str) -> dict[Path, int]:
+    """Count the calls the backfill makes to the run reader *name*, per run."""
+    counts: dict[Path, int] = {}
+    real = getattr(fingerprints_mod, name)
+
+    def spy(run_dir, *args, **kwargs):
+        counts[run_dir] = counts.get(run_dir, 0) + 1
+        return real(run_dir, *args, **kwargs)
+
+    monkeypatch.setattr(fingerprints_mod, name, spy)
+    return counts

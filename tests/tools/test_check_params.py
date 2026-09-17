@@ -75,13 +75,14 @@ def test_scan_walks_tools_with_repo_relative_keys(tmp_path, monkeypatch):
     (src / "ok.py").write_text("def narrow(a, b):\n    pass\n", encoding="utf-8")
     tools = tmp_path / "tools"
     tools.mkdir()
+    names = ", ".join(f"p{i}" for i in range(check_params.MAX_PARAMS + 1))
     (tools / "helper.py").write_text(
-        "def wide(a, b, c, d, e, f):\n    pass\n", encoding="utf-8",
+        f"def wide({names}):\n    pass\n", encoding="utf-8",
     )
     monkeypatch.setattr(check_params, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(check_params, "SCAN_ROOTS", (src, tools))
 
-    assert check_params._scan() == [("tools/helper.py", "wide", 6)]
+    assert check_params._scan() == [("tools/helper.py", "wide", check_params.MAX_PARAMS + 1)]
     assert check_params.collect_violations() == ["tools/helper.py:wide"]
 
 

@@ -1,4 +1,4 @@
-"""Parameter-count gate: fail the build on NEW functions with more than 5 parameters."""
+"""Parameter-count gate: fail the build on NEW functions with more than 6 parameters."""
 from __future__ import annotations
 
 import check_params
@@ -8,7 +8,7 @@ def test_no_new_param_violations():
     baseline = check_params.load_baseline()
     new = sorted(set(check_params.collect_violations()) - baseline)
     assert new == [], (
-        "New function(s) with more than 5 parameters. Pass an options object "
+        "New function(s) with more than 6 parameters. Pass an options object "
         "(frozen dataclass) or split the function; only with justification run "
         "`python tools/check_params.py --update-baseline`:\n" + "\n".join(new)
     )

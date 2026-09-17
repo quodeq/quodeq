@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
+import pytest
 
 from quodeq.core.events.models import (
     FindingDismissed,
@@ -77,3 +79,69 @@ def test_read_skips_malformed_lines(tmp_path: Path) -> None:
     assert len(events) == 2
     assert events[0].payload.req == "R1"
     assert events[1].payload.req == "R2"
+
+
+class _CountingLock:
+    """Stands in for the platform file lock; records how often a write took it."""
+
+    def __init__(self) -> None:
+        self.acquired = 0
+
+    def acquire(self, f) -> None:
+        self.acquired += 1
+
+    def release(self, f) -> None:
+        pass
+
+
+def _undismiss(*reqs: str) -> list[FindingUndismissedEvent]:
+    return [
+        FindingUndismissedEvent(payload=FindingUndismissed(req=req, file="a.py", line=1))
+        for req in reqs
+    ]
+
+
+def test_emit_many_appends_every_event_in_order(tmp_path: Path) -> None:
+    ActionLogWriter(tmp_path).emit_many(_undismiss("R1", "R2", "R3"))
+
+    lines = (tmp_path / "actions.jsonl").read_text().splitlines()
+    assert [json.loads(line)["payload"]["req"] for line in lines] == ["R1", "R2", "R3"]
+
+
+def test_emit_many_takes_the_file_lock_once_for_the_whole_batch(tmp_path: Path, monkeypatch) -> None:
+    lock = _CountingLock()
+    monkeypatch.setattr("quodeq.data.actions_log.get_file_lock", lambda: lock)
+
+    ActionLogWriter(tmp_path).emit_many(_undismiss("R1", "R2", "R3"))
+
+    assert lock.acquired == 1
+
+
+def test_emit_many_with_no_events_touches_nothing(tmp_path: Path) -> None:
+    ActionLogWriter(tmp_path).emit_many([])
+    assert not (tmp_path / "actions.jsonl").exists()
+
+
+def test_emit_many_serializes_before_writing_so_a_bad_event_leaves_the_log_untouched(
+    tmp_path: Path,
+) -> None:
+    writer = ActionLogWriter(tmp_path)
+    with pytest.raises(TypeError):
+        writer.emit_many([*_undismiss("R1"), object()])  # type: ignore[list-item]
+    assert not (tmp_path / "actions.jsonl").exists()
+
+
+def test_emit_many_reads_back_as_typed_events(tmp_path: Path) -> None:
+    ActionLogWriter(tmp_path).emit_many(_undismiss("R1", "R2"))
+
+    events = list(read_action_events(tmp_path))
+    assert [e.payload.req for e in events] == ["R1", "R2"]
+    assert all(isinstance(e, FindingUndismissedEvent) for e in events)
+
+
+def test_a_failed_append_is_logged_with_the_log_path(tmp_path: Path, caplog) -> None:
+    writer = ActionLogWriter(tmp_path)
+    with caplog.at_level(logging.ERROR, logger="quodeq.data.actions_log"), pytest.raises(TypeError):
+        writer.emit_many([*_undismiss("R1"), object()])  # type: ignore[list-item]
+    assert "Failed to emit" in caplog.text
+    assert str(tmp_path / "actions.jsonl") in caplog.text

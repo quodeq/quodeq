@@ -155,11 +155,11 @@ test('buildDimensionPlanFromViolations includes PLAN_TEST_INSTRUCTION_GROUP at e
 // ---------------------------------------------------------------------------
 
 test('getFixHint returns exact match for specific req ID', () => {
-  assert.equal(getFixHint('M-ANA-1'), 'Split file or extract code to a new module to reduce line count below 300');
+  assert.equal(getFixHint('M-ANA-1'), 'Split the file or extract code to a new module to bring it under the line limit');
 });
 
 test('getFixHint returns exact match for M-ANA-2', () => {
-  assert.equal(getFixHint('M-ANA-2'), 'Extract a helper function to bring the function under 50 lines');
+  assert.equal(getFixHint('M-ANA-2'), 'Extract a helper function to bring the function under the line limit');
 });
 
 test('getFixHint falls back to prefix match', () => {

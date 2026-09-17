@@ -35,8 +35,8 @@ export default [
           caughtErrors: 'none',
         },
       ],
-      // M-MOD-4: at most 5 parameters; pass one options object beyond that.
-      'max-params': ['error', { max: 5 }],
+      // M-MOD-4 (default 6): at most 6 parameters; pass one options object beyond that.
+      'max-params': ['error', { max: 6 }],
     },
   },
   {

@@ -18,7 +18,7 @@ marker-file idempotency as ``data/migrations/dismissed_json_to_actions_log``.
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,14 +28,13 @@ from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.core.finding_identity import snippet_fingerprint
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.ports.actions_log import ActionLog
-from quodeq.services._run_recency import run_dirs_newest_first
+from quodeq.services._run_recency import run_dirs_newest_first, run_started_at
 from quodeq.services._wiring import (
     MARKER_FILENAME,
     ActionLogWriter,
     read_action_events,
     read_finding_details,
     read_finding_details_from_json_eval,
-    read_run_status_json,
 )
 from quodeq.shared.validation import resolve_child_dir
 
@@ -77,14 +76,21 @@ def _in_shared_results_clone(project_dir: Path) -> bool:
     return (root / MARKER_FILENAME).is_file() and (root / ".git").exists()
 
 
-def _snippet_in_run(run_dir: Path, key: tuple[str, str, int]) -> str | None:
-    """The snippet stored for the ``(req, file, line)`` *key* in *run_dir*, or None."""
-    detail = read_finding_details(run_dir, {key}).get(key)
-    if detail is None:
-        detail = read_finding_details_from_json_eval(run_dir, {key}).get(key)
-    if detail is None:
-        return None
-    return detail.get("snippet") or None
+LineKey = tuple[str, str, int]
+
+
+def _snippets_in_run(run_dir: Path, keys: set[LineKey]) -> dict[LineKey, str]:
+    """The snippets *run_dir* stores for those of the ``(req, file, line)`` *keys* it holds.
+
+    One read of the findings table for the whole set; keys the table does
+    not hold fall back to the legacy ``evaluation/*.json``. A key whose row
+    has no snippet is absent.
+    """
+    details = read_finding_details(run_dir, keys)
+    missing = keys.difference(details)
+    if missing:
+        details.update(read_finding_details_from_json_eval(run_dir, missing))
+    return {key: detail["snippet"] for key, detail in details.items() if detail.get("snippet")}
 
 
 def _parse_iso(value: object) -> datetime | None:
@@ -103,36 +109,62 @@ def _parse_iso(value: object) -> datetime | None:
     return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
 
 
-def _started_at(run_dir: Path) -> datetime | None:
-    status = read_run_status_json(run_dir)
-    return _parse_iso(status.get("started_at")) if isinstance(status, dict) else None
+def _resolve_fingerprints(
+    project_dir: Path, targets: Iterable[DismissedEntry], *, run_id: str | None = None,
+) -> dict[LineKey, str]:
+    """The fingerprint of every target whose snippet one of the project's runs holds.
 
-
-def _candidate_runs(
-    project_dir: Path, *, run_id: str | None, at: datetime | None,
-) -> list[Path]:
-    """Runs to search, most likely first.
-
-    The named run comes first. When *at* (the dismissal's timestamp) is
-    known, runs started after it are tried last: the user dismissed what a
-    run of that time showed, and a later run may hold different code at the
-    same line.
+    Each run is read once, for every target still unresolved, in two waves:
+    first the runs started before a target's dismissal (newest first), so the
+    target matches what the user saw when they dismissed it, then the runs
+    started after it, which may hold different code at the same line. A run
+    with no recorded start counts as started before; a dismissal timestamp
+    without a zone is read as UTC. The run *run_id* names is read first for
+    every target. A blank stored snippet has no fingerprint and does not end
+    its target's search. Targets no run holds are absent.
 
     *run_id* comes from the request body. It is matched against the
     project's real run directories (``resolve_child_dir``), never joined onto
     the path, so a traversal value names nothing and the walk proceeds
     without it.
     """
-    ordered = run_dirs_newest_first(project_dir) if project_dir.is_dir() else []
-    if at is not None:
-        before = [r for r in ordered if (_started_at(r) or at) <= at]
-        after = [r for r in ordered if r not in before]
-        ordered = before + after
-    resolved = resolve_child_dir(project_dir, run_id) if run_id and project_dir.is_dir() else None
+    if not project_dir.is_dir():
+        return {}
+    pending = {target.line_key: target for target in targets}
+    dismissed_at = {key: _parse_iso(target.dismissed_at) for key, target in pending.items()}
+    found: dict[LineKey, str] = {}
+    started: dict[Path, datetime | None] = {}
+
+    def started_before(run_dir: Path, at: datetime | None) -> bool:
+        if at is None:
+            return True
+        if run_dir not in started:
+            started[run_dir] = _parse_iso(run_started_at(run_dir))
+        return (started[run_dir] or at) <= at
+
+    def read(run_dir: Path, keys: set[LineKey]) -> None:
+        for key, snippet in _snippets_in_run(run_dir, keys).items():
+            fingerprint = snippet_fingerprint(pending[key].req, snippet)
+            if fingerprint is not None:
+                found[key] = fingerprint
+
+    runs = run_dirs_newest_first(project_dir)
+    resolved = resolve_child_dir(project_dir, run_id) if run_id else None
     if resolved is not None:
         named = Path(resolved)
-        ordered = [named] + [r for r in ordered if r != named]
-    return ordered
+        read(named, set(pending))
+        runs = [run_dir for run_dir in runs if run_dir != named]
+    for before in (True, False):
+        for run_dir in runs:
+            if len(found) == len(pending):
+                return found
+            keys = {
+                key for key in pending
+                if key not in found and started_before(run_dir, dismissed_at[key]) is before
+            }
+            if keys:
+                read(run_dir, keys)
+    return found
 
 
 def resolve_fingerprint(
@@ -147,21 +179,14 @@ def resolve_fingerprint(
     no run holds any more. None when no snippet can be found: the dismissal
     then keeps its line as identity.
     """
-    key = target.line_key
-    for run_dir in _candidate_runs(project_dir, run_id=run_id, at=target.dismissed_at):
-        found = _snippet_in_run(run_dir, key)
-        if found:
-            return snippet_fingerprint(target.req, found)
-    return snippet_fingerprint(target.req, snippet)
+    found = _resolve_fingerprints(project_dir, [target], run_id=run_id)
+    return found.get(target.line_key) or snippet_fingerprint(target.req, snippet)
 
 
-def _upgrade_entry(entry: DismissedEntry, project_dir: Path) -> FindingDismissedEvent | None:
-    fp = resolve_fingerprint(project_dir, entry)
-    if fp is None:
-        return None
+def _upgraded(entry: DismissedEntry, fingerprint: str) -> FindingDismissedEvent:
     return FindingDismissedEvent(payload=FindingDismissed(
         req=entry.req, file=entry.file, line=entry.line,
-        reason=entry.reason, fingerprint=fp,
+        reason=entry.reason, fingerprint=fingerprint,
     ))
 
 
@@ -188,13 +213,13 @@ def backfill_if_needed(
         pending = [e for e in state.entries if not e.fingerprint]
         count = 0
         if pending:
-            sink = writer or ActionLogWriter(project_dir)
-            for entry in pending:
-                event = _upgrade_entry(entry, project_dir)
-                if event is None:
-                    continue
-                sink.emit(event)
-                count += 1
+            fingerprints = _resolve_fingerprints(project_dir, pending)
+            events = [
+                _upgraded(entry, fingerprint) for entry in pending
+                if (fingerprint := fingerprints.get(entry.line_key))
+            ]
+            (writer or ActionLogWriter(project_dir)).emit_many(events)
+            count = len(events)
         # Mark last: a crash mid-backfill leaves the marker absent so the next
         # call retries; the events already appended are idempotent for the fold.
         try:

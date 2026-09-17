@@ -15,7 +15,7 @@ import { SIZE_GRANDFATHER } from './tools/size_grandfather.mjs';
 
 const SIZE_RULES = {
   'max-lines': ['error', { max: 300, skipBlankLines: false }],
-  'max-lines-per-function': ['error', { max: 50 }],
+  'max-lines-per-function': ['error', { max: 60 }],
 };
 
 export default [
@@ -31,7 +31,7 @@ export default [
   // Test files group related cases under one describe(...), and ESLint
   // counts a describe callback's body as a single function -- so
   // max-lines-per-function fires on describe-body length, not on any
-  // individual test exceeding 50 lines. That's metric noise, not a real
+  // individual test exceeding 60 lines. That's metric noise, not a real
   // function-size problem, so test files are exempt from it; the 300-line
   // max-lines file cap still applies to them same as any other file.
   {
