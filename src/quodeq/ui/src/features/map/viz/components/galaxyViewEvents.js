@@ -53,6 +53,48 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
   el.style.top = top + 'px';
 }
 
+function navigateIntoHovered(h, nav, navigateTo) {
+  if (nav.depth === 0 && h.type === 'dim') navigateTo(1, h.idx);
+  else if (nav.depth === 1 && h.type === 'prin') navigateTo(2, nav.dim, h.idx);
+}
+
+// The constellation whose hit circle contains the click, or null.
+function clusterAt(e, { scene, size, w2s, camRef, canvasRef }) {
+  const rect = canvasRef.current?.getBoundingClientRect();
+  if (!rect) return null;
+  const cmx = e.clientX - rect.left, cmy = e.clientY - rect.top;
+  const zoom = camRef.current.z;
+  const hit = scene.constellations.find((con) => {
+    const csc = w2s(size.w / 2 + con.cx, size.h / 2 + con.cy);
+    const dx = cmx - csc.x, dy = cmy - csc.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    return dist < (con.spread + CLUSTER_HIT_PADDING) * zoom;
+  });
+  return hit ?? null;
+}
+
+function leaveCluster(nav, startTransition, saveNav) {
+  nav.clusterCx = null; nav.clusterCy = null;
+  startTransition(true);
+  saveNav();
+}
+
+// Clicking the cluster already zoomed into zooms back out to the galaxy.
+function toggleCluster(con, nav, startTransition, saveNav) {
+  if (nav.clusterCx === con.cx && nav.clusterCy === con.cy) {
+    leaveCluster(nav, startTransition, saveNav);
+    return;
+  }
+  nav.clusterCx = con.cx; nav.clusterCy = con.cy;
+  startTransition(false);
+  saveNav();
+}
+
+function navigateUp(nav, navigateTo) {
+  if (nav.depth === 2) navigateTo(1, nav.dim);
+  else navigateTo(0);
+}
+
 /**
  * Handle click on the galaxy canvas — navigate into stars/principles or zoom to clusters.
  *
@@ -72,49 +114,23 @@ export function handleCanvasClick(e, refs, { scene, size, navigateTo, startTrans
   const nav = navRef.current;
 
   if (h) {
-    if (nav.depth === 0 && h.type === 'dim') navigateTo(1, h.idx);
-    else if (nav.depth === 1 && h.type === 'prin') navigateTo(2, nav.dim, h.idx);
+    navigateIntoHovered(h, nav, navigateTo);
     return;
   }
 
-  // At galaxy root: check if click is near a cluster -> zoom to it
+  // At galaxy root: a click near a cluster zooms to it (or back out of it).
   if (nav.depth === 0 && !animRef.current && scene?.constellations) {
     if (!camRef.current) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      const cmx = e.clientX - rect.left, cmy = e.clientY - rect.top;
-      for (const con of scene.constellations) {
-        const csc = w2s(size.w / 2 + con.cx, size.h / 2 + con.cy);
-        const dx = cmx - csc.x, dy = cmy - csc.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const hitRadius = (con.spread + CLUSTER_HIT_PADDING) * camRef.current.z;
-        if (dist < hitRadius) {
-          if (nav.clusterCx === con.cx && nav.clusterCy === con.cy) {
-            // Already in this cluster — zoom back to galaxy
-            nav.clusterCx = null; nav.clusterCy = null;
-            startTransition(true);
-          } else {
-            // Zoom to this cluster
-            nav.clusterCx = con.cx; nav.clusterCy = con.cy;
-            startTransition(false);
-          }
-          saveNav();
-          return;
-        }
-      }
+    const con = clusterAt(e, { scene, size, w2s, camRef, canvasRef });
+    if (con) {
+      toggleCluster(con, nav, startTransition, saveNav);
+      return;
     }
   }
 
-  // Click empty space (outside any cluster)
-  if (nav.depth > 0) {
-    if (nav.depth === 2) navigateTo(1, nav.dim);
-    else navigateTo(0);
-  } else if (nav.clusterCx != null) {
-    // Zoomed into cluster but clicked far from it — zoom back
-    nav.clusterCx = null; nav.clusterCy = null;
-    startTransition(true);
-    saveNav();
-  }
+  // Click on empty space (outside any cluster).
+  if (nav.depth > 0) navigateUp(nav, navigateTo);
+  else if (nav.clusterCx != null) leaveCluster(nav, startTransition, saveNav);
 }
 
 /**

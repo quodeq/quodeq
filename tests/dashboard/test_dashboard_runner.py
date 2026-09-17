@@ -164,9 +164,21 @@ def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
     test_env: dict[str, str] = {}
     run_dashboard(config, env=test_env, hooks=hooks)
 
-    # run_dashboard copies the env dict, so original is not mutated;
-    # verify that os.environ is not polluted by verbose=True
+    assert test_env["QUODEQ_VERBOSE"] == "1"
     assert os.environ.get("QUODEQ_VERBOSE") != "1"
+
+
+def test_resolve_environ_returns_the_mapping_it_wrote_to(tmp_path: Path):
+    config = _make_config(
+        tmp_path,
+        build=BuildConfig(open_browser=False, no_build=True, reinstall=False, verbose=True),
+    )
+    test_env: dict[str, str] = {"KEEP": "me"}
+
+    result = runner._resolve_environ(config, test_env)
+
+    assert result is test_env
+    assert test_env == {"KEEP": "me", "QUODEQ_VERBOSE": "1"}
 
 
 class TestHandoffToRunningInstance:

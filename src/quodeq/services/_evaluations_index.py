@@ -66,33 +66,43 @@ class EvaluationsIndex:
         returned however deep in the index they sit.
         """
         reports_dir = self._coerce_reports_dir(reports_dir)
-        try:
-            internal_jobs = self._jobs.list_jobs(reports_root=None)
-        except (AttributeError, TypeError):
-            internal_jobs = []
+        internal_jobs = self._internal_jobs()
         # limit>0: over-fetch by len(internal_jobs) so that even if every
         # in-memory job dedupes against (and removes) a fetched DB row, the
         # fetch still leaves >= limit usable DB rows to fill the merge.
         # limit<=0 means "fetch all".
-        # A *states* filter is pushed straight into the SQL query below
+        # A *states* filter is pushed straight into the SQL query
         # (JobSnapshot.status is exactly RunRow.state for indexed rows), so
         # it narrows the same bounded fetch instead of requiring a fetch-all
         # that gets filtered in Python afterwards. It is re-applied in
         # Python only to drop in-memory jobs that have no row and therefore
         # can't be filtered in SQL.
         db_limit = limit + len(internal_jobs) if limit and limit > 0 else None
+        snapshots = self._indexed_snapshots(reports_dir, db_limit, states)
+        merged = _merge_internal_jobs(snapshots, internal_jobs)
+        if states:
+            merged = [s for s in merged if s.status in states]  # keep: in-memory jobs have no row
+        merged.sort(key=lambda s: s.started_at or "", reverse=True)
+        return merged[:limit] if limit and limit > 0 else merged
+
+    def _internal_jobs(self) -> list[JobSnapshot]:
+        """In-memory jobs from the ``JobManager``; empty when it cannot list them."""
+        try:
+            return self._jobs.list_jobs(reports_root=None)
+        except (AttributeError, TypeError):
+            return []
+
+    def _indexed_snapshots(
+        self, reports_dir: Path, db_limit: int | None, states: set[str] | None,
+    ) -> list[JobSnapshot]:
+        """Sync the index against *reports_dir*, then read up to *db_limit* rows (None: all) in *states*."""
         db = self._open_index()
         try:
             _run_index.sync_index(db, reports_dir)
             rows = _run_index.list_runs(db, limit=db_limit, states=states or None)
         finally:
             db.close()
-        snapshots = [self._run_row_to_snapshot(r) for r in rows]
-        merged = _merge_internal_jobs(snapshots, internal_jobs)
-        if states:
-            merged = [s for s in merged if s.status in states]  # keep: in-memory jobs have no row
-        merged.sort(key=lambda s: s.started_at or "", reverse=True)
-        return merged[:limit] if limit and limit > 0 else merged
+        return [self._run_row_to_snapshot(r) for r in rows]
 
     def delete(self, job_id: str, reports_dir: Path | None = None) -> bool:
         """Delete a run's on-disk dir and index row. Refuses running jobs."""

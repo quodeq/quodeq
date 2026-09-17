@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import time
+from collections.abc import Mapping
 from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
@@ -73,15 +74,16 @@ def _webview_token_from_ua(user_agent: str) -> str | None:
     return candidate if candidate.isascii() else None
 
 
-def _is_trusted_webview(user_agent: str) -> bool:
+def _is_trusted_webview(user_agent: str, env: Mapping[str, str] | None = None) -> bool:
     """True only for a request carrying this launch's webview token.
 
-    Reads QUODEQ_WEBVIEW_TOKEN lazily (not at module load) so it reflects
-    whatever _server.py set in this process's environment before spawning
-    the API subprocess, and so standalone (non-desktop) runs that never set
-    it always fail closed here regardless of UA content.
+    Reads QUODEQ_WEBVIEW_TOKEN from *env* (os.environ by default) lazily, not
+    at module load, so it reflects whatever _server.py set in this process's
+    environment before spawning the API subprocess, and so standalone
+    (non-desktop) runs that never set it always fail closed here regardless
+    of UA content.
     """
-    expected = os.environ.get(_ENV_WEBVIEW_TOKEN)
+    expected = (os.environ if env is None else env).get(_ENV_WEBVIEW_TOKEN)
     # isascii() for the same reason _webview_token_from_ua guards the
     # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
     # and this one comes from the environment, which an operator can set by
@@ -96,7 +98,7 @@ def _is_trusted_webview(user_agent: str) -> bool:
 
 
 # Host header must look like a bare hostname/IPv4 or a bracketed IPv6
-# literal (RFC 3986 host syntax, e.g. "[::1]:4180"), with an optional port,
+# literal (RFC 3986 host syntax, e.g. "[::1]:7863"), with an optional port,
 # before it's trusted enough to interpolate into the CSP connect-src
 # directive. Rejects quotes, whitespace, and other characters that could
 # inject extra CSP directives or sources via a spoofed Host header.

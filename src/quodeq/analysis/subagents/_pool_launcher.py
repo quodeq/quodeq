@@ -163,6 +163,19 @@ def _build_pool_config(
     )
 
 
+def _use_scout_mode(env: dict[str, str] | None) -> bool:
+    """Skip scout mode for providers without per-token billing (e.g. Codex
+    with ChatGPT subscription): launch all agents immediately for faster results."""
+    return get_ai_cmd(env) not in _non_scout_providers(env)
+
+
+def _pool_paths(config: RunConfig, params: LaunchPoolParams) -> PoolPaths:
+    return PoolPaths(
+        work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,
+        src=config.src, all_files=params.all_files, standards_dir=config.standards_dir,
+    )
+
+
 def _launch_pool(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
     *, env: dict[str, str] | None = None,
@@ -170,21 +183,13 @@ def _launch_pool(
     """Create and run a SubagentPool, returning its results."""
     time_limit = _resolve_pool_budget(config, dim_id, params, env)
     base_ac = _build_pool_config(config, dim_id, params, time_limit, env)
-    n_agents = config.options.max_subagents
-
-    # Skip scout mode for providers without per-token billing (e.g. Codex with
-    # ChatGPT subscription).  Launch all agents immediately for faster results.
-    ai_cmd = get_ai_cmd(env)
-    use_scout = ai_cmd not in _non_scout_providers(env)
-
     pool = SubagentPool(
-        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,
-                        src=config.src, all_files=params.all_files, standards_dir=config.standards_dir),
+        paths=_pool_paths(config, params),
         options=PoolOptions(
-            n_agents=n_agents,
+            n_agents=config.options.max_subagents,
             prompt=params.prompt,
             dimension=dim_id,
-            scout_first=use_scout,
+            scout_first=_use_scout_mode(env),
         ),
         config=base_ac,
     )

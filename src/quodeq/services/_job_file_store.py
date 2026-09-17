@@ -11,6 +11,7 @@ import os
 import threading
 import time
 from collections import deque
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,8 +24,10 @@ from quodeq.services._job_model import Job, JobStore, _MAX_LOG_LINES, _logger
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
 
-def _default_persist_dir() -> Path:
+def _default_persist_dir(env: Mapping[str, str] | None = None) -> Path:
     """Read persist dir from env at call time for lazy configuration.
+
+    *env* overrides ``os.environ`` for the ``QUODEQ_JOB_PERSIST_DIR`` read.
 
     Resolution: QUODEQ_JOB_PERSIST_DIR, else ``run/jobs`` next to the index
     DB (mirroring get_score_cache_path, so the test suite's
@@ -32,7 +35,7 @@ def _default_persist_dir() -> Path:
     itself defaults to ``~/.quodeq``. Hardcoding the home fallback here let
     pytest runs write fake jobs into the developer's real dashboard.
     """
-    explicit = os.environ.get("QUODEQ_JOB_PERSIST_DIR")
+    explicit = (env if env is not None else os.environ).get("QUODEQ_JOB_PERSIST_DIR")
     if explicit:
         return Path(explicit)
     from quodeq.shared._env import get_index_db_path

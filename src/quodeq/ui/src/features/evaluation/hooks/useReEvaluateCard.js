@@ -24,21 +24,34 @@ function initialBudgetSeconds(storage = localStorage) {
   return resolveProviderSettings(provider, storage).timeLimitS;
 }
 
-export function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
-  const api = useApi();
-  const { getProjectInfo, relocateProject } = api;
-  const { info, error, retry, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
-  const { allDimensions } = usePluginDimensions();
-  const { showToast } = useSidePane();
+// Scan scope the user picks on the card (branch, sub-path, time budget);
+// branch and path reset when the project changes.
+function useReEvalScope(project) {
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
   const [timeLimitS, setTimeLimitS] = useState(() => initialBudgetSeconds());
 
   useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
 
+  return { branch, setBranch, scopePath, setScopePath, timeLimitS, setTimeLimitS };
+}
+
+// Local-project-only data: the scan preview and the pre-run estimates.
+function useReEvalScan(project, info) {
   const isLocal = info?.location === 'local';
   const { scanData } = useScanData(isLocal ? project : null);
   const { estimates, loading: estimatesLoading } = useScanEstimates(project, isLocal && !info?.pathMissing);
+  return { isLocal, scanData, estimates, estimatesLoading };
+}
+
+export function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
+  const api = useApi();
+  const { getProjectInfo, relocateProject } = api;
+  const { info, error, retry, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
+  const { allDimensions } = usePluginDimensions();
+  const { showToast } = useSidePane();
+  const { branch, setBranch, scopePath, setScopePath, timeLimitS, setTimeLimitS } = useReEvalScope(project);
+  const { isLocal, scanData, estimates, estimatesLoading } = useReEvalScan(project, info);
 
   const { selectedDims, toggleDim, selectAll, clearAll, handleScan, cleanScan, setCleanScan } =
     useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail: showToast, preselectDims, project, timeLimitS });

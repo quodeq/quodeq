@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from pathlib import Path
+from typing import Callable
 
 from flask import Flask, jsonify, request
 
@@ -39,6 +40,211 @@ from .routes_shared_common import _logger, _shared_project_dir, _validate_segmen
 _MAX_FINDINGS_LIST_LIMIT = 5000
 
 
+def _shared_projects(
+    eval_root: Path, url: str,
+    refresh_clone: Callable[[str], tuple[bool, object]], sync_index: Callable[[str], object],
+):
+    stale = None
+    if request.args.get("refresh") == "1":
+        # Refresh-on-read: the UI calls this on tab entry to force the
+        # clone up to date before listing, rather than showing whatever
+        # was last fetched. A failed refresh (host unreachable) is not
+        # fatal -- fall through and serve the existing (now-stale)
+        # clone contents, just flag it. The index is only re-synced
+        # after a successful refresh; there is nothing new to index
+        # when the fetch itself failed.
+        ok, _ = refresh_clone(url)
+        if ok:
+            sync_index(url)
+            stale = False
+        else:
+            stale = True
+    # backfill=False: the shared clone is a git worktree, not a local
+    # evaluations dir -- writing onboardingCompletedAt into
+    # repository_info.json here would dirty it, and a dirty worktree can
+    # make publish's `pull --rebase` refuse (confusing wedge) the next
+    # time someone publishes into this clone.
+    # inline_summaries=True: this route has no warm-up engine to fill a
+    # missing project-card summary later, so a cache miss must compute
+    # it inline here instead of reporting it pending forever.
+    projects = _fs_projects.build_project_list(
+        eval_root, backfill=False, inline_summaries=True,
+    )
+    listing = {"projects": [to_camel_dict(p) for p in projects]}
+    meta = published_meta(url)
+    for project in listing["projects"]:
+        key = project.get("id") or project.get("name")
+        project.update(meta.get(key, {}))
+        project["source"] = "shared"
+    listing["lastSynced"] = last_synced_at(url)
+    if stale is not None:
+        listing["stale"] = stale
+    return jsonify(listing)
+
+
+@_with_shared_root
+def shared_project_info(project: str, eval_root: Path, url: str):
+    err = _validate_segment(project)
+    if err:
+        return err
+    try:
+        info = _fs_projects.get_project_info(str(eval_root), project)
+    except Exception:
+        _logger.exception("Failed to load shared project info for %s", project)
+        return json_error("Failed to load project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    if not info:
+        return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    # Same publishedBy/publishedAt enrichment as the list route
+    # (shared_projects above) -- without it the UI's shared-project hero
+    # badge has no "published by <name>" to show. `project` here is the
+    # directory name under the clone root, the exact key published_meta
+    # indexes by.
+    meta = published_meta(url)
+    info.update(meta.get(project, {}))
+    info["source"] = "shared"
+    return jsonify(info)
+
+
+@_with_shared_root
+def shared_runs(project: str, eval_root: Path, url: str):
+    err = _validate_segment(project)
+    if err:
+        return err
+    try:
+        runs = build_runs_unit(eval_root, shared_index_db_path(url), project)
+    except Exception:
+        _logger.exception("Failed to build shared runs unit for %s", project)
+        return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    return jsonify({"runs": runs})
+
+
+@_with_shared_root
+def shared_dashboard(project: str, eval_root: Path, url: str):
+    err = _validate_segment(project)
+    if err:
+        return err
+    run = request.args.get("run", "latest")
+    try:
+        payload = _fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
+    except FileNotFoundError:
+        return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return jsonify(payload)
+
+
+@_with_shared_root
+def shared_accumulated(project: str, eval_root: Path, url: str):
+    err = _validate_segment(project)
+    if err:
+        return err
+    as_of = request.args.get("asOf")
+    payload = _fs_reports.get_accumulated(str(eval_root), project, as_of)
+    if payload is None:
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return jsonify(payload)
+
+
+@_with_shared_root
+def shared_scores(project: str, eval_root: Path, url: str):
+    err = _validate_segment(project)
+    if err:
+        return err
+    as_of = request.args.get("asOf")
+    try:
+        result = get_project_scores(eval_root, project, as_of)
+    except Exception:
+        _logger.exception("Unexpected error fetching shared scores for project %s", project)
+        return json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    if result is None:
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return jsonify(result)
+
+
+@_with_shared_root
+def shared_compare_summary(project: str, eval_root: Path, url: str):
+    err = _validate_segment(project)
+    if err:
+        return err
+    try:
+        result = build_compare_summary(eval_root, project)
+    except Exception:
+        _logger.exception("Unexpected error building shared compare summary for project %s", project)
+        return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    if result is None:
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return jsonify(result)
+
+
+@_with_shared_root
+def shared_run_scores(project: str, run_id: str, eval_root: Path, url: str):
+    err = _validate_segment(project, run_id)
+    if err:
+        return err
+    try:
+        result = get_scores_slim(eval_root, project, run_id)
+    except FileNotFoundError:
+        return json_error("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return jsonify(result)
+
+
+@_with_shared_root
+def shared_dimension_eval(project: str, dim: str, eval_root: Path, url: str):
+    run_id = request.args.get("run", "latest")
+    err = _validate_segment(project, dim, run_id)
+    if err:
+        return err
+    payload = _fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
+    if payload is None:
+        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    if payload.get("waiting"):
+        return jsonify(payload), HTTPStatus.ACCEPTED
+    return jsonify(payload)
+
+
+@_with_shared_root
+def shared_violations(project: str, eval_root: Path, url: str):
+    run_id = request.args.get("run", "latest")
+    err = _validate_segment(project, run_id)
+    if err:
+        return err
+    try:
+        payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
+    except FileNotFoundError:
+        return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return jsonify(to_camel_dict(payload))
+
+
+def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., list]):
+    """Shared body of the dismissed/verified mirrors: validate, resolve, clamp, list."""
+    err = _validate_segment(project)
+    if err:
+        return err
+    project_dir = _shared_project_dir(eval_root, project)
+    if project_dir is None:
+        return jsonify([])
+    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    if isinstance(paging[0], dict):
+        return paging
+    limit, offset = paging
+    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
+    return jsonify(lister(project_dir, offset=offset, limit=limit))
+
+
+# The local routes take ``project`` as a query param
+# (``/api/findings/dismissed?project=``) since /api/findings/* is a flat
+# namespace shared by mutation routes too. Every other shared mirror
+# nests ``project`` as a URL path segment, so these two follow that
+# convention instead of the local route's exact URL shape -- the response
+# bodies (bare JSON array, same item shape) are unchanged.
+@_with_shared_root
+def shared_dismissed_findings(project: str, eval_root: Path, url: str):
+    return _shared_findings_page(project, eval_root, load_dismissed)
+
+
+@_with_shared_root
+def shared_verified_findings(project: str, eval_root: Path, url: str):
+    return _shared_findings_page(project, eval_root, verified_entries)
+
+
 def register_shared_mirror_routes(app: Flask) -> None:
     # refresh_shared_clone and sync_shared_index are looked up on the
     # quodeq.api.routes_shared facade at call time (rather than imported
@@ -50,210 +256,18 @@ def register_shared_mirror_routes(app: Flask) -> None:
     @app.get("/api/shared/projects")
     @_with_shared_root
     def shared_projects(eval_root: Path, url: str):
-        stale = None
-        if request.args.get("refresh") == "1":
-            # Refresh-on-read: the UI calls this on tab entry to force the
-            # clone up to date before listing, rather than showing whatever
-            # was last fetched. A failed refresh (host unreachable) is not
-            # fatal -- fall through and serve the existing (now-stale)
-            # clone contents, just flag it. The index is only re-synced
-            # after a successful refresh; there is nothing new to index
-            # when the fetch itself failed.
-            ok, _ = _routes_shared.refresh_shared_clone(url)
-            if ok:
-                _routes_shared.sync_shared_index(url)
-                stale = False
-            else:
-                stale = True
-        # backfill=False: the shared clone is a git worktree, not a local
-        # evaluations dir -- writing onboardingCompletedAt into
-        # repository_info.json here would dirty it, and a dirty worktree can
-        # make publish's `pull --rebase` refuse (confusing wedge) the next
-        # time someone publishes into this clone.
-        # inline_summaries=True: this route has no warm-up engine to fill a
-        # missing project-card summary later, so a cache miss must compute
-        # it inline here instead of reporting it pending forever.
-        projects = _fs_projects.build_project_list(
-            eval_root, backfill=False, inline_summaries=True,
+        return _shared_projects(
+            eval_root, url, _routes_shared.refresh_shared_clone, _routes_shared.sync_shared_index,
         )
-        listing = {"projects": [to_camel_dict(p) for p in projects]}
-        meta = published_meta(url)
-        for project in listing["projects"]:
-            key = project.get("id") or project.get("name")
-            project.update(meta.get(key, {}))
-            project["source"] = "shared"
-        listing["lastSynced"] = last_synced_at(url)
-        if stale is not None:
-            listing["stale"] = stale
-        return jsonify(listing)
 
-    @app.get("/api/shared/projects/<project>/info")
-    @_with_shared_root
-    def shared_project_info(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        try:
-            info = _fs_projects.get_project_info(str(eval_root), project)
-        except Exception:
-            _logger.exception("Failed to load shared project info for %s", project)
-            return json_error("Failed to load project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-        if not info:
-            return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        # Same publishedBy/publishedAt enrichment as the list route
-        # (shared_projects above) -- without it the UI's shared-project hero
-        # badge has no "published by <name>" to show. `project` here is the
-        # directory name under the clone root, the exact key published_meta
-        # indexes by.
-        meta = published_meta(url)
-        info.update(meta.get(project, {}))
-        info["source"] = "shared"
-        return jsonify(info)
-
-    @app.get("/api/shared/projects/<project>/runs")
-    @_with_shared_root
-    def shared_runs(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        try:
-            runs = build_runs_unit(eval_root, shared_index_db_path(url), project)
-        except Exception:
-            _logger.exception("Failed to build shared runs unit for %s", project)
-            return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-        return jsonify({"runs": runs})
-
-    @app.get("/api/shared/projects/<project>/dashboard")
-    @_with_shared_root
-    def shared_dashboard(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        run = request.args.get("run", "latest")
-        try:
-            payload = _fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
-        except FileNotFoundError:
-            return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(payload)
-
-    @app.get("/api/shared/projects/<project>/accumulated")
-    @_with_shared_root
-    def shared_accumulated(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        as_of = request.args.get("asOf")
-        payload = _fs_reports.get_accumulated(str(eval_root), project, as_of)
-        if payload is None:
-            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(payload)
-
-    @app.get("/api/shared/projects/<project>/scores")
-    @_with_shared_root
-    def shared_scores(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        as_of = request.args.get("asOf")
-        try:
-            result = get_project_scores(eval_root, project, as_of)
-        except Exception:
-            _logger.exception("Unexpected error fetching shared scores for project %s", project)
-            return json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-        if result is None:
-            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(result)
-
-    @app.get("/api/shared/projects/<project>/compare-summary")
-    @_with_shared_root
-    def shared_compare_summary(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        try:
-            result = build_compare_summary(eval_root, project)
-        except Exception:
-            _logger.exception("Unexpected error building shared compare summary for project %s", project)
-            return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-        if result is None:
-            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(result)
-
-    @app.get("/api/shared/projects/<project>/scores/<run_id>")
-    @_with_shared_root
-    def shared_run_scores(project: str, run_id: str, eval_root: Path, url: str):
-        err = _validate_segment(project, run_id)
-        if err:
-            return err
-        try:
-            result = get_scores_slim(eval_root, project, run_id)
-        except FileNotFoundError:
-            return json_error("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(result)
-
-    @app.get("/api/shared/projects/<project>/dimensions/<dim>/eval")
-    @_with_shared_root
-    def shared_dimension_eval(project: str, dim: str, eval_root: Path, url: str):
-        run_id = request.args.get("run", "latest")
-        err = _validate_segment(project, dim, run_id)
-        if err:
-            return err
-        payload = _fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
-        if payload is None:
-            return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        if payload.get("waiting"):
-            return jsonify(payload), HTTPStatus.ACCEPTED
-        return jsonify(payload)
-
-    @app.get("/api/shared/projects/<project>/violations")
-    @_with_shared_root
-    def shared_violations(project: str, eval_root: Path, url: str):
-        run_id = request.args.get("run", "latest")
-        err = _validate_segment(project, run_id)
-        if err:
-            return err
-        try:
-            payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
-        except FileNotFoundError:
-            return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(to_camel_dict(payload))
-
-    # The local routes take ``project`` as a query param
-    # (``/api/findings/dismissed?project=``) since /api/findings/* is a flat
-    # namespace shared by mutation routes too. Every other shared mirror
-    # nests ``project`` as a URL path segment, so these two follow that
-    # convention instead of the local route's exact URL shape -- the response
-    # bodies (bare JSON array, same item shape) are unchanged.
-    @app.get("/api/shared/projects/<project>/findings/dismissed")
-    @_with_shared_root
-    def shared_dismissed_findings(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        project_dir = _shared_project_dir(eval_root, project)
-        if project_dir is None:
-            return jsonify([])
-        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
-        if isinstance(paging[0], dict):
-            return paging
-        limit, offset = paging
-        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
-        items = load_dismissed(project_dir, offset=offset, limit=limit)
-        return jsonify(items)
-
-    @app.get("/api/shared/projects/<project>/findings/verified")
-    @_with_shared_root
-    def shared_verified_findings(project: str, eval_root: Path, url: str):
-        err = _validate_segment(project)
-        if err:
-            return err
-        project_dir = _shared_project_dir(eval_root, project)
-        if project_dir is None:
-            return jsonify([])
-        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
-        if isinstance(paging[0], dict):
-            return paging
-        limit, offset = paging
-        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
-        items = verified_entries(project_dir, offset=offset, limit=limit)
-        return jsonify(items)
+    app.get("/api/shared/projects/<project>/info")(shared_project_info)
+    app.get("/api/shared/projects/<project>/runs")(shared_runs)
+    app.get("/api/shared/projects/<project>/dashboard")(shared_dashboard)
+    app.get("/api/shared/projects/<project>/accumulated")(shared_accumulated)
+    app.get("/api/shared/projects/<project>/scores")(shared_scores)
+    app.get("/api/shared/projects/<project>/compare-summary")(shared_compare_summary)
+    app.get("/api/shared/projects/<project>/scores/<run_id>")(shared_run_scores)
+    app.get("/api/shared/projects/<project>/dimensions/<dim>/eval")(shared_dimension_eval)
+    app.get("/api/shared/projects/<project>/violations")(shared_violations)
+    app.get("/api/shared/projects/<project>/findings/dismissed")(shared_dismissed_findings)
+    app.get("/api/shared/projects/<project>/findings/verified")(shared_verified_findings)

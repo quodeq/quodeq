@@ -29,6 +29,8 @@ from quodeq.services._job_model import (
     STATUS_FAILED,
     STATUS_RUNNING,
     _MAX_COMPLETED_JOBS,  # noqa: F401 — re-export (patch/import target)
+    mark_spawn_failed,
+    new_job,
 )
 from quodeq.services._job_file_store import (
     FileJobStore,
@@ -133,18 +135,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     def start_job(self, cmd: list[str], launch: JobLaunchOptions | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
         launch = launch if launch is not None else JobLaunchOptions()
-        job_id = str(uuid.uuid4())
-        job = Job(
-            job_id=job_id,
-            status=STATUS_RUNNING,
-            command=cmd,
-            started_at=datetime.now(timezone.utc).isoformat(),
-            ended_at=None,
-            exit_code=None,
-            ai_provider=launch.ai_provider,
-            ai_model=launch.ai_model,
-            time_limit_s=launch.time_limit_s,
-        )
+        job = new_job(str(uuid.uuid4()), cmd, launch, status=STATUS_RUNNING)
         refusal = self._reserve_slot_or_refuse(job)
         if refusal is not None:
             return refusal
@@ -160,28 +151,31 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
                 start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            self._log.error(f"Failed to start job subprocess: {exc}")
-            self._release_slot(job_id)
-            job.status = STATUS_FAILED
-            job.ended_at = datetime.now(timezone.utc).isoformat()
-            job.exit_code = _EXIT_CODE_SPAWN_FAILURE
-            job.logs.append(f"Failed to start process: {exc}")
-            with self._lock:
-                self._store.put(job)
-            result = job.to_dict()
-            return replace(result, error="Failed to start the evaluation process. Check the server logs for details.")
+            return self._record_spawn_failure(job, exc)
 
         with self._lock:
             self._store.put(job)
             # The reservation becomes the tracked process under one lock hold,
             # so the slot is never double-counted and never briefly free.
-            self._reserved.discard(job_id)
-            self._processes[job_id] = process
+            self._reserved.discard(job.job_id)
+            self._processes[job.job_id] = process
+        self._start_watchers(job.job_id, process)
+        return job.to_dict()
 
+    def _record_spawn_failure(self, job: Job, exc: BaseException) -> JobSnapshot:
+        """Persist *job* as failed to start and return the snapshot the caller reports."""
+        self._log.error(f"Failed to start job subprocess: {exc}")
+        self._release_slot(job.job_id)
+        mark_spawn_failed(job, exc, status=STATUS_FAILED, exit_code=_EXIT_CODE_SPAWN_FAILURE)
+        with self._lock:
+            self._store.put(job)
+        result = job.to_dict()
+        return replace(result, error="Failed to start the evaluation process. Check the server logs for details.")
+
+    def _start_watchers(self, job_id: str, process: subprocess.Popen) -> None:
+        """Start the per-job stream consumer and exit monitor threads."""
         threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
         threading.Thread(target=self._monitor_process, args=(job_id, process), daemon=True).start()
-
-        return job.to_dict()
 
     def cancel_job(self, job_id: str, reports_root: Path | None = None, run_dir: Path | None = None) -> bool:
         """Terminate a running job. Return True if cancelled successfully.

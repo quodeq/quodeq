@@ -93,33 +93,36 @@ __all__ = [
 ]
 
 
+def _resolve_standards_checklist(context: ctx.PromptContext) -> str:
+    """Render the standards checklist for *context*, or the no-standards marker.
+
+    With a work dir the compact rendering is written to disk and replaced by
+    a read instruction; without one the full compiled rendering is inlined.
+    """
+    if not context.standards_dir:
+        return ctx.NO_STANDARDS
+    compiled_dir = context.standards_dir / "compiled"
+    eval_dir = context.evaluators_dir
+    overrides = load_project_overrides(context.project_root)
+    if not (compiled_dir.exists() or (eval_dir and eval_dir.is_dir())):
+        return ctx.NO_STANDARDS
+    if not context.work_dir:
+        return render_compiled_standards(
+            compiled_dir, context.dimension, evaluators_dir=eval_dir, overrides=overrides,
+        )
+    compact = render_compact_standards(
+        compiled_dir, context.dimension, evaluators_dir=eval_dir, overrides=overrides,
+    )
+    if compact == ctx.NO_STANDARDS_FOR_DIM:
+        return compact
+    return write_standards_and_instruction(context.work_dir, context.dimension, compact)
+
+
 def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
     """Build a complete per-dimension analysis prompt from the template."""
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
     prompt_hash = template_hash(template)
-
-    standards_checklist = ctx.NO_STANDARDS
-    if context.standards_dir:
-        compiled_dir = context.standards_dir / "compiled"
-        _eval_dir = context.evaluators_dir
-        _overrides = load_project_overrides(context.project_root)
-        if compiled_dir.exists() or (_eval_dir and _eval_dir.is_dir()):
-            if context.work_dir:
-                compact = render_compact_standards(
-                    compiled_dir, context.dimension, evaluators_dir=_eval_dir,
-                    overrides=_overrides,
-                )
-                if compact != ctx.NO_STANDARDS_FOR_DIM:
-                    standards_checklist = write_standards_and_instruction(
-                        context.work_dir, context.dimension, compact,
-                    )
-                else:
-                    standards_checklist = compact
-            else:
-                standards_checklist = render_compiled_standards(
-                    compiled_dir, context.dimension, evaluators_dir=_eval_dir,
-                    overrides=_overrides,
-                )
+    standards_checklist = _resolve_standards_checklist(context)
 
     manifest_context = ctx.render_manifest_context(context)
     values = {

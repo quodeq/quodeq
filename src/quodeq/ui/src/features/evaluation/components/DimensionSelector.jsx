@@ -2,13 +2,18 @@ import { useMemo } from 'react';
 import { t } from '../../../strings/index.js';
 
 const TYPE_CONFIG = {
-  quodeq:    { label: t('evaluate.stdQuodeq'),    className: 'dimension-chip-type--quodeq',    order: 1 },
-  custom:    { label: t('evaluate.stdCustom'),    className: 'dimension-chip-type--custom',    order: 3 },
-  community: { label: t('evaluate.stdCommunity'), className: 'dimension-chip-type--community', order: 2 },
+  quodeq:    { labelKey: 'evaluate.stdQuodeq',    className: 'dimension-chip-type--quodeq',    order: 1 },
+  custom:    { labelKey: 'evaluate.stdCustom',    className: 'dimension-chip-type--custom',    order: 3 },
+  community: { labelKey: 'evaluate.stdCommunity', className: 'dimension-chip-type--community', order: 2 },
 };
-const DEFAULT_TYPE_CONFIG = { label: t('evaluate.stdIso'), className: 'dimension-chip-type--builtin', order: 0 };
+const DEFAULT_TYPE_CONFIG = { labelKey: 'evaluate.stdIso', className: 'dimension-chip-type--builtin', order: 0 };
 
-function typeInfo(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
+function typeConfig(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
+
+function typeInfo(dim) {
+  const { labelKey, className, order } = typeConfig(dim);
+  return { label: t(labelKey), className, order };
+}
 
 function DimensionChip({ dim, isSelected, onToggle }) {
   const info = typeInfo(dim);
@@ -122,8 +127,8 @@ function DimensionSelectorChips({ sorted, selectedDims, onToggle, onSelectAll, o
  */
 export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll, variant, dimMetas = null, metasLoading = false }) {
   const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
-    const oa = (TYPE_CONFIG[a.standardType] || DEFAULT_TYPE_CONFIG).order;
-    const ob = (TYPE_CONFIG[b.standardType] || DEFAULT_TYPE_CONFIG).order;
+    const oa = typeConfig(a).order;
+    const ob = typeConfig(b).order;
     if (oa !== ob) return oa - ob;
     return (a.label || a.id).localeCompare(b.label || b.id);
   }), [allDimensions]);

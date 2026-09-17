@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
+import { notifyStandardsChanged, STANDARDS_CHANGED_REASON } from '../../../constants.js';
 
 vi.mock('../../../utils/visibleStandards.js', () => ({
   readVisibleStandardIds: vi.fn(),
@@ -56,6 +57,105 @@ describe('usePluginDimensions', () => {
     });
     await waitFor(() => expect(fakeApi.listPlugins).toHaveBeenCalled());
     expect(result.current.allDimensions).toHaveLength(0);
+  });
+
+  it('refilters an already-mounted picker from cache when visibility changes, without refetching', async () => {
+    // Starring a standard on the Standards page (or switching project, which
+    // re-hydrates the visible set) must reach a picker that is already on
+    // screen. Before, the list was filtered once per mount and stayed stale.
+    readVisibleStandardIds.mockReturnValue(['security']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: [{ id: 'security', label: 'Security' }] }]),
+      listStandards: vi.fn().mockResolvedValue([{ id: 'accessibility', name: 'Accessibility', type: 'custom' }]),
+    };
+    const { result } = renderHook(() => usePluginDimensions(cache), { wrapper: makeWrapper(fakeApi) });
+    await waitFor(() => expect(result.current.allDimensions).toHaveLength(1));
+
+    readVisibleStandardIds.mockReturnValue(['security', 'accessibility']);
+    act(() => notifyStandardsChanged(STANDARDS_CHANGED_REASON.VISIBILITY));
+
+    expect(result.current.allDimensions.map((d) => d.id)).toEqual(['security', 'accessibility']);
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches when the standards list changes so a new custom standard appears without a reload', async () => {
+    readVisibleStandardIds.mockReturnValue(['security', 'accessibility']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: [{ id: 'security', label: 'Security' }] }]),
+      listStandards: vi.fn().mockResolvedValue([]),
+    };
+    const { result } = renderHook(() => usePluginDimensions(cache), { wrapper: makeWrapper(fakeApi) });
+    await waitFor(() => expect(result.current.allDimensions).toHaveLength(1));
+
+    fakeApi.listStandards.mockResolvedValue([{ id: 'accessibility', name: 'Accessibility', type: 'custom' }]);
+    act(() => notifyStandardsChanged(STANDARDS_CHANGED_REASON.LIST));
+
+    await waitFor(() => expect(result.current.allDimensions).toHaveLength(2));
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(2);
+    expect(result.current.allDimensions[1].standardType).toBe('custom');
+  });
+
+  it('refetches on a visibility change that names a standard the cache has never seen', async () => {
+    // A JSON dropped into ~/.quodeq/evaluators after the picker loaded, then
+    // starred on the Standards page: the star only says "visibility", but
+    // refiltering the stale cache could never show it.
+    readVisibleStandardIds.mockReturnValue(['security']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: [{ id: 'security', label: 'Security' }] }]),
+      listStandards: vi.fn().mockResolvedValue([]),
+    };
+    const { result } = renderHook(() => usePluginDimensions(cache), { wrapper: makeWrapper(fakeApi) });
+    await waitFor(() => expect(result.current.allDimensions).toHaveLength(1));
+
+    fakeApi.listStandards.mockResolvedValue([{ id: 'accessibility', name: 'Accessibility', type: 'custom' }]);
+    readVisibleStandardIds.mockReturnValue(['security', 'accessibility']);
+    act(() => notifyStandardsChanged(STANDARDS_CHANGED_REASON.VISIBILITY));
+
+    await waitFor(() => expect(result.current.allDimensions).toHaveLength(2));
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(2);
+  });
+
+  it('a picker mounting onto a cache that predates a starred standard refetches instead of reusing it', async () => {
+    readVisibleStandardIds.mockReturnValue(['security']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: [{ id: 'security', label: 'Security' }] }]),
+      listStandards: vi.fn().mockResolvedValue([]),
+    };
+    const first = renderHook(() => usePluginDimensions(cache), { wrapper: makeWrapper(fakeApi) });
+    await waitFor(() => expect(first.result.current.allDimensions).toHaveLength(1));
+    first.unmount();
+
+    fakeApi.listStandards.mockResolvedValue([{ id: 'accessibility', name: 'Accessibility', type: 'custom' }]);
+    readVisibleStandardIds.mockReturnValue(['security', 'accessibility']);
+    const second = renderHook(() => usePluginDimensions(cache), { wrapper: makeWrapper(fakeApi) });
+
+    await waitFor(() => expect(second.result.current.allDimensions).toHaveLength(2));
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(2);
+  });
+
+  it('two mounted pickers share one refetch per list change', async () => {
+    readVisibleStandardIds.mockReturnValue(['security']);
+    const cache = createDimensionCache();
+    const fakeApi = {
+      listPlugins: vi.fn().mockResolvedValue([{ dimensions: [{ id: 'security', label: 'Security' }] }]),
+      listStandards: vi.fn().mockResolvedValue([]),
+    };
+    const wrapper = makeWrapper(fakeApi);
+    const first = renderHook(() => usePluginDimensions(cache), { wrapper });
+    const second = renderHook(() => usePluginDimensions(cache), { wrapper });
+    await waitFor(() => expect(first.result.current.allDimensions).toHaveLength(1));
+    await waitFor(() => expect(second.result.current.allDimensions).toHaveLength(1));
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(1);
+
+    act(() => notifyStandardsChanged(STANDARDS_CHANGED_REASON.LIST));
+
+    await waitFor(() => expect(fakeApi.listStandards).toHaveBeenCalledTimes(2));
+    await act(async () => { await cache.load(fakeApi.listPlugins, fakeApi.listStandards); });
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(2);
   });
 
   it('sets dimLoadError when the load fails (cache.load now rejects instead of swallowing to [])', async () => {

@@ -17,11 +17,9 @@ uses; the implementation is split across three siblings:
 - ``precedent_corpus.py`` -- the semantic matcher and its loader
   (``PrecedentCorpus``, ``load_precedent_corpus``, and their helpers).
 
-``precedent_corpus.py`` and ``precedent_store.py`` look up
-``_resolve_vector_store`` and ``_BACKFILL_CHUNK`` back through this module
-(a deferred facade lookup, not a bare name) so that
-``monkeypatch.setattr("quodeq.context.precedent.<name>", ...)`` in tests
-still reaches the real call sites.
+Patch ``_resolve_vector_store`` on ``precedent_corpus`` and ``_BACKFILL_CHUNK``
+on ``precedent_store``: the siblings read their own module globals, and this
+facade never gets imported back by them.
 """
 from __future__ import annotations
 

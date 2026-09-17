@@ -173,11 +173,10 @@ function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, ca
   );
 }
 
-export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
-  const {
-    onSelect, onDelete, onExport, onRelocate, onAddProject, onImportProject,
-    onResumeSetup, onFiltersChange, onProjectsReload,
-  } = actions;
+// Everything the cards list needs: the merged/filtered entries plus the
+// per-card action context (confirm/relocate dialogs, publish, pull-to-local).
+function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
+  const { onSelect, onDelete, onExport, onRelocate, onResumeSetup, onProjectsReload } = actions;
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
 
@@ -193,6 +192,12 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
     relocateActions, publishActions, localEntryById, shared, pullConflictId, handlePull, handleConfirmCopy,
     cancelConflict, pulledIds,
   };
+  return { shared, isEmpty, visibleEntries, cardsListCtx };
+}
+
+export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
+  const { onAddProject, onImportProject, onFiltersChange } = actions;
+  const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
 
   return (
     <section className="projects-page projects-page--terminal">

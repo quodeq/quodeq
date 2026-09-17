@@ -109,6 +109,61 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     return jsonify({"updated": project, "path": new_path})
 
 
+def _invalid_project_name(project: str) -> tuple[Response, int] | None:
+    """The 400 every per-project route returns for a malformed name, else None."""
+    try:
+        validate_path_segment(project)
+    except ValueError:
+        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    return None
+
+
+def _list_projects(
+    provider: ActionProvider, warmup: WarmupEngine,
+) -> Response | tuple[dict[str, Any], int]:
+    """Return all projects with optional ``?limit=N&offset=M`` pagination.
+
+    Pagination is pushed into the provider (``offset``/``limit``) so a
+    paginated request only pays for hydrating its own window instead of
+    the whole project set (see ``ProjectsCache._list_page``). ``limit=0``
+    is this route's "no limit" sentinel, so 0 stays valid; anything
+    malformed or negative answers 400 (see ``page_params``).
+    """
+    paging = page_params(request.args, default_limit=0, min_limit=0)
+    if isinstance(paging[0], dict):
+        return paging
+    limit, offset = paging
+    result = provider.list_projects(reports_dir(), offset=offset, limit=limit)
+    projects = result.get("projects", [])
+    # Self-healing warm-up: anything still pending on the page being
+    # returned goes (back) on the queue, bounding this to page size
+    # instead of the full project count.
+    for entry in projects:
+        if getattr(entry, "summary_pending", False):
+            warmup.enqueue(entry.id)
+    # Serialize at the boundary: providers hand back ProjectEntry
+    # entities (or already-serialized dicts from remote providers).
+    wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
+    payload = {**result, "projects": wire}
+    snapshot = warmup.snapshot()
+    if snapshot is not None:
+        payload["warmup"] = snapshot
+    return jsonify(payload)
+
+
+def _project_info(provider: ActionProvider, project: str) -> Response | tuple[Response, int]:
+    """Return repository metadata for a project."""
+    invalid = _invalid_project_name(project)
+    if invalid is not None:
+        return invalid
+    info = provider.get_project_info(reports_dir(), project)
+    if not info:
+        body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    return jsonify(info)
+
+
 def register_project_list_routes(
     app: Flask, provider: ActionProvider, warmup_engine: WarmupEngine = warmup_engine
 ) -> None:
@@ -117,52 +172,17 @@ def register_project_list_routes(
 
     @app.get("/api/projects")
     def list_projects() -> Response | tuple[dict[str, Any], int]:
-        """Return all projects with optional ``?limit=N&offset=M`` pagination.
-
-        Pagination is pushed into the provider (``offset``/``limit``) so a
-        paginated request only pays for hydrating its own window instead of
-        the whole project set (see ``ProjectsCache._list_page``). ``limit=0``
-        is this route's "no limit" sentinel, so 0 stays valid; anything
-        malformed or negative answers 400 (see ``page_params``).
-        """
-        paging = page_params(request.args, default_limit=0, min_limit=0)
-        if isinstance(paging[0], dict):
-            return paging
-        limit, offset = paging
-        result = provider.list_projects(reports_dir(), offset=offset, limit=limit)
-        projects = result.get("projects", [])
-        # Self-healing warm-up: anything still pending on the page being
-        # returned goes (back) on the queue, bounding this to page size
-        # instead of the full project count.
-        for entry in projects:
-            if getattr(entry, "summary_pending", False):
-                warmup_engine.enqueue(entry.id)
-        # Serialize at the boundary: providers hand back ProjectEntry
-        # entities (or already-serialized dicts from remote providers).
-        wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
-        payload = {**result, "projects": wire}
-        snapshot = warmup_engine.snapshot()
-        if snapshot is not None:
-            payload["warmup"] = snapshot
-        return jsonify(payload)
+        return _list_projects(provider, warmup_engine)
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
         """Update the local filesystem path for a project."""
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return _handle_update_project_path(provider)
+        return _invalid_project_name(project) or _handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
         """Export a project as a ZIP archive."""
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return export_project_zip(project, reports_dir())
+        return _invalid_project_name(project) or export_project_zip(project, reports_dir())
 
     @app.post("/api/projects/import")
     def import_project_route() -> Response | tuple[Response, int]:
@@ -177,23 +197,11 @@ def register_project_list_routes(
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its run data."""
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return _handle_delete_project(provider)
+        return _invalid_project_name(project) or _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
-        """Return repository metadata for a project."""
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        info = provider.get_project_info(reports_dir(), project)
-        if not info:
-            return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(info)
+        return _project_info(provider, project)
 
     @app.post("/api/projects")
     def create_project() -> Response | tuple[Response, int]:

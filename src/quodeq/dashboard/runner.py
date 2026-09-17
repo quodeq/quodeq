@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import MutableMapping
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
@@ -186,10 +187,14 @@ def _kick_update_check() -> None:
         logging.getLogger(__name__).debug("async update check failed", exc_info=True)
 
 
-def _resolve_environ(config: DashboardConfig, env: dict[str, str] | None) -> None:
-    environ = env.copy() if env is not None else os.environ
+def _resolve_environ(
+    config: DashboardConfig, env: MutableMapping[str, str] | None,
+) -> MutableMapping[str, str]:
+    """Apply config-derived variables to *env* (``os.environ`` by default) and return it."""
+    environ: MutableMapping[str, str] = env if env is not None else os.environ
     if config.build.verbose:
         environ["QUODEQ_VERBOSE"] = "1"
+    return environ
 
 
 def _log_startup_banner(config: DashboardConfig) -> None:

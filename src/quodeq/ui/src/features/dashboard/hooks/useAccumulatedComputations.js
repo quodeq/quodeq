@@ -91,14 +91,15 @@ function useDimTrends(filteredDimensions, filteredTrend, currentOverviewRun, gra
   }, [filteredDimensions, asOfTrend, granularity]);
 }
 
-export function useAccumulatedComputations(data) {
-  const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = 'day' } = data;
-  const dayRuns = dailyRuns || availableRuns;
+function usePeriodTrends(trend, granularity) {
   const dayTrend = useMemo(() => collapseByPeriod(trend, 'day'), [trend]);
   const periodTrend = useMemo(() => collapseByPeriod(trend, granularity), [trend, granularity]);
+  return { dayTrend, periodTrend };
+}
 
-  const { currentOverviewRun, selectedDayDimNames } = useOverviewRunSelection({ trend, periodTrend, dayRuns, overviewRunIndex, selectedRunId, granularity });
-
+// Everything the visible-standards filter touches: the three trend shapes
+// (daily, period, raw per-run) and the accumulated dimensions themselves.
+function useVisibleFilteredTrends({ trend, dayTrend, periodTrend, granularity, accumulatedDimensions }) {
   const visibleIds = useMemo(() => readVisibleStandardIds(), [accumulatedDimensions]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const filteredDayTrend = useMemo(() => filterTrendByVisibleStandardsDaily(trend, dayTrend, visibleSet, 'day'), [trend, dayTrend, visibleSet]);
@@ -107,6 +108,18 @@ export function useAccumulatedComputations(data) {
   // period-collapsed representatives.
   const filteredTrend = useMemo(() => filterTrendByVisibleStandards(trend, visibleSet), [trend, visibleSet]);
   const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
+  return { visibleSet, filteredDayTrend, filteredPeriodTrend, filteredTrend, filteredDimensions };
+}
+
+export function useAccumulatedComputations(data) {
+  const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = 'day' } = data;
+  const dayRuns = dailyRuns || availableRuns;
+  const { dayTrend, periodTrend } = usePeriodTrends(trend, granularity);
+
+  const { currentOverviewRun, selectedDayDimNames } = useOverviewRunSelection({ trend, periodTrend, dayRuns, overviewRunIndex, selectedRunId, granularity });
+
+  const { visibleSet, filteredDayTrend, filteredPeriodTrend, filteredTrend, filteredDimensions } =
+    useVisibleFilteredTrends({ trend, dayTrend, periodTrend, granularity, accumulatedDimensions });
 
   const dimTrends = useDimTrends(filteredDimensions, filteredTrend, currentOverviewRun, granularity);
   const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun), [accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun]);

@@ -127,25 +127,29 @@ function buildTreeActions({ addPrinciple, removePrinciple, addRequirement, remov
   return { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement, onSelectNode: setSelectedNode, editable };
 }
 
-export default function StandardEditor({ standardId, isNew, onBack, onSaved, onRescan }) {
-  const {
-    standard, loading, error, dirty, editable,
-    selectedNode, setSelectedNode,
-    updateField, addPrinciple, removePrinciple, addRequirement, removeRequirement,
-    save,
-  } = useStandardDetail(standardId, isNew);
+// The editor's state: the standard itself, the threshold overrides and their
+// save flow, the resizable tree pane, and the tree's action callbacks.
+function useStandardEditorState({ standardId, isNew, onSaved, onRescan }) {
+  const detail = useStandardDetail(standardId, isNew);
+  const { standard, editable, save, setSelectedNode, addPrinciple, removePrinciple, addRequirement, removeRequirement } = detail;
+  const overrides = useStandardEditorOverrides({ standard, editable, save, onSaved, onRescan });
+  const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
+  const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
+  return { detail, overrides, treeWidth, onDividerMouseDown, treeActions };
+}
 
+export default function StandardEditor({ standardId, isNew, onBack, onSaved, onRescan }) {
+  const { detail, overrides: overridesState, treeWidth, onDividerMouseDown, treeActions } =
+    useStandardEditorState({ standardId, isNew, onSaved, onRescan });
+  const { standard, loading, error, dirty, editable, selectedNode, updateField } = detail;
   const {
     selectedProject, overrides, overridesDirty, overridesSaveError, pendingImpact, setPendingImpact,
     customizedCount, handleChangeParam, commitSave, handleSave,
-  } = useStandardEditorOverrides({ standard, editable, save, onSaved, onRescan });
-
-  const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
+  } = overridesState;
 
   const earlyReturn = EditorLoadingOrError({ loading, error, standard, onBack });
   if (earlyReturn) return earlyReturn;
 
-  const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
   const onChangeParam = selectedProject ? handleChangeParam : undefined;
 
   return (

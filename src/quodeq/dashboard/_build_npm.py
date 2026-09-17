@@ -4,17 +4,24 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import _SYNC_ITEMS
 
-_NPM_INSTALL_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
-_NPM_BUILD_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
+def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
+    """Seconds allowed for ``npm ci``; ``QUODEQ_NPM_INSTALL_TIMEOUT_S`` overrides."""
+    return int((env if env is not None else os.environ).get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
 
 
-def _quodeq_dir(env: dict[str, str] | None = None) -> Path:
+def _npm_build_timeout_s(env: Mapping[str, str] | None = None) -> int:
+    """Seconds allowed for ``npm run build``; ``QUODEQ_NPM_BUILD_TIMEOUT_S`` overrides."""
+    return int((env if env is not None else os.environ).get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
+
+
+def _quodeq_dir(env: Mapping[str, str] | None = None) -> Path:
     """Return the base Quodeq directory, overridable via QUODEQ_DIR env var."""
     return Path((env if env is not None else os.environ).get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
 
@@ -75,11 +82,11 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
     # uncached POST to the npm advisories endpoint, which is purely
     # informational here (it never fails the install) but can single-handedly
     # blow past the timeout on slow networks.
-    subprocess.run([npm, "ci", "--no-audit"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
+    subprocess.run([npm, "ci", "--no-audit"], cwd=str(workdir), check=True, timeout=_npm_install_timeout_s())
 
     log_info("Building web UI...")
     env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}
-    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=_NPM_BUILD_TIMEOUT_S, env=env)
+    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=_npm_build_timeout_s(), env=env)
 
 
 def resolve_dev_source() -> Path:

@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import urllib.request
+from collections.abc import Mapping
 import urllib.error
 
 from quodeq.llm_bridge._ollama import (
@@ -30,9 +31,13 @@ from quodeq.llm_bridge._ollama import (
 
 _log = logging.getLogger(__name__)
 
-# llama-server defaults to port 8080. Users can override via env.
-_LLAMACPP_BASE = os.environ.get("LLAMACPP_BASE_URL", "http://localhost:8080")
 _TIMEOUT_S = 3
+
+
+def _default_base_url(env: Mapping[str, str] | None = None) -> str:
+    """llama-server base URL: ``LLAMACPP_BASE_URL`` or the default port 8080."""
+    environ = env if env is not None else os.environ
+    return environ.get("LLAMACPP_BASE_URL", "http://localhost:8080")
 
 
 def _normalize_base(base_url: str) -> str:
@@ -48,9 +53,9 @@ def _normalize_base(base_url: str) -> str:
     return stripped
 
 
-def get_llamacpp_status(base_url: str = _LLAMACPP_BASE) -> dict:
+def get_llamacpp_status(base_url: str | None = None) -> dict:
     """Check if a llama-server process is running and reachable."""
-    root = _normalize_base(base_url)
+    root = _normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -65,14 +70,14 @@ def get_llamacpp_status(base_url: str = _LLAMACPP_BASE) -> dict:
         return {"running": False, "error": "Connection failed"}
 
 
-def list_llamacpp_models(base_url: str = _LLAMACPP_BASE) -> list[dict]:
+def list_llamacpp_models(base_url: str | None = None) -> list[dict]:
     """List the model loaded by llama-server.
 
     Always returns 0 or 1 entries: llama-server is one-model-per-process.
     The model name is whatever llama-server reports for the GGUF passed
     via ``-m``, which is typically the file basename.
     """
-    root = _normalize_base(base_url)
+    root = _normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/v1/models")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -95,7 +100,7 @@ def list_llamacpp_models(base_url: str = _LLAMACPP_BASE) -> list[dict]:
 
 def run_concurrency_test(
     model: str,
-    base_url: str = _LLAMACPP_BASE,
+    base_url: str | None = None,
 ) -> dict:
     """Estimate max parallel agents for the loaded llama.cpp model.
 

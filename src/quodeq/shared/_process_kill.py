@@ -50,6 +50,29 @@ def terminate_process(process: subprocess.Popen) -> None:
             process.kill()
 
 
+def _taskkill_tree(pid: int) -> bool:
+    """Windows: kill the tree rooted at *pid* via taskkill. True when it succeeded."""
+    try:
+        result = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                                capture_output=True, timeout=_TERMINATE_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError, TypeError) as exc:
+        _logger.debug("taskkill failed for pid %s, falling back to proc.kill(): %s", pid, exc)
+        return False
+    # A non-zero exit (access denied, no such process, ...) means the tree
+    # was NOT killed; the caller falls through to proc.kill().
+    return result.returncode == 0
+
+
+def _killpg_tree(pid: int) -> bool:
+    """POSIX: SIGKILL the process group of *pid*. True when it succeeded."""
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError) as exc:
+        _logger.debug("killpg failed for pid %s, falling back to proc.kill(): %s", pid, exc)
+        return False
+    return True
+
+
 def kill_proc_tree(proc: Any) -> None:
     """Kill *proc* and its children. proc is a subprocess.Popen (or a test double
     exposing .pid/.kill()). Never raises for an already-dead or fake process."""
@@ -59,26 +82,9 @@ def kill_proc_tree(proc: Any) -> None:
     # through to proc.kill(): on Windows `taskkill /PID None` RUNS (exits
     # non-zero without raising) and would otherwise return before the fallback.
     if pid is not None:
-        if sys.platform == "win32":
-            try:
-                result = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                                        capture_output=True, timeout=_TERMINATE_TIMEOUT_S)
-                # A non-zero exit (access denied, no such process, ...) means
-                # the tree was NOT killed; fall through to proc.kill().
-                if result.returncode == 0:
-                    return
-            except (OSError, subprocess.SubprocessError, TypeError) as exc:
-                _logger.debug(
-                    "taskkill failed for pid %s, falling back to proc.kill(): %s", pid, exc,
-                )
-        else:
-            try:
-                os.killpg(os.getpgid(pid), signal.SIGKILL)
-                return
-            except (ProcessLookupError, PermissionError, OSError, TypeError, AttributeError) as exc:
-                _logger.debug(
-                    "killpg failed for pid %s, falling back to proc.kill(): %s", pid, exc,
-                )
+        killed = _taskkill_tree(pid) if sys.platform == "win32" else _killpg_tree(pid)
+        if killed:
+            return
     try:
         proc.kill()
     except (ProcessLookupError, OSError, AttributeError) as exc:

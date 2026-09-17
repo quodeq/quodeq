@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
@@ -116,6 +116,123 @@ def _finding_target_or_error(
     return {"project": project, "req": req, "file": file, "line": line}, None
 
 
+def _eval_dir(app: Flask) -> str:
+    return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
+
+
+def _scores_with_fallback(app: Flask, project: str, run_id: str | None) -> dict[str, Any] | None:
+    return rescore_with_fallback(_eval_dir(app), project, run_id)
+
+
+def _list_project_entries(
+    app: Flask, lister: Callable[..., list],
+) -> Response | tuple[dict[str, Any], int]:
+    """Shared body of the dismissed/verified listings: clamp paging, resolve, list."""
+    project = request.args.get("project", "")
+    if not project:
+        return jsonify([])
+    # No limit param → return everything (capped at the hard maximum).
+    # A malformed or out-of-range limit/offset answers 400; an explicit
+    # limit above the hard maximum stays clamped (the UI asks for 5000).
+    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    if isinstance(paging[0], dict):
+        return paging
+    limit, offset = paging
+    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
+    project_dir = _project_dir_or_none(_eval_dir(app), project)
+    if project_dir is None:
+        return jsonify([])
+    return jsonify(lister(project_dir, offset=offset, limit=limit))
+
+
+def _dismiss(app: Flask) -> tuple[Response, int]:
+    body = request.get_json(silent=True) or {}
+    target, err = _finding_target_or_error(body)
+    if err is not None:
+        return err
+    run_id = body.get("run_id") or body.get("runId")
+    dismiss_finding(_project_dir(_eval_dir(app), target["project"]), body, run_id=run_id)
+    scores = _scores_with_fallback(app, target["project"], run_id)
+    delta = dismiss_delta(
+        _eval_dir(app), target["project"], run_id,
+        {"req": target["req"], "file": target["file"], "line": target["line"]},
+    )
+    return jsonify({"scores": scores, "delta": delta}), 200
+
+
+def _restore(app: Flask) -> tuple[Response, int]:
+    body = request.get_json(silent=True) or {}
+    target, err = _finding_target_or_error(body)
+    if err is not None:
+        return err
+    run_id = body.get("run_id") or body.get("runId")
+    restore_finding(_project_dir(_eval_dir(app), target["project"]), body)
+    scores = _scores_with_fallback(app, target["project"], run_id)
+    delta = restore_delta(
+        _eval_dir(app), target["project"], run_id,
+        {"req": target["req"], "file": target["file"], "line": target["line"]},
+    )
+    return jsonify({"scores": scores, "delta": delta}), 200
+
+
+def _restore_all(app: Flask) -> tuple[Response, int]:
+    body = request.get_json(silent=True) or {}
+    project = body.get("project", "")
+    run_id = body.get("run_id") or body.get("runId")
+    if not project:
+        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
+    count = restore_all_findings(_project_dir(_eval_dir(app), project))
+    scores = _scores_with_fallback(app, project, run_id)
+    delta = restore_all_delta(_eval_dir(app), project, run_id)
+    return jsonify({"ok": True, "restored": count, "scores": scores, "delta": delta}), 200
+
+
+def _delete(app: Flask) -> tuple[Response, int]:
+    body = request.get_json(silent=True) or {}
+    project = body.get("project", "")
+    dimension = body.get("dimension", "")
+    principle = body.get("principle", "")
+    file = body.get("file", "")
+    run_id = body.get("run_id") or body.get("runId")
+    if not project or not dimension or not principle or not file:
+        return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
+    type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
+    if type_err:
+        return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
+    swept = delete_finding(_project_dir(_eval_dir(app), project), body)
+    scores = _scores_with_fallback(app, project, run_id)
+    delta = delete_delta(
+        _eval_dir(app), project, run_id,
+        {"dimension": dimension, "principle": principle, "file": file},
+    )
+    return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), 200
+
+
+def _delete_all(app: Flask) -> tuple[Response, int]:
+    if request.args.get("confirm") != "true":
+        return json_error(
+            "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
+        )
+    body = request.get_json(silent=True) or {}
+    project = body.get("project", "")
+    run_id = body.get("run_id") or body.get("runId")
+    if not project:
+        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
+    count = delete_all_dismissed(_project_dir(_eval_dir(app), project))
+    scores = _scores_with_fallback(app, project, run_id)
+    delta = delete_all_delta(_eval_dir(app), project, run_id)
+    return jsonify({"ok": True, "deleted": count, "scores": scores, "delta": delta}), 200
+
+
+def _unverify(app: Flask) -> tuple[Response, int]:
+    body = request.get_json(silent=True) or {}
+    target, err = _finding_target_or_error(body)
+    if err is not None:
+        return err
+    unverify_finding(_project_dir(_eval_dir(app), target["project"]), body)
+    return jsonify({"ok": True}), 200
+
+
 def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
 
@@ -126,132 +243,34 @@ def register_findings_routes(app: Flask) -> None:
         # of Flask's default 404 HTML page that a bare abort() would give.
         return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
 
-    def _eval_dir() -> str:
-        return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
-
-    def _scores_with_fallback(
-        project: str, run_id: str | None,
-    ) -> dict[str, Any] | None:
-        return rescore_with_fallback(_eval_dir(), project, run_id)
-
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response | tuple[dict[str, Any], int]:
-        project = request.args.get("project", "")
-        if not project:
-            return jsonify([])
-        # No limit param → return everything (capped at the hard maximum).
-        # A malformed or out-of-range limit/offset answers 400; an explicit
-        # limit above the hard maximum stays clamped (the UI asks for 5000).
-        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
-        if isinstance(paging[0], dict):
-            return paging
-        limit, offset = paging
-        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
-        project_dir = _project_dir_or_none(_eval_dir(), project)
-        if project_dir is None:
-            return jsonify([])
-        return jsonify(load_dismissed(project_dir, offset=offset, limit=limit))
+        return _list_project_entries(app, load_dismissed)
 
     @app.post("/api/findings/dismiss")
     def dismiss() -> tuple[Response, int]:
-        body = request.get_json(silent=True) or {}
-        target, err = _finding_target_or_error(body)
-        if err is not None:
-            return err
-        run_id = body.get("run_id") or body.get("runId")
-        dismiss_finding(_project_dir(_eval_dir(), target["project"]), body, run_id=run_id)
-        scores = _scores_with_fallback(target["project"], run_id)
-        delta = dismiss_delta(
-            _eval_dir(), target["project"], run_id,
-            {"req": target["req"], "file": target["file"], "line": target["line"]},
-        )
-        return jsonify({"scores": scores, "delta": delta}), 200
+        return _dismiss(app)
 
     @app.post("/api/findings/restore")
     def restore() -> tuple[Response, int]:
-        body = request.get_json(silent=True) or {}
-        target, err = _finding_target_or_error(body)
-        if err is not None:
-            return err
-        run_id = body.get("run_id") or body.get("runId")
-        restore_finding(_project_dir(_eval_dir(), target["project"]), body)
-        scores = _scores_with_fallback(target["project"], run_id)
-        delta = restore_delta(
-            _eval_dir(), target["project"], run_id,
-            {"req": target["req"], "file": target["file"], "line": target["line"]},
-        )
-        return jsonify({"scores": scores, "delta": delta}), 200
+        return _restore(app)
 
     @app.post("/api/findings/restore-all")
     def restore_all() -> tuple[Response, int]:
-        body = request.get_json(silent=True) or {}
-        project = body.get("project", "")
-        run_id = body.get("run_id") or body.get("runId")
-        if not project:
-            return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
-        count = restore_all_findings(_project_dir(_eval_dir(), project))
-        scores = _scores_with_fallback(project, run_id)
-        delta = restore_all_delta(_eval_dir(), project, run_id)
-        return jsonify({"ok": True, "restored": count, "scores": scores, "delta": delta}), 200
+        return _restore_all(app)
 
     @app.post("/api/findings/delete")
     def delete() -> tuple[Response, int]:
-        body = request.get_json(silent=True) or {}
-        project = body.get("project", "")
-        dimension = body.get("dimension", "")
-        principle = body.get("principle", "")
-        file = body.get("file", "")
-        run_id = body.get("run_id") or body.get("runId")
-        if not project or not dimension or not principle or not file:
-            return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
-        type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
-        if type_err:
-            return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
-        swept = delete_finding(_project_dir(_eval_dir(), project), body)
-        scores = _scores_with_fallback(project, run_id)
-        delta = delete_delta(
-            _eval_dir(), project, run_id,
-            {"dimension": dimension, "principle": principle, "file": file},
-        )
-        return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), 200
+        return _delete(app)
 
     @app.post("/api/findings/delete-all")
     def delete_all() -> tuple[Response, int]:
-        if request.args.get("confirm") != "true":
-            return json_error(
-                "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
-            )
-        body = request.get_json(silent=True) or {}
-        project = body.get("project", "")
-        run_id = body.get("run_id") or body.get("runId")
-        if not project:
-            return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
-        count = delete_all_dismissed(_project_dir(_eval_dir(), project))
-        scores = _scores_with_fallback(project, run_id)
-        delta = delete_all_delta(_eval_dir(), project, run_id)
-        return jsonify({"ok": True, "deleted": count, "scores": scores, "delta": delta}), 200
+        return _delete_all(app)
 
     @app.get("/api/findings/verified")
     def list_verified() -> Response | tuple[dict[str, Any], int]:
-        project = request.args.get("project", "")
-        if not project:
-            return jsonify([])
-        # Same paging rule as list_dismissed above.
-        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
-        if isinstance(paging[0], dict):
-            return paging
-        limit, offset = paging
-        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
-        project_dir = _project_dir_or_none(_eval_dir(), project)
-        if project_dir is None:
-            return jsonify([])
-        return jsonify(verified_entries(project_dir, offset=offset, limit=limit))
+        return _list_project_entries(app, verified_entries)
 
     @app.post("/api/findings/unverify")
     def unverify() -> tuple[Response, int]:
-        body = request.get_json(silent=True) or {}
-        target, err = _finding_target_or_error(body)
-        if err is not None:
-            return err
-        unverify_finding(_project_dir(_eval_dir(), target["project"]), body)
-        return jsonify({"ok": True}), 200
+        return _unverify(app)

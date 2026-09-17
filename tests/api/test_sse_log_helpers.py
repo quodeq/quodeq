@@ -67,7 +67,7 @@ class TestSseTailGeneratorErrorTermination:
         path = tmp_path / "run.log"
         path.mkdir()
 
-        monkeypatch.setattr("quodeq.api._sse_log_helpers._POLL_MS", 0)
+        monkeypatch.setattr("quodeq.api._sse_log_helpers._poll_ms", lambda env=None: 0)
 
         frames = list(sse_tail_generator(path, initial_offset=0))
 

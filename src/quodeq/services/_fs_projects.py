@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextvars
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,6 +13,7 @@ from quodeq.core.utils.io import is_within
 from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
+from quodeq.services._fs_working_copy import _annotate_working_copy, _online_path_missing
 from quodeq.services._fs_project_helpers import (
     _KnownProjectIds,
     _ListingOptions,
@@ -38,30 +38,6 @@ from quodeq.shared.utils import is_repo_url, project_name_from_repo
 _logger = logging.getLogger(__name__)
 
 _MAX_PROJECT_BUILD_WORKERS = 8
-
-
-def _derive_last_fetched_at(repo_path: str | None) -> str | None:
-    """Return ISO-8601 mtime of .git/FETCH_HEAD (or .git/HEAD as fallback), or None."""
-    if not repo_path:
-        return None
-    p = Path(repo_path)
-    fetch_head = p / ".git" / "FETCH_HEAD"
-    head = p / ".git" / "HEAD"
-    candidate = fetch_head if fetch_head.exists() else head if head.exists() else None
-    if candidate is None:
-        return None
-    try:
-        ts = candidate.stat().st_mtime
-    except OSError:
-        return None
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
-
-
-def _is_evaluable(repo_path: str | None) -> bool:
-    """Return True if the working copy directory exists on disk."""
-    if not repo_path:
-        return False
-    return Path(repo_path).is_dir()
 
 
 def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str], dict[str, dict]]:
@@ -136,6 +112,25 @@ def _build_project_entries_threaded(
     return [p for p in results if p is not None]
 
 
+def _classify_known_ids(
+    reports_root: Path, dir_names: list[str], *, backfill: bool,
+) -> tuple[_KnownProjectIds, dict[str, dict]]:
+    """Read every candidate's repo record once: known-id sets plus the records by name.
+
+    With *backfill* the lazy ``onboardingCompletedAt`` backfill runs on each
+    record before the registered set is taken.
+    """
+    parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
+    if backfill:
+        for name in dir_names:
+            _backfill_onboarding_field(reports_root / name, pre_read_data=info_by_name.get(name))
+    registered_ids = {
+        name for name in dir_names
+        if repository_info_exists(reports_root / name)
+    }
+    return _KnownProjectIds(registered_ids, parent_ids, subproject_ids), info_by_name
+
+
 def build_project_list(
     reports_root: Path, *, backfill: bool = True, inline_summaries: bool = False,
 ) -> list[ProjectEntry]:
@@ -154,16 +149,9 @@ def build_project_list(
     reported pending and left for the warm-up engine.
     """
     dir_names = _collect_candidate_dirs(reports_root, _max_projects_listed())
-    parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
-    if backfill:
-        for name in dir_names:
-            _backfill_onboarding_field(reports_root / name, pre_read_data=info_by_name.get(name))
-    registered_ids = {
-        name for name in dir_names
-        if repository_info_exists(reports_root / name)
-    }
+    known, info_by_name = _classify_known_ids(reports_root, dir_names, backfill=backfill)
     projects = _build_project_entries_threaded(
-        reports_root, dir_names, _KnownProjectIds(registered_ids, parent_ids, subproject_ids),
+        reports_root, dir_names, known,
         _ListingOptions(backfill=backfill, inline_summaries=inline_summaries), info_by_name,
     )
     projects.sort(key=lambda p: p.name)
@@ -281,14 +269,8 @@ def get_project_info(
         list_dimensions(log=SHARED_LOG) if discipline else []
     )
     fingerprints_found = has_fingerprints(Path(reports_dir), project)
-    path_missing = (
-        info.get("location") == "online"
-        and not (info.get("path", "").startswith(("https://", "git@")))
-    )
-    repo_path = info.get("path")
-    info["lastFetchedAt"] = _derive_last_fetched_at(repo_path)
-    info["evaluable"] = _is_evaluable(repo_path)
-    info.setdefault("ephemeral", False)
+    path_missing = _online_path_missing(info)
+    _annotate_working_copy(info)
     return {
         **info,
         "discipline": discipline,

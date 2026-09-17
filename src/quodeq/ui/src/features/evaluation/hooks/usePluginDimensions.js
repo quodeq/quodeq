@@ -3,6 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { STANDARD_TYPES } from '../../standards/hooks/useStandards.js';
 import { t } from '../../../strings/index.js';
+import { STANDARDS_CHANGED_EVENT, STANDARDS_CHANGED_REASON } from '../../../constants.js';
 
 function mergeStandardsDimensions(standards, seen) {
   for (const s of standards) {
@@ -40,12 +41,8 @@ function deduplicateDimensions(plugins, standards) {
 export function createDimensionCache() {
   let cachedDimensions = null;
   let cachePromise = null;
-  return {
-    /** Synchronously return the loaded list, or null before first load. */
-    get() {
-      return cachedDimensions;
-    },
-    load(listPlugins, listStandards) {
+  let refreshPromise = null;
+  function load(listPlugins, listStandards) {
       if (cachePromise) return cachePromise;
       cachePromise = Promise.all([
         listPlugins().catch(() => []),
@@ -68,10 +65,28 @@ export function createDimensionCache() {
         throw err;
       });
       return cachePromise;
+  }
+  function invalidate() {
+    cachedDimensions = null;
+    cachePromise = null;
+  }
+  return {
+    /** Synchronously return the loaded list, or null before first load. */
+    get() {
+      return cachedDimensions;
     },
-    invalidate() {
-      cachedDimensions = null;
-      cachePromise = null;
+    load,
+    invalidate,
+    /**
+     * Drop the cached list and reload. Single-flighted separately from
+     * `load`: every mounted picker reacts to the same change event, and
+     * without this each one would invalidate the other's in-flight load.
+     */
+    refresh(listPlugins, listStandards) {
+      if (refreshPromise) return refreshPromise;
+      invalidate();
+      refreshPromise = load(listPlugins, listStandards).finally(() => { refreshPromise = null; });
+      return refreshPromise;
     },
   };
 }
@@ -90,8 +105,26 @@ function _filterVisible(dims) {
   // "OWASP-Top10"), so a raw comparison would drop a visible standard from
   // the scan dimension picker while the assistant and dashboard correctly
   // keep it.
-  const visibleSet = new Set(readVisibleStandardIds().map((id) => id.toLowerCase()));
+  const visibleSet = _visibleSet();
   return dims.filter((d) => visibleSet.has((d.id || '').toLowerCase()));
+}
+
+function _visibleSet() {
+  return new Set(readVisibleStandardIds().map((id) => id.toLowerCase()));
+}
+
+/**
+ * True when the visible set names a standard the cached list has never
+ * seen: a file dropped into the evaluators dir after the picker loaded and
+ * then starred on the Standards page. Refiltering the cache cannot surface
+ * it; only a refetch can.
+ */
+function _cacheMissesVisible(dims) {
+  const known = new Set(dims.map((d) => (d.id || '').toLowerCase()));
+  for (const id of _visibleSet()) {
+    if (!known.has(id)) return true;
+  }
+  return false;
 }
 
 /**
@@ -100,6 +133,15 @@ function _filterVisible(dims) {
  *   defaults to the shared module singleton.
  * @returns {{ allDimensions: Array, dimLoadError: string|null }}
  */
+function _applyLoad(promise, setAllDimensions, setDimLoadError) {
+  return promise.then((dims) => {
+    setAllDimensions(_filterVisible(dims));
+    setDimLoadError(null);
+  }).catch(() => {
+    setDimLoadError(t('evaluate.dimensionsLoadFailed'));
+  });
+}
+
 export function usePluginDimensions(cache = defaultDimensionCache) {
   const { listPlugins, listStandards } = useApi();
   const [allDimensions, setAllDimensions] = useState(() => {
@@ -110,17 +152,30 @@ export function usePluginDimensions(cache = defaultDimensionCache) {
 
   useEffect(() => {
     const cached = cache.get();
-    if (cached) {
+    if (cached && !_cacheMissesVisible(cached)) {
       setAllDimensions(_filterVisible(cached));
       return;
     }
-    cache.load(listPlugins, listStandards).then((dims) => {
-      setAllDimensions(_filterVisible(dims));
-      setDimLoadError(null);
-    }).catch(() => {
-      setDimLoadError(t('evaluate.dimensionsLoadFailed'));
-    });
+    const load = cached ? cache.refresh(listPlugins, listStandards) : cache.load(listPlugins, listStandards);
+    _applyLoad(load, setAllDimensions, setDimLoadError);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, matching the pre-factory behavior
+
+  // The list above is filtered once per mount. A star toggle, a project
+  // switch (visibility re-hydrates) or a created / imported / duplicated /
+  // deleted standard has to reach a picker that is already on screen.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onChanged = (evt) => {
+      const cached = cache.get();
+      if (evt?.detail?.reason === STANDARDS_CHANGED_REASON.VISIBILITY && cached && !_cacheMissesVisible(cached)) {
+        setAllDimensions(_filterVisible(cached));
+        return;
+      }
+      _applyLoad(cache.refresh(listPlugins, listStandards), setAllDimensions, setDimLoadError);
+    };
+    window.addEventListener(STANDARDS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(STANDARDS_CHANGED_EVENT, onChanged);
+  }, [cache, listPlugins, listStandards]);
 
   return { allDimensions, dimLoadError };
 }

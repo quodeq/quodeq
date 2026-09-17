@@ -54,6 +54,33 @@ class JobLaunchOptions:
     time_limit_s: int | None = None
 
 
+def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: str) -> "Job":
+    """A fresh job record for *cmd*, started now, carrying *launch*'s run metadata."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    return Job(
+        job_id=job_id,
+        status=status,
+        command=cmd,
+        started_at=datetime.now(timezone.utc).isoformat(),
+        ended_at=None,
+        exit_code=None,
+        ai_provider=launch.ai_provider,
+        ai_model=launch.ai_model,
+        time_limit_s=launch.time_limit_s,
+    )
+
+
+def mark_spawn_failed(job: "Job", exc: BaseException, *, status: str, exit_code: int) -> None:
+    """Close *job* as failed-to-start: terminal status, end time, exit code and a log line."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    job.status = status
+    job.ended_at = datetime.now(timezone.utc).isoformat()
+    job.exit_code = exit_code
+    job.logs.append(f"Failed to start process: {exc}")
+
+
 @dataclass(frozen=True, slots=True)
 class JobProcessSeams:
     """Injection points for how ``JobManager`` spawns, probes and caps subprocesses.

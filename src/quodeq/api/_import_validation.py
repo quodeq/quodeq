@@ -93,6 +93,65 @@ def _validate_member_name(name: str) -> list[str]:
     return parts
 
 
+def _validate_file_entry(info: zipfile.ZipInfo) -> None:
+    """Reject a file member that is a symlink, has bad sizes, is oversize, or is a zip bomb."""
+    if _is_symlink_entry(info):
+        raise _bad_request(
+            f"Archive contains a symlink which is not allowed: {info.filename!r}",
+            "DISALLOWED_ENTRY",
+        )
+    if info.file_size < 0 or info.compress_size < 0:
+        raise _bad_request(f"Archive member has invalid size fields: {info.filename!r}")
+    if info.file_size > _MAX_PER_MEMBER_BYTES:
+        raise _bad_request(
+            f"Archive member exceeds per-file size limit: {info.filename!r}",
+            "MEMBER_TOO_LARGE",
+        )
+    # Zip-bomb guard: only above a small floor, so tiny well-compressed
+    # text files (which legitimately compress very well) don't trip it.
+    if (
+        info.file_size > _RATIO_GUARD_THRESHOLD
+        and info.compress_size > 0
+        and info.file_size // max(info.compress_size, 1) > _MAX_RATIO
+    ):
+        raise _bad_request(
+            f"Archive member has suspicious compression ratio: {info.filename!r}",
+            "BAD_RATIO",
+        )
+
+
+def _collect_file_members(
+    infos: list[zipfile.ZipInfo], *, max_total_bytes: int,
+) -> tuple[set[str], dict[str, zipfile.ZipInfo]]:
+    """Validate every member in order, returning (top-level dirs, files-by-arcname).
+
+    Directories only contribute their top-level segment; file members are
+    checked individually and against the running uncompressed total.
+    """
+    files: dict[str, zipfile.ZipInfo] = {}
+    top_dirs: set[str] = set()
+    total_uncompressed = 0
+    for info in infos:
+        parts = _validate_member_name(info.filename)
+        top_dirs.add(parts[0])
+        if len(top_dirs) > 1:
+            raise _bad_request(
+                "Archive must have a single top-level directory matching the project UUID.",
+                "BAD_LAYOUT",
+            )
+        if info.is_dir():
+            continue
+        _validate_file_entry(info)
+        total_uncompressed += info.file_size
+        if total_uncompressed > max_total_bytes:
+            raise _bad_request(
+                f"Archive uncompressed size exceeds the {max_total_bytes // (1024 * 1024)} MB limit.",
+                "TOO_LARGE",
+            )
+        files["/".join(parts)] = info
+    return top_dirs, files
+
+
 def _validate_archive(zf: zipfile.ZipFile, *, max_total_bytes: int) -> tuple[str, dict[str, zipfile.ZipInfo]]:
     """Run all security/integrity checks on a zip, return (top_dir, files-by-arcname).
 
@@ -106,52 +165,7 @@ def _validate_archive(zf: zipfile.ZipFile, *, max_total_bytes: int) -> tuple[str
             f"Archive contains too many entries (limit {_MAX_MEMBERS}).",
             "TOO_MANY_MEMBERS",
         )
-
-    files: dict[str, zipfile.ZipInfo] = {}
-    top_dirs: set[str] = set()
-    total_uncompressed = 0
-
-    for info in infos:
-        parts = _validate_member_name(info.filename)
-        top_dirs.add(parts[0])
-        if len(top_dirs) > 1:
-            raise _bad_request(
-                "Archive must have a single top-level directory matching the project UUID.",
-                "BAD_LAYOUT",
-            )
-        if info.is_dir():
-            continue
-        if _is_symlink_entry(info):
-            raise _bad_request(
-                f"Archive contains a symlink which is not allowed: {info.filename!r}",
-                "DISALLOWED_ENTRY",
-            )
-        if info.file_size < 0 or info.compress_size < 0:
-            raise _bad_request(f"Archive member has invalid size fields: {info.filename!r}")
-        if info.file_size > _MAX_PER_MEMBER_BYTES:
-            raise _bad_request(
-                f"Archive member exceeds per-file size limit: {info.filename!r}",
-                "MEMBER_TOO_LARGE",
-            )
-        # Zip-bomb guard: only above a small floor, so tiny well-compressed
-        # text files (which legitimately compress very well) don't trip it.
-        if (
-            info.file_size > _RATIO_GUARD_THRESHOLD
-            and info.compress_size > 0
-            and info.file_size // max(info.compress_size, 1) > _MAX_RATIO
-        ):
-            raise _bad_request(
-                f"Archive member has suspicious compression ratio: {info.filename!r}",
-                "BAD_RATIO",
-            )
-        total_uncompressed += info.file_size
-        if total_uncompressed > max_total_bytes:
-            raise _bad_request(
-                f"Archive uncompressed size exceeds the {max_total_bytes // (1024 * 1024)} MB limit.",
-                "TOO_LARGE",
-            )
-        files["/".join(parts)] = info
-
+    top_dirs, files = _collect_file_members(infos, max_total_bytes=max_total_bytes)
     if not files:
         raise _bad_request("Archive contains no files (only directories).")
     top_dir = next(iter(top_dirs))

@@ -17,13 +17,14 @@ function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisibl
   const handleNewStandard = () => setView({ mode: 'new' });
   const handleEditorBack = () => { setView({ mode: 'list' }); refresh(); };
   const handleSaved = (savedId) => { if (savedId) addVisible(savedId); setView({ mode: 'list' }); refresh(); };
+  const handleImported = (importedId) => { if (importedId) addVisible(importedId); setShowImport(false); refresh(); };
   const handleDeleteWithCleanup = async (id) => { removeVisible(id); await handleDelete(id); };
 
   return {
     view,
     showImport, setShowImport,
     handleEdit, handleNewStandard, handleEditorBack,
-    handleSaved, handleDeleteWithCleanup,
+    handleSaved, handleImported, handleDeleteWithCleanup,
   };
 }
 
@@ -41,7 +42,6 @@ function StandardsListView({ grouped, loading, error, actions, customizedCounts 
 }
 
 export default function StandardsPage({ onRescan }) {
-  const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
   const { selectedProject, selectedSource } = useAppState();
   // A shared (read-only) project has no local standards file to write; the
   // per-project PUT would 404 and vanish in persist()'s fire-and-forget
@@ -49,6 +49,10 @@ export default function StandardsPage({ onRescan }) {
   // is what every screen filters by.
   const visibilityProjectId = selectedSource === 'shared' ? null : selectedProject;
   const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards({ projectId: visibilityProjectId });
+  // A new standard only reaches the Evaluate picker once it is visible for
+  // this project. Create does that in handleSaved; duplicate and import
+  // land here and in handleImported.
+  const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards({ onDuplicated: addVisible });
   const { counts: customizedCounts } = useStandardsOverrides(selectedProject);
   const {
     view,
@@ -58,6 +62,7 @@ export default function StandardsPage({ onRescan }) {
     handleNewStandard,
     handleEditorBack,
     handleSaved,
+    handleImported,
     handleDeleteWithCleanup,
   } = useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible);
 
@@ -82,7 +87,7 @@ export default function StandardsPage({ onRescan }) {
         </div>
       </div>
       <StandardsListView grouped={grouped} loading={loading} error={error} actions={{ onEdit: handleEdit, onDelete: handleDeleteWithCleanup, onDuplicate: handleDuplicate, isVisible, onToggleVisibility: toggle }} customizedCounts={customizedCounts} />
-      {showImport && <ImportModal onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); refresh(); }} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} onImported={handleImported} />}
     </div>
   );
 }

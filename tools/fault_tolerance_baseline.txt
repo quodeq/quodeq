@@ -8,7 +8,7 @@
 # the baseline (update the shifted line number) over blind --update-baseline
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
-src/quodeq/_cli_lifecycle.py:70:broad-except
+src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_api_call.py:288:broad-except
 src/quodeq/analysis/_api_runner.py:96:broad-except
@@ -44,7 +44,7 @@ src/quodeq/api/_index_routes.py:24:broad-except
 src/quodeq/api/_run_event_watcher.py:152:broad-except
 src/quodeq/api/_scores_routes.py:45:broad-except
 src/quodeq/api/_scores_routes.py:65:broad-except
-src/quodeq/api/_sse_log_helpers.py:55:broad-except
+src/quodeq/api/_sse_log_helpers.py:67:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:71:broad-except
@@ -53,17 +53,17 @@ src/quodeq/api/app.py:198:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_runs.py:30:broad-except
-src/quodeq/api/routes_shared_mirrors.py:121:broad-except
-src/quodeq/api/routes_shared_mirrors.py:160:broad-except
-src/quodeq/api/routes_shared_mirrors.py:175:broad-except
-src/quodeq/api/routes_shared_mirrors.py:98:broad-except
-src/quodeq/api/security.py:264:broad-except
-src/quodeq/assistant/adapters/_api.py:113:broad-except
+src/quodeq/api/routes_shared_mirrors.py:115:broad-except
+src/quodeq/api/routes_shared_mirrors.py:154:broad-except
+src/quodeq/api/routes_shared_mirrors.py:169:broad-except
+src/quodeq/api/routes_shared_mirrors.py:92:broad-except
+src/quodeq/api/security.py:266:broad-except
+src/quodeq/assistant/adapters/_api.py:117:broad-except
 src/quodeq/assistant/adapters/_capabilities.py:31:broad-except
 src/quodeq/assistant/cancel.py:48:broad-except
 src/quodeq/assistant/cancel.py:61:broad-except
 src/quodeq/assistant/mcp/server.py:62:broad-except
-src/quodeq/assistant/orchestrator.py:231:broad-except
+src/quodeq/assistant/orchestrator.py:263:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:127:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:87:broad-except
 src/quodeq/assistant/tools/_registry.py:58:broad-except
@@ -74,9 +74,9 @@ src/quodeq/config/ai_provider.py:273:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
 src/quodeq/context/_project_shape_io.py:91:broad-except
-src/quodeq/context/precedent_corpus.py:296:broad-except
-src/quodeq/context/precedent_corpus.py:90:broad-except
-src/quodeq/context/precedent_store.py:112:broad-except
+src/quodeq/context/precedent_corpus.py:294:broad-except
+src/quodeq/context/precedent_corpus.py:91:broad-except
+src/quodeq/context/precedent_store.py:93:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
 src/quodeq/context/trust_model.py:161:broad-except
 src/quodeq/context/trust_model.py:93:broad-except
@@ -97,9 +97,9 @@ src/quodeq/dashboard/_webview_window_lifecycle.py:50:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:164:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:72:broad-except
 src/quodeq/dashboard/cli.py:88:broad-except
-src/quodeq/dashboard/runner.py:156:broad-except
-src/quodeq/dashboard/runner.py:174:broad-except
-src/quodeq/dashboard/runner.py:185:broad-except
+src/quodeq/dashboard/runner.py:157:broad-except
+src/quodeq/dashboard/runner.py:175:broad-except
+src/quodeq/dashboard/runner.py:186:broad-except
 src/quodeq/data/cache_store/_migrate_params.py:42:broad-except
 src/quodeq/data/cache_store/entry.py:37:broad-except
 src/quodeq/data/events/reader.py:61:broad-except
