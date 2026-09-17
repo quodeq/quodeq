@@ -142,3 +142,72 @@ def tally_unique_findings(
         violations=violations, compliance=compliance,
         duplicates=duplicates, suppressed=hidden, quarantined=quarantined,
     )
+
+
+_TAIL_GUARD = 512
+
+
+class IncrementalTally:
+    """A ``tally_unique_findings`` that resumes where its last call stopped.
+
+    The evidence jsonl is append-only while a pool runs, so each call reads
+    the bytes appended since the previous one and folds them into the same
+    dedup set and counters. Only complete lines are consumed: a trailing
+    partial line (an agent mid-write) waits for the next call. The consumed
+    tail is remembered; when the file is shorter than the offset or the tail
+    no longer matches (the end-of-pool dedup pass rewrites the file in
+    place), everything is re-read from zero.
+    """
+
+    def __init__(
+        self, path: Path, *,
+        suppressed: "Callable[[dict], bool] | None" = None,
+        resolver: PrincipleResolver | None = None,
+    ) -> None:
+        self.path = path
+        self._suppressed = suppressed
+        self._resolver = resolver
+        self._reset()
+
+    def _reset(self) -> None:
+        self.offset = 0
+        self._tail = b""
+        self._seen: set[tuple] = set()
+        self._counts = {"violation": 0, "compliance": 0, "duplicate": 0, "suppressed": 0, "quarantined": 0}
+
+    def _tail_matches(self, f) -> bool:
+        if not self._tail:
+            return True
+        f.seek(self.offset - len(self._tail))
+        return f.read(len(self._tail)) == self._tail
+
+    def advance(self) -> FindingTally:
+        if not self.path.is_file():
+            self._reset()
+            return self._tally()
+        try:
+            with open(self.path, "rb") as f:
+                size = f.seek(0, 2)
+                if size < self.offset or not self._tail_matches(f):
+                    self._reset()
+                f.seek(self.offset)
+                data = f.read()
+        except OSError as exc:
+            _logger.debug("evidence file unreadable during tally: %s", exc)
+            return self._tally()
+        end = data.rfind(b"\n")
+        if end < 0:
+            return self._tally()
+        complete = data[: end + 1]
+        for raw in complete.decode("utf-8", errors="replace").split("\n"):
+            kind = _classify_finding_row(raw, self._seen, suppressed=self._suppressed, resolver=self._resolver)
+            if kind in self._counts:
+                self._counts[kind] += 1
+        self.offset += len(complete)
+        self._tail = complete[-_TAIL_GUARD:]
+        return self._tally()
+
+    def _tally(self) -> FindingTally:
+        c = self._counts
+        return FindingTally(violations=c["violation"], compliance=c["compliance"],
+                            duplicates=c["duplicate"], suppressed=c["suppressed"], quarantined=c["quarantined"])
