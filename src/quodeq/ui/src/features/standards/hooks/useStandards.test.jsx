@@ -4,6 +4,14 @@ import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { useStandards, STANDARD_TYPES } from './useStandards.js';
+import { STANDARDS_CHANGED_EVENT, STANDARDS_CHANGED_REASON } from '../../../constants.js';
+
+function captureStandardsChanged() {
+  const seen = [];
+  const listener = (evt) => seen.push(evt.detail?.reason);
+  window.addEventListener(STANDARDS_CHANGED_EVENT, listener);
+  return { seen, stop: () => window.removeEventListener(STANDARDS_CHANGED_EVENT, listener) };
+}
 
 const fakeApi = {
   listStandards: vi.fn(),
@@ -48,6 +56,47 @@ describe('useStandards', () => {
     await waitFor(() => {
       expect(result.current.error).toBe('boom');
     });
+  });
+
+  it('handleDuplicate reports the new id once the server accepted it', async () => {
+    fakeApi.listStandards.mockResolvedValue([{ id: 'a', name: 'A', type: STANDARD_TYPES.CUSTOM }]);
+    fakeApi.duplicateStandard.mockResolvedValue({});
+    const onDuplicated = vi.fn();
+    const { result } = renderHook(() => useStandards({ onDuplicated }), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.standards).toHaveLength(1));
+    await act(async () => {
+      await result.current.handleDuplicate('a', 'a-copy');
+    });
+    expect(fakeApi.duplicateStandard).toHaveBeenCalledWith('a', 'a-copy');
+    expect(onDuplicated).toHaveBeenCalledWith('a-copy');
+  });
+
+  it('handleDuplicate does not report an id when the server rejects', async () => {
+    fakeApi.listStandards.mockResolvedValue([{ id: 'a', name: 'A', type: STANDARD_TYPES.CUSTOM }]);
+    fakeApi.duplicateStandard.mockRejectedValue(new Error('nope'));
+    const onDuplicated = vi.fn();
+    const { result } = renderHook(() => useStandards({ onDuplicated }), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.standards).toHaveLength(1));
+    await act(async () => {
+      await result.current.handleDuplicate('a', 'a-copy');
+    });
+    expect(onDuplicated).not.toHaveBeenCalled();
+    expect(result.current.error).toBeTruthy();
+  });
+
+  it('refresh broadcasts a list change so a mounted Evaluate picker refetches', async () => {
+    fakeApi.listStandards.mockResolvedValue([]);
+    const capture = captureStandardsChanged();
+    try {
+      const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
+      await waitFor(() => expect(fakeApi.listStandards).toHaveBeenCalled());
+      await act(async () => {
+        await result.current.refresh();
+      });
+      expect(capture.seen).toEqual([STANDARDS_CHANGED_REASON.LIST]);
+    } finally {
+      capture.stop();
+    }
   });
 
   it('handleDelete calls deleteStandard and refreshes', async () => {
