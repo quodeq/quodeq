@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Iterator
 
@@ -31,16 +32,29 @@ class ActionLogWriter:
         self._lock = get_file_lock()
 
     def emit(self, event: BaseEvent) -> None:
+        self._append([event_to_json(event) + "\n"], str(event.event_type))
+
+    def emit_many(self, events: Iterable[BaseEvent]) -> None:
+        """Append every event under one open, one lock and one flush.
+
+        The batch is serialized before the log is opened, so a bad event
+        leaves the file untouched. An empty batch opens nothing.
+        """
+        lines = [event_to_json(event) + "\n" for event in events]
+        if lines:
+            self._append(lines, f"{len(lines)} events")
+
+    def _append(self, lines: list[str], what: str) -> None:
         try:
             with open(self.log_path, mode="a", encoding="utf-8") as f:
                 self._lock.acquire(f)
                 try:
-                    f.write(event_to_json(event) + "\n")
+                    f.write("".join(lines))
                     f.flush()
                 finally:
                     self._lock.release(f)
         except Exception as e:
-            _logger.error("Failed to emit %s to %s: %s", event.event_type, self.log_path, e)
+            _logger.error("Failed to emit %s to %s: %s", what, self.log_path, e)
             raise
 
 
