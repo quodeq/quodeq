@@ -17,7 +17,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response, page_params
+from quodeq.api.helpers import json_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services._dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
@@ -124,8 +124,7 @@ def register_findings_routes(app: Flask) -> None:
         # Same {"error", "code"} shape every other error branch in this
         # file uses (lines 106, 109, 175, 190, 193, 205-206, 213), instead
         # of Flask's default 404 HTML page that a bare abort() would give.
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
 
     def _eval_dir() -> str:
         return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
@@ -219,10 +218,9 @@ def register_findings_routes(app: Flask) -> None:
     @app.post("/api/findings/delete-all")
     def delete_all() -> tuple[Response, int]:
         if request.args.get("confirm") != "true":
-            err_body, status = error_response(
+            return json_error(
                 "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
             )
-            return jsonify(err_body), status
         body = request.get_json(silent=True) or {}
         project = body.get("project", "")
         run_id = body.get("run_id") or body.get("runId")

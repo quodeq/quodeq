@@ -12,7 +12,7 @@ from flask import Flask, jsonify, request
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.assistant.workspace_actions import (
     PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
@@ -27,8 +27,7 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         """(repo, row, error_response); runs one-shot worktree/db hygiene first."""
         repo = get_repository(app)
         if repo.get_session(sid) is None:
-            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
-            return None, None, (jsonify(body), status)
+            return None, None, json_error("unknown session", 404, "UNKNOWN_SESSION")
         run_assistant_hygiene(app)
         return repo, repo.get_worktree(sid), None
 
@@ -62,8 +61,7 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None or row["status"] != "active":
-            body, status = error_response("no active worktree", 404, "NO_ACTIVE_WORKTREE")
-            return jsonify(body), status
+            return json_error("no active worktree", 404, "NO_ACTIVE_WORKTREE")
         try:
             text = diff_text(Path(row["path"]))
             truncated = len(text) > _MAX_DIFF_CHARS
@@ -71,9 +69,7 @@ def register_assistant_workspace_routes(app: Flask) -> None:
                             "stats": diff_stats(Path(row["path"]))})
         except WorktreeError as exc:
             _logger.warning("workspace diff failed for %s: %s", sid, exc)
-            body, status = error_response(
-                "failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
-            return jsonify(body), status
+            return json_error("failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
 
     @app.post("/api/assistant/sessions/<sid>/workspace/apply")
     def assistant_workspace_apply(sid: str):
@@ -81,24 +77,18 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None:
-            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
-            return jsonify(body), status
+            return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
         outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
                                   release_turn=_release_turn)
         if outcome.kind == "turn_busy":
-            body, status = error_response(
+            return json_error(
                 "a turn or workspace action is in progress; wait for it to finish",
                 409, "TURN_IN_PROGRESS")
-            return jsonify(body), status
         if outcome.kind == "not_active":
-            body, status = error_response(
-                f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
-            return jsonify(body), status
+            return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
         if outcome.kind == "failed":
             _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
-            body, status = error_response(
-                "failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
-            return jsonify(body), status
+            return json_error("failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
         return jsonify({"applied": True, "stats": outcome.stats})
 
     @app.post("/api/assistant/sessions/<sid>/workspace/pr")
@@ -107,26 +97,20 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None:
-            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
-            return jsonify(body), status
+            return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
         req_body = request.get_json(silent=True) or {}
         draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
         outcome = create_workspace_pr(
             repo, sid, draft, claim_turn=_try_claim_turn, release_turn=_release_turn)
         if outcome.kind == "turn_busy":
-            body, status = error_response(
+            return json_error(
                 "a turn or workspace action is in progress; wait for it to finish",
                 409, "TURN_IN_PROGRESS")
-            return jsonify(body), status
         if outcome.kind == "not_active":
-            body, status = error_response(
-                f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
-            return jsonify(body), status
+            return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
         if outcome.kind == "failed":
             _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
-            resp_body, status = error_response(
-                "failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
-            return jsonify(resp_body), status
+            return json_error("failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
         return jsonify(outcome.result)
 
     @app.post("/api/assistant/sessions/<sid>/workspace/discard")
@@ -135,8 +119,7 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None:
-            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
-            return jsonify(body), status
+            return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
         # Claim the turn slot like apply/pr: without this, discard raced an
         # in-flight apply (overwriting "applied" with "discarded" while the
         # changes sat in the user's real tree) and pulled the worktree out
@@ -144,20 +127,14 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         outcome = discard_workspace(repo, sid, claim_turn=_try_claim_turn,
                                     release_turn=_release_turn)
         if outcome.kind == "turn_busy":
-            body, status = error_response(
+            return json_error(
                 "a turn or workspace action is in progress; wait for it to finish",
                 409, "TURN_IN_PROGRESS")
-            return jsonify(body), status
         if outcome.kind == "gone":
-            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
-            return jsonify(body), status
+            return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
         if outcome.kind == "not_active":
-            body, status = error_response(
-                f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
-            return jsonify(body), status
+            return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
         if outcome.kind == "failed":
             _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
-            body, status = error_response(
-                "failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
-            return jsonify(body), status
+            return json_error("failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
         return jsonify({"discarded": True})

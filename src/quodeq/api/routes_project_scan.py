@@ -26,7 +26,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import _path_from_body, error_response, scan_target_error as _scan_target_error
+from quodeq.api.helpers import _path_from_body, json_error, scan_target_error as _scan_target_error
 from quodeq.services._fs_project_helpers import (
     project_record_exists,
     read_project_record,
@@ -65,13 +65,11 @@ def project_scan(project: str) -> Response | tuple[Response, int]:
     try:
         validate_path_segment(project)
     except ValueError:
-        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
+        return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
 
     project_dir = _contained_project_dir(project)
     if project_dir is None:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
 
     scan_path = project_dir / "scan.json"
     if scan_path.exists():
@@ -84,22 +82,18 @@ def project_scan(project: str) -> Response | tuple[Response, int]:
     # Check if local — read the project's repository record (via the
     # service layer; the route keeps no repository_info.json knowledge).
     if not project_record_exists(project_dir):
-        body, status = error_response("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
 
     info = read_project_record(project_dir)
     if info is None:
-        body, status = error_response("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
-        return jsonify(body), status
+        return json_error("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
 
     if info.get("location") != "local" or not info.get("path"):
-        body, status = error_response("Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
-        return jsonify(body), status
+        return json_error("Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
 
     project_path = Path(info["path"])
     if not project_path.is_dir():
-        body, status = error_response("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
-        return jsonify(body), status
+        return json_error("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
 
     result = scan_project(project_path, output_dir=project_dir)
     return jsonify(dataclasses.asdict(result))
@@ -117,13 +111,11 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
     try:
         validate_path_segment(project)
     except ValueError:
-        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
+        return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
 
     project_dir = _contained_project_dir(project)
     if project_dir is None:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
 
     # Lazy import: pulls in the analysis pipeline, which the API process
     # should not pay for at startup. Layer exception is baselined — same
@@ -144,8 +136,7 @@ def scan_path() -> Response | tuple[Response, int]:
         body, status = target
         return jsonify(body), status
     if not target:
-        body, status = error_response("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
-        return jsonify(body), status
+        return json_error("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
 
     target_path = Path(target).resolve()
     # Allowlist: only permit paths under user home or the evaluations directory
@@ -154,8 +145,7 @@ def scan_path() -> Response | tuple[Response, int]:
         body, status = err
         return jsonify(body), status
     if not target_path.is_dir():
-        body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
-        return jsonify(body), status
+        return json_error("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
 
     result = scan_project(target_path)
     return jsonify(dataclasses.asdict(result))

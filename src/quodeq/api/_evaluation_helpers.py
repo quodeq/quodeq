@@ -9,9 +9,9 @@ import time as _time
 from collections.abc import Mapping
 from http import HTTPStatus
 
-from flask import Response, jsonify, request
+from flask import Response, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.config.ai_provider import get_api_key_secure
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
@@ -70,13 +70,13 @@ def resolve_clean_scan(payload: dict) -> bool:
     return bool(payload.get("cleanScan", False))
 
 
-class InvalidEvaluationOption(ValueError):
+class InvalidEvaluationOption(ClientMessageError, ValueError):
     """A present-but-malformed evaluation option; ``public_message`` is the
-    field-naming text a route may return to the client verbatim."""
+    field-naming text a route may return to the client verbatim.
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.public_message = message
+    Also a ValueError so the routes' existing ``except ValueError`` guards
+    around option building still catch it.
+    """
 
 
 def _coerce_int(value: object, default: int, field: str) -> int:
@@ -131,12 +131,11 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     allowed_cmds = _get_allowed_ai_cmds(env=env)
     if ai_cmd not in allowed_cmds:
         allowed_list = ", ".join(sorted(allowed_cmds))
-        body, status = error_response(
+        return json_error(
             f"Invalid AI command. Allowed: {allowed_list}",
             HTTPStatus.BAD_REQUEST,
             "INVALID_INPUT",
         )
-        return jsonify(body), status
     return None
 
 
@@ -145,11 +144,10 @@ def _validate_ai_model(
 ) -> tuple[Response, int] | None:
     """API-type providers require an explicit model."""
     if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == "api" and not ai_model:
-        body, status = error_response(
+        return json_error(
             "No model selected. Go to Settings and select one.",
             HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
         )
-        return jsonify(body), status
     return None
 
 
@@ -217,12 +215,11 @@ def _validate_ai_cmd_path(
     reason = ai_cmd_path_error(ai_cmd, ai_cmd_path)
     if reason is None:
         return None
-    body, status = error_response(
+    return json_error(
         f"Invalid AI command override: {reason}",
         HTTPStatus.BAD_REQUEST,
         "INVALID_INPUT",
     )
-    return jsonify(body), status
 
 
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
@@ -277,9 +274,8 @@ def _check_eval_rate_limit(eval_rate_store: object | None) -> tuple[Response, in
     ip = request.remote_addr or "unknown"
     now = _time.monotonic()
     if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
-        body, status = error_response(
+        return json_error(
             "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
         )
-        return jsonify(body), status
     eval_rate_store.record(ip, now)  # type: ignore[union-attr]
     return None

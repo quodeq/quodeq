@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import http.client
 import logging
-import os
 import threading
 import time as _time
 from http import HTTPStatus
@@ -13,6 +12,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response, page_params
+from quodeq.shared._env import env_int
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -28,25 +28,12 @@ _DEFAULT_CWE_CACHE_TTL_S = 3600
 
 def _cache_ttl_from_env(default: int = _DEFAULT_CWE_CACHE_TTL_S) -> int:
     """Read QUODEQ_CWE_CACHE_TTL from the environment; see the module
-    comment above for units, default, and valid range."""
-    raw = os.environ.get("QUODEQ_CWE_CACHE_TTL")
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        logger.warning(
-            "QUODEQ_CWE_CACHE_TTL=%r is not a valid integer (expected seconds, "
-            "e.g. 3600); falling back to the default of %d", raw, default,
-        )
-        return default
-    if value < 0:
-        logger.warning(
-            "QUODEQ_CWE_CACHE_TTL=%d is negative (expected a non-negative number "
-            "of seconds); falling back to the default of %d", value, default,
-        )
-        return default
-    return value
+    comment above for units, default, and valid range.
+
+    ``env_int`` does the parsing, the non-negative check and the warning
+    that names the variable, the bad value and the default.
+    """
+    return env_int("QUODEQ_CWE_CACHE_TTL", default, minimum=0)
 
 
 class CweCache:

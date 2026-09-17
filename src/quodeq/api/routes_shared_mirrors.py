@@ -17,7 +17,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 
-from quodeq.api.helpers import error_response, page_params
+from quodeq.api.helpers import json_error, page_params
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit
@@ -97,11 +97,9 @@ def register_shared_mirror_routes(app: Flask) -> None:
             info = _fs_projects.get_project_info(str(eval_root), project)
         except Exception:
             _logger.exception("Failed to load shared project info for %s", project)
-            body, status = error_response("Failed to load project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            return jsonify(body), status
+            return json_error("Failed to load project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         if not info:
-            body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         # Same publishedBy/publishedAt enrichment as the list route
         # (shared_projects above) -- without it the UI's shared-project hero
         # badge has no "published by <name>" to show. `project` here is the
@@ -122,8 +120,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
             runs = build_runs_unit(eval_root, shared_index_db_path(url), project)
         except Exception:
             _logger.exception("Failed to build shared runs unit for %s", project)
-            body, status = error_response("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            return jsonify(body), status
+            return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         return jsonify({"runs": runs})
 
     @app.get("/api/shared/projects/<project>/dashboard")
@@ -136,8 +133,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
         try:
             payload = _fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
         except FileNotFoundError:
-            body, status = error_response("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(payload)
 
     @app.get("/api/shared/projects/<project>/accumulated")
@@ -149,8 +145,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
         as_of = request.args.get("asOf")
         payload = _fs_reports.get_accumulated(str(eval_root), project, as_of)
         if payload is None:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(payload)
 
     @app.get("/api/shared/projects/<project>/scores")
@@ -164,11 +159,9 @@ def register_shared_mirror_routes(app: Flask) -> None:
             result = get_project_scores(eval_root, project, as_of)
         except Exception:
             _logger.exception("Unexpected error fetching shared scores for project %s", project)
-            body, status = error_response("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            return jsonify(body), status
+            return json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         if result is None:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(result)
 
     @app.get("/api/shared/projects/<project>/compare-summary")
@@ -181,11 +174,9 @@ def register_shared_mirror_routes(app: Flask) -> None:
             result = build_compare_summary(eval_root, project)
         except Exception:
             _logger.exception("Unexpected error building shared compare summary for project %s", project)
-            body, status = error_response("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            return jsonify(body), status
+            return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         if result is None:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(result)
 
     @app.get("/api/shared/projects/<project>/scores/<run_id>")
@@ -197,8 +188,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
         try:
             result = get_scores_slim(eval_root, project, run_id)
         except FileNotFoundError:
-            body, status = error_response("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(result)
 
     @app.get("/api/shared/projects/<project>/dimensions/<dim>/eval")
@@ -210,8 +200,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
             return err
         payload = _fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
         if payload is None:
-            body, status = error_response("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         if payload.get("waiting"):
             return jsonify(payload), HTTPStatus.ACCEPTED
         return jsonify(payload)
@@ -226,8 +215,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
         try:
             payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
         except FileNotFoundError:
-            body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(to_camel_dict(payload))
 
     # The local routes take ``project`` as a query param

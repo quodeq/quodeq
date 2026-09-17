@@ -6,7 +6,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.services.rescore_run import rescore_project_run
 from quodeq.shared.utils import get_evaluations_dir
 
@@ -36,17 +36,15 @@ def register_rescore_routes(app: Flask) -> None:
     def rescore() -> Response | tuple[Response, int]:
         project = request.args.get("project", "")
         if not project:
-            body, status = error_response(
+            return json_error(
                 "project query parameter is required; add ?project=<name> to the query string",
                 HTTPStatus.BAD_REQUEST, "MISSING_PARAM",
             )
-            return jsonify(body), status
         run_id = request.args.get("run", "")
         eval_dir = _eval_dir_from_app(app)
 
         outcome = rescore_project_run(Path(eval_dir), project, run_id)
         if outcome.status != "ok":
             message, http_status, code = _OUTCOME_ERRORS[outcome.status]
-            body, status = error_response(message, http_status, code)
-            return jsonify(body), status
+            return json_error(message, http_status, code)
         return jsonify(outcome.result)

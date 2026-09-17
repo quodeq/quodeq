@@ -7,7 +7,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import _path_from_body, error_response, page_params
+from quodeq.api.helpers import _path_from_body, error_response, json_error, page_params
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
@@ -27,13 +27,11 @@ def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Respons
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
     if request.args.get("confirm") != "true":
-        body, status = error_response("Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED")
-        return jsonify(body), status
+        return json_error("Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED")
     _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.delete_project(reports_dir(), project)
     if not ok:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify({"deleted": project})
 
 
@@ -98,8 +96,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
         body, status = raw_path
         return jsonify(body), status
     if not raw_path:
-        body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
+        return json_error("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     new_path = _validated_target_path(raw_path)
     if isinstance(new_path, tuple):
         body, status = new_path
@@ -108,8 +105,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify({"updated": project, "path": new_path})
 
 
@@ -156,8 +152,7 @@ def register_project_list_routes(
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return _handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
@@ -166,8 +161,7 @@ def register_project_list_routes(
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return export_project_zip(project, reports_dir())
 
     @app.post("/api/projects/import")
@@ -186,8 +180,7 @@ def register_project_list_routes(
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
@@ -196,12 +189,10 @@ def register_project_list_routes(
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         info = provider.get_project_info(reports_dir(), project)
         if not info:
-            body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(info)
 
     @app.post("/api/projects")

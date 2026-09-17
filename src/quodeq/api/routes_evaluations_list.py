@@ -18,7 +18,7 @@ from quodeq.api._evaluation_helpers import (
     _validate_ai_model,
     clean_scan_conflict_error,
 )
-from quodeq.api.helpers import error_response, page_params, scan_target_error, validate_evaluation_payload
+from quodeq.api.helpers import json_error, page_params, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.shared.validation import relative_scope_error
 from quodeq.assistant import get_provider_configs
@@ -40,8 +40,7 @@ def _validate_start_payload(payload: dict) -> Response | tuple[Response, int] | 
     (or Flask's own error tuple) if invalid, else None."""
     validation_error = validate_evaluation_payload(payload)
     if validation_error:
-        body, status = error_response(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
+        return json_error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     ai_cmd = payload.get("aiCmd") or None
     ai_cmd_error = _validate_ai_cmd(ai_cmd)
     if ai_cmd_error is not None:
@@ -72,14 +71,12 @@ def _pre_build_options_error(payload: dict) -> tuple[Response, int] | None:
     net, never a path that has to echo exception text."""
     conflict_err = clean_scan_conflict_error(payload)
     if conflict_err is not None:
-        body, status = error_response(conflict_err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
+        return json_error(conflict_err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     scope_path = payload.get("scopePath") or None
     if scope_path is not None:
         err = relative_scope_error(str(scope_path))
         if err is not None:
-            body, status = error_response(err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     return None
 
 
@@ -104,16 +101,14 @@ def _validated_start_request(
         # exc.public_message, not str(exc): the field-naming text an
         # InvalidEvaluationOption carries is written by _coerce_int itself
         # (never raw exception formatting), so it is safe to return verbatim.
-        body, status = error_response(exc.public_message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return None, (jsonify(body), status)
+        return None, json_error(exc.public_message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     except ValueError:
         # Constant message, not str(exc): every other raise source is
         # pre-checked above. Keep it unbound so nothing here can ever echo
         # exception text.
-        body, status = error_response(
+        return None, json_error(
             "Invalid evaluation options", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
         )
-        return None, (jsonify(body), status)
     # Same allowlist as /api/scan and POST /api/projects: starting an
     # evaluation registers + scans the directory and persists its file
     # tree, so an unvalidated local path would leak arbitrary readable
@@ -121,8 +116,7 @@ def _validated_start_request(
     try:
         is_url = is_repo_url(str(repo))
     except ValueError:
-        body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
-        return None, (jsonify(body), status)
+        return None, json_error("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
     if not is_url:
         err = scan_target_error(str(repo), _reports_dir())
         if err is not None:
@@ -177,9 +171,8 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
                 repo=start_request.repo, reports_dir=_reports_dir(), options=start_request.options,
             )
         except (FileNotFoundError, ValueError):
-            body, status = error_response(
+            return json_error(
                 "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
                 HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
             )
-            return jsonify(body), status
         return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED

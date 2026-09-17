@@ -21,7 +21,7 @@ from quodeq.api._terminal_ws_helpers import (
     setup_terminal_session,
     terminal_read_loop,
 )
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.links import (
     build_open_argv,
@@ -60,8 +60,7 @@ def _gate_reason() -> str | None:
 def _forbidden() -> tuple[Response, int]:
     """The shared 403 body for every gated terminal route (code and message
     live here once instead of six identical literal dicts)."""
-    body, status = error_response("forbidden", 403, "FORBIDDEN")
-    return jsonify(body), status
+    return json_error("forbidden", 403, "FORBIDDEN")
 
 
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
@@ -133,8 +132,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
             return _forbidden()
         session = registry.create()
         if session is None:
-            body, status = error_response("session limit reached", 409, "SESSION_LIMIT")
-            return jsonify(body), status
+            return json_error("session limit reached", 409, "SESSION_LIMIT")
         return jsonify({"id": session.id, "name": session.name}), 201
 
     @app.post("/api/terminal/sessions/<sid>/kill")
@@ -142,8 +140,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         if _gate_reason() is not None:
             return _forbidden()
         if not registry.kill(sid):
-            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
-            return jsonify(body), status
+            return json_error("unknown session", 404, "UNKNOWN_SESSION")
         return jsonify({"ok": True})
 
     @app.post("/api/terminal/kill")
@@ -167,8 +164,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         body = request.get_json(silent=True) or {}
         paths = body.get("paths")
         if not isinstance(paths, list):
-            body, status = error_response("paths must be a list", 400, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error("paths must be a list", 400, "INVALID_INPUT")
         sid = body.get("session")
         bases = resolve_bases(registry.pid_for(sid if isinstance(sid, str) else None))
         resolved = []
@@ -189,8 +185,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         body = request.get_json(silent=True) or {}
         path = body.get("path")
         if not isinstance(path, str) or not path:
-            body, status = error_response("path is required", 400, "MISSING_PARAM")
-            return jsonify(body), status
+            return json_error("path is required", 400, "MISSING_PARAM")
         # Confine the launch to the terminal's own working directories (shell
         # cwd, server cwd, home) and normalize the untrusted path to its real,
         # canonical form. Everything below uses this sanitized value, never the

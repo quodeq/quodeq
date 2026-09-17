@@ -16,7 +16,7 @@ from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
-from .helpers import error_response
+from .helpers import json_error
 from .routes_common import reports_dir
 
 
@@ -61,33 +61,28 @@ def register_shared_config_routes(app: Flask) -> None:
         body = request.get_json(silent=True) or {}
         url = str(body.get("url") or "").strip()
         if not url:
-            body, status = error_response("url is required", 400, "URL_REQUIRED")
-            return jsonify(body), status
+            return json_error("url is required", 400, "URL_REQUIRED")
         outcome = connect_shared_repo(url, log=SHARED_LOG)
         if outcome.status == "invalid_url":
-            body, status = error_response(outcome.detail, 400, "INVALID_URL")
-            return jsonify(body), status
+            return json_error(outcome.detail, 400, "INVALID_URL")
         if outcome.status == "clone_failed":
-            body, status = error_response(
+            return json_error(
                 f"could not clone the repository, check that git can access {outcome.url}",
                 502,
                 "CLONE_FAILED",
             )
-            return jsonify(body), status
         if outcome.status == "foreign":
-            body, status = error_response(
+            return json_error(
                 "the repository exists but does not look like a quodeq results repository",
                 400,
                 "FOREIGN_REPO",
             )
-            return jsonify(body), status
         if outcome.status == "unsupported_version":
-            body, status = error_response(
+            return json_error(
                 "this shared repository requires a newer version of quodeq",
                 400,
                 "UNSUPPORTED_VERSION",
             )
-            return jsonify(body), status
         return jsonify({"configured": True, "url": outcome.url})
 
     @app.delete("/api/shared/config")
@@ -101,10 +96,9 @@ def register_shared_config_routes(app: Flask) -> None:
     def shared_refresh() -> Response | tuple[Response, int]:
         settings = read_settings()
         if not settings.url:
-            body, status = error_response(
+            return json_error(
                 "no shared repository configured", 400, "NO_SHARED_REPO"
             )
-            return jsonify(body), status
         ok, reason = _routes_shared.refresh_shared_clone(settings.url)
         if not ok:
             return (
@@ -124,23 +118,19 @@ def register_shared_config_routes(app: Flask) -> None:
     def shared_publish_start(project: str) -> tuple[Response, int]:
         err = path_segment_error(project)
         if err is not None:
-            body, status = error_response(err, 400, "INVALID_INPUT")
-            return jsonify(body), status
+            return json_error(err, 400, "INVALID_INPUT")
         settings = read_settings()
         if not settings.url:
-            body, status = error_response(
+            return json_error(
                 "no shared repository configured", 400, "NO_SHARED_REPO"
             )
-            return jsonify(body), status
         outcome = _routes_shared.start_publish(
             project, settings.url, evaluations_root=Path(reports_dir())
         )
         if outcome == "already_running":
-            body, status = error_response("a publish is already running", 409, "PUBLISH_IN_PROGRESS")
-            return jsonify(body), status
+            return json_error("a publish is already running", 409, "PUBLISH_IN_PROGRESS")
         if outcome != "started":
-            body, status = error_response(
+            return json_error(
                 "could not start the publish job, see server logs", 500, "PUBLISH_START_FAILED"
             )
-            return jsonify(body), status
         return jsonify({"started": True}), 202

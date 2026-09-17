@@ -9,11 +9,23 @@ from typing import Any
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
+from quodeq.shared.errors import ClientMessageError  # noqa: F401 -- re-export for api modules
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
     """Build a standardized error response tuple for Flask endpoints."""
     return {"error": message, "code": code}, status
+
+
+def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
+    """``error_response`` already jsonified, as a ``(Response, status)`` tuple.
+
+    For the handlers annotated to return a ``Response``: one call replaces
+    the ``body, status = error_response(...)`` plus
+    ``return jsonify(body), status`` pair that stood at a hundred-odd sites.
+    """
+    body, status_code = error_response(message, status, code)
+    return jsonify(body), status_code
 
 
 def _json_object_or_error(

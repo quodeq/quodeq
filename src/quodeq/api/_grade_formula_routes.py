@@ -13,7 +13,7 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
@@ -27,8 +27,7 @@ from quodeq.shared.validation import validate_path_segment
 
 
 def _invalid_input(message: str) -> tuple[Response, int]:
-    body, status = error_response(message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-    return jsonify(body), status
+    return json_error(message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
 
 
 def _parse_params(data: dict) -> tuple:
@@ -84,11 +83,10 @@ def register_grade_formula_routes(
     @app.delete("/api/grade-formula")
     def delete_grade_formula() -> Response | tuple[Response, int]:
         if request.args.get("confirm") != "true":
-            body, status = error_response(
+            return json_error(
                 "Use ?confirm=true to confirm resetting the grade formula and rescoring every run",
                 HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
             )
-            return jsonify(body), status
         grade_formula.reset_params()
         result = apply_to_all_runs(Path(reports_dir()))
         return jsonify(_state_payload(result=result))
@@ -100,18 +98,16 @@ def register_grade_formula_routes(
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response(
+            return json_error(
                 "Invalid project", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
             )
-            return jsonify(body), status
         params, err = _parse_params(payload.get("params") or {})
         if err:
             return err
         result = grade_formula.preview_scores(Path(reports_dir()), project, params)
         if result is None:
-            body, status = error_response(
+            return json_error(
                 "No evaluation with an event log found for this project",
                 HTTPStatus.NOT_FOUND, "NOT_FOUND",
             )
-            return jsonify(body), status
         return jsonify(result)

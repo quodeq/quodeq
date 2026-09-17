@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from quodeq.shared.errors import ClientMessageError
+
 _ALLOWED_TOP = {"id", "name", "description", "weight", "source", "principles"}
 _ALLOWED_PRINCIPLE = {"name", "description", "requirements"}
 _ALLOWED_REQUIREMENT = {"id", "text", "description", "refs"}
@@ -25,22 +27,20 @@ _INJECTION_PATTERNS = [
 ]
 
 
-class StandardImportValidationError(ValueError):
+class StandardImportValidationError(ClientMessageError, ValueError):
     """Raised when an imported payload fails :func:`validate_import`.
 
     Carries the validator's own field-level reasons so a caller can report
     them without re-running validation: ``errors`` is that list and
-    ``public_message`` the joined text an API route may return to the client
-    verbatim (routes read that attribute, never ``str(exc)`` -- see
-    tests/api/test_no_exception_echo.py). Stays a ``ValueError`` so callers
+    ``public_message`` (from ClientMessageError) the joined text an API route
+    may return to the client verbatim, never ``str(exc)`` -- see
+    tests/api/test_no_exception_echo.py. Stays a ``ValueError`` so callers
     that only distinguish "invalid payload" keep working.
     """
 
     def __init__(self, errors: list[str]) -> None:
-        message = "; ".join(errors)
-        super().__init__(message)
+        super().__init__("; ".join(errors))
         self.errors = list(errors)
-        self.public_message = message
 
 
 def _truncate(value: str, limit: int) -> str:
