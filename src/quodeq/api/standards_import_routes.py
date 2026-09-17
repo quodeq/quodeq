@@ -27,6 +27,10 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
     file_path = payload.get("file")
     if not file_path:
         return error_response("file is required", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    if not isinstance(file_path, str):
+        # A non-string truthy value (5, a list) passed the check above and
+        # made the containment test below raise TypeError, a bare 500.
+        return error_response("file must be a string", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     if ".." in file_path or file_path.startswith("/"):
         return error_response("Invalid file path", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     try:
