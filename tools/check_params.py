@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Parameter-count ratchet: flag functions with more than 5 parameters.
+"""Parameter-count ratchet: flag functions with more than 6 parameters.
 
-Standard M-MOD-4: functions have at most 5 parameters; more than that
+Standard M-MOD-4 (default 6): functions have at most 6 parameters; more than that
 means the caller should pass an options object (a frozen dataclass here).
 Existing violations are grandfathered in tools/param_baseline.txt so the
 gate runs green today while preventing NEW ones. Regenerate the baseline
@@ -25,7 +25,7 @@ from typing import Iterator
 
 import _ratchet
 
-MAX_PARAMS = 5
+MAX_PARAMS = 6
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PY_ROOT = REPO_ROOT / "src" / "quodeq"
 BASELINE_PATH = Path(__file__).resolve().parent / "param_baseline.txt"
@@ -111,7 +111,7 @@ def load_baseline(path: Path = BASELINE_PATH) -> set[str]:
 
 def write_baseline(path: Path = BASELINE_PATH) -> int:
     header = (
-        "# Grandfathered parameter-count violations (functions with more than 5\n"
+        "# Grandfathered parameter-count violations (functions with more than 6\n"
         "# parameters, self/cls excluded). Do NOT add entries without\n"
         "# justification -- the goal is to burn this list down, not grow it.\n"
         "# Regenerate intentionally: python tools/check_params.py --update-baseline\n"

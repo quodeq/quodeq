@@ -14,7 +14,7 @@ import { main } from './ratchet.mjs';
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 155; // set to the total printed by --update; lower it as entries burn down
+const TOTAL_CEILING = 147; // set to the total printed by --update; lower it as entries burn down
 
 main({
   script: 'check_hygiene.mjs',
@@ -24,6 +24,6 @@ main({
   ceiling: TOTAL_CEILING,
   noun: 'hygiene violations',
   found: 'unused binding(s) or over-long parameter list(s)',
-  hint: 'Delete the unused binding (prefix with _ if it must stay), or pass an options object instead of more than 5 parameters. Run `npx eslint --no-inline-config -c eslint.hygiene.config.js <file>` for details.',
+  hint: 'Delete the unused binding (prefix with _ if it must stay), or pass an options object instead of more than 6 parameters. Run `npx eslint --no-inline-config -c eslint.hygiene.config.js <file>` for details.',
   updateCommand: 'npm run lint:hygiene:update',
 });

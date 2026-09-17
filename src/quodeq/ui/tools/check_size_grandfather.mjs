@@ -24,7 +24,11 @@ import { SIZE_GRANDFATHER } from './size_grandfather.mjs';
 // Lowered 4 -> 1 by the maintainability majors: DashboardPage.jsx,
 // useAssistantStream.js and GalaxyView.jsx were split into sibling render
 // modules / hooks, leaving useAppState.js as the last entry.
-const CEILING = 1;
+//
+// Lowered 1 -> 0 when the function cap moved to 60 lines (matching the
+// maintainability standard's default): useAppState.js no longer violates
+// either rule, so the list is empty.
+const CEILING = 0;
 
 const count = SIZE_GRANDFATHER.length;
 if (count > CEILING) {

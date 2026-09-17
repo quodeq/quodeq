@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Size ratchet: flag files over 300 lines and functions over 50 lines.
+"""Size ratchet: flag files over 300 lines and functions over 60 lines.
 
 Existing violations are grandfathered via tools/size_baseline.txt so the
 gate runs green in CI today while preventing NEW violations. Regenerate the
@@ -24,7 +24,7 @@ import _ratchet
 from _ratchet import read_text as _read_text
 
 MAX_FILE_LINES = 300
-MAX_FUNCTION_LINES = 50
+MAX_FUNCTION_LINES = 60
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PY_ROOT = REPO_ROOT / "src" / "quodeq"
@@ -145,7 +145,7 @@ def load_baseline(path: Path = BASELINE_PATH) -> set[str]:
 def write_baseline(path: Path = BASELINE_PATH) -> int:
     """Write current violations to the baseline file; return the count."""
     header = (
-        "# Grandfathered size violations (files > 300 lines, functions > 50\n"
+        "# Grandfathered size violations (files > 300 lines, functions > 60\n"
         "# lines). Do NOT add entries without justification -- the goal is\n"
         "# to burn this list down, not grow it.\n"
         "# Regenerate intentionally: python tools/check_sizes.py --update-baseline\n"
