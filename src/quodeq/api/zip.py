@@ -82,7 +82,16 @@ class _ZipSizeLimitError(ValueError):
     type to key off of: the route wants to surface *this* error's own
     actionable message (it carries the MB limits and the remediation), not a
     generic one, without risking that treatment for an unrelated ValueError.
+
+    ``public_message`` is the hand-written text the route returns to the
+    client; the route reads that attribute rather than ``str(exc)`` so the
+    response never depends on exception formatting (see
+    ``_ImportError.public_message`` for the same pattern).
     """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.public_message = message
 
 
 @dataclass(frozen=True)
@@ -181,7 +190,7 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     try:
         tmp_path = _build_project_zip(project_path)
     except _ZipSizeLimitError as exc:
-        body, status = error_response(str(exc), HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+        body, status = error_response(exc.public_message, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
     except (OSError, zipfile.BadZipFile):
         body, status = error_response(

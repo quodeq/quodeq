@@ -49,6 +49,17 @@ class TestMaxZipSizeBytes:
         assert caplog.records == []
 
 
+class TestZipSizeLimitError:
+    def test_public_message_matches_str(self):
+        # _ZipSizeLimitError.__init__ passes the same text to super().__init__
+        # and to public_message, so the two stay in lockstep; the route must
+        # still read public_message (never str(exc)) per
+        # tests/api/test_no_exception_echo.py's zero baseline.
+        from quodeq.api.zip import _ZipSizeLimitError
+        exc = _ZipSizeLimitError("boom, see remediation")
+        assert exc.public_message == str(exc) == "boom, see remediation"
+
+
 class TestBuildProjectZip:
     def test_creates_zip(self, tmp_path):
         from quodeq.api.zip import _build_project_zip
