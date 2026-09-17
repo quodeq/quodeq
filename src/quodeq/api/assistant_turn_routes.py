@@ -106,7 +106,8 @@ def register_assistant_turn_routes(app: Flask) -> None:
         body = request.get_json(silent=True) or {}
         text = str(body.get("text", "")).strip()
         if not text:
-            return jsonify({"error": "text required"}), 400
+            body, status = error_response("text required", 400, "MISSING_PARAM")
+            return jsonify(body), status
         if local_provider_busy(session["provider"]):
             body, status = error_response("model busy with analysis", 409, "PROVIDER_BUSY")
             return jsonify(body), status
@@ -153,10 +154,12 @@ def register_assistant_turn_routes(app: Flask) -> None:
     @app.post("/api/assistant/sessions/<sid>/stop")
     def stop_assistant_turn(sid: str):
         if get_repository(app).get_session(sid) is None:
-            return jsonify({"error": "unknown session"}), 404
+            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
+            return jsonify(body), status
         token = _turn_state(app).cancel_token(sid)
         if token is None:
-            return jsonify({"error": "no turn running"}), 409
+            body, status = error_response("no turn running", 409, "NO_TURN_RUNNING")
+            return jsonify(body), status
         # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
         # client close) that must not serialize other sessions' turn claims.
         token.cancel()
@@ -168,7 +171,8 @@ def register_assistant_turn_routes(app: Flask) -> None:
     def assistant_events(sid: str):
         repo = get_repository(app)
         if repo.get_session(sid) is None:
-            return jsonify({"error": "unknown session"}), 404
+            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
+            return jsonify(body), status
         raw = request.headers.get("Last-Event-ID") or request.args.get("after", "0")
         try:
             after = int(raw)

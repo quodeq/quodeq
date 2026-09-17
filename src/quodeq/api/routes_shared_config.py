@@ -45,6 +45,7 @@ def register_shared_config_routes(app: Flask) -> None:
                 # Reserved for sync-level failures; always present so the UI
                 # can bind to it without existence checks.
                 "error": None,
+                "code": None,
                 "publish": publish,
                 # ok | empty | foreign | unsupported_version | missing | None
                 # (unconfigured) -- lets the UI distinguish "healthy but

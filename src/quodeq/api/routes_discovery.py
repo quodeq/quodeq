@@ -90,7 +90,11 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         instead of when a start fails.
         """
         reason = ai_cmd_path_error(client_id, request.args.get("path"))
-        return jsonify({"ok": reason is None, "error": reason})
+        return jsonify({
+            "ok": reason is None,
+            "error": reason,
+            "code": None if reason is None else "INVALID_INPUT",
+        })
 
     @app.get("/api/plugins")
     def plugins() -> Response:

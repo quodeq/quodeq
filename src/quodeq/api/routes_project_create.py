@@ -148,7 +148,11 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
     response. Returns None for a successful result (caller handles that)."""
     if result.status == "duplicate":
         return (
-            jsonify({"error": "Project already exists", "existingProjectId": result.existing_project_id}),
+            jsonify({
+                "error": "Project already exists",
+                "code": "PROJECT_EXISTS",
+                "existingProjectId": result.existing_project_id,
+            }),
             HTTPStatus.CONFLICT,
         )
     if result.status == "invalid_repo":

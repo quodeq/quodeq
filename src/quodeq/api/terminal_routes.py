@@ -189,7 +189,8 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         body = request.get_json(silent=True) or {}
         path = body.get("path")
         if not isinstance(path, str) or not path:
-            return jsonify({"error": "path is required"}), 400
+            body, status = error_response("path is required", 400, "MISSING_PARAM")
+            return jsonify(body), status
         # Confine the launch to the terminal's own working directories (shell
         # cwd, server cwd, home) and normalize the untrusted path to its real,
         # canonical form. Everything below uses this sanitized value, never the

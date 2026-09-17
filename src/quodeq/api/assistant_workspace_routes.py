@@ -81,7 +81,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None:
-            return jsonify({"error": "no worktree"}), 404
+            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
+            return jsonify(body), status
         outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
                                   release_turn=_release_turn)
         if outcome.kind == "turn_busy":
@@ -106,7 +107,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None:
-            return jsonify({"error": "no worktree"}), 404
+            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
+            return jsonify(body), status
         req_body = request.get_json(silent=True) or {}
         draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
         outcome = create_workspace_pr(
@@ -117,7 +119,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
                 409, "TURN_IN_PROGRESS")
             return jsonify(body), status
         if outcome.kind == "not_active":
-            return jsonify({"error": f"worktree already {outcome.detail}"}), 409
+            body, status = error_response(
+                f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+            return jsonify(body), status
         if outcome.kind == "failed":
             _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
             resp_body, status = error_response(
@@ -131,7 +135,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None:
-            return jsonify({"error": "no worktree"}), 404
+            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
+            return jsonify(body), status
         # Claim the turn slot like apply/pr: without this, discard raced an
         # in-flight apply (overwriting "applied" with "discarded" while the
         # changes sat in the user's real tree) and pulled the worktree out
@@ -144,9 +149,12 @@ def register_assistant_workspace_routes(app: Flask) -> None:
                 409, "TURN_IN_PROGRESS")
             return jsonify(body), status
         if outcome.kind == "gone":
-            return jsonify({"error": "no worktree"}), 404
+            body, status = error_response("no worktree", 404, "NO_ACTIVE_WORKTREE")
+            return jsonify(body), status
         if outcome.kind == "not_active":
-            return jsonify({"error": f"worktree already {outcome.detail}"}), 409
+            body, status = error_response(
+                f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+            return jsonify(body), status
         if outcome.kind == "failed":
             _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
             body, status = error_response(
