@@ -5,7 +5,7 @@ from __future__ import annotations
 import fcntl
 import logging
 import os
-import select
+import selectors
 import struct
 import subprocess
 import sys
@@ -71,10 +71,13 @@ class UnixPty:
         self._env = env
         self._proc: subprocess.Popen | None = None
         self._master_fd: int | None = None
+        self._selector: selectors.BaseSelector | None = None
 
     def spawn(self, *, cwd: str, cols: int, rows: int) -> None:
         master, slave = os.openpty()
         self._master_fd = master
+        self._selector = selectors.DefaultSelector()
+        self._watch(master)
         try:
             _set_winsize(master, cols, rows)
             env = dict(self._env if self._env is not None else os.environ)
@@ -88,7 +91,9 @@ class UnixPty:
                 preexec_fn=_make_controlling_tty,
             )
         except BaseException:
-            # Popen failed to fork/exec — don't leak the master with it.
+            # Popen failed to fork/exec — don't leak the selector or the master with it.
+            self._selector.close()
+            self._selector = None
             os.close(master)
             self._master_fd = None
             raise
@@ -97,16 +102,28 @@ class UnixPty:
             # kept its own dup, on failure it's just cleanup.
             os.close(slave)
 
+    def _watch(self, fd: int) -> None:
+        """Point the selector at `fd`, replacing any previous registration.
+        `read()` polls whichever fd `self._master_fd` currently names, and
+        that number can change from what spawn() registered (a caller
+        reassigning it, as a dup2'd fd), so re-register rather than assume
+        the original registration still matches."""
+        for key in list(self._selector.get_map().values()):
+            self._selector.unregister(key.fd)
+        self._selector.register(fd, selectors.EVENT_READ)
+
     def read(self, max_bytes: int = 65536) -> bytes:
-        if self._master_fd is None:
+        if self._master_fd is None or self._selector is None:
             return b""
         try:
-            ready, _, _ = select.select([self._master_fd], [], [], _READ_TIMEOUT_S)
+            if self._master_fd not in self._selector.get_map():
+                self._watch(self._master_fd)
+            ready = self._selector.select(_READ_TIMEOUT_S)
             if not ready:
                 return b""  # no data yet (PTY alive) -> caller loops, can observe stop
             return os.read(self._master_fd, max_bytes)
-        except OSError:
-            return b""  # master closed / child exited
+        except (OSError, ValueError):
+            return b""  # master closed / child exited, or selector closed under us
 
     def write(self, data: bytes) -> None:
         if self._master_fd is not None:
@@ -136,6 +153,15 @@ class UnixPty:
                 self._proc.wait(timeout=2)
             except subprocess.TimeoutExpired as exc:
                 _logger.debug("pty child did not exit within 2s after kill: %s", exc)
+        # getattr guards instances built via object.__new__ in tests (never
+        # ran __init__, so _selector was never assigned).
+        selector = getattr(self, "_selector", None)
+        if selector is not None:
+            try:
+                selector.close()
+            except OSError as exc:
+                _logger.debug("pty selector close failed: %s", exc)
+            self._selector = None
         if self._master_fd is not None:
             try:
                 os.close(self._master_fd)
