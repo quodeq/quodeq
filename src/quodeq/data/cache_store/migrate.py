@@ -161,7 +161,7 @@ def migrate_entries(
             index.record_many(batch)
         batch.clear()
 
-    for entry_path in list(root.rglob(_ENTRY_FILENAME)):
+    for entry_path in root.rglob(_ENTRY_FILENAME):  # lazy: reclaimed dirs are leaves, already listed
         entry = _read_entry(entry_path)
         if entry is None:
             skipped += 1

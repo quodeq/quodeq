@@ -72,7 +72,7 @@ def is_known_dimension(
 
 def _load_compiled_data(
     compiled_dir: str | Path | None, dimension: str | None,
-    evaluators_dir: Path | None = None,
+    evaluators_dir: Path | None = None, *, known: frozenset[str] | None = None,
 ) -> dict | None:
     """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
 
@@ -84,14 +84,18 @@ def _load_compiled_data(
     dimension outside that installed set is treated the same as one with no
     compiled data at all: this returns ``None`` rather than raising, matching
     every other failure mode in this function.
+
+    *known* lets a caller that already listed the standards dirs (the
+    ``_multi`` loaders, over several dimensions) skip re-listing them here.
     """
     if not dimension:
         return None
-    if (compiled_dir or evaluators_dir) and not is_known_dimension(
-        dimension, compiled_dir, evaluators_dir,
-    ):
-        _logger.warning("Rejected unknown dimension for compiled standards lookup: %r", dimension)
-        return None
+    if compiled_dir or evaluators_dir:
+        is_known = (dimension.lower() in known if known is not None
+                    else is_known_dimension(dimension, compiled_dir, evaluators_dir))
+        if not is_known:
+            _logger.warning("Rejected unknown dimension for compiled standards lookup: %r", dimension)
+            return None
     if compiled_dir:
         path = Path(compiled_dir) / f"{dimension}.json"
         if path.is_file():
@@ -112,10 +116,10 @@ def _load_compiled_data(
 
 def load_compiled_refs(
     compiled_dir: str | Path | None, dimension: str | None,
-    evaluators_dir: Path | None = None,
+    evaluators_dir: Path | None = None, *, known: frozenset[str] | None = None,
 ) -> dict[str, list[dict]]:
     """Load ``{req_id: [{label, url, ...}, ...]}`` from compiled standards on disk."""
-    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir, known=known)
     if not data:
         return {}
     return extract_refs(data)
@@ -126,9 +130,10 @@ def load_compiled_refs_multi(
     evaluators_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
     """Load refs for multiple dimensions, merging into a single lookup."""
+    known = known_dimension_ids(compiled_dir, evaluators_dir) if (compiled_dir or evaluators_dir) else None
     merged: dict[str, list[dict]] = {}
     for dim in dimensions:
-        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir))
+        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir, known=known))
     return merged
 
 
@@ -138,12 +143,14 @@ def load_compiled_requirements_multi(
     overrides: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Load requirements for multiple dimensions, merging into a single lookup."""
+    known = known_dimension_ids(compiled_dir, evaluators_dir) if (compiled_dir or evaluators_dir) else None
     merged: dict[str, dict] = {}
     for dim in dimensions:
         merged.update(load_compiled_requirements(
             compiled_dir, dim,
             evaluators_dir=evaluators_dir,
             overrides=overrides,
+            known=known,
         ))
     return merged
 
@@ -151,18 +158,19 @@ def load_compiled_requirements_multi(
 def load_compiled_requirements(
     compiled_dir: str | Path | None, dimension: str | None,
     evaluators_dir: Path | None = None,
-    overrides: dict[str, dict] | None = None,
+    overrides: dict[str, dict] | None = None, *, known: frozenset[str] | None = None,
 ) -> dict[str, dict]:
     """Load {req_id: {principle, text}} from compiled standards on disk.
 
     When *overrides* is supplied, requirement text placeholders are resolved
-    using the per-requirement override values.
+    using the per-requirement override values. *known* is as in
+    :func:`_load_compiled_data`.
 
     Backward-compat convenience wrapper that handles file I/O then delegates
     to the pure :func:`extract_requirements`.  Used by the MCP server to
     auto-fill principle name and requirement text from the requirement ID.
     """
-    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir, known=known)
     if not data:
         return {}
     return extract_requirements(data, overrides=overrides)

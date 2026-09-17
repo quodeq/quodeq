@@ -1,6 +1,7 @@
 """Tests for multi-dimension refs loading."""
 import json
 
+from quodeq.data.fs import standards_loader
 from quodeq.data.fs.standards_loader import (
     load_compiled_refs_multi,
     load_compiled_requirements_multi,
@@ -59,3 +60,35 @@ class TestLoadCompiledRequirementsMulti:
         reqs = load_compiled_requirements_multi(tmp_path, ["security", "nonexistent"])
         assert "S-CON-1" in reqs
         assert all(k.startswith("S-") for k in reqs)
+
+
+class TestMultiLoadersListStandardsDirsOnce:
+    """known_dimension_ids() globs compiled_dir/evaluators_dir from scratch;
+    the _multi loaders must compute it once per call, not once per dimension.
+    """
+
+    def test_refs_multi_lists_once(self, tmp_path, monkeypatch):
+        _write_compiled(tmp_path, "security", "S-CON-1", "Confidentiality")
+        _write_compiled(tmp_path, "reliability", "R-1", "Resilience")
+        calls = []
+        real = standards_loader.known_dimension_ids
+        monkeypatch.setattr(
+            standards_loader, "known_dimension_ids",
+            lambda *a, **k: (calls.append(a), real(*a, **k))[1],
+        )
+        refs = standards_loader.load_compiled_refs_multi(tmp_path, ["security", "reliability"])
+        assert len(calls) == 1
+        assert "S-CON-1" in refs and "R-1" in refs
+
+    def test_requirements_multi_lists_once(self, tmp_path, monkeypatch):
+        _write_compiled(tmp_path, "security", "S-CON-1", "Confidentiality")
+        _write_compiled(tmp_path, "reliability", "R-1", "Resilience")
+        calls = []
+        real = standards_loader.known_dimension_ids
+        monkeypatch.setattr(
+            standards_loader, "known_dimension_ids",
+            lambda *a, **k: (calls.append(a), real(*a, **k))[1],
+        )
+        reqs = standards_loader.load_compiled_requirements_multi(tmp_path, ["security", "reliability"])
+        assert len(calls) == 1
+        assert "S-CON-1" in reqs and "R-1" in reqs
