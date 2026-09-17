@@ -76,6 +76,10 @@ class PrecedentCorpus:
         try:
             start = time.monotonic()
             queries = self._embed(list(texts))
+            if len(queries) != len(texts):
+                raise RuntimeError(
+                    f"embedding returned {len(queries)} vectors for {len(texts)} texts"
+                )
             self._elapsed += time.monotonic() - start
             scores: list[float | None] = []
             for query in queries:

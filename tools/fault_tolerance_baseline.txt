@@ -74,8 +74,8 @@ src/quodeq/config/ai_provider.py:273:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
 src/quodeq/context/_project_shape_io.py:91:broad-except
-src/quodeq/context/precedent_corpus.py:294:broad-except
-src/quodeq/context/precedent_corpus.py:87:broad-except
+src/quodeq/context/precedent_corpus.py:298:broad-except
+src/quodeq/context/precedent_corpus.py:91:broad-except
 src/quodeq/context/precedent_store.py:114:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
 src/quodeq/context/trust_model.py:161:broad-except

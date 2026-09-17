@@ -62,6 +62,27 @@ def test_match_many_empty_texts_returns_empty_without_embedding(tmp_path: Path) 
     assert corpus.match_many([]) == []
 
 
+def test_match_many_mismatched_vector_count_trips_and_returns_all_none(tmp_path: Path) -> None:
+    """An embed callable that returns the wrong number of vectors must not
+    desync `match_many`'s zip of texts to vectors -- it trips the breaker
+    and degrades to None for the whole batch instead."""
+    calls: list[list[str]] = []
+
+    def embed(texts):
+        calls.append(list(texts))
+        return [[1.0, 0.0]]  # one vector for three texts
+
+    corpus = _corpus(tmp_path, vectors=[[1.0, 0.0]], embed=embed)
+    scores = corpus.match_many(["a", "b", "c"])
+
+    assert scores == [None, None, None]
+    assert (tmp_path / MARKER_NAME).exists()
+
+    # Tripped: a later call short-circuits without calling the embedder again.
+    assert corpus.match_many(["d"]) == [None]
+    assert len(calls) == 1
+
+
 def test_match_delegates_to_match_many_with_a_single_element_list(tmp_path: Path) -> None:
     calls: list[list[str]] = []
 
