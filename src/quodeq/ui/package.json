@@ -41,10 +41,15 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",
     "@vitejs/plugin-react": "6.1.1",
-    "eslint": "9.39.5",
+    "eslint": "10.10.0",
     "eslint-plugin-react": "7.37.5",
     "jsdom": "^30.0.1",
     "vite": "8.3.0",
     "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    }
   }
 }
