@@ -123,7 +123,7 @@ function renderHistoryEmptyState({
   return null;
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();

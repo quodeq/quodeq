@@ -93,98 +93,115 @@ def _sse_event_generator(repo, sid: str, after: int):
             yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
 
 
+def _build_turn_request(sid: str, session: dict, body: dict, text: str) -> TurnRequest:
+    """Resolve the provider endpoint and assemble the TurnRequest for *sid*."""
+    from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
+    provider_cfg = _assistant_routes._api_provider(session["provider"]) or {}
+    api_base, api_key = _assistant_routes._turn_endpoint(session["provider"], body, provider_cfg)
+    return TurnRequest(
+        session_id=sid, text=text, ui_state=body.get("uiState"),
+        api_base=api_base,
+        api_key=api_key, provider=session["provider"],
+        model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
+        web_enabled=bool(body.get("webEnabled", False)),
+        write_enabled=(bool(body.get("writeEnabled", False))
+                       and (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_LOCAL),
+    )
+
+
+def _post_assistant_message(app: Flask, sid: str):
+    from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
+    repo = get_repository(app)
+    session = repo.get_session(sid)
+    if session is None:
+        return jsonify({"error": "unknown session"}), 404
+    body = request.get_json(silent=True) or {}
+    text = str(body.get("text", "")).strip()
+    if not text:
+        return jsonify({"error": "text required"}), 400
+    if local_provider_busy(session["provider"]):
+        return jsonify({"error": "model busy with analysis"}), 409
+    if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
+        shared_error = _assistant_routes._shared_source_error()
+        if shared_error is not None:
+            return shared_error
+    state = _turn_state(app)
+    cancel = state.claim_turn(sid)
+    if cancel is None:
+        return jsonify({"error": "a turn is already running"}), 409
+    # Everything from here through Thread.start() must free the slot on
+    # failure — otherwise an exception (e.g. build_tool_context blowing
+    # up) leaves `sid` claimed forever and every future POST to this
+    # session 409s permanently.
+    try:
+        turn = _build_turn_request(sid, session, body, text)
+        tool_ctx = _assistant_routes.build_tool_context(app, session)
+        _start_turn_worker(state, turn, repo, tool_ctx, cancel)
+    except SharedSourceUnavailable:
+        # Race between the pre-check above and this build_tool_context
+        # call. Constant body, not str(exc): the pre-check already
+        # reported the specific reason; this is just the narrow window
+        # where the shared clone changed state in between.
+        state.release_turn(sid)
+        return jsonify({"error": "shared repository unavailable", "code": "SHARED_REPO_UNAVAILABLE"}), 409
+    except Exception:
+        state.release_turn(sid)
+        raise
+    return jsonify({"accepted": True}), 202
+
+
+def _stop_assistant_turn(app: Flask, sid: str):
+    if get_repository(app).get_session(sid) is None:
+        return jsonify({"error": "unknown session"}), 404
+    token = _turn_state(app).cancel_token(sid)
+    if token is None:
+        return jsonify({"error": "no turn running"}), 409
+    # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
+    # client close) that must not serialize other sessions' turn claims.
+    token.cancel()
+    # 202: the turn thread still has to unwind; the SSE `stopped` frame is
+    # the authoritative end-of-turn signal for the UI.
+    return jsonify({"stopping": True}), 202
+
+
+def _assistant_events(app: Flask, sid: str):
+    repo = get_repository(app)
+    if repo.get_session(sid) is None:
+        return jsonify({"error": "unknown session"}), 404
+    raw = request.headers.get("Last-Event-ID") or request.args.get("after", "0")
+    try:
+        after = int(raw)
+    except ValueError:
+        after = 0
+
+    state = _turn_state(app)
+    if not state.try_open_sse_stream():
+        return jsonify({"error": "too many open event streams"}), 429
+
+    release = _sse_release_guard(state)
+
+    def _generate():
+        try:
+            yield from _sse_event_generator(repo, sid, after)
+        finally:
+            release()
+
+    resp = Response(_generate(), mimetype="text/event-stream")
+    resp.call_on_close(release)
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
 def register_assistant_turn_routes(app: Flask) -> None:
     @app.post("/api/assistant/sessions/<sid>/messages")
     def post_assistant_message(sid: str):
-        from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
-        repo = get_repository(app)
-        session = repo.get_session(sid)
-        if session is None:
-            return jsonify({"error": "unknown session"}), 404
-        body = request.get_json(silent=True) or {}
-        text = str(body.get("text", "")).strip()
-        if not text:
-            return jsonify({"error": "text required"}), 400
-        if local_provider_busy(session["provider"]):
-            return jsonify({"error": "model busy with analysis"}), 409
-        if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
-            shared_error = _assistant_routes._shared_source_error()
-            if shared_error is not None:
-                return shared_error
-        state = _turn_state(app)
-        cancel = state.claim_turn(sid)
-        if cancel is None:
-            return jsonify({"error": "a turn is already running"}), 409
-        # Everything from here through Thread.start() must free the slot on
-        # failure — otherwise an exception (e.g. build_tool_context blowing
-        # up) leaves `sid` claimed forever and every future POST to this
-        # session 409s permanently.
-        try:
-            provider_cfg = _assistant_routes._api_provider(session["provider"]) or {}
-            api_base, api_key = _assistant_routes._turn_endpoint(
-                session["provider"], body, provider_cfg)
-            turn = TurnRequest(
-                session_id=sid, text=text, ui_state=body.get("uiState"),
-                api_base=api_base,
-                api_key=api_key, provider=session["provider"],
-                model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
-                web_enabled=bool(body.get("webEnabled", False)),
-                write_enabled=(bool(body.get("writeEnabled", False))
-                               and (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_LOCAL),
-            )
-            tool_ctx = _assistant_routes.build_tool_context(app, session)
-            _start_turn_worker(state, turn, repo, tool_ctx, cancel)
-        except SharedSourceUnavailable:
-            # Race between the pre-check above and this build_tool_context
-            # call. Constant body, not str(exc): the pre-check already
-            # reported the specific reason; this is just the narrow window
-            # where the shared clone changed state in between.
-            state.release_turn(sid)
-            return jsonify({"error": "shared repository unavailable", "code": "SHARED_REPO_UNAVAILABLE"}), 409
-        except Exception:
-            state.release_turn(sid)
-            raise
-        return jsonify({"accepted": True}), 202
+        return _post_assistant_message(app, sid)
 
     @app.post("/api/assistant/sessions/<sid>/stop")
     def stop_assistant_turn(sid: str):
-        if get_repository(app).get_session(sid) is None:
-            return jsonify({"error": "unknown session"}), 404
-        token = _turn_state(app).cancel_token(sid)
-        if token is None:
-            return jsonify({"error": "no turn running"}), 409
-        # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
-        # client close) that must not serialize other sessions' turn claims.
-        token.cancel()
-        # 202: the turn thread still has to unwind; the SSE `stopped` frame is
-        # the authoritative end-of-turn signal for the UI.
-        return jsonify({"stopping": True}), 202
+        return _stop_assistant_turn(app, sid)
 
     @app.get("/api/assistant/sessions/<sid>/events")
     def assistant_events(sid: str):
-        repo = get_repository(app)
-        if repo.get_session(sid) is None:
-            return jsonify({"error": "unknown session"}), 404
-        raw = request.headers.get("Last-Event-ID") or request.args.get("after", "0")
-        try:
-            after = int(raw)
-        except ValueError:
-            after = 0
-
-        state = _turn_state(app)
-        if not state.try_open_sse_stream():
-            return jsonify({"error": "too many open event streams"}), 429
-
-        release = _sse_release_guard(state)
-
-        def _generate():
-            try:
-                yield from _sse_event_generator(repo, sid, after)
-            finally:
-                release()
-
-        resp = Response(_generate(), mimetype="text/event-stream")
-        resp.call_on_close(release)
-        resp.headers["Cache-Control"] = "no-cache"
-        resp.headers["X-Accel-Buffering"] = "no"
-        return resp
+        return _assistant_events(app, sid)

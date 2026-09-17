@@ -210,6 +210,42 @@ def _resolve_selected_dims(
     return selected_dims, dismissed_counts, suppressed_counts
 
 
+def _resolve_params(params: ScoringParams | None) -> ScoringParams:
+    """Return *params*, or the saved grade-formula params when None."""
+    if params is not None:
+        return params
+    from quodeq.services import grade_formula  # noqa: PLC0415
+    return grade_formula.load_params()
+
+
+def _select_run(
+    reports_root: Path, project: str, runs: list[RunInfo], run: str, params: ScoringParams,
+) -> tuple[_SelectedRunContext, _DimensionAnnotations]:
+    """Resolve the requested run and rescore its dimensions.
+
+    Returns the selected-run context alongside the per-dimension annotations
+    (exit reason, dismissed and suppressed counts) measured on those same
+    dimensions.
+    """
+    selected_run, selected_index = _resolve_selected_run(runs, run)
+    selected_dims, dismissed_counts, suppressed_counts = _resolve_selected_dims(
+        reports_root, project, reports_root / project, selected_run, params,
+    )
+    ctx = _SelectedRunContext(
+        run=selected_run,
+        index=selected_index,
+        dimensions=selected_dims,
+        summary=summarize_dimensions(selected_dims, params),
+        runs=runs,
+    )
+    annotations = _DimensionAnnotations(
+        exit_reason=_read_run_exit_reason(reports_root, project, selected_run.run_id),
+        dismissed_counts=dismissed_counts,
+        suppressed_counts=suppressed_counts,
+    )
+    return ctx, annotations
+
+
 def build_dashboard(
     reports_dir: str,
     project: str,
@@ -226,9 +262,7 @@ def build_dashboard(
     here and threaded through the run-level summary, SQL grade override, and
     trend so the dashboard rollup honours the user's custom formula.
     """
-    if params is None:
-        from quodeq.services import grade_formula  # noqa: PLC0415
-        params = grade_formula.load_params()
+    params = _resolve_params(params)
     cc = cache_config or DashboardCacheConfig()
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
@@ -241,25 +275,9 @@ def build_dashboard(
             "trend": [],
         }
 
-    selected_run, selected_index = _resolve_selected_run(runs, run)
-    project_dir = reports_root / project
-    selected_dims, dismissed_counts, suppressed_counts = _resolve_selected_dims(
-        reports_root, project, project_dir, selected_run, params,
-    )
-    ctx = _SelectedRunContext(
-        run=selected_run,
-        index=selected_index,
-        dimensions=selected_dims,
-        summary=summarize_dimensions(selected_dims, params),
-        runs=runs,
-    )
+    ctx, annotations = _select_run(reports_root, project, runs, run, params)
     payload = _compute_dashboard_payload(reports_root, project, ctx, cc, params)
-    annotations = _DimensionAnnotations(
-        exit_reason=_read_run_exit_reason(reports_root, project, selected_run.run_id),
-        dismissed_counts=dismissed_counts,
-        suppressed_counts=suppressed_counts,
-    )
-    return _build_dashboard_result(project, runs, selected_run, payload, annotations)
+    return _build_dashboard_result(project, runs, ctx.run, payload, annotations)
 
 
 __all__ = [

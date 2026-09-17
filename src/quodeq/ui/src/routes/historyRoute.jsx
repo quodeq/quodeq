@@ -22,10 +22,6 @@ export function historyRoute(params, props) {
         selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
       }}
       availableRuns={runs}
-      dimensions={{
-        accumulatedDimensions: props.dashboardData.accumulated?.dimensions || [],
-        lastRun: { date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId },
-      }}
       callbacks={{
         onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
         onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),

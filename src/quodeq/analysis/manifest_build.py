@@ -2,77 +2,21 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections import Counter
-from fnmatch import fnmatchcase
 from pathlib import Path
 
-from quodeq.analysis._ignore import is_ignored, load_ignore_patterns
+from quodeq.analysis._ignore import load_ignore_patterns
 from quodeq.analysis.manifest_build_scope import _build_multi_scope_manifest
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
+from quodeq.analysis.manifest_targets import (
+    _MIN_FILES_PER_TARGET,
+    _build_targets_from_matches,
+    _iter_source_files,
+    target_name,
+)
 from quodeq.config.discipline_registry import DisciplineRegistry
 
 _logger = logging.getLogger(__name__)
-
-_MIN_FILES_PER_TARGET = 3
-_UNKNOWN_LANG = "unknown"
-
-
-def _matches_skip_pattern(rel_path: str, skip_patterns: list[str]) -> bool:
-    """Return True when *rel_path* (POSIX, relative to the scan root) matches a
-    skip_patterns glob from detection.json. fnmatch's ``*`` crosses directory
-    separators, so ``*.min.js`` excludes matching files at any depth — the same
-    semantics as .quodeqignore patterns.
-    """
-    return any(fnmatchcase(rel_path, pat) for pat in skip_patterns)
-
-
-def target_name(language: str, category: str | None) -> str:
-    """Build a filesystem-safe target name: '{language}_{category}' or bare '{language}'."""
-    if category:
-        return f"{language}_{category}"
-    return language
-
-
-def _build_targets_from_matches(
-    registry: DisciplineRegistry,
-    matches: list[str],
-    files_by_lang: dict[str, list[str]],
-    ext_counts_by_lang: dict[str, Counter],
-    scope_path: str = "",
-) -> list[AnalysisTarget]:
-    """Construct AnalysisTargets from a precomputed match list, consuming languages."""
-    targets: list[AnalysisTarget] = []
-    claimed_languages: set[str] = set()
-    for match_name in matches:
-        rule = registry.disciplines.get(match_name)
-        if rule is None or rule.language is None:
-            continue
-        lang = rule.language
-        if lang in claimed_languages:
-            continue
-        lang_files = files_by_lang.get(lang, [])
-        if len(lang_files) < _MIN_FILES_PER_TARGET:
-            continue
-        claimed_languages.add(lang)
-        topics = list(rule.suggested_topics) if rule.suggested_topics else []
-        ext_counts = ext_counts_by_lang.get(lang, Counter())
-        targets.append(AnalysisTarget(
-            name=target_name(lang, rule.category),
-            language=lang,
-            category=rule.category,
-            frameworks=topics,
-            source_files=sorted(lang_files),
-            total_files=len(lang_files),
-            language_stats=dict(ext_counts),
-            scope_path=scope_path,
-        ))
-
-    for lang in claimed_languages:
-        files_by_lang.pop(lang, None)
-        ext_counts_by_lang.pop(lang, None)
-
-    return targets
 
 
 def _build_targets_from_disciplines(
@@ -89,17 +33,19 @@ def _build_targets_from_disciplines(
     return _build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
 
 
-def _prune_ignored_dirs(
-    src: Path, dirpath: str, dirnames: list[str], ignore_patterns: list[str],
-) -> None:
-    """Drop directories matching an ignore pattern so they are never descended."""
-    dirnames[:] = [
-        d for d in dirnames
-        if not is_ignored(
-            os.path.relpath(os.path.join(dirpath, d), src).replace(os.sep, "/"),
-            ignore_patterns,
-        )
-    ]
+def _resolve_walk_root(src: Path, scope_path: str | None) -> Path:
+    """The directory to walk: *src*, or the contained *scope_path* under it.
+
+    Containment mirrors the CLI --scope guard (_cli_resolution): a scope that
+    resolves outside the repo (traversal segments or a symlink) must not widen
+    the walk; fall back to the full repo.
+    """
+    if not scope_path:
+        return src
+    candidate = src / scope_path
+    if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
+        return candidate
+    return src
 
 
 def _walk_and_group(
@@ -112,42 +58,13 @@ def _walk_and_group(
     expressed relative to *src* so callers see the same format regardless.
     *walk.ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
     """
-    walk_root = src
-    if scope_path:
-        candidate = src / scope_path
-        # Containment mirrors the CLI --scope guard (_cli_resolution): a
-        # scope that resolves outside the repo (traversal segments or a
-        # symlink) must not widen the walk; fall back to the full repo.
-        if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
-            walk_root = candidate
-
-    ext_map = walk.ext_map
-    skip_dirs = walk.skip_dirs
-    skip_patterns = walk.skip_patterns
-    ignore_patterns = walk.ignore_patterns or []
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
     ext_counts_by_lang: dict[str, Counter] = {}
-    all_extensions = set(ext_map.keys())
-    for dirpath, dirnames, filenames in os.walk(walk_root):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
-        if ignore_patterns:
-            _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
-        for fname in filenames:
-            suffix = os.path.splitext(fname)[1]
-            if suffix in all_extensions:
-                # Normalize to POSIX separators so manifest paths are consistent
-                # across platforms — downstream consumers and scope-prefix
-                # matching all assume "/".
-                rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
-                if _matches_skip_pattern(rel, skip_patterns):
-                    continue
-                if ignore_patterns and is_ignored(rel, ignore_patterns):
-                    continue
-                lang = ext_map.get(suffix, _UNKNOWN_LANG)
-                files_by_lang.setdefault(lang, []).append(rel)
-                ext_counts[suffix] += 1
-                ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
+    for rel, suffix, lang in _iter_source_files(src, _resolve_walk_root(src, scope_path), walk):
+        files_by_lang.setdefault(lang, []).append(rel)
+        ext_counts[suffix] += 1
+        ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
     return files_by_lang, ext_counts, ext_counts_by_lang
 
 

@@ -93,7 +93,7 @@ evidence -> tally violation types -> tally compliance types
          -> raw = base + (10 - base) * lift
          -> violation_ceiling(vt_counts)            [stage 3]
          -> severity_grade_floor(vt_counts)         [stage 4]
-         -> final = max(floor, min(ceiling, raw))
+         -> final = clamp_principle_score(raw, vt_counts) = min(ceiling, max(floor, raw))
          -> grade = score_to_grade_label(final)
 ```
 

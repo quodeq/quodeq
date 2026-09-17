@@ -190,25 +190,27 @@ def _apply_macos_fullscreen_chrome(
     _set_macos_fullscreen_class(window, is_full)
 
 
-def main() -> None:
-    _set_app_icon()
+def _parse_argv() -> tuple[str, Path, int]:
+    """``(url, sock_path, api_pid)`` from argv; the api pid slot is optional (0 when absent)."""
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = (int(sys.argv[_ARGV_API_PID])
                if len(sys.argv) > _ARGV_API_PID and sys.argv[_ARGV_API_PID] else 0)
-    webview_token = read_token_from_stdin()
+    return url, sock_path, api_pid
 
+
+def _wire_window(url: str, sock_path: Path, api_pid: int) -> tuple[webview.Window, InstanceController]:
+    """Create the window, bind its JS API and hook the lifecycle events."""
     instance = InstanceController(sock_path)
     api = _WindowApi()
-
     window = _create_window(url, api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
-
-    _on_reload = _make_on_reload(window)
-
     window.events.loaded += _make_on_loaded(window)
     window.events.closing += _make_on_closing(api, window)
+    return window, instance
 
+
+def _own_reload_socket(instance: InstanceController, window: webview.Window) -> None:
     # Own the reload socket here, not in the parent: this process holds the
     # window, so it is the only one that can bring it forward on a relaunch.
     # try_acquire is what binds the socket — without it start_listening has
@@ -219,10 +221,13 @@ def main() -> None:
             instance.sock_path,
         )
     else:
-        instance.start_listening(on_reload=_on_reload)
+        instance.start_listening(on_reload=_make_on_reload(window))
 
+
+def _run_webview(window: webview.Window, webview_token: str, instance: InstanceController,
+                 api_pid: int) -> None:
+    """Block in the webview loop; release the socket and the API process on exit."""
     storage_dir = str(_quodeq_dir() / "webview")
-
     try:
         webview.start(private_mode=False, storage_path=storage_dir,
                       user_agent=_webview_user_agent(webview_token),
@@ -231,6 +236,15 @@ def main() -> None:
         instance.shutdown()
         if api_pid:
             _kill_api(api_pid)
+
+
+def main() -> None:
+    _set_app_icon()
+    url, sock_path, api_pid = _parse_argv()
+    webview_token = read_token_from_stdin()
+    window, instance = _wire_window(url, sock_path, api_pid)
+    _own_reload_socket(instance, window)
+    _run_webview(window, webview_token, instance, api_pid)
 
 
 if __name__ == "__main__":

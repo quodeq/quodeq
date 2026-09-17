@@ -111,6 +111,7 @@ def test_cli_hook_logs_and_swallows_when_dup2_fails(monkeypatch) -> None:
 
 def test_cleanup_run_artifacts_logs_when_pid_unlink_fails(monkeypatch, tmp_path) -> None:
     import quodeq._cli_lifecycle as lifecycle
+    from quodeq._cli_evaluation import _lifecycle_hooks
     from quodeq.cli import ResolvedInputs
 
     pid_file = tmp_path / ".pid"
@@ -122,13 +123,14 @@ def test_cleanup_run_artifacts_logs_when_pid_unlink_fails(monkeypatch, tmp_path)
 
     monkeypatch.setattr(Path, "unlink", _raise)
     with patch.object(lifecycle._logger, "debug") as debug:
-        lifecycle._cleanup_run_artifacts(pid_file, args, inputs)
+        lifecycle._cleanup_run_artifacts(pid_file, args, inputs, _lifecycle_hooks())
     assert debug.called
     assert "pid file cleanup failed" in debug.call_args.args[0]
 
 
 def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_path) -> None:
     import quodeq._cli_lifecycle as lifecycle
+    from quodeq._cli_evaluation import _run_pipeline_with_cleanup
     from quodeq.cli import ResolvedInputs
 
     class _Sentinel(Exception):
@@ -151,6 +153,6 @@ def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_pa
 
     with patch.object(lifecycle._logger, "debug") as debug:
         with pytest.raises(_Sentinel):
-            lifecycle._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+            _run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
     assert debug.called
     assert "pid file write failed" in debug.call_args.args[0]

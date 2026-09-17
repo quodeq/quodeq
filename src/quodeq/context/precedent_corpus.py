@@ -22,6 +22,7 @@ from quodeq.context.precedent_store import (
     Embedder,
     VectorStoreFns,
     _load_or_backfill_vectors,
+    _resolve_vector_store,
 )
 
 _logger = logging.getLogger(__name__)
@@ -201,11 +202,8 @@ def _resolve_available_embedder(
 
 
 def _resolve_store() -> VectorStoreFns:
-    """Deferred facade lookup so a test's ``monkeypatch.setattr(
-    "quodeq.context.precedent._resolve_vector_store", ...)`` takes effect.
-    """
-    from quodeq.context import precedent as _facade  # noqa: PLC0415 -- deferred facade lookup
-    return _facade._resolve_vector_store()
+    """Production store resolver; tests patch ``precedent_corpus._resolve_vector_store``."""
+    return _resolve_vector_store()
 
 
 @dataclass(frozen=True)

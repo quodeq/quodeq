@@ -28,7 +28,7 @@ def test_backfill_scans_the_corpus_once_not_per_chunk(monkeypatch) -> None:
     """
     from quodeq.context.precedent_store import Embedder, _backfill_missing
 
-    monkeypatch.setattr("quodeq.context.precedent._BACKFILL_CHUNK", 1)
+    monkeypatch.setattr("quodeq.context.precedent_store._BACKFILL_CHUNK", 1)
     iterations = [0]
 
     class CountingTexts(dict):
@@ -208,7 +208,7 @@ def test_loader_uses_injected_vector_store_without_sqlite(tmp_path: Path, monkey
     """
     monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
     monkeypatch.setattr(
-        "quodeq.context.precedent._resolve_vector_store",
+        "quodeq.context.precedent_corpus._resolve_vector_store",
         lambda: pytest.fail("production sqlite store resolved despite injected store"),
     )
     project_dir = tmp_path / "project"
@@ -291,7 +291,7 @@ def test_loader_embed_failure_partial_corpus(tmp_path: Path, monkeypatch) -> Non
     dismissed finding's vector, instead of abandoning the whole tier.
     """
     monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
-    monkeypatch.setattr("quodeq.context.precedent._BACKFILL_CHUNK", 1)
+    monkeypatch.setattr("quodeq.context.precedent_store._BACKFILL_CHUNK", 1)
 
     project_dir = tmp_path / "project"
     project_dir.mkdir()

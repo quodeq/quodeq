@@ -24,44 +24,50 @@ function readStoredActive() {
  *  - on tab activation: refetch lazily so the status bar's cwd stays fresh
  *    without polling.
  */
+// The network round-trip: list, creating one session first when the list is
+// empty and the caller asked for that. Throws when the server is unreachable.
+async function fetchSessionList({ listTerminalSessions, createTerminalSession, createIfEmpty }) {
+  let r = await listTerminalSessions();
+  if (!(r.sessions || []).length && createIfEmpty) {
+    await createTerminalSession().catch((err) => {
+      console.warn('terminal: create-if-empty session failed, list may still be empty', err);
+    });
+    r = await listTerminalSessions();
+  }
+  return { list: r.sessions || [], max: r.max };
+}
+
+// Keep the current tab when it still exists; on a fresh mount (drawer
+// reopened) restore the last selected tab if that session still exists, else
+// fall back to the newest one.
+function pickActiveId(list, prev) {
+  if (list.some((s) => s.id === prev)) return prev;
+  const stored = readStoredActive();
+  if (list.some((s) => s.id === stored)) return stored;
+  return list[list.length - 1]?.id ?? null;
+}
+
 function makeReconcile({ listTerminalSessions, createTerminalSession, setSessions, setMax, setActiveId, reconcilingRef }) {
+  // Only the network round-trip is caught: a genuinely unreachable server
+  // keeps the current tabs and lets sockets surface it. The state updates
+  // run outside the try so a bug in the reconcile logic itself doesn't get
+  // silently swallowed as "server unreachable".
+  async function runReconcile(createIfEmpty) {
+    let fetched;
+    try {
+      fetched = await fetchSessionList({ listTerminalSessions, createTerminalSession, createIfEmpty });
+    } catch (err) {
+      console.debug('terminal: reconcile list unreachable, keeping current tabs', err);
+      return;
+    }
+    setSessions(fetched.list);
+    if (fetched.max) setMax(fetched.max);
+    setActiveId((prev) => pickActiveId(fetched.list, prev));
+  }
   return function reconcile({ createIfEmpty = true } = {}) {
     if (!reconcilingRef.current) {
       reconcilingRef.current = (async () => {
-        try {
-          // Only the network round-trip (list, and the create-if-empty
-          // re-list) is caught here, matching the comment below: a genuinely
-          // unreachable server keeps the current tabs and lets sockets
-          // surface it. setSessions/setMax/setActiveId run outside this try
-          // so a bug in the reconcile logic itself doesn't get silently
-          // swallowed as "server unreachable".
-          let list;
-          let listMax;
-          try {
-            let r = await listTerminalSessions();
-            if (!(r.sessions || []).length && createIfEmpty) {
-              await createTerminalSession().catch((err) => {
-                console.warn('terminal: create-if-empty session failed, list may still be empty', err);
-              });
-              r = await listTerminalSessions();
-            }
-            list = r.sessions || [];
-            listMax = r.max;
-          } catch (err) {
-            console.debug('terminal: reconcile list unreachable, keeping current tabs', err);
-            return;
-          }
-          setSessions(list);
-          if (listMax) setMax(listMax);
-          setActiveId((prev) => {
-            if (list.some((s) => s.id === prev)) return prev;
-            // Fresh mount (drawer reopened): restore the last selected tab if
-            // that session still exists, else fall back to the newest one.
-            const stored = readStoredActive();
-            if (list.some((s) => s.id === stored)) return stored;
-            return list[list.length - 1]?.id ?? null;
-          });
-        } finally { reconcilingRef.current = null; }
+        try { await runReconcile(createIfEmpty); } finally { reconcilingRef.current = null; }
       })();
     }
     return reconcilingRef.current;

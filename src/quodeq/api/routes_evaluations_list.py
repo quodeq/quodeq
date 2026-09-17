@@ -82,6 +82,45 @@ def _pre_build_options_error(payload: dict) -> tuple[Response, int] | None:
     return None
 
 
+def _build_options_or_error(payload: dict) -> tuple[Any, tuple[Response, int] | None]:
+    """Pre-check then build the evaluation options. Returns ``(options, error)``."""
+    pre_error = _pre_build_options_error(payload)
+    if pre_error is not None:
+        return None, pre_error
+    try:
+        return _build_evaluation_options(payload), None
+    except ValueError:
+        # Constant message, not str(exc): both known raise sources are
+        # pre-checked above. Keep it unbound so nothing here can ever echo
+        # exception text.
+        body, status = error_response(
+            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
+        return None, (jsonify(body), status)
+
+
+def _repo_target_error(repo: Any) -> tuple[Response, int] | None:
+    """Reject a repo that is neither a valid URL nor an allowlisted local path.
+
+    Same allowlist as /api/scan and POST /api/projects: starting an
+    evaluation registers + scans the directory and persists its file
+    tree, so an unvalidated local path would leak arbitrary readable
+    directories through project endpoints.
+    """
+    try:
+        is_url = is_repo_url(str(repo))
+    except ValueError:
+        body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
+        return jsonify(body), status
+    if is_url:
+        return None
+    err = scan_target_error(str(repo), _reports_dir())
+    if err is None:
+        return None
+    body, status = err
+    return jsonify(body), status
+
+
 def _validated_start_request(
     payload: dict,
 ) -> tuple[_StartRequest | None, Response | tuple[Response, int] | None]:
@@ -94,33 +133,12 @@ def _validated_start_request(
         return None, error
     repo = payload.get("repo")
     _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
-    pre_error = _pre_build_options_error(payload)
-    if pre_error is not None:
-        return None, pre_error
-    try:
-        options = _build_evaluation_options(payload)
-    except ValueError:
-        # Constant message, not str(exc): both known raise sources are
-        # pre-checked above. Keep it unbound so nothing here can ever echo
-        # exception text.
-        body, status = error_response(
-            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-        )
-        return None, (jsonify(body), status)
-    # Same allowlist as /api/scan and POST /api/projects: starting an
-    # evaluation registers + scans the directory and persists its file
-    # tree, so an unvalidated local path would leak arbitrary readable
-    # directories through project endpoints.
-    try:
-        is_url = is_repo_url(str(repo))
-    except ValueError:
-        body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
-        return None, (jsonify(body), status)
-    if not is_url:
-        err = scan_target_error(str(repo), _reports_dir())
-        if err is not None:
-            body, status = err
-            return None, (jsonify(body), status)
+    options, options_error = _build_options_or_error(payload)
+    if options_error is not None:
+        return None, options_error
+    target_error = _repo_target_error(repo)
+    if target_error is not None:
+        return None, target_error
     return _StartRequest(repo=repo, options=options), None
 
 

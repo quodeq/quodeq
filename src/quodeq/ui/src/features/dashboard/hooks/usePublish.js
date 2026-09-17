@@ -157,26 +157,32 @@ function usePublishRefGuards() {
   return { publishingRef, mountedRef, publishingLocalRef };
 }
 
+// The publish job itself: the in-flight guards, the optimistic cache patch,
+// the running-job poll and the trigger that starts one.
+function usePublishJob({ queryClient, sharedListProjects, getSharedStatus, publishProject }) {
+  const { publishingRef, mountedRef, publishingLocalRef } = usePublishRefGuards();
+  const applyOptimisticPublish = useApplyOptimisticPublish({ queryClient, publishingLocalRef });
+  const polling = usePublishPolling({ queryClient, sharedListProjects, getSharedStatus, applyOptimisticPublish, mountedRef });
+  const publish = usePublishTrigger({
+    publishProject, startPolling: polling.startPolling, publishingRef, publishingLocalRef,
+    setPublishState: polling.setPublishState, setPublishError: polling.setPublishError,
+    setPublishErrorProject: polling.setPublishErrorProject, setPublishingProjectBoth: polling.setPublishingProjectBoth,
+  });
+  return { ...polling, publish, mountedRef, applyOptimisticPublish };
+}
+
 export function usePublish({ enabled = true } = {}) {
   const { getSharedStatus, sharedListProjects, publishProject } = useApi();
   const queryClient = useQueryClient();
 
   const { statusQuery, configured, publishedAtByProject } = usePublishQueries({ enabled, getSharedStatus, sharedListProjects });
-  const { publishingRef, mountedRef, publishingLocalRef } = usePublishRefGuards();
-
-  const applyOptimisticPublish = useApplyOptimisticPublish({ queryClient, publishingLocalRef });
 
   const {
-    publishState, publishingProject, publishError, publishErrorProject,
+    publishState, publishingProject, publishError, publishErrorProject, publish,
     setPublishState, setPublishError, setPublishErrorProject,
     publishingProjectRef, setPublishingProjectBoth,
-    stopPolling, startPolling, refreshListAfterCompletion,
-  } = usePublishPolling({ queryClient, sharedListProjects, getSharedStatus, applyOptimisticPublish, mountedRef });
-
-  const publish = usePublishTrigger({
-    publishProject, startPolling, publishingRef, publishingLocalRef,
-    setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth,
-  });
+    stopPolling, startPolling, refreshListAfterCompletion, mountedRef, applyOptimisticPublish,
+  } = usePublishJob({ queryClient, sharedListProjects, getSharedStatus, publishProject });
 
   usePublishLifecycleEffects({ mountedRef, stopPolling, enabled });
 

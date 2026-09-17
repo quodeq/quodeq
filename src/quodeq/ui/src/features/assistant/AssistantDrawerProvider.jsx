@@ -84,36 +84,42 @@ function buildDrawerContextValue({
   };
 }
 
-export function AssistantDrawerProvider({ children }) {
+// Drawer chrome: which panels are open, the drag height, the maximize toggle
+// and the global hotkeys, gated on the two feature switches.
+function useDrawerChrome() {
   const { enabled: assistantEnabled } = useAssistantProvider();
   const { enabled: terminalEnabled } = useTerminalSettings();
-
   // Each panel has an independent open/selected state — see useDrawerPanels.js.
-  const {
-    openPanels, activeTab, isOpen, openTab, selectTab, toggleTopbar,
-    open, close, toggle, closeActiveTab, closePanel,
-  } = useDrawerPanels({ assistantEnabled, terminalEnabled });
-
-  const { maximized, setMaximized, toggleMaximized } = useDrawerMaximized(openPanels.length);
-
+  const panels = useDrawerPanels({ assistantEnabled, terminalEnabled });
+  const { maximized, setMaximized, toggleMaximized } = useDrawerMaximized(panels.openPanels.length);
   const { height, setHeight } = useDrawerHeight();
+  useDrawerHotkeys({ assistantEnabled, terminalEnabled, toggleTopbar: panels.toggleTopbar });
+  return { ...panels, terminalEnabled, maximized, setMaximized, toggleMaximized, height, setHeight };
+}
 
-  useDrawerHotkeys({ assistantEnabled, terminalEnabled, toggleTopbar });
-
+// The conversation: the catalog (fetched on first open), the session, and the
+// message list with the local user turns interleaved.
+function useAssistantConversation(isOpen) {
   const catalog = useAssistantCatalog(isOpen);
-
   const session = useAssistantSession();
+  const { userTurns, stream } = session;
+  const messages = useMemo(() => mergeMessages(userTurns, stream.messages), [userTurns, stream.messages]);
+  return { ...session, catalog, messages };
+}
+
+export function AssistantDrawerProvider({ children }) {
   const {
-    sessionId, sessionMeta, userTurns, localError, stream, turnActive,
+    isOpen, open, close, toggle, closeActiveTab, closePanel,
+    openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
+    height, setHeight, maximized, toggleMaximized, setMaximized,
+  } = useDrawerChrome();
+
+  const {
+    catalog, messages, sessionId, sessionMeta, localError, stream, turnActive,
     webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
     repoInfo, workspace, readOnly, refreshWorkspace,
     addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
-  } = session;
-
-  const messages = useMemo(
-    () => mergeMessages(userTurns, stream.messages),
-    [userTurns, stream.messages],
-  );
+  } = useAssistantConversation(isOpen);
 
   const value = useMemo(() => buildDrawerContextValue({
     isOpen, open, close, toggle, closeActiveTab, closePanel,

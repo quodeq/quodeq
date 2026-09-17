@@ -22,6 +22,7 @@ import os
 import re
 import shutil
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.data.cache_store.backend import CacheStats
@@ -46,13 +47,15 @@ _SHARD_PREFIX_LEN = 2  # two-char <sha[:2]>/<sha[2:]> sharding, see the module d
 _MIN_KEY_LEN = _SHARD_PREFIX_LEN + 1  # at least one char left after the shard prefix
 
 
-def default_cache_root() -> Path:
+def default_cache_root(env: Mapping[str, str] | None = None) -> Path:
     """Resolve the result cache root, honouring ``QUODEQ_CACHE_ROOT``.
 
     Returns ``<base>/results`` so this cache is a sibling of the online
-    repo cache under the same shared parent directory.
+    repo cache under the same shared parent directory. *env* overrides
+    ``os.environ`` when provided.
     """
-    raw = os.environ.get(_ROOT_ENV, "").strip()
+    environ = env if env is not None else os.environ
+    raw = environ.get(_ROOT_ENV, "").strip()
     base = Path(raw) if raw else Path.home() / ".quodeq" / "cache"
     return base / _RESULTS_SUBDIR
 

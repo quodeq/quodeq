@@ -8,13 +8,17 @@ target group per scope. The single-scope path (root-only or a pinned
 """
 from __future__ import annotations
 
-import os
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._ignore import is_ignored
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
+from quodeq.analysis.manifest_targets import (
+    _MIN_FILES_PER_TARGET,
+    _build_targets_from_matches,
+    _iter_source_files,
+    target_name,
+)
 from quodeq.config.discipline_registry import DisciplineRegistry
 
 
@@ -69,40 +73,19 @@ def _walk_and_partition_by_scope(
     shouldn't appear in any target. Callers that must not lose unclassified source
     pass ``"."`` among *scope_paths* as a catch-all (see _build_multi_scope_manifest).
     """
-    from quodeq.analysis.manifest_build import (
-        _UNKNOWN_LANG,
-        _matches_skip_pattern,
-        _prune_ignored_dirs,
-    )
-
-    ext_map = walk.ext_map
-    ignore_patterns = walk.ignore_patterns or []
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
     ext_counts_overall: Counter[str] = Counter()
     ext_counts_by_scope_lang: dict[str, dict[str, Counter]] = {s: {} for s in scope_paths}
     resolve_scope = _scope_resolver(scope_paths)
-    for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in walk.skip_dirs and not d.startswith(".")]
-        if ignore_patterns:
-            _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
-        for fname in filenames:
-            suffix = os.path.splitext(fname)[1]
-            if suffix not in ext_map:
-                continue
-            # Match the POSIX-style scope_paths from detect_matches_recursive
-            # so prefix matching works on Windows.
-            rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
-            if _matches_skip_pattern(rel, walk.skip_patterns):
-                continue
-            if ignore_patterns and is_ignored(rel, ignore_patterns):
-                continue
-            owner = resolve_scope(rel)
-            if owner is None:
-                continue
-            lang = ext_map.get(suffix, _UNKNOWN_LANG)
-            files_by_scope_lang[owner].setdefault(lang, []).append(rel)
-            ext_counts_overall[suffix] += 1
-            ext_counts_by_scope_lang[owner].setdefault(lang, Counter())[suffix] += 1
+    # Paths are POSIX-style like the scope_paths from detect_matches_recursive,
+    # so prefix matching works on Windows.
+    for rel, suffix, lang in _iter_source_files(src, src, walk):
+        owner = resolve_scope(rel)
+        if owner is None:
+            continue
+        files_by_scope_lang[owner].setdefault(lang, []).append(rel)
+        ext_counts_overall[suffix] += 1
+        ext_counts_by_scope_lang[owner].setdefault(lang, Counter())[suffix] += 1
     return files_by_scope_lang, ext_counts_overall, ext_counts_by_scope_lang
 
 
@@ -136,12 +119,6 @@ def _build_scope_targets(
     registry: DisciplineRegistry,
 ) -> list[AnalysisTarget]:
     """Build one AnalysisTarget group per scope from the partitioned files."""
-    from quodeq.analysis.manifest_build import (
-        _MIN_FILES_PER_TARGET,
-        _build_targets_from_matches,
-        target_name,
-    )
-
     targets: list[AnalysisTarget] = []
     for scope in scope_paths:
         lang_files = files_by_scope[scope]

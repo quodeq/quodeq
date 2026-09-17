@@ -85,6 +85,35 @@ def delete_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None
     return swept
 
 
+def _add_deleted_entries(project_dir: Path, findings: list[dict]) -> None:
+    """Append a deleted entry per unique, fully-keyed finding and write the store.
+
+    Caller holds the deleted-store lock.
+    """
+    existing = load_deleted(project_dir)
+    existing_keys = {_key(e) for e in existing}
+    for finding in findings:
+        k = _key(finding)
+        if not k[1] or not k[2] or k in existing_keys:
+            continue
+        existing.append(_entry_from_finding(finding))
+        existing_keys.add(k)
+    write_deleted_entries(project_dir, existing)
+
+
+def _dismissed_row_entry(row: dict) -> DismissedEntry:
+    """The actions-log entry a dismissed row (as listed by ``load_dismissed``) names."""
+    return DismissedEntry(
+        row.get("req", ""), row.get("file", ""), int(row.get("line", 0)),
+        row.get("fingerprint") or None,
+    )
+
+
+def _emit_undismiss(log: ActionLog, entries: list[DismissedEntry]) -> None:
+    """Undismiss *entries* via the action log in one write."""
+    log.emit_many([undismiss_event(entry) for entry in entries])
+
+
 def delete_all_dismissed(project_dir: Path, *, writer: ActionLog | None = None) -> int:
     """Convert every currently-dismissed entry into a permanent suppression.
 
@@ -97,24 +126,9 @@ def delete_all_dismissed(project_dir: Path, *, writer: ActionLog | None = None) 
         dismissed_entries = load_dismissed(project_dir)
         if not dismissed_entries:
             return 0
-        existing = load_deleted(project_dir)
-        existing_keys = {_key(e) for e in existing}
-        for entry in dismissed_entries:
-            k = _key(entry)
-            if not k[1] or not k[2] or k in existing_keys:
-                continue
-            existing.append(_entry_from_finding(entry))
-            existing_keys.add(k)
-        write_deleted_entries(project_dir, existing)
-        # Undismiss all via the action log, in one write.
+        _add_deleted_entries(project_dir, dismissed_entries)
         log = writer or ActionLogWriter(project_dir)
-        log.emit_many([
-            undismiss_event(DismissedEntry(
-                entry.get("req", ""), entry.get("file", ""), int(entry.get("line", 0)),
-                entry.get("fingerprint") or None,
-            ))
-            for entry in dismissed_entries
-        ])
+        _emit_undismiss(log, [_dismissed_row_entry(row) for row in dismissed_entries])
         return len(dismissed_entries)
 
 
@@ -151,7 +165,6 @@ def _sweep_dismissed_matching(
     An entry several runs hold is therefore released once. Returns the
     number of entries released.
     """
-    dimension, principle, file = key
     if not project_dir.is_dir():
         return 0
 
@@ -159,24 +172,38 @@ def _sweep_dismissed_matching(
     log = writer or ActionLogWriter(project_dir)
     released: set[DismissedEntry] = set()
     for run_dir in run_dirs_newest_first(project_dir):
-        batch: list[DismissedEntry] = []
-        for req, f, line, practice_id, snippet in find_dismissed_matching(
-            run_dir, dimension=dimension, practice_id=principle, file=file,
-        ):
-            keys = finding_dismiss_keys(
-                req=req, principle=practice_id, file=f, line=line, snippet=snippet)
-            targets = [entry for k in keys for entry in index.get(k, ())]
-            if not targets:
-                # SQL says dismissed but the log has no entry (stale
-                # projection): release the row by its own identity.
-                targets = [DismissedEntry(req, f, line, snippet_fingerprint(req, snippet))]
-            for entry in targets:
-                if entry not in released:
-                    released.add(entry)
-                    batch.append(entry)
+        batch = _collect_run_releases(run_dir, key, index, released)
         if batch:
-            log.emit_many([undismiss_event(entry) for entry in batch])
+            _emit_undismiss(log, batch)
     return len(released)
+
+
+def _collect_run_releases(
+    run_dir: Path, key: tuple, index: dict[DismissKey, list[DismissedEntry]],
+    released: set[DismissedEntry],
+) -> list[DismissedEntry]:
+    """The entries one run's matching dismissed rows release, skipping any in *released*.
+
+    Every newly released entry is added to *released* so a later run does not
+    name it again.
+    """
+    dimension, principle, file = key
+    batch: list[DismissedEntry] = []
+    for req, f, line, practice_id, snippet in find_dismissed_matching(
+        run_dir, dimension=dimension, practice_id=principle, file=file,
+    ):
+        keys = finding_dismiss_keys(
+            req=req, principle=practice_id, file=f, line=line, snippet=snippet)
+        targets = [entry for k in keys for entry in index.get(k, ())]
+        if not targets:
+            # SQL says dismissed but the log has no entry (stale
+            # projection): release the row by its own identity.
+            targets = [DismissedEntry(req, f, line, snippet_fingerprint(req, snippet))]
+        for entry in targets:
+            if entry not in released:
+                released.add(entry)
+                batch.append(entry)
+    return batch
 
 
 def is_finding_deleted(

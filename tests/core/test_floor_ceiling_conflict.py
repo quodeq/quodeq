@@ -96,14 +96,13 @@ def test_principle_grade_does_not_read_good_under_a_pile_of_minor_findings() -> 
 
 
 def test_the_evidence_path_agrees_with_the_projector() -> None:
-    """The clamp exists in THREE places and real runs use this one.
+    """Pin the clamp on the path real runs take.
 
-    `rescore_dimensions` only falls back to services/rescore's copy when a run
-    has no evidence on disk; every modern run goes through
-    services/evidence_rescore -> core/scoring/engine -> _principle. Fixing the
-    other two copies left the displayed grade completely unchanged, and the
-    projector-level test above still passed -- which is exactly how a
-    three-copy invariant rots. Pin the path users actually hit.
+    `rescore_dimensions` only falls back to the legacy no-evidence path when a
+    run has no evidence on disk; every modern run goes through
+    services/evidence_rescore -> core/scoring/engine -> _principle. The
+    projector-level test above does not exercise that path, so a regression
+    there would leave the displayed grade unchanged while it still passed.
     """
     from quodeq.core.scoring._principle import _score_numerical, _build_context
 
