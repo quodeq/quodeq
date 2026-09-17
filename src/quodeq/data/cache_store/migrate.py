@@ -33,9 +33,8 @@ import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from quodeq.core.standards.overrides import (
-    hash_non_default_params,
-    non_default_from_effective,
+from quodeq.data.cache_store._migrate_params import (
+    derive_params_hash,  # noqa: F401 -- re-export for existing importers
 )
 from quodeq.data.cache_store.entry import ENTRY_FORMAT_VERSION, CacheEntry
 from quodeq.data.cache_store.index import ContentIndex
@@ -66,35 +65,6 @@ class MigrationStats:
     skipped: int = 0
 
 
-def derive_params_hash(
-    dimension: str, effective_params: dict, standards_dir: Path | None,
-    _cache: dict[tuple[str, str], dict] | None = None,
-) -> str:
-    """Rebuild a schema-3 entry's ``params_hash`` from its stored effective params.
-
-    The writer hashed the non-default subset against the compiled defaults
-    (``analysis.fingerprint._compute_dimension_params``). Diff the stored
-    effective map against the current compiled defaults and hash the same way.
-    "" when there is nothing to compare (no params, no standards dir, no or
-    malformed compiled file), which is exactly what such entries were keyed
-    under.
-    """
-    if not effective_params or standards_dir is None:
-        return ""
-    if _cache is None:
-        _cache = {}
-    k = (str(standards_dir), dimension)
-    if k not in _cache:
-        c = Path(standards_dir) / "compiled" / f"{dimension}.json"
-        try:
-            _cache[k] = json.loads(c.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001 - same rationale as the writer: never abort
-            return ""
-    try:
-        return hash_non_default_params(non_default_from_effective(_cache[k], effective_params))
-    except (AttributeError, TypeError):
-        return ""
-
 def _index_row(entry: CacheEntry) -> tuple[str, str, str, str, str, str]:
     return (
         entry.key, entry.file_content_hash, entry.dimension, entry.params_hash,
@@ -120,8 +90,12 @@ def _migrate_v3(
     entry: CacheEntry, entry_dir: Path, backend: LocalFileBackend,
     standards_dir: Path | None, batch: list[tuple],
     _cache: dict[tuple[str, str], dict] | None = None,
-) -> tuple[int, int]:
-    """Re-key one schema-3 entry. Returns (migrated, deduplicated) as 0/1."""
+) -> tuple[int, int, str | None]:
+    """Re-key one schema-3 entry.
+
+    Returns (migrated, deduplicated) as 0/1, plus the key this call wrote so
+    the walk can skip the new entry if it reaches it (see migrate_entries).
+    """
     params_hash = entry.params_hash or derive_params_hash(
         entry.dimension, (entry.provenance or {}).get("effective_params") or {}, standards_dir,
         _cache=_cache,
@@ -132,17 +106,17 @@ def _migrate_v3(
     ))
     if backend.has(new_key):
         _remove_dir(entry_dir)
-        return 0, 1
+        return 0, 1, None
     new_entry = replace(
         entry, key=new_key, schema_version=SCHEMA_VERSION, params_hash=params_hash,
         cache_format_version=ENTRY_FORMAT_VERSION,
     )
     backend.put(new_key, new_entry, index=False)
     if not backend.has(new_key):
-        return 0, 0  # write failed (logged by the backend); keep the old entry
+        return 0, 0, None  # write failed (logged by the backend); keep the old entry
     batch.append(_index_row(new_entry))
     _remove_dir(entry_dir)
-    return 1, 0
+    return 1, 0, new_key
 
 def migrate_entries(
     root: Path, *, standards_dir: Path | None, backend: LocalFileBackend | None = None,
@@ -155,24 +129,35 @@ def migrate_entries(
     migrated = deduplicated = indexed = removed = skipped = 0
     batch: list[tuple] = []
     cache: dict[tuple[str, str], dict] = {}
+    written_keys: set[str] = set()
 
     def _flush() -> None:
         if batch and index is not None:
             index.record_many(batch)
         batch.clear()
 
-    for entry_path in root.rglob(_ENTRY_FILENAME):  # lazy: reclaimed dirs are leaves, already listed
+    # The walk stays lazy and tolerates its own writes both ways: a reclaimed
+    # directory is a leaf rglob already listed, and a re-keyed entry written
+    # into a shard the walk has not reached yet is skipped below via
+    # written_keys (it was already counted and indexed as `migrated`).
+    for entry_path in root.rglob(_ENTRY_FILENAME):
         entry = _read_entry(entry_path)
         if entry is None:
             skipped += 1
             continue
         if entry.schema_version == SCHEMA_VERSION:
+            if entry.key in written_keys:
+                continue
             batch.append(_index_row(entry))
             indexed += 1
         elif entry.schema_version == SCHEMA_VERSION - 1:
-            m, d = _migrate_v3(entry, entry_path.parent, backend, standards_dir, batch, _cache=cache)
+            m, d, new_key = _migrate_v3(
+                entry, entry_path.parent, backend, standards_dir, batch, _cache=cache,
+            )
             migrated += m
             deduplicated += d
+            if new_key is not None:
+                written_keys.add(new_key)
         elif _remove_dir(entry_path.parent):
             removed += 1
         if len(batch) >= _BATCH:
