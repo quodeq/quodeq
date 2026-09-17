@@ -27,7 +27,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         """(repo, row, error_response); runs one-shot worktree/db hygiene first."""
         repo = get_repository(app)
         if repo.get_session(sid) is None:
-            return None, None, (jsonify({"error": "unknown session"}), 404)
+            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
+            return None, None, (jsonify(body), status)
         run_assistant_hygiene(app)
         return repo, repo.get_worktree(sid), None
 
@@ -61,7 +62,8 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         if err:
             return err
         if row is None or row["status"] != "active":
-            return jsonify({"error": "no active worktree"}), 404
+            body, status = error_response("no active worktree", 404, "NO_ACTIVE_WORKTREE")
+            return jsonify(body), status
         try:
             text = diff_text(Path(row["path"]))
             truncated = len(text) > _MAX_DIFF_CHARS
@@ -88,7 +90,9 @@ def register_assistant_workspace_routes(app: Flask) -> None:
                 409, "TURN_IN_PROGRESS")
             return jsonify(body), status
         if outcome.kind == "not_active":
-            return jsonify({"error": f"worktree already {outcome.detail}"}), 409
+            body, status = error_response(
+                f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+            return jsonify(body), status
         if outcome.kind == "failed":
             _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
             body, status = error_response(
@@ -108,8 +112,10 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         outcome = create_workspace_pr(
             repo, sid, draft, claim_turn=_try_claim_turn, release_turn=_release_turn)
         if outcome.kind == "turn_busy":
-            return jsonify({"error": "a turn or workspace action is in progress;"
-                            " wait for it to finish"}), 409
+            body, status = error_response(
+                "a turn or workspace action is in progress; wait for it to finish",
+                409, "TURN_IN_PROGRESS")
+            return jsonify(body), status
         if outcome.kind == "not_active":
             return jsonify({"error": f"worktree already {outcome.detail}"}), 409
         if outcome.kind == "failed":
@@ -133,8 +139,10 @@ def register_assistant_workspace_routes(app: Flask) -> None:
         outcome = discard_workspace(repo, sid, claim_turn=_try_claim_turn,
                                     release_turn=_release_turn)
         if outcome.kind == "turn_busy":
-            return jsonify({"error": "a turn or workspace action is in progress;"
-                            " wait for it to finish"}), 409
+            body, status = error_response(
+                "a turn or workspace action is in progress; wait for it to finish",
+                409, "TURN_IN_PROGRESS")
+            return jsonify(body), status
         if outcome.kind == "gone":
             return jsonify({"error": "no worktree"}), 404
         if outcome.kind == "not_active":

@@ -23,6 +23,7 @@ from quodeq.api._assistant_helpers import (
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, _turn_state
+from quodeq.api.helpers import error_response
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.services.score_cache import score_cache_path_override
@@ -100,13 +101,15 @@ def register_assistant_turn_routes(app: Flask) -> None:
         repo = get_repository(app)
         session = repo.get_session(sid)
         if session is None:
-            return jsonify({"error": "unknown session"}), 404
+            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
+            return jsonify(body), status
         body = request.get_json(silent=True) or {}
         text = str(body.get("text", "")).strip()
         if not text:
             return jsonify({"error": "text required"}), 400
         if local_provider_busy(session["provider"]):
-            return jsonify({"error": "model busy with analysis"}), 409
+            body, status = error_response("model busy with analysis", 409, "PROVIDER_BUSY")
+            return jsonify(body), status
         if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
             shared_error = _assistant_routes._shared_source_error()
             if shared_error is not None:
@@ -114,7 +117,8 @@ def register_assistant_turn_routes(app: Flask) -> None:
         state = _turn_state(app)
         cancel = state.claim_turn(sid)
         if cancel is None:
-            return jsonify({"error": "a turn is already running"}), 409
+            body, status = error_response("a turn is already running", 409, "TURN_IN_PROGRESS")
+            return jsonify(body), status
         # Everything from here through Thread.start() must free the slot on
         # failure — otherwise an exception (e.g. build_tool_context blowing
         # up) leaves `sid` claimed forever and every future POST to this
@@ -173,7 +177,9 @@ def register_assistant_turn_routes(app: Flask) -> None:
 
         state = _turn_state(app)
         if not state.try_open_sse_stream():
-            return jsonify({"error": "too many open event streams"}), 429
+            body, status = error_response(
+                "too many open event streams", 429, "TOO_MANY_STREAMS")
+            return jsonify(body), status
 
         release = _sse_release_guard(state)
 
