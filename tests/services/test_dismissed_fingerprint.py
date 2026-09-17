@@ -97,6 +97,19 @@ def test_client_snippet_is_the_fallback_when_no_run_holds_the_finding(tmp_path: 
     assert entry.fingerprint == FP
 
 
+def test_a_blank_snippet_in_the_newest_run_does_not_end_the_search(tmp_path: Path) -> None:
+    """A whitespace-only stored snippet has no fingerprint; the older run that
+    holds the real code still names the finding."""
+    project_dir = tmp_path / "proj"
+    _seed_run(project_dir, "r1", line=10, started_at="2026-01-01T00:00:00+00:00")
+    _seed_run(project_dir, "r2", line=10, snippet="   ", started_at="2026-02-01T00:00:00+00:00")
+
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+
+    (entry,) = dismissed_keys(project_dir).entries
+    assert entry.fingerprint == FP
+
+
 def test_snippet_less_finding_keeps_its_line_identity(tmp_path: Path) -> None:
     project_dir = tmp_path / "proj"
     _seed_run(project_dir, "r1", line=10, snippet=None)

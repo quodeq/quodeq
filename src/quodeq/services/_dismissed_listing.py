@@ -110,18 +110,30 @@ def load_dismissed(
     offset: int = 0,
     limit: int | None = None,
 ) -> list[dict]:
-    """List dismissed findings as dicts (shape matches /api/findings/dismissed response)."""
+    """List dismissed findings as dicts (shape matches /api/findings/dismissed response).
+
+    Only the entries on the requested page are looked up in the runs; the
+    items are one-to-one with the entries, so paging the entries first gives
+    the same page as paging the full listing would.
+    """
     if not project_dir.is_dir():
         return []
     state = dismissed_keys(project_dir)
     if not state:
         return []
+    page = _page(state.entries, offset, limit)
+    if not page:
+        return []
+    details = _collect_dismissed_details(project_dir, {e.key for e in page})
+    return _dismissed_items(page, details)
 
-    details = _collect_dismissed_details(project_dir, {e.key for e in state.entries})
-    items = _dismissed_items(state.entries, details)
 
+def _page(
+    entries: tuple[DismissedEntry, ...], offset: int, limit: int | None,
+) -> tuple[DismissedEntry, ...]:
+    """The slice of *entries* a page names; all of them when no page is asked for."""
     if offset <= 0 and limit is None:
-        return items
+        return entries
     start = max(0, offset)
     end = start + limit if limit is not None and limit >= 0 else None
-    return items[start:end]
+    return entries[start:end]
