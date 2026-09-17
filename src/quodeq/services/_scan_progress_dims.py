@@ -9,6 +9,7 @@ loop body (no logic change, same values, same order).
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.evidence._req_mapping import build_principle_resolver
@@ -31,12 +32,31 @@ _AGENT_ACTIVE_WINDOW_S = 30
 # Bounded process-wide memo of IncrementalTally objects, one per (evidence
 # file, suppression state) so a live-progress poll resumes where the last
 # poll stopped instead of re-parsing the file from byte 0 (findings
-# 5531/5532). The dashboard polls from several threads, hence the lock.
+# 5531/5532). The dashboard polls from several threads, hence the lock --
+# which covers the memo only, never a tally's own file read.
 _LIVE_TALLIES: LRUDict = LRUDict(256)
 _LIVE_TALLIES_LOCK = threading.Lock()
 
 
-def _suppression_stamp(dismissed, deleted) -> tuple:
+@dataclass
+class _GuardedTally:
+    """One memoized ``IncrementalTally`` plus the lock that serialises it.
+
+    A tally is mutable state (offset, dedup set, counters) shared by every
+    poll of the same run and suppression state, so concurrent ``advance()``
+    calls on ONE tally have to be serialised. Its own lock, rather than the
+    memo's: two polls of different runs then read their files in parallel.
+    """
+
+    tally: IncrementalTally
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def advance(self) -> FindingTally:
+        with self.lock:
+            return self.tally.advance()
+
+
+def _suppression_stamp(dismissed, deleted) -> tuple | None:
     """A hashable stamp of the current suppression state, for the memo key.
 
     Returns the ``(dismissed, frozenset(deleted))`` tuple itself rather than
@@ -47,26 +67,64 @@ def _suppression_stamp(dismissed, deleted) -> tuple:
     A poll with an unchanged dismissed/deleted state resumes the existing
     tally; a changed one starts a fresh tally under a new key -- no worse
     than today's from-scratch cost. ``dismissed`` may be a plain (unhashable)
-    ``set`` (see ``SuppressionMatcher``); such a caller falls back to object
-    identity, so a poll handed fresh objects each time simply never resumes.
+    ``set`` (see ``SuppressionMatcher``); such a state has no usable key at
+    all and yields None, which keeps it out of the memo entirely. Keying it
+    on ``id()`` instead would let a later, different object reuse a freed
+    id and resume a tally built with the previous predicate.
     """
     stamp = (dismissed, frozenset(deleted))
     try:
         hash(stamp)
     except TypeError:
-        return (id(dismissed), id(deleted))
+        return None
     return stamp
 
 
-def live_tally(path: Path, *, suppressed, resolver, memo_key: tuple) -> FindingTally:
-    """The file's tally, resumed from the last poll when *memo_key* is unchanged."""
+def _standards_stamp(directory: Path | None) -> tuple[str, int]:
+    """``(path, dir mtime_ns)`` for one standards directory, 0 when missing.
+
+    Part of the memo key because the principle resolver is built from these
+    directories: a standard imported or removed mid-run changes the
+    directory's mtime, which starts a fresh tally with the fresh resolver
+    instead of resuming one that cannot see the new standard. One stat.
+    """
+    try:
+        return (str(directory), directory.stat().st_mtime_ns if directory is not None else 0)
+    except OSError:
+        return (str(directory), 0)
+
+
+def live_tally(path: Path, *, suppressed, resolver, memo_key: tuple | None) -> FindingTally:
+    """The file's tally, resumed from the last poll when *memo_key* is unchanged.
+
+    ``memo_key=None`` means this state cannot be keyed (see
+    ``_suppression_stamp``): the file is tallied from scratch and nothing is
+    stored.
+    """
+    if memo_key is None:
+        return IncrementalTally(path, suppressed=suppressed, resolver=resolver).advance()
     key = (str(path), memo_key)
     with _LIVE_TALLIES_LOCK:
-        tally = _LIVE_TALLIES.get(key)
-        if tally is None:
-            tally = IncrementalTally(path, suppressed=suppressed, resolver=resolver)
-            _LIVE_TALLIES.put(key, tally)
-        return tally.advance()
+        guarded = _LIVE_TALLIES.get(key)
+        if guarded is None:
+            guarded = _GuardedTally(
+                IncrementalTally(path, suppressed=suppressed, resolver=resolver))
+            _LIVE_TALLIES.put(key, guarded)
+    return guarded.advance()
+
+
+def forget_live_tallies(run_dir: Path) -> None:
+    """Drop every memoized tally for evidence files under *run_dir*.
+
+    Called once a run is terminal: nothing more will be appended to its
+    evidence, so its dedup sets are dead weight until 256 other keys evict
+    them.
+    """
+    prefix = f"{run_dir}/"
+    with _LIVE_TALLIES_LOCK:
+        for key in _LIVE_TALLIES.keys():
+            if key[0].startswith(prefix):
+                _LIVE_TALLIES.discard(key)
 
 
 def _active_agents(evidence_dir: Path, dim_id: str) -> int:
@@ -177,7 +235,10 @@ def _dim_evidence_tally(
     evaluators_dir: Path | None, compiled_dir: Path | None,
 ):
     matcher = build_matcher(dim_id, dismissed, deleted)
-    memo_key = (dim_id, _suppression_stamp(dismissed, deleted), str(evaluators_dir), str(compiled_dir))
+    stamp = _suppression_stamp(dismissed, deleted)
+    memo_key = None if stamp is None else (
+        dim_id, stamp, _standards_stamp(evaluators_dir), _standards_stamp(compiled_dir),
+    )
     return live_tally(
         dimension_evidence_file(run_dir, dim_id),
         suppressed=matcher.is_suppressed if matcher.active else None,

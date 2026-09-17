@@ -58,6 +58,18 @@ class LRUDict(Generic[K, V]):
         while len(self._data) > self.capacity:
             self._data.popitem(last=False)
 
+    def keys(self) -> list[K]:
+        """A snapshot of the keys, coldest first. Recency is untouched.
+
+        A list, not a view: callers iterate it to decide what to discard, and
+        a view would raise once the first one is dropped.
+        """
+        return list(self._data)
+
+    def discard(self, key: K) -> None:
+        """Drop *key* if present, like ``set.discard``."""
+        self._data.pop(key, None)
+
     def __contains__(self, key: object) -> bool:
         return key in self._data
 

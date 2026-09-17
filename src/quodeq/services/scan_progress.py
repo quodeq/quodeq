@@ -24,7 +24,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
-from quodeq.services._scan_progress_dims import _build_dim_progress, _consolidated_dim_progress
+from quodeq.services._scan_progress_dims import (
+    _build_dim_progress,
+    _consolidated_dim_progress,
+    forget_live_tallies,
+)
 from quodeq.services._scan_progress_elapsed import _parse_started_at
 from quodeq.services._scan_progress_types import (  # noqa: F401 - _DimProgress/_ScanProgress re-export
     _DimProgress,
@@ -145,6 +149,11 @@ def _build_per_dim_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress
         _build_dim_progress(dim_id, ctx, dismissed, deleted)
         for dim_id in ctx.dim_ids
     ]
+    if ctx.is_terminal:
+        # This poll was the last one that could learn anything from the run's
+        # evidence files, so its resumable tallies go now rather than sitting
+        # in the memo until 256 other keys evict them.
+        forget_live_tallies(ctx.run_dir)
 
     return _ScanProgress(
         job_id=job_id,
