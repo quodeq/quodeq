@@ -8,8 +8,6 @@ import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
 
-const OMLX_MODEL_HINT = tRich('settings.omlxModelHint');
-
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
   const hasModels = models.length > 0;
@@ -52,7 +50,7 @@ function OmlxModelRow({ state, models, update }) {
       <div className="settings-row-label">
         <span className="settings-label-row">
           <span className="settings-label">{t('settings.modelLabel')}</span>
-          <HelpHint label={t('settings.modelHelpAria')}>{OMLX_MODEL_HINT}</HelpHint>
+          <HelpHint label={t('settings.modelHelpAria')}>{tRich('settings.omlxModelHint')}</HelpHint>
         </span>
         <span className="settings-description">{t('settings.thisModelEveryStep')}</span>
       </div>

@@ -16,11 +16,23 @@ from quodeq.shared.serialization import to_camel_dict
 logger = logging.getLogger(__name__)
 
 
+def _json_object_body() -> dict | None:
+    """Return the request's JSON body when it is an object, else None."""
+    payload = request.get_json(force=True)
+    return payload if isinstance(payload, dict) else None
+
+
+def _body_not_object() -> tuple[Response, int]:
+    return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+
+
 def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, int]:
     library = get_library_client(app)
     if library is None:
         return error_response("Standards library not configured", HTTPStatus.BAD_REQUEST, "library_not_configured")
-    payload = request.get_json(force=True)
+    payload = _json_object_body()
+    if payload is None:
+        return _body_not_object()
     file_path = payload.get("file")
     if not file_path:
         return error_response("file is required", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
@@ -45,7 +57,9 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
 
 def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     svc = get_service(app)
-    payload = request.get_json(force=True)
+    payload = _json_object_body()
+    if payload is None:
+        return _body_not_object()
     data = payload.get("data")
     if not data or not isinstance(data, dict):
         return error_response("'data' field is required and must be an object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)

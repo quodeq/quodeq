@@ -95,101 +95,115 @@ def _resolve_cancel_intent(snapshot: Any, intent: str | None) -> tuple[dict, int
     return None
 
 
+def _cancel_running(provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+    discard = request.args.get("discard", "").lower() == "true"
+    _logger.info(
+        "cancel_evaluation: job_id=%s, discard=%s, remote_addr=%s",
+        job_id, discard, request.remote_addr,
+    )
+    if discard:
+        # Claim the one-time scoring slot BEFORE the job flips to
+        # cancelled: otherwise the UI's next status poll sees the
+        # cancelled state and spawns _score_completed_evidence,
+        # resurrecting a run the user just discarded.
+        _claim_scoring(job_id)
+    ok = provider.cancel_evaluation(
+        job_id, reports_dir=_reports_dir(), discard_partial=discard,
+    )
+    if not ok:
+        if discard:
+            _release_scoring(job_id)
+        body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
+        return jsonify(body), status
+    return jsonify({"ok": True, "action": "cancelled", "discarded": discard})
+
+
+def _delete_finished(provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+    _logger.info("delete_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
+    ok = provider.delete_evaluation(job_id, reports_dir=_reports_dir())
+    if not ok:
+        body, status = error_response("Job could not be deleted", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    return jsonify({"ok": True, "action": "deleted"})
+
+
+def _get_evaluation(app: Flask, provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+    job = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+    if not job:
+        body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    _score_completed_dims_in_bg(app, job_id, job)
+    payload = to_camel_dict(job)
+    payload["dimStates"] = _read_dim_states(job)
+    return jsonify(payload)
+
+
+def _get_evaluation_progress(app: Flask, provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+    """Return live progress for a scan (works for internal and external runs)."""
+    run_dir = provider.get_log_run_dir(job_id) if hasattr(provider, "get_log_run_dir") else None
+    if run_dir is None:
+        body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    # Total time limit for the whole run. The snapshot carries the
+    # budget for both internal jobs (JobManager) and index-served runs
+    # (read from status.json). 0 = unlimited -> no budget shown.
+    time_limit_s: int | None = None
+    snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+    if snapshot is not None:
+        raw = getattr(snapshot, "time_limit_s", None)
+        if isinstance(raw, int) and raw > 0:
+            time_limit_s = raw
+    progress = build_scan_progress(
+        job_id, run_dir, time_limit_s=time_limit_s,
+        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+    )
+    if progress is None:
+        body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    return jsonify(to_camel_dict(progress))
+
+
+def _cancel_or_delete_evaluation(provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+    """DELETE on a running job cancels it. DELETE on a finished job removes it from history.
+
+    Query: ``?intent=cancel|delete`` declares what the client is asking
+    for. Without it, the action is inferred from the momentary status
+    (legacy behavior), which is race-prone: a run finishing while the
+    cancel dialog is open, or a double-clicked cancel, used to fall
+    through to the permanent-purge branch and erase a run the user
+    chose to keep. With intent=cancel this endpoint can never purge;
+    with intent=delete it never silently cancels.
+
+    ``?discard=true`` on a cancel also wipes the run entirely so the
+    next run treats the work as never-happened.
+    """
+    snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+    if snapshot is None:
+        body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    intent = request.args.get("intent", "").lower() or None
+    conflict = _resolve_cancel_intent(snapshot, intent)
+    if conflict is not None:
+        body, status = conflict
+        return jsonify(body), status
+    if snapshot.status == "running":
+        return _cancel_running(provider, job_id)
+    return _delete_finished(provider, job_id)
+
+
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
 
     app.extensions["reset_scored_jobs"] = reset_scored_jobs
 
-    def _cancel_running(job_id: str) -> Response | tuple[Response, int]:
-        discard = request.args.get("discard", "").lower() == "true"
-        _logger.info(
-            "cancel_evaluation: job_id=%s, discard=%s, remote_addr=%s",
-            job_id, discard, request.remote_addr,
-        )
-        if discard:
-            # Claim the one-time scoring slot BEFORE the job flips to
-            # cancelled: otherwise the UI's next status poll sees the
-            # cancelled state and spawns _score_completed_evidence,
-            # resurrecting a run the user just discarded.
-            _claim_scoring(job_id)
-        ok = provider.cancel_evaluation(
-            job_id, reports_dir=_reports_dir(), discard_partial=discard,
-        )
-        if not ok:
-            if discard:
-                _release_scoring(job_id)
-            body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
-            return jsonify(body), status
-        return jsonify({"ok": True, "action": "cancelled", "discarded": discard})
-
-    def _delete_finished(job_id: str) -> Response | tuple[Response, int]:
-        _logger.info("delete_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
-        ok = provider.delete_evaluation(job_id, reports_dir=_reports_dir())
-        if not ok:
-            body, status = error_response("Job could not be deleted", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        return jsonify({"ok": True, "action": "deleted"})
-
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        job = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
-        if not job:
-            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        _score_completed_dims_in_bg(app, job_id, job)
-        payload = to_camel_dict(job)
-        payload["dimStates"] = _read_dim_states(job)
-        return jsonify(payload)
+        return _get_evaluation(app, provider, job_id)
 
     @app.get("/api/evaluations/<job_id>/progress")
     def get_evaluation_progress(job_id: str) -> Response | tuple[Response, int]:
-        """Return live progress for a scan (works for internal and external runs)."""
-        run_dir = provider.get_log_run_dir(job_id) if hasattr(provider, "get_log_run_dir") else None
-        if run_dir is None:
-            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        # Total time limit for the whole run. The snapshot carries the
-        # budget for both internal jobs (JobManager) and index-served runs
-        # (read from status.json). 0 = unlimited -> no budget shown.
-        time_limit_s: int | None = None
-        snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
-        if snapshot is not None:
-            raw = getattr(snapshot, "time_limit_s", None)
-            if isinstance(raw, int) and raw > 0:
-                time_limit_s = raw
-        progress = build_scan_progress(
-            job_id, run_dir, time_limit_s=time_limit_s,
-            compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
-        )
-        if progress is None:
-            body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        return jsonify(to_camel_dict(progress))
+        return _get_evaluation_progress(app, provider, job_id)
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        """DELETE on a running job cancels it. DELETE on a finished job removes it from history.
-
-        Query: ``?intent=cancel|delete`` declares what the client is asking
-        for. Without it, the action is inferred from the momentary status
-        (legacy behavior), which is race-prone: a run finishing while the
-        cancel dialog is open, or a double-clicked cancel, used to fall
-        through to the permanent-purge branch and erase a run the user
-        chose to keep. With intent=cancel this endpoint can never purge;
-        with intent=delete it never silently cancels.
-
-        ``?discard=true`` on a cancel also wipes the run entirely so the
-        next run treats the work as never-happened.
-        """
-        snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
-        if snapshot is None:
-            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        intent = request.args.get("intent", "").lower() or None
-        conflict = _resolve_cancel_intent(snapshot, intent)
-        if conflict is not None:
-            body, status = conflict
-            return jsonify(body), status
-        if snapshot.status == "running":
-            return _cancel_running(job_id)
-        return _delete_finished(job_id)
+        return _cancel_or_delete_evaluation(provider, job_id)

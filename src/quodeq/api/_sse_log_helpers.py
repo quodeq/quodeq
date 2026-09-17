@@ -3,11 +3,23 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Callable
 
-_POLL_MS = int(os.environ.get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
-_MAX_WAIT_S = int(os.environ.get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
+
+def _poll_ms(env: Mapping[str, str] | None = None) -> int:
+    """Poll interval between tail ticks; ``QUODEQ_LOG_STREAM_POLL_MS`` overrides."""
+    environ = env if env is not None else os.environ
+    return int(environ.get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
+
+
+def _max_wait_s(env: Mapping[str, str] | None = None) -> int:
+    """Seconds to wait for a missing log file; ``QUODEQ_LOG_STREAM_MAX_WAIT_S`` overrides."""
+    environ = env if env is not None else os.environ
+    return int(environ.get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
+
+
 # Cadence for SSE comments emitted while waiting on a not-yet-existing log
 # file. Keeps the EventSource from being torn down by intermediaries even
 # when the runner spends a long time in the "preparing" phase.
@@ -72,7 +84,7 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
         a 404 during that window shows up in the dashboard as a dead
         "stream disconnected" pane until the user reopens it.
       - is_done absent (legacy callers, e.g. ollama log stream): preserve
-        the original "give up after _MAX_WAIT_S" behaviour so a missing file
+        the original "give up after _max_wait_s()" behaviour so a missing file
         doesn't hang the connection forever.
 
     Yields keepalive/error SSE frames as needed. Returns
@@ -80,19 +92,20 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
     ``"timeout"`` (error frame already yielded, caller should return), or
     ``"done"`` (is_done() returned True; caller emits the done frame).
     """
+    poll_ms = _poll_ms()
     if is_done is None:
-        if waited_ms >= _MAX_WAIT_S * 1000:
+        if waited_ms >= _max_wait_s() * 1000:
             yield sse_line("log file unavailable", event="error")
             return waited_ms, keepalive_ms, "timeout"
-        waited_ms += _POLL_MS
+        waited_ms += poll_ms
     else:
         if is_done():
             return waited_ms, keepalive_ms, "done"
-        keepalive_ms += _POLL_MS
+        keepalive_ms += poll_ms
         if keepalive_ms >= _KEEPALIVE_MS:
             yield ":keepalive\n\n"
             keepalive_ms = 0
-    time.sleep(_POLL_MS / 1000)
+    time.sleep(poll_ms / 1000)
     return waited_ms, keepalive_ms, "continue"
 
 
@@ -140,7 +153,7 @@ def sse_tail_generator(
              the EventSource alive in the meantime.
     is_done: optional callable returning True when streaming should terminate
              with an ``event: done`` frame. None means tail forever (subject
-             to the legacy 10s ``_MAX_WAIT_S`` timeout when the file never
+             to the legacy 10s ``_max_wait_s()`` timeout when the file never
              materializes).
     line_filter: optional callable(str) -> bool. Lines for which it returns
              False are not emitted (kept in the file but hidden from clients).
@@ -172,4 +185,4 @@ def sse_tail_generator(
         if is_done is not None and is_done():
             yield _emit_done_frame(terminal_state, offset)
             return
-        time.sleep(_POLL_MS / 1000)
+        time.sleep(_poll_ms() / 1000)

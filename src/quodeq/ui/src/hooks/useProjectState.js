@@ -119,6 +119,50 @@ function useProjectStateFields(storage) {
   };
 }
 
+function makeSelectionHandlers({ setSelectedProject, setSelectedSource, setSelectedRun, storage }) {
+  const handleProjectChange = makeHandleProjectChange({ setSelectedProject, setSelectedSource, setSelectedRun, storage });
+  const selectProjectAndRun = makeSelectProjectAndRun({ setSelectedProject, setSelectedSource, setSelectedRun, storage });
+  function handleRunChange(runId) { setSelectedRun(runId); }
+  return { handleProjectChange, selectProjectAndRun, handleRunChange };
+}
+
+// The project-list fetch: the retrying loader and the Retry action that also
+// re-resolves the stored selection, like boot does.
+function useProjectListLoader({ listProjects, maxRetries, retryDelayMs, fields, handleProjectChange, onNoProjects, storage }) {
+  const { loadInFlightRef, setProjectsLoadFailed, setWarmup, setProjects, setProjectsLoaded, selectedProject, selectedSource } = fields;
+  const loadProjects = useCallback(
+    makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlightRef, setProjectsLoadFailed, setWarmup, setProjects, setProjectsLoaded }),
+    [listProjects, maxRetries, retryDelayMs],
+  );
+  const retryLoadProjects = makeRetryLoadProjects({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage });
+  return { loadProjects, retryLoadProjects };
+}
+
+// The failure screen owns its own recovery: while it shows, retry quietly in
+// the background (hooks/useProjectAutoRetry.js); and the warm-up poll
+// (hooks/useProjectWarmupPoll.js).
+function useProjectBackgroundRefresh({ fields, listProjects, handleProjectChange, onNoProjects, storage, autoRetryMs, loadProjects, summaryPollMs }) {
+  const {
+    projects, projectsLoaded, projectsLoadFailed, loadInFlightRef, setWarmup, setProjects,
+    setProjectsLoaded, setProjectsLoadFailed, selectedProject, selectedSource,
+  } = fields;
+  useProjectAutoRetry({
+    projectsLoadFailed, projectsLoaded, loadInFlightRef, listProjects, setWarmup, setProjects,
+    setProjectsLoaded, setProjectsLoadFailed, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage, autoRetryMs,
+  });
+  useProjectWarmupPoll({ projects, projectsLoaded, projectsLoadFailed, loadProjects, summaryPollMs });
+}
+
+function useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage }) {
+  useEffect(() => {
+    loadProjects().then((list) => {
+      // Array (possibly empty -> onboarding) on success; null when the load
+      // failed after retries -> do NOT force onboarding on a transient error.
+      if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 /**
  * Manages the selected project, run, and project list state.
  *
@@ -146,40 +190,22 @@ export function useProjectState({
   autoRetryMs = DEFAULT_AUTO_RETRY_MS,
 }) {
   const { listProjects } = useApi();
+  const fields = useProjectStateFields(storage);
   const {
-    projects, setProjects, projectsLoaded, setProjectsLoaded, projectsLoadFailed, setProjectsLoadFailed,
-    warmup, setWarmup, selectedProject, setSelectedProject, selectedSource, setSelectedSource,
-    selectedRun, setSelectedRun, loadInFlightRef,
-  } = useProjectStateFields(storage);
+    projects, setProjects, projectsLoaded, projectsLoadFailed, warmup,
+    selectedProject, setSelectedProject, selectedSource, setSelectedSource, selectedRun, setSelectedRun,
+  } = fields;
 
-  const loadProjects = useCallback(
-    makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlightRef, setProjectsLoadFailed, setWarmup, setProjects, setProjectsLoaded }),
-    [listProjects, maxRetries, retryDelayMs],
-  );
+  const { handleProjectChange, selectProjectAndRun, handleRunChange } =
+    makeSelectionHandlers({ setSelectedProject, setSelectedSource, setSelectedRun, storage });
 
-  const handleProjectChange = makeHandleProjectChange({ setSelectedProject, setSelectedSource, setSelectedRun, storage });
-  const selectProjectAndRun = makeSelectProjectAndRun({ setSelectedProject, setSelectedSource, setSelectedRun, storage });
-  function handleRunChange(runId) { setSelectedRun(runId); }
-
-  const retryLoadProjects = makeRetryLoadProjects({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage });
-
-  // The failure screen owns its own recovery: while it shows, retry quietly
-  // in the background — see hooks/useProjectAutoRetry.js.
-  useProjectAutoRetry({
-    projectsLoadFailed, projectsLoaded, loadInFlightRef, listProjects, setWarmup, setProjects,
-    setProjectsLoaded, setProjectsLoadFailed, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage, autoRetryMs,
+  const { loadProjects, retryLoadProjects } = useProjectListLoader({
+    listProjects, maxRetries, retryDelayMs, fields, handleProjectChange, onNoProjects, storage,
   });
 
-  // Warm-up poll — see hooks/useProjectWarmupPoll.js.
-  useProjectWarmupPoll({ projects, projectsLoaded, projectsLoadFailed, loadProjects, summaryPollMs });
+  useProjectBackgroundRefresh({ fields, listProjects, handleProjectChange, onNoProjects, storage, autoRetryMs, loadProjects, summaryPollMs });
 
-  useEffect(() => {
-    loadProjects().then((list) => {
-      // Array (possibly empty -> onboarding) on success; null when the load
-      // failed after retries -> do NOT force onboarding on a transient error.
-      if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage });
 
   return buildProjectStateResult({
     projects, warmup, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,

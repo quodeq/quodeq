@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.data.sqlite import precedent_vectors as _sqlite_vectors
+
 _logger = logging.getLogger(__name__)
 
 _BACKFILL_BUDGET_S = 60.0
@@ -52,28 +54,14 @@ class VectorStoreFns:
 
 
 def _resolve_vector_store() -> VectorStoreFns:
-    """Build the production vector-store callables from ``data.sqlite``.
-
-    Local import for the same reason as ``load_precedent_fingerprints``'s
-    lazy default: a top-level ``data.sqlite`` import would close the
-    ``data.fs.repo_clone`` -> ``context`` -> ``data.sqlite`` loop.
-    """
-    from quodeq.data.sqlite.precedent_vectors import (  # noqa: PLC0415
-        insert_vectors,
-        load_vectors,
-        open_vector_store,
-        release_backfill_claim,
-        stored_fingerprints,
-        try_claim_backfill,
-    )
-
+    """Build the production vector-store callables from ``data.sqlite``."""
     return VectorStoreFns(
-        open_vector_store=open_vector_store,
-        load_vectors=load_vectors,
-        insert_vectors=insert_vectors,
-        stored_fingerprints=stored_fingerprints,
-        try_claim_backfill=try_claim_backfill,
-        release_backfill_claim=release_backfill_claim,
+        open_vector_store=_sqlite_vectors.open_vector_store,
+        load_vectors=_sqlite_vectors.load_vectors,
+        insert_vectors=_sqlite_vectors.insert_vectors,
+        stored_fingerprints=_sqlite_vectors.stored_fingerprints,
+        try_claim_backfill=_sqlite_vectors.try_claim_backfill,
+        release_backfill_claim=_sqlite_vectors.release_backfill_claim,
     )
 
 
@@ -90,19 +78,12 @@ def _backfill_missing(
     slices each chunk off that list. Re-querying the table per chunk was an
     N+1 scan, and rescanning ``texts`` per chunk made the loop quadratic in
     the corpus size. Returns how many were newly embedded.
-
-    ``_BACKFILL_CHUNK`` is read off the facade module (``context.precedent``)
-    rather than this module's own global, so a test's
-    ``monkeypatch.setattr("quodeq.context.precedent._BACKFILL_CHUNK", ...)``
-    still takes effect here.
     """
-    from quodeq.context import precedent as _facade  # noqa: PLC0415 -- deferred facade lookup
-
     embedded_new = 0
     deadline = time.monotonic() + _BACKFILL_BUDGET_S
     stored = store.stored_fingerprints(conn)
     missing = [fp for fp in texts if fp not in stored]
-    chunk_size = _facade._BACKFILL_CHUNK
+    chunk_size = _BACKFILL_CHUNK
     for start in range(0, len(missing), chunk_size):
         if time.monotonic() >= deadline:
             break

@@ -19,9 +19,10 @@ import { systemKeys } from '../api/queryKeys.js';
 // Where the server can have moved to. The dashboard walks *upward* from its
 // configured base port when one is taken (see dashboard/_networking.py), so a
 // relaunch while the old instance still held 7863 lands on 7864 and the open
-// window must follow it there. The previous list (4180-4183) predates the
-// current port scheme, so it probed ports quodeq never binds and this recovery
-// could not fire at all.
+// window must follow it there. The API's CSP connect-src allow-lists exactly
+// this range (shared/dashboard_ports.py mirrors DASHBOARD_BASE_PORT and
+// PORT_SCAN_SPAN; tests/api/test_csp_header.py pins both), so a probe outside
+// it would be blocked by the browser before it reached the server.
 const PORT_SCAN_SPAN = 5; // enough for a few stacked relaunches, not all 20 scan tries
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const HEALTH_POLL_INTERVAL_MS = 5000;

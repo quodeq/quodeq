@@ -4,6 +4,19 @@ import { applyParamOverride, countCustomizedRequirements, decideSave } from '../
 import { useAppState } from '../../../hooks/useAppState.js';
 import { t } from '../../../strings/index.js';
 
+async function persistEditorChanges({ editable, save, overridesDirty, overrides, saveOverrides, setDraftOverrides }) {
+  if (editable) await save();
+  if (overridesDirty) {
+    await saveOverrides(overrides);
+    setDraftOverrides(null);
+  }
+}
+
+function notifySaved({ rescanDims, onRescan, onSaved, standardId }) {
+  if (rescanDims?.length && onRescan) onRescan(rescanDims);
+  if (onSaved) onSaved(standardId);
+}
+
 function makeCommitSave({
   standard, editable, save, overridesDirty, overrides, saveOverrides, setDraftOverrides,
   onRescan, onSaved, setPendingImpact, setOverridesSaveError,
@@ -12,13 +25,8 @@ function makeCommitSave({
     setPendingImpact(null);
     setOverridesSaveError(null);
     try {
-      if (editable) await save();
-      if (overridesDirty) {
-        await saveOverrides(overrides);
-        setDraftOverrides(null);
-      }
-      if (rescanDims?.length && onRescan) onRescan(rescanDims);
-      if (onSaved) onSaved(standard?.id);
+      await persistEditorChanges({ editable, save, overridesDirty, overrides, saveOverrides, setDraftOverrides });
+      notifySaved({ rescanDims, onRescan, onSaved, standardId: standard?.id });
     } catch (err) {
       // Keep the draft so the user can retry; surface the error inline.
       setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));

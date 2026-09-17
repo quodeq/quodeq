@@ -79,7 +79,11 @@ extend-exclude = ["tests/fixtures/discipline_corpus"]
 # import placement, M-MDF-1 magic literals). Widen one rule at a
 # time, with the tree clean for that rule in the same PR, so the gate
 # never grandfathers.
-select = ["F401", "F841", "E402", "PLR2004"]
+select = ["F401", "F841", "E402", "PLR2004", "C901"]
+
+[tool.ruff.lint.mccabe]
+# M-MOD-1 cyclomatic complexity; 15 is the standard's default ceiling.
+max-complexity = 15
 
 [tool.ruff.lint.per-file-ignores]
 # Re-export blocks placed after the accessors they depend on; moving

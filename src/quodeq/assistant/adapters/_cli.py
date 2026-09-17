@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import shutil
 import subprocess
 import tempfile
 import threading
@@ -14,6 +13,7 @@ from typing import Callable
 from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._cli_command import (
     McpConfigRef, TurnArgvRequest, build_turn_argv)
+from quodeq.assistant.adapters._cli_cleanup import TurnResources, release_turn_resources
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
@@ -211,10 +211,7 @@ def _finalize_turn_result(proc, stream_result, *, repository: AssistantStore, se
 def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
               new_session_id: str) -> tuple[str, str | None, int, str | None, str | None]:
     mcp_config_ref = _setup_mcp_config(cfg, cli_cfg)
-    proc = None
-    timer = None
-    cwd = None
-    sandbox_cleanup = None
+    resources = TurnResources()
     try:
         # argv-append providers get the system prompt every run; on the
         # rebuild-replay path the transcript also carries a [system] block,
@@ -223,23 +220,12 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
             cfg, prompt=prompt, mcp_config=mcp_config_ref,
             prior_session_id=session.prior_session_id, new_session_id=new_session_id)
         spec = build_turn_argv(cli_cfg, request)
-        cwd, proc, timer, sandbox_cleanup, stream_result = _spawn_and_stream(
-            cfg, cli_cfg, spec, session)
-        return _finalize_turn_result(proc, stream_result, repository=session.repository,
+        (resources.cwd, resources.proc, resources.timer, resources.sandbox_cleanup,
+         stream_result) = _spawn_and_stream(cfg, cli_cfg, spec, session)
+        return _finalize_turn_result(resources.proc, stream_result, repository=session.repository,
                                      session_id=session.session_id)
     finally:
-        if timer is not None:
-            timer.cancel()
-        if proc is not None and proc.poll() is None:
-            _kill_proc_tree(proc)
-        if mcp_config_ref.path:
-            Path(mcp_config_ref.path).unlink(missing_ok=True)
-        if sandbox_cleanup is not None:
-            sandbox_cleanup()
-        if cli_cfg.mcp_style == "cli-register":
-            mcp_config.unregister_cli_mcp(cli_cfg.cmd)
-        if cwd is not None:
-            shutil.rmtree(cwd, ignore_errors=True)
+        release_turn_resources(resources, mcp_config_ref=mcp_config_ref, cli_cfg=cli_cfg)
 
 
 def _inject_system_prompt(cli_cfg, config: CliTurnConfig, prior_session_id: str | None,

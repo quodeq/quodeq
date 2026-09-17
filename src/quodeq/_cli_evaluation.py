@@ -1,15 +1,15 @@
 """Evaluation pipeline execution — config building and running.
 
 Input resolution lives in ``_cli_resolution.py``; run lifecycle (directory
-setup, RunLifecycleContext wiring, cleanup, SARIF export) lives in
-``_cli_lifecycle.py``; suppression-aware score printing lives in
-``_cli_scoring.py``; run_evaluate's --diff-from resolution and post-run
+setup, RunLifecycleContext wiring, cleanup) lives in ``_cli_lifecycle.py``;
+env/argv helpers in ``_cli_env.py``; suppression-aware score printing lives
+in ``_cli_scoring.py``; run_evaluate's --diff-from resolution and post-run
 consolidation/SARIF finalization live in ``_cli_evaluate_finalize.py``. All
 public names stay re-exported here (and, in turn, by ``quodeq.cli``) — ~15
-test files patch ``quodeq._cli_evaluation.<name>``. A few re-exports below
-have no direct caller left here (their callers moved out and reach them via
-a deferred facade lookup on this module) but must stay importable as patch
-targets.
+test files patch ``quodeq._cli_evaluation.<name>``. The lifecycle helpers
+receive those patchable names as a ``LifecycleHooks`` bundle built here at
+call time (see ``_lifecycle_hooks``), so the re-exports below with no direct
+caller left in this module must stay importable as patch targets.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ import argparse
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -38,75 +37,28 @@ from quodeq.analysis._diff_resolver import resolve_diff_files  # noqa: F401 — 
 from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
+from quodeq._cli_env import (  # noqa: F401
+    _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_POOL_BUDGET, _ENV_TIME_LIMIT,
+    _env_int, _no_verify, _resolve_time_limit, _subagent_model,
+)
 from quodeq._cli_resolution import (  # noqa: F401
     ResolvedInputs, _build_manifest, _cleanup_worktree, _create_worktree,
     _filter_manifest_by_scope, _override_manifest_single_file,
     _resolve_evaluation_inputs, _resolve_language, _resolve_repo,
     _resolve_scope, _resolve_single_file,
 )
+from quodeq import _cli_lifecycle
 from quodeq._cli_lifecycle import (  # noqa: F401
-    _record_deadline_if_hit, _record_provider_fatal_if_cancelled,
-    _run_pipeline_with_cleanup, _setup_run_dirs, _write_sarif_if_requested,
+    LifecycleHooks, _record_deadline_if_hit, _record_provider_fatal_if_cancelled,
 )
 from quodeq._cli_scoring import (  # noqa: F401
     _count_excluded_findings, _dim_evidence_counts, _format_adjusted_score, _print_scores,
 )
-from quodeq._cli_evaluate_finalize import _apply_diff_from, _finalize_run_evaluate  # noqa: F401
+from quodeq._cli_evaluate_finalize import (  # noqa: F401
+    _apply_diff_from, _finalize_run_evaluate, _write_sarif_if_requested,
+)
 
 _logger = logging.getLogger(__name__)
-
-# Environment helpers
-_ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
-_ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
-_ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
-_ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
-
-
-def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = None) -> int | None:
-    """Resolve the run-level time limit from CLI args or env.
-
-    Precedence: explicit CLI flag > QUODEQ_TIME_LIMIT > legacy QUODEQ_POOL_BUDGET.
-    Emits a one-line deprecation warning when the legacy CLI flag or env var is
-    the source of the value.
-    """
-    src_env = env or os.environ
-    if getattr(args, "pool_budget", None) is not None:
-        # argparse stores both --time-limit and --pool-budget on the same dest;
-        # detect deprecated form by scanning the original argv.
-        if any(a == "--pool-budget" or a.startswith("--pool-budget=") for a in sys.argv[1:]):
-            sys.stderr.write(
-                "warning: --pool-budget is deprecated, use --time-limit instead\n"
-            )
-        return args.pool_budget
-    if src_env.get(_ENV_TIME_LIMIT) is not None:
-        return _env_int(_ENV_TIME_LIMIT, None, env=env)
-    if src_env.get(_ENV_POOL_BUDGET) is not None:
-        sys.stderr.write(
-            f"warning: {_ENV_POOL_BUDGET} is deprecated, use {_ENV_TIME_LIMIT} instead\n"
-        )
-        return _env_int(_ENV_POOL_BUDGET, None, env=env)
-    return None
-
-
-def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
-    """Read an environment variable as an int, returning *default* if unset or invalid."""
-    raw = (env or os.environ).get(var)
-    if raw is None:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        return default
-
-
-def _subagent_model(env: dict[str, str] | None = None) -> str | None:
-    """Return the subagent model override from the environment, or None."""
-    return (env or os.environ).get("SUBAGENT_MODEL") or None
-
-
-def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
-    """Return True if verification should be skipped (CLI flag or env var)."""
-    return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
 # Pipeline execution
@@ -222,6 +174,35 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     )
 
 
+def _lifecycle_hooks() -> LifecycleHooks:
+    """Bundle this module's globals for ``_cli_lifecycle``, resolved at call
+    time so a patch on ``quodeq._cli_evaluation.<name>`` is what runs."""
+    return LifecycleHooks(
+        resolve_project_uuid=resolve_project_uuid,
+        project_name_from_repo=project_name_from_repo,
+        is_repo_url=is_repo_url,
+        emit_marker=emit_marker,
+        cleanup_cloned_repo=cleanup_cloned_repo,
+        cleanup_worktree=_cleanup_worktree,
+        get_ai_model=get_ai_model,
+        save_manifest=_save_manifest,
+        build_run_config=_build_run_config,
+        execute_pipeline=_execute_pipeline,
+    )
+
+
+def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Path]:
+    """Resolve project UUID and create evidence/evaluation directories."""
+    return _cli_lifecycle._setup_run_dirs(args, src, _lifecycle_hooks())
+
+
+def _run_pipeline_with_cleanup(
+    args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
+) -> int:
+    """Set up directories, build config, run the pipeline, and clean up cloned repos."""
+    return _cli_lifecycle._run_pipeline_with_cleanup(args, inputs, paths, _lifecycle_hooks())
+
+
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     # --incremental is a deprecated no-op alias; incremental is already the default.
@@ -251,7 +232,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if inputs is None:
         return 1
 
-    diff_from_error = _apply_diff_from(args, inputs)
+    diff_from_error = _apply_diff_from(args, inputs, resolve_diff_files)
     if diff_from_error is not None:
         return diff_from_error
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -27,9 +28,11 @@ _CAP_NOTE = "\n\n*(stopped: tool iteration limit reached)*"
 _OPENAI_API_HOST = "api.openai.com"
 
 
-def _extra_body(config: "ApiTurnConfig") -> dict:
+def _extra_body(config: "ApiTurnConfig", env: Mapping[str, str] | None = None) -> dict:
     """Provider tuning that mirrors the analysis API runner so the assistant
     behaves like the (working) evaluation path on the same local models.
+
+    *env* overrides ``os.environ`` for the ``QUODEQ_CONTEXT_SIZE`` read.
 
     Local reasoning models (Gemma, Qwen3) otherwise burn thousands of thinking
     tokens before answering — a multi-minute streamed generation that is prone
@@ -44,7 +47,8 @@ def _extra_body(config: "ApiTurnConfig") -> dict:
     body["reasoning_effort"] = "none"
     if _OPENAI_API_HOST not in (config.api_base or ""):
         body["chat_template_kwargs"] = {"enable_thinking": False}
-    env_ctx = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
+    environ = env if env is not None else os.environ
+    env_ctx = environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
     if env_ctx.isdigit() and int(env_ctx) > 0:
         body["num_ctx"] = int(env_ctx)
     return body

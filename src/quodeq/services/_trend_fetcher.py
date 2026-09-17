@@ -161,20 +161,12 @@ def _make_heavy_trend_fetcher(
     """Wrap the findings-based rescoring fetcher with the read-through score
     cache. The cache version is a content hash of dismissals/deletions/
     params, so any change auto-invalidates."""
-    project_dir = reports_root / project
-    dismissed_keys = deps.dismissed_keys or _default_dismissed_keys
-    deleted_keys = deps.deleted_keys or _default_deleted_keys
     base = make_rescoring_fetcher(
         reports_root, project, params=params,
         base_fetcher=deps.base_fetcher_factory(reports_root, project), deps=deps,
     )
-    from quodeq.services.score_cache import load_run_keys_or_empty  # noqa: PLC0415
-    dismissed = dismissed_keys(project_dir)
-    deleted = deleted_keys(project_dir)
-
-    version_for = _make_version_for(
-        project_dir, project, VersionInputs.of(params, dismissed, deleted),
-        lambda: load_run_keys_or_empty(project), cacheable_run_ids,
+    version_for = _suppression_version_for(
+        reports_root / project, project, params, cacheable_run_ids, deps,
     )
     is_cacheable = (
         None if cacheable_run_ids is None
@@ -182,6 +174,21 @@ def _make_heavy_trend_fetcher(
     )
     return make_cache_backed_fetcher(
         project, version_for, base, is_cacheable=is_cacheable, log=SHARED_LOG,
+    )
+
+
+def _suppression_version_for(
+    project_dir: Path, project: str, params: ScoringParams,
+    cacheable_run_ids: set[str] | None, deps: ScoringDeps,
+) -> Callable[[str], str]:
+    """Per-run cache version keyed on *params* plus the project's current
+    dismissals and deletions (read through *deps*)."""
+    from quodeq.services.score_cache import load_run_keys_or_empty  # noqa: PLC0415
+    dismissed = (deps.dismissed_keys or _default_dismissed_keys)(project_dir)
+    deleted = (deps.deleted_keys or _default_deleted_keys)(project_dir)
+    return _make_version_for(
+        project_dir, project, VersionInputs.of(params, dismissed, deleted),
+        lambda: load_run_keys_or_empty(project), cacheable_run_ids,
     )
 
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from quodeq.core.types import Finding, ViolationResponse
 from quodeq.core.stream.events import TEXT_EXTRACTORS, extract_files_from_event
 from quodeq.services.violation_context import ViolationContext
-from quodeq.services.violations_parsing import (
+from quodeq.services._violations_shared import (
     _build_finding_entry,
     _build_violation_response,
     _ResponseOptions,

@@ -186,42 +186,74 @@ def _run_api_engine(request: TurnRequest, messages: list[dict], skill,
     return deps.turn_fn(messages=messages, config=config, session=session)
 
 
+def _build_deps(request: TurnRequest, repository: AssistantStore, engines: TurnEngines,
+                cancel: CancelToken) -> _EngineDeps:
+    """Production collaborators for the turn, with *engines* overriding any of the three runners."""
+    emit = lambda frame: repository.append_event(request.session_id, frame)  # noqa: E731
+    return _EngineDeps(repository=repository, emit=emit, cancel=cancel,
+                       turn_fn=engines.turn_fn or run_api_turn,
+                       capability_fn=engines.capability_fn or supports_native_tools,
+                       cli_turn_fn=engines.cli_turn_fn or run_cli_turn)
+
+
+def _resolve_skill(raw_text: str) -> tuple[object | None, str, str | None]:
+    """``(skill, text, unknown_name)``: the loaded ``/skill`` prefix of *raw_text*, if any.
+
+    ``unknown_name`` is set (and ``skill`` None) when the prefix names no
+    loaded skill.
+    """
+    skill_name, text = _split_skill(raw_text)
+    if skill_name is None:
+        return None, text, None
+    skill = load_skills().get(skill_name)
+    return skill, text, (skill_name if skill is None else None)
+
+
+def _persist_user_turn(request: TurnRequest, repository: AssistantStore, text: str) -> list[dict]:
+    """Record the user's message and return the session history including it."""
+    user_content = build_turn_message(text, request.ui_state)
+    repository.add_message(request.session_id, "user", user_content)
+    return repository.list_messages(request.session_id)
+
+
+def _compose_messages(skill, grants: _TurnGrants, history: list[dict]) -> list[dict]:
+    return [{"role": "system",
+             "content": build_system_prompt(skill=skill,
+                                            web_enabled=grants.web_tools_on,
+                                            write_enabled=grants.write_on)},
+            *({"role": m["role"], "content": m["content"]} for m in history)]
+
+
+def _run_engine(request: TurnRequest, messages: list[dict], skill,
+                grants: _TurnGrants, deps: _EngineDeps) -> str:
+    if _provider_type(request.provider) == "cli":
+        return _run_cli_engine(request, grants.tool_ctx, messages, skill, deps)
+    return _run_api_engine(request, messages, skill, grants, deps)
+
+
+def _execute_turn(request: TurnRequest, tool_ctx: ToolContext, deps: _EngineDeps) -> None:
+    """The happy path of one turn: persist, contextualize, run the engine, persist, emit."""
+    skill, text, unknown_skill = _resolve_skill(request.text)
+    if unknown_skill is not None:
+        deps.emit({"type": "error", "message": f"unknown skill: /{unknown_skill}"})
+        return
+    history = _persist_user_turn(request, deps.repository, text)
+    # In-process web tools are local-API-only: claude gets NATIVE web
+    # tools via argv, and cloud APIs (openrouter/custom) stay excluded.
+    web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
+    grants = _resolve_write_grant(request, deps.repository, tool_ctx, web_tools_on)
+    final = _run_engine(request, _compose_messages(skill, grants, history), skill, grants, deps)
+    deps.repository.add_message(request.session_id, "assistant", final)
+    deps.emit({"type": "done"})
+
+
 def run_turn(request: TurnRequest, *, repository: AssistantStore,
              tool_ctx: ToolContext, engines: TurnEngines | None = None,
              cancel: CancelToken | None = None) -> None:
-    engines = engines or TurnEngines()
-    cancel = cancel or CancelToken()
-    emit = lambda frame: repository.append_event(request.session_id, frame)  # noqa: E731
-    deps = _EngineDeps(repository=repository, emit=emit, cancel=cancel,
-                      turn_fn=engines.turn_fn or run_api_turn,
-                      capability_fn=engines.capability_fn or supports_native_tools,
-                      cli_turn_fn=engines.cli_turn_fn or run_cli_turn)
+    deps = _build_deps(request, repository, engines or TurnEngines(), cancel or CancelToken())
+    emit = deps.emit
     try:
-        skill_name, text = _split_skill(request.text)
-        skill = None
-        if skill_name is not None:
-            skill = load_skills().get(skill_name)
-            if skill is None:
-                emit({"type": "error", "message": f"unknown skill: /{skill_name}"})
-                return
-        user_content = build_turn_message(text, request.ui_state)
-        repository.add_message(request.session_id, "user", user_content)
-        history = repository.list_messages(request.session_id)
-        # In-process web tools are local-API-only: claude gets NATIVE web
-        # tools via argv, and cloud APIs (openrouter/custom) stay excluded.
-        web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
-        grants = _resolve_write_grant(request, repository, tool_ctx, web_tools_on)
-        messages = [{"role": "system",
-                     "content": build_system_prompt(skill=skill,
-                                                    web_enabled=grants.web_tools_on,
-                                                    write_enabled=grants.write_on)},
-                    *({"role": m["role"], "content": m["content"]} for m in history)]
-        if _provider_type(request.provider) == "cli":
-            final = _run_cli_engine(request, grants.tool_ctx, messages, skill, deps)
-        else:
-            final = _run_api_engine(request, messages, skill, grants, deps)
-        repository.add_message(request.session_id, "assistant", final)
-        emit({"type": "done"})
+        _execute_turn(request, tool_ctx, deps)
     except TurnCancelled as exc:
         # User-initiated stop, not a failure. Persist any partial answer so
         # the next turn's replayed history matches what the user saw.

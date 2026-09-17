@@ -70,12 +70,8 @@ function useTrendDeltas(dashboard) {
   }, [dashboard]);
 }
 
-export default function RunOverviewPanel({ dashboard, selectedRunId, projectName, onDimensionClick, onFileClick, onNavigate }) {
-  const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
-  const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
-  const runDateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
-
-  const onCardNavigate = useMemo(() => {
+function useCardNavigate({ dashboard, selectedRunId, projectName, runDateLabel, onNavigate }) {
+  return useMemo(() => {
     if (!onNavigate) return undefined;
     return (kind) => {
       const label = `${projectName || 'project'} · ${runDateLabel || 'run'}`;
@@ -84,9 +80,22 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, projectName
       onNavigate('file', { file: projectFile, severityFilter, runId: selectedRunId, dateLabel: runDateLabel });
     };
   }, [onNavigate, dashboard, projectName, runDateLabel, selectedRunId]);
+}
 
+// The run's derived view data: summary, worst files, hero-card navigation and
+// the per-dimension deltas; also registers this run's report specs.
+function useRunOverviewModel({ dashboard, selectedRunId, projectName, onNavigate }) {
+  const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
+  const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
+  const runDateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
+  const onCardNavigate = useCardNavigate({ dashboard, selectedRunId, projectName, runDateLabel, onNavigate });
   useRunReportSpecs({ dashboard, runSummary, selectedRunId, projectName });
   const trendDeltas = useTrendDeltas(dashboard);
+  return { runSummary, runTopFiles, onCardNavigate, trendDeltas };
+}
+
+export default function RunOverviewPanel({ dashboard, selectedRunId, projectName, onDimensionClick, onFileClick, onNavigate }) {
+  const { runSummary, runTopFiles, onCardNavigate, trendDeltas } = useRunOverviewModel({ dashboard, selectedRunId, projectName, onNavigate });
 
   const isLoading = !dashboard || !dashboard.dimensions;
   if (isLoading) {

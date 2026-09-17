@@ -7,10 +7,13 @@ helpers in _csp_helpers.py.
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from quodeq.api import security
 from quodeq.api.app import create_app
+from quodeq.shared import dashboard_ports
 from tests.api._csp_helpers import _ALT_PORT_ORIGINS, _WS_ALT_PORT_ORIGINS, _directive
 
 
@@ -124,3 +127,18 @@ def test_csp_mask_src_allows_data_uris(csp):
     mask_src = _directive(csp, "mask-src")
     assert mask_src is not None, "mask-src must be present in CSP"
     assert "data:" in mask_src, "mask-src must include data: to allow inline SVG masks"
+
+
+def test_csp_connect_src_ports_match_the_current_dashboard_scheme(csp):
+    """connect-src enumerates exactly the ports useServerHealth.js can probe.
+
+    The alt-port range once listed the retired 4180-4183 scheme, which the UI
+    never binds; a stale entry there is invisible in the browser (nothing
+    fails, the reconnect just never fires). Pin the set of explicit ports to
+    the shared constants so the two sides cannot drift apart again.
+    """
+    connect_src = _directive(csp, "connect-src")
+    ports = {int(p) for p in re.findall(r":(\d+)\b", connect_src)}
+    assert ports == set(dashboard_ports.alt_ports())
+    assert dashboard_ports.DASHBOARD_BASE_PORT == 7863
+    assert not any(4180 <= p <= 4199 for p in ports), "retired 418x port scheme must not be allow-listed"

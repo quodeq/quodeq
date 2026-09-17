@@ -109,6 +109,25 @@ def finding_to_scoring_dict(f: Finding) -> dict[str, Any]:
     return d
 
 
+def clamp_principle_score(
+    raw: float, vt_counts: dict[str, int], *, params: ScoringParams = DEFAULT_PARAMS,
+) -> float:
+    """Clamp a raw principle score between the severity floor and the volume ceiling.
+
+    Floor first, ceiling last. The two guards cross when a principle carries a
+    LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
+    above the volume ceiling. Clamping the other way round handed back the
+    floor and discarded the ceiling -- the one guard that encodes volume -- so
+    a principle with 269 findings read "Good". Algebraically identical whenever
+    floor <= ceil, so only the contradictory case moves. Every scoring path
+    (evidence, projector, legacy no-evidence fallback) goes through here so a
+    principle scores the same whichever read surface asked.
+    """
+    ceil = violation_ceiling(vt_counts, params=params)
+    floor = severity_grade_floor(vt_counts, params=params)
+    return round(min(ceil, max(floor, raw)), 1)
+
+
 def principle_score_and_grade(
     vt_counts: dict[str, int],
     ct_counts: dict[str, int],
@@ -116,18 +135,8 @@ def principle_score_and_grade(
 ) -> tuple[float, str]:
     base = violation_base(vt_counts, params=params)
     lift = compliance_lift(ct_counts, vt_counts, params=params)
-    ceil = violation_ceiling(vt_counts, params=params)
-    floor = severity_grade_floor(vt_counts, params=params)
-
     raw = base + (10.0 - base) * lift
-    # Floor first, ceiling last. The two guards cross when a principle carries a
-    # LOT of issues that all happen to be minor: the minor-only floor (8.0) rises
-    # above the volume ceiling. Clamping the other way round handed back the
-    # floor and discarded the ceiling -- the one guard that encodes volume -- so
-    # a principle with 269 findings read "Good". Algebraically identical whenever
-    # floor <= ceil, so only the contradictory case moves.
-    final = min(ceil, max(floor, raw))
-    final = round(final, 1)
+    final = clamp_principle_score(raw, vt_counts, params=params)
     grade = score_to_grade_label(final, params=params)
     return final, grade
 

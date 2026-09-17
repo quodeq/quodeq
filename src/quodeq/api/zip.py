@@ -94,6 +94,27 @@ class _ZipLimits:
         return _ZipLimits(size_limit, uncompressed_limit, compressed_error, uncompressed_error)
 
 
+def _iter_export_files(project_path: Path):
+    """Yield the regular files under *project_path* that belong in the export.
+
+    Symlinks and non-files are skipped, as is any prior manifest so the
+    export-time one is authoritative.
+    """
+    for file_entry in project_path.rglob("*"):
+        if file_entry.is_symlink() or not file_entry.is_file():
+            continue
+        if file_entry == project_path / _MANIFEST_FILENAME:
+            continue
+        yield file_entry
+
+
+def _write_manifest_entry(zf: zipfile.ZipFile, project_path: Path) -> int:
+    """Write the export manifest into *zf*; returns its uncompressed byte size."""
+    manifest_json = json.dumps(_build_manifest(project_path), indent=2)
+    zf.writestr(f"{project_path.name}/{_MANIFEST_FILENAME}", manifest_json)
+    return len(manifest_json.encode("utf-8"))
+
+
 def _write_project_zip_entries(
     zf: zipfile.ZipFile, fh, project_path: Path, limits: _ZipLimits,
 ) -> None:
@@ -104,24 +125,14 @@ def _write_project_zip_entries(
     mid-write.
     """
     total_uncompressed = 0
-    for file_entry in project_path.rglob("*"):
-        if file_entry.is_symlink():
-            continue
-        if not file_entry.is_file():
-            continue
-        # Skip any prior manifest so the export-time one is authoritative.
-        if file_entry == project_path / _MANIFEST_FILENAME:
-            continue
+    for file_entry in _iter_export_files(project_path):
         zf.write(file_entry, file_entry.relative_to(project_path.parent))
         total_uncompressed += file_entry.stat().st_size
         if fh.tell() > limits.size_limit:
             raise limits.compressed_error
         if total_uncompressed > limits.uncompressed_limit:
             raise limits.uncompressed_error
-    manifest_json = json.dumps(_build_manifest(project_path), indent=2)
-    manifest_arcname = f"{project_path.name}/{_MANIFEST_FILENAME}"
-    zf.writestr(manifest_arcname, manifest_json)
-    total_uncompressed += len(manifest_json.encode("utf-8"))
+    total_uncompressed += _write_manifest_entry(zf, project_path)
     if total_uncompressed > limits.uncompressed_limit:
         raise limits.uncompressed_error
 
@@ -151,30 +162,26 @@ def _build_project_zip(project_path: Path) -> Path:
     return Path(tmp_path)
 
 
-def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Response, int]:
-    """Build and return a zip archive download response for a project directory."""
+def _zip_error(message: str, status: int, code: str) -> tuple[Response, int]:
+    body, http_status = error_response(message, status, code)
+    return jsonify(body), http_status
+
+
+def _resolve_project_path(project: str, reports_dir: str) -> tuple[Path | None, tuple[Response, int] | None]:
+    """Locate *project* under *reports_dir*. Returns ``(path, None)`` or ``(None, error)``."""
     project_path = (Path(reports_dir) / project).resolve()
     if not project_path.is_relative_to(Path(reports_dir).resolve()):
-        body, status = error_response(
+        return None, _zip_error(
             "Invalid project name. Use only alphanumeric characters, hyphens, and underscores (no path separators).",
             HTTPStatus.BAD_REQUEST, "BAD_REQUEST",
         )
-        return jsonify(body), status
     if not project_path.exists() or not project_path.is_dir():
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    try:
-        tmp_path = _build_project_zip(project_path)
-    except ValueError:
-        body, status = error_response("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
-        return jsonify(body), status
-    except (OSError, zipfile.BadZipFile):
-        body, status = error_response(
-            "Failed to build project archive. Check disk space and file permissions, then try again.",
-            HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
-        )
-        return jsonify(body), status
+        return None, _zip_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return project_path, None
 
+
+def _unlink_after_response(tmp_path: Path) -> None:
+    """Remove the temporary archive once the download response has been sent."""
     @after_this_request
     def _cleanup(response: Response) -> Response:
         try:
@@ -183,4 +190,20 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
             _logger.warning("Failed to remove temp zip %s: %s", tmp_path, exc)
         return response
 
+
+def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Response, int]:
+    """Build and return a zip archive download response for a project directory."""
+    project_path, err = _resolve_project_path(project, reports_dir)
+    if err is not None:
+        return err
+    try:
+        tmp_path = _build_project_zip(project_path)
+    except ValueError:
+        return _zip_error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+    except (OSError, zipfile.BadZipFile):
+        return _zip_error(
+            "Failed to build project archive. Check disk space and file permissions, then try again.",
+            HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
+        )
+    _unlink_after_response(tmp_path)
     return send_file(str(tmp_path), mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")

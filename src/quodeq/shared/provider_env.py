@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
 
 
-def _providers_path() -> Path:
-    return Path(os.environ.get("QUODEQ_AI_PROVIDERS_PATH", str(_DEFAULT_PATH)))
+def _providers_path(env: Mapping[str, str] | None = None) -> Path:
+    """Path of ``ai_providers.json``; ``QUODEQ_AI_PROVIDERS_PATH`` overrides the bundled file."""
+    environ = env if env is not None else os.environ
+    return Path(environ.get("QUODEQ_AI_PROVIDERS_PATH", str(_DEFAULT_PATH)))
 
 
 def provider_env_exports(

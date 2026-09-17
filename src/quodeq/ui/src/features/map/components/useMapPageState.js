@@ -85,18 +85,9 @@ function buildMapPageResult({
   };
 }
 
-/**
- * Map page state, as composition: DOM sizing (useDashboardFullHeight), the
- * standards fetch (useVisibleStandards), display prefs (useMapDisplayPrefs),
- * the dimension filter (useMapDimensionFilter), the tree (useMapTreeState),
- * and storage via the shared adapters (adapters/storage.js + pageStateCache).
- */
-export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
-  const selectedProject = data?.projectName || data?.selectedProject || '__map__';
-  const {
-    currentPath, vizStyle, viewMode, galaxyMode,
-    setCurrentPath, setVizStyle, setViewMode, setGalaxyMode,
-  } = useMapNavParams(nav);
+// Per-mount plumbing: the tab-scoped state cache, the viewport lock, the
+// refresh on mount / tab re-click, and the standard types for constellations.
+function useMapPageLifecycle({ selectedProject, tabKey, callbacks }) {
   const cached = useMapTabCache(selectedProject, tabKey);
 
   // Lock parent to viewport height while map is active.
@@ -109,6 +100,22 @@ export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
 
   // Standard types for galaxy constellation grouping.
   const { standardTypes } = useVisibleStandards();
+  return { cached, standardTypes };
+}
+
+/**
+ * Map page state, as composition: DOM sizing (useDashboardFullHeight), the
+ * standards fetch (useVisibleStandards), display prefs (useMapDisplayPrefs),
+ * the dimension filter (useMapDimensionFilter), the tree (useMapTreeState),
+ * and storage via the shared adapters (adapters/storage.js + pageStateCache).
+ */
+export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
+  const selectedProject = data?.projectName || data?.selectedProject || '__map__';
+  const {
+    currentPath, vizStyle, viewMode, galaxyMode,
+    setCurrentPath, setVizStyle, setViewMode, setGalaxyMode,
+  } = useMapNavParams(nav);
+  const { cached, standardTypes } = useMapPageLifecycle({ selectedProject, tabKey, callbacks });
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
 

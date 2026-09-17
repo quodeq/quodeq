@@ -109,22 +109,15 @@ def _gather_progress_context(
     """Resolve the run-level scalars build_scan_progress needs before
     dispatching to the consolidated-live check or the per-dim loop."""
     state = status.get("state") or "unknown"
-    is_terminal = state in {"done", "failed", "cancelled"}
-    started_at = _parse_started_at(status)
-    total_elapsed_s = _compute_total_elapsed(status, state, started_at)
-    run_budget_s = time_limit_s if (time_limit_s and time_limit_s > 0) else None
-    project_files = _project_total_files(run_dir)
-    dim_estimates = read_dim_estimates(run_dir)
-    dim_records = read_dimensions(run_dir).get("dimensions") or {}
-    dim_ids = _recover_dim_ids(status, dim_records, dim_estimates)
+    dim_estimates, dim_records, dim_ids = _read_dimension_inputs(status, run_dir)
     return _ProgressContext(
         run_dir=run_dir,
         status=status,
         state=state,
-        is_terminal=is_terminal,
-        total_elapsed_s=total_elapsed_s,
-        run_budget_s=run_budget_s,
-        project_files=project_files,
+        is_terminal=state in {"done", "failed", "cancelled"},
+        total_elapsed_s=_total_elapsed_s(status, state),
+        run_budget_s=time_limit_s if (time_limit_s and time_limit_s > 0) else None,
+        project_files=_project_total_files(run_dir),
         dim_estimates=dim_estimates,
         dim_records=dim_records,
         dim_ids=dim_ids,
@@ -132,6 +125,18 @@ def _gather_progress_context(
         evaluators_dir=default_paths().evaluators_dir,
         compiled_dir=compiled_dir,
     )
+
+
+def _total_elapsed_s(status: dict, state: str) -> float | None:
+    """Seconds the run has been going (live) or took (finalized); None when unknown."""
+    return _compute_total_elapsed(status, state, _parse_started_at(status))
+
+
+def _read_dimension_inputs(status: dict, run_dir: Path) -> tuple[dict, dict, list[str]]:
+    """Per-dim estimates and records from the run's sidecars, plus the resolved dim ids."""
+    dim_estimates = read_dim_estimates(run_dir)
+    dim_records = read_dimensions(run_dir).get("dimensions") or {}
+    return dim_estimates, dim_records, _recover_dim_ids(status, dim_records, dim_estimates)
 
 
 def _build_per_dim_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress:

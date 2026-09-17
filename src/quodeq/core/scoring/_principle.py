@@ -9,6 +9,7 @@ from quodeq.core.scoring.overall import MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
     build_deductions,
+    clamp_principle_score,
     compliance_dampening,
     compliance_lift,
     confidence_interval_for,
@@ -16,10 +17,8 @@ from quodeq.core.scoring.internals import (
     drop_grade,
     evidence_has_taxonomy,
     score_to_grade_label,
-    severity_grade_floor,
     tally_types,
     violation_base,
-    violation_ceiling,
 )
 
 _BASE_SCORE = 10
@@ -85,13 +84,7 @@ def _score_numerical(
     base = violation_base(ctx.vt_counts, params=params)
     lift = compliance_lift(ctx.ct_counts, ctx.vt_counts, params=params)
     raw = base + (_BASE_SCORE - base) * lift
-    # Floor first, ceiling last -- see the note in core/scoring/projector_scoring.py.
-    # This is the path real runs take (services/evidence_rescore); the other two
-    # copies are the projector and the legacy no-evidence fallback. All three
-    # must agree or the same principle scores differently depending on which
-    # read surface asked.
-    final_pts = round(min(violation_ceiling(ctx.vt_counts, params=params),
-                          max(severity_grade_floor(ctx.vt_counts, params=params), raw)), 1)
+    final_pts = clamp_principle_score(raw, ctx.vt_counts, params=params)
     return PrincipleScore(
         **kwargs, base_score=round(base, 1),
         deductions=build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult),

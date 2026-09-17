@@ -1,4 +1,5 @@
-// Hygiene ratchet: unused bindings and parameter counts.
+// Hygiene ratchet: unused bindings, parameter counts, nesting depth and
+// cyclomatic complexity.
 //
 // Separate from eslint.config.js (the i18n ratchet) and eslint.size.config.js
 // (sizes) for the same reason those two are separate: each gate owns its
@@ -37,6 +38,13 @@ export default [
       ],
       // M-MOD-4 (default 6): at most 6 parameters; pass one options object beyond that.
       'max-params': ['error', { max: 6 }],
+      // M-ANA-3: blocks nest at most 4 deep; extract the inner branches into
+      // named functions.
+      'max-depth': ['error', { max: 4 }],
+      // M-MOD-1 (default 15): cyclomatic complexity per function. Existing
+      // offenders are grandfathered in the baseline; new ones split the
+      // function.
+      'complexity': ['error', { max: 15 }],
     },
   },
   {

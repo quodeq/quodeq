@@ -65,10 +65,7 @@ class EvaluationsIndex:
         returned however deep in the index they sit.
         """
         reports_dir = self._coerce_reports_dir(reports_dir)
-        try:
-            internal_jobs = self._jobs.list_jobs(reports_root=None)
-        except (AttributeError, TypeError):
-            internal_jobs = []
+        internal_jobs = self._internal_jobs()
         # limit>0: over-fetch by len(internal_jobs) so that even if every
         # in-memory job dedupes against (and removes) a fetched DB row, the
         # fetch still leaves >= limit usable DB rows to fill the merge.
@@ -79,18 +76,29 @@ class EvaluationsIndex:
         # is not pushed into SQL (in-memory jobs have no row), so drop the
         # pushdown entirely and fetch all whenever a filter is in play.
         db_limit = limit + len(internal_jobs) if limit and limit > 0 and not states else 0
+        snapshots = self._indexed_snapshots(reports_dir, db_limit)
+        merged = _merge_internal_jobs(snapshots, internal_jobs)
+        if states:
+            merged = [s for s in merged if s.status in states]
+        merged.sort(key=lambda s: s.started_at or "", reverse=True)
+        return merged[:limit] if limit and limit > 0 else merged
+
+    def _internal_jobs(self) -> list[JobSnapshot]:
+        """In-memory jobs from the ``JobManager``; empty when it cannot list them."""
+        try:
+            return self._jobs.list_jobs(reports_root=None)
+        except (AttributeError, TypeError):
+            return []
+
+    def _indexed_snapshots(self, reports_dir: Path, db_limit: int) -> list[JobSnapshot]:
+        """Sync the SQLite index against *reports_dir* and read up to *db_limit* rows (0: all)."""
         db = self._open_index()
         try:
             _run_index.sync_index(db, reports_dir)
             rows = _run_index.list_runs(db, limit=db_limit)
         finally:
             db.close()
-        snapshots = [self._run_row_to_snapshot(r) for r in rows]
-        merged = _merge_internal_jobs(snapshots, internal_jobs)
-        if states:
-            merged = [s for s in merged if s.status in states]
-        merged.sort(key=lambda s: s.started_at or "", reverse=True)
-        return merged[:limit] if limit and limit > 0 else merged
+        return [self._run_row_to_snapshot(r) for r in rows]
 
     def delete(self, job_id: str, reports_dir: Path | None = None) -> bool:
         """Delete a run's on-disk dir and index row. Refuses running jobs."""

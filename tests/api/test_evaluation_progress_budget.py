@@ -28,63 +28,68 @@ def reports_root(monkeypatch):
         yield Path(tmp)
 
 
+class _Provider(ActionProvider):
+    def __init__(self, run_dir: Path, time_limit_s):
+        self._run_dir = run_dir
+        self._time_limit_s = time_limit_s
+
+    def list_projects(self, reports_dir):
+        return {"projects": []}
+
+    def get_project_info(self, reports_dir, project):
+        return {"project": project}
+
+    def get_dashboard(self, reports_dir, project, run):
+        return {}
+
+    def get_accumulated(self, reports_dir, project, as_of):
+        return {"summary": {"dimensionCount": 0}}
+
+    def get_dimension_eval(self, reports_dir, project, run_id, dimension):
+        return {}
+
+    def get_run_plan(self, reports_dir, project, run_id):
+        return {}
+
+    def get_violations(self, reports_dir, project, run_id):
+        return {"total": 0, "critical": 0, "major": 0, "minor": 0, "files": []}
+
+    def start_evaluation(self, repo, reports_dir, options):
+        return {"jobId": "job-1", "status": "running", "logs": []}
+
+    def get_evaluation_status(self, job_id, reports_dir=None):
+        if job_id != "job-1":
+            return None
+        return JobSnapshot(
+            job_id="job-1", status="running", logs=[],
+            output_project="proj", output_run_id="run-1",
+            time_limit_s=self._time_limit_s,
+        )
+
+    def get_log_run_dir(self, job_id):
+        return self._run_dir if job_id == "job-1" else None
+
+    def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False):
+        return False
+
+    def list_evaluations(self, *, limit=0, reports_dir=None, states=None):
+        return []
+
+    def delete_project(self, reports_dir, project):
+        return False
+
+    def browse_repo(self, path=None):
+        return {"current": "/", "parent": None, "directories": [], "isGitRepo": False}
+
+    def get_ai_clients(self):
+        return {"clients": []}
+
+    def get_client_models(self, client_id):
+        return {"models": []}
+
+
 def _make_provider(run_dir: Path, time_limit_s):
-    class _Provider(ActionProvider):
-        def list_projects(self, reports_dir):
-            return {"projects": []}
-
-        def get_project_info(self, reports_dir, project):
-            return {"project": project}
-
-        def get_dashboard(self, reports_dir, project, run):
-            return {}
-
-        def get_accumulated(self, reports_dir, project, as_of):
-            return {"summary": {"dimensionCount": 0}}
-
-        def get_dimension_eval(self, reports_dir, project, run_id, dimension):
-            return {}
-
-        def get_run_plan(self, reports_dir, project, run_id):
-            return {}
-
-        def get_violations(self, reports_dir, project, run_id):
-            return {"total": 0, "critical": 0, "major": 0, "minor": 0, "files": []}
-
-        def start_evaluation(self, repo, reports_dir, options):
-            return {"jobId": "job-1", "status": "running", "logs": []}
-
-        def get_evaluation_status(self, job_id, reports_dir=None):
-            if job_id != "job-1":
-                return None
-            return JobSnapshot(
-                job_id="job-1", status="running", logs=[],
-                output_project="proj", output_run_id="run-1",
-                time_limit_s=time_limit_s,
-            )
-
-        def get_log_run_dir(self, job_id):
-            return run_dir if job_id == "job-1" else None
-
-        def cancel_evaluation(self, job_id, reports_dir=None, *, discard_partial=False):
-            return False
-
-        def list_evaluations(self, *, limit=0, reports_dir=None, states=None):
-            return []
-
-        def delete_project(self, reports_dir, project):
-            return False
-
-        def browse_repo(self, path=None):
-            return {"current": "/", "parent": None, "directories": [], "isGitRepo": False}
-
-        def get_ai_clients(self):
-            return {"clients": []}
-
-        def get_client_models(self, client_id):
-            return {"models": []}
-
-    return _Provider()
+    return _Provider(run_dir, time_limit_s)
 
 
 def _write_running_run(reports_root: Path) -> Path:

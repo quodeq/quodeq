@@ -147,3 +147,17 @@ def test_audit_log_records_final_status_for_non_ascii_ua(monkeypatch):
     assert audit_calls, "after_request must emit an audit line"
     assert audit_calls[-1][2] == "/api/health"
     assert audit_calls[-1][4] == 200, "the audit line must carry the real final status code"
+
+
+def test_is_trusted_webview_reads_the_injected_env(monkeypatch):
+    """The env mapping is a parameter so the check is testable without
+    touching os.environ; the process environment stays the default."""
+    monkeypatch.delenv(security._ENV_WEBVIEW_TOKEN, raising=False)
+    env = {security._ENV_WEBVIEW_TOKEN: _TOKEN}
+    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, env) is True
+    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, {}) is False
+    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN) is False
+
+    monkeypatch.setenv(security._ENV_WEBVIEW_TOKEN, _TOKEN)
+    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN) is True
+    assert security._is_trusted_webview(_WEBVIEW_UA_WITH_TOKEN, {}) is False

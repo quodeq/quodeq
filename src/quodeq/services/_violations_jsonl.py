@@ -15,7 +15,7 @@ from quodeq.services.suppression import SuppressionMatcher, load_req_to_principl
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.config.paths import default_paths
 from quodeq.shared.validation import validate_path_segment
-from quodeq.services.violations_parsing import (
+from quodeq.services._violations_shared import (
     _build_finding_entry,
     _build_violation_response,
     _ResponseOptions,
