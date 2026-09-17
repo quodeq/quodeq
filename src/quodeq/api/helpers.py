@@ -78,7 +78,9 @@ def _page_int(args, name: str, default: int, minimum: int, kind: str, code: str)
         return default
     try:
         value = int(raw)
-    except ValueError:
+    except (TypeError, ValueError):
+        # TypeError: request.args only ever holds str, but a direct call
+        # with a list or other non-str value must answer the same 400.
         return error_response(f"{name} must be {kind}, got {raw!r}", HTTPStatus.BAD_REQUEST, code)
     if value < minimum:
         return error_response(f"{name} must be {kind}, got {value!r}", HTTPStatus.BAD_REQUEST, code)

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from flask import Response, jsonify, request
 
-from quodeq.api.helpers import error_response, json_error, scan_target_error as _scan_target_error
+from quodeq.api.helpers import json_error, scan_target_error as _scan_target_error
 from quodeq.services.base import ActionProvider, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
@@ -160,8 +160,7 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
             "unknown": ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY),
         }
         code, status = code_map.get(result.clone_error_kind, ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY))
-        body, _ = error_response(result.message, status, code)
-        return jsonify(body), status
+        return json_error(result.message, status, code)
     if result.status == "internal_error":
         # Return a generic message; the exception detail (which can carry
         # filesystem paths or backend internals) is already logged by the
