@@ -26,7 +26,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
+from quodeq.api.helpers import _path_from_body, error_response, scan_target_error as _scan_target_error
 from quodeq.services._fs_project_helpers import (
     project_record_exists,
     read_project_record,
@@ -139,11 +139,10 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
 def scan_path() -> Response | tuple[Response, int]:
     """Scan a local directory path directly (no registered project required)."""
     data = request.get_json(silent=True) or {}
-    raw_path = data.get("path", "")
-    if not isinstance(raw_path, str):
-        body, status = error_response("path must be a string", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    target = _path_from_body(data)
+    if isinstance(target, tuple):
+        body, status = target
         return jsonify(body), status
-    target = raw_path.strip()
     if not target:
         body, status = error_response("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
         return jsonify(body), status

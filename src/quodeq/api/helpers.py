@@ -14,6 +14,20 @@ def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any]
     return {"error": message, "code": code}, status
 
 
+def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
+    """Return the request body's stripped ``path``, or a 400 error tuple.
+
+    Shared by PATCH /api/projects/<project>/path and POST /api/scan so both
+    refuse a non-string ``path`` the same way instead of raising
+    AttributeError on ``.strip()`` and answering 500. An absent ``path``
+    gives ``""``: each route keeps its own required-field message.
+    """
+    raw = data.get("path", "")
+    if not isinstance(raw, str):
+        return error_response("path must be a string", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    return raw.strip()
+
+
 def _sanitize_for_log(value: str) -> str:
     """Remove CR/LF from a value before including it in a log message.
 

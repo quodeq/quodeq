@@ -72,12 +72,31 @@ class TestUpdateProjectPathValidation:
     URL, non-directory target, missing project) get their own message
     instead of a blanket "Project not found" 404 for all of them."""
 
-    def test_repo_url_rejected_before_reaching_the_provider(self, client, provider):
+    def test_valid_repo_url_reaches_the_provider(self, client, provider):
+        """URL relocation is supported: the UI's "Enter the URL to restore"
+        flow PATCHes this route with a repository URL, and
+        _fs_projects.update_project_path stores it as an online project."""
         resp = client.patch(
             "/api/projects/my-proj/path", json={"path": "https://github.com/foo/bar"},
         )
+        assert resp.status_code == 200
+        assert provider.updated_paths["my-proj"] == "https://github.com/foo/bar"
+
+    def test_malformed_repo_url_is_refused_with_invalid_url(self, client, provider):
+        resp = client.patch(
+            "/api/projects/my-proj/path", json={"path": "https://github.com/"},
+        )
         assert resp.status_code == 400
-        assert resp.get_json()["code"] == "INVALID_INPUT"
+        body = resp.get_json()
+        assert body["code"] == "INVALID_URL"
+        assert "my-proj" not in provider.updated_paths
+
+    def test_non_string_path_is_refused(self, client, provider):
+        resp = client.patch("/api/projects/my-proj/path", json={"path": 123})
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert "path must be a string" in body["error"]
         assert "my-proj" not in provider.updated_paths
 
     def test_cleartext_http_url_names_the_reason(self, client):

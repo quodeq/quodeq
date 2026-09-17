@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
+from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import _path_from_body, error_response
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
@@ -14,6 +15,7 @@ from quodeq.api.routes_project_create import _create_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
 from quodeq.services._warmup import WarmupEngine, engine as warmup_engine
+from quodeq.services._wiring import is_valid_repo_url
 from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment
@@ -35,56 +37,73 @@ def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Respons
     return jsonify({"deleted": project})
 
 
-def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
-    """Handle PATCH /api/projects/<project>/path.
+def _validated_target_path(new_path: str) -> str | tuple[dict[str, Any], int]:
+    """Return what the provider should store for *new_path*, or an error tuple.
 
-    ``provider.update_project_path`` only ever returns a bare bool, so
-    everything checkable up front (a repository URL -- not supported by
-    this endpoint --, a path-traversal attempt, a non-existent target) is
-    validated here and given its own message/code. Once that passes, a
-    False from the provider can only mean the project itself is not
-    registered, so NOT_FOUND is reserved for that case (finding 5926).
+    A value that looks like a repository URL is checked with
+    ``is_valid_repo_url`` -- the same check the provider applies -- and
+    passed through unchanged: relocating an online project to a new URL is
+    supported here and is what the UI's "Enter the URL to restore" flow
+    sends. Anything else must be an existing, canonical, absolute
+    directory, and comes back resolved.
     """
-    project = request.view_args["project"]
-    data = request.get_json(silent=True) or {}
-    new_path = data.get("path", "").strip()
-    if not new_path:
-        body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-
     try:
         looks_like_url = is_repo_url(new_path)
     except ValueError:
         # Fixed message, not str(exc): is_repo_url only raises for cleartext
         # http://, always with the same reason -- never echo exception text.
-        body, status = error_response(
+        return error_response(
             "path must use https:// or git@; cleartext http:// repository URLs are rejected",
             HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
         )
-        return jsonify(body), status
     if looks_like_url:
-        body, status = error_response(
-            f"path must be a local directory; repository URLs are not supported here, got {new_path!r}",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-        )
-        return jsonify(body), status
+        if not is_valid_repo_url(new_path):
+            return error_response(
+                f"path must be a repository URL of the form https://host/owner/repo "
+                f"or git@host:owner/repo.git, got {new_path!r}",
+                HTTPStatus.BAD_REQUEST, "INVALID_URL",
+            )
+        return new_path
 
     try:
         resolved = validate_canonical_absolute(new_path)
     except (OSError, ValueError):
         # Fixed message, not str(exc): never echo exception text.
-        body, status = error_response(
+        return error_response(
             f"path must be an absolute, traversal-free directory, got {new_path!r}",
             HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
         )
-        return jsonify(body), status
     if not resolved.is_dir():
-        body, status = error_response(
+        return error_response(
             f"path must be an existing directory, got {new_path!r}",
             HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
         )
+    return str(resolved)
+
+
+def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
+    """Handle PATCH /api/projects/<project>/path.
+
+    ``provider.update_project_path`` only ever returns a bare bool, so
+    everything checkable up front (a malformed repository URL, a
+    path-traversal attempt, a non-existent target) is validated by
+    ``_validated_target_path`` and given its own message/code. Once that
+    passes, a False from the provider can only mean the project itself is
+    not registered, so NOT_FOUND is reserved for that case (finding 5926).
+    """
+    project = request.view_args["project"]
+    data = request.get_json(silent=True) or {}
+    raw_path = _path_from_body(data)
+    if isinstance(raw_path, tuple):
+        body, status = raw_path
         return jsonify(body), status
-    new_path = str(resolved)
+    if not raw_path:
+        body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    new_path = _validated_target_path(raw_path)
+    if isinstance(new_path, tuple):
+        body, status = new_path
+        return jsonify(body), status
 
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
