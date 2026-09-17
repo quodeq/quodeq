@@ -23,7 +23,7 @@ def test_syncs_started_at_and_is_mtime_gated(tmp_path, monkeypatch):
     db = open_index(tmp_path / "idx.db")
     try:
         sync_project_dates(db, proj, "proj")
-        rows = {r.run_id: r.started_at for r in list_runs_for_project(db, "proj")}
+        rows = {r.run_id: r.started_at for r in list_runs_for_project(db, "proj", limit=None)}
         assert rows == {
             "run-a": "2026-05-25T22:19:50+00:00",
             "run-b": "2026-05-26T09:00:00+00:00",

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types.job import JobSnapshot
+from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._run_status_readers import _status_json_terminal
 from quodeq.core.utils.io import is_within
 
@@ -104,6 +105,22 @@ def _scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path |
         if candidate.is_dir():
             return candidate
     return None
+
+
+def _sync_external_run_by_scan(db, reports_dir: Path, run_id: str) -> None:
+    """Fallback for an "ext-" id the index has no usable run_dir for yet.
+
+    Scans every project dir under *reports_dir* for ``<project>/<run_id>``
+    and syncs just that run when found; otherwise falls back to a full
+    ``sync_index`` so a brand-new run still gets picked up. Once a run has
+    been indexed once, ``get_status`` resolves it straight from its stored
+    ``run_dir`` instead of reaching this scan again.
+    """
+    candidate = _scan_reports_root_for_run(reports_dir, run_id)
+    if candidate is not None:
+        _run_index.sync_index_for_run(db, candidate)
+        return
+    _run_index.sync_index(db, reports_dir)
 
 
 def _external_job_is_complete(run_dir: Path) -> bool:

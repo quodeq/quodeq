@@ -1,4 +1,5 @@
 const SINCE_UNSET = -1; // no line index seen yet: the first poll fetches everything
+const MAX_LINES = 2000; // oldest lines are dropped past this so a tab left open for hours does not grow without bound
 const LOGS_ENDPOINT = '/api/logs';
 const SINCE_PARAM = 'since'; // query key: only lines after this index
 const ISO_TIME_START = 11, ISO_TIME_END = 19; // the HH:MM:SS slice of an ISO timestamp
@@ -22,6 +23,7 @@ async function poll() {
         since = e.index;
       });
       el.appendChild(frag);
+      while (el.childElementCount > MAX_LINES) el.removeChild(el.firstElementChild);
       window.scrollTo(0, document.body.scrollHeight);
     }
   } catch (e) { console.warn('poll error', e); }

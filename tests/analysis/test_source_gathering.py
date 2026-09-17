@@ -1,6 +1,8 @@
 """Tests for source file gathering — _gather_source_files and skip dirs from subprocess.py."""
 from __future__ import annotations
 
+import os
+
 from quodeq.analysis import _api_standards_text, dispatch_policy
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -108,6 +110,18 @@ class TestGatherSourceFiles:
         names = {f.name for f in result}
         assert "page.html" in names
         assert "style.css" in names
+
+    def test_does_not_descend_into_skipped_dirs(self, tmp_path, monkeypatch):
+        (tmp_path / "src").mkdir(); (tmp_path / "src" / "a.py").write_text("x")
+        nm = tmp_path / "node_modules" / "pkg"; nm.mkdir(parents=True); (nm / "b.js").write_text("y")
+        visited = []
+        real_scandir = os.scandir
+        def spy(path=".", *a, **k):
+            visited.append(str(path)); return real_scandir(path, *a, **k)
+        monkeypatch.setattr(os, "scandir", spy)
+        files = _gather_source_files(tmp_path)
+        assert [f.name for f in files] == ["a.py"]
+        assert not any("node_modules" in v for v in visited)
 
 
 # ---------------------------------------------------------------------------

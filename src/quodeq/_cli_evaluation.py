@@ -25,7 +25,9 @@ from quodeq.config.paths import default_paths
 from quodeq.analysis.dispatch_policy import default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions, RunConfig, run
 from quodeq.analysis.scoring_pipeline import run_full
-from quodeq.services.evidence_rescore import score_dimension_from_evidence  # noqa: F401 — facade patch target
+from quodeq.services.evidence_rescore import (  # noqa: F401 — facade patch targets
+    rescore_dimension_from_evidence, score_dimension_from_evidence,
+)
 from quodeq.services.grade_formula import load_params
 from quodeq.data.fs.project_resolver import resolve_project_uuid  # noqa: F401 — facade patch target
 from quodeq.shared.logging import log_error, log_info, log_warning
@@ -49,7 +51,7 @@ from quodeq._cli_lifecycle import (  # noqa: F401
     _run_pipeline_with_cleanup, _setup_run_dirs, _write_sarif_if_requested,
 )
 from quodeq._cli_scoring import (  # noqa: F401
-    _count_excluded_findings, _dim_evidence_counts, _format_adjusted_score, _print_scores,
+    _dim_evidence_counts, _format_adjusted_score, _print_scores,
 )
 from quodeq._cli_evaluate_finalize import _apply_diff_from, _finalize_run_evaluate  # noqa: F401
 

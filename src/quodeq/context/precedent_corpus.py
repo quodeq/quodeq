@@ -69,31 +69,38 @@ class PrecedentCorpus:
         except OSError as exc:
             _logger.debug("precedent marker %s not written: %s", self._marker_path, exc)
 
-    def match(self, text: str) -> float | None:
-        """Best cosine similarity of *text* against the corpus, or None."""
-        if self._disabled or not self._vectors:
-            return None
+    def match_many(self, texts: list[str]) -> list[float | None]:
+        """Best cosine similarity of each text against the corpus, one embedding call."""
+        if self._disabled or not self._vectors or not texts:
+            return [None] * len(texts)
         try:
             start = time.monotonic()
-            query = self._embed([text])[0]
+            queries = self._embed(list(texts))
+            if len(queries) != len(texts):
+                raise RuntimeError(f"embedding returned {len(queries)} vectors "
+                                   f"for {len(texts)} texts")
             self._elapsed += time.monotonic() - start
-            q = _unit(query)
-            if q is None:
-                return None
-            best = max(math.sumprod(q, v) for v in self._vectors)
+            scores: list[float | None] = []
+            for query in queries:
+                q = _unit(query)
+                scores.append(None if q is None else max(math.sumprod(q, v) for v in self._vectors))
             if self._elapsed > _EMBED_BUDGET_S:
                 self._trip("cumulative embedding time budget exceeded")
-            return best
+            return scores
         except Exception as exc:  # noqa: BLE001 -- contractually total
             self._trip(f"embedding failed: {exc}")
-            return None
+            return [None] * len(texts)
+
+    def match(self, text: str) -> float | None:
+        """Best cosine similarity of *text* against the corpus, or None."""
+        return self.match_many([text])[0]
 
 
 def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     """Map fingerprint -> canonical text for every dismissed finding.
 
-    Mirrors ``_semantic_eligible`` in ``analysis/mcp/enricher.py`` on the
-    match side: scope-level and empty-snippet/line<=0 dismissals are
+    Mirrors ``_semantic_eligible`` in ``analysis/mcp/precedent_downweight.py``
+    on the match side: scope-level and empty-snippet/line<=0 dismissals are
     excluded here too. Without this, a single empty-snippet dismissal
     (``fingerprint`` text like ``"REQ\\n\\n"``) would cosine-match every
     future finding filed under that requirement, and corpus/match-side
@@ -129,12 +136,8 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     overrides the query-time default for backfill chunks.
     """
     from quodeq.llm_bridge._embeddings import (  # noqa: PLC0415
-        BATCH_TIMEOUT,
-        QUERY_TIMEOUT,
-        EmbeddingEndpoint,
-        embed_texts,
-        embedding_model_available,
-    )
+        BATCH_TIMEOUT, QUERY_TIMEOUT, EmbeddingEndpoint, embed_texts,
+        embedding_model_available)
 
     endpoint = EmbeddingEndpoint(base_url=base_url)
 

@@ -63,6 +63,35 @@ def test_read_returns_empty_quickly_when_idle():
         pty.kill()
 
 
+def test_read_works_when_the_master_fd_is_above_select_limit():
+    """select.select() rejects fds >= 1024; a long-lived server reaches them."""
+    import os
+    import resource
+
+    from quodeq.terminal._pty_unix import UnixPty
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if soft < 1200:
+        try:
+            resource.setrlimit(
+                resource.RLIMIT_NOFILE,
+                (min(1200, hard) if hard != resource.RLIM_INFINITY else 1200, hard),
+            )
+        except (ValueError, OSError):
+            pytest.skip("cannot raise RLIMIT_NOFILE to reach fd 1100")
+    pty = UnixPty(argv=["/bin/sh"])
+    pty.spawn(cwd="/", cols=80, rows=24)
+    try:
+        high = 1100
+        os.dup2(pty._master_fd, high)
+        os.close(pty._master_fd)
+        pty._master_fd = high  # the reader must cope with any fd number
+        # read() re-registers the selector on the new fd number automatically.
+        pty.write(b"echo hello-high\n")
+        assert b"hello-high" in _drain_until(pty, b"hello-high")
+    finally:
+        pty.kill()
+
+
 def test_resolve_shell_returns_login_interactive_argv():
     from quodeq.terminal._pty_unix import resolve_shell
     argv = resolve_shell(env={"SHELL": "/bin/bash"})

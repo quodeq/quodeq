@@ -65,13 +65,14 @@ def _resolve_evidence_jsonl(run_dir: Path, dim_id: str) -> Path | None:
     return Path(candidate)
 
 
-def _apply_suppressions_and_recompute(
-    evidence, dim_id: str, dismissed: set[tuple], deleted: set[tuple], source_file_count: int,
-) -> None:
-    """Drop dismissed/deleted violations from each principle's evidence and
-    recompute its metrics in place."""
+def _apply_suppressions(
+    evidence, dim_id: str, dismissed: set[tuple], deleted: set[tuple],
+) -> int:
+    """Drop dismissed/deleted violations from each principle's evidence in
+    place, and return how many violations that removed."""
+    excluded = 0
     for pe in evidence.principles.values():
-        pe.violations = [
+        kept = [
             v for v in pe.violations
             if not is_dismissed(dismissed, FindingRef(
                 req=v.get("req"), principle=pe.practice_id, file=v.get("file"),
@@ -79,8 +80,18 @@ def _apply_suppressions_and_recompute(
             and not is_deleted(deleted, dimension=dim_id, principle=pe.practice_id,
                                file=v.get("file"))
         ]
-        # Same call shape as core/evidence/parser._build_principles so the
-        # recomputed metrics (confidence, compliance %) match scan time.
+        excluded += len(pe.violations) - len(kept)
+        pe.violations = kept
+    return excluded
+
+
+def _recompute_metrics(evidence, source_file_count: int) -> None:
+    """Recompute every principle's metrics in place.
+
+    Same call shape as core/evidence/parser._build_principles so the
+    recomputed metrics (confidence, compliance %) match scan time.
+    """
+    for pe in evidence.principles.values():
         pe.compute_metrics(source_file_count=source_file_count)
 
 
@@ -121,6 +132,60 @@ class EvidenceScoreRequest:
     standard_dirs_fn: Callable[[], tuple[Path | None, Path | None]] | None = None
 
 
+@dataclass(frozen=True)
+class EvidenceRescore:
+    result: ScoringResult | None
+    excluded: int
+
+
+def rescore_dimension_from_evidence(
+    run_dir: Path,
+    dim_id: str,
+    request: EvidenceScoreRequest,
+    *,
+    score_when_nothing_excluded: bool = True,
+) -> EvidenceRescore:
+    """`score_dimension_from_evidence` plus the number of violations the
+    suppressions removed.
+
+    Parses the evidence jsonl exactly once: the exclusion count and the
+    rescored result both come from that same parse (previously the CLI
+    counted exclusions with one parse, then rescored with a second).
+    Returns ``EvidenceRescore(None, 0)`` when the evidence file is
+    missing/empty/unparseable, so the caller can fall back to the legacy
+    in-place formula.
+
+    *score_when_nothing_excluded* False stops at the count when no
+    suppression matched this run: with zero exclusions the result equals the
+    stored scan score by construction, so a caller that only prints an
+    adjusted grade (the CLI) has nothing to gain from the metrics recompute
+    and the scoring pass. The dashboard callers need the score itself and
+    keep the default.
+    """
+    jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
+    if jsonl is None or evidence_file_size(jsonl) == 0:
+        return EvidenceRescore(None, 0)
+    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request)
+    if evidence is None:
+        return EvidenceRescore(None, 0)
+
+    excluded = _apply_suppressions(evidence, dim_id, request.dismissed, request.deleted)
+    if excluded == 0 and not score_when_nothing_excluded:
+        return EvidenceRescore(None, 0)
+    _recompute_metrics(evidence, request.source_file_count)
+
+    # Broad catch on purpose (mirrors mutation_rescore and the CLI print
+    # guard): the engine can throw on edge-case evidence, and every consumer
+    # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back
+    # to the stored score" — one bad dimension must not fail the whole run.
+    try:
+        result = score_evidence(evidence, mode="numerical", params=request.params)
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
+        return EvidenceRescore(None, excluded)
+    return EvidenceRescore(result, excluded)
+
+
 def score_dimension_from_evidence(
     run_dir: Path,
     dim_id: str,
@@ -131,23 +196,4 @@ def score_dimension_from_evidence(
     Returns None when the evidence file is missing/empty/unparseable so the
     caller can fall back to the legacy in-place formula.
     """
-    jsonl = _resolve_evidence_jsonl(run_dir, dim_id)
-    if jsonl is None or evidence_file_size(jsonl) == 0:
-        return None
-    evidence = _parse_evidence_jsonl(jsonl, run_dir, dim_id, request)
-    if evidence is None:
-        return None
-
-    _apply_suppressions_and_recompute(
-        evidence, dim_id, request.dismissed, request.deleted, request.source_file_count,
-    )
-
-    # Broad catch on purpose (mirrors mutation_rescore and the CLI print
-    # guard): the engine can throw on edge-case evidence, and every consumer
-    # (dashboard build, /api/rescore, trend fetcher) treats None as "fall back
-    # to the stored score" — one bad dimension must not fail the whole run.
-    try:
-        return score_evidence(evidence, mode="numerical", params=request.params)
-    except Exception as exc:  # noqa: BLE001
-        _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
-        return None
+    return rescore_dimension_from_evidence(run_dir, dim_id, request).result

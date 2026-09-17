@@ -37,7 +37,7 @@ def project_run_dates(reports_root: Path, project: str) -> dict[str, tuple[str, 
         db = open_index(Path(get_index_db_path()))
         try:
             sync_project_dates(db, Path(reports_root) / project, project)
-            rows = list_runs_for_project(db, project)
+            rows = list_runs_for_project(db, project, limit=None)
         finally:
             db.close()
     except Exception:

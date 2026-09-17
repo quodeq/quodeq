@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -74,4 +75,33 @@ def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
                             skill.name, path)
             continue
         skills[skill.name] = skill
+    return skills
+
+
+_SKILLS_MEMO: dict[Path, tuple[tuple, dict[str, Skill]]] = {}
+_SKILLS_MEMO_LOCK = threading.Lock()
+
+
+def _skills_stamp(directory: Path) -> tuple:
+    """Identity of the directory's skill files: name, size and mtime of every ``*.md``."""
+    try:
+        with os.scandir(directory) as it:
+            return tuple(sorted(
+                (e.name, e.stat().st_size, e.stat().st_mtime_ns)
+                for e in it if e.name.endswith(".md") and e.is_file()))
+    except OSError:
+        return ()
+
+
+def cached_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
+    """``load_skills`` memoized on the directory's file stamps; a changed, added or removed file re-parses."""
+    directory = skills_dir or _SKILLS_DIR
+    stamp = _skills_stamp(directory)
+    with _SKILLS_MEMO_LOCK:
+        hit = _SKILLS_MEMO.get(directory)
+        if hit is not None and hit[0] == stamp:
+            return hit[1]
+    skills = load_skills(directory)
+    with _SKILLS_MEMO_LOCK:
+        _SKILLS_MEMO[directory] = (stamp, skills)
     return skills

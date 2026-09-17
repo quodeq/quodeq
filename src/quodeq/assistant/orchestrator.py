@@ -14,7 +14,7 @@ from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
-from quodeq.assistant.skills import load_skills
+from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.assistant.tools._write_tools import register_write_tools
 from quodeq.assistant.worktree import ensure_session_worktree
@@ -200,7 +200,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantStore,
         skill_name, text = _split_skill(request.text)
         skill = None
         if skill_name is not None:
-            skill = load_skills().get(skill_name)
+            skill = cached_skills().get(skill_name)
             if skill is None:
                 emit({"type": "error", "message": f"unknown skill: /{skill_name}"})
                 return

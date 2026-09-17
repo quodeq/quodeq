@@ -49,6 +49,7 @@ class _DdgResultParser(HTMLParser):
         self._target: str | None = None   # "title" | "snippet" while inside one
         self._container: str | None = None
         self._depth = 0
+        self._parts: list[str] = []
 
     def handle_starttag(self, tag, attrs):
         if self._target is not None:
@@ -60,19 +61,30 @@ class _DdgResultParser(HTMLParser):
             url = _decode_ddg_href(dict(attrs).get("href") or "")
             self.results.append({"title": "", "url": url, "snippet": ""})
             self._target, self._container, self._depth = "title", tag, 1
+            self._parts = []
         elif "result__snippet" in classes and self.results:
             self._target, self._container, self._depth = "snippet", tag, 1
+            self._parts = []
 
     def handle_endtag(self, tag):
         if self._target is None or tag != self._container:
             return
         self._depth -= 1
         if self._depth == 0:
+            self._flush()
             self._target = None
 
     def handle_data(self, data):
         if self._target and self.results:
-            self.results[-1][self._target] += data
+            self._parts.append(data)
+
+    def _flush(self) -> None:
+        if self._target and self.results:
+            self.results[-1][self._target] = "".join(self._parts)
+
+    def close(self) -> None:
+        super().close()  # feeds any buffered trailing data through handle_data first
+        self._flush()  # an unterminated target tag still yields its accumulated text
 
 
 def _search_web(query: str, max_results: int = 5) -> dict:

@@ -110,6 +110,24 @@ def test_put_accepts_empty_selection(client, project_id, repo_root):
     assert (repo_root / VISIBILITY_RELPATH).is_file()
 
 
+def test_put_computes_known_ids_once(client, project_id, monkeypatch):
+    import quodeq.api.standards_visibility_routes as _mod
+    real_known_ids = _mod._known_ids
+    calls = {"n": 0}
+
+    def counting(app):
+        calls["n"] += 1
+        return real_known_ids(app)
+
+    monkeypatch.setattr(_mod, "_known_ids", counting)
+
+    resp = client.put(f"/api/projects/{project_id}/standards-visibility",
+                       json={"visibleStandardIds": ["security"]},
+                       headers=_LOCALHOST)
+    assert resp.status_code == 200
+    assert calls["n"] == 1, "the PUT must list all standards only once"
+
+
 def test_routes_404_when_project_has_no_local_repo(client, detached_project_id):
     for call in (client.get, client.put):
         resp = call(f"/api/projects/{detached_project_id}/standards-visibility",

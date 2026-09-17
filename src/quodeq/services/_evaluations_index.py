@@ -22,7 +22,8 @@ from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import is_safe_run_segment
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
-    _external_job_is_complete, _merge_internal_jobs, _remove_run_directory, _scan_reports_root_for_run,
+    _external_job_is_complete, _merge_internal_jobs, _remove_run_directory,
+    _scan_reports_root_for_run, _sync_external_run_by_scan,
 )
 from quodeq.services._run_status_readers import build_job_snapshot
 from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
@@ -72,23 +73,24 @@ class EvaluationsIndex:
         # limit>0: over-fetch by len(internal_jobs) so that even if every
         # in-memory job dedupes against (and removes) a fetched DB row, the
         # fetch still leaves >= limit usable DB rows to fill the merge.
-        # limit<=0 means "fetch all" — leave that path untouched.
-        # A *states* filter is applied after the merge, so any finite fetch
-        # can starve it: rows matching the filter may sit past the fetched
-        # window, silently returning fewer than *limit* matches. The filter
-        # is not pushed into SQL (in-memory jobs have no row), so drop the
-        # pushdown entirely and fetch all whenever a filter is in play.
-        db_limit = limit + len(internal_jobs) if limit and limit > 0 and not states else 0
+        # limit<=0 means "fetch all".
+        # A *states* filter is pushed straight into the SQL query below
+        # (JobSnapshot.status is exactly RunRow.state for indexed rows), so
+        # it narrows the same bounded fetch instead of requiring a fetch-all
+        # that gets filtered in Python afterwards. It is re-applied in
+        # Python only to drop in-memory jobs that have no row and therefore
+        # can't be filtered in SQL.
+        db_limit = limit + len(internal_jobs) if limit and limit > 0 else None
         db = self._open_index()
         try:
             _run_index.sync_index(db, reports_dir)
-            rows = _run_index.list_runs(db, limit=db_limit)
+            rows = _run_index.list_runs(db, limit=db_limit, states=states or None)
         finally:
             db.close()
         snapshots = [self._run_row_to_snapshot(r) for r in rows]
         merged = _merge_internal_jobs(snapshots, internal_jobs)
         if states:
-            merged = [s for s in merged if s.status in states]
+            merged = [s for s in merged if s.status in states]  # keep: in-memory jobs have no row
         merged.sort(key=lambda s: s.started_at or "", reverse=True)
         return merged[:limit] if limit and limit > 0 else merged
 
@@ -149,13 +151,15 @@ class EvaluationsIndex:
                 run_id = job_id[len("ext-"):]
                 if not is_safe_run_segment(run_id):
                     return None
-                for project_dir in (reports_dir.iterdir() if reports_dir.is_dir() else []):
-                    candidate = project_dir / run_id
-                    if candidate.is_dir():
-                        _run_index.sync_index_for_run(db, candidate)
-                        break
+                known = _run_index.get_run(db, job_id)
+                # A blank run_dir falls through to the scan: Path("") is
+                # Path("."), whose is_dir() is True, so it would sync the
+                # process cwd as if it were the run.
+                run_dir = Path(known.run_dir) if known is not None and known.run_dir else None
+                if run_dir is not None and run_dir.is_dir():
+                    _run_index.sync_index_for_run(db, run_dir)
                 else:
-                    _run_index.sync_index(db, reports_dir)
+                    _sync_external_run_by_scan(db, reports_dir, run_id)
             else:
                 _run_index.sync_index(db, reports_dir)
             row = _run_index.get_run(db, job_id)

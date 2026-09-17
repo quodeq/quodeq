@@ -26,6 +26,7 @@ from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-ex
     is_safe_run_segment,
     resolve_external_pid,
 )
+from quodeq.services._run_index_fs import _scan_reports_root_for_run
 from quodeq.shared._env import env_float
 from quodeq.shared.process import is_pid_alive
 
@@ -50,6 +51,25 @@ class ProcessControl:
     pid_alive: Callable[[int], bool] = is_pid_alive
 
 
+
+
+def resolve_external_run_project(
+    reports_root: Path, run_id: str, *, run_dir_hint: Path | None = None,
+) -> str | None:
+    """Return the project_uuid owning *run_id*, or None if not found.
+
+    *run_dir_hint*, when it names a real directory, is trusted directly (its
+    parent's name is the project_uuid) so a caller that already knows
+    output_project/output_run_id skips scanning every project dir under
+    *reports_root*.
+
+    Without a hint this goes through ``_scan_reports_root_for_run``, the one
+    copy of the scan, so the ``is_within`` jail applies here too.
+    """
+    if run_dir_hint is not None and run_dir_hint.is_dir():
+        return run_dir_hint.parent.name
+    candidate = _scan_reports_root_for_run(reports_root, run_id)
+    return candidate.parent.name if candidate is not None else None
 
 
 def cancel_external_run(

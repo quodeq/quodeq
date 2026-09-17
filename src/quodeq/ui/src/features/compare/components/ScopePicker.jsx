@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { nf, score1 } from '../compareFormatters.js';
@@ -31,6 +31,7 @@ function ScopePickerRow({ row, on, toggleProject }) {
 }
 
 function ScopePickerPopover({ rows, scopeIds, toggleProject, selectAll, selectFlagged }) {
+  const inScope = useMemo(() => (scopeIds == null ? null : new Set(scopeIds)), [scopeIds]);
   return (
     <div className="compare-picker__pop">
       <div className="compare-picker__head">
@@ -47,7 +48,7 @@ function ScopePickerPopover({ rows, scopeIds, toggleProject, selectAll, selectFl
           <ScopePickerRow
             key={row.id}
             row={row}
-            on={scopeIds == null || scopeIds.includes(row.id)}
+            on={inScope == null || inScope.has(row.id)}
             toggleProject={toggleProject}
           />
         ))}

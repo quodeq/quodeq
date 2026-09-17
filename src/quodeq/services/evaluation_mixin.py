@@ -167,12 +167,14 @@ class FsEvaluationMixin:
         """
         reports_root = Path(reports_dir) if reports_dir else None
         job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
-        ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
         # A job cancelled before the report_path marker landed has no
         # output_project/output_run_id yet — there is no run dir to wait on,
-        # score, or discard.
-        if ok and reports_dir and job and job.output_project and job.output_run_id:
+        # score, discard, or hand to cancel_job as its ext- lookup hint.
+        run_dir: Path | None = None
+        if reports_dir and job and job.output_project and job.output_run_id:
             run_dir = Path(reports_dir) / job.output_project / job.output_run_id
+        ok = self._jobs.cancel_job(job_id, reports_root=reports_root, run_dir=run_dir)
+        if ok and run_dir is not None:
             _wait_for_terminal_status(run_dir)
             if discard_partial:
                 _discard_run_state(reports_dir, {
