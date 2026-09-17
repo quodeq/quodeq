@@ -9,7 +9,7 @@
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
 src/quodeq/_cli_lifecycle.py:70:broad-except
-src/quodeq/_cli_scoring.py:124:broad-except
+src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_api_call.py:291:broad-except
 src/quodeq/analysis/_api_runner.py:96:broad-except
 src/quodeq/analysis/_loop_steps.py:103:broad-except
@@ -135,7 +135,7 @@ src/quodeq/services/active_evaluation.py:68:broad-except
 src/quodeq/services/background.py:43:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
-src/quodeq/services/evidence_rescore.py:169:broad-except
+src/quodeq/services/evidence_rescore.py:188:broad-except
 src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/mutation_rescore.py:180:broad-except
 src/quodeq/services/project_registration.py:178:broad-except

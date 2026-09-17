@@ -120,6 +120,9 @@ def _adjusted_score(
                 source_file_count=source_file_count, files_read=files_read,
                 params=params,
             ),
+            # Nothing excluded means the stored grade already is the answer
+            # (see the return below), so don't pay for a scoring pass.
+            score_when_nothing_excluded=False,
         )
     except Exception as exc:  # noqa: BLE001 — console embellishment on top of
         # reports already on disk; nothing upstream catches a generic exception
