@@ -239,8 +239,8 @@ def register_findings_routes(app: Flask) -> None:
     @app.errorhandler(_ProjectNotFoundError)
     def _handle_project_not_found(_exc: _ProjectNotFoundError) -> tuple[Response, int]:
         # Same {"error", "code"} shape every other error branch in this
-        # file uses (lines 106, 109, 175, 190, 193, 205-206, 213), instead
-        # of Flask's default 404 HTML page that a bare abort() would give.
+        # file returns, instead of Flask's default 404 HTML page that the
+        # bare abort() _project_dir used to call would give.
         return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
 
     @app.get("/api/findings/dismissed")
