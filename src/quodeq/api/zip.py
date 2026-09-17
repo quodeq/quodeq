@@ -192,7 +192,13 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     except _ZipSizeLimitError as exc:
         body, status = error_response(exc.public_message, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
-    except (OSError, zipfile.BadZipFile):
+    except (OSError, zipfile.BadZipFile, ValueError) as exc:
+        # ValueError covers zipfile's own rejections (for example "ZIP does
+        # not support timestamps before 1980" from zf.write under the
+        # default strict_timestamps=True). Without this they would leave the
+        # route as Flask's default 500 page, which carries no code. The
+        # message is fixed and the exception only logged, never echoed.
+        _logger.warning("Failed to build export zip for %s: %s", project, exc)
         body, status = error_response(
             "Failed to build project archive. Check disk space and file permissions, then try again.",
             HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",

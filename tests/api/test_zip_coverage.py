@@ -207,6 +207,31 @@ class TestExportProjectZip:
                 assert "QUODEQ_MAX_ZIP_SIZE_MB" in message
                 assert message != "Project too large to export"
 
+    def test_other_value_error_answers_a_coded_json_body(self, tmp_path, monkeypatch):
+        """zipfile raises ValueErrors of its own (for example "ZIP does not
+        support timestamps before 1980" from zf.write under the default
+        strict_timestamps=True). Those must get the same coded JSON body as an
+        OSError, not Flask's default 500 HTML page with no code."""
+        from quodeq.api.zip import export_project_zip
+        from flask import Flask
+        project = tmp_path / "proj"
+        project.mkdir()
+        (project / "file.txt").write_text("x")
+
+        def _raise_value_error(*_args, **_kwargs):
+            raise ValueError("x")
+
+        monkeypatch.setattr(zipfile.ZipFile, "write", _raise_value_error)
+        app = Flask(__name__)
+        with app.app_context():
+            resp = export_project_zip("proj", str(tmp_path))
+        assert isinstance(resp, tuple)
+        response, status = resp
+        assert status == 500
+        body = response.get_json()
+        assert body["code"] == "EXPORT_ERROR"
+        assert "x" != body["error"], "the exception text must not be echoed"
+
     def test_os_error(self, tmp_path):
         from quodeq.api.zip import export_project_zip
         from flask import Flask
