@@ -42,12 +42,12 @@ def _known_ids(app: Flask) -> set[str]:
     return {m.id.strip().lower() for m in service.list_standards()}
 
 
-def _payload(app: Flask, root: Path) -> dict:
+def _payload(app: Flask, root: Path, *, known_ids: set[str] | None = None) -> dict:
     ids = load_visible_standard_ids(root)
     return {
         "visibleStandardIds": list(ids),
         "isDefault": visibility_is_default(root),
-        "knownStandardIds": sorted(_known_ids(app)),
+        "knownStandardIds": sorted(known_ids if known_ids is not None else _known_ids(app)),
         # Additive: lets the UI's boot-time JS literal (constants.js)
         # be reconciled against the server's own default set instead
         # of duplicating it as a second source of truth.
@@ -85,7 +85,8 @@ def register_visibility_routes(app: Flask) -> None:
         if raw is None:
             return error_response('Body must be {"visibleStandardIds": [...]}',
                                   HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
-        clean, errors = validate_visible_ids(raw, _known_ids(app))
+        known = _known_ids(app)
+        clean, errors = validate_visible_ids(raw, known)
         if errors:
             resp = jsonify({"error": "Invalid visibility selection",
                             "code": "invalid_visibility", "details": errors})
@@ -94,4 +95,4 @@ def register_visibility_routes(app: Flask) -> None:
         save_visible_standard_ids(root, clean)
         logger.info("standards.visibility saved project=%s visible=%d",
                     project_id, len(clean))
-        return jsonify(_payload(app, root))
+        return jsonify(_payload(app, root, known_ids=known))

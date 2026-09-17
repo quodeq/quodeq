@@ -84,8 +84,8 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
         limit = request.args.get("limit", 500, type=int)
         offset = request.args.get("offset", 0, type=int)
         svc = get_service(app)
-        items = [to_camel_dict(s) for s in svc.list_standards()]
-        return jsonify(items[offset:offset + limit])
+        page = svc.list_standards()[offset:offset + limit]
+        return jsonify([to_camel_dict(s) for s in page])
 
     @app.get("/api/standards/library")
     def list_library() -> Response:

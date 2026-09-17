@@ -59,6 +59,18 @@ def test_logs_js_polls_the_api_logs_endpoint():
     assert b"{{POLL_INTERVAL_MS}}" not in resp.data
 
 
+def test_logs_js_caps_the_dom_with_max_lines():
+    """A tab left open for hours must not grow #logs without bound: the
+    poller trims the oldest lines past MAX_LINES."""
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs.js")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert "MAX_LINES" in text
+    assert "removeChild" in text
+
+
 def test_logs_css_served():
     app = create_app()
     client = app.test_client()
