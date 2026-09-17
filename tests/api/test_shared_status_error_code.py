@@ -1,8 +1,11 @@
-"""Machine-readable error-code coverage for GET /api/shared/status
-(usability cycle 1, task 6 sweep): the one bare jsonify() tools/
-check_error_codes.py (the zero-tolerance gate added in task 6) found under
-routes_shared_config.py -- the status payload's reserved, always-present
-"error" field now has a matching reserved "code" field alongside it.
+"""GET /api/shared/status keeps its reserved error slot without a code.
+
+The status payload's always-present ``"error"`` field is a reserved slot the
+UI binds to without existence checks, not an error response, so it carries no
+``"code"``: tools/check_error_codes.py exempts a dict literal whose
+``"error"`` value is ``None`` (final-review item 9). A meaningless
+``"code": None`` was added to satisfy the gate's earlier false positive and
+is removed again here.
 
 Sibling of test_shared_routes_error_codes.py. The ``client`` fixture is
 reused, not copied, from tests/api/_routes_shared_fixtures.py.
@@ -12,9 +15,9 @@ from __future__ import annotations
 from tests.api._routes_shared_fixtures import client  # noqa: F401 -- pytest fixture
 
 
-def test_shared_status_has_reserved_code_field(client):
+def test_shared_status_keeps_the_reserved_error_slot_without_a_code(client):
     resp = client.get("/api/shared/status")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["error"] is None
-    assert body["code"] is None
+    assert "code" not in body
