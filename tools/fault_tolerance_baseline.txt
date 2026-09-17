@@ -113,10 +113,10 @@ src/quodeq/data/fs/suppression_rules.py:42:broad-except
 src/quodeq/data/migrations/dismissed_json_to_actions_log.py:51:broad-except
 src/quodeq/data/sqlite/findings_queries.py:215:broad-except
 src/quodeq/data/sqlite/findings_queries.py:263:broad-except
-src/quodeq/data/sqlite/run_index.py:111:broad-except
-src/quodeq/data/sqlite/run_index.py:179:broad-except
-src/quodeq/data/sqlite/run_index.py:88:broad-except
-src/quodeq/data/sqlite/run_index.py:94:broad-except
+src/quodeq/data/sqlite/run_index.py:112:broad-except
+src/quodeq/data/sqlite/run_index.py:180:broad-except
+src/quodeq/data/sqlite/run_index.py:89:broad-except
+src/quodeq/data/sqlite/run_index.py:95:broad-except
 src/quodeq/llm_bridge/_cloud.py:60:broad-except
 src/quodeq/menubar/app.py:115:broad-except
 src/quodeq/menubar/app.py:134:broad-except

@@ -52,6 +52,26 @@ class ProcessControl:
 
 
 
+def resolve_external_run_project(
+    reports_root: Path, run_id: str, *, run_dir_hint: Path | None = None,
+) -> str | None:
+    """Return the project_uuid owning *run_id*, or None if not found.
+
+    *run_dir_hint*, when it names a real directory, is trusted directly (its
+    parent's name is the project_uuid) so a caller that already knows
+    output_project/output_run_id skips scanning every project dir under
+    *reports_root*.
+    """
+    if run_dir_hint is not None and run_dir_hint.is_dir():
+        return run_dir_hint.parent.name
+    if not reports_root.is_dir():
+        return None
+    for project_dir in reports_root.iterdir():
+        if project_dir.is_dir() and (project_dir / run_id).is_dir():
+            return project_dir.name
+    return None
+
+
 def cancel_external_run(
     project_uuid: str,
     run_id: str,

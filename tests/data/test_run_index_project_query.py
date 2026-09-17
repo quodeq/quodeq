@@ -14,10 +14,10 @@ def test_list_runs_for_project_filters_and_orders(tmp_path):
         _insert(db, job_id="ext-a", project="P1", run_id="a", state="done", started_at="2026-01-01T00:00:00Z")
         _insert(db, job_id="ext-b", project="P1", run_id="b", state="done", started_at="2026-03-01T00:00:00Z")
         _insert(db, job_id="ext-c", project="P2", run_id="c", state="done", started_at="2026-02-01T00:00:00Z")
-    rows = list_runs_for_project(db, "P1")
+    rows = list_runs_for_project(db, "P1", limit=None)
     assert [r.run_id for r in rows] == ["b", "a"]
     assert all(r.project_uuid == "P1" for r in rows)
 
 def test_list_runs_for_project_empty(tmp_path):
     db = open_index(tmp_path / "index.db")
-    assert list_runs_for_project(db, "nope") == []
+    assert list_runs_for_project(db, "nope", limit=None) == []
