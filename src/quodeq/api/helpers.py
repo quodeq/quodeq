@@ -49,6 +49,63 @@ def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     return raw.strip()
 
 
+_MIN_PAGE_LIMIT = 1
+_DEFAULT_PAGE_OFFSET = 0
+
+
+def _page_int(args, name: str, default: int, minimum: int, kind: str, code: str) -> int | tuple[dict[str, Any], int]:
+    """Parse one paging query parameter for :func:`page_params`.
+
+    An absent parameter keeps *default*. A present value that fails
+    ``int()``, or is below *minimum*, comes back as a ready
+    ``error_response`` result naming the parameter, what was received and
+    what is valid.
+    """
+    raw = args.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return error_response(f"{name} must be {kind}, got {raw!r}", HTTPStatus.BAD_REQUEST, code)
+    if value < minimum:
+        return error_response(f"{name} must be {kind}, got {value!r}", HTTPStatus.BAD_REQUEST, code)
+    return value
+
+
+def page_params(
+    args,
+    *,
+    default_limit: int,
+    default_offset: int = _DEFAULT_PAGE_OFFSET,
+    min_limit: int = _MIN_PAGE_LIMIT,
+    code: str = "INVALID_INPUT",
+) -> tuple[int, int] | tuple[dict[str, Any], int]:
+    """Parse and validate ``limit``/``offset`` for a paginated route.
+
+    Returns ``(limit, offset)``, or an ``error_response`` result whose first
+    element is a dict, which is how callers tell the two apart. Every
+    paginated route shares one rule: an absent parameter keeps the route's
+    default, and a parameter that IS present but is not an integer or is
+    below its minimum answers 400 naming the parameter, instead of silently
+    substituting the default the way ``request.args.get(..., type=int)``
+    did.
+
+    *min_limit* is 0 for the routes where ``limit=0`` is the "no limit"
+    sentinel, and *code* covers the modules whose error codes are
+    lower-case. A route's own upper cap stays a clamp in the route: asking
+    for more than it serves is not an error.
+    """
+    limit_kind = "a positive integer" if min_limit > 0 else "a non-negative integer"
+    limit = _page_int(args, "limit", default_limit, min_limit, limit_kind, code)
+    if isinstance(limit, tuple):
+        return limit
+    offset = _page_int(args, "offset", default_offset, 0, "a non-negative integer", code)
+    if isinstance(offset, tuple):
+        return offset
+    return limit, offset
+
+
 def _sanitize_for_log(value: str) -> str:
     """Remove CR/LF from a value before including it in a log message.
 

@@ -18,7 +18,7 @@ from quodeq.api._evaluation_helpers import (
     _validate_ai_model,
     clean_scan_conflict_error,
 )
-from quodeq.api.helpers import error_response, scan_target_error, validate_evaluation_payload
+from quodeq.api.helpers import error_response, page_params, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.shared.validation import relative_scope_error
 from quodeq.assistant import get_provider_configs
@@ -135,8 +135,14 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
     """Register evaluation listing and creation routes."""
 
     @app.get("/api/evaluations")
-    def list_evaluations() -> Response:
-        raw_limit = request.args.get("limit", 0, type=int)
+    def list_evaluations() -> Response | tuple[dict[str, Any], int]:
+        # limit=0 is this route's "no client cap" sentinel, so 0 stays valid;
+        # a malformed or negative value answers 400 (see page_params). The
+        # hard cap stays a clamp below.
+        paging = page_params(request.args, default_limit=0, min_limit=0)
+        if isinstance(paging[0], dict):
+            return paging
+        raw_limit = paging[0]
         if raw_limit <= 0 or raw_limit > _EVALUATIONS_LIST_HARD_CAP:
             limit = _EVALUATIONS_LIST_HARD_CAP
         else:

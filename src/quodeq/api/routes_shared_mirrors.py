@@ -17,7 +17,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import error_response, page_params
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit
@@ -245,9 +245,11 @@ def register_shared_mirror_routes(app: Flask) -> None:
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
             return jsonify([])
-        raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
-        offset = max(0, request.args.get("offset", 0, type=int))
+        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+        if isinstance(paging[0], dict):
+            return paging
+        limit, offset = paging
+        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
         items = load_dismissed(project_dir, offset=offset, limit=limit)
         return jsonify(items)
 
@@ -260,8 +262,10 @@ def register_shared_mirror_routes(app: Flask) -> None:
         project_dir = _shared_project_dir(eval_root, project)
         if project_dir is None:
             return jsonify([])
-        raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
-        offset = max(0, request.args.get("offset", 0, type=int))
+        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+        if isinstance(paging[0], dict):
+            return paging
+        limit, offset = paging
+        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
         items = verified_entries(project_dir, offset=offset, limit=limit)
         return jsonify(items)

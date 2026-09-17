@@ -547,6 +547,24 @@ def test_shared_dismissed_findings_invalid_segment(client, shared_clone_fixture)
     assert resp.status_code == 400
 
 
+def test_shared_dismissed_findings_rejects_a_malformed_limit(client, shared_clone_fixture):
+    """Final-review item 10: the mirrors follow the same paging rule as the
+    local lists instead of silently defaulting a malformed value."""
+    resp = client.get("/api/shared/projects/proj-a/findings/dismissed?limit=abc")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "INVALID_INPUT"
+    assert "limit" in body["error"]
+
+
+def test_shared_verified_findings_rejects_a_malformed_limit(client, shared_clone_fixture):
+    resp = client.get("/api/shared/projects/proj-a/findings/verified?limit=abc")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "INVALID_INPUT"
+    assert "limit" in body["error"]
+
+
 def test_shared_projects_expose_origin_url_and_score_fields(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200

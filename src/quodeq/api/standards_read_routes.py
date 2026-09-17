@@ -12,7 +12,7 @@ from typing import Callable
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import error_response, page_params
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -100,41 +100,18 @@ _DEFAULT_LIST_LIMIT = 500
 _DEFAULT_LIST_OFFSET = 0
 
 
-def _validated_page_int(args, name: str, default: int, minimum: int, kind: str) -> int | tuple[dict, int]:
-    """Parse one paging query param for `_page_params`.
-
-    An absent parameter keeps *default*. A present value that fails
-    ``int()``, or is below *minimum*, returns a ready ``error_response()``
-    result naming the parameter, what was received, and what is valid.
-    """
-    raw = args.get(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return error_response(f"{name} must be {kind}, got {raw!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
-    if value < minimum:
-        return error_response(f"{name} must be {kind}, got {value!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
-    return value
-
-
 def _page_params(args) -> tuple[int, int] | tuple[dict, int]:
     """Parse and validate ``limit``/``offset`` for GET /api/standards.
 
-    Each is optional and keeps its default when absent (limit=500,
-    offset=0). A parameter that IS present but is not an integer, or is
-    below its minimum (limit < 1, offset < 0), returns a 400 error
-    response naming the parameter instead of silently substituting the
-    default -- the previous behaviour of ``request.args.get(..., type=int)``.
+    Thin wrapper over the shared ``page_params`` so this route keeps its own
+    defaults (limit=500, offset=0) and this module's lower-case error code.
     """
-    limit = _validated_page_int(args, "limit", _DEFAULT_LIST_LIMIT, 1, "a positive integer")
-    if isinstance(limit, tuple):
-        return limit
-    offset = _validated_page_int(args, "offset", _DEFAULT_LIST_OFFSET, 0, "a non-negative integer")
-    if isinstance(offset, tuple):
-        return offset
-    return limit, offset
+    return page_params(
+        args,
+        default_limit=_DEFAULT_LIST_LIMIT,
+        default_offset=_DEFAULT_LIST_OFFSET,
+        code=ERROR_CODE_BAD_REQUEST,
+    )
 
 
 def register_read_routes(app: Flask, get_service, get_library_client) -> None:

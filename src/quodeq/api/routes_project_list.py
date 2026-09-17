@@ -7,7 +7,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import _path_from_body, error_response
+from quodeq.api.helpers import _path_from_body, error_response, page_params
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
@@ -120,15 +120,19 @@ def register_project_list_routes(
     register_project_scan_routes(app)
 
     @app.get("/api/projects")
-    def list_projects() -> Response:
+    def list_projects() -> Response | tuple[dict[str, Any], int]:
         """Return all projects with optional ``?limit=N&offset=M`` pagination.
 
         Pagination is pushed into the provider (``offset``/``limit``) so a
         paginated request only pays for hydrating its own window instead of
-        the whole project set (see ``ProjectsCache._list_page``).
+        the whole project set (see ``ProjectsCache._list_page``). ``limit=0``
+        is this route's "no limit" sentinel, so 0 stays valid; anything
+        malformed or negative answers 400 (see ``page_params``).
         """
-        offset = request.args.get("offset", 0, type=int)
-        limit = request.args.get("limit", 0, type=int)
+        paging = page_params(request.args, default_limit=0, min_limit=0)
+        if isinstance(paging[0], dict):
+            return paging
+        limit, offset = paging
         result = provider.list_projects(reports_dir(), offset=offset, limit=limit)
         projects = result.get("projects", [])
         # Self-healing warm-up: anything still pending on the page being

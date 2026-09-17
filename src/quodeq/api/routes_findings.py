@@ -17,7 +17,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import error_response, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services._dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
@@ -136,15 +136,18 @@ def register_findings_routes(app: Flask) -> None:
         return rescore_with_fallback(_eval_dir(), project, run_id)
 
     @app.get("/api/findings/dismissed")
-    def list_dismissed() -> Response:
+    def list_dismissed() -> Response | tuple[dict[str, Any], int]:
         project = request.args.get("project", "")
         if not project:
             return jsonify([])
         # No limit param → return everything (capped at the hard maximum).
-        # An explicit limit is clamped to [1, _MAX_FINDINGS_LIST_LIMIT].
-        raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
-        offset = max(0, request.args.get("offset", 0, type=int))
+        # A malformed or out-of-range limit/offset answers 400; an explicit
+        # limit above the hard maximum stays clamped (the UI asks for 5000).
+        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+        if isinstance(paging[0], dict):
+            return paging
+        limit, offset = paging
+        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
         project_dir = _project_dir_or_none(_eval_dir(), project)
         if project_dir is None:
             return jsonify([])
@@ -231,15 +234,16 @@ def register_findings_routes(app: Flask) -> None:
         return jsonify({"ok": True, "deleted": count, "scores": scores, "delta": delta}), 200
 
     @app.get("/api/findings/verified")
-    def list_verified() -> Response:
+    def list_verified() -> Response | tuple[dict[str, Any], int]:
         project = request.args.get("project", "")
         if not project:
             return jsonify([])
-        # No limit param → return everything (capped at the hard maximum).
-        # An explicit limit is clamped to [1, _MAX_FINDINGS_LIST_LIMIT].
-        raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
-        limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
-        offset = max(0, request.args.get("offset", 0, type=int))
+        # Same paging rule as list_dismissed above.
+        paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+        if isinstance(paging[0], dict):
+            return paging
+        limit, offset = paging
+        limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
         project_dir = _project_dir_or_none(_eval_dir(), project)
         if project_dir is None:
             return jsonify([])
