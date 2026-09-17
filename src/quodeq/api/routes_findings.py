@@ -15,7 +15,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, abort, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
@@ -77,6 +77,12 @@ def _project_dir_or_none(evaluations_dir: str, project: str) -> Path | None:
     return Path(resolved) if resolved is not None else None
 
 
+class _ProjectNotFoundError(Exception):
+    """Raised by `_project_dir`; the errorhandler registered in
+    `register_findings_routes` turns it into this file's own
+    {"error", "code"} shape instead of Flask's default 404 body."""
+
+
 def _project_dir(evaluations_dir: str, project: str) -> Path:
     """As above, but 404 when the project has no directory.
 
@@ -86,7 +92,7 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     """
     resolved = _project_dir_or_none(evaluations_dir, project)
     if resolved is None:
-        abort(404, description="Project not found")
+        raise _ProjectNotFoundError(project)
     return resolved
 
 
@@ -112,6 +118,14 @@ def _finding_target_or_error(
 
 def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
+
+    @app.errorhandler(_ProjectNotFoundError)
+    def _handle_project_not_found(_exc: _ProjectNotFoundError) -> tuple[Response, int]:
+        # Same {"error", "code"} shape every other error branch in this
+        # file uses (lines 106, 109, 175, 190, 193, 205-206, 213), instead
+        # of Flask's default 404 HTML page that a bare abort() would give.
+        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
 
     def _eval_dir() -> str:
         return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()

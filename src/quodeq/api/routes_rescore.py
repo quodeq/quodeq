@@ -25,13 +25,21 @@ _OUTCOME_ERRORS = {
 
 
 def register_rescore_routes(app: Flask) -> None:
-    """Register /api/rescore route."""
+    """Register the GET /api/rescore route on *app*.
+
+    Example:
+        GET /api/rescore?project=my-project
+        GET /api/rescore?project=my-project&run=run-42
+    """
 
     @app.get("/api/rescore")
     def rescore() -> Response | tuple[Response, int]:
         project = request.args.get("project", "")
         if not project:
-            body, status = error_response("project query parameter is required", HTTPStatus.BAD_REQUEST, "MISSING_PARAM")
+            body, status = error_response(
+                "project query parameter is required; add ?project=<name> to the query string",
+                HTTPStatus.BAD_REQUEST, "MISSING_PARAM",
+            )
             return jsonify(body), status
         run_id = request.args.get("run", "")
         eval_dir = _eval_dir_from_app(app)

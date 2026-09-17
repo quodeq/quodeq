@@ -10,6 +10,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN
 from quodeq.api.helpers import _sanitize_for_log, error_response
+from quodeq.services.import_validator import validate_import
 from quodeq.services.standards_library import StandardImportConflictError
 from quodeq.shared.serialization import to_camel_dict
 
@@ -30,7 +31,15 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
     except StandardImportConflictError as exc:
         logger.warning("Library import conflict: %s", exc)
-        return error_response("Import conflict", 409, "conflict")
+        # A hand-written resolution hint, not `str(exc)`: this module never
+        # echoes caught-exception text into a response (see
+        # tests/api/test_no_exception_echo.py). The generic "Import
+        # conflict" gave the caller no path forward; this names one.
+        return error_response(
+            "A standard with this ID already exists from a different source. "
+            "Duplicate it to customize your own copy, or delete the existing one, then retry.",
+            409, "conflict",
+        )
     except (OSError, ValueError, http.client.HTTPException) as exc:
         # See list_library: HTTPException is urllib's truncated/malformed
         # response family and is not an OSError.
@@ -54,8 +63,21 @@ def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     try:
         result = svc.import_from_file(data, force=force)
     except ValueError as exc:
+        # import_from_file's ValueError text is exactly "; ".join(the same
+        # validate_import(data)["errors"] list) -- but this module never
+        # echoes caught-exception text into a response (see
+        # tests/api/test_no_exception_echo.py). Re-run the same pure,
+        # non-raising checker import_from_file uses internally to get the
+        # specific field-level reasons directly from `data`, not from
+        # `exc`, instead of the bare "Invalid import data" this used to be.
         logger.warning("standards.import validation error: %s", exc)
-        return error_response("Invalid import data", HTTPStatus.BAD_REQUEST, "validation_error")
+        imported_id = data.get("id", "<unknown>")
+        validation = validate_import(data)
+        reasons = "; ".join(validation["errors"]) if validation["errors"] else "schema validation failed"
+        return error_response(
+            f"Invalid import data for standard {imported_id!r}: {reasons}",
+            HTTPStatus.BAD_REQUEST, "validation_error",
+        )
     except PermissionError as exc:
         logger.warning("standards.import permission error: %s", exc)
         return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)

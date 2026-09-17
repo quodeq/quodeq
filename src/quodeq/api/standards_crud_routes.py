@@ -16,15 +16,29 @@ logger = logging.getLogger(__name__)
 def _handle_create(get_service, app: Flask) -> tuple[Response, int]:
     """Handle POST /api/standards -- create a new standard."""
     svc = get_service(app)
-    payload = request.get_json(force=True)
+    # silent=True: an unparseable body must still answer through this
+    # module's own {"error", "code"} shape, not Werkzeug's default HTML
+    # 400 page that a bare `get_json(force=True)` would raise on.
+    payload = request.get_json(force=True, silent=True)
+    if payload is None:
+        return error_response("request body must be JSON", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     if not isinstance(payload, dict):
         return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     logger.info("standards.create id=%s", payload.get("id", "<unknown>"))
     try:
         detail = svc.create_standard(payload)
     except ValueError as exc:
+        # create_standard raises ValueError for exactly two reasons: an
+        # invalid id (contains '/', '\\', '..', or is empty) or an id
+        # that's already in use. Name the id from `payload` (not from
+        # `exc`) -- this module never echoes caught-exception text into a
+        # response, see tests/api/test_no_exception_echo.py.
         logger.debug("standards.create validation error: %s", exc)
-        return error_response("Invalid standard data", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+        standard_id = payload.get("id", "<unknown>")
+        return error_response(
+            f"Invalid standard data: standard id {standard_id!r} is invalid, or already exists",
+            HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST,
+        )
     return jsonify(to_camel_dict(detail)), HTTPStatus.CREATED
 
 

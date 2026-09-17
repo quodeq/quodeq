@@ -11,11 +11,42 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import ERROR_CODE_NOT_FOUND
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
+
+# QUODEQ_CWE_CACHE_TTL: how long (in seconds) the CWE reference list stays
+# cached before the next request reloads it. Default 3600 (one hour). Valid
+# values are non-negative integers; 0 disables caching (reload every call).
+# A non-numeric or negative value is invalid and falls back to the default,
+# with a warning logged naming the variable, so a mistyped env value is
+# visible instead of silently changing cache behaviour.
+_DEFAULT_CWE_CACHE_TTL_S = 3600
+
+
+def _cache_ttl_from_env(default: int = _DEFAULT_CWE_CACHE_TTL_S) -> int:
+    """Read QUODEQ_CWE_CACHE_TTL from the environment; see the module
+    comment above for units, default, and valid range."""
+    raw = os.environ.get("QUODEQ_CWE_CACHE_TTL")
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning(
+            "QUODEQ_CWE_CACHE_TTL=%r is not a valid integer (expected seconds, "
+            "e.g. 3600); falling back to the default of %d", raw, default,
+        )
+        return default
+    if value < 0:
+        logger.warning(
+            "QUODEQ_CWE_CACHE_TTL=%d is negative (expected a non-negative number "
+            "of seconds); falling back to the default of %d", value, default,
+        )
+        return default
+    return value
 
 
 class CweCache:
@@ -34,7 +65,7 @@ class CweCache:
         # Read PER INSTANCE (not at import time) so tests can construct a
         # fresh CweCache after changing QUODEQ_CWE_CACHE_TTL, and so two
         # instances in the same process can disagree.
-        self._ttl_s = ttl_s if ttl_s is not None else int(os.environ.get("QUODEQ_CWE_CACHE_TTL", "3600"))
+        self._ttl_s = ttl_s if ttl_s is not None else _cache_ttl_from_env()
         self._clock = clock
         self._cache: list | None = None
         self._cache_time: float = 0.0
@@ -65,6 +96,47 @@ def _cache(app: Flask) -> CweCache:
     return app.extensions.setdefault("cwe_cache", CweCache())
 
 
+_DEFAULT_LIST_LIMIT = 500
+_DEFAULT_LIST_OFFSET = 0
+
+
+def _validated_page_int(args, name: str, default: int, minimum: int, kind: str) -> int | tuple[dict, int]:
+    """Parse one paging query param for `_page_params`.
+
+    An absent parameter keeps *default*. A present value that fails
+    ``int()``, or is below *minimum*, returns a ready ``error_response()``
+    result naming the parameter, what was received, and what is valid.
+    """
+    raw = args.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return error_response(f"{name} must be {kind}, got {raw!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    if value < minimum:
+        return error_response(f"{name} must be {kind}, got {value!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    return value
+
+
+def _page_params(args) -> tuple[int, int] | tuple[dict, int]:
+    """Parse and validate ``limit``/``offset`` for GET /api/standards.
+
+    Each is optional and keeps its default when absent (limit=500,
+    offset=0). A parameter that IS present but is not an integer, or is
+    below its minimum (limit < 1, offset < 0), returns a 400 error
+    response naming the parameter instead of silently substituting the
+    default -- the previous behaviour of ``request.args.get(..., type=int)``.
+    """
+    limit = _validated_page_int(args, "limit", _DEFAULT_LIST_LIMIT, 1, "a positive integer")
+    if isinstance(limit, tuple):
+        return limit
+    offset = _validated_page_int(args, "offset", _DEFAULT_LIST_OFFSET, 0, "a non-negative integer")
+    if isinstance(offset, tuple):
+        return offset
+    return limit, offset
+
+
 def register_read_routes(app: Flask, get_service, get_library_client) -> None:
     """Register GET routes for the standards API.
 
@@ -80,9 +152,11 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
         return jsonify(result)
 
     @app.get("/api/standards")
-    def list_standards() -> Response:
-        limit = request.args.get("limit", 500, type=int)
-        offset = request.args.get("offset", 0, type=int)
+    def list_standards() -> Response | tuple[dict, int]:
+        result = _page_params(request.args)
+        if isinstance(result[0], dict):
+            return result
+        limit, offset = result
         svc = get_service(app)
         page = svc.list_standards()[offset:offset + limit]
         return jsonify([to_camel_dict(s) for s in page])
