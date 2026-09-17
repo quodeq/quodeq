@@ -153,12 +153,9 @@ class UnixPty:
                 self._proc.wait(timeout=2)
             except subprocess.TimeoutExpired as exc:
                 _logger.debug("pty child did not exit within 2s after kill: %s", exc)
-        # getattr guards instances built via object.__new__ in tests (never
-        # ran __init__, so _selector was never assigned).
-        selector = getattr(self, "_selector", None)
-        if selector is not None:
+        if self._selector is not None:
             try:
-                selector.close()
+                self._selector.close()
             except OSError as exc:
                 _logger.debug("pty selector close failed: %s", exc)
             self._selector = None
