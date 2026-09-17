@@ -5,7 +5,7 @@ re-stats the same path just to ask a question the first stat answered.
 """
 from __future__ import annotations
 
-from pathlib import Path
+import os
 
 from quodeq.data.sqlite._db_stamp_memo import db_stamp
 
@@ -14,13 +14,16 @@ def test_db_stamp_stats_the_file_once(tmp_path, monkeypatch):
     db = tmp_path / "evaluation.db"
     db.write_bytes(b"x")
     calls = []
-    real_stat = Path.stat
+    real_stat = os.stat
 
-    def counting_stat(self, *a, **k):
-        calls.append(self)
-        return real_stat(self, *a, **k)
+    # Spy at the os.stat seam rather than Path.stat: Path.is_file() reaches
+    # os.stat() either via Path.stat() or, on 3.14+, via os.path.isfile()
+    # calling os.stat() directly -- Path.stat alone misses that second path.
+    def counting_stat(path, *a, **k):
+        calls.append(path)
+        return real_stat(path, *a, **k)
 
-    monkeypatch.setattr(Path, "stat", counting_stat)
+    monkeypatch.setattr(os, "stat", counting_stat)
     assert db_stamp(db) is not None
     assert calls.count(db) == 1  # the WAL stat is a different path
 

@@ -80,13 +80,11 @@ def _load_compiled_data(
 
     *dimension* is request-reachable (routed here from the action API's
     per-dimension endpoints), so it is checked against
-    :func:`is_known_dimension` before it ever reaches a path join. A
-    dimension outside that installed set is treated the same as one with no
-    compiled data at all: this returns ``None`` rather than raising, matching
-    every other failure mode in this function.
-
-    *known* lets a caller that already listed the standards dirs (the
-    ``_multi`` loaders, over several dimensions) skip re-listing them here.
+    :func:`is_known_dimension` (or the pre-listed *known*, from a ``_multi``
+    loader) before it ever reaches a path join. A dimension outside that
+    installed set is treated the same as one with no compiled data at all:
+    this returns ``None`` rather than raising, matching every other failure
+    mode in this function.
     """
     if not dimension:
         return None
@@ -130,7 +128,7 @@ def load_compiled_refs_multi(
     evaluators_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
     """Load refs for multiple dimensions, merging into a single lookup."""
-    known = known_dimension_ids(compiled_dir, evaluators_dir) if (compiled_dir or evaluators_dir) else None
+    known = frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)) if (compiled_dir or evaluators_dir) else None
     merged: dict[str, list[dict]] = {}
     for dim in dimensions:
         merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir, known=known))
@@ -143,7 +141,7 @@ def load_compiled_requirements_multi(
     overrides: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Load requirements for multiple dimensions, merging into a single lookup."""
-    known = known_dimension_ids(compiled_dir, evaluators_dir) if (compiled_dir or evaluators_dir) else None
+    known = frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)) if (compiled_dir or evaluators_dir) else None
     merged: dict[str, dict] = {}
     for dim in dimensions:
         merged.update(load_compiled_requirements(
@@ -163,8 +161,7 @@ def load_compiled_requirements(
     """Load {req_id: {principle, text}} from compiled standards on disk.
 
     When *overrides* is supplied, requirement text placeholders are resolved
-    using the per-requirement override values. *known* is as in
-    :func:`_load_compiled_data`.
+    using the per-requirement override values.
 
     Backward-compat convenience wrapper that handles file I/O then delegates
     to the pure :func:`extract_requirements`.  Used by the MCP server to

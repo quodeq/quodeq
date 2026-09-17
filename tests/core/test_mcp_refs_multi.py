@@ -92,3 +92,13 @@ class TestMultiLoadersListStandardsDirsOnce:
         reqs = standards_loader.load_compiled_requirements_multi(tmp_path, ["security", "reliability"])
         assert len(calls) == 1
         assert "S-CON-1" in reqs and "R-1" in reqs
+
+    def test_refs_multi_reaches_a_mixed_case_dimension_file(self, tmp_path):
+        # services/standards_library.py writes "{id}.json" verbatim from
+        # user-supplied JSON, so a custom evaluator's filename can be
+        # mixed-case. is_known_dimension() lower-cases both sides; the
+        # _multi path must match that or the dimension becomes reachable
+        # single, unreachable multi.
+        _write_compiled(tmp_path, "MyDimension", "X-1", "Custom")
+        refs = standards_loader.load_compiled_refs_multi(tmp_path, ["mydimension"])
+        assert "X-1" in refs
