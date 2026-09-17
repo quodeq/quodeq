@@ -63,7 +63,8 @@ def register_shared_config_routes(app: Flask) -> None:
             return jsonify(body), status
         outcome = connect_shared_repo(url, log=SHARED_LOG)
         if outcome.status == "invalid_url":
-            return jsonify({"error": outcome.detail}), 400
+            body, status = error_response(outcome.detail, 400, "INVALID_URL")
+            return jsonify(body), status
         if outcome.status == "clone_failed":
             body, status = error_response(
                 f"could not clone the repository, check that git can access {outcome.url}",
@@ -98,7 +99,10 @@ def register_shared_config_routes(app: Flask) -> None:
     def shared_refresh() -> Response | tuple[Response, int]:
         settings = read_settings()
         if not settings.url:
-            return jsonify({"error": "no shared repository configured"}), 400
+            body, status = error_response(
+                "no shared repository configured", 400, "NO_SHARED_REPO"
+            )
+            return jsonify(body), status
         ok, reason = _routes_shared.refresh_shared_clone(settings.url)
         if not ok:
             return (
@@ -118,10 +122,14 @@ def register_shared_config_routes(app: Flask) -> None:
     def shared_publish_start(project: str) -> tuple[Response, int]:
         err = path_segment_error(project)
         if err is not None:
-            return jsonify({"error": err}), 400
+            body, status = error_response(err, 400, "INVALID_INPUT")
+            return jsonify(body), status
         settings = read_settings()
         if not settings.url:
-            return jsonify({"error": "no shared repository configured"}), 400
+            body, status = error_response(
+                "no shared repository configured", 400, "NO_SHARED_REPO"
+            )
+            return jsonify(body), status
         outcome = _routes_shared.start_publish(
             project, settings.url, evaluations_root=Path(reports_dir())
         )

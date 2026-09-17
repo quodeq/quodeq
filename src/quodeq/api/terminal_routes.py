@@ -12,7 +12,7 @@ import struct
 import subprocess
 import threading
 
-from flask import Flask, current_app, jsonify, request
+from flask import Flask, Response, current_app, jsonify, request
 from flask_sock import Sock
 
 from quodeq.api._terminal_ws_helpers import (
@@ -21,6 +21,7 @@ from quodeq.api._terminal_ws_helpers import (
     setup_terminal_session,
     terminal_read_loop,
 )
+from quodeq.api.helpers import error_response
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.links import (
     build_open_argv,
@@ -54,6 +55,13 @@ def _gate_reason() -> str | None:
         origin=request.headers.get("Origin"),
         request_host=request.host,
     )
+
+
+def _forbidden() -> tuple[Response, int]:
+    """The shared 403 body for every gated terminal route (code and message
+    live here once instead of six identical literal dicts)."""
+    body, status = error_response("forbidden", 403, "FORBIDDEN")
+    return jsonify(body), status
 
 
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
@@ -116,24 +124,26 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         # _env_reason, not the full gate: same-origin GETs carry no Origin
         # header (same reasoning as /status).
         if _env_reason() is not None:
-            return jsonify({"error": "forbidden"}), 403
+            return _forbidden()
         return jsonify({"sessions": registry.list(), "max": registry.MAX_SESSIONS})
 
     @app.post("/api/terminal/sessions")
     def terminal_session_create():
         if _gate_reason() is not None:
-            return jsonify({"error": "forbidden"}), 403
+            return _forbidden()
         session = registry.create()
         if session is None:
-            return jsonify({"error": "session limit reached"}), 409
+            body, status = error_response("session limit reached", 409, "SESSION_LIMIT")
+            return jsonify(body), status
         return jsonify({"id": session.id, "name": session.name}), 201
 
     @app.post("/api/terminal/sessions/<sid>/kill")
     def terminal_session_kill(sid):
         if _gate_reason() is not None:
-            return jsonify({"error": "forbidden"}), 403
+            return _forbidden()
         if not registry.kill(sid):
-            return jsonify({"error": "unknown session"}), 404
+            body, status = error_response("unknown session", 404, "UNKNOWN_SESSION")
+            return jsonify(body), status
         return jsonify({"ok": True})
 
     @app.post("/api/terminal/kill")
@@ -141,7 +151,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         # Kills EVERY session — this backs Settings' "Restart terminal", which
         # is a full reset; the client reconciles its tabs via /sessions after.
         if _gate_reason() is not None:
-            return jsonify({"error": "forbidden"}), 403
+            return _forbidden()
         registry.kill_all()
         return jsonify({"ok": True})
 
@@ -153,11 +163,12 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         Gated exactly like the other terminal routes (same threat model: a
         single-user localhost app whose terminal already grants a full shell)."""
         if _gate_reason() is not None:
-            return jsonify({"error": "forbidden"}), 403
+            return _forbidden()
         body = request.get_json(silent=True) or {}
         paths = body.get("paths")
         if not isinstance(paths, list):
-            return jsonify({"error": "paths must be a list"}), 400
+            body, status = error_response("paths must be a list", 400, "INVALID_INPUT")
+            return jsonify(body), status
         sid = body.get("session")
         bases = resolve_bases(registry.pid_for(sid if isinstance(sid, str) else None))
         resolved = []
@@ -174,7 +185,7 @@ def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | Non
         optional line/col. Fail-soft: any error returns opened=false rather than
         raising, so a missing editor never surfaces as a 500."""
         if _gate_reason() is not None:
-            return jsonify({"error": "forbidden"}), 403
+            return _forbidden()
         body = request.get_json(silent=True) or {}
         path = body.get("path")
         if not isinstance(path, str) or not path:

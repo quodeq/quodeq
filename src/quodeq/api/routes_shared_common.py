@@ -48,30 +48,33 @@ def _with_shared_root(fn):
     def wrapper(*args, **kwargs):
         settings = read_settings()
         if not settings.url:
-            return jsonify({"error": "no shared repository configured"}), 409
+            body, status = error_response(
+                "no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO"
+            )
+            return jsonify(body), status
         state = read_state(settings.url)
         if state == "unsupported_version":
-            return (
-                jsonify({"error": "this shared repository requires a newer version of quodeq"}),
-                409,
+            body, status = error_response(
+                "this shared repository requires a newer version of quodeq",
+                HTTPStatus.CONFLICT,
+                "UNSUPPORTED_VERSION",
             )
+            return jsonify(body), status
         if state == "foreign":
-            return (
-                jsonify(
-                    {
-                        "error": "the configured repository does not look like a quodeq results repository",
-                        "code": "FOREIGN_REPO",
-                    }
-                ),
-                409,
+            body, status = error_response(
+                "the configured repository does not look like a quodeq results repository"
+                " — reconnect it in Settings",
+                HTTPStatus.CONFLICT,
+                "FOREIGN_REPO",
             )
+            return jsonify(body), status
         if state == "missing":
-            return (
-                jsonify(
-                    {"error": "the shared repository has not been cloned yet — reconnect it in Settings"}
-                ),
-                503,
+            body, status = error_response(
+                "the shared repository has not been cloned yet — reconnect it in Settings",
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "SHARED_REPO_MISSING",
             )
+            return jsonify(body), status
         root = shared_evaluations_root(settings.url)
         with score_cache_path_override(shared_score_cache_path(settings.url)):
             return fn(*args, eval_root=root, url=settings.url, **kwargs)
