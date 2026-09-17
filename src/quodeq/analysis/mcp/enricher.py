@@ -189,37 +189,11 @@ class FindingEnricher:
         elif not declared and self._dimension:
             finding["d"] = self._dimension
 
-    def _apply_enrichment_pipeline(
-        self, finding: dict, precedent_score: float | None = _UNSET,
-    ) -> None:
-        """Attach code context and apply downweights + severity gates in place.
+    def _from_standards(self, args: dict) -> dict:
+        """The finding dict *args* maps onto, with its standards-derived fields.
 
-        Gates the LIVE path only: this runs once per freshly-dispatched
-        finding, before it ever reaches the cache. A cached finding replayed on
-        a later run does NOT come back through here -- cache replay bypasses
-        enrich() entirely and writes straight to the per-dim JSONL, and a
-        deterministic checker never comes through here at all. Those two sinks
-        (dimension_runner._write_findings, checks.runner) call the same helper
-        for the same reason. Every call site is required: this one gates what
-        the model just emitted, the others gate what a warm cache is about to
-        replay and what a checker just computed, and skipping any one leaves a
-        class of findings ungated. See severity_gates.py for why the sequence
-        lives there rather than being repeated here.
-        """
-        enrich_code(finding, self._work_dir, self._read_file)
-        _apply_path_role_downweight(finding)
-        _apply_shape_downweight(finding, self._project_shape)
-        _apply_precedent_downweight(
-            finding, self._precedent_fingerprints, self._precedent_corpus,
-            score=precedent_score, log=self._log,
-        )
-        apply_severity_gates(finding, self._trust_model)
-
-    def enrich(self, args: dict, *, precedent_score: float | None = _UNSET) -> dict:
-        """Return a fully enriched finding dict built from *args*.
-
-        *precedent_score* lets a caller that already ran the batch semantic
-        lookup (``precedent_scores``) skip a second ``corpus.match`` call.
+        First stage of the pipeline: no source file is read and no downweight
+        is applied yet, so the dict is not usable as a finding on its own.
         """
         req = args.get("req")
 
@@ -241,10 +215,68 @@ class FindingEnricher:
             finding["req_refs"] = select_best_refs(
                 self._refs[req], args.get("w", ""), args.get("reason", ""),
             )
-
-        self._apply_enrichment_pipeline(finding, precedent_score)
-
         return finding
+
+    def _before_precedent(self, finding: dict) -> None:
+        """Attach code context and apply the two content-independent downweights.
+
+        Runs before the precedent tier on purpose: ``enrich_code`` replaces the
+        model's quoted snippet with the source-derived window, and that window
+        is what the precedent corpus was built from. Scoring a precedent before
+        this ran embeds a different text than the corpus holds.
+        """
+        enrich_code(finding, self._work_dir, self._read_file)
+        _apply_path_role_downweight(finding)
+        _apply_shape_downweight(finding, self._project_shape)
+
+    def _after_precedent(
+        self, finding: dict, precedent_score: float | None = _UNSET,
+    ) -> None:
+        """Apply the precedent downweight and the severity gates in place.
+
+        Gates the LIVE path only: this runs once per freshly-dispatched
+        finding, before it ever reaches the cache. A cached finding replayed on
+        a later run does NOT come back through here -- cache replay bypasses
+        enrich() entirely and writes straight to the per-dim JSONL, and a
+        deterministic checker never comes through here at all. Those two sinks
+        (dimension_runner._write_findings, checks.runner) call the same helper
+        for the same reason. Every call site is required: this one gates what
+        the model just emitted, the others gate what a warm cache is about to
+        replay and what a checker just computed, and skipping any one leaves a
+        class of findings ungated. See severity_gates.py for why the sequence
+        lives there rather than being repeated here.
+        """
+        _apply_precedent_downweight(
+            finding, self._precedent_fingerprints, self._precedent_corpus,
+            score=precedent_score, log=self._log,
+        )
+        apply_severity_gates(finding, self._trust_model)
+
+    def enrich(self, args: dict, *, precedent_score: float | None = _UNSET) -> dict:
+        """Return a fully enriched finding dict built from *args*.
+
+        *precedent_score* lets a caller that already ran the batch semantic
+        lookup (``precedent_scores``) skip a second ``corpus.match`` call.
+        """
+        finding = self._from_standards(args)
+        self._before_precedent(finding)
+        self._after_precedent(finding, precedent_score)
+        return finding
+
+    def enrich_many(self, findings: list[dict]) -> list[dict]:
+        """Enrich a batch with one batched precedent lookup for all of them.
+
+        Same per-finding step order as ``enrich``; only the precedent tier is
+        shared, and it runs on the ENRICHED dicts so the embedded text is the
+        one the corpus was built from.
+        """
+        enriched = [self._from_standards(args) for args in findings]
+        for finding in enriched:
+            self._before_precedent(finding)
+        scores = self.precedent_scores(enriched)
+        for finding, score in zip(enriched, scores):
+            self._after_precedent(finding, score)
+        return enriched
 
     def precedent_scores(self, findings: list[dict]) -> list[float | None]:
         """Best-effort semantic precedent score per finding, one embed call.

@@ -138,12 +138,9 @@ class FindingsRouter:
             self._seen.add(key)
             pending.append(args)
 
-        scores = self._enricher.precedent_scores(pending)
-        results: list[dict] = []
-        for args, score in zip(pending, scores):
-            finding = self._enricher.enrich(args, precedent_score=score)
+        results = self._enricher.enrich_many(pending)
+        for finding in results:
             self._finish_finding(finding)
-            results.append(finding)
         return results
 
     def _finish_finding(self, finding: dict) -> None:

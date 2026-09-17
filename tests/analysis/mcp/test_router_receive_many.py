@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 
 from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.analysis.mcp.router import FindingsRouter
+from quodeq.context.precedent import PrecedentCorpus
 
 
 class _FakeCorpus:
@@ -91,3 +93,66 @@ def test_receive_many_empty_batch_is_a_noop() -> None:
     assert router.receive_many([]) == []
     assert fh.getvalue() == ""
     assert router.counter == 0
+
+
+# --- The batch path must score the ENRICHED snippet -------------------------
+# The corpus is built from enriched snippets, so embedding the model's raw
+# quote scores a different text than the per-finding path and a dismissed
+# precedent stops downweighting.
+
+_MODEL_QUOTE = "password = os.environ['PW']  # as the model quoted it"
+
+
+def _source(tmp_path: Path) -> Path:
+    src = tmp_path / "auth.py"
+    src.write_text("\n".join(f"source line {i}" for i in range(1, 21)))
+    return src
+
+
+def _matching_corpus(tmp_path: Path, marker: str) -> tuple[PrecedentCorpus, list[str]]:
+    """Corpus that only matches texts containing *marker*, plus the embed log."""
+    embedded: list[str] = []
+
+    def embed(texts: list[str]) -> list[list[float]]:
+        embedded.extend(texts)
+        return [[1.0, 0.0] if marker in t else [0.0, 1.0] for t in texts]
+
+    corpus = PrecedentCorpus(
+        vectors=[[1.0, 0.0]], embed=embed, threshold=0.85,
+        marker_path=tmp_path / ".precedent_marker",
+    )
+    return corpus, embedded
+
+
+def _enriching_router(tmp_path: Path, corpus: PrecedentCorpus) -> FindingsRouter:
+    ctx = CompiledContext(precedent_fingerprints=set())
+    ctx.work_dir = tmp_path
+    ctx.precedent_corpus = corpus
+    return FindingsRouter(io.StringIO(), context=ctx)
+
+
+def test_receive_many_embeds_the_enriched_snippet_not_the_model_quote(tmp_path) -> None:
+    _source(tmp_path)
+    corpus, embedded = _matching_corpus(tmp_path, "source line 10")
+    router = _enriching_router(tmp_path, corpus)
+
+    router.receive_many([_violation("S-CON-1", "auth.py", 10, _MODEL_QUOTE)])
+
+    assert len(embedded) == 1
+    assert "source line 10" in embedded[0]
+    assert _MODEL_QUOTE not in embedded[0]
+
+
+def test_receive_many_downweights_a_precedent_exactly_like_receive(tmp_path) -> None:
+    _source(tmp_path)
+    args = _violation("S-CON-1", "auth.py", 10, _MODEL_QUOTE)
+
+    batch_corpus, _ = _matching_corpus(tmp_path, "source line 10")
+    batched = _enriching_router(tmp_path, batch_corpus).receive_many([dict(args)])
+
+    single_corpus, _ = _matching_corpus(tmp_path, "source line 10")
+    single_router = _enriching_router(tmp_path, single_corpus)
+    single_router.receive(dict(args))
+    written = json.loads(single_router._fh.getvalue().splitlines()[0])
+
+    assert batched[0]["confidence"] == written["confidence"] == 25

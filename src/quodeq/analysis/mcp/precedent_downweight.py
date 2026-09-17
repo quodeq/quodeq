@@ -39,24 +39,28 @@ def _semantic_eligible(finding: dict[str, object]) -> bool:
     return isinstance(snippet, str) and bool(snippet.strip())
 
 
-def _precedent_lookup_text(
+def _precedent_probe(
     finding: dict[str, object], fingerprints: set[str] | None,
-) -> str | None:
-    """Text to embed for the semantic tier, or None to skip the lookup: not
-    a violation, already exact-fingerprint matched, or ineligible (see
-    `_semantic_eligible`)."""
+) -> tuple[bool, str | None]:
+    """``(exact_matched, text_to_embed)`` for one finding.
+
+    Single source of both tiers' inputs, so the fingerprint is computed once
+    per finding for the downweight and the batch scorer alike. The text is
+    None when the semantic lookup is skipped: not a violation, already
+    exact-fingerprint matched, or ineligible (see `_semantic_eligible`).
+    """
     if finding.get("t") != "violation":
-        return None
+        return False, None
     req = finding.get("req")
     snippet = finding.get("snippet")
     req_s = req if isinstance(req, str) else None
     snippet_s = snippet if isinstance(snippet, str) else None
     fp = _precedent_fingerprint(req_s, snippet_s)
     if fp is not None and fingerprints is not None and fp in fingerprints:
-        return None
+        return True, None
     if not _semantic_eligible(finding):
-        return None
-    return _precedent_text(req_s, snippet_s)
+        return False, None
+    return False, _precedent_text(req_s, snippet_s)
 
 
 def _apply_precedent_downweight(
@@ -72,27 +76,17 @@ def _apply_precedent_downweight(
     findings. *score* lets a caller that already ran the batch lookup
     (``precedent_scores``) skip a second ``corpus.match`` call.
     """
-    if finding.get("t") != "violation":
-        return
-    req = finding.get("req")
-    snippet = finding.get("snippet")
-    fp = _precedent_fingerprint(
-        req if isinstance(req, str) else None,
-        snippet if isinstance(snippet, str) else None,
-    )
-    matched = fp is not None and fingerprints is not None and fp in fingerprints
+    matched, text = _precedent_probe(finding, fingerprints)
 
-    if not matched and corpus is not None:
-        text = _precedent_lookup_text(finding, fingerprints)
-        if text is not None:
-            if score is _UNSET:
-                score = corpus.match(text)
-            if score is not None and score >= corpus.threshold:
-                matched = True
-                log.debug(
-                    f"Semantic precedent match ({score:.3f}) for "
-                    f"{finding.get('file')}:{finding.get('line')}"
-                )
+    if not matched and corpus is not None and text is not None:
+        if score is _UNSET:
+            score = corpus.match(text)
+        if score is not None and score >= corpus.threshold:
+            matched = True
+            log.debug(
+                f"Semantic precedent match ({score:.3f}) for "
+                f"{finding.get('file')}:{finding.get('line')}"
+            )
 
     if not matched:
         return
@@ -108,12 +102,12 @@ def precedent_scores(
 ) -> list[float | None]:
     """Best-effort semantic precedent score per finding, one embed call.
 
-    None for a finding that skips the lookup (`_precedent_lookup_text`), and
-    for every finding when *corpus* is None.
+    None for a finding that skips the lookup (`_precedent_probe`), and for
+    every finding when *corpus* is None.
     """
     if corpus is None:
         return [None] * len(findings)
-    texts = [_precedent_lookup_text(f, fingerprints) for f in findings]
+    texts = [_precedent_probe(f, fingerprints)[1] for f in findings]
     pending = [t for t in texts if t is not None]
     if not pending:
         return [None] * len(findings)
