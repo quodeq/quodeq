@@ -54,8 +54,13 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
 
     try:
         looks_like_url = is_repo_url(new_path)
-    except ValueError as exc:
-        body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    except ValueError:
+        # Fixed message, not str(exc): is_repo_url only raises for cleartext
+        # http://, always with the same reason -- never echo exception text.
+        body, status = error_response(
+            "path must use https:// or git@; cleartext http:// repository URLs are rejected",
+            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
         return jsonify(body), status
     if looks_like_url:
         body, status = error_response(
@@ -66,9 +71,10 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
 
     try:
         resolved = validate_canonical_absolute(new_path)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError):
+        # Fixed message, not str(exc): never echo exception text.
         body, status = error_response(
-            f"path must be an absolute, traversal-free directory, got {new_path!r} ({exc})",
+            f"path must be an absolute, traversal-free directory, got {new_path!r}",
             HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
         )
         return jsonify(body), status

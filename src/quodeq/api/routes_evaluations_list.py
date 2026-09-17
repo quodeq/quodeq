@@ -9,6 +9,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._evaluation_helpers import (
+    InvalidEvaluationOption,
     _build_evaluation_options,
     _check_eval_rate_limit,
     _sanitize_url,
@@ -99,8 +100,14 @@ def _validated_start_request(
         return None, pre_error
     try:
         options = _build_evaluation_options(payload)
+    except InvalidEvaluationOption as exc:
+        # exc.public_message, not str(exc): the field-naming text an
+        # InvalidEvaluationOption carries is written by _coerce_int itself
+        # (never raw exception formatting), so it is safe to return verbatim.
+        body, status = error_response(exc.public_message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return None, (jsonify(body), status)
     except ValueError:
-        # Constant message, not str(exc): both known raise sources are
+        # Constant message, not str(exc): every other raise source is
         # pre-checked above. Keep it unbound so nothing here can ever echo
         # exception text.
         body, status = error_response(

@@ -70,19 +70,28 @@ def resolve_clean_scan(payload: dict) -> bool:
     return bool(payload.get("cleanScan", False))
 
 
+class InvalidEvaluationOption(ValueError):
+    """A present-but-malformed evaluation option; ``public_message`` is the
+    field-naming text a route may return to the client verbatim."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.public_message = message
+
+
 def _coerce_int(value: object, default: int, field: str) -> int:
     """Return int(*value*) when convertible; *default* when *value* is
-    ``None`` (absent). Raises ``ValueError`` naming *field* and the value
-    received when *value* is present but not convertible to int, so a
-    malformed override surfaces as a 400 instead of silently falling back
-    to the default.
+    ``None`` (absent). Raises ``InvalidEvaluationOption`` naming *field* and
+    the value received when *value* is present but not convertible to int,
+    so a malformed override surfaces as a 400 instead of silently falling
+    back to the default.
     """
     if value is None:
         return default
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field} must be an integer, got {value!r}") from exc
+        raise InvalidEvaluationOption(f"{field} must be an integer, got {value!r}") from exc
 
 
 def _sanitize_url(url: str) -> str:

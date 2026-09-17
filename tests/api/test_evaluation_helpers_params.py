@@ -7,6 +7,8 @@ present-but-malformed value, while a genuinely absent value still defaults.
 """
 from __future__ import annotations
 
+from http import HTTPStatus
+
 import pytest
 
 from quodeq.api._evaluation_helpers import _build_evaluation_options, _coerce_int
@@ -57,3 +59,36 @@ class TestBuildEvaluationOptionsIntFields:
     def test_malformed_context_size_raises_400_worthy_error(self):
         with pytest.raises(ValueError, match="contextSize"):
             _build_evaluation_options(self._payload(contextSize="abc"))
+
+
+class TestPostEvaluationsMalformedOption:
+    """End to end: the field-naming message must reach the client instead
+    of the route's generic "Invalid evaluation options" catch-all (review
+    round 1 on finding 5880)."""
+
+    @pytest.fixture()
+    def client(self, monkeypatch):
+        monkeypatch.delenv("QUODEQ_API_KEY", raising=False)
+        from quodeq.api.app import create_app
+        from tests.api.test_action_api import StubProvider
+
+        return create_app(StubProvider()).test_client()
+
+    def test_malformed_max_subagents_names_the_field_in_the_response(self, client):
+        resp = client.post(
+            "/api/evaluations",
+            json={"repo": "https://github.com/foo/bar", "maxSubagents": "abc"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert "maxSubagents" in body["error"]
+
+    def test_absent_max_subagents_starts_normally(self, client):
+        resp = client.post(
+            "/api/evaluations",
+            json={"repo": "https://github.com/foo/bar"},
+            headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == HTTPStatus.ACCEPTED
