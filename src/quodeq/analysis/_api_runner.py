@@ -117,6 +117,11 @@ def _build_cache_writer(
     cache-write path; legacy callers that omit either get None (no cache is
     written). Imports stay lazy so the cache machinery loads only when the
     path is actually enabled.
+
+    When ``classify_files_via_cache`` has already stashed this dimension's
+    ClassifyResult on ``run_config._classify_cache`` (finding 5398), its
+    ``miss_hashes`` is passed through so the writer reuses the hash classify
+    already computed instead of re-hashing every dispatched file.
     """
     if run_config is None or dim_id is None:
         return None
@@ -125,8 +130,14 @@ def _build_cache_writer(
         build_cache_writer,
     )
     from quodeq.analysis.cache.local import default_cache_root as _dcr  # noqa: PLC0415
+    content_hashes = None
+    stash = run_config._classify_cache
+    if stash is not None:
+        stashed = stash.get(dim_id)
+        if stashed is not None:
+            content_hashes = stashed[1].miss_hashes
     return build_cache_writer(
-        CacheWriterSpec.from_run_config(run_config, dim_id, _dcr()),
+        CacheWriterSpec.from_run_config(run_config, dim_id, _dcr(), content_hashes),
     )
 
 

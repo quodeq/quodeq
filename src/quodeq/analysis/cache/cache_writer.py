@@ -19,9 +19,9 @@ MISS what this closure writes. The load-bearing equality test in
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from quodeq.analysis._types import RunConfig
 from quodeq.analysis.cache.dimension_helpers import (
@@ -65,6 +65,11 @@ class CacheWriteTarget:
     dimension: str
     language: str
     model_id: str
+    # file_path -> content hash already computed at classify time (""
+    # when a miss couldn't be hashed). A file absent from this mapping
+    # falls back to hashing it directly. Empty by default so callers that
+    # never pass one (e.g. the MCP server) keep hashing as before.
+    content_hashes: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -78,12 +83,21 @@ class CacheWriterSpec:
     dimension: str
     model_id: str
     language: str
+    # file_path -> content hash already computed at classify time. See
+    # CacheWriteTarget.content_hashes; threaded straight through to it.
+    content_hashes: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_run_config(
         cls, run_config: RunConfig, dim_id: str, cache_root: Path,
+        content_hashes: Mapping[str, str] | None = None,
     ) -> "CacheWriterSpec":
-        """Resolve a spec from the ``_api_runner`` composition root's RunConfig."""
+        """Resolve a spec from the ``_api_runner`` composition root's RunConfig.
+
+        *content_hashes* is the dimension's ClassifyResult.miss_hashes when
+        the caller has one in scope (see ``_api_runner._build_cache_writer``);
+        left ``None``, entries hash their file directly, as before.
+        """
         model_id = (
             run_config.options.subagent_model
             or run_config.options.ai_model
@@ -93,6 +107,7 @@ class CacheWriterSpec:
             cache_root=cache_root, src_root=run_config.src,
             standards_dir=run_config.standards_dir, prompts_dir=run_config.prompts_dir,
             dimension=dim_id, model_id=model_id, language=run_config.language or "",
+            content_hashes=content_hashes or {},
         )
 
 
@@ -134,7 +149,9 @@ def _write_cache_entry(
         inside = resolved.resolve().is_relative_to(target.src_root.resolve())
     except (OSError, ValueError):
         inside = False
-    content_hash = (_hash_file(resolved) or "") if inside else ""
+    content_hash = target.content_hashes.get(file_path) if inside else ""
+    if content_hash is None:
+        content_hash = _hash_file(resolved) or ""
     key_struct = CacheKey(
         schema_version=_SCHEMA_VERSION,
         file_content_hash=content_hash,
@@ -187,6 +204,7 @@ def build_cache_writer(spec: CacheWriterSpec) -> Callable[[str, list[dict]], Non
     target = CacheWriteTarget(
         cache=cache, src_root=spec.src_root, dimension=spec.dimension,
         language=spec.language, model_id=spec.model_id,
+        content_hashes=spec.content_hashes,
     )
 
     def write(file_path: str, findings: list[dict]) -> None:
