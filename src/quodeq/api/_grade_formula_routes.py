@@ -82,7 +82,13 @@ def register_grade_formula_routes(
         return jsonify(_state_payload(result=result))
 
     @app.delete("/api/grade-formula")
-    def delete_grade_formula() -> Response:
+    def delete_grade_formula() -> Response | tuple[Response, int]:
+        if request.args.get("confirm") != "true":
+            body, status = error_response(
+                "Use ?confirm=true to confirm resetting the grade formula and rescoring every run",
+                HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
+            )
+            return jsonify(body), status
         grade_formula.reset_params()
         result = apply_to_all_runs(Path(reports_dir()))
         return jsonify(_state_payload(result=result))

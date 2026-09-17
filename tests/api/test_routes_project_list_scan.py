@@ -75,6 +75,13 @@ class TestScanPath:
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "MISSING_PATH"
 
+    def test_non_string_path_rejected_with_400_not_500(self, client):
+        resp = client.post("/api/scan", json={"path": 123})
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert body["error"] == "path must be a string"
+
     def test_path_not_directory(self, client):
         # Use a path under home that doesn't exist to pass the allowlist check
         fake = str(Path.home() / "nonexistent_quodeq_test_path_abc")

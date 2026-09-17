@@ -15,6 +15,7 @@ from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
 from quodeq.services._warmup import WarmupEngine, engine as warmup_engine
 from quodeq.services.base import ActionProvider
+from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -35,19 +36,50 @@ def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Respons
 
 
 def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
-    """Handle PATCH /api/projects/<project>/path."""
+    """Handle PATCH /api/projects/<project>/path.
+
+    ``provider.update_project_path`` only ever returns a bare bool, so
+    everything checkable up front (a repository URL -- not supported by
+    this endpoint --, a path-traversal attempt, a non-existent target) is
+    validated here and given its own message/code. Once that passes, a
+    False from the provider can only mean the project itself is not
+    registered, so NOT_FOUND is reserved for that case (finding 5926).
+    """
     project = request.view_args["project"]
     data = request.get_json(silent=True) or {}
     new_path = data.get("path", "").strip()
     if not new_path:
         body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
+
+    try:
+        looks_like_url = is_repo_url(new_path)
+    except ValueError as exc:
+        body, status = error_response(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    if looks_like_url:
+        body, status = error_response(
+            f"path must be a local directory; repository URLs are not supported here, got {new_path!r}",
+            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
+        return jsonify(body), status
+
     try:
         resolved = validate_canonical_absolute(new_path)
-    except (OSError, ValueError):
-        body, status = error_response("Invalid path", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    except (OSError, ValueError) as exc:
+        body, status = error_response(
+            f"path must be an absolute, traversal-free directory, got {new_path!r} ({exc})",
+            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
+        return jsonify(body), status
+    if not resolved.is_dir():
+        body, status = error_response(
+            f"path must be an existing directory, got {new_path!r}",
+            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
         return jsonify(body), status
     new_path = str(resolved)
+
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:

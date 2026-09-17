@@ -20,11 +20,6 @@ from tests.api._routes_project_list_fixtures import (  # noqa: F401 -- app/clien
     provider,
 )
 
-# Path.is_absolute() requires a drive letter on Windows ("/Users/test/code"
-# is not absolute there), so use a platform-appropriate sample path for
-# routes that validate absolute-ness.
-_ABS_SAMPLE_PATH = "C:\\Users\\test\\code" if os.name == "nt" else "/Users/test/code"
-
 
 class TestListProjects:
     def test_returns_empty_list(self, client, provider):
@@ -260,17 +255,23 @@ class TestUpdateProjectPath:
         resp = client.patch("/api/projects/my-proj/path", json={"path": "/foo/../bar"})
         assert resp.status_code == 400
 
-    def test_update_success(self, client, provider):
-        resp = client.patch("/api/projects/my-proj/path", json={"path": _ABS_SAMPLE_PATH})
+    def test_update_success(self, client, provider, tmp_path):
+        # finding 5926: update_project_path now also requires the target to
+        # be an existing directory, so a real one (not the placeholder
+        # absolute path) is needed for the success path.
+        target = tmp_path / "relocated"
+        target.mkdir()
+        resp = client.patch("/api/projects/my-proj/path", json={"path": str(target)})
         assert resp.status_code == 200
         body = resp.get_json()
         assert body["updated"] == "my-proj"
-        assert body["path"] == str(Path(_ABS_SAMPLE_PATH).resolve(strict=False))
+        assert body["path"] == str(target.resolve(strict=False))
 
-    def test_update_not_found(self, client, provider):
-        # Make update_project_path return False
+    def test_update_not_found(self, client, provider, tmp_path):
+        # Make update_project_path return False (project itself missing) --
+        # the path must still be valid so the provider is actually reached.
         provider.update_project_path = lambda *a: False
-        resp = client.patch("/api/projects/my-proj/path", json={"path": _ABS_SAMPLE_PATH})
+        resp = client.patch("/api/projects/my-proj/path", json={"path": str(tmp_path)})
         assert resp.status_code == 404
 
 

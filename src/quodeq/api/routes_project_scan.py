@@ -139,7 +139,11 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
 def scan_path() -> Response | tuple[Response, int]:
     """Scan a local directory path directly (no registered project required)."""
     data = request.get_json(silent=True) or {}
-    target = data.get("path", "").strip()
+    raw_path = data.get("path", "")
+    if not isinstance(raw_path, str):
+        body, status = error_response("path must be a string", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    target = raw_path.strip()
     if not target:
         body, status = error_response("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
         return jsonify(body), status

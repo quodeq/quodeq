@@ -41,6 +41,12 @@ class TestDashboardRoute:
         resp = client.get("/api/projects/..secret/dashboard")
         assert resp.status_code == 400
 
+    def test_invalid_project_names_the_parameter(self, client):
+        resp = client.get("/api/projects/..secret/dashboard")
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert body["error"] == "project must be a plain path segment, got '..secret'"
+
 
 class TestAccumulatedRoute:
     def test_success(self, client):
@@ -78,6 +84,21 @@ class TestDimensionEvalRoute:
     def test_invalid_params(self, client):
         resp = client.get("/api/projects/..evil/runs/r/dimensions/d/eval")
         assert resp.status_code == 400
+
+    def test_invalid_run_id_names_the_parameter(self, client):
+        # Validated one at a time: project is fine, run_id is the culprit.
+        resp = client.get("/api/projects/p/runs/foo..bar/dimensions/d/eval")
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert body["error"] == "run_id must be a plain path segment, got 'foo..bar'"
+
+    def test_invalid_dimension_names_the_parameter(self, client):
+        resp = client.get("/api/projects/p/runs/r/dimensions/foo..bar/eval")
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert body["error"] == "dimension must be a plain path segment, got 'foo..bar'"
 
 
 class TestRunViolationsRoute:

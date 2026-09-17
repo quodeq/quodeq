@@ -70,14 +70,19 @@ def resolve_clean_scan(payload: dict) -> bool:
     return bool(payload.get("cleanScan", False))
 
 
-def _coerce_int(value: object, default: int) -> int:
-    """Return int(*value*) when convertible, else *default*. Never raises."""
+def _coerce_int(value: object, default: int, field: str) -> int:
+    """Return int(*value*) when convertible; *default* when *value* is
+    ``None`` (absent). Raises ``ValueError`` naming *field* and the value
+    received when *value* is present but not convertible to int, so a
+    malformed override surfaces as a 400 instead of silently falling back
+    to the default.
+    """
     if value is None:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
-        return default
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be an integer, got {value!r}") from exc
 
 
 def _sanitize_url(url: str) -> str:
@@ -209,11 +214,11 @@ def _validate_ai_cmd_path(
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
-    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS)
+    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS, "maxSubagents")
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
     # Read new key first; fall back to legacy `poolBudget` for back-compat.
     time_limit_raw = _coerce_int(
-        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT,
+        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT, "timeLimit",
     )
     time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None
@@ -240,7 +245,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         time_limit=time_limit,
         clean_scan=clean_scan,
         per_dimension=bool(payload.get("perDimension", False)),
-        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
+        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0, "contextSize"))),
         branch=payload.get("branch") or None,
         scope_path=scope_path,
         provider_api_key=provider_api_key,
