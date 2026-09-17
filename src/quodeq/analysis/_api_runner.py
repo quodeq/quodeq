@@ -277,8 +277,7 @@ def run_api_analysis(
         router = seams.router_factory(
             fh, context=ctx, event_log=event_log, on_file_done=cache_writer,
         )
-        for f in findings:
-            router.receive(f)
+        router.receive_many(findings)
         _mark_source_files_done(router, request.source_file_paths, was_lossy, fatal_exc)
     if fatal_exc is not None:
         raise fatal_exc

@@ -11,14 +11,15 @@ from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 from quodeq.analysis.mcp.enrichment import enrich_code
+from quodeq.analysis.mcp.precedent_downweight import (
+    _UNSET,
+    _apply_precedent_downweight,
+    precedent_scores as _compute_precedent_scores,
+)
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
-from quodeq.context.precedent import (
-    PrecedentCorpus,
-    fingerprint as _precedent_fingerprint,
-    precedent_text as _precedent_text,
-)
+from quodeq.context.precedent import PrecedentCorpus
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
 from quodeq.core._constants import FULL_CONFIDENCE
@@ -32,7 +33,6 @@ _FINDING_SCHEMA_VERSION = 1
 # (#639), is the lever that moves the score.
 _NON_PROD_DOWNWEIGHT = 50
 _SHAPE_DOWNWEIGHT = 40
-_PRECEDENT_DOWNWEIGHT = 25
 
 _HOSTED_SERVICE_KEYWORDS: tuple[str, ...] = (
     "concurrent caller", "concurrent callers", "concurrent request",
@@ -114,61 +114,6 @@ def _apply_shape_downweight(
         finding["confidence"] = _SHAPE_DOWNWEIGHT
 
 
-def _semantic_eligible(finding: dict[str, object]) -> bool:
-    """Scope-level and empty-snippet findings are excluded from the semantic
-    tier: their enriched snippet is the first ~40 lines of the file regardless
-    of the issue (enrichment.py), so any two scope-level findings on the same
-    file embed near-identical texts and would cross-match across requirements.
-    The exact tier still covers them."""
-    line = finding.get("line")
-    if not isinstance(line, int) or line <= 0:
-        return False
-    if finding.get("scope"):
-        return False
-    snippet = finding.get("snippet")
-    return isinstance(snippet, str) and bool(snippet.strip())
-
-
-def _apply_precedent_downweight(
-    finding: dict[str, object],
-    fingerprints: set[str] | None,
-    corpus: PrecedentCorpus | None = None,
-    *, log: LogSink = NULL_LOG,
-) -> None:
-    """Drop confidence to ~25 when this finding matches a prior dismissal.
-
-    Tier 1: exact fingerprint (unchanged, SARIF-compatible). Tier 2: semantic
-    similarity via the corpus, only on exact miss and only for eligible
-    findings. Same effect, same guard for both tiers.
-    """
-    if finding.get("t") != "violation":
-        return
-    req = finding.get("req")
-    snippet = finding.get("snippet")
-    req_s = req if isinstance(req, str) else None
-    snippet_s = snippet if isinstance(snippet, str) else None
-
-    fp = _precedent_fingerprint(req_s, snippet_s)
-    matched = fp is not None and fingerprints is not None and fp in fingerprints
-
-    if not matched and corpus is not None and _semantic_eligible(finding):
-        text = _precedent_text(req_s, snippet_s)
-        if text is not None:
-            score = corpus.match(text)
-            if score is not None and score >= corpus.threshold:
-                matched = True
-                log.debug(
-                    f"Semantic precedent match ({score:.3f}) for "
-                    f"{finding.get('file')}:{finding.get('line')}"
-                )
-
-    if not matched:
-        return
-    existing = finding.get("confidence")
-    if existing is None or existing == FULL_CONFIDENCE:
-        finding["confidence"] = _PRECEDENT_DOWNWEIGHT
-
-
 def _default_read_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -244,7 +189,9 @@ class FindingEnricher:
         elif not declared and self._dimension:
             finding["d"] = self._dimension
 
-    def _apply_enrichment_pipeline(self, finding: dict) -> None:
+    def _apply_enrichment_pipeline(
+        self, finding: dict, precedent_score: float | None = _UNSET,
+    ) -> None:
         """Attach code context and apply downweights + severity gates in place.
 
         Gates the LIVE path only: this runs once per freshly-dispatched
@@ -264,12 +211,16 @@ class FindingEnricher:
         _apply_shape_downweight(finding, self._project_shape)
         _apply_precedent_downweight(
             finding, self._precedent_fingerprints, self._precedent_corpus,
-            log=self._log,
+            score=precedent_score, log=self._log,
         )
         apply_severity_gates(finding, self._trust_model)
 
-    def enrich(self, args: dict) -> dict:
-        """Return a fully enriched finding dict built from *args*."""
+    def enrich(self, args: dict, *, precedent_score: float | None = _UNSET) -> dict:
+        """Return a fully enriched finding dict built from *args*.
+
+        *precedent_score* lets a caller that already ran the batch semantic
+        lookup (``precedent_scores``) skip a second ``corpus.match`` call.
+        """
         req = args.get("req")
 
         finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
@@ -291,6 +242,16 @@ class FindingEnricher:
                 self._refs[req], args.get("w", ""), args.get("reason", ""),
             )
 
-        self._apply_enrichment_pipeline(finding)
+        self._apply_enrichment_pipeline(finding, precedent_score)
 
         return finding
+
+    def precedent_scores(self, findings: list[dict]) -> list[float | None]:
+        """Best-effort semantic precedent score per finding, one embed call.
+
+        None for a finding that skips the lookup and for every finding when
+        no precedent corpus is configured.
+        """
+        return _compute_precedent_scores(
+            self._precedent_corpus, self._precedent_fingerprints, findings,
+        )

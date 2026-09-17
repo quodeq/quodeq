@@ -9,7 +9,7 @@
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
 src/quodeq/_cli_lifecycle.py:70:broad-except
-src/quodeq/_cli_scoring.py:171:broad-except
+src/quodeq/_cli_scoring.py:124:broad-except
 src/quodeq/analysis/_api_call.py:291:broad-except
 src/quodeq/analysis/_api_runner.py:96:broad-except
 src/quodeq/analysis/_loop_steps.py:103:broad-except
@@ -36,8 +36,8 @@ src/quodeq/analysis/checks/runner.py:282:broad-except
 src/quodeq/analysis/checks/runner.py:52:broad-except
 src/quodeq/analysis/checks/runner.py:74:broad-except
 src/quodeq/analysis/fingerprint.py:72:broad-except
-src/quodeq/analysis/mcp/router.py:138:broad-except
-src/quodeq/analysis/mcp/router.py:174:broad-except
+src/quodeq/analysis/mcp/router.py:166:broad-except
+src/quodeq/analysis/mcp/router.py:202:broad-except
 src/quodeq/analysis/subagents/_pool_launcher.py:87:broad-except
 src/quodeq/api/_assistant_hygiene.py:59:broad-except
 src/quodeq/api/_index_routes.py:24:broad-except
@@ -74,7 +74,7 @@ src/quodeq/config/ai_provider.py:273:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
 src/quodeq/context/_project_shape_io.py:91:broad-except
-src/quodeq/context/precedent_corpus.py:290:broad-except
+src/quodeq/context/precedent_corpus.py:294:broad-except
 src/quodeq/context/precedent_corpus.py:87:broad-except
 src/quodeq/context/precedent_store.py:114:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
@@ -135,7 +135,7 @@ src/quodeq/services/active_evaluation.py:68:broad-except
 src/quodeq/services/background.py:43:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
-src/quodeq/services/evidence_rescore.py:156:broad-except
+src/quodeq/services/evidence_rescore.py:169:broad-except
 src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/mutation_rescore.py:180:broad-except
 src/quodeq/services/project_registration.py:178:broad-except
