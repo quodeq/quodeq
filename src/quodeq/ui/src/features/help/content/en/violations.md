@@ -69,7 +69,7 @@ If a finding is a false positive or an accepted trade-off, dismiss it from the v
 
 Two files refine how findings are judged, beyond one-off dismissals:
 
-- **Trust model** `.quodeq/project-profile.json` in the repo declares what the service is exposed to, e.g. `{"version": 1, "multiTenant": false, "networkExposure": "loopback"}`. Detection can fill in `multiTenant`, but network exposure is never guessed: only a human declaration can relax a remote-reachability finding. Commit it and the whole team scores against the same assumptions.
+- **Trust model** `.quodeq/project-profile.json` in the repo declares what the service is exposed to, e.g. `{"version": 1, "multiTenant": false, "networkExposure": "loopback", "deploymentTopology": "single-host"}`. Detection can fill in `multiTenant`, but neither network exposure nor deployment topology is ever guessed: a loopback deployment and a hosted one, and a single-host deployment and a scaled-out one, are byte-identical on disk, so only a human declaration can relax a remote-reachability or a scalability finding. Commit it and the whole team scores against the same assumptions.
 - **Suppression rules** `suppression_rules.json` in the project's data directory (under `~/.quodeq/evaluations`, next to its runs) holds pattern rules: a requirement glob, a file glob, and a mandatory reason. A rule survives the code moving or being renamed, which a plain dismissal does not. There is no editor for it yet; it is a hand-written JSON file, and malformed entries are skipped rather than suppressing everything.
 
 The run stats show how many findings the rules removed as *suppressed*.

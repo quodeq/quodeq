@@ -1,5 +1,6 @@
 {
   "version": 1,
   "multiTenant": false,
-  "networkExposure": "loopback"
+  "networkExposure": "loopback",
+  "deploymentTopology": "single-host"
 }
