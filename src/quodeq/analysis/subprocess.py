@@ -163,7 +163,7 @@ def _resolve_provider_config(
 
 
 def _run_api_analysis_bridge(
-    work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
+    work_dir: Path, _prompt: str, stream_file: Path, cfg: AnalysisConfig,
     env: Mapping[str, str],
 ) -> None:
     """Run analysis via direct API call (new behavior).

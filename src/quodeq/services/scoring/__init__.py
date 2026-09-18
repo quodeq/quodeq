@@ -38,7 +38,7 @@ from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 —
 # Decomposed submodules. Every moved name is re-exported here so external
 # callers and test patch targets keep working against the package facade.
 # ---------------------------------------------------------------------------
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS  # noqa: F401
+from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.services.scoring._fetchers import _make_trend_fetcher, _max_history_runs  # noqa: F401
 from quodeq.services.scoring._response_builders import (  # noqa: F401
     _build_dimension_dict,
@@ -55,8 +55,8 @@ from quodeq.services.scoring._rescoring import (  # noqa: F401
     _rescore_accumulated_with_coverage,
     _rescore_runs_by_dimension,
 )
-from quodeq.services.scoring._project_scores import get_project_scores  # noqa: F401
-from quodeq.services.scoring._scores_raw import get_scores_raw, get_scores_slim  # noqa: F401
+from quodeq.services.scoring._project_scores import get_project_scores
+from quodeq.services.scoring._scores_raw import get_scores_raw, get_scores_slim
 from quodeq.services._wiring import load_suppression_rules
 
 

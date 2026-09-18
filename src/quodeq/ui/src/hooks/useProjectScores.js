@@ -81,6 +81,16 @@ function buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, ref
   };
 }
 
+/**
+ * Scores for a project, either latest or as of a specific run.
+ *
+ * Selecting a run that is still in progress falls back to the latest completed
+ * scores rather than going blank mid-run. Placeholder data is reused only
+ * within the same project and source, so a project switch never shows the
+ * previous project's numbers.
+ *
+ * @returns {{...queryState, availableRuns: object[], refreshScores: Function}}
+ */
 export function useProjectScores({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
   const { getProjectScores, sharedGetProjectScores } = useApi();
   const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;

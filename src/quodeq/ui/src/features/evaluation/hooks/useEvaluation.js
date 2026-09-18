@@ -102,6 +102,15 @@ function useClearJobCallback(jobId, queryClient, setJobId, setJobError, setStart
   }, [jobId, queryClient]);
 }
 
+/**
+ * The running evaluation: the job, its live findings grouped by dimension,
+ * any error, and the start/cancel/dismiss handles.
+ *
+ * A job already running when the UI loads is picked back up, so a reload
+ * never strands one. `startedProject` names the project the run was launched
+ * for, which the in-progress card uses until the backend resolves the job's
+ * own project.
+ */
 export function useEvaluation() {
   const api = useApi();
   const queryClient = useQueryClient();

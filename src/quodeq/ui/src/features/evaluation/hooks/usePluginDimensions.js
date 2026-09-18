@@ -95,6 +95,10 @@ export function createDimensionCache() {
 // module-level behavior every production consumer relies on.
 const defaultDimensionCache = createDimensionCache();
 
+/**
+ * Drops the shared dimension cache, so the next mount refetches. Tests and
+ * the standards editor use this when the plugin list is known to have moved.
+ */
 export function invalidateDimensionCache() {
   defaultDimensionCache.invalidate();
 }
@@ -142,6 +146,16 @@ function _applyLoad(promise, setAllDimensions, setDimLoadError) {
   });
 }
 
+/**
+ * The dimensions offered in the scan picker, filtered to the standards the
+ * user has left visible, plus a load error to surface.
+ *
+ * The list is cached across mounts and kept in step with the Standards screen:
+ * creating, importing, deleting or starring a standard reaches a picker that
+ * is already on screen. `cache` is injectable for tests.
+ *
+ * @returns {{allDimensions: object[], dimLoadError: string|null}}
+ */
 export function usePluginDimensions(cache = defaultDimensionCache) {
   const { listPlugins, listStandards } = useApi();
   const [allDimensions, setAllDimensions] = useState(() => {

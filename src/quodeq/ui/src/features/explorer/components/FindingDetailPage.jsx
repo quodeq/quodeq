@@ -9,7 +9,7 @@
  * summary. If the user wants the principle's full list, there's already the
  * PrincipleDetailPage route.
  */
-import { TermHeader, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 import { EvalViolationCard } from './EvalCards.jsx';
 import { t } from '../../../strings/index.js';
 

@@ -9,6 +9,15 @@ function loadNewOnly(storage) {
   return storage.getItem(NEW_FINDINGS_ONLY_KEY) !== 'false';
 }
 
+/**
+ * Whether the live findings feed hides findings carried forward from the
+ * incremental cache. On unless explicitly turned off.
+ *
+ * Writes are broadcast so the Settings screen and the evaluation screen stay
+ * in sync within one window. `storage` is injectable for tests.
+ *
+ * @returns {{newOnly: boolean, setNewOnly: (value: boolean) => void}}
+ */
 export default function useLiveFeedSettings({ storage = localStorage } = {}) {
   const [newOnly, setNewOnlyState] = useState(() => loadNewOnly(storage));
 

@@ -44,6 +44,14 @@ function useReEvalScan(project, info) {
   return { isLocal, scanData, estimates, estimatesLoading };
 }
 
+/**
+ * Everything the re-evaluate card renders and does: project info (with the
+ * restore-from-URL recovery), the dimension picker, branch/scope/time-limit
+ * scope state, and the scan estimates.
+ *
+ * Composes useReEvalInfo, usePluginDimensions and useDimensionSelection so the
+ * card itself stays presentational.
+ */
 export function useReEvaluateCard(project, onStart, projectInfo, preselectDims) {
   const api = useApi();
   const { getProjectInfo, relocateProject } = api;

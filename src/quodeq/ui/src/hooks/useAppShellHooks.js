@@ -27,6 +27,9 @@ import { buildBreadcrumbSiblingsFor } from '../features/side-pane/breadcrumbSibl
 // call its member hooks inline -- React only cares about that sequence, not
 // how many function frames it's nested inside.
 
+/**
+ * Whether a run is in flight, which gates the wizard and any second start.
+ */
 export function computeIsEvaluating(state) {
   // While an evaluation is running we block any path that would open the
   // onboarding wizard or start a second evaluation — only one job may be in
@@ -34,13 +37,15 @@ export function computeIsEvaluating(state) {
   return state.evalLifecycle?.job?.status === 'running';
 }
 
-// Warm the Overview's lazy chunks (DashboardPage + the recharts chart) while
-// the startup loader is up — see bootChunks.js for why page-mount time
-// measured too late. Also owns the passive shared-repo content signal (the
-// wizard auto-open, one-shot landing redirect, and "browse remote
-// repositories" empty-state actions share this — same react-query cache as
-// ProjectsPage/Settings, no extra fetching) and the two pieces of App-local
-// UI state that don't depend on anything else.
+/**
+ * Warm the Overview's lazy chunks (DashboardPage + the recharts chart) while
+ * the startup loader is up — see bootChunks.js for why page-mount time
+ * measured too late. Also owns the passive shared-repo content signal (the
+ * wizard auto-open, one-shot landing redirect, and "browse remote
+ * repositories" empty-state actions share this — same react-query cache as
+ * ProjectsPage/Settings, no extra fetching) and the two pieces of App-local
+ * UI state that don't depend on anything else.
+ */
 export function useAppBootExtras() {
   useEffect(() => { warmOverviewChunks(); }, []);
   const sharedSignal = useSharedContentSignal();
@@ -55,19 +60,21 @@ export function useAppBootExtras() {
   return { sharedSignal, sidebarPinned, setSidebarPinned, dismissRefreshKey, bumpDismissRefresh };
 }
 
-// Live assistant context: the pure derivation reuses the app-state object
-// we already hold (calling useAssistantContext() would spin up a second
-// useAppState and duplicate every dashboard query). The gate provides the
-// active assistant provider/model. Starts (or re-starts) the assistant
-// session when the drawer is open and on any provider/model/project/run
-// change while it stays open. startSession dedupes by context key, so
-// re-runs with an unchanged context no-op; a real project/run switch
-// produces a fresh session. We deliberately do NOT start a session while the
-// drawer is closed — sends only originate from the open drawer, so
-// first-open is early enough and avoids needless sessions. Shared projects
-// get READ-ONLY sessions: the backend roots their reads in the shared clone
-// and registers no mutating tools, so the drawer no longer closes on a
-// source switch; the source-keyed session context re-keys instead.
+/**
+ * Live assistant context: the pure derivation reuses the app-state object
+ * we already hold (calling useAssistantContext() would spin up a second
+ * useAppState and duplicate every dashboard query). The gate provides the
+ * active assistant provider/model. Starts (or re-starts) the assistant
+ * session when the drawer is open and on any provider/model/project/run
+ * change while it stays open. startSession dedupes by context key, so
+ * re-runs with an unchanged context no-op; a real project/run switch
+ * produces a fresh session. We deliberately do NOT start a session while the
+ * drawer is closed — sends only originate from the open drawer, so
+ * first-open is early enough and avoids needless sessions. Shared projects
+ * get READ-ONLY sessions: the backend roots their reads in the shared clone
+ * and registers no mutating tools, so the drawer no longer closes on a
+ * source switch; the source-keyed session context re-keys instead.
+ */
 export function useAppAssistant(state) {
   const { showToast } = useSidePane();
   const assistantGate = useAssistantProvider();
@@ -83,9 +90,11 @@ export function useAppAssistant(state) {
   return { showToast, assistantCtx };
 }
 
-// Grade-formula boot sync, wizard entry/auto-open lifecycle, and the
-// Evaluate-tab bounce guard — see useAppEffects.js and
-// features/onboarding/useWizardLifecycle.js for the individual rationales.
+/**
+ * Grade-formula boot sync, wizard entry/auto-open lifecycle, and the
+ * Evaluate-tab bounce guard — see useAppEffects.js and
+ * features/onboarding/useWizardLifecycle.js for the individual rationales.
+ */
 export function useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal }) {
   useGradeFormulaBootSyncEffect();
   const { wizardEntry, setWizardEntry, wizardHandlers } = useWizardLifecycle({
@@ -96,9 +105,11 @@ export function useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, s
   return { wizardEntry, setWizardEntry, wizardHandlers, hasCurrentProjectRuns };
 }
 
-// Startup-loader gating, the one-shot initial-landing redirect, the native
-// macOS Help-menu nav bridge, and the two selected-project-keyed sync
-// effects (scroll reset, visible-standards hydration).
+/**
+ * Startup-loader gating, the one-shot initial-landing redirect, the native
+ * macOS Help-menu nav bridge, and the two selected-project-keyed sync
+ * effects (scroll reset, visible-standards hydration).
+ */
 export function useAppNavBoot({ state, activeTab, navTab, sharedSignal }) {
   // NOT memoized on purpose: a per-render read is what makes this pick up a
   // Settings change (active provider/model) without its own change listener.
@@ -123,8 +134,10 @@ export function useAppNavBoot({ state, activeTab, navTab, sharedSignal }) {
   return { sidebarProvider, sidebarModel, showStartupLoader };
 }
 
-// Day-label memo, dark/light theme sync, visible-standards-filtered
-// trend/accumulated data, and the breadcrumb jump-bar's sibling lookup.
+/**
+ * Day-label memo, dark/light theme sync, visible-standards-filtered
+ * trend/accumulated data, and the breadcrumb jump-bar's sibling lookup.
+ */
 export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
   const currentDayLabel = useMemo(
     () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
@@ -154,9 +167,11 @@ export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
   return { currentDayLabel, effectiveDark, toggleTheme, filteredTrend, filteredAccumulated, breadcrumbSiblingsFor };
 }
 
-// Live run progress for the topbar chrome (run chip + bottom hairline).
-// Shares the JobStatStrip/ScanProgress query cache entry, so this adds no
-// extra polling.
+/**
+ * Live run progress for the topbar chrome (run chip + bottom hairline).
+ * Shares the JobStatStrip/ScanProgress query cache entry, so this adds no
+ * extra polling.
+ */
 export function useAppEvalProgress({ state, isEvaluating }) {
   const evalJob = state.evalLifecycle?.job;
   const { data: evalProgress } = useEvaluationProgress(isEvaluating ? evalJob?.jobId : undefined, !isEvaluating);

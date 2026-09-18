@@ -27,6 +27,15 @@ const DEFAULTS = {
 // Legacy storage key fallback, only consulted when the new key has no value.
 const LEGACY_KEY_MAP = { 'time-limit': 'pool-budget' };
 
+/**
+ * Reads one provider's settings, falling back to `overrides` and then the
+ * shipped defaults for anything unset.
+ *
+ * The api-key slot comes back blank when the backend holds the key (the local
+ * value is only a "configured" marker), so a caller can never send the marker
+ * to a provider as a credential. Legacy key names are migrated on read;
+ * `onPersistError` reports a migration that could not be written back.
+ */
 export function loadProviderState(providerId, overrides, storage = localStorage, { onPersistError } = {}) {
   const merged = { ...DEFAULTS, ...overrides };
   const state = {};
@@ -62,6 +71,11 @@ export function loadProviderState(providerId, overrides, storage = localStorage,
   return state;
 }
 
+/**
+ * Persists one provider setting. Storage failures are reported through
+ * `onPersistError` rather than thrown — a setting that cannot be cached must
+ * not break the screen.
+ */
 export function saveProviderSetting(providerId, key, value, storage = localStorage, { onPersistError } = {}) {
   try {
     storage.setItem(providerKey(providerId, key), String(value));
@@ -71,9 +85,11 @@ export function saveProviderSetting(providerId, key, value, storage = localStora
   }
 }
 
-// The key itself never touches localStorage: it goes straight to the
-// backend's secure store, and only the "configured" sentinel is cached
-// locally afterward.
+/**
+ * The key itself never touches localStorage: it goes straight to the
+ * backend's secure store, and only the "configured" sentinel is cached
+ * locally afterward.
+ */
 export async function saveProviderApiKey(providerId, apiKey, storage = localStorage, { onPersistError } = {}) {
   try {
     const { stored } = await saveProviderKey(providerId, apiKey);
@@ -87,6 +103,15 @@ export async function saveProviderApiKey(providerId, apiKey, storage = localStor
   }
 }
 
+/**
+ * One provider's settings plus the updater the tabs write through.
+ *
+ * Reads apply the same defaults and legacy migration as loadProviderState; a
+ * migration that fails to persist is toasted after mount rather than during
+ * render. `storage` is injectable for tests.
+ *
+ * @returns {{state: object, update: Function}}
+ */
 export default function useProviderSettings(providerId, defaults, { storage = localStorage } = {}) {
   const { showToast } = useSidePane();
   // loadProviderState runs inside the useState initializer, i.e. during

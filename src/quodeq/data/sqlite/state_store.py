@@ -1,3 +1,4 @@
+"""SQLite state store: the findings and grade tables the projection writes."""
 from __future__ import annotations
 
 import logging
@@ -90,12 +91,22 @@ class SQLiteStateStore(_StateStoreMetaMixin):
                 yield conn
 
     def record_finding(self, payload: Judgment) -> None:
+        """Insert one judgment into ``findings``.
+
+        INSERT OR IGNORE on the dedup key, so replaying an already-projected
+        event is a no-op rather than a duplicate row.
+        """
         row = judgment_to_row(payload)
         with self._db() as conn:
             conn.execute(_INSERT_FINDING, row)
             conn.commit()
 
     def clear_all(self) -> None:
+        """Reset everything the projection owns for this run.
+
+        Clears ``findings`` and ``dimension_scores`` and drops the checkpoint
+        keys, so the next pass replays from event zero.
+        """
         with self._db() as conn:
             conn.execute("DELETE FROM findings")
             conn.execute("DELETE FROM dimension_scores")
@@ -162,6 +173,7 @@ class SQLiteStateStore(_StateStoreMetaMixin):
     def record_dimension_score(
         self, *, dimension: str, score: float | None, grade: str | None,
     ) -> None:
+        """Upsert one ``dimension_scores`` row and stamp ``completed_at``."""
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO dimension_scores (dimension, score, grade, completed_at) "
@@ -173,6 +185,7 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             conn.commit()
 
     def record_principle_grade(self, row: PrincipleGradeRow) -> None:
+        """Upsert one ``principle_grades`` row, keyed on (dimension, principle_id)."""
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO principle_grades "
@@ -235,12 +248,14 @@ class SQLiteStateStore(_StateStoreMetaMixin):
             conn.commit()
 
     def clear_grades(self) -> None:
+        """Empty both grade tables. Findings are left alone."""
         with self._db() as conn:
             conn.execute("DELETE FROM dimension_scores")
             conn.execute("DELETE FROM principle_grades")
             conn.commit()
 
     def read_dimension_scores(self) -> list[dict]:
+        """Return every ``dimension_scores`` row as a dict, ordered by dimension."""
         with self._db() as conn:
             rows = conn.execute(
                 "SELECT dimension, score, grade, exit_reason "
@@ -252,6 +267,7 @@ class SQLiteStateStore(_StateStoreMetaMixin):
         ]
 
     def read_principle_grades(self) -> list[dict]:
+        """Return the ``principle_grades`` rows as dicts, ordered by dimension then id."""
         with self._db() as conn:
             rows = conn.execute(
                 "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "

@@ -88,6 +88,15 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
   });
 }
 
+/**
+ * Subscribes to a run's SSE stream and writes status, dimensions and findings
+ * straight into the query caches, so the screens reading those keys update
+ * without polling.
+ *
+ * No-op when the job id is absent or SSE is disabled (VITE_USE_SSE_EVENTS),
+ * in which case the polling queries cover it. The stream is closed on unmount
+ * and when the run finishes.
+ */
 export function useRunEventStream(jobId) {
   const queryClient = useQueryClient();
 

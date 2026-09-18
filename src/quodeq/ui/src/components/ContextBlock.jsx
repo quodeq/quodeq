@@ -136,7 +136,7 @@ function renderContextLines(ctxLines, line) {
   ];
 }
 
-export default function ContextBlock({ context, snippet, scope, line, endLine }) {
+export default function ContextBlock({ context, snippet, scope, line }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = () => setExpanded((e) => !e);
 

@@ -51,7 +51,7 @@ function StandardLaunchActions({ selectedIds, onLaunch, onBack }) {
   );
 }
 
-export default function StandardLaunchStep({ state, actions, standards, onLaunch, onCancel, onBack, stepIndex = 0, stepTotal = 0 }) {
+export default function StandardLaunchStep({ state, actions, standards, onLaunch, onBack, stepIndex = 0, stepTotal = 0 }) {
   const inputType = state.isFirstProject ? 'radio' : 'checkbox';
   const selectedIds = Array.from(state.standardIds);
   const selectedNames = standards

@@ -16,9 +16,6 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
 /**
  * @param {object} options
  * @param {string} options.selectedProject
- * @param {Function} [options.onRefresh] - Unused by the mutation handlers (the
- *   reconcile below marks stale itself); kept in the signature for the
- *   navigation-time mount refresh ViolationsPage wires separately.
  * @param {Function} [options.setRestoreError]
  * @param {number} [options.refreshKey=0]
  * @param {'local'|'shared'} [options.selectedSource='local'] - Shared projects have no
@@ -146,7 +143,7 @@ function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyD
   };
 }
 
-export function useDismissedFindings({ selectedProject, onRefresh, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile }) {
+export function useDismissedFindings({ selectedProject, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile }) {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
   const isShared = selectedSource === 'shared';

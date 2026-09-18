@@ -212,7 +212,6 @@ function CompactBackButton({ canGoBack, onBack }) {
  */
 export default function TopBar({
   projectName,
-  activeTab,
   serverConnected,
   serverUrl,
   provider,

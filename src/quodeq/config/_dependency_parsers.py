@@ -26,11 +26,11 @@ import tomllib
 from functools import lru_cache
 from typing import Callable
 
-from quodeq.config._dependency_parsers_python import (  # noqa: F401 - re-export
+from quodeq.config._dependency_parsers_python import (  # re-export
     has_pyproject_dependency,
     has_requirements_txt_dependency,
 )
-from quodeq.config._dependency_parsers_compiled import (  # noqa: F401 - re-export
+from quodeq.config._dependency_parsers_compiled import (  # re-export
     has_cargo_dependency,
     has_composer_dependency,
     has_go_mod_module,

@@ -1,3 +1,4 @@
+"""Streaming JSONL reader for the run event log, with per-line error recovery."""
 from __future__ import annotations
 
 import json

@@ -19,7 +19,7 @@ from quodeq.analysis.subagents._pool_scaling import (
 from quodeq.shared import cancellation
 
 
-from tests._analysis_helpers import _FixedRemainingQueue, _fake_run_analysis  # noqa: F401 — shared helper
+from tests._analysis_helpers import _FixedRemainingQueue, _fake_run_analysis  # shared helper
 
 # See test_scout_burst_integration.py for the Windows skip rationale.
 pytestmark = pytest.mark.skipif(

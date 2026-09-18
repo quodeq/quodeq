@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { it, expect, vi } from 'vitest';
 
 vi.mock('../../hooks/useAppState.js', () => ({ default: () => ({}) }));  // not used directly; see note
 vi.mock('../settings/hooks/useAssistantProvider.js', () => ({

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
-from quodeq.data.fs.run_files import run_fingerprint  # noqa: F401 — facade re-export
+from quodeq.data.fs.run_files import run_fingerprint  # facade re-export
 from quodeq.data.fs.report_parser.runs import RunInfo, read_run_data
 from quodeq.core.types import DimensionResult
 

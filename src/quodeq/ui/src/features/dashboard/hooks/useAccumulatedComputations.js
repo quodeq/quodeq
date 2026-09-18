@@ -8,13 +8,15 @@ import { formatRunId } from '../../../utils/formatters.js';
 // old DimensionScorePanel SPARKLINE_LIMIT).
 const DIM_SPARKLINE_LIMIT = 10;
 
-// The "vs previous" delta compares two accumulated numericAverage points from the
-// trend (this run vs the prior run). With fewer than two trend entries there is no
-// comparable previous point, so the delta stays null rather than falling back to
-// summary.previousNumericAverage: that value is the prior run's own-dimension average,
-// not comparable to the accumulated numericAverage (an apples-to-oranges subtraction).
-// Canonical definition lives here (not in AccumulatedOverviewPanel.jsx, which
-// re-exports it) to avoid a circular import: this hook needs it too.
+/**
+ * The "vs previous" delta compares two accumulated numericAverage points from the
+ * trend (this run vs the prior run). With fewer than two trend entries there is no
+ * comparable previous point, so the delta stays null rather than falling back to
+ * summary.previousNumericAverage: that value is the prior run's own-dimension average,
+ * not comparable to the accumulated numericAverage (an apples-to-oranges subtraction).
+ * Canonical definition lives here (not in AccumulatedOverviewPanel.jsx, which
+ * re-exports it) to avoid a circular import: this hook needs it too.
+ */
 export function computeAccumulatedStats(accumulatedDimensions, dailyTrend, selectedRunId) {
   let scoreDelta = null;
   if (dailyTrend && dailyTrend.length >= 2) {
@@ -111,6 +113,15 @@ function useVisibleFilteredTrends({ trend, dayTrend, periodTrend, granularity, a
   return { visibleSet, filteredDayTrend, filteredPeriodTrend, filteredTrend, filteredDimensions };
 }
 
+/**
+ * Everything the Overview's accumulated view renders from: the selected run,
+ * the trends (per run and per period) and dimensions filtered to the visible
+ * standards, the derived stats, and whether there is enough history to mount
+ * the chart.
+ *
+ * One hook so every panel on the screen filters and selects identically — the
+ * chips, the chart and the cards cannot disagree about which run is showing.
+ */
 export function useAccumulatedComputations(data) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = 'day' } = data;
   const dayRuns = dailyRuns || availableRuns;

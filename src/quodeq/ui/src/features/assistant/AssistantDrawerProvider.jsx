@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { fetchAssistantCatalog } from '../../api/assistant.js';
 import useAssistantProvider from '../settings/hooks/useAssistantProvider.js';
 import useTerminalSettings from '../settings/hooks/useTerminalSettings.js';

@@ -129,7 +129,7 @@ function MapBreadcrumb({ path, onNavigate, projectName }) {
 
 function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }) {
   const appIsDark = useThemeIsDark();
-  const { vizStyle, viewMode, galaxyMode, setGalaxyMode } = vizState;
+  const { vizStyle, viewMode, galaxyMode } = vizState;
   const { node, fullTree, currentPath, onPathChange } = treeState;
   const { onDrillDown, onFileClick, onNavigate, onBreadcrumbNav } = callbacks;
   const { showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, resetKey, projectName, standardTypes } = display;
@@ -150,8 +150,8 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
       </div>
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
       {vizStyle === 'zoompack' && <ZoomablePackView node={fullTree} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} currentPath={currentPath} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }

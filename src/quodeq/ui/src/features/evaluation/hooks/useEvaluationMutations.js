@@ -101,6 +101,12 @@ function cancelOnError({ queryClient, jobId, setJobId, setJobError }) {
   };
 }
 
+/**
+ * The start and cancel mutations, wired so success and failure both leave the
+ * job id, the error field and the evaluation caches consistent.
+ *
+ * @returns {{startMutation: object, cancelMutation: object}}
+ */
 export function useEvaluationMutations({ api, queryClient, jobId, setJobId, setJobError, setStartedProject }) {
   const startMutation = useMutation({
     mutationFn: startMutationFn(api),

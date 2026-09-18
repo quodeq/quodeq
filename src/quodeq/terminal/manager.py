@@ -20,6 +20,9 @@ from quodeq.terminal.backend import PtyBackend
 
 
 class TerminalManager:
+    """One PTY session: spawn/kill, the scrollback ring and the incremental
+    UTF-8 decoder that survives reconnects."""
+
     MAX_SCROLLBACK = 256 * 1024  # characters
 
     def __init__(self, *, backend_factory=PtyBackend):
@@ -31,6 +34,12 @@ class TerminalManager:
         self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
     def ensure_session(self, *, cwd: str, cols: int, rows: int) -> None:
+        """Spawn the shell if there isn't a live one; no-op when there is.
+
+        A dead backend is closed and replaced, which drops the scrollback and
+        resets the decoder — *cwd*, *cols* and *rows* only apply to that fresh
+        PTY, never to a session already running.
+        """
         with self._lock:
             if self._backend is not None and self._backend.alive:
                 return
@@ -59,19 +68,25 @@ class TerminalManager:
         return data
 
     def write(self, data: bytes) -> None:
+        """Send keystrokes to the shell. Dropped when no PTY is running."""
         backend = self._backend
         if backend is not None:
             backend.write(data)
 
     def resize(self, cols: int, rows: int) -> None:
+        """Tell the shell its new window size so TUIs redraw at the right
+        width. Dropped when no PTY is running."""
         backend = self._backend
         if backend is not None:
             backend.resize(cols, rows)
 
     def scrollback(self) -> str:
+        """Replay buffer for a reconnecting client, capped at
+        ``MAX_SCROLLBACK`` characters."""
         return "".join(self._ring)
 
     def kill(self) -> None:
+        """Close the PTY. Idempotent; the scrollback stays readable after."""
         with self._lock:
             if self._backend is not None:
                 self._backend.kill()
@@ -79,6 +94,7 @@ class TerminalManager:
 
     @property
     def alive(self) -> bool:
+        """True while the shell process is still running."""
         return self._backend is not None and self._backend.alive
 
     @property

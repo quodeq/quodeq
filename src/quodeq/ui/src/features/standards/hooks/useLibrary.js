@@ -2,9 +2,17 @@ import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
-import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
+/**
+ * The bundled standards library and the import action.
+ *
+ * `error` carries whichever failed last, the listing or an import.
+ * importStandard rethrows after recording the message, so the caller can keep
+ * its own dialog open.
+ *
+ * @returns {{libraryStandards: object[], loading: boolean, error: string|null, importStandard: Function}}
+ */
 export function useLibrary() {
   const { listLibrary, importFromLibrary } = useApi();
   const [importError, setImportError] = useState(null);

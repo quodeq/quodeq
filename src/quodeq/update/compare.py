@@ -6,6 +6,7 @@ from packaging.version import InvalidVersion, Version
 
 
 def normalize(version: str) -> str:
+    """Strip a leading ``v`` and surrounding whitespace off a release tag."""
     v = version.strip()
     if v[:1] in ("v", "V"):
         v = v[1:]

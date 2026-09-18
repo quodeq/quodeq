@@ -26,6 +26,11 @@ class Taxonomy:
     requirements: Mapping[str, RequirementTypes] = field(default_factory=dict)
 
     def for_requirement(self, req_id: str | None) -> RequirementTypes | None:
+        """The allowed types for one requirement, or None if it declares none.
+
+        None is also the answer for a missing *req_id*, so a finding's raw
+        requirement can be passed straight through without a guard.
+        """
         if not req_id:
             return None
         return self.requirements.get(req_id)

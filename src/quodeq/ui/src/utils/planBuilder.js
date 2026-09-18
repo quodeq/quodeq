@@ -52,6 +52,10 @@ export const PLAN_COMPLETION_CHECKLIST = [
 
 export { FIX_HINTS };
 
+/**
+ * The canned fix hint for a requirement id, falling back to the hint for its
+ * id prefix (so `M-MOD-4` can reuse `M-MOD`). Null when nothing matches.
+ */
 export function getFixHint(req) {
   if (!req) return null;
   if (FIX_HINTS[req]) return FIX_HINTS[req];
@@ -141,10 +145,15 @@ function _buildPlanLines(dimName, totalCount, bySeverity, allViolations, entryKe
   return lines.join('\n').trim();
 }
 
-// ---------------------------------------------------------------------------
-// Dimension plan builders (used by explorerUtils re-exports)
-// ---------------------------------------------------------------------------
-
+/**
+ * Fix plan for a whole dimension, built from an evaluation payload: every
+ * violation under every principle, ordered critical-first.
+ *
+ * Returns an empty string when the dimension has no violations, which callers
+ * treat as "nothing to plan".
+ *
+ * @returns {string} Markdown
+ */
 export function buildDimensionPlanText(evalData) {
   const bySeverity = {};
   let total = 0;
@@ -164,6 +173,12 @@ export function buildDimensionPlanText(evalData) {
   );
 }
 
+/**
+ * Same plan as buildDimensionPlanText, for callers that already hold a flat
+ * violation list instead of an evaluation payload.
+ *
+ * @returns {string} Markdown, empty when the list is empty.
+ */
 export function buildDimensionPlanFromViolations(dimName, violations) {
   if (!violations || violations.length === 0) return '';
   const bySeverity = {};

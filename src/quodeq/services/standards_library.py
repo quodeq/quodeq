@@ -23,16 +23,26 @@ class StandardImportConflictError(ValueError):
     ``ValueError`` so callers can tell the two apart by type."""
 
 class HttpClient(Protocol):
-    def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any: ...
+    """Transport seam for the library client, so tests can answer without a network."""
+    def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
+        """Fetch *url* and return the decoded JSON body."""
+        ...
 
 class UrllibJsonClient:
+    """``HttpClient`` over ``urllib`` with a default-verified TLS context."""
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
+        """Fetch *url* with a 30s timeout. Transport and decode errors propagate."""
         req = urllib.request.Request(url, headers=headers or {})
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S, context=ctx) as resp:
             return json.loads(resp.read())
 
 class StandardsLibraryClient:
+    """Read side of a remote standards library: index, fetch, and import-to-disk.
+
+    Construction rejects any base URL that is not ``https://``, so the bearer
+    token can never ride on a plaintext request.
+    """
     def __init__(self, base_url: str, http_client: HttpClient, token: str | None = None) -> None:
         if not base_url.startswith("https://"):
             raise ValueError(f"Only https:// base URLs are allowed, got: {base_url!r}")

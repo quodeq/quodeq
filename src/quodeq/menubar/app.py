@@ -55,6 +55,13 @@ def _load_config(env=None):
 
 
 class QuodeqApp(DashboardLifecycleMixin, rumps.App):
+    """The status item itself: menu, icon state, and the AppKit run loop.
+
+    Owns every menu item and the polling thread that keeps the icon in sync
+    with the dashboard; starting and stopping the dashboard comes from
+    ``DashboardLifecycleMixin``.
+    """
+
     def __init__(self):
         super().__init__(
             "Quodeq", icon=_find_icon("menubar_iconTemplate.png"), template=True,
@@ -214,6 +221,7 @@ def _set_accessory_policy() -> None:
 
 
 def main() -> None:
+    """Run the menu bar until quit. Returns immediately if a bar already owns the pidfile."""
     _source_user_path()
     if _control.is_running():
         # Another bar owns the status item; a second icon would only confuse.

@@ -1,5 +1,5 @@
 import {
-  TAU, getThemeColors, drawGlow, drawParticles, rgba, rgb,
+  TAU, getThemeColors, drawGlow, drawParticles, rgba,
 } from '../core/galaxyCore.js';
 import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL } from '../core/galaxyTunables.js';
 

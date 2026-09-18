@@ -74,6 +74,10 @@ class SqliteFindingsRepository:
         self._ensure_fresh()
 
     def insert_finding(self, finding: dict[str, Any]) -> bool:
+        """Insert into ``findings``; INSERT OR IGNORE on the dedup key.
+
+        Returns False when the row already existed. Does not project.
+        """
         row = finding_dict_to_row(finding)
         with open_evaluation_db(self._run_dir) as conn:
             cur = conn.execute(_INSERT_SQL, row)
@@ -81,6 +85,10 @@ class SqliteFindingsRepository:
             return cur.rowcount == 1
 
     def list_by_dimension(self, dimension: str) -> list[Finding]:
+        """One indexed SELECT over ``findings``, ordered by insertion id.
+
+        Projects first, so the rows reflect the current event log.
+        """
         self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
@@ -105,6 +113,10 @@ class SqliteFindingsRepository:
         return [row_to_finding(r) for r in rows]
 
     def count_by_dimension(self) -> dict[str, int]:
+        """Return ``COUNT(*) GROUP BY dimension``, dismissed rows included.
+
+        Dimensions with no findings are absent from the dict rather than zero.
+        """
         self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
             rows = conn.execute(
@@ -155,6 +167,10 @@ class SqliteFindingsRepository:
         return [row_to_finding(r) for r in rows]
 
     def set_verdict(self, *, practice_id: str, file: str, line: int, verdict: str) -> int:
+        """One UPDATE keyed on (practice_id, file, line). Returns rows affected.
+
+        Several findings can share that tuple; all of them get *verdict*.
+        """
         with open_evaluation_db(self._run_dir) as conn:
             cur = conn.execute(
                 "UPDATE findings SET verdict = ? "

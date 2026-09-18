@@ -13,6 +13,15 @@ function loadEnabled(storage) {
   }
 }
 
+/**
+ * Whether the embedded terminal is available. On unless explicitly turned
+ * off, and unreadable storage falls back to on rather than hiding the feature.
+ *
+ * Writes are broadcast so every consumer in the window follows immediately.
+ * `storage` is injectable for tests.
+ *
+ * @returns {{enabled: boolean, setEnabled: (value: boolean) => void}}
+ */
 export default function useTerminalSettings({ storage = localStorage } = {}) {
   const [enabled, setEnabledState] = useState(() => loadEnabled(storage));
 

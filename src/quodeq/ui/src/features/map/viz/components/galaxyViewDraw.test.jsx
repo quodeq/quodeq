@@ -48,7 +48,7 @@ function makeMockCtx(calls) {
     })),
   };
   for (const m of methods.filter(m => m !== 'createRadialGradient')) {
-    ctx[m] = vi.fn((...args) => { calls.push(m); });
+    ctx[m] = vi.fn(() => { calls.push(m); });
   }
   // Record createRadialGradient too
   const origCRG = ctx.createRadialGradient;

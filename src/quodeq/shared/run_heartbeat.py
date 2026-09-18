@@ -28,6 +28,7 @@ class HeartbeatThread:
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
+        """Spawn the daemon thread. Idempotent while a previous thread is still alive."""
         if self._thread is not None and self._thread.is_alive():
             return  # idempotent
         self._stop.clear()
@@ -35,6 +36,11 @@ class HeartbeatThread:
         self._thread.start()
 
     def stop(self, *, timeout: float = 2.0) -> None:
+        """Signal the thread and join it for at most *timeout* seconds.
+
+        A thread still mid-``touch`` past the timeout is abandoned rather than
+        waited on; it is a daemon, so it dies with the interpreter.
+        """
         self._stop.set()
         thread = self._thread
         if thread is not None and thread.is_alive():

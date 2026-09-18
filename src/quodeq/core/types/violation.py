@@ -1,3 +1,4 @@
+"""Payload shapes a dimension analysis streams and persists, plus their schema version."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

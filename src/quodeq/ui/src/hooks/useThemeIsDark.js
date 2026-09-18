@@ -13,6 +13,14 @@ function computeIsDark() {
   return window.matchMedia(PREFERS_DARK_QUERY).matches;
 }
 
+/**
+ * Whether the theme showing right now is dark, tracked by observing the
+ * applied DATA_THEME_ATTR (and the OS preference in system mode) rather than
+ * re-reading settings state — so it stays right no matter which code path
+ * changed the theme.
+ *
+ * @returns {boolean}
+ */
 export function useThemeIsDark() {
   const [isDark, setIsDark] = useState(computeIsDark);
 

@@ -103,6 +103,11 @@ def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | N
 
 
 def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
+    """Bind the assistant session lifecycle routes.
+
+    *gates* carries the per-source admission checks, so a caller can stand the
+    routes up with a provider disabled without touching this module.
+    """
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
         # First assistant request of the process: reap leaked worktrees +

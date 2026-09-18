@@ -7,7 +7,7 @@ import {
  * Draw all scene elements to the canvas context.
  */
 export function drawScene(ctx, activeScene, params) {
-  const { W, H, t, cam, w2s, showLabels, mouseRef, flyRef, focusedFolderRef, canvasRef } = params;
+  const { W, H, canvasRef } = params;
   const tc = getThemeColors(canvasRef.current?.parentElement);
 
   // Background gradient
@@ -192,7 +192,7 @@ function hitTestStar({ s, i, sc, sr }, params) {
  * Draw all stars and collect label/hit-test info. Returns { pendingLabels, newHovered }.
  */
 export function drawStars(ctx, activeScene, params) {
-  const { t, cam, w2s, showLabels, flyRef, focusedFolderRef, tc } = params;
+  const { t, cam, w2s, showLabels, flyRef } = params;
   let newHovered = null;
   const pendingLabels = [];
 

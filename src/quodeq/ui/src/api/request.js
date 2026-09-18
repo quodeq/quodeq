@@ -5,6 +5,18 @@
 export const BASE = import.meta.env.VITE_API_BASE || '/api';
 const API_TIMEOUT_MS = 30000;
 
+/**
+ * Issues a JSON request against the API base and resolves to the parsed body.
+ *
+ * On a non-2xx response it throws an Error carrying `status` (the HTTP code)
+ * and `code` (the envelope's stable error code, which strings/apiErrors.js
+ * turns into translated copy). Aborts after `options.timeout` ms, defaulting
+ * to 30s.
+ *
+ * @param {string} path - Path below the API base, e.g. `/projects`.
+ * @param {RequestInit & {timeout?: number}} [options]
+ * @returns {Promise<object>}
+ */
 export async function request(path, options = {}) {
   // Per-call timeout override: slow mutations (git push + gh can each take up
   // to 120s) pass a larger `timeout` so the client does not falsely report a

@@ -137,6 +137,19 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
   return { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
 }
 
+/**
+ * The app's navigation stack, kept in sync with browser history so back and
+ * forward work.
+ *
+ * Pushes render in a transition, so `navPending` is the caller's cue to show
+ * progress. Object payloads stay in a per-index map rather than in history
+ * state (see toHistoryEntry), and every navigation resets the main column's
+ * scroll.
+ *
+ * `historyAdapter` is injectable for tests.
+ *
+ * @returns {{navStack: object[], activePage: object, navPending: boolean, navPush: Function, navPop: Function, navReplace: Function, navGoTo: Function, navSwapAt: Function, navReset: Function, navTab: Function}}
+ */
 export function useNavStack({ historyAdapter } = {}) {
   const history = historyAdapter || defaultHistoryAdapter;
   const [navStack, setNavStack] = useState([{ page: DEFAULT_PAGE }]);

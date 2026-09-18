@@ -16,7 +16,7 @@ from quodeq.analysis.mcp.handlers import (
 )
 
 # Re-export public names so ``from dispatch import X`` keeps working.
-from quodeq.analysis.mcp.schemas import (  # noqa: F401
+from quodeq.analysis.mcp.schemas import (
     GET_NEXT_FILES_DESC,
     GET_NEXT_FILES_NAME,
     GET_NEXT_FILES_SCHEMA,

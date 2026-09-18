@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';

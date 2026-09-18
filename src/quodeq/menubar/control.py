@@ -85,6 +85,7 @@ def write_pidfile() -> None:
 
 
 def remove_pidfile() -> None:
+    """Release pidfile ownership. Missing or unwritable files are ignored."""
     try:
         _pidfile_path().unlink()
     except OSError as exc:

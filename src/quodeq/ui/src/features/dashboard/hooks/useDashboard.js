@@ -133,6 +133,16 @@ function mergeTrendIntoDashboard(dashboardData, fallbackTrend) {
   return { ...dashboardData, trend: fallbackTrend };
 }
 
+/**
+ * The Overview's data for one project and run: the dashboard payload, the
+ * accumulated and per-run scores, the available runs, loading/error state,
+ * and the refresh/reconcile handles for invalidating it after a mutation.
+ *
+ * Local and shared projects go through the same shape; `selectedSource` picks
+ * the route. `keepPlaceholder` shows the previous run's data during a swap,
+ * which History turns off because flashing a neighbouring run is misleading
+ * there. Placeholders never cross a project or source boundary.
+ */
 export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
   const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
   const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;

@@ -38,6 +38,16 @@ const NEVER_QUERIED = () => {
   throw new Error('cache slot is SSE-fed; queryFn must not run');
 };
 
+/**
+ * Live state for a run open in History: the dimensions scored so far, the ones
+ * still planned, and whether at least one has finished.
+ *
+ * The dimension and status slots are fed by the SSE stream rather than
+ * fetched; the progress read is polled unconditionally so the page still
+ * advances with SSE off.
+ *
+ * @returns {{liveDims: object, plannedDimensions: string[], hasScoredDimension: boolean}}
+ */
 export function useHistoryRunLive(runId) {
   useRunEventStream(runId);
 

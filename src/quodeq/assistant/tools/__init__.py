@@ -16,6 +16,11 @@ __all__ = ["ToolContext", "ToolError", "ToolRegistry", "ToolSpec", "build_regist
 
 
 def build_registry(ctx: ToolContext) -> ToolRegistry:
+    """Assemble the tool registry for one session.
+
+    Read-only sessions get no ``draft_action``, so a shared session has no
+    mutation primitive to gate further down.
+    """
     registry = ToolRegistry()
     register_context_tool(registry, ctx)
     register_read_tools(registry, ctx)

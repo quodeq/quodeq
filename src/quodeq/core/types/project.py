@@ -1,3 +1,4 @@
+"""Project registry shapes: the stored metadata and the listing row built from it."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

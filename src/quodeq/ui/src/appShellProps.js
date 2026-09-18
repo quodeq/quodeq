@@ -11,14 +11,13 @@ import { buildDashboardDataBundle, buildNavigationBundle } from './routes/render
 // element.
 
 export function buildSidebarProps({
-  activeTab, navTab, projectsCount, selectedSource, hasCurrentProjectRuns, sharedProjectInfo,
+  activeTab, navTab, selectedSource, hasCurrentProjectRuns, sharedProjectInfo,
   projects, sharedHasContent, resolvedDisplayName, headerMeta, version, sidebarCounts,
   lastEvalAt, isPinned, onPinChange,
 }) {
   return {
     activeTab,
     onNavTab: navTab,
-    hasEvaluations: projectsCount > 0,
     showProjectTabs: shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, sharedProjectInfo }),
     showCompareTab: shouldShowCompareTab({ projects, sharedHasContent }),
     selectedSource,
@@ -33,13 +32,12 @@ export function buildSidebarProps({
 }
 
 export function buildTopBarProps({
-  resolvedDisplayName, activeTab, serverConnected, sidebarProvider, sidebarModel, selectedSource,
+  resolvedDisplayName, serverConnected, sidebarProvider, sidebarModel, selectedSource,
   projectsCount, onEvaluateClick, evaluating, topbarRunProgress, navTab, setSidebarPinned,
   breadcrumb, mobileTitle, navStackLength, navPop, effectiveDark, toggleTheme,
 }) {
   return {
     projectName: resolvedDisplayName,
-    activeTab,
     serverConnected,
     serverUrl: typeof window !== 'undefined' ? window.location.origin : null,
     provider: sidebarProvider,

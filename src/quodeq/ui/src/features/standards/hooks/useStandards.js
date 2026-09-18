@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
-import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { STANDARDS_CHANGED_REASON, notifyStandardsChanged } from '../../../constants.js';
 
@@ -48,6 +47,13 @@ function groupStandards(standards) {
   return g;
 }
 
+/**
+ * The standards list, grouped by type, with delete and duplicate.
+ *
+ * A refresh also notifies the Evaluate picker, which keeps its own merged
+ * plugin+standards list outside React Query and would otherwise go stale.
+ * `error` carries whichever failed last, the listing or a mutation.
+ */
 export function useStandards({ onDuplicated } = {}) {
   const { listStandards, deleteStandard, duplicateStandard } = useApi();
   const queryClient = useQueryClient();

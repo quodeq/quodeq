@@ -1,5 +1,5 @@
-// Hygiene ratchet: unused bindings, parameter counts, nesting depth and
-// cyclomatic complexity.
+// Hygiene ratchet: unused bindings, parameter counts, nesting depth,
+// cyclomatic complexity and JSDoc on exported API.
 //
 // Separate from eslint.config.js (the i18n ratchet) and eslint.size.config.js
 // (sizes) for the same reason those two are separate: each gate owns its
@@ -8,8 +8,46 @@
 // way to grandfather a violation is tools/hygiene_baseline.json, which may
 // only shrink.
 import react from 'eslint-plugin-react';
+import jsdoc from 'eslint-plugin-jsdoc';
 
 export default [
+  {
+    // M-ANA-5: every export in the shared layers carries a JSDoc block.
+    //
+    // Scoped to the layers other code imports across feature boundaries --
+    // hooks, the API client, the utils and the feature-level hooks. Those are
+    // read by callers who cannot see the implementation, so the block earns
+    // its keep. Presentational components are deliberately out of scope: the
+    // props are the contract there and a block per component would be noise.
+    //
+    // Landed at ZERO baseline entries and must stay there.
+    files: [
+      'src/hooks/**/*.js', 'src/hooks/**/*.jsx',
+      'src/api/**/*.js', 'src/api/**/*.jsx',
+      'src/utils/**/*.js', 'src/utils/**/*.jsx',
+      'src/features/*/hooks/**/*.js', 'src/features/*/hooks/**/*.jsx',
+    ],
+    ignores: ['**/*.test.js', '**/*.test.jsx'],
+    plugins: { jsdoc },
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    rules: {
+      'jsdoc/require-jsdoc': ['error', {
+        publicOnly: true,
+        require: {
+          FunctionDeclaration: true,
+          ArrowFunctionExpression: true,
+          ClassDeclaration: true,
+          FunctionExpression: false,
+          MethodDefinition: false,
+        },
+        enableFixer: false,
+      }],
+    },
+  },
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
     plugins: { react },

@@ -2,16 +2,18 @@ import { useCallback, useRef, useState } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
-// connect()/pull(): in-flight guards -- aria-disabled on the triggering
-// button does not stop a click in this codebase's convention (buttons stay
-// clickable so their handlers can surface a snackbar/tooltip), and the
-// Enter-key path on TermInput bypasses the button entirely. So double-submit
-// protection has to live here, at the hook, rather than on any one caller's
-// button. Refs (not state) because the guard must be readable synchronously
-// on the very next call, before any state update triggered by this call has
-// committed/re-rendered -- the identical in-flight-ref idiom used by
-// usePublishTrigger (usePublish.js). Extracted verbatim from
-// useSharedProjects.js.
+/**
+ * connect()/pull(): in-flight guards -- aria-disabled on the triggering
+ * button does not stop a click in this codebase's convention (buttons stay
+ * clickable so their handlers can surface a snackbar/tooltip), and the
+ * Enter-key path on TermInput bypasses the button entirely. So double-submit
+ * protection has to live here, at the hook, rather than on any one caller's
+ * button. Refs (not state) because the guard must be readable synchronously
+ * on the very next call, before any state update triggered by this call has
+ * committed/re-rendered -- the identical in-flight-ref idiom used by
+ * usePublishTrigger (usePublish.js). Extracted verbatim from
+ * useSharedProjects.js.
+ */
 export function useSharedActions({ connectShared, pullSharedProject, queryClient }) {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState(null);

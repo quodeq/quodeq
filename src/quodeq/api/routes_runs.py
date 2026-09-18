@@ -18,6 +18,7 @@ _logger = logging.getLogger(__name__)
 
 
 def register_runs_routes(app: Flask) -> None:
+    """Bind GET /api/projects/<project>/runs."""
     @app.get("/api/projects/<project>/runs")
     def project_runs(project: str) -> Response | tuple[Response, int]:
         try:

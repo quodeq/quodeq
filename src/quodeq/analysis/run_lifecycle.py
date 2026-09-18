@@ -235,9 +235,11 @@ class RunLifecycleContext:
     # ---- Transition API ----------------------------------------------------
 
     def transition_to_finalizing(self) -> None:
+        """Mark the run as writing its report, so a crash from here reads as a finalize failure."""
         self._transition(RunState.FINALIZING)
 
     def set_phase(self, phase: str | None, current_dimension: str | None = None) -> None:
+        """Publish the current phase and dimension to status.json for the progress UI."""
         self._status.phase = phase
         self._status.current_dimension = current_dimension
         self._write(self._current_state)
@@ -284,7 +286,7 @@ class RunLifecycleContext:
         """
         return _is_named_error(exc_type, name)
 
-    def _handle_signal(self, signum: int, frame: Any) -> None:
+    def _handle_signal(self, signum: int, _frame: Any) -> None:
         """Write CANCELLED status, close out unfinished dims, then re-raise as SystemExit."""
         _run_signal_shutdown(self._heartbeat, self._resources, self._status, signum, log=_logger)
         self._current_state = RunState.CANCELLED

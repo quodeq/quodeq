@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.config._config_paths import ConfigPaths  # noqa: F401
-from quodeq.config._env_loader import load_env_file  # noqa: F401
+from quodeq.config._config_paths import ConfigPaths
+from quodeq.config._env_loader import load_env_file
 
 __all__ = ["ConfigPaths", "load_env_file", "default_paths"]
 

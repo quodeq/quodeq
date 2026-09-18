@@ -28,6 +28,9 @@ _RESERVED_NAMES = frozenset(name for name, _ in RESERVED_COMMANDS)
 
 @dataclass(frozen=True)
 class Skill:
+    """One parsed skill file: its front matter plus the markdown body injected
+    into the turn as ``instructions``."""
+
     name: str
     description: str
     instructions: str
@@ -56,6 +59,12 @@ def _parse(text: str) -> Skill | None:
 
 
 def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
+    """Read every ``*.md`` in the skills directory, keyed by skill name.
+
+    Malformed files and any skill whose name collides with a reserved client
+    command are logged and skipped, never raised — one bad file must not take
+    the whole pack down. A missing directory yields an empty dict.
+    """
     directory = skills_dir or _SKILLS_DIR
     skills: dict[str, Skill] = {}
     if not directory.is_dir():

@@ -76,14 +76,24 @@ extend-exclude = ["tests/fixtures/discipline_corpus"]
 [tool.ruff.lint]
 # Deliberately narrow. Each rule here maps to a maintainability
 # violation type the self-eval flags (M-ANA-10 dead code, M-ANA-9
-# import placement, M-MDF-1 magic literals). Widen one rule at a
-# time, with the tree clean for that rule in the same PR, so the gate
-# never grandfathers.
-select = ["F401", "F841", "E402", "PLR2004", "C901"]
+# import placement, M-MDF-1 magic literals, M-ANA-5 missing API
+# documentation). Widen one rule at a time, with the tree clean for
+# that rule in the same PR, so the gate never grandfathers.
+select = [
+    "F401", "F841", "E402", "PLR2004", "C901", "ARG",
+    # D1xx only: every public module, package, class, method and
+    # function carries a docstring. The other pydocstyle families
+    # (formatting, wording) are NOT selected -- they would churn the
+    # existing docstrings without saying anything a reader needs.
+    "D100", "D101", "D102", "D103", "D104",
+]
 
 [tool.ruff.lint.mccabe]
 # M-MOD-1 cyclomatic complexity; 15 is the standard's default ceiling.
 max-complexity = 15
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
 
 [tool.ruff.lint.per-file-ignores]
 # Re-export blocks placed after the accessors they depend on; moving
@@ -93,9 +103,15 @@ max-complexity = 15
 # Standalone scripts that insert the repo root into sys.path first.
 "tools/*.py" = ["E402"]
 # Tests assert literal expectations; the literal is the contract.
-"tests/**" = ["PLR2004"]
-# Standalone scripts outside the layer rules.
-"tools/**" = ["PLR2004"]
+# D1xx gates the public API, which is src/quodeq only: a test module is
+# not importable surface, and a docstring on every test function would
+# be noise rather than documentation.
+# ARG: fakes, stubs and monkeypatch replacements have to match the
+# signature they stand in for, so an unused parameter there is the
+# point, not dead code.
+"tests/**" = ["PLR2004", "ARG", "D100", "D101", "D102", "D103", "D104"]
+# Standalone scripts outside the layer rules, and likewise not API.
+"tools/**" = ["PLR2004", "D100", "D101", "D102", "D103", "D104"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

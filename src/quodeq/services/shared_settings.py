@@ -18,6 +18,8 @@ _FILENAME = "shared.json"
 
 @dataclass
 class SharedSettings:
+    """Contents of shared.json. ``url`` is the shared results repo, None when unconfigured."""
+
     url: str | None = None
 
 

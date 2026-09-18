@@ -26,13 +26,13 @@ from quodeq.config.paths import default_paths
 from quodeq.core.dismissals import DismissedKeys
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
+from quodeq.services.suppression_keys import (  # re-exported API
     FindingRef,
     is_deleted,
     is_dismissed,
 )
 from quodeq.shared.validation import validate_path_segment
-from quodeq.services._wiring import load_suppression_rules  # noqa: F401 — re-exported API
+from quodeq.services._wiring import load_suppression_rules  # re-exported API
 from quodeq.services._wiring import read_req_to_principle_map
 
 _TYPE_VIOLATION = "violation"

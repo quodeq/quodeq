@@ -41,7 +41,7 @@ class PostRunHook:
                 exc_info=True,
             )
         try:
-            self.project_events(job_id, job, reports)
+            self.project_events(job, reports)
         except Exception:
             _logger.warning(
                 "Post-run projection failed for job %s — State Store may be incomplete",
@@ -60,7 +60,7 @@ class PostRunHook:
         )
 
     @staticmethod
-    def project_events(job_id: str, job: Any, reports_root: Path) -> None:
+    def project_events(job: Any, reports_root: Path) -> None:
         """Project ``events.jsonl`` into ``evaluation.db`` for the run.
 
         No-op when the run has no events log. Raises on projection failure.

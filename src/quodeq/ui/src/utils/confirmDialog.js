@@ -57,6 +57,13 @@ function createConfirmButtons(actionsEl, { cancelLabel, confirmLabel, safeVarian
   return { cancelBtn, confirmBtn };
 }
 
+/**
+ * Modal confirmation. Resolves false on cancel. With `checkboxLabel` set it
+ * resolves to `{ confirmed, checked }` instead of a bare boolean, for the
+ * "don't ask again"-style options.
+ *
+ * @returns {Promise<boolean|{confirmed: boolean, checked: boolean}>}
+ */
 export function confirmDialog({
   title = t('common.confirm'),
   message = t('common.areYouSure'),

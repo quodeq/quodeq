@@ -15,42 +15,38 @@ from quodeq.services.suppression_keys import SuppressionKeys
 _NO_KEYS = SuppressionKeys(set(), set())
 
 
-def test_version_changes_with_run_set(tmp_path):
-    pd = tmp_path / "proj"; pd.mkdir()
-    v1 = accumulated_cache_version(pd, DEFAULT_PARAMS, [("r1", "complete")], None)
-    v2 = accumulated_cache_version(pd, DEFAULT_PARAMS, [("r1", "complete"), ("r2", "complete")], None)
+def test_version_changes_with_run_set():
+    v1 = accumulated_cache_version(DEFAULT_PARAMS, [("r1", "complete")], None)
+    v2 = accumulated_cache_version(DEFAULT_PARAMS, [("r1", "complete"), ("r2", "complete")], None)
     assert v1 != v2 and len(v1) == 64
 
 
-def test_version_changes_with_status_and_as_of(tmp_path):
-    pd = tmp_path / "proj"; pd.mkdir()
-    base = accumulated_cache_version(pd, DEFAULT_PARAMS, [("r1", "complete")], None)
-    assert accumulated_cache_version(pd, DEFAULT_PARAMS, [("r1", "in_progress")], None) != base
-    assert accumulated_cache_version(pd, DEFAULT_PARAMS, [("r1", "complete")], "r1") != base
+def test_version_changes_with_status_and_as_of():
+    base = accumulated_cache_version(DEFAULT_PARAMS, [("r1", "complete")], None)
+    assert accumulated_cache_version(DEFAULT_PARAMS, [("r1", "in_progress")], None) != base
+    assert accumulated_cache_version(DEFAULT_PARAMS, [("r1", "complete")], "r1") != base
 
 
-def test_version_stable_regardless_of_run_order(tmp_path):
-    pd = tmp_path / "proj"; pd.mkdir()
-    a = accumulated_cache_version(pd, DEFAULT_PARAMS, [("r1", "complete"), ("r2", "complete")], None)
-    b = accumulated_cache_version(pd, DEFAULT_PARAMS, [("r2", "complete"), ("r1", "complete")], None)
+def test_version_stable_regardless_of_run_order():
+    a = accumulated_cache_version(DEFAULT_PARAMS, [("r1", "complete"), ("r2", "complete")], None)
+    b = accumulated_cache_version(DEFAULT_PARAMS, [("r2", "complete"), ("r1", "complete")], None)
     assert a == b  # run-set is order-independent (sorted)
 
 
-def test_version_folds_visible_dims_only_when_given(tmp_path):
+def test_version_folds_visible_dims_only_when_given():
     """visible_dims invalidates visibility-scoped payloads (project card) on a
     selection change, while None-passing callers (accumulated Overview, which
     returns every dim and lets the client filter) keep their hashes."""
-    pd = tmp_path / "proj"; pd.mkdir()
     runs = [("r1", "complete")]
-    base = accumulated_cache_version(pd, DEFAULT_PARAMS, runs, None)
+    base = accumulated_cache_version(DEFAULT_PARAMS, runs, None)
     six = accumulated_cache_version(
-        pd, DEFAULT_PARAMS, runs, None, visible_dims=("security", "reliability"))
+        DEFAULT_PARAMS, runs, None, visible_dims=("security", "reliability"))
     one = accumulated_cache_version(
-        pd, DEFAULT_PARAMS, runs, None, visible_dims=("security",))
+        DEFAULT_PARAMS, runs, None, visible_dims=("security",))
     assert len({base, six, one}) == 3
     # Selection is order-independent (sorted before hashing).
     assert six == accumulated_cache_version(
-        pd, DEFAULT_PARAMS, runs, None, visible_dims=("reliability", "security"))
+        DEFAULT_PARAMS, runs, None, visible_dims=("reliability", "security"))
 
 
 def test_cached_accumulated_miss_then_hit(tmp_path, monkeypatch):
@@ -82,8 +78,8 @@ def test_per_run_versions_status_flip_reinvalidates(tmp_path, monkeypatch):
         pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
     assert in_progress != complete  # status carried in the tuple
 
-    v_ip = accumulated_cache_version(pd, DEFAULT_PARAMS, in_progress, None)
-    v_c = accumulated_cache_version(pd, DEFAULT_PARAMS, complete, None)
+    v_ip = accumulated_cache_version(DEFAULT_PARAMS, in_progress, None)
+    v_c = accumulated_cache_version(DEFAULT_PARAMS, complete, None)
     assert v_ip != v_c
 
 

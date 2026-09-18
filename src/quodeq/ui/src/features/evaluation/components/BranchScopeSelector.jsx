@@ -36,7 +36,6 @@ function ScopeDisplay({ scopePath, onOpenBrowser, onScopeChange }) {
 }
 
 export default function BranchScopeSelector({
-  branches,
   currentBranch,
   projectPath,
   onScopeChange,

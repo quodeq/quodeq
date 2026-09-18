@@ -41,7 +41,7 @@ class ActionSpec:
     apply: Callable[[dict, ActionContext], dict]       # executes on user approval
 
 
-def _validate_create_standard(payload: dict, ctx: ToolContext) -> dict:
+def _validate_create_standard(payload: dict, _ctx: ToolContext) -> dict:
     verdict = validate_import(payload)
     if not verdict["valid"]:
         raise ToolError("invalid standard payload: " + "; ".join(verdict["errors"]))

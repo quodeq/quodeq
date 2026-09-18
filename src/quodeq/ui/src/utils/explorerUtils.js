@@ -17,6 +17,10 @@ function normalizeSeverity(value) {
   return KNOWN_SEVERITIES.includes(normalized) ? normalized : 'unknown';
 }
 
+/**
+ * Whether an entry survives the principle and file-substring filters. An
+ * empty filter matches everything.
+ */
 export function matchesEntryFilters(entry, { selectedPrinciples = [], fileFilter = '' } = {}) {
   if (selectedPrinciples.length > 0 && !selectedPrinciples.includes(entry.principle || '')) {
     return false;
@@ -33,6 +37,10 @@ export function matchesEntryFilters(entry, { selectedPrinciples = [], fileFilter
   return true;
 }
 
+/**
+ * matchesEntryFilters plus the severity filter, for violations rather than
+ * compliance entries.
+ */
 export function matchesViolationFilters(
   entry,
   { selectedSeverities = [], selectedPrinciples = [], fileFilter = '' } = {}
@@ -92,6 +100,12 @@ function aggregateViolationEntry(bucket, dimension, entry) {
 
 const DEFAULT_TOP_FILES_LIMIT = 500;
 
+/**
+ * Rolls the filtered violations across every dimension up per file, ordered
+ * worst first and capped at `limit` rows.
+ *
+ * This is the model behind the "top offending files" tables.
+ */
 export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DEFAULT_TOP_FILES_LIMIT) {
   const bucket = new Map();
 
@@ -170,6 +184,11 @@ export function buildProjectRootFile(dimensions = [], projectName = 'project') {
   };
 }
 
+/**
+ * Keeps the current selection when it still exists, otherwise falls back to
+ * the first project (or an empty string when there are none), so a deleted or
+ * renamed project can never leave the UI pointing at nothing.
+ */
 export function pickValidProject(projects = [], selectedProject = '') {
   if (!Array.isArray(projects) || projects.length === 0) {
     return '';

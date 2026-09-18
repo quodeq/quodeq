@@ -16,8 +16,8 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-exports from split modules -- keep the public API stable
-from quodeq.analysis.subagents._source_files import _list_source_files  # noqa: F401
-from quodeq.analysis.subagents._prompts import _build_subagent_prompt  # noqa: F401
+from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents._prompts import _build_subagent_prompt
 from quodeq.analysis.subagents._pool_launcher import (  # noqa: F401
     LaunchPoolParams,
     _compute_files_per_agent,
@@ -25,7 +25,7 @@ from quodeq.analysis.subagents._pool_launcher import (  # noqa: F401
     _launch_pool,
     _collect_all_evidence,
 )
-from quodeq.analysis.subagents._evidence_collector import (  # noqa: F401
+from quodeq.analysis.subagents._evidence_collector import (
     _CollectionContext,
     _collect_evidence,
 )
@@ -72,7 +72,7 @@ def process_consolidated_dimensions(
 
 
 def _prepare_findings_and_queue(
-    config: RunConfig, dc: _DimensionContext, log: LogSink,
+    dc: _DimensionContext, log: LogSink,
 ) -> _PoolExecutionParams:
     """Build the file queue for the pool. No prior-findings logic — V2's
     cache hit/miss already determined which files need dispatch."""
@@ -130,6 +130,6 @@ def process_dimension_with_subagents(
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
     dc = _DimensionContext(dim_id=dim_id, idx=idx, ctx=ctx, files=files, evidence_dir=evidence_dir)
-    pool_params = _prepare_findings_and_queue(config, dc, log)
+    pool_params = _prepare_findings_and_queue(dc, log)
 
     return _execute_pool_and_collect(config, dc, pool_params)

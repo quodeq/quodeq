@@ -95,14 +95,14 @@ class TestBuildEvalEnv:
 
     def test_python_unbuffered(self):
         m = self._mixin()
-        env = m._build_eval_env("/repo", EvaluationOptions(), env={})
+        env = m._build_eval_env(EvaluationOptions(), env={})
         assert env["PYTHONUNBUFFERED"] == "1"
 
     @patch("quodeq.services.evaluation_mixin.get_ai_cmd", return_value="claude")
     @patch("quodeq.services.evaluation_mixin.get_ai_model", return_value="sonnet")
     def test_ai_cmd_and_model(self, mock_model, mock_cmd):
         m = self._mixin()
-        env = m._build_eval_env("/repo", EvaluationOptions(), env={})
+        env = m._build_eval_env(EvaluationOptions(), env={})
         assert env["AI_CMD"] == "claude"
         assert env["AI_MODEL"] == "sonnet"
         assert env["SUBAGENT_MODEL"] == "sonnet"
@@ -110,7 +110,7 @@ class TestBuildEvalEnv:
     def test_explicit_options_override(self):
         m = self._mixin()
         opts = EvaluationOptions(ai_cmd="codex", ai_model="gpt-4", subagent_model="gpt-3.5")
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["AI_CMD"] == "codex"
         assert env["AI_MODEL"] == "gpt-4"
         assert env["SUBAGENT_MODEL"] == "gpt-3.5"
@@ -118,30 +118,30 @@ class TestBuildEvalEnv:
     def test_ai_cmd_path_exported(self):
         m = self._mixin()
         opts = EvaluationOptions(ai_cmd="claude", ai_cmd_path="/opt/bin/claude-api")
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["AI_CMD_PATH"] == "/opt/bin/claude-api"
 
     def test_no_ai_cmd_path_not_exported(self):
         m = self._mixin()
-        env = m._build_eval_env("/repo", EvaluationOptions(ai_cmd="claude"), env={})
+        env = m._build_eval_env(EvaluationOptions(ai_cmd="claude"), env={})
         assert "AI_CMD_PATH" not in env
 
     def test_no_verify(self):
         m = self._mixin()
         opts = EvaluationOptions(verify_findings=False)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env.get("QUODEQ_NO_VERIFY") == "1"
 
     def test_verify_findings_default_no_env(self):
         m = self._mixin()
         opts = EvaluationOptions(verify_findings=True)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert "QUODEQ_NO_VERIFY" not in env
 
     def test_custom_time_limit(self):
         m = self._mixin()
         opts = EvaluationOptions(time_limit=1200)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == "1200"
 
     def test_default_time_limit_is_set(self):
@@ -152,7 +152,7 @@ class TestBuildEvalEnv:
         # fired, and the UI countdown timer froze at the static budget.
         m = self._mixin()
         opts = EvaluationOptions(time_limit=DEFAULT_TIME_LIMIT)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == str(DEFAULT_TIME_LIMIT)
 
     def test_unlimited_time_limit_propagated_as_zero(self):
@@ -163,19 +163,19 @@ class TestBuildEvalEnv:
         # sets no deadline.
         m = self._mixin()
         opts = EvaluationOptions(time_limit=0)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["QUODEQ_TIME_LIMIT"] == "0"
 
     def test_per_dimension(self):
         m = self._mixin()
         opts = EvaluationOptions(per_dimension=True)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["QUODEQ_NO_CONSOLIDATE"] == "1"
 
     def test_context_size(self):
         m = self._mixin()
         opts = EvaluationOptions(context_size=128000)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["QUODEQ_CONTEXT_SIZE"] == "128000"
 
     def test_cloud_provider_api_key_exported(self):
@@ -184,7 +184,7 @@ class TestBuildEvalEnv:
         # an OpenRouter key typed in Settings was silently discarded.
         m = self._mixin()
         opts = EvaluationOptions(ai_cmd="openrouter", provider_api_key="sk-or-1")
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["OPENROUTER_API_KEY"] == "sk-or-1"
 
     def test_omlx_key_and_base_still_exported(self):
@@ -192,14 +192,14 @@ class TestBuildEvalEnv:
         opts = EvaluationOptions(
             ai_cmd="omlx", provider_api_key="k1", provider_api_base="http://h:1/v1",
         )
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert env["OMLX_API_KEY"] == "k1"
         assert env["OMLX_BASE_URL"] == "http://h:1/v1"
 
     def test_zero_context_size_not_set(self):
         m = self._mixin()
         opts = EvaluationOptions(context_size=0)
-        env = m._build_eval_env("/repo", opts, env={})
+        env = m._build_eval_env(opts, env={})
         assert "QUODEQ_CONTEXT_SIZE" not in env
 
 

@@ -1,3 +1,10 @@
+"""Records written to the event log: judgments, user actions, and their envelopes.
+
+Every event is frozen and carries its own id and UTC timestamp, so the log
+is append-only and replayable in order. ``EVENT_MODEL_MAP`` and
+``PAYLOAD_MODEL_MAP`` at the bottom are what the decoder in
+``data.events.codec`` uses to rebuild the right pair of classes per line.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -20,6 +27,12 @@ VALID_VERDICTS = frozenset({VERDICT_VIOLATION, VERDICT_COMPLIANCE})
 
 
 class EventType(str, Enum):
+    """Discriminator stored on every event line; the decoder keys both maps off it.
+
+    String-valued so an unknown member read back from an old log surfaces as
+    a plain value error rather than a silent mismatch.
+    """
+
     RUN_STARTED = "RUN_STARTED"
     RUN_COMPLETED = "RUN_COMPLETED"
     RUN_ABORTED = "RUN_ABORTED"
@@ -91,9 +104,11 @@ class Judgment:
     carried_forward: bool = False
 
     def is_violation(self) -> bool:
+        """True when this judgment counts against the score."""
         return self.verdict == VERDICT_VIOLATION
 
     def is_compliance(self) -> bool:
+        """True when this judgment is evidence the practice was followed."""
         return self.verdict == VERDICT_COMPLIANCE
 
     def has_valid_verdict(self) -> bool:
@@ -149,11 +164,15 @@ class FindingUndismissed:
 
 @dataclass(frozen=True, kw_only=True)
 class FindingDismissedEvent(BaseEvent[FindingDismissed]):
+    """Event emitted when a user hides a finding from the read surfaces."""
+
     event_type: EventType = EventType.FINDING_DISMISSED
 
 
 @dataclass(frozen=True, kw_only=True)
 class FindingUndismissedEvent(BaseEvent[FindingUndismissed]):
+    """Event emitted when a user brings a dismissed finding back into view."""
+
     event_type: EventType = EventType.FINDING_UNDISMISSED
 
 
@@ -178,11 +197,15 @@ class FindingUnverified:
 
 @dataclass(frozen=True, kw_only=True)
 class FindingVerifiedEvent(BaseEvent[FindingVerified]):
+    """Event emitted when a user confirms a finding is a real defect."""
+
     event_type: EventType = EventType.FINDING_VERIFIED
 
 
 @dataclass(frozen=True, kw_only=True)
 class FindingUnverifiedEvent(BaseEvent[FindingUnverified]):
+    """Event emitted when a user clears a finding's verified badge."""
+
     event_type: EventType = EventType.FINDING_UNVERIFIED
 
 

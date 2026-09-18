@@ -125,7 +125,6 @@ function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPri
   return {
     data: buildViolationsData({ props, acc, dims }),
     callbacks: buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension }),
-    isDirectNav: props.navigation.navStackLength === 1,
     tabKey: params._tabKey || 0,
     // The by-dimension / by-file / dismissed flip is view state on the SAME
     // screen: it lives in the route entry so back/forward and the crumb see

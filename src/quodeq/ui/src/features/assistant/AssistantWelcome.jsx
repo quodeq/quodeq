@@ -1,4 +1,3 @@
-import React from 'react';
 import { pillsForView } from './commands.js';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { t } from '../../strings/index.js';

@@ -1,5 +1,5 @@
 // src/quodeq/ui/src/api/assistant.test.jsx
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as assistant from './assistant.js';
 
 let calls;

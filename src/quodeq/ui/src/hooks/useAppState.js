@@ -95,7 +95,7 @@ function useAppNavigation() {
       projectBundle.retryLoadProjects();
     }
   }, [serverConnected]); // eslint-disable-line react-hooks/exhaustive-deps
-  const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
+  const { setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
   function handleNavigate(page, params = {}) {
     if (page === 'run' && params.runId) setSelectedRun(params.runId);
@@ -110,6 +110,10 @@ function useAppNavigation() {
   return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPush, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
+/**
+ * The overview run's date as a long local date string, falling back to the
+ * run's own label and then its id when the trend carries no timestamp.
+ */
 export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
   const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
   if (entry?.dateISO) {
@@ -120,28 +124,30 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }
 
-// Returning to the Overview from another tab must reconcile any project query
-// a mark-stale-only invalidation left behind (refreshDashboard's
-// refetchType:'none', or ordinary staleTime elapse): the Overview's
-// useDashboard observer is mounted at the app root and never remounts on tab
-// navigation, and the desktop pywebview window never fires the focus-refetch
-// a browser tab gets on refocus. `stale: true` keeps this a no-op when
-// nothing is actually stale, so switching tabs doesn't re-download the
-// (potentially 10-20 MB) payload on every visit — only a query already
-// marked stale gets refetched here.
-//
-// Gates on `rootTab` (navStack[0].page), NOT the derived `activeTab`.
-// `activeTab`'s fallback bucket defaults any untagged/unknown page to
-// TAB_OVERVIEW -- and drill-down pages pushed without a `sourceTab` (e.g.
-// ExplorerPage's onPrincipleClick -> 'evalprinciple', handleCardNavigate ->
-// 'file') hit that fallback while the user is still mid-triage inside
-// Violations/Map. That would misfire a real refetch of the (potentially
-// 10-20 MB) payload during triage -- exactly the freeze this stack exists to
-// avoid. `navTab()` (useNavStack.js) always resets the stack to a single root
-// entry and `navPush` only appends, so `navStack[0].page` is the true
-// top-level tab regardless of drill-down depth or sourceTab tagging.
-// Exported (and taking plain values rather than reading nav state itself) so
-// the transition-gating logic is testable without mounting all of useAppState.
+/**
+ * Returning to the Overview from another tab must reconcile any project query
+ * a mark-stale-only invalidation left behind (refreshDashboard's
+ * refetchType:'none', or ordinary staleTime elapse): the Overview's
+ * useDashboard observer is mounted at the app root and never remounts on tab
+ * navigation, and the desktop pywebview window never fires the focus-refetch
+ * a browser tab gets on refocus. `stale: true` keeps this a no-op when
+ * nothing is actually stale, so switching tabs doesn't re-download the
+ * (potentially 10-20 MB) payload on every visit — only a query already
+ * marked stale gets refetched here.
+ *
+ * Gates on `rootTab` (navStack[0].page), NOT the derived `activeTab`.
+ * `activeTab`'s fallback bucket defaults any untagged/unknown page to
+ * TAB_OVERVIEW -- and drill-down pages pushed without a `sourceTab` (e.g.
+ * ExplorerPage's onPrincipleClick -> 'evalprinciple', handleCardNavigate ->
+ * 'file') hit that fallback while the user is still mid-triage inside
+ * Violations/Map. That would misfire a real refetch of the (potentially
+ * 10-20 MB) payload during triage -- exactly the freeze this stack exists to
+ * avoid. `navTab()` (useNavStack.js) always resets the stack to a single root
+ * entry and `navPush` only appends, so `navStack[0].page` is the true
+ * top-level tab regardless of drill-down depth or sourceTab tagging.
+ * Exported (and taking plain values rather than reading nav state itself) so
+ * the transition-gating logic is testable without mounting all of useAppState.
+ */
 export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedSource }) {
   const queryClient = useQueryClient();
   const prevTabRef = useRef(rootTab);
@@ -177,6 +183,17 @@ export function resolveActiveTab(activePage) {
   return TAB_OVERVIEW;
 }
 
+/**
+ * The app shell's whole state in one object: navigation stack, project
+ * selection, dashboard/score data for the selected project and run, run
+ * navigation, evaluation lifecycle, theme settings and the derived chrome
+ * flags (`activeTab`, `showProjectHeader`, `showRunNav`).
+ *
+ * Called once, at the root; every screen reads its slice from the result
+ * rather than re-deriving it. Composes useAppNavigation, useDashboard,
+ * useEvaluationLifecycle and useAppSettings, so hook order here is the app's
+ * hook order.
+ */
 export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
@@ -215,7 +232,7 @@ export function useAppState() {
   const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun, granularity);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, selectedSource, availableRuns: visibleDailyRuns, overviewRunIndex });
-  const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
+  const evalLifecycle = useEvaluationLifecycle({ navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
 
   const activeTab = resolveActiveTab(activePage);
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;

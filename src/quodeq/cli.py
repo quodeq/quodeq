@@ -11,7 +11,7 @@ import logging
 import sys
 from typing import Callable
 
-from quodeq.cli_parser import build_parser  # noqa: F401 — re-export
+from quodeq.cli_parser import build_parser  # re-export
 from quodeq.update.checker import check_async, get_status, set_settings
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main

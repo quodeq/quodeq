@@ -126,7 +126,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
     return _list_model_dirs()
 
 
-def run_concurrency_test(model: str, base_url: str | None = None, api_key: str | None = None) -> dict:
+def run_concurrency_test(_model: str, base_url: str | None = None, api_key: str | None = None) -> dict:
     """Estimate max parallel agents for the omlx server."""
     gpu_memory = _detect_memory()
     models = list_omlx_models(base_url, api_key)

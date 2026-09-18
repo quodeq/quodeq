@@ -31,7 +31,7 @@ function ViolationCardDetail({ v }) {
           </>}
         </div>
       )}
-      <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} endLine={v.endLine} />
+      <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} />
     </div>
   );
 }

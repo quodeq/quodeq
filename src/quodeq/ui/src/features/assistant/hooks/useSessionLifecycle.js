@@ -179,6 +179,16 @@ function makeRefreshWorkspace({ sessionIdRef, fetchAssistantWorkspace, setWorksp
   };
 }
 
+/**
+ * Owns the assistant session: creating it for the current context, resetting
+ * the conversation, the web/write access toggles, and the workspace state
+ * those writes produce.
+ *
+ * startSession dedupes by context key, so re-running with an unchanged context
+ * is a no-op while a real project/run switch produces a fresh session.
+ * Responses from a session that has since been replaced are discarded rather
+ * than applied late.
+ */
 export function useSessionLifecycle() {
   const { createAssistantSession, fetchAssistantWorkspace } = useApi();
   const {

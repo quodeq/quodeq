@@ -115,7 +115,6 @@ class LaunchPoolParams:
 
 def _resolve_pool_budget(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
-    env: dict[str, str] | None,
 ) -> int:
     """Resolve this pool's effective time limit and ratchet the run deadline.
 
@@ -181,7 +180,7 @@ def _launch_pool(
     *, env: dict[str, str] | None = None,
 ) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
-    time_limit = _resolve_pool_budget(config, dim_id, params, env)
+    time_limit = _resolve_pool_budget(config, dim_id, params)
     base_ac = _build_pool_config(config, dim_id, params, time_limit, env)
     pool = SubagentPool(
         paths=_pool_paths(config, params),

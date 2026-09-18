@@ -101,22 +101,27 @@ class FilesystemActionProvider(ActionProvider):
         reports_dir: Path | None = None,
         states: set[str] | None = None,
     ) -> list[JobSnapshot]:
+        """Return runs from the SQLite index merged with JobManager's in-memory jobs."""
         return self._evaluations.list(limit=limit, reports_dir=reports_dir, states=states)
 
     def delete_evaluation(self, job_id: str, reports_dir: Path | None = None) -> bool:
+        """Drop the run directory and its index row. Running jobs are refused."""
         return self._evaluations.delete(job_id, reports_dir=reports_dir)
 
     def get_evaluation_status(
         self, job_id: str, reports_dir: Path | None = None,
     ) -> JobSnapshot | None:
+        """Return one run's snapshot. ``ext-`` ids resolve from the index after a scoped sync."""
         return self._evaluations.get_status(job_id, reports_dir=reports_dir)
 
     def start_evaluation(
         self, repo: str, reports_dir: str, options: EvaluationOptions,
     ) -> JobSnapshot:
+        """Spawn the evaluation subprocess. *repo* must be a local path, not a URL."""
         return self._eval_handler.start_evaluation(repo, reports_dir, options)
 
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
+        """Score the dimensions that finished before the run failed or was cancelled."""
         return self._eval_handler.score_failed_evaluation(job_id, reports_dir)
 
     def cancel_evaluation(
@@ -154,9 +159,14 @@ class FilesystemActionProvider(ActionProvider):
         return ok
 
     def get_log_run_dir(self, job_id: str) -> Path | None:
+        """Return the run directory behind *job_id*, or None if no run matches.
+
+        Completed runs with no in-memory job entry cost a filesystem scan.
+        """
         return self._evaluations.get_log_run_dir(job_id)
 
     def is_job_complete(self, job_id: str) -> bool:
+        """Return True once *job_id* has reached done, failed, or cancelled."""
         return self._evaluations.is_complete(job_id)
 
     def rebuild_index(self, reports_root: Path | None = None) -> tuple[int, int]:
@@ -166,21 +176,27 @@ class FilesystemActionProvider(ActionProvider):
     # -- projects (delegate to ProjectsCache + _fs_projects) ------------
 
     def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict[str, Any]:
+        """Return the ``{"projects": [...]}`` payload, served from the TTL-bounded cache."""
         return self._projects.list(reports_dir, offset=offset, limit=limit)
 
     def invalidate_projects_cache(self) -> None:
+        """Drop the cached payload and index so the next listing re-reads from disk."""
         self._projects.invalidate()
 
     def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
+        """Clone if needed, scan, and register a project, rolling back every step on failure."""
         return register_project_with_rollback(reports_dir, spec, log=SHARED_LOG)
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
+        """Repoint a registered project at *new_path*. Return True on success."""
         return _fs_projects.update_project_path(reports_dir, project, new_path)
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
+        """Remove a project's registry entry and its report data. Return True on success."""
         return _fs_projects.delete_project(reports_dir, project)
 
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:
+        """Return a project's metadata (discipline, dimensions), or None if unregistered."""
         return _fs_projects.get_project_info(reports_dir, project)
 
     @staticmethod
@@ -190,33 +206,45 @@ class FilesystemActionProvider(ActionProvider):
     # -- reports (delegate to _fs_reports) ------------------------------
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
+        """Return the dashboard payload assembled from one run's on-disk artifacts."""
         return _fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
 
     def get_accumulated(
         self, reports_dir: str, project: str, as_of: str | None,
     ) -> dict[str, Any] | None:
+        """Return dimension data accumulated across every run up to *as_of*, or None."""
         return _fs_reports.get_accumulated(reports_dir, project, as_of)
 
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
     ) -> dict[str, Any] | None:
+        """Return one dimension's parsed evaluation, resolved against ``_compiled_dir``."""
         return _fs_reports.get_dimension_eval(
             reports_dir, project, run_id, dimension, compiled_dir=self._compiled_dir,
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
+        """Return the violation counts aggregated across a run's dimensions."""
         return _fs_reports.get_violations(reports_dir, project, run_id, log=SHARED_LOG)
 
     # -- tooling (delegate to FsToolingMixin) ---------------------------
 
     def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
+        """List directories (and files when *include_files*) under *path*, jailed to the home dir."""
         return self._tooling.browse_repo(path, include_files)
 
     def browse_mkdir(self, parent: str, name: str) -> dict[str, Any]:
+        """Create folder *name* under *parent*.
+
+        Validation failures come back as an ``{"error", "error_code"}`` payload
+        for the route to map onto HTTP, not as an exception.
+        """
         return self._tooling.browse_mkdir(parent, name)
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
+        """Return the installed CLI clients and configured API providers. *env* overrides ``os.environ``."""
         return self._tooling.get_ai_clients(env)
 
     def get_client_models(self, client_id: str) -> dict[str, list[str]]:
+        """Return the models offered by *client_id*; Claude resolves through its own fetcher."""
         return self._tooling.get_client_models(client_id)

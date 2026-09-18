@@ -19,7 +19,7 @@ const FOLD_OPACITY = 0.5;
 const LINE_OPACITY_PRIMARY = 0.4;
 const LINE_OPACITY_SECONDARY = 0.3;
 
-export default function FileShape({ cx, cy, r, color, borderColor, glow, handlers, transition = false, parentScale = 1 }) {
+export default function FileShape({ cx, cy, r, color, borderColor, glow, handlers, parentScale = 1 }) {
   const scale = r / (BASE / 2);
   // Compensate for both own scale and parent group scale to keep strokes at ~1px
   const totalScale = scale * parentScale;

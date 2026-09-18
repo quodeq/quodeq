@@ -13,6 +13,12 @@ export function stripPrinciplePrefix(reason, principle) {
 }
 export const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
 
+/**
+ * Splits a `path:line` reference into its parts. An explicit `rawLine` wins
+ * over a line embedded in the path.
+ *
+ * @returns {{filePath: string|null, line: number|null}}
+ */
 export function parseFileRef(rawFile, rawLine) {
   if (!rawFile) return { filePath: null, line: rawLine ?? null };
   const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
@@ -21,6 +27,10 @@ export function parseFileRef(rawFile, rawLine) {
   return { filePath, line };
 }
 
+const DELTA_CLAMP = 4;
+const ANGLE_BASE = 90;
+const ANGLE_RANGE = 55;
+
 /**
  * Convert a score delta into a rotation angle for trend arrows.
  * Clamps the delta to [-4, 4] and maps it to an angle around 90 degrees.
@@ -28,10 +38,6 @@ export function parseFileRef(rawFile, rawLine) {
  * @param {number} d - Score delta value
  * @returns {number} Rotation angle in degrees (35..145)
  */
-const DELTA_CLAMP = 4;
-const ANGLE_BASE = 90;
-const ANGLE_RANGE = 55;
-
 export function angleFromDelta(d) {
   const clamped = Math.max(-DELTA_CLAMP, Math.min(DELTA_CLAMP, d));
   return ANGLE_BASE - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / DELTA_CLAMP) * ANGLE_RANGE;

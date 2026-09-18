@@ -45,6 +45,13 @@ async function detectStoredCloudKey(providerId) {
   }
 }
 
+/**
+ * Probes every supported provider in parallel and returns one result per
+ * probe. A probe that throws reports as not detected, so one broken provider
+ * cannot fail the whole detection pass.
+ *
+ * @returns {Promise<Array<{id?: string, classification?: string, detected: boolean, defaultModel?: string|null}>>}
+ */
 export async function runDetection() {
   const probes = await Promise.allSettled([
     detectCliProvider('codex-cli'),

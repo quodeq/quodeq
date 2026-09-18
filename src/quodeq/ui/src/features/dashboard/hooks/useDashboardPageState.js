@@ -129,12 +129,14 @@ function useNoRunsSticky(runMode, contentReady, error, loading, noRunsScopeKey) 
   return showNoRunsEmpty;
 }
 
-// Composed grace/appear/sticky-latch state machine for DashboardPage. Calls
-// its three sub-hooks unconditionally, every render, in the same order they
-// ran when this was inline in DashboardPage -- preserving both the render-
-// phase state adjustments (grace reset, sticky-latch write) and the
-// useState/useEffect/useRef call order StrictMode's double-invocation
-// depends on.
+/**
+ * Composed grace/appear/sticky-latch state machine for DashboardPage. Calls
+ * its three sub-hooks unconditionally, every render, in the same order they
+ * ran when this was inline in DashboardPage -- preserving both the render-
+ * phase state adjustments (grace reset, sticky-latch write) and the
+ * useState/useEffect/useRef call order StrictMode's double-invocation
+ * depends on.
+ */
 export function useDashboardPageState({ runMode, dashboard, accumulated, loading, error, selectedProject, selectedSource, selectedRunId }) {
   const { contentReady, isLoading, showOverviewSkeleton } = useContentReadiness(runMode, dashboard, accumulated, loading);
   // Keyed like noRunsScopeKey below, but the run is folded in too so a run

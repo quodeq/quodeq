@@ -17,4 +17,6 @@ from quodeq.core.events.models import BaseEvent
 class EventEmitter(Protocol):
     """Append-only sink for run events (matches ``EventLogWriter.emit``)."""
 
-    def emit(self, event: BaseEvent) -> None: ...
+    def emit(self, event: BaseEvent) -> None:
+        """Append *event* to the log. Ordering is the caller's emit order."""
+        ...

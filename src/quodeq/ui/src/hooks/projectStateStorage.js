@@ -14,19 +14,30 @@ export function persistProject(setter, name, storage = localStorage) {
   try { storage.setItem(STORAGE_KEY, name); } catch { /* private browsing */ }
 }
 
-// Normalizes and persists the project's source. Always paired with
-// persistProject in the same call so a stored project id is never left
-// alongside a stale/mismatched source after a restart.
+/**
+ * Normalizes and persists the project's source. Always paired with
+ * persistProject in the same call so a stored project id is never left
+ * alongside a stale/mismatched source after a restart.
+ */
 export function persistSource(setter, source, storage = localStorage) {
   const value = VALID_SOURCES.includes(source) ? source : DEFAULT_SOURCE;
   setter(value);
   try { storage.setItem(SOURCE_STORAGE_KEY, value); } catch { /* private browsing */ }
 }
 
+/**
+ * The project id selected in the last session, or '' when nothing is stored
+ * or storage is unavailable.
+ */
 export function readStoredProject(storage = localStorage) {
   try { return storage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
 }
 
+/**
+ * The source selected in the last session, falling back to DEFAULT_SOURCE for
+ * anything unrecognised so a tampered or outdated value cannot select a source
+ * that no longer exists.
+ */
 export function readStoredSource(storage = localStorage) {
   try {
     const stored = storage.getItem(SOURCE_STORAGE_KEY);

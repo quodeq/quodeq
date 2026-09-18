@@ -12,16 +12,34 @@
  */
 import { KNOWN_SEVERITIES } from './constants.js';
 
+/**
+ * Coerces any severity value to one of the four known ones, mapping anything
+ * unrecognised (including null) to 'unknown'.
+ *
+ * @returns {'critical'|'major'|'minor'|'unknown'}
+ */
 export function normalizeSeverity(value) {
   const normalized = String(value || 'unknown').toLowerCase();
   return KNOWN_SEVERITIES.includes(normalized) ? normalized : 'unknown';
 }
 
+/**
+ * Like normalizeSeverity, but folds 'unknown' into 'minor' so the three
+ * summary chips always add up to the violation total.
+ *
+ * @returns {'critical'|'major'|'minor'}
+ */
 export function summaryBucket(value) {
   const normalized = normalizeSeverity(value);
   return normalized === 'unknown' ? 'minor' : normalized;
 }
 
+/**
+ * Counts violations into the three summary buckets. Every entry lands in
+ * exactly one, so the counts sum to the list length.
+ *
+ * @returns {{critical: number, major: number, minor: number}}
+ */
 export function countBySeverity(violations) {
   const counts = { critical: 0, major: 0, minor: 0 };
   for (const v of violations || []) {

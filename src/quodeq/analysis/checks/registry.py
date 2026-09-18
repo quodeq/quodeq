@@ -51,6 +51,10 @@ class CheckContext:
         return [Path(f) for f in self.source_files]
 
     def graph(self) -> ImportGraph:
+        """Import graph for this context, parsed on first ask and memoised.
+
+        Raises RuntimeError when no ``graph_builder`` was injected.
+        """
         if "graph" not in self._cache:
             if self.graph_builder is None:
                 raise RuntimeError(
@@ -60,6 +64,10 @@ class CheckContext:
         return self._cache["graph"]
 
     def config_symbol_uses(self) -> tuple[SymbolUse, ...]:
+        """Uses of ``CONFIG_SYMBOLS`` across the sources, parsed once per context.
+
+        Raises RuntimeError when no ``symbol_uses_builder`` was injected.
+        """
         if "uses" not in self._cache:
             if self.symbol_uses_builder is None:
                 raise RuntimeError(

@@ -15,6 +15,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LINT_PATHS = ["src/quodeq", "tests", "tools"]
 MAX_COMPLEXITY = 15
+DOCSTRING_CODES = ["D100", "D101", "D102", "D103", "D104"]
 
 
 def test_complexity_gate_selected():
@@ -26,6 +27,41 @@ def test_complexity_gate_selected():
     assert lint["mccabe"]["max-complexity"] == MAX_COMPLEXITY
     ignored = [rules for rules in lint.get("per-file-ignores", {}).values() if "C901" in rules]
     assert not ignored, "C901 must not be ignored per file"
+
+
+def test_docstring_gate_selected():
+    """D100-D104 are selected and ignored only for tests/ and tools/, so
+    test_ruff_clean below also proves every public module, package, class,
+    method and function under src/quodeq is documented (M-ANA-5)."""
+    with (REPO_ROOT / "pyproject.toml").open("rb") as fh:
+        lint = tomllib.load(fh)["tool"]["ruff"]["lint"]
+    missing = [code for code in DOCSTRING_CODES if code not in lint["select"]]
+    assert not missing, f"docstring codes dropped from the gate: {missing}"
+    assert lint["pydocstyle"]["convention"] == "pep257"
+    ignoring = {
+        pattern for pattern, rules in lint.get("per-file-ignores", {}).items()
+        if any(code in rules for code in DOCSTRING_CODES)
+    }
+    assert ignoring == {"tests/**", "tools/**"}, (
+        "D1xx may only be ignored for tests/ and tools/; src/quodeq is the "
+        f"documented surface. Got: {sorted(ignoring)}"
+    )
+
+
+def test_unused_argument_gate_selected():
+    """ARG is selected and ignored only for tests/, so test_ruff_clean below
+    also proves src/quodeq and tools/ carry no unused argument (M-ANA-10)."""
+    with (REPO_ROOT / "pyproject.toml").open("rb") as fh:
+        lint = tomllib.load(fh)["tool"]["ruff"]["lint"]
+    assert "ARG" in lint["select"]
+    ignoring = {
+        pattern for pattern, rules in lint.get("per-file-ignores", {}).items()
+        if "ARG" in rules
+    }
+    assert ignoring == {"tests/**"}, (
+        "ARG may only be ignored for tests/, where fakes must match the "
+        f"signature they stand in for. Got: {sorted(ignoring)}"
+    )
 
 
 def test_ruff_clean():

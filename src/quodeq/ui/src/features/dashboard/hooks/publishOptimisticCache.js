@@ -1,6 +1,12 @@
 import { useCallback } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
 
+/**
+ * Indexes a shared project list by id to its publish timestamp, for the
+ * "published / needs update" chips.
+ *
+ * @returns {Record<string, string>}
+ */
 export function buildPublishedAtMap(list) {
   const map = {};
   for (const p of list || []) {
@@ -10,15 +16,17 @@ export function buildPublishedAtMap(list) {
   return map;
 }
 
-// Upserts the just-published project into the shared list cache's `projects`
-// array, merging over any existing entry with the same id (audit C3/C4).
-// `local` is the LOCAL project object the publish() call was made with (see
-// publishingLocalRef below) -- its originUrl/latestRunId/latestDoneRunId are
-// copied over so the merge in projectsMerge.js immediately recognizes this as
-// the SAME project (chips flip to PUBLISHED, no stale publish/update button)
-// without waiting for the authoritative refresh to learn those fields from
-// the backend. Falls back to whatever the existing entry already had for any
-// field `local` doesn't know, so a merge never regresses already-good data.
+/**
+ * Upserts the just-published project into the shared list cache's `projects`
+ * array, merging over any existing entry with the same id (audit C3/C4).
+ * `local` is the LOCAL project object the publish() call was made with (see
+ * publishingLocalRef below) -- its originUrl/latestRunId/latestDoneRunId are
+ * copied over so the merge in projectsMerge.js immediately recognizes this as
+ * the SAME project (chips flip to PUBLISHED, no stale publish/update button)
+ * without waiting for the authoritative refresh to learn those fields from
+ * the backend. Falls back to whatever the existing entry already had for any
+ * field `local` doesn't know, so a merge never regresses already-good data.
+ */
 export function upsertPublishedProject(projects, id, local) {
   const idx = projects.findIndex((p) => (p.id || p.name) === id);
   const existing = idx === -1 ? null : projects[idx];
@@ -41,15 +49,17 @@ export function upsertPublishedProject(projects, id, local) {
   return next;
 }
 
-// Synchronous, BEFORE any network round trip: patches the shared list
-// cache with the just-published id the instant the job reports 'done', so
-// every consumer of sharedKeys.list() (useMergedProjects' chips/action via
-// useSharedProjects, and usePublishQueries' own publishedAtByProject) flips in
-// the SAME render (audit C3/C4) instead of waiting up to 30s for the
-// authoritative refresh below to land. Only uses `publishingLocalRef` when
-// it actually corresponds to `id` -- a fresh mount that reconciles a job
-// started elsewhere never had a local project object handed to it, and a
-// stale ref must never get attributed to the wrong id.
+/**
+ * Synchronous, BEFORE any network round trip: patches the shared list
+ * cache with the just-published id the instant the job reports 'done', so
+ * every consumer of sharedKeys.list() (useMergedProjects' chips/action via
+ * useSharedProjects, and usePublishQueries' own publishedAtByProject) flips in
+ * the SAME render (audit C3/C4) instead of waiting up to 30s for the
+ * authoritative refresh below to land. Only uses `publishingLocalRef` when
+ * it actually corresponds to `id` -- a fresh mount that reconciles a job
+ * started elsewhere never had a local project object handed to it, and a
+ * stale ref must never get attributed to the wrong id.
+ */
 export function useApplyOptimisticPublish({ queryClient, publishingLocalRef }) {
   return useCallback((id) => {
     const local = publishingLocalRef.current;

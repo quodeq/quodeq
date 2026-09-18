@@ -3,6 +3,11 @@ import { useSharedProjects } from './useSharedProjects.js';
 import { usePublish } from './usePublish.js';
 import { useMergedProjects } from './useMergedProjects.js';
 
+/**
+ * Groups projects into parent/child buckets so subprojects render nested
+ * under their root instead of as their own top-level cards. Parents are
+ * resolved by id or name, and an entry whose parent is missing stays a root.
+ */
 export function computeProjectTree(projects) {
   const lookup = {};
   for (const p of projects) {
@@ -150,10 +155,12 @@ function useEntryLists(projectsWithPublished, shared, filters) {
   return { allEntries, locationFilteredEntries };
 }
 
-// The full merge/filter pipeline that backs ProjectsPage's render: shared
-// project sync, publish state, the local/shared merge (unfiltered and
-// location-filtered), subproject nesting, and the query filter. Extracted
-// verbatim (same hooks, same deps, same order) from ProjectsPage's body.
+/**
+ * The full merge/filter pipeline that backs ProjectsPage's render: shared
+ * project sync, publish state, the local/shared merge (unfiltered and
+ * location-filtered), subproject nesting, and the query filter. Extracted
+ * verbatim (same hooks, same deps, same order) from ProjectsPage's body.
+ */
 export function useProjectsPageData({ projects, filters }) {
   const { shared, sharedConfigured, publishedAtByProject, publishState, publishingProject, publishError, publishErrorProject, publish } = useSharedAndPublish(projects);
   const projectsWithPublished = useProjectsWithPublished(projects, sharedConfigured, publishedAtByProject);

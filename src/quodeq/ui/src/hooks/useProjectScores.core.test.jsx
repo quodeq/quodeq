@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useProjectScores } from "./useProjectScores";
 import { withQueryClient } from "../test-utils/withQueryClient.jsx";
@@ -29,7 +28,7 @@ function makeFakeApi() {
         ],
       };
     }),
-    sharedGetProjectScores: vi.fn(async (project, asOf) => ({
+    sharedGetProjectScores: vi.fn(async () => ({
       accumulated: { score: 55 },
       trend: [],
       availableRuns: [{ runId: "r1", status: "complete" }],

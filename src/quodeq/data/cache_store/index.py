@@ -57,6 +57,12 @@ _BUILT_KEY = "built_for_schema"
 
 @dataclass(frozen=True)
 class IndexRow:
+    """A hit from ``find``: which entry to look at, and where it came from.
+
+    A hint only. The caller reads the entry at ``key`` and verifies it before
+    adopting anything, since the index can lag the entries it describes.
+    """
+
     key: str
     file_path: str
     created_at: str
@@ -74,6 +80,7 @@ class IndexEntry:
     created_at: str
 
     def as_row(self) -> tuple[str, str, str, str, str, str]:
+        """Flatten to the column order ``record_many`` inserts."""
         return (self.key, self.content_hash, self.dimension, self.params_hash,
                 self.file_path, self.created_at)
 
@@ -140,6 +147,7 @@ class ContentIndex:
     # -- writes -----------------------------------------------------------
 
     def record(self, entry: IndexEntry) -> None:
+        """Record one entry. A commit per call; batch with ``record_many``."""
         self.record_many([entry.as_row()])
 
     def record_many(self, rows: Iterable[tuple[str, str, str, str, str, str]]) -> None:
@@ -165,6 +173,7 @@ class ContentIndex:
                 _logger.debug("content index write failed: %s", exc)
 
     def forget(self, key: str) -> None:
+        """Drop the row for *key*, so a deleted entry stops being offered."""
         with self._lock:
             conn = self._connect()
             if conn is None:
@@ -217,6 +226,7 @@ class ContentIndex:
             return None
 
     def mark_built(self, schema: int) -> None:
+        """Stamp the rows as built for *schema*. Read back by ``built_for_schema``."""
         with self._lock:
             conn = self._connect()
             if conn is None:

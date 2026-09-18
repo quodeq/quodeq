@@ -5,7 +5,6 @@
  * never removes them if the component unmounts mid-drag. This test proves the
  * listeners are removed when the component unmounts during an active drag.
  */
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -32,7 +31,7 @@ describe('SidePane drag cleanup on unmount (#514)', () => {
     addedListeners = [];
     removedListeners = [];
 
-    addEventSpy = vi.spyOn(window, 'addEventListener').mockImplementation((type, handler, opts) => {
+    addEventSpy = vi.spyOn(window, 'addEventListener').mockImplementation((type, handler) => {
       addedListeners.push({ type, handler });
     });
     removeEventSpy = vi.spyOn(window, 'removeEventListener').mockImplementation((type, handler) => {
