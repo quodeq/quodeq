@@ -31,3 +31,17 @@ def test_b_shared_token_is_clean_for_the_next_test() -> None:
     fixture reset the token after the previous test (#1201); without that
     fixture this fails whenever it runs after a test that cancels."""
     assert cancellation.is_cancelled() is False
+
+
+def test_reset_is_applied_to_every_test(request) -> None:
+    """Guard the wiring, not just the ordering.
+
+    The pair above only proves anything while both tests share one process,
+    and pytest-xdist's default load scheduling may hand them to different
+    workers, which makes the second pass vacuously on the parallel CI leg.
+    ``request.fixturenames`` lists the fixtures actually applied to this
+    test, not every fixture in scope, so an autouse fixture appears here
+    although nothing requested it. Drop ``autouse``, rename the fixture or
+    delete it and this fails on every leg, in or out of a worker process.
+    """
+    assert "_reset_cancellation" in request.fixturenames
