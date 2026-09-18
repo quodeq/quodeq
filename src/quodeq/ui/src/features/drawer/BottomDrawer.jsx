@@ -79,7 +79,7 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
       style={maximized ? undefined : { height }}>
       <div className="assistant-drawer-drag" onPointerDown={handleDragStart}
         role="separator" tabIndex={0} aria-orientation="horizontal"
-        aria-label={t('drawer.resizeHandleAria')} aria-valuenow={height}
+        aria-label={t('common.resizeDrawer')} aria-valuenow={height}
         onKeyDown={handleResizeKey} />
       {openPanels.includes('assistant') && (
         <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>

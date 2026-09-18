@@ -1460,7 +1460,6 @@
   "dashboard.runHistoryKbdLabel": "Run history bars",
   "dashboard.runKbdItem": "{date}: score {score}",
   "evaluate.scanProgressAria": "Scan progress",
-  "drawer.resizeHandleAria": "Resize drawer",
   "settings.appearanceGroupAria": "Appearance",
   "settings.violationGroupingAria": "Violation grouping",
   "settings.verifyFindingsAria": "Verify findings",

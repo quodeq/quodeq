@@ -10,6 +10,7 @@ import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '..
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { computeCoverageInfo, buildPartialTooltip } from './dimensionGaugeMath.js';
+import { activateOnKey } from '../../../utils/a11y.js';
 
 /**
  * Findings the scan produced but scoring never saw, because the principle they
@@ -53,13 +54,6 @@ const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 const RING_CX = RING_SIZE / 2;
 const RING_CY = RING_SIZE / 2;
-
-function handleKey(e, onActivate) {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    onActivate();
-  }
-}
 
 function InsufficientGauge() {
   return (
@@ -193,7 +187,7 @@ export default function DimensionGaugeCard({
       role="button"
       tabIndex={0}
       onClick={activate}
-      onKeyDown={(e) => handleKey(e, activate)}
+      onKeyDown={activateOnKey(activate)}
       aria-label={t('overview.dimensionDetailsAria', { name: item.dimension })}
       aria-describedby={isInsufficient ? undefined : summaryId}
     >
