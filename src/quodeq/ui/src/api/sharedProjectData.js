@@ -14,7 +14,7 @@ import { epochSecondsToMs } from './sharedStatus.js';
 
 /**
  * List projects from the shared repository.
- * Unlike listProjects's envelope (projects + warmup), this envelope carries sync metadata
+ * Unlike listProjects's envelope, this envelope carries sync metadata
  * because the shared tab needs lastSynced and stale status.
  * @param {{refresh?: boolean}} [options={}]
  * @returns {Promise<{projects: import('../models/project.js').Project[], lastSynced: number|null, stale: boolean}>}

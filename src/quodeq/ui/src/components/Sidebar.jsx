@@ -201,6 +201,7 @@ export default function Sidebar({
   onPinChange,
   selectedSource = 'local',
   showCompareTab = false,
+  inert = undefined,
 }) {
   const { isPinned, setPinned, handleTogglePin, handleNav } = useSidebarPin({ controlledPinned, onPinChange, onNavTab });
   const repoName = projectInfo?.displayName || projectInfo?.name || projectInfo?.id || null;
@@ -209,7 +210,7 @@ export default function Sidebar({
   return (
     <>
       <SidebarScrim isPinned={isPinned} onClose={() => setPinned(false)} />
-      <aside className={`sidebar sidebar--expanded${isPinned ? ' sidebar--pinned' : ''}`}>
+      <aside className={`sidebar sidebar--expanded${isPinned ? ' sidebar--pinned' : ''}`} inert={inert}>
         <SidebarHeader isPinned={isPinned} handleTogglePin={handleTogglePin} version={version} />
 
         <ProjectTabsNav

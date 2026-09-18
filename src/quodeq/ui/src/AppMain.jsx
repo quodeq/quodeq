@@ -20,16 +20,17 @@ import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 
 /**
- * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element }} props
+ * @param {{ sidebar: JSX.Element, header: JSX.Element|null, content: JSX.Element,
+ *   startupLoader: JSX.Element|null, booting: boolean }} props
  * @returns {JSX.Element}
  */
-function AppShell({ sidebar, header, content, drawer, navPending }) {
+function AppShell({ sidebar, header, content, drawer, navPending, startupLoader, booting }) {
   return (
     <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
       {header && <div className="app-shell__topbar">{header}</div>}
       <div className="app-shell__body">
         {sidebar}
-        <div className="app-shell__main-column">
+        <div className="app-shell__main-column" inert={booting || undefined}>
           {/* Feedback while a navigation's target page renders (useNavStack
               transition). Must live HERE, outside the scrolling <main>: the
               .dashboard is position:relative, so an absolutely-positioned bar
@@ -44,15 +45,23 @@ function AppShell({ sidebar, header, content, drawer, navPending }) {
         </div>
         <SidePane />
         {drawer}
+        {/* Last child of the body row, NOT of the main column: the column sets
+            `contain: layout paint`, which makes it the containing block for
+            fixed-position descendants, so a loader mounted inside it was
+            clipped to the column and left the sidebar both visible and
+            clickable. Out here it covers sidebar + main + side pane and stops
+            below the TopBar (see .loading-screen--shell). */}
+        {startupLoader}
       </div>
     </div>
   );
 }
 
 function AppSidebar({ shell }) {
-  const { state, activeTab, navTab, hasCurrentProjectRuns, sharedSignal, resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned } = shell;
+  const { state, activeTab, navTab, hasCurrentProjectRuns, sharedSignal, resolvedDisplayName, APP_VERSION, sidebarCounts, sidebarPinned, setSidebarPinned, showStartupLoader } = shell;
   return (
     <Sidebar
+      inert={showStartupLoader || undefined}
       {...buildSidebarProps({
         activeTab,
         navTab,
@@ -112,41 +121,27 @@ function AppTopBar({ shell }) {
 }
 
 function AppRouteContent({ shell }) {
-  const { state, showStartupLoader, activePage, activeTab, contentProps, wizardEntry, wizardHandlers } = shell;
+  const { state, activePage, activeTab, contentProps, wizardEntry, wizardHandlers } = shell;
   return (
-    <>
-      {/* One stable mount for the startup loader, OUTSIDE the
-          Suspense: inside it, a lazy chunk's suspension unmounts the
-          loader itself and the plain fallback restarts the fade and
-          tips from zero (a loader-to-loader flash). Out here it
-          covers chunk loads AND holds through the Overview's first
-          data (shouldShowStartupLoader), so boot goes loader ->
-          content with no skeleton in between. */}
-      <FadingLoadingScreen
-        show={showStartupLoader}
-        tips
-        warmup={state.warmup}
-      />
-      <Suspense fallback={<LoadingScreen />}>
-        {/* Every route, not just Evaluate. A dead backend is the one
-            failure no page can render around: the Overview's own wall
-            falls back to a bare loading spinner that never resolves, so
-            a killed server read as "quodeq won't start" with nothing
-            on screen to say why or to retry from. */}
-        {!state.serverConnected && (
-          <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
-        )}
-        <div className="tab-fade" key={activeTab}>
-          <MainContent activePage={activePage} props={contentProps} />
-        </div>
-        {wizardEntry && (
-          <OnboardingWizard
-            entry={wizardEntry}
-            {...wizardHandlers}
-          />
-        )}
-      </Suspense>
-    </>
+    <Suspense fallback={<LoadingScreen />}>
+      {/* Every route, not just Evaluate. A dead backend is the one
+          failure no page can render around: the Overview's own wall
+          falls back to a bare loading spinner that never resolves, so
+          a killed server read as "quodeq won't start" with nothing
+          on screen to say why or to retry from. */}
+      {!state.serverConnected && (
+        <ServerDisconnectedOverlay onReconnect={() => state.setServerConnected(true)} />
+      )}
+      <div className="tab-fade" key={activeTab}>
+        <MainContent activePage={activePage} props={contentProps} />
+      </div>
+      {wizardEntry && (
+        <OnboardingWizard
+          entry={wizardEntry}
+          {...wizardHandlers}
+        />
+      )}
+    </Suspense>
   );
 }
 
@@ -169,11 +164,23 @@ export default function AppMain({ shell }) {
               <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
                 <AppShell
                   navPending={state.navPending}
+                  booting={shell.showStartupLoader}
                   drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
                     onOpenSettings={() => navTab('settings')} />}
                   sidebar={<AppSidebar shell={shell} />}
                   header={<AppTopBar shell={shell} />}
                   content={<AppRouteContent shell={shell} />}
+                  startupLoader={
+                    /* One stable mount for the startup loader, OUTSIDE the
+                       routed Suspense: inside it, a lazy chunk's suspension
+                       unmounts the loader itself and the plain fallback
+                       restarts the fade and tips from zero (a loader-to-loader
+                       flash). Out here it covers chunk loads AND holds through
+                       the Overview's first data (shouldShowStartupLoader), so
+                       boot goes loader -> content with no skeleton in
+                       between. */
+                    <FadingLoadingScreen show={shell.showStartupLoader} variant="shell" tips />
+                  }
                 />
               </VerifiedFindingsProvider>
             </LlamaCppLogProvider>

@@ -1935,6 +1935,22 @@ textarea:focus {
   z-index: 2;
 }
 
+/* Boot variant: fills the app shell's body row, so it covers the sidebar, the
+   main column and the side pane but stops below the TopBar. Absolute rather
+   than fixed because `.app-shell__main-column` sets `contain: paint` -- a
+   fixed loader anywhere in that subtree gets clipped to the column, which is
+   how the sidebar stayed visible (and clickable) under a "fullscreen" loader.
+   z-index sits one below `.app-shell__topbar`'s 5 so the bar keeps painting on
+   top without an `isolation` on the body (which would trap the mobile sidebar
+   scrim below the topbar). `pointer-events: auto` overrides the base rule:
+   this variant is meant to swallow clicks, not pass them through to chrome the
+   user can no longer see. */
+.loading-screen--shell {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
+}
+
 .loading-message {
   margin: 0;
   font-size: var(--text-sm);
@@ -1968,46 +1984,6 @@ textarea:focus {
 @keyframes loading-fadeout {
   from { opacity: 1; }
   to   { opacity: 0; }
-}
-
-.warmup-notice {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 420px;
-}
-
-/* Inside the fullscreen loader the warm-up strip anchors to the bottom so the
-   logo + tip keep the center to themselves; the skeleton-page placement (the
-   notice rendered standalone) keeps normal flow. */
-.loading-screen:not(.loading-screen--inline) .warmup-notice {
-  position: absolute;
-  bottom: var(--space-10);
-  left: 0;
-  right: 0;
-  margin: 0 auto;
-}
-
-.warmup-notice__bar {
-  width: 240px;
-  height: 4px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-alt);
-  overflow: hidden;
-}
-
-.warmup-notice__fill {
-  height: 100%;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  transition: width 400ms ease;
-}
-
-.warmup-notice__label {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  text-align: center;
 }
 
 .loading-logo {
