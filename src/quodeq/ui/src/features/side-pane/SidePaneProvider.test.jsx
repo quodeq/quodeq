@@ -84,7 +84,9 @@ describe('SidePaneProvider', () => {
     fireEvent.click(screen.getByText('add-a'));
     fireEvent.click(screen.getByText('add-b'));
     fireEvent.click(screen.getByText('add-c'));
-    expect(screen.queryByRole('status')).toBeNull();
+    // The live region is always mounted (announce-on-change), so "no toast"
+    // means an empty region, not a missing one.
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     fireEvent.click(screen.getByText('add-d'));
     expect(screen.getByRole('status')).toHaveTextContent(/3 panels/i);
   });
@@ -194,9 +196,11 @@ describe('SidePaneProvider', () => {
 
     it('renders a toast with the given message when fired', () => {
       render(<SidePaneProvider><ToastProbe /></SidePaneProvider>);
-      expect(screen.queryByText('blocked: try again later')).toBeNull();
+      expect(document.querySelector('.side-pane-toast')).toBeNull();
       fireEvent.click(screen.getByText('fire'));
-      expect(screen.getByText('blocked: try again later')).toBeInTheDocument();
+      // The message is in the visible shell and in the live region beside it.
+      expect(document.querySelector('.side-pane-toast')).toHaveTextContent('blocked: try again later');
+      expect(screen.getByRole('status')).toHaveTextContent('blocked: try again later');
     });
 
     it('is exposed as part of the context value (no-op when called with empty)', () => {
@@ -207,8 +211,8 @@ describe('SidePaneProvider', () => {
       render(<SidePaneProvider><NoMessageProbe /></SidePaneProvider>);
       // No throw, no toast rendered
       fireEvent.click(screen.getByText('fire-empty'));
-      // The toast role is "status" — assert none exists.
-      expect(screen.queryByRole('status')).toBeNull();
+      expect(document.querySelector('.side-pane-toast')).toBeNull();
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
     });
   });
 });

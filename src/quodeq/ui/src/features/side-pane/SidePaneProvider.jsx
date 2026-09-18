@@ -12,21 +12,44 @@ const MAX_WINDOWS = 3;
 const NOTICE_DISMISS_MS = 4000;
 const AT_CAP_MESSAGE = t('sidePane.atCap', { max: MAX_WINDOWS });
 
-function SidePaneToast({ notice, onDismiss }) {
+/**
+ * The transient side-pane notice. The whole toast dismisses on click, the mouse
+ * convenience its `cursor: pointer` promises, and the dismiss button is the
+ * keyboard-reachable control; two paths to the same dismiss are fine, but the
+ * button stops its click so one press does not dismiss twice.
+ *
+ * The shell is `role="presentation"`, because jsx-a11y (rightly) refuses mouse
+ * handlers on a `role="status"` element and the shell really is presentational.
+ * It carries no live region at all: it is keyed by notice, so it remounts with
+ * its text already in place, which is not reliably announced. The live region
+ * is the persistent one the provider renders beside it.
+ */
+export function SidePaneToast({ notice, onDismiss }) {
   useEffect(() => {
     if (!notice) return undefined;
     const t = setTimeout(onDismiss, NOTICE_DISMISS_MS);
     return () => clearTimeout(t);
   }, [notice, onDismiss]);
   if (!notice) return null;
+  function handleDismissClick(e) {
+    e.stopPropagation();
+    onDismiss();
+  }
   return (
     <div
       className="job-error-toast side-pane-toast"
+      role="presentation"
       onClick={onDismiss}
-      role="status"
-      aria-live="polite"
     >
       {notice.message}
+      <button
+        type="button"
+        className="side-pane-toast__dismiss"
+        aria-label={t('common.dismissNotificationAria')}
+        onClick={handleDismissClick}
+      >
+        ×
+      </button>
     </div>
   );
 }
@@ -185,6 +208,10 @@ export function SidePaneProvider({ children }) {
   return (
     <SidePaneContext.Provider value={value}>
       {children}
+      {/* Always mounted, text toggled, and deliberately outside the keyed
+          shell: a live region that mounts with its text in it is not
+          reliably announced. */}
+      <span role="status" className="sr-only">{notice ? notice.message : ''}</span>
       <SidePaneToast key={notice?.key} notice={notice} onDismiss={clearNotice} />
     </SidePaneContext.Provider>
   );

@@ -1,6 +1,7 @@
 import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
 import { formatRunId, extDisplayName } from '../utils/formatters.js';
 import { t, LOCALE } from '../strings/index.js';
+import { activateOnKey } from '../utils/a11y.js';
 
 const MAX_DISPLAYED_STATS = 5;
 
@@ -58,7 +59,7 @@ export default function ProjectHeader({
                 role="button"
                 tabIndex={0}
                 onClick={() => parentId && onProjectChange(parentId)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && parentId) onProjectChange(parentId); }}
+                onKeyDown={activateOnKey(() => parentId && onProjectChange(parentId))}
               >{parent}</span>
               <span className="content-project-sep">&rsaquo;</span>
             </>

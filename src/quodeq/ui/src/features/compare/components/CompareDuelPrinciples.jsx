@@ -1,9 +1,9 @@
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-import { DuelBars, gapClass, score1, signed1 } from './compareDuelShared.jsx';
+import { DuelBars, gapClass, SideScore, signed1 } from './compareDuelShared.jsx';
 
-function PrincipleGroup({ group, dim }) {
+function PrincipleGroup({ group, dim, aName, bName }) {
   return (
     <article className="compare-duel-principles__group">
       <h3 className="compare-duel-principles__dim">
@@ -14,9 +14,9 @@ function PrincipleGroup({ group, dim }) {
              row bars up here. */
           <span className="compare-duel-principles__dimScores">
             <span className="compare-duel-principles__side compare-duel-principles__side--a" aria-hidden="true" />
-            <span className={scoreColorClass(dim.a)}>{score1(dim.a)}</span>
+            <SideScore className={scoreColorClass(dim.a)} project={aName} score={dim.a} />
             <span className="compare-duel-principles__side compare-duel-principles__side--b" aria-hidden="true" />
-            <span className={scoreColorClass(dim.b)}>{score1(dim.b)}</span>
+            <SideScore className={scoreColorClass(dim.b)} project={bName} score={dim.b} />
             <span className={`compare-duel__gap ${gapClass(dim.gap)}`}>
               {dim.gap != null ? signed1(dim.gap) : '—'}
             </span>
@@ -27,9 +27,17 @@ function PrincipleGroup({ group, dim }) {
         {group.items.map((p) => (
           <li key={p.key} className="compare-duel-principles__row">
             <span className="compare-duel-principles__label">{p.label}</span>
-            <span className={`compare-duel-principles__score ${scoreColorClass(p.a)}`}>{score1(p.a)}</span>
+            <SideScore
+              className={`compare-duel-principles__score ${scoreColorClass(p.a)}`}
+              project={aName}
+              score={p.a}
+            />
             <DuelBars a={p.a} b={p.b} />
-            <span className={`compare-duel-principles__score ${scoreColorClass(p.b)}`}>{score1(p.b)}</span>
+            <SideScore
+              className={`compare-duel-principles__score ${scoreColorClass(p.b)}`}
+              project={bName}
+              score={p.b}
+            />
             <span className={`compare-duel__gap ${gapClass(p.gap)}`}>
               {p.gap != null ? signed1(p.gap) : '—'}
             </span>
@@ -43,7 +51,7 @@ function PrincipleGroup({ group, dim }) {
 /** Per-principle diffs, one group per shared dimension. The group heading
  * repeats that dimension's two scores + gap so the diff reads without
  * scrolling back up to the dimensions table. */
-export default function CompareDuelPrinciples({ principles, dimensions }) {
+export default function CompareDuelPrinciples({ principles, dimensions, aName, bName }) {
   const count = principles.reduce((n, g) => n + g.items.length, 0);
   // Dimension lookup keyed once, not a find() per principle group.
   const dimByKey = new Map(dimensions.map((d) => [d.key, d]));
@@ -60,6 +68,8 @@ export default function CompareDuelPrinciples({ principles, dimensions }) {
               key={group.key}
               group={group}
               dim={dimByKey.get(group.key)}
+              aName={aName}
+              bName={bName}
             />
           ))}
         </div>

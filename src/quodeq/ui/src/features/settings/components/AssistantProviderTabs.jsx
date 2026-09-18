@@ -89,7 +89,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
       <div className="panel-header">
         <SectionLabel marker="▶">{t('settings.assistantLabel')}</SectionLabel>
       </div>
-      {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
+      {clientsError && <div className="settings-row"><span className="settings-error" role="alert">{clientsError}</span></div>}
 
       <AssistantEnableRow enabled={enabled} setEnabled={setEnabled} />
 

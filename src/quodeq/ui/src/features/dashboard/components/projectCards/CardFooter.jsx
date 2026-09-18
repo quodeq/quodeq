@@ -74,7 +74,7 @@ export function CardFooter({ name, confirming, setConfirming, onDelete, onExport
         <button type="button" className="project-delete-btn" title={t('projects.downloadReportsTitle')} aria-label={t('projects.downloadReportsTitle')} onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
         <button type="button" className="project-delete-btn" title={t('projects.deleteProjectTitle')} aria-label={t('projects.deleteProjectTitle')} onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
       </div>
-      {showError && <p className="inline-error project-card-footer-error">{publishError}</p>}
+      {showError && <p className="inline-error project-card-footer-error" role="alert">{publishError}</p>}
     </>
   );
 }

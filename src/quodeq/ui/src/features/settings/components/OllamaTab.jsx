@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
@@ -11,11 +12,16 @@ import { tRich } from '../../../strings/rich.jsx';
 
 const OLLAMA_MODEL_HINT = tRich('settings.ollamaModelHint');
 
-function ModelSelector({ value, models, onChange }) {
+function ModelSelector({ value, models, onChange, labelId }) {
   const needsModel = !value;
   return (
     <div className="settings-model-field">
-      <select className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-labelledby={labelId}
+      >
         <option value="">{t('settings.pickAModel')}</option>
         {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
       </select>
@@ -25,16 +31,17 @@ function ModelSelector({ value, models, onChange }) {
 }
 
 function OllamaModelRow({ state, models, update }) {
+  const labelId = useId();
   return (
     <div className="settings-row">
       <div className="settings-row-label">
         <span className="settings-label-row">
-          <span className="settings-label">{t('settings.modelLabel')}</span>
+          <span className="settings-label" id={labelId}>{t('settings.modelLabel')}</span>
           <HelpHint label={t('settings.modelHelpAria')}>{OLLAMA_MODEL_HINT}</HelpHint>
         </span>
         <span className="settings-description">{t('settings.thisModelEveryStep')}</span>
       </div>
-      <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} />
+      <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
     </div>
   );
 }

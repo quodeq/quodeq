@@ -2,6 +2,9 @@ import {
   TAU, getThemeColors, scoreRGB, rgba,
   drawGlow, drawParticles,
 } from '../core/galaxyCore.js';
+import { newCueBatch, collectSeverityCue, drawCueBatch } from './galaxyFolderCues.js';
+
+export { starShapeFor } from './galaxyFolderCues.js';
 
 /**
  * Draw all scene elements to the canvas context.
@@ -125,11 +128,13 @@ function drawFolderNebula(ctx, star, view) {
   }
 }
 
-/** Draw a star's own violation/alert particles (both folders and files). */
-function drawFileParticles(ctx, s, sc, cam, t) {
+/** Draw a star's own violation/alert particles (both folders and files); the
+ * severity rings are queued on `cues` and stroked once at the end of the frame. */
+function drawFileParticles(ctx, s, sc, cam, t, cues) {
   if (s.particles.length === 0) return;
   const pScale = cam.z * 0.5;
   drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
+  s.particles.forEach((p) => collectSeverityCue(cues, p, sc, pScale, t));
 }
 
 /** Labeled violation orbs around a file star, shown only at high zoom.
@@ -195,6 +200,7 @@ export function drawStars(ctx, activeScene, params) {
   const { t, cam, w2s, showLabels, flyRef } = params;
   let newHovered = null;
   const pendingLabels = [];
+  const cues = newCueBatch();
 
   activeScene.rootStars.forEach((s, i) => {
     const sc = w2s(s.x, s.y);
@@ -209,7 +215,7 @@ export function drawStars(ctx, activeScene, params) {
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: starAlpha });
 
     if (s.isFolder) drawFolderNebula(ctx, { s, i, sc, sr }, { cam, t, curFly });
-    drawFileParticles(ctx, s, sc, cam, t);
+    drawFileParticles(ctx, s, sc, cam, t, cues);
     drawLabeledOrbs(ctx, s, sc, params);
 
     const label = collectStarLabel(s, sc, sr, cam, showLabels);
@@ -219,6 +225,7 @@ export function drawStars(ctx, activeScene, params) {
     if (hovered) newHovered = hovered;
   });
 
+  drawCueBatch(ctx, cues);
   return { pendingLabels, newHovered };
 }
 

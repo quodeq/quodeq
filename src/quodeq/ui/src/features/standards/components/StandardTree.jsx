@@ -18,14 +18,14 @@ function TreeNodeActions({ onAdd, onRemove, addTitle, removeTitle }) {
   return (
     <div className="tree-node-actions" onClick={(e) => e.stopPropagation()}>
       {onAdd && (
-        <button type="button" className="tree-action-btn" onClick={onAdd} title={addTitle || t('standards.add')}>
+        <button type="button" className="tree-action-btn" onClick={onAdd} title={addTitle || t('standards.add')} aria-label={addTitle || t('standards.add')}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
       )}
       {onRemove && (
-        <button type="button" className="tree-action-btn tree-action-btn--remove" onClick={onRemove} title={removeTitle || t('standards.remove')}>
+        <button type="button" className="tree-action-btn tree-action-btn--remove" onClick={onRemove} title={removeTitle || t('standards.remove')} aria-label={removeTitle || t('standards.remove')}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
             <path d="M5 12h14" />
           </svg>

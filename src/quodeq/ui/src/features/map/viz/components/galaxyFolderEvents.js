@@ -38,6 +38,23 @@ function makeClickHandler(refs, params) {
   };
 }
 
+/** Open one star by path, for the keyboard layer over the canvas: the same
+ * handleNodeClick a click on a hovered star reaches, with the same
+ * mid-animation guard, since there is no mouse position to hit-test. Keyed
+ * on path, not index, so a rebuilt scene cannot open a different star than
+ * the control the user activated. */
+function makeActivateStarHandler(refs, params) {
+  const { startTransition, saveNav, scene } = params;
+  return function activateStar(starPath) {
+    if (refs.animRef.current || refs.flyRef.current) return;
+    const stars = (refs.sceneRef.current || scene)?.rootStars || [];
+    const starIdx = stars.findIndex((s) => (s.path || s.name) === starPath);
+    if (starIdx < 0) return;
+    const s = stars[starIdx];
+    handleNodeClick(refs, { type: s.isFolder ? 'folder' : 'file', starIdx, data: s }, { startTransition, saveNav });
+  };
+}
+
 function makeGoToPathIndexHandler(refs, size) {
   return function goToPathIndex(idx) {
     if (idx >= refs.navRef.current.path.length - 1 || refs.flyRef.current) return;
@@ -93,7 +110,7 @@ function makeKeyDownHandler(refs, handleClick) {
 
 /**
  * Create mouse/click event handlers for GalaxyFolderView.
- * Returns { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, updateTooltip, handleKeyDown }.
+ * Returns { handleMouseMove, handleMouseLeave, handleClick, activateStar, goToPathIndex, updateTooltip, handleKeyDown }.
  */
 export function createEventHandlers(refs, params) {
   const { size } = params;
@@ -101,8 +118,9 @@ export function createEventHandlers(refs, params) {
   const handleMouseMove = makeMouseMoveHandler(refs, updateTooltip);
   const handleMouseLeave = makeMouseLeaveHandler(refs);
   const handleClick = makeClickHandler(refs, params);
+  const activateStar = makeActivateStarHandler(refs, params);
   const goToPathIndex = makeGoToPathIndexHandler(refs, size);
   const handleKeyDown = makeKeyDownHandler(refs, handleClick);
 
-  return { handleMouseMove, handleMouseLeave, handleClick, goToPathIndex, updateTooltip, handleKeyDown };
+  return { handleMouseMove, handleMouseLeave, handleClick, activateStar, goToPathIndex, updateTooltip, handleKeyDown };
 }

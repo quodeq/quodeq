@@ -103,9 +103,9 @@ export function AdvancedAnalysisSettings({ state, update }) {
           </span>
           <span className="settings-description">{t('settings.analysisModeDesc')}</span>
         </div>
-        <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>{t('settings.perDimension')}</button>
-          <button type="button" className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>{t('settings.grouped')}</button>
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.violationGroupingAria')}>
+          <button type="button" role="radio" aria-checked={perDimension} className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>{t('settings.perDimension')}</button>
+          <button type="button" role="radio" aria-checked={!perDimension} className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>{t('settings.grouped')}</button>
         </div>
       </div>
 
@@ -117,9 +117,9 @@ export function AdvancedAnalysisSettings({ state, update }) {
           </span>
           <span className="settings-description">{t('settings.verifyFindingsDesc')}</span>
         </div>
-        <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>{t('settings.on')}</button>
-          <button type="button" className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>{t('settings.off')}</button>
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.verifyFindingsAria')}>
+          <button type="button" role="radio" aria-checked={verify} className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>{t('settings.on')}</button>
+          <button type="button" role="radio" aria-checked={!verify} className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>{t('settings.off')}</button>
         </div>
       </div>
     </>

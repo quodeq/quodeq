@@ -141,6 +141,9 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <QMarkIcon className={`assistant-compass${streaming ? ' assistant-compass--think' : ''}`} />
         </span>
       )}
+      {/* Always mounted, text toggled: a live region inserted with its text
+          already in it is not reliably announced. */}
+      <span className="sr-only" role="status">{streaming ? t('assistant.responding') : ''}</span>
       <div className="assistant-panel-identity">
         <div className="assistant-panel-title">{t('assistant.assistantLabel')}</div>
         <div className="assistant-panel-subtitle">

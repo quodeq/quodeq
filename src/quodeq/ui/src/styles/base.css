@@ -617,6 +617,25 @@ textarea:focus {
   opacity: 0.9;
 }
 
+/* Keyboard-reachable dismiss inside the side-pane toast. The toast itself is
+   also clickable, so this stays chrome-free and reads as part of the message
+   instead of a browser button parked next to it. */
+.side-pane-toast__dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  padding: 0;
+  margin-left: var(--space-2, 8px);
+  cursor: pointer;
+}
+
+.side-pane-toast__dismiss:focus-visible {
+  outline: 2px solid var(--color-bg, #0d1117);
+  outline-offset: 2px;
+}
+
 .settings-info-toast {
   background: var(--color-text, #e6edf3);
   color: var(--color-bg, #0d1117);
@@ -2326,5 +2345,18 @@ fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; curso
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
+}
+
+/* Visually hidden, still read by assistive tech. Shared by every feature. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 

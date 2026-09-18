@@ -347,6 +347,37 @@
   text-align: left;
 }
 
+/* A sortable header whose label is a real <button> (DimensionHeatGridView,
+   so sorting is keyboard-reachable): the button takes the cell's padding
+   over and fills it, otherwise the padding ring shows the cell's pointer
+   cursor and sorts nothing. Same reset as compare.css' column buttons. */
+.heat-grid-th-sort:has(> button) {
+  padding: 0;
+}
+
+.heat-grid-th-sort > button {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: inherit;
+  background: transparent;
+  border: none;
+  display: block;
+  width: 100%;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.heat-grid-th-sort > button:hover {
+  color: var(--color-text);
+}
+
+.heat-grid-th-sort > button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
 .heat-grid td {
   padding: 0;
 }

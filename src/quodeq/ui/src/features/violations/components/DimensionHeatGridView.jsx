@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../components/HeatGridCells.jsx';
 import { buildRows } from './dimensionHeatGridModel.js';
+import { activateOnKey } from '../../../utils/a11y.js';
 import { t } from '../../../strings/index.js';
 
 const PRINCIPLE_INDENT_PX = 24;
+
+function ariaSort(isActive, sortDir) {
+  if (!isActive) return 'none';
+  return sortDir === 'asc' ? 'ascending' : 'descending';
+}
 
 const COLUMNS = [
   { id: 'name', label: t('violations.colDimensionPrinciple'), align: 'left' },
@@ -19,8 +25,21 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
     <thead>
       <tr>
         {COLUMNS.map((col) => (
-          <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
-            {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+          <th
+            key={col.id}
+            className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
+            aria-sort={ariaSort(sortCol === col.id, sortDir)}
+          >
+            {/* A real <button> so sorting is reachable from the keyboard (a <th>
+                is not focusable). It fills the cell and looks like plain header
+                text: see `.heat-grid-th-sort > button` in styles/map.css. */}
+            <button
+              type="button"
+              aria-label={t('violations.sortByAria', { column: col.label })}
+              onClick={() => handleSort(col.id)}
+            >
+              {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+            </button>
           </th>
         ))}
       </tr>
@@ -38,7 +57,7 @@ function HeatGridRow({ row, i, onDimensionClick, onPrincipleClick, onCellClick }
           role="button"
           tabIndex={0}
           onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
-          onKeyDown={(e) => e.key === 'Enter' && (isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
+          onKeyDown={activateOnKey(() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
           style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
         >
           {row.name}

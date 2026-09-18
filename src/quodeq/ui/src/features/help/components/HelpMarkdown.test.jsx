@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 import HelpMarkdown from './HelpMarkdown.jsx';
 
 describe('HelpMarkdown', () => {
@@ -43,5 +44,21 @@ describe('HelpMarkdown', () => {
     const src = ['```figure', 'component: ScoreGroupingFigure', 'caption: cap', '```'].join('\n');
     const { container } = render(<HelpMarkdown source={src} />);
     expect(container.querySelector('.sg-figure')).toBeTruthy();
+  });
+
+  // #6043 fix round 1 - HelpFigure wraps illustration children in
+  // aria-hidden="true" by default, which suppressed GradeFormulaCurveFigure's
+  // role="img"/aria-label from ever reaching a screen reader on the real Help
+  // page. The registry now marks it informative so HelpFigure skips hiding it.
+  it('keeps the grade-curve figure in the accessibility tree', () => {
+    const src = ['```figure', 'component: GradeFormulaCurveFigure', 'caption: cap', '```'].join('\n');
+    render(<HelpMarkdown source={src} />);
+    expect(screen.getByRole('img', { name: /grade curve/i })).toBeInTheDocument();
+  });
+
+  it('still hides the decorative score-grouping figure from the accessibility tree', () => {
+    const src = ['```figure', 'component: ScoreGroupingFigure', 'caption: cap', '```'].join('\n');
+    render(<HelpMarkdown source={src} />);
+    expect(screen.queryByRole('img')).toBeNull();
   });
 });

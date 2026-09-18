@@ -67,7 +67,7 @@ function DuelTrendPanel({ trend, a, b, onOpenProject }) {
       </div>
       {trendPoints >= 2 ? (
         <>
-          <CompareDuelTrend a={trend.a} b={trend.b} />
+          <CompareDuelTrend a={trend.a} b={trend.b} aName={a.name} bName={b.name} />
           <div className="compare-radar__legend">
             <button
               type="button"
@@ -145,14 +145,19 @@ export default function CompareDuelView({ duel, onOpenProject }) {
         </section>
       ) : (
         <>
-          <CompareDuelDimensionsTable dimensions={duel.dimensions} />
+          <CompareDuelDimensionsTable dimensions={duel.dimensions} aName={a.name} bName={b.name} />
 
           <div className="compare-lower compare-lower--duel">
             <CompareDuelShapePanel sharedDims={sharedDims} a={a} b={b} />
             <DuelTrendPanel trend={duel.trend} a={a} b={b} onOpenProject={onOpenProject} />
           </div>
 
-          <CompareDuelPrinciples principles={duel.principles} dimensions={duel.dimensions} />
+          <CompareDuelPrinciples
+            principles={duel.principles}
+            dimensions={duel.dimensions}
+            aName={a.name}
+            bName={b.name}
+          />
         </>
       )}
     </>

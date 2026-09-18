@@ -68,6 +68,7 @@ function FileDetailBody({
           scrollElement={scrollElement}
           estimateSize={estimateItemSize(items)}
           getItemKey={itemKey(items)}
+          label={t('explorer.violationsListAria')}
           renderItem={(item) => renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded })}
         />
       </DeferredMount>

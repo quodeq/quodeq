@@ -29,14 +29,15 @@ export default function AppearanceSection({ themeMode, themeFamily, onApplyMode,
           <span className="settings-label">{t('settings.modeLabel')}</span>
           <span className="settings-description">{t('settings.modeDesc')}</span>
         </div>
-        <div className="settings-pill-group">
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.appearanceGroupAria')}>
           {MODE_OPTIONS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
+              role="radio"
+              aria-checked={themeMode === value}
               className={`settings-pill${themeMode === value ? ' settings-pill--active' : ''}`}
               onClick={() => onApplyMode(value)}
-              aria-pressed={themeMode === value}
             >
               {label}
             </button>

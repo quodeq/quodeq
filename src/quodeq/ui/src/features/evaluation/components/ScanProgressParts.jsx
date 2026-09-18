@@ -69,11 +69,16 @@ export function ScanProgressBanner({ isFailed, isLost, status, progress, logs })
   return null;
 }
 
-export function ScanProgressBar({ showCoverage, cachedFiles, cachedPctWidth, runPctWidth, overallPct, isRunning, projectTotal, coveredFiles, takenFiles }) {
+export function ScanProgressBar({ showCoverage, cachedFiles, cachedPctWidth, runPctWidth, overallPct, coveredPct, isRunning, projectTotal, coveredFiles, takenFiles }) {
   return (
     <>
       <div
         className="scan-progress__bar"
+        role="progressbar"
+        aria-label={t('evaluate.scanProgressAria')}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(showCoverage ? coveredPct : overallPct)}
         title={showCoverage ? t('evaluate.cachedBarTitle', { count: cachedFiles }) : undefined}
       >
         {showCoverage && (
@@ -210,6 +215,7 @@ export function ScanProgressBody({ job, status, isRunning, isFailed, isLost, pro
         cachedPctWidth={cachedPctWidth}
         runPctWidth={runPctWidth}
         overallPct={overallPct}
+        coveredPct={coveredPct}
         isRunning={isRunning}
         projectTotal={projectTotal}
         coveredFiles={coveredFiles}

@@ -1,6 +1,14 @@
+import { t } from '../../../../strings/index.js';
+
 const RATE_HIGH = 0.9;
 const RATE_MEDIUM = 0.7;
 const RATE_LOW = 0.4;
+
+const SEVERITY_STATE_KEYS = {
+  critical: 'map.stateCritical',
+  major: 'map.stateMajor',
+  minor: 'map.stateMinor',
+};
 
 export function severityColor(severity) {
   switch (severity) {
@@ -79,6 +87,20 @@ export function nodeColor(node, viewMode) {
     case 'health': return healthColor(node.complianceRate);
     default: return severityColor(worstSeverity(node.severity));
   }
+}
+
+/**
+ * The screen-reader equivalent of the colour nodeColor picks for this node:
+ * the worst severity word in violations mode, the rounded compliance
+ * percentage in the compliance/health modes. Colour is the only cue a
+ * sighted user gets, so every focusable node label carries this too.
+ */
+export function nodeStateText(node, viewMode) {
+  if (viewMode === 'compliance' || viewMode === 'health') {
+    return t('map.stateCompliance', { pct: Math.round((node.complianceRate || 0) * 100) });
+  }
+  const worst = worstSeverity(node.severity || {});
+  return worst ? t(SEVERITY_STATE_KEYS[worst]) : t('map.stateClean');
 }
 
 export function nodeSize(node, viewMode) {

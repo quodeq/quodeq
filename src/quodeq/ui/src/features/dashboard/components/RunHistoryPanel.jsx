@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
 import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
+import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../strings/index.js';
 import { granularityLabel } from '../../../strings/labels.js';
 import {
@@ -168,6 +169,25 @@ function ScoreHistoryChart({ data, interaction }) {
   );
 }
 
+// Keyboard-only equivalent of the chart's mouse click: one focusable button
+// per run, mirroring DimensionScoreHistoryPanel's own ChartKeyboardControls
+// usage. Empty when there is nothing to click (ChartKeyboardControls itself
+// renders null for an empty list).
+// A bucket with no runId has nothing to select, so it gets no control rather
+// than a button that calls onBarClick(undefined); the label follows the chart,
+// which shows periodLabel once the granularity is week or month.
+function buildRunKbdItems(data, onBarClick) {
+  if (!onBarClick) return [];
+  return data.filter((d) => d.runId).map((d) => ({
+    key: d.runId,
+    text: t('dashboard.runKbdItem', {
+      date: d.periodLabel || d.dateLabel,
+      score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?',
+    }),
+    onActivate: () => onBarClick(d.runId),
+  }));
+}
+
 export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Hooks must run in the same order every render, so compute before any early return.
@@ -204,10 +224,16 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
         </span>
       </div>
       {hasChart ? (
-        <ScoreHistoryChart
-          data={data}
-          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
-        />
+        <div className="chart-with-kbd">
+          <ScoreHistoryChart
+            data={data}
+            interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
+          />
+          <ChartKeyboardControls
+            label={t('dashboard.runHistoryKbdLabel')}
+            items={buildRunKbdItems(data, onBarClick)}
+          />
+        </div>
       ) : (
         <p className="run-history-panel__sparse">{t('overview.sparseTrend', { period: granularityLabel(granularity) })}</p>
       )}

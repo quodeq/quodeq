@@ -15,6 +15,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
+import { t } from '../strings/index.js';
 
 const CONTEXT_PADDING = 5;
 const CODE_LINE_HEIGHT = 18; // must match terminal.css .ctx-line line-height
@@ -25,7 +26,11 @@ function renderLine(raw, lineNum, isHighlighted) {
   const display = isHighlighted ? stripHighlightMarker(raw) : raw;
   return (
     <div key={lineNum} className={`ctx-line${isHighlighted ? ' ctx-line--hl' : ''}`}>
-      <span className="ctx-gutter">{lineNum}</span>
+      <span className="ctx-gutter">
+        {isHighlighted && <span className="sr-only">{t('context.violationLineMarker')}</span>}
+        <span aria-hidden="true" className="context-line__marker">{isHighlighted ? '▸' : ''}</span>
+        {lineNum}
+      </span>
       <span className="ctx-code">{display}</span>
     </div>
   );

@@ -212,7 +212,7 @@ export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = '
 
   return (
     <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
-      {restoreError && <div className="error-banner">{restoreError}</div>}
+      {restoreError && <div className="error-banner" role="alert">{restoreError}</div>}
       <ViolationsHeader
         summary={summary} visibleDimensions={visibleDimensions} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples}
         selectedSource={selectedSource} activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab} dismissed={dismissed}

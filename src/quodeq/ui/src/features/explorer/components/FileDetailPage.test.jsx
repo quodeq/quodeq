@@ -37,6 +37,11 @@ function renderPage(props = {}) {
 }
 
 describe('FileDetailPage', () => {
+  it('names the virtualized violations list for assistive tech', () => {
+    renderPage();
+    expect(screen.getByRole('list', { name: 'Violations' })).toBeInTheDocument();
+  });
+
   it('mounts without crashing and renders the file header + violation', () => {
     expect(() => renderPage()).not.toThrow();
     expect(screen.getByText('src/app.js')).toBeInTheDocument();

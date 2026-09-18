@@ -1,0 +1,23 @@
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import DimensionGaugeCard from './DimensionGaugeCard.jsx';
+
+const baseItem = {
+  dimension: 'modifiability',
+  overallScore: '7.5/10',
+  totals: { violationCount: 4, complianceCount: 20, severity: { critical: 0, major: 1, minor: 3 } },
+};
+
+describe('DimensionGaugeCard accessible score summary', () => {
+  it('exposes the score and grade as the button\'s accessible description, not just raw DOM text', () => {
+    render(<DimensionGaugeCard item={baseItem} onDimensionClick={() => {}} />);
+    // The gauge itself stays aria-hidden (decorative SVG). The card's role="button"
+    // has children-presentational semantics and an explicit aria-label (the
+    // dimension name only), so a sr-only sibling's text never reaches assistive
+    // tech unless it's wired up via aria-describedby -- toHaveAccessibleDescription
+    // resolves the real accessibility-tree description, not just DOM text content.
+    expect(screen.getByRole('button', { name: /dimension details/i }))
+      .toHaveAccessibleDescription(/score 7\.5, grade good/i);
+  });
+});

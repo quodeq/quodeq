@@ -10,7 +10,7 @@ export default function ScoreGroupingFigure() {
         <span className="sg-figure__label">{t('overview.scoreHistoryLabel')} · {BAR_COUNT}{t('granularity.dayAbbrev')}</span>
         <span className="sg-figure__select">{t('common.periodDay')} &#9662;</span>
       </div>
-      <svg viewBox="0 0 320 56" preserveAspectRatio="none">
+      <svg viewBox="0 0 320 56" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         {bars.map((h, i) => (
           <rect
             key={i}

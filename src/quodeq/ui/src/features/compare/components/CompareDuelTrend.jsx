@@ -107,8 +107,10 @@ function DuelTrendAxis({ ticks, y }) {
  * @param {object} props
  * @param {{dateISO: string, value: number}[]} props.a - Oldest-first series.
  * @param {{dateISO: string, value: number}[]} props.b - Oldest-first series.
+ * @param {string} props.aName - Left/first project, for the chart's name.
+ * @param {string} props.bName - Right/second project, for the chart's name.
  */
-export default function CompareDuelTrend({ a, b }) {
+export default function CompareDuelTrend({ a, b, aName, bName }) {
   const { t0, t1, v0, v1 } = trendDomain([a, b]);
   const span = t1 - t0;
   const x = (iso) => (span
@@ -122,7 +124,15 @@ export default function CompareDuelTrend({ a, b }) {
   return (
     <div className="compare-duel-trend">
       <div className="compare-duel-trend__plot">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" className="compare-duel-trend__svg">
+        {/* role="img" prunes everything inside the svg from the a11y tree,
+            so the name is the whole account of the chart a screen reader
+            gets; without it the plot is an unnamed image (U-ACC-1). */}
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label={t('compare.trendChartAria', { a: aName, b: bName })}
+          className="compare-duel-trend__svg"
+        >
           <DuelTrendWindow t0={t0} t1={t1} span={span} />
           <DuelTrendGrid ticks={ticks} y={y} />
           <DuelTrendLine key="b" series={b} variant="b" x={x} y={y} />
@@ -130,7 +140,11 @@ export default function CompareDuelTrend({ a, b }) {
         </svg>
         <DuelTrendAxis ticks={ticks} y={y} />
       </div>
-      <div className="compare-duel-trend__dates" aria-hidden="true">
+      {/* Not aria-hidden: this sits outside the role="img" svg, so hiding it
+          really did withhold the chart's time span from a screen reader
+          (U-ACC-1). The 0..10 tick column above stays hidden; it duplicates
+          the grid lines and reads as loose numbers. */}
+      <div className="compare-duel-trend__dates">
         <span>{shortDate(t0)}</span>
         {span > 0 && <span>{shortDate(t1)}</span>}
       </div>

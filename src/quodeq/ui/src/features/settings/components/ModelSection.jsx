@@ -16,6 +16,8 @@ function ClientPillGroup({ clients, value, onApply }) {
     <button
       key={id}
       type="button"
+      role="radio"
+      aria-checked={value === id}
       className={`settings-pill${value === id ? ' settings-pill--active' : ''}`}
       onClick={() => onApply(id)}
     >
@@ -62,7 +64,7 @@ function ClientSelector({ aiCmd = {}, availableClients }) {
           <span className="settings-label">{t('settings.clientLabel')}</span>
           <span className="settings-description">{t('settings.clientDesc')}</span>
         </div>
-        <div className="settings-pill-group">
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.clientPillsAria')}>
           <ClientPillGroup clients={cliClients} value={value} onApply={onApply} />
           <ClientPillGroup clients={apiClients} value={value} onApply={onApply} />
         </div>

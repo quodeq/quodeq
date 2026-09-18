@@ -19,7 +19,14 @@ function PickStep({ fileRef, onFile, onClose }) {
     <>
       <h3 id="import-modal-title" className="modal-title">{t('standards.importEvaluatorTitle')}</h3>
       <p className="modal-body">{t('standards.selectFilePrefix')} <strong>{QUODEQ_FILE_EXT}</strong> {t('standards.selectFileSuffix')}</p>
-      <input ref={fileRef} type="file" accept=".quodeq,.json" onChange={onFile} style={{ margin: '12px 0' }} />
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".quodeq,.json"
+        onChange={onFile}
+        style={{ margin: '12px 0' }}
+        aria-label={t('standards.importFileAria')}
+      />
       <div className="modal-actions">
         <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
       </div>
