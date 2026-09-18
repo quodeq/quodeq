@@ -6,8 +6,12 @@ from quodeq.analysis.api_prompt_assembly import _format_shape_block
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
-LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
-PUBLIC_SINGLE_TENANT = TrustModel(multi_tenant=False, network_exposure="public")
+LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback",
+                   deployment_topology="distributed")
+PUBLIC_SINGLE_TENANT = TrustModel(multi_tenant=False, network_exposure="public",
+                                  deployment_topology="distributed")
+SINGLE_HOST = TrustModel(multi_tenant=False, network_exposure="loopback",
+                         deployment_topology="single-host")
 DESKTOP_SHAPE = ProjectShape(deployment=Deployment.DESKTOP, is_single_user=True)
 
 
@@ -63,3 +67,21 @@ def test_no_note_claims_a_category_does_not_apply():
     for model in (LOCAL, PUBLIC_SINGLE_TENANT, CONSERVATIVE):
         block = _format_shape_block(DESKTOP_SHAPE, model).lower()
         assert "not apply" not in block
+
+
+def test_topology_is_briefed():
+    assert "deployment_topology=single-host" in _format_shape_block(
+        DESKTOP_SHAPE, SINGLE_HOST)
+
+
+def test_single_host_note_advises_minor_not_omission():
+    # Same contract as the other two notes: cap the severity, never omit.
+    block = _format_shape_block(DESKTOP_SHAPE, SINGLE_HOST).lower()
+    assert "single host" in block
+    assert "minor" in block
+    assert "omit" in block
+    assert "not apply" not in block
+
+
+def test_no_topology_note_when_distributed():
+    assert "single host" not in _format_shape_block(DESKTOP_SHAPE, LOCAL).lower()

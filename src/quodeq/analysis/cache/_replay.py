@@ -156,7 +156,9 @@ def _regate_replayed_findings(
     every replay -- this is that something. The practical effect: editing
     the profile to declare, say, ``networkExposure: loopback`` re-caps
     already-cached ``major`` findings on the very next run, without a cache
-    miss or a CacheKey change.
+    miss or a CacheKey change. ``deploymentTopology: single-host`` is the
+    second such key: declaring it re-caps already-cached ``major``
+    scalability findings on the very next run, with no cache miss either.
 
     apply_scope_gate is symmetric (see its own module docstring): the same
     call also restores a finding this gate previously capped to ``minor``

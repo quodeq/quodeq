@@ -75,8 +75,8 @@ src/quodeq/context/precedent_corpus.py:294:broad-except
 src/quodeq/context/precedent_corpus.py:91:broad-except
 src/quodeq/context/precedent_store.py:93:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
-src/quodeq/context/trust_model.py:161:broad-except
-src/quodeq/context/trust_model.py:93:broad-except
+src/quodeq/context/trust_model.py:186:broad-except
+src/quodeq/context/trust_model.py:108:broad-except
 src/quodeq/dashboard/_webview_token.py:86:suppress
 src/quodeq/dashboard/_webview_window_about.py:61:broad-except
 src/quodeq/dashboard/_webview_window_chrome.py:143:broad-except

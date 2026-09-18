@@ -145,7 +145,8 @@ def test_lan_behaves_as_public_for_relaxation(tmp_path):
 
 
 def test_loopback_relaxes():
-    assert TrustModel(multi_tenant=False, network_exposure="loopback").relaxes_remote() is True
+    assert TrustModel(multi_tenant=False, network_exposure="loopback",
+                      deployment_topology="distributed").relaxes_remote() is True
 
 
 @pytest.mark.skipif(
@@ -209,3 +210,29 @@ def test_deeply_nested_pyproject_toml_degrades(tmp_path):
     (tmp_path / "pyproject.toml").write_text(
         "a = " + "[" * 5000 + "]" * 5000, encoding="utf-8")
     assert resolve_trust_model(tmp_path) == CONSERVATIVE
+
+
+def test_declared_topology_wins(tmp_path):
+    _write_profile(tmp_path, {"version": 1, "deploymentTopology": "single-host"})
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.deployment_topology == "single-host"
+    assert resolved.is_single_host() is True
+
+
+def test_undeclared_topology_is_conservative(tmp_path):
+    # Topology is never detected, so an undeclared project stays distributed.
+    _write_profile(tmp_path, {"version": 1, "multiTenant": False})
+    assert resolve_trust_model(tmp_path).deployment_topology == "distributed"
+
+
+def test_unknown_topology_value_is_ignored(tmp_path):
+    _write_profile(tmp_path, {"version": 1, "deploymentTopology": "kubernetes"})
+    assert resolve_trust_model(tmp_path).deployment_topology == "distributed"
+
+
+def test_bad_topology_does_not_discard_other_axes(tmp_path):
+    _write_profile(tmp_path, {
+        "version": 1, "networkExposure": "loopback", "deploymentTopology": 7})
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.network_exposure == "loopback"
+    assert resolved.deployment_topology == "distributed"

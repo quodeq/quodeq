@@ -24,7 +24,8 @@ from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
 _FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/scope_gate_replay/security_findings.json"
 
-LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
+LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback",
+                   deployment_topology="distributed")
 
 
 def _violations(severity: str):
