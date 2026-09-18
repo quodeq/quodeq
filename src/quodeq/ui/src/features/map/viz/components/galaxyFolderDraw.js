@@ -125,11 +125,50 @@ function drawFolderNebula(ctx, star, view) {
   }
 }
 
+const CUE_RING_RADIUS_RATIO = 2.2; // ring sits outside the particle's own dot
+const CUE_CORE_RADIUS_RATIO = 0.45; // critical-only core dot, inside the dot
+const CUE_RING_WIDTH_RATIO = 0.25;
+const CUE_RING_WIDTH_MIN = 0.6;
+const CUE_MIN_PARTICLE_SIZE = 0.8; // below this the cue is sub-pixel noise
+const CUE_ALPHA = 0.9;
+
+/**
+ * Shape cue for a violation particle's severity, so severity does not ride
+ * on colour alone (U-ACC-2): 'ring-dot' for critical, 'ring' for major,
+ * 'dot' (what drawParticles already paints) for minor and anything else.
+ */
+export function starShapeFor(severity) {
+  switch (severity) {
+    case 'critical': return 'ring-dot';
+    case 'major': return 'ring';
+    default: return 'dot';
+  }
+}
+
+/** Stroke the severity cue around one particle, at the orbit position
+ * drawParticles paints it at (same angle/scale math as galaxyCore's). */
+function drawSeverityCue(ctx, p, sc, scale, t) {
+  const shape = starShapeFor(p.sev);
+  const sz = p.sz * scale;
+  if (shape === 'dot' || sz < CUE_MIN_PARTICLE_SIZE) return;
+  const a = t * p.os + p.op;
+  const px = sc.x + Math.cos(a) * p.or * p.ec * scale;
+  const py = sc.y + Math.sin(a) * p.or * scale;
+  ctx.beginPath(); ctx.arc(px, py, sz * CUE_RING_RADIUS_RATIO, 0, TAU);
+  ctx.strokeStyle = rgba(p.col, CUE_ALPHA);
+  ctx.lineWidth = Math.max(CUE_RING_WIDTH_MIN, sz * CUE_RING_WIDTH_RATIO);
+  ctx.stroke();
+  if (shape !== 'ring-dot') return;
+  ctx.beginPath(); ctx.arc(px, py, sz * CUE_CORE_RADIUS_RATIO, 0, TAU);
+  ctx.fillStyle = rgba(p.col, 1); ctx.fill();
+}
+
 /** Draw a star's own violation/alert particles (both folders and files). */
 function drawFileParticles(ctx, s, sc, cam, t) {
   if (s.particles.length === 0) return;
   const pScale = cam.z * 0.5;
   drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
+  s.particles.forEach((p) => drawSeverityCue(ctx, p, sc, pScale, t));
 }
 
 /** Labeled violation orbs around a file star, shown only at high zoom.

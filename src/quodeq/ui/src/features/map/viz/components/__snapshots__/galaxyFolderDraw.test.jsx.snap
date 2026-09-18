@@ -23,5 +23,14 @@ exports[`galaxyFolderDraw drawStars (pre-refactor baseline) > records the ctx-ca
   "setLineDash",
   "stroke",
   "setLineDash",
+  "beginPath",
+  "arc",
+  "stroke",
+  "beginPath",
+  "arc",
+  "fill",
+  "beginPath",
+  "arc",
+  "stroke",
 ]
 `;

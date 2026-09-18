@@ -1,3 +1,5 @@
+import { activateOnKey } from '../../../../utils/a11y.js';
+
 // File icon drawn at origin (centered on 0,0) with unit size ~1x1, scaled via transform.
 // Use: <FileShape cx={x} cy={y} r={size} color={...} />
 // The <g> wrapper handles positioning.
@@ -19,7 +21,14 @@ const FOLD_OPACITY = 0.5;
 const LINE_OPACITY_PRIMARY = 0.4;
 const LINE_OPACITY_SECONDARY = 0.3;
 
-export default function FileShape({ cx, cy, r, color, borderColor, glow, handlers, transition = false, parentScale = 1 }) {
+/** Button props for a clickable file body (none at all when it is static):
+ * focusable, named, and activated by Enter or Space like its click. */
+function buttonProps(handlers, ariaLabel) {
+  if (!handlers?.onClick) return null;
+  return { tabIndex: 0, role: 'button', 'aria-label': ariaLabel, onKeyDown: activateOnKey(handlers.onClick) };
+}
+
+export default function FileShape({ cx, cy, r, color, borderColor, glow, handlers, ariaLabel, transition = false, parentScale = 1 }) {
   const scale = r / (BASE / 2);
   // Compensate for both own scale and parent group scale to keep strokes at ~1px
   const totalScale = scale * parentScale;
@@ -34,9 +43,7 @@ export default function FileShape({ cx, cy, r, color, borderColor, glow, handler
         fill={color} fillOpacity={FILE_FILL_OPACITY} stroke={stroke} strokeWidth={0.8 / totalScale}
         filter={glow ? 'url(#glow)' : undefined}
         style={{ cursor: handlers?.onClick ? 'pointer' : 'default', transition: 'fill-opacity 0.2s ease' }}
-        tabIndex={handlers?.onClick ? 0 : undefined}
-        role={handlers?.onClick ? 'button' : undefined}
-        onKeyDown={handlers?.onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlers.onClick(e); } } : undefined}
+        {...buttonProps(handlers, ariaLabel)}
         {...handlers}
       />
       <path d={FOLD_PATH}

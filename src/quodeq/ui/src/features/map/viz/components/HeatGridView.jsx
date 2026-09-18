@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../../components/HeatGridCells.jsx';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
+import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
 
 const COL_NAME = 'name';
@@ -67,7 +68,7 @@ function HeatGridHeaderRow({ sortCol, sortDir, onSort }) {
           key={col.id}
           className={`heat-grid-th-sort viz-focusable${col.align === 'left' ? ' left' : ''}`}
           onClick={() => onSort(col.id)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(col.id); } }}
+          onKeyDown={activateOnKey(() => onSort(col.id))}
           tabIndex={0}
           aria-sort={sortCol === col.id ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
         >
@@ -88,7 +89,7 @@ function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
           role={canDrill || row.isFile ? 'button' : undefined}
           tabIndex={canDrill || row.isFile ? 0 : undefined}
           onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}
-          onKeyDown={(e) => e.key === 'Enter' && (canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
+          onKeyDown={activateOnKey(() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
           title={row.path}
         >
           {row.isFile ? null : <span className="heat-grid-folder-icon" aria-hidden="true">{ICON_FOLDER}</span>}

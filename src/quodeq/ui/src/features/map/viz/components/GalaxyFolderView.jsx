@@ -7,7 +7,26 @@ import { createEventHandlers } from './galaxyFolderEvents.js';
 import { useGalaxyFolderNav } from './useGalaxyFolderNav.js';
 import { useGalaxyFolderCamera } from './useGalaxyFolderCamera.js';
 import { LevelInfoPanel } from './galaxyViewInfo.jsx';
+import ChartKeyboardControls from '../../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../../strings/index.js';
+
+// One control per file star. The canvas hit-tests every star, but a folder
+// with hundreds of files would bury the rest of the page's tab order.
+const GALAXY_KBD_MAX = 100;
+
+/** Keyboard-reachable stand-ins for the file stars the canvas hit-tests. */
+function fileStarItems(scene, activateStar) {
+  const items = [];
+  (scene?.rootStars || []).forEach((s, i) => {
+    if (s.isFolder || items.length >= GALAXY_KBD_MAX) return;
+    items.push({
+      key: s.path || s.name || String(i),
+      text: t('map.riskBubbleAria', { file: s.name, count: s.violations || 0 }),
+      onActivate: () => activateStar(i),
+    });
+  });
+  return items;
+}
 
 /** Breadcrumb parts for the current nav path — project name first, then
  * one entry per folder drilled into. */
@@ -88,6 +107,7 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
         onClick={handlers.handleClick}
         onKeyDown={handlers.handleKeyDown}
       />
+      <ChartKeyboardControls label={t('map.galaxyKbdLabel')} items={fileStarItems(scene, handlers.activateStar)} />
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
         label: bc.label,
         onClick: i < breadcrumb.length - 1 ? () => handlers.goToPathIndex(bc.idx) : undefined,

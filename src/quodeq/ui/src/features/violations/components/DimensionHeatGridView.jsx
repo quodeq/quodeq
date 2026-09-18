@@ -1,9 +1,23 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../components/HeatGridCells.jsx';
 import { buildRows } from './dimensionHeatGridModel.js';
+import { activateOnKey } from '../../../utils/a11y.js';
 import { t } from '../../../strings/index.js';
 
 const PRINCIPLE_INDENT_PX = 24;
+
+// The header text is a real <button> so sorting is reachable from the
+// keyboard (a <th> is not focusable). The reset is inline so the cell keeps
+// looking like plain header text without a new rule in the shared sheet.
+const SORT_BUTTON_STYLE = {
+  font: 'inherit', color: 'inherit', letterSpacing: 'inherit',
+  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+};
+
+function ariaSort(isActive, sortDir) {
+  if (!isActive) return 'none';
+  return sortDir === 'asc' ? 'ascending' : 'descending';
+}
 
 const COLUMNS = [
   { id: 'name', label: t('violations.colDimensionPrinciple'), align: 'left' },
@@ -19,8 +33,19 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
     <thead>
       <tr>
         {COLUMNS.map((col) => (
-          <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
-            {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+          <th
+            key={col.id}
+            className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
+            aria-sort={ariaSort(sortCol === col.id, sortDir)}
+          >
+            <button
+              type="button"
+              style={SORT_BUTTON_STYLE}
+              aria-label={t('violations.sortByAria', { column: col.label })}
+              onClick={() => handleSort(col.id)}
+            >
+              {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+            </button>
           </th>
         ))}
       </tr>
@@ -38,7 +63,7 @@ function HeatGridRow({ row, i, onDimensionClick, onPrincipleClick, onCellClick }
           role="button"
           tabIndex={0}
           onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
-          onKeyDown={(e) => e.key === 'Enter' && (isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
+          onKeyDown={activateOnKey(() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
           style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
         >
           {row.name}
