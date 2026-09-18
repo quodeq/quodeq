@@ -11,13 +11,18 @@ import { focusables, trapTab, restoreFocus } from '../../../utils/a11y.js';
 export default function ThresholdImpactDialog({ changedDimensions, onCancel, onSave, onSaveAndRescan }) {
   const many = changedDimensions.length > 1;
   const rootRef = useRef(null);
+  // The caller (StandardEditor) passes a fresh inline onCancel on every
+  // render, so this ref (not [onCancel]) is what the effect depends on: the
+  // mount/unmount effect below must run once per open, not once per render.
+  const cancelRef = useRef(onCancel);
+  cancelRef.current = onCancel;
 
   useEffect(() => {
     const opener = document.activeElement;
     const first = focusables(rootRef.current)[0];
     if (first) first.focus();
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') { onCancel(); return; }
+      if (e.key === 'Escape') { cancelRef.current(); return; }
       trapTab(rootRef.current, e);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -25,7 +30,7 @@ export default function ThresholdImpactDialog({ changedDimensions, onCancel, onS
       document.removeEventListener('keydown', onKeyDown);
       restoreFocus(opener);
     };
-  }, [onCancel]);
+  }, []);
 
   return (
     <div className="modal-overlay" onClick={onCancel}>

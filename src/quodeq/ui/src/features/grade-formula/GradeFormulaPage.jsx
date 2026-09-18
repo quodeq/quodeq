@@ -14,15 +14,26 @@ const TABS = [
   { id: 'dimensions', label: 'DIMENSIONS', Body: DimensionsTab },
 ];
 
+// A single panel is rendered at a time (swapped by active tab), so every tab
+// button controls the same panel id; the panel in turn is labelled by
+// whichever tab button is currently active.
+const TAB_PANEL_ID = 'gf-tabpanel';
+
+function tabButtonId(tabId) {
+  return `gf-tab-${tabId}`;
+}
+
 function TabButtons({ tab, setTab }) {
   return (
     <div className="gf-tabs" role="tablist" aria-label={t('gradeFormula.tabsAria')}>
       {TABS.map((tabDef) => (
         <button
           key={tabDef.id}
+          id={tabButtonId(tabDef.id)}
           type="button"
           role="tab"
           aria-selected={tab === tabDef.id}
+          aria-controls={TAB_PANEL_ID}
           className={`gf-tab${tab === tabDef.id ? ' gf-tab--active' : ''}`}
           onClick={() => setTab(tabDef.id)}
         >
@@ -43,11 +54,13 @@ function TabButtons({ tab, setTab }) {
 // div-based sliders. GradeBoundaryBar.startDrag guards against
 // fieldset[disabled] in JS, and base.css adds pointer-events:none
 // on .gf-tab-body:disabled .gf-boundary-divider as a CSS companion.
-function TabBody({ busy, ActiveBody, draft, update }) {
+function TabBody({ busy, ActiveBody, draft, update, activeTabId }) {
   return (
     <fieldset
+      id={TAB_PANEL_ID}
       className="gf-tab-body"
       role="tabpanel"
+      aria-labelledby={tabButtonId(activeTabId)}
       disabled={busy}
       style={{ margin: 0, minInlineSize: 'auto' }}
     >
@@ -121,7 +134,7 @@ export default function GradeFormulaPage({ navigation }) {
         sub={projectId ? t('gradeFormula.previewOf', { project: projectId }) : t('gradeFormula.noPreviewProject')}
       />
       <TabButtons tab={tab} setTab={setTab} />
-      <TabBody busy={busy} ActiveBody={ActiveBody} draft={draft} update={update} />
+      <TabBody busy={busy} ActiveBody={ActiveBody} draft={draft} update={update} activeTabId={tab} />
       <PreviewStrip
         preview={preview}
         emptyHint={projectId

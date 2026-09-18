@@ -67,4 +67,24 @@ describe('GradeFormulaPage tab widget a11y', () => {
     render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
     expect(screen.getByRole('tabpanel')).toBeInTheDocument();
   });
+
+  // #6033 fix round 1 - complete the tab pattern: each tab points at the
+  // panel it controls, and the panel is labelled by whichever tab is active.
+  it('wires aria-controls from the active tab to the panel, and aria-labelledby back', () => {
+    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    const tab = screen.getByRole('tab', { selected: true });
+    const panel = screen.getByRole('tabpanel');
+    expect(tab).toHaveAttribute('aria-controls', panel.id);
+    expect(panel).toHaveAttribute('aria-labelledby', tab.id);
+  });
+
+  it('updates aria-controls/aria-labelledby when the active tab changes', () => {
+    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'DIMENSIONS' }));
+    const tab = screen.getByRole('tab', { selected: true });
+    const panel = screen.getByRole('tabpanel');
+    expect(tab).toHaveTextContent('DIMENSIONS');
+    expect(tab).toHaveAttribute('aria-controls', panel.id);
+    expect(panel).toHaveAttribute('aria-labelledby', tab.id);
+  });
 });

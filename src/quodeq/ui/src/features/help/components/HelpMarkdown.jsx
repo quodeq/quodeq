@@ -27,7 +27,14 @@ import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 
-const FIGURES = { GradeFormulaCurveFigure, ScoreGroupingFigure };
+// `informative: true` means the figure's own svg already carries an
+// accessible name (role="img"/aria-label) that must reach the accessibility
+// tree, so HelpFigure must not wrap it in aria-hidden. Figures default to
+// decorative (informative: false / omitted), described only by the caption.
+const FIGURES = {
+  GradeFormulaCurveFigure: { Component: GradeFormulaCurveFigure, informative: true },
+  ScoreGroupingFigure: { Component: ScoreGroupingFigure },
+};
 const IMAGES = { gradeFormulaDark, gradeFormulaLight };
 
 // Registry lookups must consider OWN keys only. A plain object inherits from
@@ -72,9 +79,10 @@ function parseFigure(body) {
 function Figure({ body }) {
   const { component, caption, alt, srcDark, srcLight } = parseFigure(body);
   if (component && component !== 'image') {
-    const Inner = pick(FIGURES, component);
-    if (!Inner) return null;
-    return <HelpFigure caption={caption}><Inner /></HelpFigure>;
+    const entry = pick(FIGURES, component);
+    if (!entry) return null;
+    const { Component: Inner, informative } = entry;
+    return <HelpFigure caption={caption} informative={informative}><Inner /></HelpFigure>;
   }
   return <HelpFigure caption={caption} alt={alt} srcDark={srcDark} srcLight={srcLight} />;
 }
