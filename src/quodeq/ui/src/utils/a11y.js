@@ -20,6 +20,7 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+/** True for the keys that activate a control from the keyboard: Enter and Space. */
 export function isActivationKey(e) {
   return ACTIVATION_KEYS.has(e.key);
 }
@@ -33,6 +34,7 @@ export function activateOnKey(handler) {
   };
 }
 
+/** The tabbable descendants of `root`, in document order (see the selector's limits above). */
 export function focusables(root) {
   return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR));
 }
