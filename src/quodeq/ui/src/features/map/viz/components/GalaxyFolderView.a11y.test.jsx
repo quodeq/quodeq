@@ -72,7 +72,7 @@ function renderView(props = {}) {
 describe('GalaxyFolderView keyboard star layer (6424)', () => {
   it('renders one focusable control per star, under a named group', () => {
     renderView();
-    const group = screen.getByLabelText('Files in this folder');
+    const group = screen.getByLabelText('Contents of this folder');
     expect(group).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'a.js: 2 violations' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'b.js: 1 violations' })).toBeInTheDocument();

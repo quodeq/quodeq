@@ -1477,6 +1477,6 @@
   "map.stateClean": "no violations",
   "map.stateCompliance": "{pct}% compliant",
   "map.riskBubbleAria": "{file}: {count} violations",
-  "map.galaxyKbdLabel": "Files in this folder",
+  "map.galaxyKbdLabel": "Contents of this folder",
   "violations.sortByAria": "Sort by {column}"
 }
