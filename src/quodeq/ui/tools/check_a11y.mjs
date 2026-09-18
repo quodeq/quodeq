@@ -10,7 +10,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 68; // set to the total printed by --update after the sweep
+const TOTAL_CEILING = 64; // set to the total printed by --update after the sweep
 
 main({
   script: 'check_a11y.mjs',

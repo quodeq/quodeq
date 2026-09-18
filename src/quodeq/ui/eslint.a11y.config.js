@@ -23,6 +23,13 @@ export default [
     rules: {
       ...jsxA11y.flatConfigs.recommended.rules,
       'jsx-a11y/no-autofocus': 'off',
+      // A focusable separator is the WAI-ARIA window-splitter pattern (the
+      // side-pane, drawer and standards-tree dividers resize with the arrow
+      // keys); the plugin classifies the role as non-interactive regardless.
+      'jsx-a11y/no-noninteractive-tabindex': [
+        'error',
+        { tags: [], roles: ['tabpanel', 'separator'], allowExpressionValues: true },
+      ],
     },
   },
 ];

@@ -1,5 +1,8 @@
 import { focusables, trapTab, restoreFocus } from './a11y.js';
 
+// Distinct title/message ids per dialog for aria-labelledby / aria-describedby.
+let dialogSeq = 0;
+
 /**
  * Shared DOM shell for confirmDialog.js and chooseDialog.js: the overlay +
  * dialog + title + message + actions row, the click-outside-to-cancel and
@@ -11,8 +14,6 @@ import { focusables, trapTab, restoreFocus } from './a11y.js';
  * described by its message, mount() moves focus to the first action and
  * keeps Tab inside the overlay, unmount() hands focus back to the opener.
  */
-let dialogSeq = 0;
-
 export function buildDialogShell({ title, message, dialogClassName, onCancel, onConfirm }) {
   dialogSeq += 1;
   const overlay = document.createElement('div');
