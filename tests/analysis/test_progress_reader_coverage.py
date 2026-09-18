@@ -46,9 +46,44 @@ class TestIncrementalProgressReader:
         )
         reader = self._make_reader(tmp_path, jsonl_content=jsonl)
         progress = reader.read_progress()
-        assert progress["evidence"] == 3
+        # Evidence counts findings, not lines: the unknown type is neither a
+        # violation nor a compliance, so it is not one of the findings the
+        # heartbeat reports.
+        assert progress["evidence"] == 2
         assert progress["violations"] == 1
         assert progress["compliances"] == 1
+
+    def test_file_done_markers_are_not_findings(self, tmp_path):
+        # The real evidence log interleaves findings with one bookkeeping
+        # marker per analysed file. Counting those made the heartbeat's
+        # findings number grow with the scan (90 "findings" for 36 real ones
+        # on a live security run) and disagree with its own breakdown.
+        jsonl = (
+            json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n"
+            + json.dumps({"t": "violation", "p": "Authenticity"}) + "\n"
+            + json.dumps({"_marker": "file_done", "file": "b.py", "status": "ok"}) + "\n"
+        )
+        reader = self._make_reader(tmp_path, jsonl_content=jsonl)
+        progress = reader.read_progress()
+        assert progress["evidence"] == 1
+        assert progress["violations"] == 1
+        assert progress["compliances"] == 0
+
+    def test_evidence_equals_violations_plus_compliances(self, tmp_path):
+        jsonl = "".join(
+            json.dumps(obj) + "\n"
+            for obj in (
+                {"t": "violation"},
+                {"_marker": "file_done", "file": "a.py", "status": "ok"},
+                {"t": "compliance"},
+                {"t": "violation"},
+                {"_marker": "file_done", "file": "b.py", "status": "ok"},
+            )
+        )
+        reader = self._make_reader(tmp_path, jsonl_content=jsonl)
+        progress = reader.read_progress()
+        assert progress["evidence"] == progress["violations"] + progress["compliances"]
+        assert progress["evidence"] == 3
 
     def test_incremental_reads(self, tmp_path):
         stream_file = tmp_path / "stream.jsonl"
@@ -75,7 +110,9 @@ class TestIncrementalProgressReader:
         jsonl = "not json\n" + json.dumps({"t": "violation"}) + "\n"
         reader = self._make_reader(tmp_path, jsonl_content=jsonl)
         progress = reader.read_progress()
-        assert progress["evidence"] == 2  # both lines counted
+        # An unparseable line has no type, so it is not a finding either. It
+        # is skipped rather than reported as one the user could go look at.
+        assert progress["evidence"] == 1
         assert progress["violations"] == 1
 
     def test_no_jsonl_file(self, tmp_path):
