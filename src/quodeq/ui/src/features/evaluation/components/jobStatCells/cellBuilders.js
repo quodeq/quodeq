@@ -48,22 +48,6 @@ function foundCell(liveCount, label = 'FOUND', hint = t('evaluate.liveViolations
   };
 }
 
-// A dimension's findings become readable only when its report is written, at
-// dimension completion. Until then the feed's source is empty even though the
-// agents have already written findings to the evidence log, so a plain `0`
-// asserts the scan has found nothing at the exact moment we cannot know that.
-// On a single-dimension run that assertion would stand for the entire scan.
-// Show what the run has counted, marked as not yet listed, and leave the
-// severity breakdown out: it is derived from the feed, which has nothing.
-function pendingCell(pendingCount, suppressedCount, carriedCount) {
-  return {
-    label: 'violations',
-    value: pendingCount,
-    hint: `${t('evaluate.pendingReport')}${suppressedSuffix(suppressedCount)}${carriedSuffix(carriedCount)}`,
-    tone: 'default',
-  };
-}
-
 function statusHint(s) {
   if (s === 'running') return t('evaluate.scanInProgress');
   if (s === 'done' || s === 'completed') return null;
@@ -114,9 +98,7 @@ function buildRunningCells(inputs) {
       hint: runKnown ? `${inputs.overallPct}%${modeHint}` : 'preparing…',
       tone: 'default',
     },
-    inputs.liveCount === 0 && inputs.pendingCount > 0
-      ? pendingCell(inputs.pendingCount, inputs.suppressedCount, inputs.carriedCount)
-      : foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount, inputs.carriedCount),
+    foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount, inputs.carriedCount),
     elapsedCell(inputs.elapsedS, 'elapsed', inputs.etaHint ?? null),
   ];
 }
@@ -129,7 +111,6 @@ function buildRunningCells(inputs) {
  * @param {number} inputs.totalFiles
  * @param {number|null|undefined} inputs.elapsedS
  * @param {number} inputs.liveCount
- * @param {number} [inputs.pendingCount] — violations counted live, before any dimension report exists (running only)
  * @param {number} [inputs.suppressedCount] — re-found findings already dismissed/deleted
  * @param {number} [inputs.carriedCount] — carried-forward findings the live-feed preference hid
  * @param {string|null} [inputs.exitReason] — job.exitReason; time-limit reasons soften the status cell

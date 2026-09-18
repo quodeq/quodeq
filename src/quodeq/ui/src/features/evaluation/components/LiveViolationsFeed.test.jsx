@@ -93,47 +93,4 @@ describe('LiveViolationsFeed', () => {
     expect(screen.getByText(/12 carried forward hidden/)).toBeInTheDocument();
     expect(container.querySelector('.vlive-card')).toBeNull();
   });
-
-  it('says findings are pending while a dimension has not published its report', async () => {
-    // The only source this feed reads is the per-dimension report, written at
-    // dimension completion. A single-dimension run therefore has nothing to
-    // list for its whole duration, so "no new findings" would be a wrong
-    // answer held for hours rather than a momentary one.
-    getEvaluationProgress.mockResolvedValue({
-      currentDimension: 'security',
-      dimensions: [
-        { id: 'security', state: 'running', violations: 17, files: { taken: 30, total: 2923 } },
-      ],
-    });
-    renderFeed({ liveViolations: {}, job: { jobId: 'j3', status: 'running' } });
-    expect(await screen.findByText(/17 so far, listed when the dimension finishes/)).toBeInTheDocument();
-    expect(screen.queryByText(/no new findings/)).toBeNull();
-  });
-
-  it('renders nothing while a running scan has genuinely found nothing', async () => {
-    getEvaluationProgress.mockResolvedValue({
-      currentDimension: 'security',
-      dimensions: [
-        { id: 'security', state: 'running', violations: 0, files: { taken: 30, total: 2923 } },
-      ],
-    });
-    const { container } = renderFeed({ liveViolations: {}, job: { jobId: 'j4', status: 'running' } });
-    await vi.waitFor(() => expect(getEvaluationProgress).toHaveBeenCalled());
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('lists findings normally once a report exists, ignoring the live count', async () => {
-    getEvaluationProgress.mockResolvedValue({
-      currentDimension: 'security',
-      dimensions: [
-        { id: 'reliability', state: 'done', violations: 2 },
-        { id: 'security', state: 'running', violations: 17 },
-      ],
-    });
-    renderFeed({ liveViolations: violations, job: { jobId: 'j5', status: 'running' } });
-    // Regex, not an exact string: a running job appends "· streaming" into
-    // the same counter element.
-    expect(await screen.findByText(/2 across 1 dimension/)).toBeInTheDocument();
-    expect(screen.queryByText(/listed when the dimension finishes/)).toBeNull();
-  });
 });
