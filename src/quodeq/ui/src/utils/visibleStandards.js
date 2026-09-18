@@ -28,7 +28,8 @@ export function readVisibleStandardIds(storage = localStorage) {
     if (!raw) return DEFAULT_VISIBLE_STANDARDS;
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : DEFAULT_VISIBLE_STANDARDS;
-  } catch {
+  } catch (err) {
+    console.warn('[visibleStandards] could not read visible standard ids:', err);
     return DEFAULT_VISIBLE_STANDARDS;
   }
 }

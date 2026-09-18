@@ -29,7 +29,9 @@ export function useStandardDescriptions(dimension) {
           principleDescriptions,
         });
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('[useStandardDescriptions] getStandard failed:', err);
+      });
     return () => { cancelled = true; };
   }, [dimension, getStandard]);
 

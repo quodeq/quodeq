@@ -35,8 +35,9 @@ async function probeAltPort(port, baseUrl) {
     const res = await fetch(`${baseUrl}:${port}${HEALTH_ENDPOINT}`, { signal: ac.signal });
     clearTimeout(tid);
     return res.ok ? port : null;
-  } catch {
+  } catch (err) {
     clearTimeout(tid);
+    console.warn('[useServerHealth] alt-port probe failed:', err);
     return null;
   }
 }
@@ -85,7 +86,8 @@ export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
         setConnected(true);
         if (data?.version) setVersion(data.version);
         return true;
-      } catch {
+      } catch (err) {
+        console.warn('[useServerHealth] health check failed:', err);
         const currentPort = typeof window !== 'undefined' ? window.location.port : '';
         const candidates = altPorts || altPortCandidates(currentPort);
         const foundPort = await tryFindPort(

@@ -41,7 +41,9 @@ export function useGradeFormulaBootSyncEffect() {
   useEffect(() => {
     getGradeFormula()
       .then((d) => setGradeThresholds(d?.current?.gradeThresholds))
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('[useAppEffects] grade formula boot fetch failed:', err);
+      });
   }, []);
 }
 

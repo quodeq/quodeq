@@ -74,7 +74,8 @@ function formatLastEval(iso) {
       minute: '2-digit',
       hour12: false,
     });
-  } catch {
+  } catch (err) {
+    console.warn('[Sidebar] date format failed:', err);
     return null;
   }
 }

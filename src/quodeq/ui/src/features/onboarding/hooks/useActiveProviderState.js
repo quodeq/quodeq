@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getProviderConfigs } from '../../../api/index.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { readString } from '../../../adapters/storage.js';
 
 // Poll interval for mirroring localStorage: ProviderTabs and its children
 // write directly and the `storage` event only fires cross-tab. Short enough
@@ -16,16 +17,17 @@ const ACTIVE_PROVIDER_POLL_MS = 400;
  */
 export function readActiveProviderState() {
   try {
-    const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;
+    const id = readString(ACTIVE_PROVIDER_KEY, null);
     if (!id) return { id: null, model: null, timeLimitS: null };
-    const model = localStorage.getItem(providerKey(id, 'model')) || null;
+    const model = readString(providerKey(id, 'model'), null);
     // ProviderTabs persists time-limit per provider as a stringified number of
     // seconds. Treat 0 as unlimited; missing key falls back to null so the
     // wizard's existing default applies.
-    const tlRaw = localStorage.getItem(providerKey(id, 'time-limit'));
+    const tlRaw = readString(providerKey(id, 'time-limit'), null);
     const timeLimitS = tlRaw === null ? null : Number.parseInt(tlRaw, 10);
     return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
-  } catch {
+  } catch (err) {
+    console.warn('[useActiveProviderState] could not read active provider state:', err);
     return { id: null, model: null, timeLimitS: null };
   }
 }

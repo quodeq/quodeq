@@ -156,6 +156,9 @@ function useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, 
       // Array (possibly empty -> onboarding) on success; null when the load
       // failed after retries -> do NOT force onboarding on a transient error.
       if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
+    }).catch((err) => {
+      // loadProjects already retries and never rejects; defense in depth.
+      console.warn('[useProjectState] initial project load failed unexpectedly:', err);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }

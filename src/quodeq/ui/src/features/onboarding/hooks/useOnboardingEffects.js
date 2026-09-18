@@ -40,6 +40,8 @@ export function useOnboardingEffects({ wizard, entry, setStandards }) {
         if (!scan) return;
         wizard.succeedScan(entry.presetProjectId, scan);
       })
-      .catch(() => { /* tolerate scan fetch failure */ });
+      .catch((err) => {
+        console.warn('[useOnboardingEffects] resume-scan fetch failed:', err); // tolerate: onboarding still proceeds without the summary
+      });
   }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
 }

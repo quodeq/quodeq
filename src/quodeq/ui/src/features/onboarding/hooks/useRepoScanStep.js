@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getProjectScan as apiGetProjectScan } from '../../../api/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { writeString } from '../../../adapters/storage.js';
 
 const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
 const CLONE_DEST_STORAGE_KEY = 'quodeq.lastCloneRoot';
@@ -35,7 +36,8 @@ function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
       });
       actions.succeedScan(existingProjectId, scanData);
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('[useRepoScanStep] resume existing project failed:', err);
       return false;
     }
   };
@@ -92,7 +94,8 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
       const payload = { repo, cloneDest, ephemeral };
       const { projectId, scanData } = await createProject(payload);
       if (cloneDest && !ephemeral) {
-        try { localStorage.setItem(CLONE_DEST_STORAGE_KEY, cloneDest); } catch (_) { /* private mode */ }
+        const ok = writeString(CLONE_DEST_STORAGE_KEY, cloneDest);
+        if (!ok) console.warn('[useRepoScanStep] could not persist clone destination'); // private mode
       }
       actions.succeedScan(projectId, scanData);
       setSubStep('input');

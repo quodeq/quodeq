@@ -27,7 +27,8 @@ export function useOllamaServerStatus() {
           return { status: 'online', address: result.address ?? null };
         }
         return { status: 'offline', address: null };
-      } catch {
+      } catch (err) {
+        console.warn('[useOllamaServerStatus] status poll failed:', err);
         return { status: 'offline', address: null };
       }
     },

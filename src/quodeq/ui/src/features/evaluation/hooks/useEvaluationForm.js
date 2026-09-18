@@ -23,10 +23,9 @@ function buildAndSubmit(onStart, formState) {
   setBranch(null);
   setScopePath(null);
   if (cleanScan === CLEAN_PERSIST.ONCE) {
-    Promise.resolve(result).then(
-      () => setCleanScan(CLEAN_PERSIST.OFF),
-      () => {},
-    );
+    Promise.resolve(result)
+      .then(() => setCleanScan(CLEAN_PERSIST.OFF))
+      .catch((err) => console.warn('[useEvaluationForm] start evaluation failed:', err));
   }
 }
 

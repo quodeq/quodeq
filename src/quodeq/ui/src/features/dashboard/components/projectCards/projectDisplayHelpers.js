@@ -32,7 +32,8 @@ export function formatDate(iso) {
   if (!iso) return null;
   try {
     return new Date(iso).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
-  } catch {
+  } catch (err) {
+    console.warn('[projectDisplayHelpers] date format failed:', err);
     return null;
   }
 }

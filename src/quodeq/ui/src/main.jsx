@@ -71,8 +71,8 @@ applyInitialTheme();
 // these classes remain for platform/shell-conditional styling.
 try {
   if (isMacPlatform()) document.documentElement.classList.add('platform-mac');
-} catch {
-  // ignore — platform detection is a progressive enhancement
+} catch (err) {
+  console.warn('[main] platform detection failed:', err); // progressive enhancement only
 }
 
 // pywebview injects `window.pywebview` before PYWEBVIEW_READY_EVENT fires.

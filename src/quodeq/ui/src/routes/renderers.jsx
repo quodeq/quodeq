@@ -294,5 +294,6 @@ export function MainContent({ activePage, props }) {
   }
   const renderer = ROUTE_RENDERERS[page];
   if (renderer) return renderer(params, props);
-  return null;
+  console.warn('[renderers] unrecognized route:', page);
+  return <EmptyState title={t('overview.routeNotFoundTitle')} description={t('overview.routeNotFoundDesc')} />;
 }

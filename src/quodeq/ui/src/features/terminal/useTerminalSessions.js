@@ -80,8 +80,9 @@ function makeOpenSession({ createTerminalSession, reconcile, setActiveId }) {
       const created = await createTerminalSession();
       await reconcile();
       if (created?.id) setActiveId(created.id);
-    } catch {
+    } catch (err) {
       // 409 at the cap (or a race): the server is the source of truth.
+      console.warn('[useTerminalSessions] create session failed:', err);
       await reconcile();
     }
   };

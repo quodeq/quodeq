@@ -99,7 +99,10 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
         apiKey: '',
       });
       setTestResult(result);
-    } catch { setTestResult({ success: false, error: t('settings.connectionFailed') }); }
+    } catch (err) {
+      console.warn('[CloudProviderTab] connection test failed:', err);
+      setTestResult({ success: false, error: t('settings.connectionFailed') });
+    }
     setTesting(false);
   };
 

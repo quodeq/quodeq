@@ -141,6 +141,10 @@ export default function useProviderSettings(providerId, defaults, { storage = lo
         // OmlxTab), and the sentinel is not one. Storage still records it,
         // which is what survives a reload.
         if (ok) setState(prev => ({ ...prev, [key]: '' }));
+      }).catch((err) => {
+        // saveProviderApiKey already catches internally and never rejects;
+        // this is defense in depth in case that contract ever changes.
+        console.warn('[useProviderSettings] unexpected error saving api key:', err);
       });
     } else {
       saveProviderSetting(providerId, key, value, storage, { onPersistError });

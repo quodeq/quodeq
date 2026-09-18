@@ -64,7 +64,9 @@ function useRefitOnOpen({ status, resize, rootRef, fitRef, termRef }) {
     try {
       fitRef.current.fit();
       resize(termRef.current.cols, termRef.current.rows);
-    } catch { /* noop */ }
+    } catch (err) {
+      console.warn('[TerminalSessionView] refit on open failed:', err);
+    }
   }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -80,7 +82,11 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
     // tab or backgrounded panel), fitting measures a 0x0 box (bogus PTY
     // size); the status-open and activation effects both fit once shown.
     if (!isHidden(rootRef.current)) {
-      try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
+      try {
+        fit.fit(); resize(term.cols, term.rows);
+      } catch (err) {
+        console.warn('[TerminalSessionView] initial fit failed:', err);
+      }
     }
     // Fit ONCE after the size settles (FIT_DEBOUNCE_MS). ResizeObserver isn't
     // in JSDOM; guard so tests and any lacking environment don't crash.
@@ -92,7 +98,11 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
         // isHidden — a 0x0 fit drives the PTY to a bogus size and the shell
         // floods the prompt with cursor-position replies (the "14;3R…" garbage).
         if (isHidden(rootRef.current)) return;
-        try { fit.fit(); resize(term.cols, term.rows); } catch { /* noop */ }
+        try {
+          fit.fit(); resize(term.cols, term.rows);
+        } catch (err) {
+          console.warn('[TerminalSessionView] debounced fit failed:', err);
+        }
       }, FIT_DEBOUNCE_MS);
     };
     box.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleFit) : null;
@@ -108,7 +118,13 @@ function makeSessionTeardown({ termRef, fitRef, box }) {
     box.disposed = true;
     if (box.fitTimer) clearTimeout(box.fitTimer);
     box.ro?.disconnect(); box.mo?.disconnect();
-    box.linkProviders.forEach((d) => { try { d.dispose(); } catch { /* noop */ } });
+    box.linkProviders.forEach((d) => {
+      try {
+        d.dispose();
+      } catch (err) {
+        console.warn('[TerminalSessionView] link provider dispose failed:', err);
+      }
+    });
     if (termRef.current) { termRef.current.dispose(); }
     termRef.current = null; fitRef.current = null;
   };
@@ -136,7 +152,11 @@ function useRefitOnActivate({ active, resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
     if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
-    try { fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows); } catch { /* noop */ }
+    try {
+      fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows);
+    } catch (err) {
+      console.warn('[TerminalSessionView] refit on activate failed:', err);
+    }
   }, [active, resize]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -148,7 +168,11 @@ function useRefitOnActivate({ active, resize, rootRef, fitRef, termRef }) {
 function useFocusOnActivate(active, live, termRef) {
   useEffect(() => {
     if (!active || !live || !termRef.current) return;
-    try { termRef.current.focus(); } catch { /* noop */ }
+    try {
+      termRef.current.focus();
+    } catch (err) {
+      console.warn('[TerminalSessionView] focus on activate failed:', err);
+    }
   }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -191,7 +215,7 @@ function computeOverlay(status) {
 // scrollback, so a reconnect to a still-alive backend repaints history
 // instead of appending a duplicate copy under it. Also re-enable input
 // (it's disabled while disconnected — see the status effect below).
-function makeSocketOnOpen(termRef) {
+export function makeSocketOnOpen(termRef) {
   return () => {
     const term = termRef.current;
     if (!term) return;
@@ -201,7 +225,9 @@ function makeSocketOnOpen(termRef) {
       // room that scrolls away with the scrollback instead of being a fixed
       // viewport inset (which CSS padding on xterm would be).
       term.write('\r\n');
-    } catch { /* noop */ }
+    } catch (err) {
+      console.warn('[TerminalSessionView] reset on reconnect failed:', err);
+    }
     term.options.disableStdin = false;
   };
 }

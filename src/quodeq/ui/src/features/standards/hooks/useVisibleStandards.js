@@ -15,7 +15,9 @@ function makePersist({ storage, projectId, queryClient }) {
         // invalidate AFTER the PUT lands so its refetch reads the new
         // server state instead of racing the write.
         .then(() => queryClient.invalidateQueries({ queryKey: projectKeys.standardsVisibility(projectId) }))
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('[useVisibleStandards] server sync failed:', err);
+        });
     }
   };
 }

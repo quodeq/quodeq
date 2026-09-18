@@ -17,7 +17,7 @@ export default function FileCopyBtn({ display, copyText }) {
         setStatus('copied');
         setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);
       })
-      .then(undefined, (err) => {
+      .catch((err) => {
         console.warn('Clipboard copy failed:', err?.message || err);
         setStatus('failed');
         setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);

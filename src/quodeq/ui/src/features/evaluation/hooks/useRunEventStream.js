@@ -54,8 +54,9 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
         // dim cache for an unbounded time.
         queryClient.invalidateQueries({ queryKey: projectKeys.all() });
       }
-    } catch {
-      // ignore malformed frames; reconnect handles recovery via Last-Event-ID
+    } catch (err) {
+      // malformed frame; reconnect handles recovery via Last-Event-ID
+      console.warn("[useRunEventStream] could not parse status frame:", err);
     }
   });
 
@@ -66,8 +67,8 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
         evaluationKeys.dimensions(jobId),
         (prev = {}) => ({ ...prev, [data.dimension]: data }),
       );
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[useRunEventStream] could not parse dimension-completed frame:", err);
     }
   });
 
@@ -78,8 +79,8 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
         evaluationKeys.findings(jobId),
         (prev = []) => appendBoundedFinding(prev, data),
       );
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[useRunEventStream] could not parse finding frame:", err);
     }
   });
 
@@ -105,7 +106,12 @@ export function useRunEventStream(jobId) {
     if (!jobId) return undefined;
 
     const writeCache = (key, updater) => {
-      queryClient.cancelQueries({ queryKey: key });
+      // Fire-and-forget by design (see file-level comment): the setQueryData
+      // write below must not wait on the cancel. Still log a rejection
+      // instead of letting it vanish as an unhandled promise rejection.
+      queryClient.cancelQueries({ queryKey: key }).catch((err) => {
+        console.warn('[useRunEventStream] cancelQueries failed:', err);
+      });
       queryClient.setQueryData(key, updater);
     };
 

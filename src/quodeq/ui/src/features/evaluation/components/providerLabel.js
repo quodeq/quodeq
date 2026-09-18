@@ -1,4 +1,5 @@
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { readString } from '../../../adapters/storage.js';
 
 /**
  * The active provider/model pair the next run would use, for the identity
@@ -7,8 +8,8 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
  * @returns {{provider:string, model:string}|null} null when no provider is active
  */
 export function readActiveProviderModel(storage = localStorage) {
-  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const provider = readString(ACTIVE_PROVIDER_KEY, '', storage);
   if (!provider) return null;
-  const model = storage.getItem(providerKey(provider, 'model')) || '';
+  const model = readString(providerKey(provider, 'model'), '', storage);
   return { provider, model };
 }

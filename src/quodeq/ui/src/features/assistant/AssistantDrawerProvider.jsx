@@ -54,7 +54,9 @@ function useAssistantCatalog(isOpen) {
     let cancelled = false;
     fetchAssistantCatalog()
       .then((c) => { if (!cancelled) setCatalog(c); })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('[AssistantDrawerProvider] catalog fetch failed:', err);
+      });
     return () => { cancelled = true; };
   }, [isOpen, catalog]);
   return catalog;

@@ -48,7 +48,11 @@ function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef
   return () => {
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     ws.onopen = ws.onmessage = ws.onclose = null;
-    try { ws.close(); } catch { /* noop */ }
+    try {
+      ws.close();
+    } catch (err) {
+      console.warn('[useTerminalSocket] socket close during cleanup failed:', err);
+    }
     if (wsRef.current === ws) wsRef.current = null;
   };
 }

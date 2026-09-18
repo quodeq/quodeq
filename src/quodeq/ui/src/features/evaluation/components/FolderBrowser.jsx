@@ -163,7 +163,12 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
       <input
         type="text" className="new-folder-input" value={name}
         onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
+        onKeyDown={(e) => {
+          // Fire-and-forget: handleCreate already catches its own errors and
+          // sets the inline error state, same as the button's onClick below.
+          if (e.key === 'Enter') void handleCreate();
+          if (e.key === 'Escape') onClose();
+        }}
         placeholder={t('evaluate.folderNamePlaceholder')} autoFocus
       />
       <button className="folder-nav-btn folder-nav-btn--text" onClick={handleCreate} disabled={!name.trim()}>{t('evaluate.create')}</button>
@@ -223,7 +228,10 @@ export default function FolderBrowser({ onSelect, onClose, title = t('evaluate.s
       setPathInput(rootPath);
       return;
     }
-    navigateFolder(path, navigation, showFiles, browseDirectory);
+    // Fire-and-forget: navigateFolder already catches its own errors and
+    // sets navError; callers (click handlers, the mount effect below) are
+    // not async.
+    void navigateFolder(path, navigation, showFiles, browseDirectory);
   }, [rootPath, showFiles, browseDirectory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { navigate(rootPath || ''); }, [rootPath, navigate]);

@@ -34,7 +34,10 @@ export function VerifiedFindingsProvider({ project, source = PROJECT_SOURCE.LOCA
   const refresh = useCallback(() => {
     if (!project) { setEntries([]); return; }
     const fetchVerified = isShared ? sharedListVerifiedFindings : listVerifiedFindings;
-    fetchVerified(project).then(setEntries).catch(() => setEntries([]));
+    fetchVerified(project).then(setEntries).catch((err) => {
+      console.warn('[verifiedFindingsContext] refresh failed:', err);
+      setEntries([]);
+    });
   }, [project, isShared]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -56,6 +59,10 @@ export function VerifiedFindingsProvider({ project, source = PROJECT_SOURCE.LOCA
       // for shared projects — there is no mutation route to click into, so
       // rendering a button would be a dead end.
       readOnly: isShared,
+      // Deliberately left to reject on failure (not caught here): the one
+      // caller, VerifiedChip.jsx, already catches and logs it (with the
+      // documented rationale that a stronger revert-on-failure UX is out of
+      // scope), and swallowing it here too would just duplicate that.
       unverify: async (v) => {
         if (isShared) return;
         await unverifyFinding(project, { req: v.req, file: v.file, line: v.line });

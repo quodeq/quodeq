@@ -62,10 +62,11 @@ function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
   return async () => {
     try {
       await refreshShared();
-    } catch {
+    } catch (err) {
       // Keep whatever projects/lastSynced are already on screen; just flag
       // it stale. The exact API error message isn't shown here -- the
       // stale banner copy is fixed regardless of cause.
+      console.warn('[useSharedProjects] refresh failed:', err);
       setStaleOverride(true);
       return;
     }
@@ -73,7 +74,8 @@ function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
       await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
       const listState = queryClient.getQueryState(sharedKeys.list());
       setStaleOverride(listState?.status === 'error');
-    } catch {
+    } catch (err) {
+      console.warn('[useSharedProjects] post-refresh invalidate failed:', err);
       setStaleOverride(true);
     }
   };

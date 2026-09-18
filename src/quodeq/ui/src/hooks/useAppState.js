@@ -119,7 +119,10 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
   if (entry?.dateISO) {
     try {
       return new Date(entry.dateISO).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return entry.dateISO; }
+    } catch (err) {
+      console.warn('[useAppState] date format failed:', err);
+      return entry.dateISO;
+    }
   }
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }

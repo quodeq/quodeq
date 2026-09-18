@@ -97,4 +97,20 @@ describe('usePublishPolling', () => {
 
     expect(callOrder).toEqual(['optimistic', 'refresh']);
   });
+
+  it('logs a transient status-poll failure instead of swallowing it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const getSharedStatus = vi.fn(async () => { throw new Error('network blip'); });
+    const { result } = setup({ getSharedStatus });
+
+    await act(async () => {
+      await result.current.checkStatus();
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('[usePublishPolling]'),
+      expect.any(Error),
+    );
+    warn.mockRestore();
+  });
 });

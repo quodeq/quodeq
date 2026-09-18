@@ -123,7 +123,8 @@ export default function UpdatesSection() {
     setStatus((s) => ({ ...(s || {}), auto_check_enabled: enabled }));
     try {
       await setUpdateAutoCheck(enabled);
-    } catch {
+    } catch (err) {
+      console.warn('[UpdatesSection] auto-check toggle failed:', err);
       setStatus((s) => ({ ...(s || {}), auto_check_enabled: previous }));
     }
   };
