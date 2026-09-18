@@ -80,6 +80,12 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
     e.stopPropagation();
     onDelete?.();
   }
+  // The row's own onKeyDown (activateOnKey) would otherwise see the delete
+  // button's Enter/Space bubble up and open the run -- stop it here so the
+  // row never activates just because the keydown started on the button.
+  function handleDeleteKeyDown(e) {
+    e.stopPropagation();
+  }
   return (
     <div
       className={common}
@@ -107,6 +113,7 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
                 aria-label={t('history.deleteRunTitle')}
                 title={t('history.deleteRunTitle')}
                 onClick={handleDeleteClick}
+                onKeyDown={handleDeleteKeyDown}
               >
                 ×
               </button>

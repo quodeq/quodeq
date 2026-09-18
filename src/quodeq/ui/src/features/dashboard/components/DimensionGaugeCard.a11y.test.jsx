@@ -10,10 +10,14 @@ const baseItem = {
 };
 
 describe('DimensionGaugeCard accessible score summary', () => {
-  it('exposes the score and grade to assistive tech even though the gauge SVG is aria-hidden', () => {
+  it('exposes the score and grade as the button\'s accessible description, not just raw DOM text', () => {
     render(<DimensionGaugeCard item={baseItem} onDimensionClick={() => {}} />);
-    // The gauge itself stays aria-hidden (decorative SVG); the sr-only
-    // sibling carries the same information as real accessible text.
-    expect(screen.getByText(/score 7\.5, grade good/i)).toBeInTheDocument();
+    // The gauge itself stays aria-hidden (decorative SVG). The card's role="button"
+    // has children-presentational semantics and an explicit aria-label (the
+    // dimension name only), so a sr-only sibling's text never reaches assistive
+    // tech unless it's wired up via aria-describedby -- toHaveAccessibleDescription
+    // resolves the real accessibility-tree description, not just DOM text content.
+    expect(screen.getByRole('button', { name: /dimension details/i }))
+      .toHaveAccessibleDescription(/score 7\.5, grade good/i);
   });
 });

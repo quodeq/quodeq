@@ -41,4 +41,20 @@ describe('EvaluationsTable row keyboard access and delete discoverability', () =
     renderTable({ onDeleteRun: vi.fn() });
     expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
   });
+
+  it('does not let the delete button\'s Enter/Space bubble into the row\'s own activation', () => {
+    // A native <button>'s own Enter/Space-to-click synthesis is the browser's
+    // job, which jsdom does not perform for fireEvent.keyDown -- so this only
+    // asserts non-propagation: the row's onClick (wired via activateOnKey)
+    // must never fire just because the keydown started on the delete button.
+    // The existing "exposes the delete button" test plus its own click
+    // handler already cover onDelete firing on a real click.
+    const onRunClick = vi.fn();
+    renderTable({ onRunClick, onDeleteRun: vi.fn() });
+    const deleteBtn = screen.getByRole('button', { name: /delete/i });
+    deleteBtn.focus();
+    fireEvent.keyDown(deleteBtn, { key: 'Enter' });
+    fireEvent.keyDown(deleteBtn, { key: ' ' });
+    expect(onRunClick).not.toHaveBeenCalled();
+  });
 });

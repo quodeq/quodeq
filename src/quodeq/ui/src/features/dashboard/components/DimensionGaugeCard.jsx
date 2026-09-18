@@ -3,6 +3,7 @@
  * score, grade word, violation/ratio line and severity pills. Shared by the
  * accumulated and run overviews.
  */
+import { useId } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
@@ -111,11 +112,11 @@ function ScoreGauge({ scoreDisplay, gradeWord, ringColor, dashOffset }) {
   );
 }
 
-function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev }) {
+function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev, summaryId }) {
   return (
     <>
       <ScoreGauge scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset} />
-      <span className="sr-only">{t('overview.gaugeSummaryAria', { score: scoreDisplay, grade: gradeWord })}</span>
+      <span id={summaryId} className="sr-only">{t('overview.gaugeSummaryAria', { score: scoreDisplay, grade: gradeWord })}</span>
 
       <div className="dim-gauge-card__meta">
         {t('overview.violAbbrev')} · {violationCount} · {ratio}
@@ -179,6 +180,12 @@ export default function DimensionGaugeCard({
     staleClass, dateText, coverage, partialTooltip,
   } = computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId });
   const activate = () => onDimensionClick?.(item, selectedRunId);
+  // role="button" gives the article children-presentational semantics, and the
+  // explicit aria-label above already skips its content -- so the sr-only score
+  // summary needs its own id wired up via aria-describedby to reach assistive
+  // tech at all (a11y review, fix round 1). No description when insufficient:
+  // InsufficientGauge's own caption isn't aria-hidden, so it's already exposed.
+  const summaryId = useId();
 
   return (
     <article
@@ -188,6 +195,7 @@ export default function DimensionGaugeCard({
       onClick={activate}
       onKeyDown={(e) => handleKey(e, activate)}
       aria-label={t('overview.dimensionDetailsAria', { name: item.dimension })}
+      aria-describedby={isInsufficient ? undefined : summaryId}
     >
       <div className="dim-gauge-card__head">
         <span className="dim-gauge-card__name">{item.dimension}</span>
@@ -200,6 +208,7 @@ export default function DimensionGaugeCard({
         <DimensionScoreBody
           scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset}
           violationCount={violationCount} ratio={ratio} sev={sev}
+          summaryId={summaryId}
         />
       )}
 

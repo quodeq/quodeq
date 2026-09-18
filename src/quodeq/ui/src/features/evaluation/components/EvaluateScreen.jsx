@@ -48,10 +48,17 @@ function ErrorToast({ message, onDismiss }) {
     return () => clearTimeout(timer);
   }, [message, onDismiss]);
 
+  // role="alert" on the button itself would override its native button role
+  // for assistive tech. Keep the button unmodified and announce the same
+  // text through an sr-only alert twin instead (fix round 1, review finding).
+  const text = sanitizeErrorMessage(message);
   return (
-    <button type="button" className="job-error-toast" role="alert" onClick={onDismiss}>
-      {sanitizeErrorMessage(message)}
-    </button>
+    <>
+      <button type="button" className="job-error-toast" onClick={onDismiss}>
+        {text}
+      </button>
+      <span role="alert" className="sr-only">{text}</span>
+    </>
   );
 }
 
