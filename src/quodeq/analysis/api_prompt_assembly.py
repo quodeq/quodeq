@@ -119,10 +119,10 @@ def _deployment_note(shape: ProjectShape) -> str:
 def _trust_relaxation_notes(trust_model: TrustModel | None) -> str:
     """Return trust-relaxation caveats for the LLM, or "" when none apply.
 
-    Each note below mirrors one of scope_gate.py's own rules, deliberately
-    at the same preconditions, so the prompt never advises something the
-    deterministic gate would not also do. Neither ever tells the model a
-    category "does not apply" -- that invites the model to omit the
+    Each note below mirrors one of ``scope_gate_rules``'s own rules,
+    deliberately at the same preconditions, so the prompt never advises
+    something the deterministic gate would not also do. None of them ever
+    tells the model a category "does not apply" -- that invites the model to omit the
     finding, which is unrecoverable, unlike a severity cap. Always report;
     only the severity guidance changes.
     """

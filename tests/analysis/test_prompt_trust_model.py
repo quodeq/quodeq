@@ -30,6 +30,21 @@ def test_conservative_model_adds_no_relaxing_note():
     assert "no untrusted" not in block
 
 
+def test_conservative_block_text_is_pinned():
+    # The undeclared prompt is the no-regression baseline, so it is pinned
+    # whole rather than by substring. deployment_topology is briefed even
+    # when it is the conservative default, exactly as network_exposure is:
+    # the model is told what the axis resolved to, not left to guess.
+    assert _format_shape_block(DESKTOP_SHAPE, CONSERVATIVE) == (
+        "## Project Shape\n\n**deployment=desktop, single_user=true, "
+        "multi_tenant=true, network_exposure=public, "
+        "deployment_topology=distributed**. This is a single-user desktop "
+        "tool, not a hosted multi-tenant service. Treat findings about "
+        "thread blocking, distributed state, concurrent callers, and rate "
+        "limiting with skepticism."
+    )
+
+
 def test_block_renders_when_shape_unknown_but_model_declared():
     # The declaration is the authority. An UNKNOWN shape must no longer
     # suppress the briefing when the team has told us the answer.
