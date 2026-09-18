@@ -92,6 +92,32 @@
       "system_prompt_style": "message-prefix"
     }
   },
+  "copilot": {
+    "type": "cli",
+    "order": 4,
+    "cmd": "copilot",
+    "base_args": "--output-format json --stream on --no-auto-update --no-custom-instructions --no-ask-user --disable-builtin-mcps --available-tools view glob grep findings",
+    "prompt_style": "flag",
+    "prompt_flag": "-p",
+    "supports_mcp": true,
+    "supports_tools": false,
+    "supports_budget": false,
+    "supports_turns": false,
+    "mcp_config_flag": "--additional-mcp-config",
+    "mcp_config_prefix": "@",
+    "mcp_server_tools": ["*"],
+    "mcp_strict_args": [],
+    "mcp_permission_args": ["--allow-tool", "findings"],
+    "assistant": {
+      "assistant_args": ["--output-format", "json", "--stream", "on",
+                         "--no-auto-update", "--no-custom-instructions", "--no-ask-user",
+                         "--disable-builtin-mcps", "--available-tools", "quodeq-assistant",
+                         "--allow-tool", "quodeq-assistant"],
+      "resume_style": "flag-resume",
+      "session_id_source": "preassign",
+      "system_prompt_style": "message-prefix"
+    }
+  },
   "openrouter": {
     "type": "api",
     "order": 4,

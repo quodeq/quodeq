@@ -47,7 +47,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     )
 
 
-_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini"})
+_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini", "copilot"})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -217,6 +217,7 @@ class FsToolingMixin:
         {"id": "claude", "label": "Claude"},
         {"id": "codex", "label": "Codex"},
         {"id": "gemini", "label": "Gemini"},
+        {"id": "copilot", "label": "GitHub Copilot"},
     ]
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
@@ -266,6 +267,8 @@ class FsToolingMixin:
             return {"models": []}
         if not client_id.isalnum():
             return {"models": []}
+        if client_id == "copilot":  # No non-interactive model-list command.
+            return {"models": ["auto"]}
         output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S)
         models = []
         for line in output.splitlines():

@@ -111,7 +111,7 @@ def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec
     if resume_frag:
         argv.extend(resume_frag)
     if request.mcp_config_path and cfg.mcp_style == "config-file":
-        argv.extend(["--mcp-config", request.mcp_config_path])
+        argv.extend([cfg.mcp_config_flag, f"{cfg.mcp_config_prefix}{request.mcp_config_path}"])
     if request.mcp_config_arg and cfg.mcp_style == "config-arg":
         argv.extend(["-c", request.mcp_config_arg])
     normalized_model = _model_arg(cfg, request.model)

@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable
+from quodeq.shared.copilot import build_copilot_env
 
 # The spawned agent CLI is network-capable and tool-executing; it must NOT
 # inherit arbitrary secrets from the server process (JIRA_API_TOKEN, GH_TOKEN,
@@ -54,8 +55,10 @@ def _externally_sandboxed(argv: list[str]) -> bool:
     return bool(argv) and Path(argv[0]).name in _EXTERNAL_SANDBOX_LAUNCHERS
 
 
-def build_chat_env(env: dict | None = None) -> dict:
+def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> dict:
     source = env if env is not None else os.environ
+    if provider == "copilot":
+        return build_copilot_env(source)
     result = {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
     return result
 

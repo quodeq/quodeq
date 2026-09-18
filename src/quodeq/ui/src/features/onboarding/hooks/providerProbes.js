@@ -18,7 +18,7 @@ async function detectCliProvider(id) {
     const res = await fetch('/api/ai-clients', { method: 'GET', signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { id, classification: 'cli', detected: false, defaultModel: null };
     const data = await res.json();
-    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli');
+    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli' && c.installed !== false);
     return { id, classification: 'cli', detected, defaultModel: null };
   } catch {
     return { id, classification: 'cli', detected: false, defaultModel: null };
@@ -56,6 +56,7 @@ export async function runDetection() {
   const probes = await Promise.allSettled([
     detectCliProvider('codex-cli'),
     detectCliProvider('claude-code'),
+    detectCliProvider('copilot'),
     detectOllamaDaemon(),
     detectStoredCloudKey('openai'),
     detectStoredCloudKey('anthropic'),

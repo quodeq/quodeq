@@ -38,6 +38,13 @@ _CLI_INSTALL_HINTS: dict[str, str] = {
         "  npm install -g @google/gemini-cli\n"
         "  https://geminicli.com/docs/get-started/installation/"
     ),
+    "copilot": (
+        "Install GitHub Copilot CLI:\n"
+        "  npm install -g @github/copilot\n"
+        "Sign in with Quodeq's dedicated profile (macOS/Linux):\n"
+        '  COPILOT_HOME="$HOME/.quodeq/copilot" copilot login\n'
+        "  https://docs.github.com/en/copilot/how-tos/copilot-cli"
+    ),
 }
 
 _SETTINGS_HINT = (
@@ -164,7 +171,7 @@ def check_evaluate_prereqs() -> None:
             "No AI provider configured.\n\n"
             "Quodeq needs an AI provider to evaluate your code. You can use:\n\n"
             "  Local (free, private):  Ollama with Gemma 4\n"
-            "  Cloud (faster):         Claude Code, Codex CLI, or Gemini CLI\n\n"
+            "  Cloud (faster):         Claude Code, Codex CLI, Gemini CLI, or GitHub Copilot CLI\n\n"
             f"{_SETTINGS_HINT}"
         )
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from quodeq.core.stream.events import copilot_error, copilot_event_data, texts_from_copilot
 
 _TEXT_TYPES = ("text", "output_text")
 
@@ -30,6 +31,9 @@ def partial_text(event: dict) -> str | None:
     """Incremental text from a `stream_event` wrapper (claude/gemini
     --include-partial-messages): the Anthropic SSE `content_block_delta`
     carrying a `text_delta`. Thinking/tool-input deltas are not display text."""
+    if event.get("type") == "assistant.message_delta":
+        text = copilot_event_data(event).get("deltaContent")
+        return text if isinstance(text, str) else None
     if event.get("type") != "stream_event":
         return None
     inner = event.get("event")
@@ -44,6 +48,8 @@ def partial_text(event: dict) -> str | None:
 
 def assistant_text(event: dict) -> list[str]:
     etype = event.get("type")
+    if etype == "assistant.message":
+        return texts_from_copilot(event)
     if etype == "assistant":
         msg = event.get("message")
         blocks = msg.get("content") if isinstance(msg, dict) else None
@@ -88,6 +94,12 @@ def tool_use_details(event: dict) -> list[dict]:
     to avoid a duplicate frame).
     """
     etype = event.get("type")
+    if etype == "tool.execution_start":
+        data = copilot_event_data(event)
+        name = data.get("mcpToolName") or data.get("toolName")
+        if isinstance(name, str) and name:
+            return [{"name": name, "args_summary": _args_summary(data.get("arguments"))}]
+        return []
     if etype == "item.started":
         item = event.get("item")
         detail = _codex_tool_detail(item) if isinstance(item, dict) else None
@@ -129,6 +141,9 @@ def _nested_error_message(value) -> str | None:
 
 
 def error_message(event: dict) -> str | None:
+    error = copilot_error(event)
+    if error:
+        return error[0]
     if event.get("type") == "error":
         return _nested_error_message(event.get("message")) or _nested_error_message(event)
     if event.get("type") == "turn.failed":
@@ -137,5 +152,7 @@ def error_message(event: dict) -> str | None:
 
 
 def session_id(event: dict) -> str | None:
-    sid = event.get("session_id") or event.get("thread_id")
+    sid = event.get("session_id") or event.get("thread_id") or event.get("sessionId")
+    if not sid and event.get("type") == "session.start":
+        sid = copilot_event_data(event).get("sessionId")
     return sid if isinstance(sid, str) else None

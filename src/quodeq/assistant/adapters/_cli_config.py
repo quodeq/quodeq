@@ -21,6 +21,9 @@ class CliChatConfig:
     supports_tools: bool
     system_prompt_style: str
     requires_external_sandbox: bool
+    mcp_config_flag: str = "--mcp-config"
+    mcp_config_prefix: str = ""
+    mcp_server_tools: tuple[str, ...] | None = None
 
 
 def load_cli_chat_config(provider_id: str) -> CliChatConfig:
@@ -43,4 +46,7 @@ def load_cli_chat_config(provider_id: str) -> CliChatConfig:
         supports_tools=cfg.get("supports_tools", True),
         system_prompt_style=assistant.get("system_prompt_style", "message-prefix"),
         requires_external_sandbox=cfg.get("requires_external_sandbox", False),
+        mcp_config_flag=cfg.get("mcp_config_flag", "--mcp-config"),
+        mcp_config_prefix=cfg.get("mcp_config_prefix", ""),
+        mcp_server_tools=tuple(cfg["mcp_server_tools"]) if "mcp_server_tools" in cfg else None,
     )

@@ -43,10 +43,37 @@ def texts_from_item_completed(event: dict) -> list[str]:
     return texts
 
 
+def copilot_event_data(event: dict) -> dict:
+    """Return the object payload of a Copilot JSONL event."""
+    data = event.get("data")
+    return data if isinstance(data, dict) else {}
+
+
+def texts_from_copilot(event: dict) -> list[str]:
+    """Extract a complete Copilot assistant message, not its delta echo."""
+    text = copilot_event_data(event).get("content")
+    return [text] if isinstance(text, str) and text else []
+
+
+def copilot_error(event: dict) -> tuple[str, str | None] | None:
+    """Return a Copilot error message and optional non-retryable reason."""
+    if event.get("type") == "session.error":
+        data = copilot_event_data(event)
+        message = data.get("message")
+        category = data.get("errorType")
+        reason = {"authentication": "auth", "authorization": "auth",
+                  "quota": "quota", "policy": "policy"}.get(category) if isinstance(category, str) else None
+        return (message if isinstance(message, str) and message else "Copilot session failed", reason)
+    if event.get("type") == "result" and event.get("exitCode"):
+        return (f"Copilot exited with code {event['exitCode']}", None)
+    return None
+
+
 TEXT_EXTRACTORS: dict[str, Callable[[dict], list[str]]] = {
     "assistant": texts_from_assistant,
     "result": texts_from_result,
     "item.completed": texts_from_item_completed,
+    "assistant.message": texts_from_copilot,
 }
 
 
@@ -81,4 +108,11 @@ def extract_files_from_event(data: dict) -> set[str]:
         return extract_files_from_blocks(data.get("message", {}).get("content", []))
     if etype == "item.completed":
         return extract_files_from_blocks(data.get("item", {}).get("content", []))
+    if etype == "tool.execution_start":
+        payload = copilot_event_data(data)
+        args = payload.get("arguments")
+        if payload.get("toolName") in ("view", "grep") and isinstance(args, dict):
+            path = args.get("path")
+            if isinstance(path, str) and path:
+                return {path}
     return set()

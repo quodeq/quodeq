@@ -86,7 +86,7 @@ def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     if cli_cfg.mcp_style == "config-file":
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         tmp.close()
-        mcp_config.write_mcp_config(cfg.mcp_server_args, Path(tmp.name))
+        mcp_config.write_mcp_config(cfg.mcp_server_args, Path(tmp.name), tools=cli_cfg.mcp_server_tools)
         return McpConfigRef(tmp.name, None)
     if cli_cfg.mcp_style == "config-arg":
         # codex: define the server inline per invocation; no global state to clean up.
@@ -112,7 +112,7 @@ def _consume_stream_events(stdout, emit: Callable[[dict], None], parsed_sid: str
                 raw_errors.append(raw)
             continue
         etype = event.get("type")
-        if etype == "result":
+        if etype == "result" and "exitCode" not in event:
             saw_result = True
         err = _stream.error_message(event)
         if err:
@@ -153,6 +153,7 @@ def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession
     first four feed ``_run_once``'s ``finally`` cleanup. *session* must
     carry resolved ``spawn_fn``/``cancel`` (``run_cli_turn`` fills them in).
     """
+    env = build_chat_env(provider=cfg.provider)
     cwd = scratch_cwd(cfg.scratch_base)
     argv = spec.argv
     sandbox_cleanup = None
@@ -166,7 +167,7 @@ def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession
                            *([str(cfg.worktree_dir)] if cfg.worktree_dir else [])],
             writable_files=[db, db + "-wal", db + "-shm", db + "-journal"])
         argv = prefix + argv
-    proc = session.spawn_fn(argv, cwd=cwd, env=build_chat_env())
+    proc = session.spawn_fn(argv, cwd=cwd, env=env)
     # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
     timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
     timer.start()

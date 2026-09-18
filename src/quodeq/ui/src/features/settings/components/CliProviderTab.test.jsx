@@ -19,6 +19,19 @@ function makeWrapper() {
 }
 
 describe('CliProviderTab', () => {
+  it('shows the dedicated Copilot login and accepts a model ID', () => {
+    const Wrapper = makeWrapper();
+    const update = vi.fn();
+    render(
+      <Wrapper>
+        <CliProviderTab providerId="copilot" state={{ model: 'auto' }} update={update} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeTruthy();
+    fireEvent.change(screen.getByDisplayValue('auto'), { target: { value: 'claude-sonnet-4.6' } });
+    expect(update).toHaveBeenCalledWith('model', 'claude-sonnet-4.6');
+  });
+
   it('renders a free-text model input pre-populated from state', () => {
     const Wrapper = makeWrapper();
     const state = { model: 'sonnet', subagents: '4', 'time-limit-min': '60' };

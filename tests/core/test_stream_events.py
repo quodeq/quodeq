@@ -41,7 +41,7 @@ class TestPureParsers:
     def test_text_extractors_cover_the_event_types(self):
         from quodeq.core.stream.events import TEXT_EXTRACTORS
 
-        assert set(TEXT_EXTRACTORS) == {"assistant", "result", "item.completed"}
+        assert set(TEXT_EXTRACTORS) == {"assistant", "result", "item.completed", "assistant.message"}
         assert TEXT_EXTRACTORS["result"]({"result": "done"}) == ["done"]
 
 

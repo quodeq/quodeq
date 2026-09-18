@@ -11,12 +11,14 @@ const MODEL_HINTS = {
   claude: tRich('settings.modelHintClaude'),
   codex: tRich('settings.modelHintCodex'),
   gemini: tRich('settings.modelHintGemini'),
+  copilot: tRich('settings.modelHintCopilot'),
 };
 
 const ANALYSIS_MODEL_HINTS = {
   claude: tRich('settings.analysisModelsHintClaude'),
   codex: tRich('settings.analysisModelsHintCodex'),
   gemini: tRich('settings.analysisModelsHintGemini'),
+  copilot: tRich('settings.analysisModelsHintCopilot'),
 };
 
 /**

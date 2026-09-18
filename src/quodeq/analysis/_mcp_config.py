@@ -20,6 +20,8 @@ def _create_mcp_config(
     compiled_dir: Path | None = None,
     dimension: str | None = None,
     agent_params: _AgentParams | None = None,
+    *,
+    tools: list[str] | None = None,
 ) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
     ap = agent_params or _AgentParams()
@@ -53,6 +55,8 @@ def _create_mcp_config(
             }
         }
     }
+    if tools is not None:
+        config["mcpServers"]["findings"]["tools"] = tools
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="mcp_findings_", delete=False,
     )

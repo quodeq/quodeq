@@ -93,6 +93,19 @@ describe('AssistantProviderTabs', () => {
     expect(container.querySelector('select')).toBeNull();
   });
 
+  it('supports Copilot independently and shows its dedicated login instructions', async () => {
+    fakeApi.getAiClients.mockResolvedValueOnce({ clients: [
+      ...CLIENTS, { id: 'copilot', label: 'GitHub Copilot', type: 'cli', installed: true },
+    ] });
+    localStorage.setItem('cc-assistant-mode', 'custom');
+    localStorage.setItem('cc-assistant-active-provider', 'copilot');
+    const { findByText, getByLabelText } = await renderPanel();
+    expect(await findByText('GitHub Copilot')).toBeTruthy();
+    expect(await findByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeTruthy();
+    fireEvent.change(getByLabelText('Assistant model'), { target: { value: 'auto' } });
+    expect(localStorage.getItem('cc-active-provider')).toBe('claude');
+  });
+
   it('custom mode with an ollama provider renders a model dropdown', async () => {
     localStorage.setItem('cc-assistant-mode', 'custom');
     localStorage.setItem('cc-assistant-active-provider', 'ollama');

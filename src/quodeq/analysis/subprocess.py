@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
+from contextlib import ExitStack
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -46,6 +48,9 @@ from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPat
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
+from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
+from quodeq.core.stream.events import copilot_error, parse_stream_event
+from quodeq.shared.utils import sanitize_sensitive
 from quodeq.shared.utils import get_ai_cmd
 
 
@@ -100,13 +105,17 @@ def _run_cli_analysis(
         _register_cli_mcp(ai_cmd, cfg, work_dir)
 
     args, mcp_config_path = _build_ai_cmd(prompt, cfg, work_dir=work_dir)
-    env = _build_analysis_env(ai_cmd)
     stream_err = Path(str(stream_file) + ".err")
 
     try:
-        process, timed_out = _spawn_and_monitor(
-            args, work_dir, env, _SpawnPaths(stream_file, stream_err), cfg,
-        )
+        env = _build_analysis_env(ai_cmd)
+        with ExitStack() as stack:
+            cwd = work_dir
+            if ai_cmd == "copilot":
+                cwd = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="quodeq-copilot-")))
+            process, timed_out = _spawn_and_monitor(
+                args, cwd, env, _SpawnPaths(stream_file, stream_err), cfg,
+            )
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
@@ -114,7 +123,24 @@ def _run_cli_analysis(
         # Cleanup happens via _register_cli_mcp's idempotent remove-then-add on next run.
 
     if not timed_out:
+        if ai_cmd == "copilot":
+            _check_copilot_stream(stream_file)
         _check_process_result(process, stream_err)
+
+
+def _check_copilot_stream(stream_file: Path) -> None:
+    """Copilot reports provider errors on stdout, including some zero-exit failures."""
+    with stream_file.open(encoding="utf-8") as stream:
+        for line in stream:
+            event = parse_stream_event(line)
+            error = copilot_error(event) if isinstance(event, dict) else None
+            if error:
+                message, reason = error
+                message = sanitize_sensitive(message)
+                reason = reason or classify_fatal_provider_message(message)
+                if reason:
+                    raise FatalProviderError(message, reason=reason)
+                raise AnalysisError(message)
 
 
 def _resolve_provider_config(

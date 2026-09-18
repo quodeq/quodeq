@@ -34,6 +34,7 @@ PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
     "codex": ("CODEX_API_KEY", "codex"),
     "gemini": ("GEMINI_API_KEY", "gemini"),
+    "copilot": ("", "copilot"),
     "ollama": ("", "ollama"),
     "llamacpp": ("", "llamacpp"),
     "openrouter": ("OPENROUTER_API_KEY", "openrouter"),

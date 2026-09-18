@@ -89,8 +89,9 @@ def _build_config_file_mcp_args(
 ) -> tuple[list[str], Path | None]:
     """Build the config-file MCP variant's args: --mcp-config, strict-mode,
     allowed tools, and permission mode."""
+    options = {"tools": provider_cfg["mcp_server_tools"]} if "mcp_server_tools" in provider_cfg else {}
     mcp_config_path = _create_mcp_config(
-        config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
+        config.jsonl_file, config.compiled_dir, config.dimension, agent_params, **options,
     )
     mcp_flag = provider_cfg.get("mcp_config_flag", "--mcp-config")
     mcp_prefix = provider_cfg.get("mcp_config_prefix", "")

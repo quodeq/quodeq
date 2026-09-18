@@ -4,6 +4,7 @@ import { TimeLimitSetting, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx'
 import { CliAdvancedPanel, ModelTextInput } from './CliAdvancedPanel.jsx';
 import { useCliProviderTab } from '../hooks/useCliProviderTab.js';
 import { t } from '../../../strings/index.js';
+import CopilotSetupHint from './CopilotSetupHint.jsx';
 
 export default function CliProviderTab({ providerId, state, update }) {
   const {
@@ -12,6 +13,7 @@ export default function CliProviderTab({ providerId, state, update }) {
 
   return (
     <>
+      {providerId === 'copilot' && <CopilotSetupHint />}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">

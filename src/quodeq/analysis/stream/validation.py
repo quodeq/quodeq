@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.stream.events import copilot_error, copilot_event_data
 from quodeq.shared.utils import open_text
 
 _MCP_SERVER_NAME = "findings"
@@ -16,17 +17,16 @@ def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
         return None
     try:
         with open_text(stream_file) as f:
-            first = f.readline().strip()
-            if not first:
-                return None
-            d = json.loads(first)
-            if not isinstance(d, dict):
-                return None
-            for srv in d.get("mcp_servers", []):
-                if not isinstance(srv, dict):
-                    continue  # skip a non-dict element, keep scanning the rest
-                if srv.get("name") == _MCP_SERVER_NAME:
-                    return srv.get("status")
+            for line in f:
+                d = json.loads(line)
+                if not isinstance(d, dict):
+                    continue
+                servers = d.get("mcp_servers", [])
+                if d.get("type") == "session.mcp_servers_loaded":
+                    servers = copilot_event_data(d).get("servers", [])
+                for srv in servers:
+                    if isinstance(srv, dict) and srv.get("name") == _MCP_SERVER_NAME:
+                        return srv.get("status")
     except (json.JSONDecodeError, OSError) as exc:
         log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None
@@ -45,7 +45,7 @@ def _is_error_event(
         return False  # a valid-JSON non-object line is not an error event
     if d.get("type") == "result" and d.get("is_error"):
         return True
-    return False
+    return copilot_error(d) is not None
 
 
 def is_stream_valid(stream_file: Path, *, log: LogSink = NULL_LOG) -> bool:
