@@ -9,9 +9,9 @@ import time as _time
 from collections.abc import Mapping
 from http import HTTPStatus
 
-from flask import Response, jsonify, request
+from flask import Response, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.config.ai_provider import get_api_key_secure
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
@@ -70,14 +70,33 @@ def resolve_clean_scan(payload: dict) -> bool:
     return bool(payload.get("cleanScan", False))
 
 
-def _coerce_int(value: object, default: int) -> int:
-    """Return int(*value*) when convertible, else *default*. Never raises."""
+class InvalidEvaluationOption(ClientMessageError, ValueError):
+    """A present-but-malformed evaluation option; ``public_message`` is the
+    field-naming text a route may return to the client verbatim.
+
+    Also a ValueError so the routes' existing ``except ValueError`` guards
+    around option building still catch it.
+    """
+
+
+def _coerce_int(value: object, default: int, field: str) -> int:
+    """Return int(*value*) when convertible; *default* when *value* is
+    ``None`` (absent) or a blank/whitespace-only string. Raises
+    ``InvalidEvaluationOption`` naming *field* and the value received when
+    *value* is present but not convertible to int, so a malformed override
+    surfaces as a 400 instead of silently falling back to the default.
+
+    A blank string counts as absent: that is how a cleared form field
+    arrives, and it meant "use the default" before this validation existed.
+    """
     if value is None:
+        return default
+    if isinstance(value, str) and not value.strip():
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
-        return default
+    except (TypeError, ValueError) as exc:
+        raise InvalidEvaluationOption(f"{field} must be an integer, got {value!r}") from exc
 
 
 def _sanitize_url(url: str) -> str:
@@ -112,12 +131,11 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     allowed_cmds = _get_allowed_ai_cmds(env=env)
     if ai_cmd not in allowed_cmds:
         allowed_list = ", ".join(sorted(allowed_cmds))
-        body, status = error_response(
+        return json_error(
             f"Invalid AI command. Allowed: {allowed_list}",
             HTTPStatus.BAD_REQUEST,
             "INVALID_INPUT",
         )
-        return jsonify(body), status
     return None
 
 
@@ -126,11 +144,10 @@ def _validate_ai_model(
 ) -> tuple[Response, int] | None:
     """API-type providers require an explicit model."""
     if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == "api" and not ai_model:
-        body, status = error_response(
+        return json_error(
             "No model selected. Go to Settings and select one.",
             HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
         )
-        return jsonify(body), status
     return None
 
 
@@ -198,22 +215,24 @@ def _validate_ai_cmd_path(
     reason = ai_cmd_path_error(ai_cmd, ai_cmd_path)
     if reason is None:
         return None
-    body, status = error_response(
+    return json_error(
         f"Invalid AI command override: {reason}",
         HTTPStatus.BAD_REQUEST,
         "INVALID_INPUT",
     )
-    return jsonify(body), status
 
 
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
-    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS)
+    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS, "maxSubagents")
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
     # Read new key first; fall back to legacy `poolBudget` for back-compat.
+    # The label is the key the client actually sent, so a malformed legacy
+    # value is not reported against a field absent from the body.
+    time_limit_field = "poolBudget" if "poolBudget" in payload and "timeLimit" not in payload else "timeLimit"
     time_limit_raw = _coerce_int(
-        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT,
+        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT, time_limit_field,
     )
     time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
     ai_model = payload.get("aiModel") or None
@@ -240,7 +259,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         time_limit=time_limit,
         clean_scan=clean_scan,
         per_dimension=bool(payload.get("perDimension", False)),
-        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0))),
+        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0, "contextSize"))),
         branch=payload.get("branch") or None,
         scope_path=scope_path,
         provider_api_key=provider_api_key,
@@ -255,9 +274,8 @@ def _check_eval_rate_limit(eval_rate_store: object | None) -> tuple[Response, in
     ip = request.remote_addr or "unknown"
     now = _time.monotonic()
     if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
-        body, status = error_response(
+        return json_error(
             "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
         )
-        return jsonify(body), status
     eval_rate_store.record(ip, now)  # type: ignore[union-attr]
     return None

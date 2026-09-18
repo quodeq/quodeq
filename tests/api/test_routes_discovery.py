@@ -99,7 +99,7 @@ def test_cmd_path_check_valid_bare_name(client, bin_dir):
     _make_executable(bin_dir, "claude-api")
     resp = client.get("/api/ai-clients/claude/cmd-path-check?path=claude-api")
     assert resp.status_code == 200
-    assert resp.get_json() == {"ok": True, "error": None}
+    assert resp.get_json() == {"ok": True, "error": None, "code": None}
 
 
 def test_cmd_path_check_missing_binary(client, bin_dir):
@@ -122,4 +122,4 @@ def test_cmd_path_check_wrong_prefix(client, bin_dir):
 def test_cmd_path_check_empty_path_is_valid(client):
     resp = client.get("/api/ai-clients/claude/cmd-path-check")
     assert resp.status_code == 200
-    assert resp.get_json() == {"ok": True, "error": None}
+    assert resp.get_json() == {"ok": True, "error": None, "code": None}

@@ -4,6 +4,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { STANDARDS_CHANGED_REASON, notifyStandardsChanged } from '../../../constants.js';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
@@ -19,11 +20,14 @@ function makeHandleDelete({ deleteStandard, setMutationError, refresh }) {
   };
 }
 
-function makeHandleDuplicate({ duplicateStandard, setMutationError, refresh }) {
+function makeHandleDuplicate({ duplicateStandard, setMutationError, refresh, onDuplicated }) {
   return async (id, newId) => {
     try {
       await duplicateStandard(id, newId);
       setMutationError(null);
+      // Only after the server accepted it: the page marks the copy visible
+      // for the current project, and an unknown id would fail that PUT.
+      if (onDuplicated) onDuplicated(newId);
       await refresh();
     } catch (err) {
       setMutationError(apiErrorMessage(err, 'standards.duplicateFailed'));
@@ -44,7 +48,7 @@ function groupStandards(standards) {
   return g;
 }
 
-export function useStandards() {
+export function useStandards({ onDuplicated } = {}) {
   const { listStandards, deleteStandard, duplicateStandard } = useApi();
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState(null);
@@ -58,6 +62,9 @@ export function useStandards() {
 
   const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: standardsKeys.list() });
+    // The Evaluate picker keeps its own merged plugin+standards list outside
+    // React Query; tell it the set of standards may have changed.
+    notifyStandardsChanged(STANDARDS_CHANGED_REASON.LIST);
     return refetch();
   }, [queryClient, refetch]);
 
@@ -67,8 +74,8 @@ export function useStandards() {
   );
 
   const handleDuplicate = useCallback(
-    makeHandleDuplicate({ duplicateStandard, setMutationError, refresh }),
-    [duplicateStandard, refresh],
+    makeHandleDuplicate({ duplicateStandard, setMutationError, refresh, onDuplicated }),
+    [duplicateStandard, refresh, onDuplicated],
   );
 
   const grouped = useMemo(() => groupStandards(standards), [standards]);

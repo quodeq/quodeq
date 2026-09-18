@@ -78,7 +78,10 @@ def test_shared_routes_409_when_foreign(client):
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 409
     body = resp.get_json()
-    assert body["error"] == "the configured repository does not look like a quodeq results repository"
+    assert body["error"] == (
+        "the configured repository does not look like a quodeq results repository"
+        " — reconnect it in Settings"
+    )
     assert body["code"] == "FOREIGN_REPO"
 
 

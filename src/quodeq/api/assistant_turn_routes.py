@@ -23,6 +23,7 @@ from quodeq.api._assistant_helpers import (
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, _turn_state
+from quodeq.api.helpers import json_error
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.services.score_cache import score_cache_path_override
@@ -114,13 +115,13 @@ def _post_assistant_message(app: Flask, sid: str):
     repo = get_repository(app)
     session = repo.get_session(sid)
     if session is None:
-        return jsonify({"error": "unknown session"}), 404
+        return json_error("unknown session", 404, "UNKNOWN_SESSION")
     body = request.get_json(silent=True) or {}
     text = str(body.get("text", "")).strip()
     if not text:
-        return jsonify({"error": "text required"}), 400
+        return json_error("text required", 400, "MISSING_PARAM")
     if local_provider_busy(session["provider"]):
-        return jsonify({"error": "model busy with analysis"}), 409
+        return json_error("model busy with analysis", 409, "PROVIDER_BUSY")
     if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
         shared_error = _assistant_routes._shared_source_error()
         if shared_error is not None:
@@ -128,7 +129,7 @@ def _post_assistant_message(app: Flask, sid: str):
     state = _turn_state(app)
     cancel = state.claim_turn(sid)
     if cancel is None:
-        return jsonify({"error": "a turn is already running"}), 409
+        return json_error("a turn is already running", 409, "TURN_IN_PROGRESS")
     # Everything from here through Thread.start() must free the slot on
     # failure — otherwise an exception (e.g. build_tool_context blowing
     # up) leaves `sid` claimed forever and every future POST to this
@@ -152,10 +153,10 @@ def _post_assistant_message(app: Flask, sid: str):
 
 def _stop_assistant_turn(app: Flask, sid: str):
     if get_repository(app).get_session(sid) is None:
-        return jsonify({"error": "unknown session"}), 404
+        return json_error("unknown session", 404, "UNKNOWN_SESSION")
     token = _turn_state(app).cancel_token(sid)
     if token is None:
-        return jsonify({"error": "no turn running"}), 409
+        return json_error("no turn running", 409, "NO_TURN_RUNNING")
     # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
     # client close) that must not serialize other sessions' turn claims.
     token.cancel()
@@ -167,7 +168,7 @@ def _stop_assistant_turn(app: Flask, sid: str):
 def _assistant_events(app: Flask, sid: str):
     repo = get_repository(app)
     if repo.get_session(sid) is None:
-        return jsonify({"error": "unknown session"}), 404
+        return json_error("unknown session", 404, "UNKNOWN_SESSION")
     raw = request.headers.get("Last-Event-ID") or request.args.get("after", "0")
     try:
         after = int(raw)
@@ -176,7 +177,7 @@ def _assistant_events(app: Flask, sid: str):
 
     state = _turn_state(app)
     if not state.try_open_sse_stream():
-        return jsonify({"error": "too many open event streams"}), 429
+        return json_error("too many open event streams", 429, "TOO_MANY_STREAMS")
 
     release = _sse_release_guard(state)
 

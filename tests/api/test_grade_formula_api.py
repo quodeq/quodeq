@@ -95,13 +95,31 @@ def test_put_rejects_invalid_params_with_400(client, formula_path):
     assert not formula_path.exists()
 
 
-def test_delete_resets_to_defaults(formula_path):
+def test_delete_requires_confirm_and_does_not_reset(formula_path):
+    calls = []
     client = _client_with_apply_to_all_runs(
-        lambda root: grade_formula.ApplyResult(rescored=0, failed=[]),
+        lambda root: calls.append(root) or grade_formula.ApplyResult(rescored=0, failed=[]),
     )
     grade_formula.save_params(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
     resp = client.delete("/api/grade-formula", headers=_ORIGIN)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "CONFIRMATION_REQUIRED"
+    assert "?confirm=true" in body["error"]
+    assert calls == [], "apply_to_all_runs (rescore) must not run without ?confirm=true"
+    assert grade_formula.load_params().base_k == 0.3
+    assert formula_path.exists()
+
+
+def test_delete_with_confirm_resets_to_defaults(formula_path):
+    calls = []
+    client = _client_with_apply_to_all_runs(
+        lambda root: calls.append(root) or grade_formula.ApplyResult(rescored=0, failed=[]),
+    )
+    grade_formula.save_params(dataclasses.replace(DEFAULT_PARAMS, base_k=0.3))
+    resp = client.delete("/api/grade-formula?confirm=true", headers=_ORIGIN)
     assert resp.status_code == 200
+    assert calls, "apply_to_all_runs (rescore) must run with ?confirm=true"
     assert resp.get_json()["isCustom"] is False
     assert not formula_path.exists()
 

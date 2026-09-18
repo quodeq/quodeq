@@ -35,3 +35,15 @@ def test_import_from_library_list_body_returns_400(dirs, monkeypatch):
     body = resp.get_json()
     assert body["code"] == "bad_request"
     assert "object" in body["error"]
+
+
+def test_import_from_library_non_string_file_returns_400(dirs, monkeypatch):
+    """``{"file": 5}`` passes the truthiness check; before the type guard the
+    ``".." in file_path`` test then raised TypeError, a bare 500."""
+    app = _library_client(dirs, monkeypatch, _FakeLibraryHttpClient())
+    with app.test_client() as c:
+        resp = c.post("/api/standards/library/import", json={"file": 5}, headers=_ORIGIN)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "bad_request"
+    assert "file" in body["error"] and "string" in body["error"]

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import http.client
 import logging
-import os
 import threading
 import time as _time
 from http import HTTPStatus
@@ -11,11 +10,30 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import ERROR_CODE_NOT_FOUND
-from quodeq.api.helpers import error_response
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
+from quodeq.api.helpers import error_response, page_params
+from quodeq.shared._env import env_int
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
+
+# QUODEQ_CWE_CACHE_TTL: how long (in seconds) the CWE reference list stays
+# cached before the next request reloads it. Default 3600 (one hour). Valid
+# values are non-negative integers; 0 disables caching (reload every call).
+# A non-numeric or negative value is invalid and falls back to the default,
+# with a warning logged naming the variable, so a mistyped env value is
+# visible instead of silently changing cache behaviour.
+_DEFAULT_CWE_CACHE_TTL_S = 3600
+
+
+def _cache_ttl_from_env(default: int = _DEFAULT_CWE_CACHE_TTL_S) -> int:
+    """Read QUODEQ_CWE_CACHE_TTL from the environment; see the module
+    comment above for units, default, and valid range.
+
+    ``env_int`` does the parsing, the non-negative check and the warning
+    that names the variable, the bad value and the default.
+    """
+    return env_int("QUODEQ_CWE_CACHE_TTL", default, minimum=0)
 
 
 class CweCache:
@@ -34,7 +52,7 @@ class CweCache:
         # Read PER INSTANCE (not at import time) so tests can construct a
         # fresh CweCache after changing QUODEQ_CWE_CACHE_TTL, and so two
         # instances in the same process can disagree.
-        self._ttl_s = ttl_s if ttl_s is not None else int(os.environ.get("QUODEQ_CWE_CACHE_TTL", "3600"))
+        self._ttl_s = ttl_s if ttl_s is not None else _cache_ttl_from_env()
         self._clock = clock
         self._cache: list | None = None
         self._cache_time: float = 0.0
@@ -65,6 +83,24 @@ def _cache(app: Flask) -> CweCache:
     return app.extensions.setdefault("cwe_cache", CweCache())
 
 
+_DEFAULT_LIST_LIMIT = 500
+_DEFAULT_LIST_OFFSET = 0
+
+
+def _page_params(args) -> tuple[int, int] | tuple[dict, int]:
+    """Parse and validate ``limit``/``offset`` for GET /api/standards.
+
+    Thin wrapper over the shared ``page_params`` so this route keeps its own
+    defaults (limit=500, offset=0) and this module's lower-case error code.
+    """
+    return page_params(
+        args,
+        default_limit=_DEFAULT_LIST_LIMIT,
+        default_offset=_DEFAULT_LIST_OFFSET,
+        code=ERROR_CODE_BAD_REQUEST,
+    )
+
+
 def register_read_routes(app: Flask, get_service, get_library_client) -> None:
     """Register GET routes for the standards API.
 
@@ -80,9 +116,11 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
         return jsonify(result)
 
     @app.get("/api/standards")
-    def list_standards() -> Response:
-        limit = request.args.get("limit", 500, type=int)
-        offset = request.args.get("offset", 0, type=int)
+    def list_standards() -> Response | tuple[dict, int]:
+        result = _page_params(request.args)
+        if isinstance(result[0], dict):
+            return result
+        limit, offset = result
         svc = get_service(app)
         page = svc.list_standards()[offset:offset + limit]
         return jsonify([to_camel_dict(s) for s in page])

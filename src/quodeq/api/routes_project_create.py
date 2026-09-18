@@ -16,7 +16,7 @@ from pathlib import Path
 
 from flask import Response, jsonify, request
 
-from quodeq.api.helpers import error_response, scan_target_error as _scan_target_error
+from quodeq.api.helpers import json_error, scan_target_error as _scan_target_error
 from quodeq.services.base import ActionProvider, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
@@ -45,15 +45,13 @@ def _parse_create_project_request(
     (parsed, error): parsed is None on failure, error is None on success."""
     repo = (data.get("repo") or "").strip()
     if not repo:
-        body, status = error_response("repo is required", HTTPStatus.BAD_REQUEST, "MISSING_REPO")
-        return None, (jsonify(body), status)
+        return None, json_error("repo is required", HTTPStatus.BAD_REQUEST, "MISSING_REPO")
 
     scope_path = data.get("scopePath") or None
     if scope_path is not None:
         err = relative_scope_error(str(scope_path))
         if err is not None:
-            body, status = error_response(err, HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
-            return None, (jsonify(body), status)
+            return None, json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
     discipline = data.get("discipline") or None
     clone_dest = data.get("cloneDest") or None
     ephemeral = bool(data.get("ephemeral", False))
@@ -62,8 +60,7 @@ def _parse_create_project_request(
     try:
         is_url = is_repo_url(repo)
     except ValueError:
-        body, status = error_response("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
-        return None, (jsonify(body), status)
+        return None, json_error("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
 
     return _CreateProjectRequest(
         repo=repo, discipline=discipline, scope_path=scope_path,
@@ -77,12 +74,11 @@ def _resolve_create_project_clone_dest(
 ) -> tuple[str | None, tuple[Response, int] | None]:
     """For a URL repo, resolve/validate cloneDest. Returns (resolved_clone_dest, error)."""
     if not ephemeral and not clone_dest:
-        body, status = error_response(
+        return None, json_error(
             "cloneDest is required for URL repos when ephemeral is false",
             HTTPStatus.BAD_REQUEST,
             "MISSING_CLONE_DEST",
         )
-        return None, (jsonify(body), status)
     if not ephemeral and clone_dest:
         try:
             # Containment and the directory check both live in the try
@@ -93,19 +89,17 @@ def _resolve_create_project_clone_dest(
             if not os.path.isdir(dest):
                 raise ValueError("cloneDest is not an existing directory")
         except OSError:
-            body, status = error_response(
+            return None, json_error(
                 "Invalid cloneDest path",
                 HTTPStatus.BAD_REQUEST,
                 "INVALID_CLONE_DEST",
             )
-            return None, (jsonify(body), status)
         except ValueError:
-            body, status = error_response(
+            return None, json_error(
                 "cloneDest must be an existing directory under your home folder",
                 HTTPStatus.BAD_REQUEST,
                 "INVALID_CLONE_DEST",
             )
-            return None, (jsonify(body), status)
         # Hand the *contained* path to the cloner. The previous code
         # resolved into a local and then passed the raw request string
         # on, so the check guarded a value nothing downstream used.
@@ -127,12 +121,11 @@ def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[R
             if local_candidate.exists()
             else "does not exist"
         )
-        body, status = error_response(
+        return json_error(
             f"Local repo path {detail}",
             HTTPStatus.BAD_REQUEST,
             "INVALID_REPO",
         )
-        return jsonify(body), status
     # Same allowlist as /api/scan: registering a project scans it and
     # persists the file tree, so an unvalidated path here would leak
     # arbitrary readable directories through project endpoints.
@@ -148,12 +141,15 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
     response. Returns None for a successful result (caller handles that)."""
     if result.status == "duplicate":
         return (
-            jsonify({"error": "Project already exists", "existingProjectId": result.existing_project_id}),
+            jsonify({
+                "error": "Project already exists",
+                "code": "PROJECT_EXISTS",
+                "existingProjectId": result.existing_project_id,
+            }),
             HTTPStatus.CONFLICT,
         )
     if result.status == "invalid_repo":
-        body, status = error_response(result.message, HTTPStatus.BAD_REQUEST, "INVALID_REPO")
-        return jsonify(body), status
+        return json_error(result.message, HTTPStatus.BAD_REQUEST, "INVALID_REPO")
     if result.status == "clone_failed":
         code_map = {
             "auth": ("AUTH_REQUIRED", HTTPStatus.BAD_REQUEST),
@@ -164,18 +160,16 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
             "unknown": ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY),
         }
         code, status = code_map.get(result.clone_error_kind, ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY))
-        body, _ = error_response(result.message, status, code)
-        return jsonify(body), status
+        return json_error(result.message, status, code)
     if result.status == "internal_error":
         # Return a generic message; the exception detail (which can carry
         # filesystem paths or backend internals) is already logged by the
         # provider, not sent to the remote caller.
-        body, status = error_response(
+        return json_error(
             "Registration failed due to an internal error.",
             HTTPStatus.INTERNAL_SERVER_ERROR,
             "REGISTRATION_FAILED",
         )
-        return jsonify(body), status
     return None
 
 

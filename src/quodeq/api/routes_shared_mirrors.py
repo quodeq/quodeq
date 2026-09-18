@@ -18,7 +18,7 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error, page_params
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
 from quodeq.services._runs_unit import build_runs_unit
@@ -90,8 +90,7 @@ def _load_or_500(
         return load(), None
     except Exception:
         _logger.exception(log_msg, project)
-        body, status = error_response(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-        return None, (jsonify(body), status)
+        return None, json_error(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
 
 
 @_with_shared_root
@@ -106,8 +105,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     if err:
         return err
     if not info:
-        body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     # Same publishedBy/publishedAt enrichment as the list route
     # (shared_projects above) -- without it the UI's shared-project hero
     # badge has no "published by <name>" to show. `project` here is the
@@ -142,8 +140,7 @@ def shared_dashboard(project: str, eval_root: Path, url: str):
     try:
         payload = _fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
     except FileNotFoundError:
-        body, status = error_response("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(payload)
 
 
@@ -155,8 +152,7 @@ def shared_accumulated(project: str, eval_root: Path, url: str):
     as_of = request.args.get("asOf")
     payload = _fs_reports.get_accumulated(str(eval_root), project, as_of)
     if payload is None:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(payload)
 
 
@@ -173,8 +169,7 @@ def shared_scores(project: str, eval_root: Path, url: str):
     if err:
         return err
     if result is None:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(result)
 
 
@@ -191,8 +186,7 @@ def shared_compare_summary(project: str, eval_root: Path, url: str):
     if err:
         return err
     if result is None:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(result)
 
 
@@ -204,8 +198,7 @@ def shared_run_scores(project: str, run_id: str, eval_root: Path, url: str):
     try:
         result = get_scores_slim(eval_root, project, run_id)
     except FileNotFoundError:
-        body, status = error_response("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(result)
 
 
@@ -217,8 +210,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path, url: str):
         return err
     payload = _fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
     if payload is None:
-        body, status = error_response("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     if payload.get("waiting"):
         return jsonify(payload), HTTPStatus.ACCEPTED
     return jsonify(payload)
@@ -233,8 +225,7 @@ def shared_violations(project: str, eval_root: Path, url: str):
     try:
         payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
     except FileNotFoundError:
-        body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
+        return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(to_camel_dict(payload))
 
 
@@ -246,9 +237,11 @@ def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., l
     project_dir = _shared_project_dir(eval_root, project)
     if project_dir is None:
         return jsonify([])
-    raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
-    limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
-    offset = max(0, request.args.get("offset", 0, type=int))
+    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    if isinstance(paging[0], dict):
+        return paging
+    limit, offset = paging
+    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
     return jsonify(lister(project_dir, offset=offset, limit=limit))
 
 

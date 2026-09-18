@@ -110,7 +110,8 @@ async function importEvaluator(data, force, onImported, state, importStandard) {
       setStep(STEP.WARNINGS);
       return;
     }
-    onImported();
+    // The server echoes the stored standard; fall back to the file's own id.
+    onImported(result.detail?.id ?? data?.id);
   } catch (err) {
     setError(apiErrorMessage(err, 'standards.importFailed'));
     setStep(STEP.ERROR);

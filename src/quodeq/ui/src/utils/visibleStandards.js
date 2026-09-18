@@ -1,4 +1,7 @@
-import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
+import {
+  VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS,
+  STANDARDS_CHANGED_REASON, notifyStandardsChanged,
+} from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
 import { countBySeverity } from './severity.js';
 import { readJSON, writeString } from '../adapters/storage.js';
@@ -54,6 +57,9 @@ export function resetWriteGeneration() {
 export function writeVisibleStandardIds(ids, storage = localStorage) {
   storage.setItem(VISIBLE_STANDARDS_STORAGE_KEY, JSON.stringify(ids));
   writeGeneration += 1;
+  // Same-tab consumers (the Evaluate picker) read this cache synchronously
+  // and only on mount; tell them it moved.
+  notifyStandardsChanged(STANDARDS_CHANGED_REASON.VISIBILITY);
 }
 
 /**

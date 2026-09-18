@@ -12,9 +12,9 @@ import logging
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Response, jsonify
+from flask import Response
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import (
     read_state,
@@ -48,29 +48,28 @@ def _with_shared_root(fn):
     def wrapper(*args, **kwargs):
         settings = read_settings()
         if not settings.url:
-            return jsonify({"error": "no shared repository configured"}), 409
+            return json_error(
+                "no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO"
+            )
         state = read_state(settings.url)
         if state == "unsupported_version":
-            return (
-                jsonify({"error": "this shared repository requires a newer version of quodeq"}),
-                409,
+            return json_error(
+                "this shared repository requires a newer version of quodeq",
+                HTTPStatus.CONFLICT,
+                "UNSUPPORTED_VERSION",
             )
         if state == "foreign":
-            return (
-                jsonify(
-                    {
-                        "error": "the configured repository does not look like a quodeq results repository",
-                        "code": "FOREIGN_REPO",
-                    }
-                ),
-                409,
+            return json_error(
+                "the configured repository does not look like a quodeq results repository"
+                " — reconnect it in Settings",
+                HTTPStatus.CONFLICT,
+                "FOREIGN_REPO",
             )
         if state == "missing":
-            return (
-                jsonify(
-                    {"error": "the shared repository has not been cloned yet — reconnect it in Settings"}
-                ),
-                503,
+            return json_error(
+                "the shared repository has not been cloned yet — reconnect it in Settings",
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "SHARED_REPO_MISSING",
             )
         root = shared_evaluations_root(settings.url)
         with score_cache_path_override(shared_score_cache_path(settings.url)):
@@ -90,8 +89,7 @@ def _validate_segment(*segments: str) -> tuple[Response, int] | None:
     try:
         validate_path_segment(*segments)
     except ValueError:
-        body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
+        return json_error("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     return None
 
 

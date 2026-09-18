@@ -16,6 +16,7 @@ from typing import Callable
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api import _assistant_helpers
+from quodeq.api.helpers import error_response
 from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, cached_skills
@@ -44,10 +45,13 @@ def _validate_session_request(
     """
     provider_cfg = gates.known_provider(str(body.get("provider", "")))
     if provider_cfg is None:
-        return (jsonify({"error": "unknown or unsupported provider"}), 400), ""
+        body_, status = error_response(
+            "unknown or unsupported provider", 400, "INVALID_PROVIDER")
+        return (jsonify(body_), status), ""
     source = str(body.get("source") or SESSION_SOURCE_LOCAL)
     if source not in SESSION_SOURCES:
-        return (jsonify({"error": "invalid source"}), 400), source
+        body_, status = error_response("invalid source", 400, "INVALID_SOURCE")
+        return (jsonify(body_), status), source
     if source == SESSION_SOURCE_SHARED:
         shared_error = gates.shared_source_error()
         if shared_error is not None:

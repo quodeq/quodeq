@@ -59,6 +59,10 @@ Keep pull requests focused on a single change. If you are fixing a bug and also 
   - UI: module-level `const UPPER_SNAKE = value; // reason`. Shared inside a feature: that feature's constants module. App-wide storage keys, event names, DOM attributes, media queries and breakpoints: `src/constants.js`; unit conversions: `src/utils/time.js`. `npm run lint:magic` ratchets bare numbers per file (`tools/magic_baseline.json` may only shrink).
   - Tests keep asserting the literal value: the literal is the contract, the constant is the implementation.
 
+#### API error responses
+
+Every error response from `src/quodeq/api` carries a machine-readable `code`: build it with `error_response(message, status, code)` from `quodeq.api.helpers`, not a bare `jsonify({"error": ...})`. `code` is an UPPER_SNAKE literal; reuse an existing spelling for the same condition (grep `src/quodeq/api` first) rather than inventing a new one. Route modules do not call `abort()`. Raise a small exception and handle it with `@app.errorhandler`, or return `error_response(...)` directly, so the body keeps the `{"error", "code"}` shape instead of Flask's default error page. `tools/check_error_codes.py` enforces this with a zero-tolerance gate: under `src/quodeq/api`, a `jsonify({"error": ...})` or a `return {"error": ...}, <400+>` without a `"code"` key, or an `abort(400+)`, fails the build. A dict literal whose `"error"` value is `None` is exempt: that is a reserved slot in a success payload, not an error response.
+
 ## Branch Model
 
 - `main` is for releases only

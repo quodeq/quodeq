@@ -65,3 +65,57 @@ def test_export_project_rejects_invalid_project_name(client):
     resp = client.get("/api/projects/../export")
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_INPUT"
+
+
+class TestUpdateProjectPathValidation:
+    """finding 5926: update_project_path's distinct failure modes (invalid
+    URL, non-directory target, missing project) get their own message
+    instead of a blanket "Project not found" 404 for all of them."""
+
+    def test_valid_repo_url_reaches_the_provider(self, client, provider):
+        """URL relocation is supported: the UI's "Enter the URL to restore"
+        flow PATCHes this route with a repository URL, and
+        _fs_projects.update_project_path stores it as an online project."""
+        resp = client.patch(
+            "/api/projects/my-proj/path", json={"path": "https://github.com/foo/bar"},
+        )
+        assert resp.status_code == 200
+        assert provider.updated_paths["my-proj"] == "https://github.com/foo/bar"
+
+    def test_malformed_repo_url_is_refused_with_invalid_url(self, client, provider):
+        resp = client.patch(
+            "/api/projects/my-proj/path", json={"path": "https://github.com/"},
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_URL"
+        assert "my-proj" not in provider.updated_paths
+
+    def test_non_string_path_is_refused(self, client, provider):
+        resp = client.patch("/api/projects/my-proj/path", json={"path": 123})
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert "path must be a string" in body["error"]
+        assert "my-proj" not in provider.updated_paths
+
+    def test_cleartext_http_url_names_the_reason(self, client):
+        resp = client.patch(
+            "/api/projects/my-proj/path", json={"path": "http://github.com/foo/bar"},
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "INVALID_INPUT"
+        assert "cleartext" in body["error"].lower()
+
+    def test_non_directory_target_is_invalid_input_not_not_found(self, client, tmp_path):
+        target = tmp_path / "does-not-exist"
+        resp = client.patch("/api/projects/my-proj/path", json={"path": str(target)})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_INPUT"
+
+    def test_missing_project_is_still_not_found_once_path_is_valid(self, client, provider, tmp_path):
+        provider.update_project_path = lambda *a: False
+        resp = client.patch("/api/projects/my-proj/path", json={"path": str(tmp_path)})
+        assert resp.status_code == 404
+        assert resp.get_json()["code"] == "NOT_FOUND"

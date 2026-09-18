@@ -15,9 +15,9 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable
 
-from flask import Flask, Response, abort, jsonify, request
+from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services._dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
@@ -77,6 +77,12 @@ def _project_dir_or_none(evaluations_dir: str, project: str) -> Path | None:
     return Path(resolved) if resolved is not None else None
 
 
+class _ProjectNotFoundError(Exception):
+    """Raised by `_project_dir`; the errorhandler registered in
+    `register_findings_routes` turns it into this file's own
+    {"error", "code"} shape instead of Flask's default 404 body."""
+
+
 def _project_dir(evaluations_dir: str, project: str) -> Path:
     """As above, but 404 when the project has no directory.
 
@@ -86,7 +92,7 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     """
     resolved = _project_dir_or_none(evaluations_dir, project)
     if resolved is None:
-        abort(404, description="Project not found")
+        raise _ProjectNotFoundError(project)
     return resolved
 
 
@@ -118,16 +124,21 @@ def _scores_with_fallback(app: Flask, project: str, run_id: str | None) -> dict[
     return rescore_with_fallback(_eval_dir(app), project, run_id)
 
 
-def _list_project_entries(app: Flask, lister: Callable[..., list]) -> Response:
+def _list_project_entries(
+    app: Flask, lister: Callable[..., list],
+) -> Response | tuple[dict[str, Any], int]:
     """Shared body of the dismissed/verified listings: clamp paging, resolve, list."""
     project = request.args.get("project", "")
     if not project:
         return jsonify([])
     # No limit param → return everything (capped at the hard maximum).
-    # An explicit limit is clamped to [1, _MAX_FINDINGS_LIST_LIMIT].
-    raw_limit = request.args.get("limit", _MAX_FINDINGS_LIST_LIMIT, type=int)
-    limit = max(1, min(raw_limit, _MAX_FINDINGS_LIST_LIMIT))
-    offset = max(0, request.args.get("offset", 0, type=int))
+    # A malformed or out-of-range limit/offset answers 400; an explicit
+    # limit above the hard maximum stays clamped (the UI asks for 5000).
+    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    if isinstance(paging[0], dict):
+        return paging
+    limit, offset = paging
+    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
     project_dir = _project_dir_or_none(_eval_dir(app), project)
     if project_dir is None:
         return jsonify([])
@@ -199,10 +210,9 @@ def _delete(app: Flask) -> tuple[Response, int]:
 
 def _delete_all(app: Flask) -> tuple[Response, int]:
     if request.args.get("confirm") != "true":
-        err_body, status = error_response(
+        return json_error(
             "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
         )
-        return jsonify(err_body), status
     body = request.get_json(silent=True) or {}
     project = body.get("project", "")
     run_id = body.get("run_id") or body.get("runId")
@@ -226,8 +236,15 @@ def _unverify(app: Flask) -> tuple[Response, int]:
 def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
 
+    @app.errorhandler(_ProjectNotFoundError)
+    def _handle_project_not_found(_exc: _ProjectNotFoundError) -> tuple[Response, int]:
+        # Same {"error", "code"} shape every other error branch in this
+        # file returns, instead of Flask's default 404 HTML page that the
+        # bare abort() _project_dir used to call would give.
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+
     @app.get("/api/findings/dismissed")
-    def list_dismissed() -> Response:
+    def list_dismissed() -> Response | tuple[dict[str, Any], int]:
         return _list_project_entries(app, load_dismissed)
 
     @app.post("/api/findings/dismiss")
@@ -251,7 +268,7 @@ def register_findings_routes(app: Flask) -> None:
         return _delete_all(app)
 
     @app.get("/api/findings/verified")
-    def list_verified() -> Response:
+    def list_verified() -> Response | tuple[dict[str, Any], int]:
         return _list_project_entries(app, verified_entries)
 
     @app.post("/api/findings/unverify")

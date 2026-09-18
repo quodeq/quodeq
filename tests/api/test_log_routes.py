@@ -71,6 +71,40 @@ def test_logs_js_caps_the_dom_with_max_lines():
     assert "removeChild" in text
 
 
+def test_logs_page_has_aria_live_log_region():
+    """New lines must be announced to assistive tech (finding 7329)."""
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert 'role="log"' in text
+    assert 'aria-live="polite"' in text
+
+
+def test_logs_page_has_a_status_region():
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert 'id="log-status"' in text
+    assert 'role="status"' in text
+
+
+def test_logs_js_reports_a_stalled_poll():
+    """A failed poll must show a visible status, not just console.warn
+    (finding 7334); the next successful poll clears it."""
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs.js")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert "console.warn" in text
+    assert "log-status" in text
+    assert "retrying" in text
+
+
 def test_logs_css_served():
     app = create_app()
     client = app.test_client()
