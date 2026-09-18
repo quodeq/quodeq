@@ -9,6 +9,7 @@ a poll only reads what was appended since the previous one.
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path, PureWindowsPath
 
@@ -139,6 +140,14 @@ def test_a_new_standard_on_disk_starts_a_fresh_tally(tmp_path):
 
     before = evaluators_dir.stat().st_mtime_ns
     (evaluators_dir / "custom.json").write_text("{}")
+    # Windows directory mtime is coarse enough that a write landing in the same
+    # filesystem tick leaves st_mtime_ns untouched, which tripped this
+    # precondition before the assertion below it ever ran. What is under test is
+    # that a CHANGED standards stamp starts a fresh tally, not how quickly the OS
+    # notices the write, so move the stamp ourselves when the write did not.
+    if evaluators_dir.stat().st_mtime_ns == before:
+        bumped = before + 1_000_000_000
+        os.utime(evaluators_dir, ns=(bumped, bumped))
     assert evaluators_dir.stat().st_mtime_ns != before, "dir mtime did not move"
 
     # A fresh _ctx on purpose: the stamp is re-read from disk, not cached.
