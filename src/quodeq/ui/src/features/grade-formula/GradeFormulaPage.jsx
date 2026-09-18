@@ -16,11 +16,13 @@ const TABS = [
 
 function TabButtons({ tab, setTab }) {
   return (
-    <div className="gf-tabs">
+    <div className="gf-tabs" role="tablist" aria-label={t('gradeFormula.tabsAria')}>
       {TABS.map((tabDef) => (
         <button
           key={tabDef.id}
           type="button"
+          role="tab"
+          aria-selected={tab === tabDef.id}
           className={`gf-tab${tab === tabDef.id ? ' gf-tab--active' : ''}`}
           onClick={() => setTab(tabDef.id)}
         >
@@ -45,6 +47,7 @@ function TabBody({ busy, ActiveBody, draft, update }) {
   return (
     <fieldset
       className="gf-tab-body"
+      role="tabpanel"
       disabled={busy}
       style={{ margin: 0, minInlineSize: 'auto' }}
     >

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
@@ -8,7 +9,7 @@ import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
 
-function ModelSelector({ value, models, onChange }) {
+function ModelSelector({ value, models, onChange, labelId }) {
   const needsModel = !value;
   const hasModels = models.length > 0;
   return (
@@ -18,6 +19,7 @@ function ModelSelector({ value, models, onChange }) {
           className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          aria-labelledby={labelId}
         >
           <option value="">{t('settings.pickAModel')}</option>
           {models.map((m) => (
@@ -31,6 +33,7 @@ function ModelSelector({ value, models, onChange }) {
           placeholder="mlx-community/gemma-3-4b-it-4bit"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          aria-labelledby={labelId}
         />
       )}
       {needsModel && (
@@ -45,16 +48,17 @@ function ModelSelector({ value, models, onChange }) {
 }
 
 function OmlxModelRow({ state, models, update }) {
+  const labelId = useId();
   return (
     <div className="settings-row">
       <div className="settings-row-label">
         <span className="settings-label-row">
-          <span className="settings-label">{t('settings.modelLabel')}</span>
+          <span className="settings-label" id={labelId}>{t('settings.modelLabel')}</span>
           <HelpHint label={t('settings.modelHelpAria')}>{tRich('settings.omlxModelHint')}</HelpHint>
         </span>
         <span className="settings-description">{t('settings.thisModelEveryStep')}</span>
       </div>
-      <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} />
+      <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
     </div>
   );
 }

@@ -72,7 +72,7 @@ describe('GradeFormulaPage', () => {
     // Severity tab body shows the critical slider.
     expect(screen.getByLabelText('critical')).toBeInTheDocument();
     // Switch to Dimensions: its toggle button appears, severity slider goes away.
-    fireEvent.click(screen.getByRole('button', { name: 'DIMENSIONS' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'DIMENSIONS' }));
     expect(screen.getByText('apply dimension weights')).toBeInTheDocument();
     expect(screen.queryByLabelText('critical')).not.toBeInTheDocument();
   });
@@ -151,7 +151,7 @@ describe('GradeFormulaPage', () => {
     it('blocks boundary-bar drags while busy:true — update is NOT called', () => {
       const state = mockHook({ busy: true });
       render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
-      fireEvent.click(screen.getByRole('button', { name: 'BOUNDARIES' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'BOUNDARIES' }));
 
       const divider = screen.getByLabelText('Boundary 1');
       fireEvent.pointerDown(divider, { clientX: 30 });
@@ -164,7 +164,7 @@ describe('GradeFormulaPage', () => {
     it('allows boundary-bar drags while busy:false — update IS called', () => {
       const state = mockHook({ busy: false });
       render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
-      fireEvent.click(screen.getByRole('button', { name: 'BOUNDARIES' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'BOUNDARIES' }));
 
       const divider = screen.getByLabelText('Boundary 1');
       fireEvent.pointerDown(divider, { clientX: 30 });

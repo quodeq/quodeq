@@ -61,6 +61,7 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
         placeholder={t('standards.cweSearchPlaceholder')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        aria-label={t('standards.cweSearchAria')}
       />
       <select
         className="cwe-browser-filter"
@@ -104,7 +105,7 @@ function CweBrowserModal({ onSelect, onClose }) {
       <div className="cwe-browser-modal" onClick={(e) => e.stopPropagation()}>
         <div className="cwe-browser-header">
           <h3 className="cwe-browser-title">{t('standards.selectCweTitle')}</h3>
-          <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label={t('common.closeDialogAria')}>&times;</button>
         </div>
         <CweFilterBar searchRef={searchRef} query={query} setQuery={setQuery} filterAbstraction={filterAbstraction} setFilterAbstraction={setFilterAbstraction} />
         {cweError && <div className="error-banner">{cweError}</div>}
