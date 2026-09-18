@@ -1,15 +1,8 @@
 {
-  "src/components/FileCopyBtn.jsx": 1,
-  "src/features/evaluation/components/FolderBrowser.jsx": 2,
-  "src/features/evaluation/hooks/useDimensionSelection.js": 1,
-  "src/features/evaluation/hooks/useEvaluationForm.js": 1,
   "src/features/explorer/components/explorerPrincipleView.js": 1,
   "src/features/grade-formula/GradeFormulaPage.jsx": 1,
   "src/features/onboarding/hooks/useActiveProviderState.js": 3,
   "src/features/onboarding/hooks/useRepoScanStep.js": 1,
-  "src/features/settings/hooks/useProviderSettings.js": 1,
-  "src/features/side-pane/SidePaneWindow.jsx": 1,
   "src/features/violations/components/dimensionHeatGridModel.js": 2,
-  "src/hooks/useProjectState.js": 1,
   "src/utils/evalPrincipal.js": 1
 }

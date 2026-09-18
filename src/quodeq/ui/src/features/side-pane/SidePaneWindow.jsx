@@ -131,6 +131,9 @@ export function SidePaneWindow({ spec, onClose }) {
     // copyToClipboard resolves `false` (never rejects) on failure.
     copyToClipboard(spec.copy()).then((ok) => {
       if (ok) setJustCopied(true);
+    }).catch((err) => {
+      // copyToClipboard never rejects; defense in depth in case that changes.
+      console.warn('[SidePaneWindow] unexpected clipboard error:', err);
     });
   }, [spec]);
 

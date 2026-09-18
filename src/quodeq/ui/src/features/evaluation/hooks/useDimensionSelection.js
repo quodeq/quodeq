@@ -96,10 +96,9 @@ export function useDimensionSelection({ allDimensions, info, branch, scopePath, 
     // a failed start rejects. Eating the toggle in either case makes the
     // user's retry silently run incremental.
     if (cleanScan === CLEAN_PERSIST.ONCE && result !== false) {
-      Promise.resolve(result).then(
-        () => setCleanScan(CLEAN_PERSIST.OFF),
-        () => {},
-      );
+      Promise.resolve(result)
+        .then(() => setCleanScan(CLEAN_PERSIST.OFF))
+        .catch((err) => console.warn('[useDimensionSelection] scan start failed:', err));
     }
   };
 

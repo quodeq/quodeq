@@ -106,7 +106,12 @@ export function useRunEventStream(jobId) {
     if (!jobId) return undefined;
 
     const writeCache = (key, updater) => {
-      queryClient.cancelQueries({ queryKey: key });
+      // Fire-and-forget by design (see file-level comment): the setQueryData
+      // write below must not wait on the cancel. Still log a rejection
+      // instead of letting it vanish as an unhandled promise rejection.
+      queryClient.cancelQueries({ queryKey: key }).catch((err) => {
+        console.warn('[useRunEventStream] cancelQueries failed:', err);
+      });
       queryClient.setQueryData(key, updater);
     };
 

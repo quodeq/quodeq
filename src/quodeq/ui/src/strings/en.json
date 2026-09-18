@@ -665,6 +665,7 @@
   "help.termSub": "how quodeq works and how to get the most out of it",
   "helpFigure.weightChip": "{severity} {value}",
   "history.accumulatedLabel": "Accumulated",
+  "history.chartRenderFailed": "The chart could not be displayed.",
   "history.colDate": "DATE",
   "history.colDelta": "Δ",
   "history.colDims": "DIMENSIONS CHANGED",

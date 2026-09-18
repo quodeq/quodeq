@@ -13,8 +13,10 @@ function makeHandleDelete({ deleteStandard, setMutationError, refresh }) {
       await deleteStandard(id);
       setMutationError(null);
       await refresh();
+      return true;
     } catch (err) {
       setMutationError(apiErrorMessage(err, 'standards.deleteFailed'));
+      return false;
     }
   };
 }

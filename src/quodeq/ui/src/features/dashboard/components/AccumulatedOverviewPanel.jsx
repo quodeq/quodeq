@@ -9,7 +9,9 @@ const RunHistoryPanel = lazy(runHistoryPanelImport);
 // committing its RunHistoryPanelPlaceholder fallback — otherwise a cold
 // boot pays a placeholder beat inside otherwise-real content.
 export function preloadRunHistoryPanel() {
-  runHistoryPanelImport();
+  runHistoryPanelImport().catch((err) => {
+    console.warn('[AccumulatedOverviewPanel] chart chunk preload failed:', err);
+  });
 }
 import RunHistoryPanelPlaceholder from './RunHistoryPanelPlaceholder.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { Component, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 import HistoryChartPanelPlaceholder from './HistoryChartPanelPlaceholder.jsx';
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
@@ -7,6 +7,19 @@ import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
+
+// The lazy-loaded chart panel had no error boundary around its Suspense: a
+// chunk-load failure (offline, deploy skew) or a render throw inside the
+// chart used to crash the whole History page instead of just the chart.
+class ChartErrorBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error, info) { console.warn('[HistoryContent] chart panel failed:', error, info); }
+  render() {
+    if (this.state.failed) return <p className="inline-error inline-error--spaced">{t('history.chartRenderFailed')}</p>;
+    return this.props.children;
+  }
+}
 
 const TOAST_DISMISS_MS = 2600;
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
@@ -116,9 +129,11 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
         availableRuns={availableRuns} runNav={runNav} onRunClick={onRunClick}
       />
 
-      <Suspense fallback={<HistoryChartPanelPlaceholder />}>
-        <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
-      </Suspense>
+      <ChartErrorBoundary>
+        <Suspense fallback={<HistoryChartPanelPlaceholder />}>
+          <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+        </Suspense>
+      </ChartErrorBoundary>
 
       <EvaluationsTable
         visible={visible}

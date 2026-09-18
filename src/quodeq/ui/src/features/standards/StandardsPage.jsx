@@ -9,7 +9,7 @@ import { TermHeader } from '../../components/terminal/index.js';
 import { useAppState } from '../../hooks/useAppState.js';
 import { t } from '../../strings/index.js';
 
-function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
+export function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
   const [view, setView] = useState({ mode: 'list' });
   const [showImport, setShowImport] = useState(false);
 
@@ -18,7 +18,16 @@ function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisibl
   const handleEditorBack = () => { setView({ mode: 'list' }); refresh(); };
   const handleSaved = (savedId) => { if (savedId) addVisible(savedId); setView({ mode: 'list' }); refresh(); };
   const handleImported = (importedId) => { if (importedId) addVisible(importedId); setShowImport(false); refresh(); };
-  const handleDeleteWithCleanup = async (id) => { removeVisible(id); await handleDelete(id); };
+  const handleDeleteWithCleanup = async (id) => {
+    removeVisible(id);
+    const ok = await handleDelete(id);
+    if (!ok) {
+      // Delete failed server-side: restore the optimistic visibility removal
+      // instead of leaving the standard hidden while it still exists.
+      console.warn('[StandardsPage] delete failed, restoring visibility for', id);
+      addVisible(id);
+    }
+  };
 
   return {
     view,
