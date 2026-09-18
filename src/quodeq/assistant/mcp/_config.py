@@ -24,9 +24,11 @@ def _server_argv(server_args: list[str]) -> list[str]:
     return [sys.executable, *_SERVER_MODULE, *server_args]
 
 
-def write_mcp_config(server_args: list[str], path: Path) -> None:
+def write_mcp_config(server_args: list[str], path: Path, *, tools: tuple[str, ...] | None = None) -> None:
     payload = {"mcpServers": {_SERVER_NAME: {
         "command": sys.executable, "args": [*_SERVER_MODULE, *server_args]}}}
+    if tools is not None:
+        payload["mcpServers"][_SERVER_NAME]["tools"] = list(tools)
     path.write_text(json.dumps(payload), encoding="utf-8")
     os.chmod(path, 0o600)
 

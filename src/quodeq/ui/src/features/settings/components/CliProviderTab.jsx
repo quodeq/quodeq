@@ -1,9 +1,10 @@
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { TimeLimitSetting, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
-import { CliAdvancedPanel, ModelTextInput } from './CliAdvancedPanel.jsx';
+import { CliAdvancedPanel, CliModelInput } from './CliAdvancedPanel.jsx';
 import { useCliProviderTab } from '../hooks/useCliProviderTab.js';
 import { t } from '../../../strings/index.js';
+import { CopilotModelStatus } from './CopilotModelSelect.jsx';
 
 export default function CliProviderTab({ providerId, state, update }) {
   const {
@@ -12,6 +13,7 @@ export default function CliProviderTab({ providerId, state, update }) {
 
   return (
     <>
+      {providerId === 'copilot' && <CopilotModelStatus />}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label-row">
@@ -21,7 +23,7 @@ export default function CliProviderTab({ providerId, state, update }) {
           <span className="settings-description">{t('settings.pickModelYouWant')}</span>
         </div>
         <div className="settings-model-field">
-          <ModelTextInput value={state.model} onChange={(v) => update('model', v)} required />
+          <CliModelInput providerId={providerId} value={state.model} onChange={(v) => update('model', v)} required />
           {!state.model && <span className="settings-model-hint">{t('settings.pickModelToStart')}</span>}
         </div>
       </div>

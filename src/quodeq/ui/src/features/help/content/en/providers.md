@@ -11,13 +11,43 @@ Routes through a hosted API using your key. Good when you want the latest fronti
 
 Use **Test connection** in the provider tab to verify the key and model before launching a real run.
 
-### CLI (Claude Code, Codex, Gemini)
+### CLI (Claude Code, Codex, Gemini, GitHub Copilot)
 
 Delegates to an AI CLI you already have authenticated on your machine. The CLI handles auth and billing; Quodeq drives it.
 
 1. Install and sign in to your CLI of choice (Claude Code, Codex, Gemini CLI).
 2. In **Settings → CLI Provider**, pick the binary and a model id like `gpt-5` or `claude-sonnet-4-6`.
 3. Optionally pin a different model per power tier (Fast, Balanced, Thorough).
+
+#### GitHub Copilot
+
+Install GitHub Copilot CLI with `npm install -g @github/copilot`. Quodeq uses a
+dedicated profile for evaluations and the embedded assistant. Sign in once with
+your Copilot account:
+
+```bash
+COPILOT_HOME="$HOME/.quodeq/copilot" copilot login
+```
+
+In PowerShell, set `$env:COPILOT_HOME="$HOME/.quodeq/copilot"` before running
+`copilot login`, then remove it with `Remove-Item Env:COPILOT_HOME`.
+
+Select **GitHub Copilot** in Settings. The model dropdown loads the models
+available to your signed-in account. Choose **Auto** or a specific model.
+The evaluation, assistant, and tier-override selectors use the same account list.
+Company policy, model access and usage limits still apply.
+For Enterprise Cloud data residency, add `--host YOUR-ENTERPRISE.ghe.com` to login.
+Repeat the same login command if authentication expires.
+
+The setup message is hidden after a successful model lookup. If discovery fails,
+the message and error are shown with **Retry connection**. No prompt is sent to
+a model when loading this list.
+
+The dedicated profile does not reuse your normal Copilot login, plugins or MCP
+servers. Keep it for Quodeq only. Hooks, custom instructions and built-in MCP
+servers are disabled. Evaluations can read source files and report findings;
+the assistant uses only Quodeq's tools and existing write-grant controls.
+Copilot does not support the assistant's web toggle.
 
 ### Ollama (local, private)
 

@@ -1,0 +1,155 @@
+import json
+from unittest.mock import Mock
+
+import pytest
+
+from quodeq.analysis._command import _build_ai_cmd, _build_analysis_env
+from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
+from quodeq.analysis.subprocess import _run_cli_analysis
+from quodeq.config.ai_provider import PROVIDERS
+from quodeq.services.tooling_mixin import FsToolingMixin, get_allowed_client_ids
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+
+def test_copilot_is_discoverable_and_keyless(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: "/bin/copilot" if name == "copilot" else None)
+    clients = FsToolingMixin().get_ai_clients(env={})["clients"]
+    assert {"id": "copilot", "label": "GitHub Copilot", "type": "cli", "installed": True} in clients
+    assert "copilot" in get_allowed_client_ids(env={})
+    assert PROVIDERS["copilot"] == ("", "copilot")
+
+
+def test_copilot_model_listing_uses_account_discovery_not_interactive_cli(monkeypatch):
+    run = Mock()
+    monkeypatch.setattr("quodeq.services.tooling_mixin.run_cli_models_command", run)
+    discover = Mock(return_value={"models": ["auto", "gpt-test"]})
+    monkeypatch.setattr("quodeq.services.tooling_mixin.fetch_copilot_models", discover)
+    assert FsToolingMixin().get_client_models("copilot") == {"models": ["auto", "gpt-test"]}
+    discover.assert_called_once()
+    run.assert_not_called()
+
+
+def test_copilot_analysis_args_and_scoped_mcp(tmp_path):
+    config = AnalysisConfig(
+        ai_cmd="copilot", ai_model="claude-sonnet-4.6",
+        jsonl_file=tmp_path / "findings.jsonl", queue_path=tmp_path / "queue.json",
+        agent_id="agent-2", max_turns=3, analysis_budget=1,
+    )
+    args, path = _build_ai_cmd("Inspect sources", config, work_dir=tmp_path)
+    try:
+        assert args[0] == "copilot"
+        assert args[args.index("--output-format") + 1] == "json"
+        assert args[args.index("--additional-mcp-config") + 1] == f"@{path}"
+        assert args[args.index("--model") + 1] == "claude-sonnet-4.6"
+        assert args[args.index("--allow-tool") + 1] == "findings"
+        assert "--available-tools" in args
+        assert all(tool in args for tool in ("view", "glob", "grep", "findings"))
+        assert "--disable-builtin-mcps" in args
+        assert "--no-custom-instructions" in args
+        assert "Use view, glob and grep" in args[-1]
+        assert not {"--tools", "--strict-mcp-config", "--max-turns",
+                    "--max-budget-usd", "--allow-all-tools", "--yolo"} & set(args)
+        payload = json.loads(path.read_text())
+        server = payload["mcpServers"]["findings"]
+        assert server["tools"] == ["*"]
+        assert "agent-2" in server["args"]
+        assert str(tmp_path / "queue.json") in server["args"]
+        assert str(tmp_path.resolve()) in server["args"]
+    finally:
+        if path:
+            path.unlink(missing_ok=True)
+
+
+def test_copilot_analysis_env_uses_dedicated_profile(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    env = _build_analysis_env("copilot", env={
+        "PATH": "/bin", "COPILOT_HOME": "/personal-profile",
+        "COPILOT_GITHUB_TOKEN": "not-inherited", "GH_TOKEN": "not-inherited",
+        "GITHUB_TOKEN": "not-inherited", "COPILOT_ALLOW_ALL": "true",
+        "COPILOT_PROVIDER_BASE_URL": "https://not-copilot.invalid",
+    })
+    assert env["COPILOT_HOME"] == str(tmp_path / ".quodeq" / "copilot")
+    assert not {"GH_TOKEN", "GITHUB_TOKEN", "COPILOT_GITHUB_TOKEN",
+                "COPILOT_ALLOW_ALL", "COPILOT_PROVIDER_BASE_URL"} & env.keys()
+    config = json.loads((tmp_path / ".quodeq/copilot/settings.json").read_text())
+    assert config["disableAllHooks"] is True
+
+
+def test_copilot_evaluation_uses_scratch_cwd_and_cleans_mcp(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    captured = {}
+
+    def spawn(args, work_dir, env, paths, cfg):
+        captured.update(args=args, cwd=work_dir, env=env)
+        assert work_dir != tmp_path
+        assert work_dir.is_dir()
+        mcp = args[args.index("--additional-mcp-config") + 1]
+        captured["mcp"] = mcp[1:]
+        paths.stream_file.write_text('{"type":"result","exitCode":0}\n')
+        return Mock(returncode=0), False
+
+    monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
+    cfg = AnalysisConfig(ai_cmd="copilot", jsonl_file=tmp_path / "f.jsonl")
+    _run_cli_analysis(tmp_path, "Inspect sources", tmp_path / "s.jsonl", cfg)
+    from pathlib import Path
+    assert not Path(captured["mcp"]).exists()
+    assert not captured["cwd"].exists()
+    args = captured["args"]
+    assert args[args.index("--add-dir") + 1] == str(tmp_path)
+    assert str(tmp_path) in args[-1]
+
+
+def test_copilot_stdout_auth_error_aborts_evaluation(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    def spawn(args, work_dir, env, paths, cfg):
+        paths.stream_file.write_text(json.dumps({
+            "type": "session.error",
+            "data": {"errorType": "authentication", "message": "Sign in to GitHub Copilot"},
+        }) + "\n")
+        return Mock(returncode=1), False
+
+    monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
+    with pytest.raises(FatalProviderError, match="Sign in") as exc:
+        _run_cli_analysis(tmp_path, "hi", tmp_path / "s.jsonl", AnalysisConfig(ai_cmd="copilot"))
+    assert exc.value.reason == "auth"
+
+
+@pytest.mark.parametrize("event", [
+    {"type": "session.error", "data": {"message": "Model unavailable"}},
+    {"type": "result", "exitCode": 1},
+])
+def test_copilot_error_stream_is_invalid(tmp_path, event):
+    stream = tmp_path / "s.jsonl"
+    stream.write_text(json.dumps(event))
+    assert is_stream_valid(stream) is False
+
+
+def test_copilot_mcp_status_after_initial_events(tmp_path):
+    stream = tmp_path / "s.jsonl"
+    stream.write_text('\n'.join(json.dumps(e) for e in [
+        {"type": "session.info", "data": {}},
+        {"type": "session.mcp_servers_loaded", "data": {
+            "servers": [{"name": "findings", "status": "connected"}]}},
+    ]))
+    assert get_mcp_status(stream) == "connected"
+
+
+@pytest.mark.parametrize("servers", [None, 42, "invalid", {"findings": "connected"},
+                                     [{"name": "findings", "status": []}]])
+def test_copilot_malformed_mcp_status_is_logged_and_skipped(tmp_path, servers):
+    stream = tmp_path / "s.jsonl"
+    stream.write_text('\n'.join(json.dumps(e) for e in [
+        {"type": "session.mcp_servers_loaded", "data": {"servers": servers}},
+        {"type": "session.mcp_servers_loaded", "data": {
+            "servers": [{"name": "findings", "status": "connected"}]}},
+    ]))
+    log = Mock()
+    assert get_mcp_status(stream, log=log) == "connected"
+    log.debug.assert_called()

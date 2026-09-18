@@ -25,7 +25,7 @@ AI models can now find vulnerabilities and design flaws that human review misses
 Scans any codebase with AI across six quality dimensions from [ISO 25010](https://www.iso.org/standard/35733.html):
 **Security**, **Reliability**, **Maintainability**, **Performance**, **Flexibility**, and **Usability**.
 
-Every finding maps to a [CWE](https://cwe.mitre.org/) identifier. You get grades, violations with line numbers, and a fix plan. Cloud providers (Claude, Gemini, Codex) for speed. Local models via [Ollama](https://ollama.com) for privacy.
+Every finding maps to a [CWE](https://cwe.mitre.org/) identifier. You get grades, violations with line numbers, and a fix plan. Cloud providers (Claude, Gemini, Codex, GitHub Copilot) for speed. Local models via [Ollama](https://ollama.com) for privacy.
 
 ---
 
@@ -102,6 +102,7 @@ ollama serve    # runs in the background
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) — `npm install -g @anthropic-ai/claude-code`
 - [Codex CLI](https://developers.openai.com/codex/quickstart) — `npm install -g @openai/codex`
 - [Gemini CLI](https://geminicli.com/docs/get-started/installation/) — `npm install -g @google/gemini-cli`
+- [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli) (`npm install -g @github/copilot`). Requires a [dedicated Quodeq login](#using-github-copilot).
 
 [llama.cpp](#ai-providers) is also supported. See [AI Providers](#ai-providers) for the
 full list and how to choose.
@@ -225,8 +226,55 @@ Choose what fits your workflow. Configure in **Settings** from the dashboard.
 | [Claude Code](https://code.claude.com/docs/en/quickstart) | Cloud | Best balance of speed, quality, and cost |
 | [Codex CLI](https://developers.openai.com/codex/quickstart) | Cloud | OpenAI models |
 | [Gemini CLI](https://geminicli.com/docs/get-started/installation/) | Cloud | Google models |
+| [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli) | Cloud | Models available through your Copilot account, including company-managed accounts |
 
 > For local analysis we recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) ([`gemma4:26b`](https://ollama.com/library/gemma4:26b)). Reducing the context window to 32k still gives good results and allows running multiple subagents in parallel.
+
+### Using GitHub Copilot
+
+Copilot supports evaluations and the embedded assistant. Install a current GitHub
+Copilot CLI, then sign in once using Quodeq's dedicated profile:
+
+```bash
+npm install -g @github/copilot
+COPILOT_HOME="$HOME/.quodeq/copilot" copilot login
+```
+
+On PowerShell:
+
+```powershell
+$env:COPILOT_HOME = "$HOME/.quodeq/copilot"
+copilot login
+Remove-Item Env:COPILOT_HOME
+```
+
+Use your company account if it provides your Copilot entitlement. For Enterprise
+Cloud with data residency, add `--host YOUR-ENTERPRISE.ghe.com` to the login command.
+Your organization must permit Copilot CLI and the selected model. Subscription
+limits, usage charges and company policies still apply.
+
+Select **GitHub Copilot** in the evaluation or assistant settings. Quodeq loads
+the models available to your signed-in account into a dropdown. Choose **Auto**
+or a specific model. Tier overrides use the same list; leave them on **Use main
+model** to reuse the selected model.
+
+The login instructions disappear when model discovery succeeds. If it fails,
+Quodeq shows the setup instructions, an error, and **Retry connection**. Model
+discovery queries the CLI's model API without sending a prompt or running tools.
+
+Quodeq uses `~/.quodeq/copilot`, not your normal `~/.copilot` profile. It does not
+copy credentials or inherit unrelated API keys, GitHub tokens, Copilot permission
+or BYOK environment overrides. Keep this profile for login and Quodeq sessions only. Custom MCP
+servers and installed plugins in it are rejected. Quodeq disables hooks,
+custom instructions and built-in MCP servers, and runs from a scratch directory.
+Evaluations expose file-reading tools plus Quodeq's findings MCP server; assistant
+turns expose only Quodeq's assistant MCP tools, with the existing write-grant rules.
+The assistant's web toggle is unavailable for Copilot.
+
+If authentication expires, repeat the dedicated-profile login command. Errors
+from model access, company policy and quota restrictions are surfaced rather than
+silently switching providers. Quodeq's evaluation time limits still apply; its
+Claude-specific dollar-budget and maximum-turn flags are not passed to Copilot.
 
 ### Using llama.cpp
 
@@ -299,7 +347,7 @@ otherwise assumes the most pessimistic model, which is how it behaves today.
 There is no Quodeq account, no Quodeq server, and no telemetry. Your source code is read
 locally and evaluation results are written to `~/.quodeq/evaluations/` as plain JSON. If
 you run a local provider, nothing about your code leaves the machine at all. If you pick a
-cloud provider, your code goes to that provider under your own API key and nowhere else.
+cloud provider, your code goes to that provider using your own API key or CLI account.
 
 Quodeq makes exactly one network call of its own: a daily unauthenticated version check
 (PyPI for `pip`/`pipx`/`uv` installs, GitHub Releases for the desktop apps). It shows a
@@ -319,7 +367,7 @@ uv run quodeq             # launch the dashboard
 uv run pytest             # run the test suite
 ```
 
-Same OS prerequisites as the pipx install (Python 3.12+), plus Node 20+ and npm 10+ because a source checkout builds the dashboard UI from the working copy. You also need a configured LLM provider (Ollama or Claude Code / Codex CLI / Gemini CLI) before you can actually scan anything.
+Same OS prerequisites as the pipx install (Python 3.12+), plus Node 20+ and npm 10+ because a source checkout builds the dashboard UI from the working copy. You also need a configured LLM provider (Ollama or Claude Code / Codex CLI / Gemini CLI / GitHub Copilot CLI) before you can actually scan anything.
 
 If the dashboard window doesn't appear on Linux, run `uv run quodeq --browser` (the native window needs `python3-gi` + `gir1.2-webkit2-4.1`, which aren't pulled in by the pip wheel).
 

@@ -123,6 +123,7 @@ from quodeq.data.fs.standards_loader import read_req_to_principle_map  # noqa: F
 
 # AI client discovery: CLI ``/models`` subprocess + Anthropic HTTP API.
 from quodeq.data.cli_models import run_cli_models_command  # noqa: F401
+from quodeq.data.copilot_models import fetch_copilot_models  # noqa: F401
 from quodeq.data.anthropic_models import fetch_anthropic_models  # noqa: F401
 
 # Run discovery + report aggregation (filesystem report parser).

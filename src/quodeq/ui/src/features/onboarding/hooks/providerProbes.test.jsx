@@ -6,6 +6,15 @@ afterEach(() => {
 });
 
 describe('providerProbes – timeout behaviour', () => {
+  it.each([true, false])('detects Copilot only when installed=%s', async (installed) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ clients: [{ id: 'copilot', type: 'cli', installed }] }),
+    }));
+    const results = await runDetection();
+    expect(results.find((r) => r.id === 'copilot')).toMatchObject({ detected: installed });
+  });
+
   function successFetch() {
     return vi.fn().mockResolvedValue({
       ok: true,

@@ -76,8 +76,11 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(provider.get_ai_clients())
 
     @app.get("/api/ai-clients/<client_id>/models")
-    def client_models(client_id: str) -> Response:
-        return jsonify(provider.get_client_models(client_id))
+    def client_models(client_id: str) -> Response | tuple[Response, int]:
+        payload = provider.get_client_models(client_id)
+        if "error" in payload:
+            return json_error(payload["error"], HTTPStatus.SERVICE_UNAVAILABLE, payload["error_code"])
+        return jsonify(payload)
 
     @app.get("/api/ai-clients/<client_id>/cmd-path-check")
     def client_cmd_path_check(client_id: str) -> Response:

@@ -29,6 +29,7 @@ from quodeq.analysis._mcp_arg_builders import (
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
+from quodeq.shared.copilot import build_copilot_env
 
 _log = logging.getLogger(__name__)
 
@@ -50,6 +51,14 @@ def _build_ai_cmd(
     args = _build_base_args(cmd, provider_cfg)
     mcp_args, mcp_config_path = _build_mcp_args(config, provider_cfg, work_dir)
     args.extend(mcp_args)
+    if cmd == "copilot" and work_dir is not None:
+        root = str(work_dir.resolve())
+        args.extend(["--add-dir", root])
+        prompt = (
+            f"Repository root: {root}\nResolve relative source paths against this root.\n"
+            "Use view, glob and grep where instructions refer to Read, Glob and Grep. "
+            "Shell tools are unavailable.\n\n" + prompt
+        )
     args.extend(_build_model_budget_prompt_args(prompt, config, provider_cfg, model))
 
     return args, mcp_config_path
@@ -189,4 +198,6 @@ def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = 
             env[key] = val
     for key in provider_cfg.get("env_remove", []):
         env.pop(key, None)
+    if ai_cmd == "copilot":
+        return build_copilot_env(env)
     return env

@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.data.fs.report_parser import safe_read_dir
-from quodeq.services._wiring import fetch_anthropic_models, run_cli_models_command
+from quodeq.services._wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.utils import get_anthropic_api_key, read_json
 
@@ -47,7 +47,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     )
 
 
-_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini"})
+_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini", "copilot"})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -217,6 +217,7 @@ class FsToolingMixin:
         {"id": "claude", "label": "Claude"},
         {"id": "codex", "label": "Codex"},
         {"id": "gemini", "label": "Gemini"},
+        {"id": "copilot", "label": "GitHub Copilot"},
     ]
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
@@ -261,11 +262,13 @@ class FsToolingMixin:
 
         return {"clients": clients}
 
-    def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, list[str]]:
+    def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, Any]:
         if client_id not in get_allowed_client_ids(env=env):
             return {"models": []}
         if not client_id.isalnum():
             return {"models": []}
+        if client_id == "copilot":
+            return fetch_copilot_models(env=env)
         output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S)
         models = []
         for line in output.splitlines():
@@ -274,7 +277,7 @@ class FsToolingMixin:
                 models.append(token)
         return {"models": models}
 
-    def get_client_models(self, client_id: str) -> dict[str, list[str]]:
+    def get_client_models(self, client_id: str) -> dict[str, Any]:
         """Return available models for a specific AI client."""
         fetcher = self._model_fetchers.get(client_id, self._get_cli_models)
         return fetcher(client_id)

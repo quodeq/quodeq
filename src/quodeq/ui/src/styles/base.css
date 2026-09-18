@@ -1713,6 +1713,13 @@ textarea:focus {
   line-height: 1.5;
 }
 
+.settings-copilot-setup {
+  align-self: stretch;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .settings-install-hint code {
   font-family: var(--font-mono);
   font-size: 0.92em;
@@ -2347,4 +2354,3 @@ fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; curso
   white-space: nowrap;
   border: 0;
 }
-

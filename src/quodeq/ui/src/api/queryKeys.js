@@ -98,6 +98,7 @@ export const standardsKeys = {
 export const settingsKeys = {
   all: () => ["settings"],
   aiClients: () => ["settings", "aiClients"],
+  clientModels: (clientId) => ["settings", "clientModels", clientId],
   knownModels: (providerId) => ["settings", "knownModels", providerId],
   ollamaModels: () => ["settings", "ollamaModels"],
   llamacppModels: () => ["settings", "llamacppModels"],

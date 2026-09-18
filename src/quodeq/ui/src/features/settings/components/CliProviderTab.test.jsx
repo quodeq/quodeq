@@ -5,7 +5,9 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 
-const fakeApi = {};
+const fakeApi = {
+  getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'claude-test'] }),
+};
 
 function makeWrapper() {
   const QueryWrapper = withQueryClient();
@@ -19,6 +21,22 @@ function makeWrapper() {
 }
 
 describe('CliProviderTab', () => {
+  it('offers Copilot account models and hides setup after successful discovery', async () => {
+    const Wrapper = makeWrapper();
+    const update = vi.fn();
+    render(
+      <Wrapper>
+        <CliProviderTab providerId="copilot" state={{ model: 'auto' }} update={update} />
+      </Wrapper>,
+    );
+    await screen.findAllByRole('option', { name: 'claude-test' });
+    expect(screen.queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
+    fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'claude-test' } });
+    expect(update).toHaveBeenCalledWith('model', 'claude-test');
+    fireEvent.change(screen.getByLabelText('Fast model'), { target: { value: 'claude-test' } });
+    expect(update).toHaveBeenCalledWith('model-fast', 'claude-test');
+  });
+
   it('renders a free-text model input pre-populated from state', () => {
     const Wrapper = makeWrapper();
     const state = { model: 'sonnet', subagents: '4', 'time-limit-min': '60' };

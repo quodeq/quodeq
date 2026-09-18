@@ -23,6 +23,7 @@ const INSTALL_INSTRUCTIONS = {
   claude: tRich('settings.installHintClaude'),
   codex: tRich('settings.installHintCodex'),
   gemini: tRich('settings.installHintGemini'),
+  copilot: tRich('settings.installHintCopilot'),
 };
 
 function ProviderPillRow({ clients, activeTab, selectTab }) {

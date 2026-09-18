@@ -9,6 +9,7 @@ const PROVIDER_LABELS = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
   gemini: 'Gemini CLI',
+  copilot: 'GitHub Copilot',
   ollama: 'Ollama',
   openrouter: 'OpenRouter',
   openai: 'OpenAI',
