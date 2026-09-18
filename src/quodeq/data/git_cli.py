@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import unicodedata
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
@@ -59,10 +60,20 @@ def list_tracked_files(
     from a run, so an unanswerable question has to leave the caller's file
     set exactly as it was.
 
-    An empty set is a real answer, not a missing one: a repository with
-    nothing in its index tracks nothing. A submodule's contents are not
-    tracked by the parent repository either, so they are absent here — a
-    submodule is its own repository and is listed by its own index.
+    An empty index is treated as no answer too. A repository between ``git
+    init`` and its first ``git add`` tracks nothing, and filtering on that
+    would score zero files: no baseline exists yet to compare a working tree
+    against, so the honest result is the unfiltered one the caller had
+    before. A submodule's contents are not tracked by the parent repository,
+    so they are absent here and are skipped — a submodule is its own
+    repository and is listed by its own index.
+
+    Each name is recorded in both unicode normalisations. git stores the
+    bytes it was handed, while a filesystem may return a name composed
+    differently (a repository written as NFC and checked out onto a
+    normalising filesystem is the usual way the two diverge), and a
+    byte-exact miss would silently drop a real source file. Keeping both
+    spellings errs toward including a file, which is the safe direction.
     """
     try:
         out = run_git(["-C", str(path), "ls-files", "-z", "--cached"], timeout=timeout)
@@ -73,8 +84,18 @@ def list_tracked_files(
         return None
     if out is None:
         return None
+    rels = [rel for rel in out.split("\0") if rel]
+    if not rels:
+        _logger.info(
+            "No tracked files under %s; scoring the working tree instead", path,
+        )
+        return None
     base = Path(path).resolve()
-    return {base / rel for rel in out.split("\0") if rel}
+    return {
+        base / spelling
+        for rel in rels
+        for spelling in {unicodedata.normalize("NFC", rel), unicodedata.normalize("NFD", rel)}
+    }
 
 
 def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> list[str]:

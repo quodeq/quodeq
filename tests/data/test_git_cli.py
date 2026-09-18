@@ -71,10 +71,38 @@ class TestListTrackedFiles:
 
         assert list_tracked_files(repo / "pkg") == {(repo / "pkg" / "mod.py").resolve()}
 
-    def test_empty_index_is_an_answer_not_a_failure(self, tmp_path):
+    def test_empty_index_does_not_filter(self, tmp_path, caplog):
+        """A repo before its first `git add` has no baseline to filter on.
+
+        Returning an empty set would score zero files, which is never a
+        useful answer, so an empty index falls back to the unfiltered
+        working tree and says why.
+        """
+        import logging
+
         from quodeq.data.git_cli import list_tracked_files
 
-        assert list_tracked_files(_init_repo(tmp_path)) == set()
+        repo = _init_repo(tmp_path)
+        with caplog.at_level(logging.INFO, logger="quodeq.data.git_cli"):
+            assert list_tracked_files(repo) is None
+        assert "No tracked files" in caplog.text
+
+    def test_both_unicode_spellings_of_a_name_are_tracked(self, tmp_path):
+        """git keeps the bytes it was given; a filesystem may compose a name
+        differently, and a byte-exact miss would drop a real source file."""
+        import unicodedata
+
+        from quodeq.data.git_cli import list_tracked_files
+
+        repo = _init_repo(tmp_path)
+        name = unicodedata.normalize("NFC", "café.py")
+        (repo / name).write_text("x = 1\n")
+        sp.run(["git", "-C", str(repo), "add", "-A"], check=True)
+
+        tracked = list_tracked_files(repo)
+        assert tracked is not None
+        for form in ("NFC", "NFD"):
+            assert (repo / unicodedata.normalize(form, name)).resolve() in tracked
 
     def test_non_repo_returns_none(self, tmp_path):
         from quodeq.data.git_cli import list_tracked_files
