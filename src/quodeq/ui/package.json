@@ -22,7 +22,9 @@
     "lint:magic": "node tools/check_magic.mjs",
     "lint:magic:update": "node tools/check_magic.mjs --update",
     "lint:a11y": "node tools/check_a11y.mjs",
-    "lint:a11y:update": "node tools/check_a11y.mjs --update"
+    "lint:a11y:update": "node tools/check_a11y.mjs --update",
+    "lint:fault": "node tools/check_fault.mjs",
+    "lint:fault:update": "node tools/check_fault.mjs --update"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.9",

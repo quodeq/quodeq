@@ -156,3 +156,12 @@ jobs:
         # above its committed ceiling. Shrunk counts are locked in with
         # `npm run lint:a11y:update`.
         run: npm run lint:a11y
+
+      - name: Check UI fault tolerance (fault ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on swallowed catches, floating promises, raw web storage access
+        # or unguarded lookup dereferences in production code beyond the
+        # per-file counts in tools/fault_baseline.json, or a baseline total
+        # above its committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:fault:update`.
+        run: npm run lint:fault
