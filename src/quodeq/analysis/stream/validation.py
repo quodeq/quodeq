@@ -24,9 +24,15 @@ def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
                 servers = d.get("mcp_servers", [])
                 if d.get("type") == "session.mcp_servers_loaded":
                     servers = copilot_event_data(d).get("servers", [])
+                if not isinstance(servers, list):
+                    log.debug(f"Invalid MCP server list in {stream_file}")
+                    continue
                 for srv in servers:
                     if isinstance(srv, dict) and srv.get("name") == _MCP_SERVER_NAME:
-                        return srv.get("status")
+                        status = srv.get("status")
+                        if isinstance(status, str):
+                            return status
+                        log.debug(f"Invalid MCP server status in {stream_file}")
     except (json.JSONDecodeError, OSError) as exc:
         log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None

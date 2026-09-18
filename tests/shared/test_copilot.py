@@ -48,6 +48,17 @@ def test_dedicated_profile_rejects_unrelated_mcp_servers(tmp_path, monkeypatch):
         build_copilot_env({})
 
 
+@pytest.mark.parametrize("content", ["not-json", "[]", "null"])
+def test_invalid_mcp_profile_fails_explicitly_without_overwriting(tmp_path, content):
+    profile = tmp_path / ".quodeq/copilot"
+    profile.mkdir(parents=True)
+    config = profile / "mcp-config.json"
+    config.write_text(content)
+    with pytest.raises(RuntimeError, match="Copilot profile"):
+        build_copilot_env({"HOME": str(tmp_path)})
+    assert config.read_text() == content
+
+
 def test_dedicated_profile_rejects_plugins(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     plugins = tmp_path / ".quodeq/copilot/installed-plugins"
@@ -83,10 +94,11 @@ def test_profile_preserves_unrelated_ide_settings(tmp_path, monkeypatch):
     }
 
 
-def test_profile_home_is_injectable_and_unrelated_secrets_are_not_inherited(tmp_path, monkeypatch):
+@pytest.mark.parametrize("home_key", ["HOME", "USERPROFILE"])
+def test_profile_home_is_injectable_and_unrelated_secrets_are_not_inherited(tmp_path, monkeypatch, home_key):
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "default")
     env = build_copilot_env({
-        "HOME": str(tmp_path), "PATH": "/bin",
+        home_key: str(tmp_path), "PATH": "/bin",
         "ANTHROPIC_API_KEY": "not-inherited", "AWS_SECRET_ACCESS_KEY": "not-inherited",
         "APPDATA": "platform-data", "SYSTEMROOT": "platform-system",
     })

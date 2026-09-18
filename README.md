@@ -259,8 +259,8 @@ and Codex numeric shortcuts are not translated for Copilot. Leave tier overrides
 blank to reuse the selected model.
 
 Quodeq uses `~/.quodeq/copilot`, not your normal `~/.copilot` profile. It does not
-copy credentials or inherit GitHub token, Copilot permission or BYOK environment
-overrides. Keep this profile for login and Quodeq sessions only. Custom MCP
+copy credentials or inherit unrelated API keys, GitHub tokens, Copilot permission
+or BYOK environment overrides. Keep this profile for login and Quodeq sessions only. Custom MCP
 servers and installed plugins in it are rejected. Quodeq disables hooks,
 custom instructions and built-in MCP servers, and runs from a scratch directory.
 Evaluations expose file-reading tools plus Quodeq's findings MCP server; assistant

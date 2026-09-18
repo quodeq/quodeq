@@ -136,3 +136,17 @@ def test_copilot_mcp_status_after_initial_events(tmp_path):
             "servers": [{"name": "findings", "status": "connected"}]}},
     ]))
     assert get_mcp_status(stream) == "connected"
+
+
+@pytest.mark.parametrize("servers", [None, 42, "invalid", {"findings": "connected"},
+                                     [{"name": "findings", "status": []}]])
+def test_copilot_malformed_mcp_status_is_logged_and_skipped(tmp_path, servers):
+    stream = tmp_path / "s.jsonl"
+    stream.write_text('\n'.join(json.dumps(e) for e in [
+        {"type": "session.mcp_servers_loaded", "data": {"servers": servers}},
+        {"type": "session.mcp_servers_loaded", "data": {
+            "servers": [{"name": "findings", "status": "connected"}]}},
+    ]))
+    log = Mock()
+    assert get_mcp_status(stream, log=log) == "connected"
+    log.debug.assert_called()
