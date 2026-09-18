@@ -1,4 +1,5 @@
 import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../constants.js';
+import { writeString } from '../adapters/storage.js';
 
 export const STORAGE_KEY = 'quodeq_selected_project';
 export const SOURCE_STORAGE_KEY = 'quodeq_selected_source';
@@ -11,11 +12,8 @@ export const VALID_SOURCES = Object.values(PROJECT_SOURCE);
  */
 export function persistProject(setter, name, storage = localStorage) {
   setter(name);
-  try {
-    storage.setItem(STORAGE_KEY, name);
-  } catch (err) {
-    console.warn('[projectStateStorage] could not persist project:', err); // private browsing
-  }
+  const ok = writeString(STORAGE_KEY, name, storage);
+  if (!ok) console.warn('[projectStateStorage] could not persist project'); // private browsing
 }
 
 /**
@@ -26,11 +24,8 @@ export function persistProject(setter, name, storage = localStorage) {
 export function persistSource(setter, source, storage = localStorage) {
   const value = VALID_SOURCES.includes(source) ? source : DEFAULT_SOURCE;
   setter(value);
-  try {
-    storage.setItem(SOURCE_STORAGE_KEY, value);
-  } catch (err) {
-    console.warn('[projectStateStorage] could not persist source:', err); // private browsing
-  }
+  const ok = writeString(SOURCE_STORAGE_KEY, value, storage);
+  if (!ok) console.warn('[projectStateStorage] could not persist source'); // private browsing
 }
 
 /**
