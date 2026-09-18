@@ -8,7 +8,10 @@ export function computeComplianceByPrinciple(evalData) {
   const map = new Map();
   for (const c of (evalData?.compliance || [])) {
     if (!map.has(c.principle)) map.set(c.principle, []);
-    map.get(c.principle).push(c);
+    // has()+set() above guarantee an entry here: one lookup into a local,
+    // not a re-derefed call expression (matches dimensionHeatGridModel.js).
+    const list = map.get(c.principle);
+    list.push(c);
   }
   return map;
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { STANDARD_TYPES } from '../hooks/useStandards.js';
+import { STANDARD_TYPES, UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
 import { useStandardRowModals } from '../hooks/useStandardRowModals.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
 import { t } from '../../../strings/index.js';
@@ -137,7 +137,7 @@ function StandardRowMain({
         {standard.description && <span className="standards-row-subtitle">{standard.description}</span>}
       </div>
       <div className="standards-cell standards-cell--base">
-        <span className={`standards-base-pill standards-base-pill--${standard.type}`}>{baseLabel}</span>
+        <span className={`standards-base-pill standards-base-pill--${standard.type || 'unknown'}`}>{baseLabel}</span>
         {customizedCounts?.[standard.id] > 0 && (
           <span className="standards-customized-badge">
             {t('standards.customizedCount', { count: customizedCounts[standard.id] })}
@@ -174,7 +174,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
   const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
   const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce((sum, p) => sum + (p.requirements?.length ?? 0), 0);
   const isDeletable = isDeletableStandard(standard.type);
-  const baseLabel = BASE_LABELS[standard.type] || standard.type;
+  const baseLabel = BASE_LABELS[standard.type] || standard.type || t('standards.baseUnknown');
 
   return (
     <>
@@ -211,7 +211,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
 export default function StandardsTable({ grouped, actions, customizedCounts }) {
   const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
   const all = useMemo(
-    () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])],
+    () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || []), ...(grouped[UNKNOWN_STANDARD_TYPE] || [])],
     [grouped],
   );
 

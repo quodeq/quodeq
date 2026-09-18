@@ -112,6 +112,14 @@ function DuelTrendAxis({ ticks, y }) {
  */
 export default function CompareDuelTrend({ a, b, aName, bName }) {
   const { t0, t1, v0, v1 } = trendDomain([a, b]);
+  // Both series empty: trendDomain returns an explicit null domain rather
+  // than an Infinity/-Infinity span. The panel that mounts this component
+  // already gates on there being at least 2 combined points, so render
+  // nothing rather than dividing by an undefined span. Number.isFinite (not
+  // `== null`) also catches an unparseable dateISO: Date.parse on a bad
+  // string is NaN, and NaN propagates through Math.min/max without being
+  // loosely equal to null.
+  if (!Number.isFinite(t0) || !Number.isFinite(t1)) return null;
   const span = t1 - t0;
   const x = (iso) => (span
     ? PAD.left + ((new Date(iso).getTime() - t0) / span) * (W - PAD.left - PAD.right)

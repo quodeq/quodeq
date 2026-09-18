@@ -35,6 +35,21 @@ test('trendDomain: flattens the series once, deriving times and values from one 
   assert.deepEqual([v0, v1], scoreDomain([6, 8]));
 });
 
+test('trendDomain: returns an explicit empty domain (not Infinity/-Infinity) for an empty combined series', () => {
+  const domain = trendDomain([[], []]);
+  assert.deepEqual(domain, { t0: null, t1: null, v0: null, v1: null });
+});
+
+test('trendDomain: an unparseable dateISO produces a NaN time bound (documents why callers must check Number.isFinite, not == null)', () => {
+  const a = [{ dateISO: 'not-a-date', value: 7 }, { dateISO: '2024-02-01', value: 7.5 }];
+  const { t0, t1 } = trendDomain([a, []]);
+  assert.ok(Number.isNaN(t0));
+  assert.ok(Number.isNaN(t1));
+  // NaN is not loosely equal to null (Node's assert.notEqual uses `!=`) --
+  // a caller guarding with `== null` would miss this case.
+  assert.notEqual(t0, null);
+});
+
 // ---------------------------------------------------------------------------
 // monotonePath — exact `d`-string (rounding + spline math frozen)
 // ---------------------------------------------------------------------------

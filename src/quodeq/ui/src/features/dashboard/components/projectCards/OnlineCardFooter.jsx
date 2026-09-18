@@ -25,6 +25,6 @@ export function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCop
     );
   }
   return (
-    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull(projectId); }}>{t('projects.pullLocalCopy')}</button>
+    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull?.(projectId); }}>{t('projects.pullLocalCopy')}</button>
   );
 }

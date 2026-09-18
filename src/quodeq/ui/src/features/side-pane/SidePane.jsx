@@ -9,8 +9,16 @@ import './SidePane.css';
 
 // Build weights from ratios: walk through, treating each ratios[i] as the
 // split between weights[i] and weights[i+1] of their combined share.
-function computeWeights(windowCount, ratios) {
+// ratios is legitimately out of sync with windowCount for one render
+// whenever a window is added/removed: useInnerDividerDrag's windowCount
+// effect resets ratios' length, but that effect runs AFTER this render, so
+// the first render of a window-count change still holds the old-length
+// ratios array. Walking past weights' bounds in that case would produce
+// NaN weights, so fall back to equal weights for that one frame instead
+// (no warning -- this path is routine, not exceptional).
+export function computeWeights(windowCount, ratios) {
   const weights = Array(windowCount).fill(1);
+  if (ratios.length > windowCount - 1) return weights;
   for (let i = 0; i < ratios.length; i += 1) {
     const r = ratios[i] ?? 0.5;
     const sum = weights[i] + weights[i + 1];

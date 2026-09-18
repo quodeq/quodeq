@@ -76,8 +76,11 @@ export function buildDimensionGroup(dim) {
   for (const c of compliance) {
     const pName = c.principle || UNKNOWN_PRINCIPLE;
     if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
-    principleMap.get(pName).compliance++;
-    principleMap.get(pName).complianceItems.push(c);
+    // has()+set() above guarantee an entry here, same as the violations loop
+    // above: one lookup into a local, not a re-derefed call expression.
+    const p = principleMap.get(pName);
+    p.compliance++;
+    p.complianceItems.push(c);
   }
 
   const dimTotal = violations.length + compliance.length;

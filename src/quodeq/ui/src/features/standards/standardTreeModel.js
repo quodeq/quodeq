@@ -25,7 +25,13 @@ export function removePrincipleFromStandard(standard, index) {
 export function addRequirementToStandard(standard, principleIndex) {
   const next = deepClone(standard);
   const principle = next.principles[principleIndex];
-  const seq = (principle.requirements?.length || 0) + 1;
+  // Absent principle (stale/out-of-range index): skip the mutation and land
+  // the selection back at root rather than indexing into undefined.
+  if (!principle) return { standard: next, selectedNode: { type: 'root' } };
+  // The principle itself may exist without a requirements array yet
+  // (e.g. hand-edited/imported data); default it before pushing.
+  principle.requirements ??= [];
+  const seq = principle.requirements.length + 1;
   const autoId = generateRequirementId(next.id, principle.name, seq);
   principle.requirements.push({ id: autoId, text: '', description: '', refs: [] });
   return {
@@ -36,7 +42,13 @@ export function addRequirementToStandard(standard, principleIndex) {
 
 export function removeRequirementFromStandard(standard, principleIndex, reqIndex) {
   const next = deepClone(standard);
-  next.principles[principleIndex].requirements.splice(reqIndex, 1);
+  const principle = next.principles[principleIndex];
+  // Absent principle: nothing to remove from, skip the splice. A present
+  // principle may still lack a requirements array; default it first.
+  if (principle) {
+    principle.requirements ??= [];
+    principle.requirements.splice(reqIndex, 1);
+  }
   return { standard: next, selectedNode: { type: 'principle', index: principleIndex } };
 }
 

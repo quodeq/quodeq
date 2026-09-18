@@ -35,7 +35,7 @@ export function computeAccumulatedStats(accumulatedDimensions, dailyTrend, selec
     ? { date: null, runId: null }
     : { date: withDates[0].dateLabel || formatRunId(withDates[0].runId), runId: withDates[0].runId };
 
-  const sorted = [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
+  const sorted = [...accumulatedDimensions].sort((a, b) => (a.dimension ?? '').localeCompare(b.dimension ?? ''));
 
   return { scoreDelta, lastRun, sorted };
 }

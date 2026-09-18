@@ -77,7 +77,7 @@ function FileDetailBody({
 }
 
 const FileDetailPage = memo(function FileDetailPage({ file, runId, dateLabel, onDismiss, severityFilter }) {
-  const dimensionsCount = file.dimensionsCount || 0;
+  const dimensionsCount = file?.dimensionsCount || 0;
   const [activeFilter, setActiveFilter] = useState(severityFilter || null);
   const [lowConfExpanded, setLowConfExpanded] = useState(false);
 

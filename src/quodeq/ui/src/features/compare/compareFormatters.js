@@ -5,7 +5,7 @@ import { LOCALE } from '../../strings/index.js';
 
 export const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 export const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
-export const signed1 = (g) => (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1));
+export const signed1 = (g) => (g == null ? '—' : (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1)));
 
 // Short labels: the dimension tab bar and the matrix column headers speak
 // the same shorthand, the label's first characters ("clean", "flexi",

@@ -1251,6 +1251,7 @@
   "standards.baseCustom": "custom",
   "standards.baseIso": "iso-25010",
   "standards.baseQuodeq": "quodeq",
+  "standards.baseUnknown": "unknown",
   "standards.cannotBeUndone": "This action cannot be undone.",
   "standards.colBase": "Base",
   "standards.colEnabled": "Enabled",

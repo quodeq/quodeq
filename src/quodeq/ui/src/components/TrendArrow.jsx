@@ -20,7 +20,10 @@ export default function TrendArrow({ trend, delta }) {
     : angle >= ANGLE_SOFT_DOWN_MIN ? 'trend-soft-down'
     : 'trend-same';
 
-  const title = d !== null ? `${d > 0 ? '+' : ''}${d.toFixed(2)}` : (trend ?? '');
+  // A defined-but-invalid delta (e.g. a non-numeric string) parses to NaN:
+  // fall back to the same neutral copy the "no delta" branch already uses,
+  // same as the angle computation above, instead of literally showing "NaN".
+  const title = (d !== null && !isNaN(d)) ? `${d > 0 ? '+' : ''}${d.toFixed(2)}` : (trend ?? '');
 
   return (
     <span

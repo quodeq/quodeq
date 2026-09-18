@@ -67,6 +67,23 @@ test('addRequirementToStandard: first requirement in an empty principle gets seq
   assert.deepEqual(selectedNode, { type: 'requirement', principleIndex: 1, reqIndex: 0 });
 });
 
+test('addRequirementToStandard: does not throw and defaults the array when the principle has no requirements array at all', () => {
+  const original = makeStandard();
+  delete original.principles[0].requirements;
+  assert.doesNotThrow(() => addRequirementToStandard(original, 0));
+  const { standard } = addRequirementToStandard(original, 0);
+  const reqs = standard.principles[0].requirements;
+  assert.equal(reqs.length, 1);
+  assert.equal(reqs[0].id, 'MYST-ERR-01');
+});
+
+test('addRequirementToStandard: skips the mutation and selects root when principleIndex is out of range', () => {
+  const original = makeStandard();
+  const { standard, selectedNode } = addRequirementToStandard(original, 99);
+  assert.deepEqual(standard, original);
+  assert.deepEqual(selectedNode, { type: 'root' });
+});
+
 // ---------------------------------------------------------------------------
 // removeRequirementFromStandard
 // ---------------------------------------------------------------------------
@@ -76,6 +93,22 @@ test('removeRequirementFromStandard: removes the requirement and selects the par
   const { standard, selectedNode } = removeRequirementFromStandard(original, 0, 0);
   assert.equal(standard.principles[0].requirements.length, 0);
   assert.deepEqual(selectedNode, { type: 'principle', index: 0 });
+});
+
+test('removeRequirementFromStandard: does not throw and leaves an empty array when the principle has no requirements array at all', () => {
+  const original = makeStandard();
+  delete original.principles[0].requirements;
+  assert.doesNotThrow(() => removeRequirementFromStandard(original, 0, 0));
+  const { standard } = removeRequirementFromStandard(original, 0, 0);
+  assert.deepEqual(standard.principles[0].requirements, []);
+});
+
+test('removeRequirementFromStandard: does not throw when principleIndex is out of range', () => {
+  const original = makeStandard();
+  assert.doesNotThrow(() => removeRequirementFromStandard(original, 99, 0));
+  const { standard, selectedNode } = removeRequirementFromStandard(original, 99, 0);
+  assert.deepEqual(standard, original);
+  assert.deepEqual(selectedNode, { type: 'principle', index: 99 });
 });
 
 // ---------------------------------------------------------------------------

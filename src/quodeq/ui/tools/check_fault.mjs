@@ -17,7 +17,7 @@ import { main } from './ratchet.mjs';
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 5; // set to the total printed by --update after the sweep
+const TOTAL_CEILING = 0; // burned down to zero in the null-guard/lookup-deref sweep
 
 main({
   script: 'check_fault.mjs',

@@ -11,6 +11,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import FileDetailPage from './FileDetailPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
+import { t } from '../../../strings/index.js';
 
 function makeFile(overrides = {}) {
   const violation = {
@@ -60,6 +61,12 @@ describe('FileDetailPage', () => {
   it('does not render a dismiss control when onDismiss is not provided', () => {
     renderPage({ onDismiss: undefined });
     expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
+  });
+
+  it('does not throw and shows 0 dimensions when the file object has no dimensionsCount', () => {
+    const file = makeFile({ dimensionsCount: undefined });
+    expect(() => renderPage({ file })).not.toThrow();
+    expect(screen.getByText(t('explorer.dimensionsStat'))).toBeInTheDocument();
   });
 
   it('severity filter pills narrow the list to the selected severity', () => {

@@ -19,4 +19,9 @@ describe('compareFormatters', () => {
     expect(signed1(-0.5)).toBe('-0.5');
     expect(signed1(0)).toBe('0.0');
   });
+
+  it('signed1 shows a dash for null/undefined instead of throwing', () => {
+    expect(signed1(null)).toBe('—');
+    expect(signed1(undefined)).toBe('—');
+  });
 });

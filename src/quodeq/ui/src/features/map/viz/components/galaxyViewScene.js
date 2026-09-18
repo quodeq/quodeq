@@ -46,7 +46,12 @@ export function countSeverities(violations) {
 
 /** Compute a principle's score from raw data, grade, or violation ratio */
 export function computePrincipleScore(rawScore, grade, violationCount, complianceCount) {
-  if (rawScore) return parseFloat(rawScore);
+  // A finite numeric score -- including 0 -- is a real score. Checking
+  // `if (rawScore)` first would treat 0 as absent and fall through to the
+  // grade/ratio chain below, inconsistent with buildDimStar/
+  // updateSceneLiveData, which already keep a 0 overallScore as-is.
+  const parsed = parseFloat(rawScore);
+  if (Number.isFinite(parsed)) return parsed;
   if (grade) return gradeToScore(grade);
   const total = violationCount + complianceCount;
   return total > 0 ? (complianceCount / total) * 10 : 5;
@@ -77,7 +82,8 @@ function groupDimensionsByType(dimensions, standardTypes) {
 function buildDimStar(dim, extra) {
   const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
   const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
-  const score = dim.overallScore ? parseFloat(dim.overallScore) : 5;
+  const parsedScore = parseFloat(dim.overallScore);
+  const score = Number.isFinite(parsedScore) ? parsedScore : 5;
   const radius = 3 + Math.sqrt(totalV + totalC) * 0.4;
   return {
     name: dim.dimension || 'Unknown',
@@ -234,7 +240,8 @@ export function updateSceneLiveData(scene, dimensions) {
     if (!star) return;
     const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
     const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
-    const score = dim.overallScore ? parseFloat(dim.overallScore) : 5;
+    const parsedScore = parseFloat(dim.overallScore);
+    const score = Number.isFinite(parsedScore) ? parsedScore : 5;
     star.violations = totalV;
     star.compliance = totalC;
     star.score = score;
