@@ -1,21 +1,7 @@
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-import { DuelBars, gapClass, score1, signed1 } from './compareDuelShared.jsx';
-
-/* A score plus the side it belongs to. The swatches and bars beside these
-   numbers are decorative, so without this label a screen reader hears two
-   bare numbers per row with nothing tying either to a project (U-ACC-1). */
-function SideScore({ className, project, score }) {
-  return (
-    <span
-      className={className}
-      aria-label={t('compare.sideScoreAria', { project, score: score1(score) })}
-    >
-      {score1(score)}
-    </span>
-  );
-}
+import { DuelBars, gapClass, SideScore, signed1 } from './compareDuelShared.jsx';
 
 function PrincipleGroup({ group, dim, aName, bName }) {
   return (

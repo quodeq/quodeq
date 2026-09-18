@@ -19,8 +19,8 @@ const renderPrinciples = () => render(
 describe('CompareDuelPrinciples accessibility', () => {
   it('#6370 names the group-heading dimension scores after their side', () => {
     const { container } = renderPrinciples();
-    expect(screen.getByLabelText('Alpha: 8.0')).toHaveTextContent('8.0');
-    expect(screen.getByLabelText('Beta: 4.5')).toHaveTextContent('4.5');
+    expect(screen.getByText('Alpha: 8.0')).toBeInTheDocument();
+    expect(screen.getByText('Beta: 4.5')).toBeInTheDocument();
     // The legend swatches stay decorative: they carry no text of their own.
     const swatches = container.querySelectorAll('.compare-duel-principles__side');
     expect(swatches).toHaveLength(2);
@@ -29,13 +29,21 @@ describe('CompareDuelPrinciples accessibility', () => {
 
   it('#6371 names each per-principle row score after its side', () => {
     renderPrinciples();
-    expect(screen.getByLabelText('Alpha: 7.0')).toHaveTextContent('7.0');
-    expect(screen.getByLabelText('Beta: 5.5')).toHaveTextContent('5.5');
+    expect(screen.getByText('Alpha: 7.0')).toBeInTheDocument();
+    expect(screen.getByText('Beta: 5.5')).toBeInTheDocument();
   });
 
   it('#6370/#6371 keeps heading and row scores separately labelled', () => {
     renderPrinciples();
-    expect(screen.getAllByLabelText(/^Alpha: /)).toHaveLength(2);
-    expect(screen.getAllByLabelText(/^Beta: /)).toHaveLength(2);
+    expect(screen.getAllByText(/^Alpha: /)).toHaveLength(2);
+    expect(screen.getAllByText(/^Beta: /)).toHaveLength(2);
+  });
+
+  it('#6370/#6371 carries the name as visually hidden text, not aria-label', () => {
+    const { container } = renderPrinciples();
+    // aria-label is prohibited on a role-less span (ARIA 1.2).
+    expect(container.querySelectorAll('span[aria-label]')).toHaveLength(0);
+    expect(screen.getByText('Alpha: 7.0')).toHaveClass('sr-only');
+    expect(screen.getByText('7.0')).toHaveAttribute('aria-hidden', 'true');
   });
 });

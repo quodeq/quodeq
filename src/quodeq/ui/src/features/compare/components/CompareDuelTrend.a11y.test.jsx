@@ -22,4 +22,14 @@ describe('CompareDuelTrend accessibility (#6316)', () => {
     render(<CompareDuelTrend a={seriesA} b={seriesB} aName="Alpha" bName="Beta" />);
     expect(screen.getAllByRole('img')).toHaveLength(1);
   });
+
+  it('leaves the plotted date range readable, keeping the tick column hidden', () => {
+    const { container } = render(
+      <CompareDuelTrend a={seriesA} b={seriesB} aName="Alpha" bName="Beta" />,
+    );
+    // Both overlays sit outside the role="img" svg, so hiding them really
+    // did hide them. The dates are the chart's time axis in words.
+    expect(container.querySelector('.compare-duel-trend__dates')).not.toHaveAttribute('aria-hidden');
+    expect(container.querySelector('.compare-duel-trend__ticks')).toHaveAttribute('aria-hidden', 'true');
+  });
 });

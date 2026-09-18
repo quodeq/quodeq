@@ -140,7 +140,11 @@ export default function CompareDuelTrend({ a, b, aName, bName }) {
         </svg>
         <DuelTrendAxis ticks={ticks} y={y} />
       </div>
-      <div className="compare-duel-trend__dates" aria-hidden="true">
+      {/* Not aria-hidden: this sits outside the role="img" svg, so hiding it
+          really did withhold the chart's time span from a screen reader
+          (U-ACC-1). The 0..10 tick column above stays hidden; it duplicates
+          the grid lines and reads as loose numbers. */}
+      <div className="compare-duel-trend__dates">
         <span>{shortDate(t0)}</span>
         {span > 0 && <span>{shortDate(t1)}</span>}
       </div>

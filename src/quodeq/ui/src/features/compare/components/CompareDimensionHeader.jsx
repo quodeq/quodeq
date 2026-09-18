@@ -6,6 +6,12 @@ import { t } from '../../../strings/index.js';
 import { nf, TAB_LABEL_CHARS } from '../compareFormatters.js';
 
 
+/* One panel region holds whichever dimension is open, so every tab controls
+   the same element and points at this id. CompareDimensionView puts it on
+   the body it renders below this header. */
+export const DIMENSION_PANEL_ID = 'compare-dimension-panel';
+export const dimensionTabId = (key) => `compare-dimension-tab-${key}`;
+
 /** Title/subtitle + the dimension tab bar (switches sideways between
  * dimensions without a local back button — the app breadcrumb walks back). */
 export default function CompareDimensionHeader({ view, board, onOpenDimension }) {
@@ -41,7 +47,12 @@ export default function CompareDimensionHeader({ view, board, onOpenDimension })
                 key={b.key}
                 type="button"
                 role="tab"
+                id={dimensionTabId(b.key)}
                 aria-selected={isSelected}
+                aria-controls={DIMENSION_PANEL_ID}
+                /* The visible text is clipped to five characters, so the
+                   whole dimension name has to come from the label. */
+                aria-label={b.label}
                 className={`compare-sort__btn${isSelected ? ' compare-sort__btn--on' : ''}`}
                 onClick={() => onOpenDimension(b.key)}
               >

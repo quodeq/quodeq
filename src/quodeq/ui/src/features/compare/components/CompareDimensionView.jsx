@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { buildDimensionAttention } from '../compareModel.js';
 import CompareMatrix from './CompareMatrix.jsx';
-import CompareDimensionHeader from './CompareDimensionHeader.jsx';
+import CompareDimensionHeader, { DIMENSION_PANEL_ID, dimensionTabId } from './CompareDimensionHeader.jsx';
 import CompareDimensionStatCards from './CompareDimensionStatCards.jsx';
 import CompareAttentionStrip from './CompareAttentionStrip.jsx';
 import CompareStandingsList from './CompareStandingsList.jsx';
@@ -106,39 +106,49 @@ export default function CompareDimensionView({
   return (
     <>
       <CompareDimensionHeader view={view} board={board} onOpenDimension={onOpenDimension} />
-      <CompareDimensionStatCards view={view} />
-      {/* Dimension-scoped triage: principles where one project sits far
-          under the rest, and hard 30-day drops. Renders only when it has
-          something to say. */}
-      <CompareAttentionStrip
-        ariaLabel={t('compare.dimAttentionAria', { dim: view.label })}
-        noteText={t('compare.dimAttentionNote')}
-        items={buildAttentionItems(dimAttention, onOpenProject, onOpenPrinciple)}
-      />
-
-      <div className="compare-lower compare-lower--dim">
-        <CompareStandingsList
-          view={view}
-          onOpenProject={onOpenProject}
-          onOpenProjectDimension={onOpenProjectDimension}
-          setFocusId={setFocusId}
+      {/* The header's tabs swap this one region, so it is the tab panel they
+          control. The class repeats .compare-page's column rhythm, which the
+          sections used to get as direct children of the page. */}
+      <div
+        id={DIMENSION_PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={dimensionTabId(view.key)}
+        className="compare-dimension-panel"
+      >
+        <CompareDimensionStatCards view={view} />
+        {/* Dimension-scoped triage: principles where one project sits far
+            under the rest, and hard 30-day drops. Renders only when it has
+            something to say. */}
+        <CompareAttentionStrip
+          ariaLabel={t('compare.dimAttentionAria', { dim: view.label })}
+          noteText={t('compare.dimAttentionNote')}
+          items={buildAttentionItems(dimAttention, onOpenProject, onOpenPrinciple)}
         />
-        <CompareRadarPanel view={view} axes={axes} series={series} />
+
+        <div className="compare-lower compare-lower--dim">
+          <CompareStandingsList
+            view={view}
+            onOpenProject={onOpenProject}
+            onOpenProjectDimension={onOpenProjectDimension}
+            setFocusId={setFocusId}
+          />
+          <CompareRadarPanel view={view} axes={axes} series={series} />
+        </div>
+
+        {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
+            one level deeper — projects x principles, cells opening that
+            project's own principle page. */}
+        <CompareMatrix
+          ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
+          header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
+          note={t('compare.matrixNote')}
+          footOverall={view.avg}
+          columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
+          matrixRows={buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple)}
+        />
+
+        <ComparePrincipleCards principles={view.principles} onOpenPrinciple={onOpenPrinciple} />
       </div>
-
-      {/* v4c appendix: the same matrix grammar as the fleet's SCORE_MATRIX,
-          one level deeper — projects x principles, cells opening that
-          project's own principle page. */}
-      <CompareMatrix
-        ariaLabel={t('compare.principleMatrixAria', { dim: view.label })}
-        header={t('compare.principleMatrixHeader', { rows: view.standings.length, cols: view.principles.length })}
-        note={t('compare.matrixNote')}
-        footOverall={view.avg}
-        columns={view.principles.map((p) => ({ key: p.key, label: p.label, avg: p.avg }))}
-        matrixRows={buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple)}
-      />
-
-      <ComparePrincipleCards principles={view.principles} onOpenPrinciple={onOpenPrinciple} />
     </>
   );
 }

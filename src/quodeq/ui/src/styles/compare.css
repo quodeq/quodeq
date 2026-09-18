@@ -11,6 +11,15 @@
    strip's own bottom margin stacks on top of the gap. */
 .compare-page .term-stat-strip { margin-bottom: 0; }
 
+/* The dimension drill-down's body is one tabpanel region, so its sections
+   are children of that wrapper rather than of .compare-page. It repeats the
+   page's own column rhythm so the spacing is unchanged. */
+.compare-dimension-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+}
+
 /* Pre-projectsLoaded fleet-table stand-in (CompareSkeleton.jsx). Same
    idiom as dashboard.css .overview-skeleton: static dimmed blocks. */
 .compare-skeleton {

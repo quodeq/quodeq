@@ -1,7 +1,7 @@
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-import { DuelBars, gapClass, score1, signed1 } from './compareDuelShared.jsx';
+import { DuelBars, gapClass, SideScore, signed1 } from './compareDuelShared.jsx';
 
 /**
  * @param {object} props
@@ -22,19 +22,17 @@ export default function CompareDuelDimensionsTable({ dimensions, aName, bName })
             <span className="compare-duel-dims__label">{d.label}</span>
             {/* Which side a number belongs to is otherwise only its column
                 position, which is not exposed as text (U-ACC-1). */}
-            <span
+            <SideScore
               className={`compare-duel-dims__score ${scoreColorClass(d.a)}`}
-              aria-label={t('compare.sideScoreAria', { project: aName, score: score1(d.a) })}
-            >
-              {score1(d.a)}
-            </span>
+              project={aName}
+              score={d.a}
+            />
             <DuelBars a={d.a} b={d.b} />
-            <span
+            <SideScore
               className={`compare-duel-dims__score ${scoreColorClass(d.b)}`}
-              aria-label={t('compare.sideScoreAria', { project: bName, score: score1(d.b) })}
-            >
-              {score1(d.b)}
-            </span>
+              project={bName}
+              score={d.b}
+            />
             <span className={`compare-duel__gap ${gapClass(d.gap)}`}>
               {d.gap != null ? signed1(d.gap) : '—'}
             </span>
