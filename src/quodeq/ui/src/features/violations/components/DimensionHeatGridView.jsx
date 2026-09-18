@@ -6,9 +6,6 @@ import { t } from '../../../strings/index.js';
 
 const PRINCIPLE_INDENT_PX = 24;
 
-// The header text is a real <button> so sorting is reachable from the
-// keyboard (a <th> is not focusable). It fills the cell and looks like plain
-// header text: see `.heat-grid-th-sort > button` in styles/map.css.
 function ariaSort(isActive, sortDir) {
   if (!isActive) return 'none';
   return sortDir === 'asc' ? 'ascending' : 'descending';
@@ -33,6 +30,9 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
             className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
             aria-sort={ariaSort(sortCol === col.id, sortDir)}
           >
+            {/* A real <button> so sorting is reachable from the keyboard (a <th>
+                is not focusable). It fills the cell and looks like plain header
+                text: see `.heat-grid-th-sort > button` in styles/map.css. */}
             <button
               type="button"
               aria-label={t('violations.sortByAria', { column: col.label })}
