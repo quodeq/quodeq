@@ -29,6 +29,12 @@ def _now_iso() -> str:
 
 
 def read_dimensions(run_dir: Path) -> dict[str, Any]:
+    """Read a run's dimensions.json.
+
+    A missing or unparseable file reads as an empty set of dimensions at the
+    current schema, so callers never have to tell "not started yet" apart
+    from "corrupt".
+    """
     path = run_dir / FILENAME
     try:
         return json.loads(path.read_text(encoding="utf-8"))

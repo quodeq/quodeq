@@ -133,6 +133,12 @@ def principle_score_and_grade(
     ct_counts: dict[str, int],
     *, params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float, str]:
+    """Score one principle from its violation and compliance type counts.
+
+    Compliance lifts the violation-derived base towards 10 rather than adding
+    to it, so a principle with violations can never reach a clean score on
+    volume of compliance alone. Returns (score, grade_label).
+    """
     base = violation_base(vt_counts, params=params)
     lift = compliance_lift(ct_counts, vt_counts, params=params)
     raw = base + (10.0 - base) * lift

@@ -125,7 +125,7 @@ function renderHistoryEmptyState({
 
 export default function HistoryPage({ trend: rawTrend, selection, availableRuns, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
   const { selectedRunId } = selection;
-  const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
+  const { onRunClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
   // Background refresh while a run is alive so the running row flips
   // to "complete" without the user manually reloading. Scoped to this

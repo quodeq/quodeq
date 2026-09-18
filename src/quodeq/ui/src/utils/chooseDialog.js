@@ -54,6 +54,14 @@ function focusDefaultButton(cancelBtn, buttons, actions) {
   else buttons[buttons.length - 1].btn.focus();
 }
 
+/**
+ * Modal picker: shows `actions` as buttons and resolves to the chosen
+ * action's `value`, or null if the user cancels (or there is nothing to
+ * choose from). When any action is destructive, Cancel takes focus so Enter
+ * cannot fire it by accident.
+ *
+ * @returns {Promise<*|null>}
+ */
 export function chooseDialog({
   title = t('common.chooseAnOption'),
   message = '',

@@ -100,10 +100,17 @@ class CacheEntry:
     consolidated: bool = True
 
     def to_json(self) -> str:
+        """Serialise to the compact JSON the backend writes to disk."""
         return json.dumps(asdict(self), separators=(",", ":"))
 
     @classmethod
     def from_json(cls, text: str) -> CacheEntry:
+        """Rebuild an entry from stored JSON, tolerating format drift.
+
+        Unknown keys are dropped and missing ones fall back to their field
+        defaults, so neither an older nor a newer entry raises. A raise here
+        would make ``LocalFileBackend`` treat the entry as corrupt and delete it.
+        """
         data = json.loads(text)
         # Tolerate format drift in BOTH directions so a version mismatch never
         # throws (a throw would make LocalFileBackend treat the entry as

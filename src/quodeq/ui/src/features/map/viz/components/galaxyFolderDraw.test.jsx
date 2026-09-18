@@ -28,7 +28,7 @@ function makeMockCtx(calls) {
   ];
   const ctx = { fillStyle: null, strokeStyle: null, lineWidth: null, font: null, textAlign: null };
   for (const m of methods) {
-    ctx[m] = vi.fn((...args) => {
+    ctx[m] = vi.fn(() => {
       calls.push(m);
       if (m === 'createRadialGradient') return { addColorStop: vi.fn() };
     });

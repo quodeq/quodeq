@@ -49,6 +49,13 @@ function buildPrincipleViolationsSection({ filteredViolations, bySeverity, sever
   return lines;
 }
 
+/**
+ * The full Markdown report for one principle. `severityFilter` narrows it to
+ * what the user is currently looking at; 'compliance' drops the violations
+ * section entirely.
+ *
+ * @returns {string}
+ */
 export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
   const rawViolations = violations || [];
   const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);

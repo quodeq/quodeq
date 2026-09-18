@@ -59,7 +59,7 @@ function GalaxyFolderOverlays({ tooltipRef }) {
   );
 }
 
-export default function GalaxyFolderView({ node, currentPath = '', onPathChange, onFileClick, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '' }) {
+export default function GalaxyFolderView({ node, currentPath = '', onPathChange, onFileClick, showLabels = true, darkMode, resetKey = 0, projectName = '' }) {
   useEffect(() => { invalidateThemeColors(); }, [darkMode]);
 
   const { refs, scene, size, handlers, breadcrumb, levelInfo } = useGalaxyFolderViewModel({

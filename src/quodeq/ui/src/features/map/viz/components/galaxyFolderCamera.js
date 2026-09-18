@@ -104,7 +104,7 @@ export function advanceFlyTransition(fly, cam, refs, params) {
  * Advance camera state (non-fly mode). Returns nothing, mutates cam in place.
  */
 export function advanceCamera(cam, refs, params) {
-  const { TRANS, scene, computeFocusCamera, saveNav, setNavVersion, getFitZoom, W, H } = params;
+  const { TRANS, scene, computeFocusCamera, W, H } = params;
   const tg = computeFocusCamera();
   const anim = refs.animRef.current;
   refs.frameCount.current++;

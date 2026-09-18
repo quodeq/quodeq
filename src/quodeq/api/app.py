@@ -176,7 +176,7 @@ def main(env: dict[str, str] | None = None) -> None:
     # _kill_stale_action_api on the first) would cascade and kill any scan in
     # flight. Scans have their own lifecycle; use the UI cancel button or the
     # DELETE endpoint for explicit stops.
-    def _handle_shutdown(signum: int, frame: object) -> None:
+    def _handle_shutdown(_signum: int, _frame: object) -> None:
         raise SystemExit(0)
 
     if hasattr(signal, "SIGTERM"):

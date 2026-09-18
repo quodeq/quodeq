@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot, ViolationSummary
-from quodeq.shared.constants import (  # noqa: F401 — re-export for backward compat
+from quodeq.shared.constants import (  # re-export for backward compat
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
 )

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { MessageList } from './MessageList.jsx';
 import { CommandMenu } from './CommandMenu.jsx';

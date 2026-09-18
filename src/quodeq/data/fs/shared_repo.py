@@ -84,6 +84,15 @@ def _git_env() -> dict[str, str]:
 def run_git(
     args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S
 ) -> tuple[bool, str]:
+    """Run a git command and return ``(ok, output)``.
+
+    *output* is the merged stdout+stderr of a git command that actually ran,
+    which is safe to surface to a caller. A process that never ran (git
+    missing, the timeout fired) is logged server-side and reported as a
+    generic reason instead, since its exception text can carry local paths and
+    errno detail. Never raises. stdin is closed, so git can never block on a
+    prompt.
+    """
     try:
         proc = subprocess.run(
             ["git", *args],
@@ -117,15 +126,18 @@ def _cache_base(env: dict | None = None) -> Path:
 
 
 def shared_cache_dir(url: str, env: dict | None = None) -> Path:
+    """Per-remote cache directory, named by a 16-char digest of *url*."""
     digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()[:16]
     return _cache_base(env) / digest
 
 
 def shared_repo_path(url: str, env: dict | None = None) -> Path:
+    """Clone directory for *url*. Also the key ``clone_lock`` locks on."""
     return shared_cache_dir(url, env) / "repo"
 
 
 def shared_evaluations_root(url: str, env: dict | None = None) -> Path:
+    """The clone's evaluations/ tree, laid out like the local evaluations dir."""
     return shared_repo_path(url, env) / "evaluations"
 
 
@@ -150,6 +162,12 @@ def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
 
 
 def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
+    """Return the clone path for *url*, cloning it once if it is not there yet.
+
+    None when the clone failed; the half-written directory is removed so the
+    next call starts clean. Keeps run_git's 300s default, unlike
+    ``refresh_shared_clone`` -- a first clone can legitimately take minutes.
+    """
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
         if (repo / ".git").exists():
@@ -235,6 +253,10 @@ def refresh_shared_clone(
 
 
 def last_synced_at(url: str, env: dict | None = None) -> float | None:
+    """Unix mtime of the clone's last fetch, or None when it was never cloned.
+
+    Falls back to HEAD when FETCH_HEAD is absent (cloned, never refreshed).
+    """
     repo = shared_repo_path(url, env)
     for name in ("FETCH_HEAD", "HEAD"):
         candidate = repo / ".git" / name

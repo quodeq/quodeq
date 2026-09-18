@@ -23,6 +23,12 @@ _STATE_FILENAME = "update_state.json"
 
 @dataclass
 class UpdateState:
+    """Everything the update subsystem remembers between runs.
+
+    Written by whichever process last ran a check; the ETag is what keeps the
+    GitHub releases call cheap.
+    """
+
     auto_check_enabled: bool = True
     last_check_ts: str | None = None
     latest_version: str | None = None
@@ -35,6 +41,7 @@ class UpdateState:
 
 
 def get_update_state_path(env: dict[str, str] | None = None) -> str:
+    """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
     environ = env if env is not None else os.environ
     explicit = environ.get("QUODEQ_UPDATE_STATE_PATH")
     if explicit:
@@ -44,6 +51,11 @@ def get_update_state_path(env: dict[str, str] | None = None) -> str:
 
 
 def read_state(env: dict[str, str] | None = None) -> UpdateState:
+    """Load the state, falling back to defaults on a missing or corrupt file.
+
+    Unknown keys are dropped so an older process can read a file written by a
+    newer one.
+    """
     path = Path(get_update_state_path(env))
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -56,6 +68,7 @@ def read_state(env: dict[str, str] | None = None) -> UpdateState:
 
 
 def write_state(state: UpdateState, env: dict[str, str] | None = None) -> None:
+    """Persist the state atomically. Failures are logged, never raised."""
     path = Path(get_update_state_path(env))
     # Write a fresh unique temp file then os.replace() onto the target so
     # concurrent writers (dashboard, menubar, CLI) never share a temp path

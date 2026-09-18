@@ -81,7 +81,7 @@ function ViolationDetail({ item }) {
           </>}
         </div>
       )}
-      <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} endLine={item.endLine} />
+      <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} />
     </div>
   );
 }

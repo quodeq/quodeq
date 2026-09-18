@@ -1,4 +1,3 @@
-import React from 'react';
 import { TerminalIcon } from '../../components/CopyButton.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';

@@ -7,7 +7,7 @@ describe('registerProject', () => {
   beforeEach(async () => {
     // Reset fetch tracking
     fetchCalls = [];
-    vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
       fetchCalls.push(url);
       return {
         ok: true,

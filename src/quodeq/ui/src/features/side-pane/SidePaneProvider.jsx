@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SidePaneContext } from './SidePaneContext.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
 import { readString, removeKey, writeString } from '../../adapters/storage.js';

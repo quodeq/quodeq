@@ -64,7 +64,6 @@ function EvaluationFormBody({ repo, setRepo, isLocalRepo, scanData, branch, scop
 
       {isLocalRepo && (
         <BranchScopeSelector
-          branches={scanData?.branches}
           currentBranch={scanData?.currentBranch || branch}
           projectPath={repo}
           onScopeChange={setScopePath}
@@ -92,7 +91,7 @@ function EvaluationFormBody({ repo, setRepo, isLocalRepo, scanData, branch, scop
   );
 }
 
-export default function EvaluationForm({ onStart, disabled, selectedProject }) {
+export default function EvaluationForm({ onStart, disabled }) {
   const { showToast } = useSidePane();
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,

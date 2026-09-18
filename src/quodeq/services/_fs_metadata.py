@@ -167,7 +167,7 @@ def _summary_version(
     run_versions = per_run_versions(
         project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
     version = accumulated_cache_version(
-        project_dir, params, run_versions, as_of=None, visible_dims=visible)
+        params, run_versions, as_of=None, visible_dims=visible)
     return _SummaryScope(version, visible_set)
 
 

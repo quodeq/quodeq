@@ -65,7 +65,7 @@ def _import_pulled_zip(project: str, zip_path: Path, action: str | None) -> tupl
 
 
 @_with_shared_root
-def shared_pull(project: str, eval_root: Path, url: str) -> Response | tuple[Response, int]:
+def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int]:
     """Materialize a shared project as a local copy.
 
     Body: optional JSON ``{"action": "copy"|"replace"}`` to resolve a 409
@@ -97,4 +97,5 @@ def shared_pull(project: str, eval_root: Path, url: str) -> Response | tuple[Res
 
 
 def register_shared_pull_routes(app: Flask) -> None:
+    """Bind POST /api/shared/projects/<project>/pull, which copies a shared project local."""
     app.post("/api/shared/projects/<project>/pull")(shared_pull)

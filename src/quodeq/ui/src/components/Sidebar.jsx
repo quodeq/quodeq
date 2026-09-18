@@ -190,7 +190,6 @@ function ProjectsNav({ repoName, activeTab, handleNav }) {
 export default function Sidebar({
   activeTab,
   onNavTab,
-  hasEvaluations,
   showProjectTabs = true,
   projectInfo = null,
   version = null,
@@ -205,8 +204,6 @@ export default function Sidebar({
 }) {
   const { isPinned, setPinned, handleTogglePin, handleNav } = useSidebarPin({ controlledPinned, onPinChange, onNavTab });
   const repoName = projectInfo?.displayName || projectInfo?.name || projectInfo?.id || null;
-  const branch = projectInfo?.meta?.branch || projectInfo?.branch || null;
-  const repoStatus = projectInfo?.meta?.repoStatus || (branch ? 'clean' : null);
   const lastEvalStr = formatLastEval(lastEvalAt);
 
   return (

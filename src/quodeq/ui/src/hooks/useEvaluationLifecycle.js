@@ -61,7 +61,18 @@ function makeEvalDismissHandler({ job, startedProject, selectedProject, selectPr
   };
 }
 
-export function useEvaluationLifecycle({ settings, navigation, projects, selectedProject = null, storage: _storage }) {
+/**
+ * Owns starting, cancelling and dismissing an evaluation, plus the analysis
+ * power setting the start payload is built from.
+ *
+ * A start refused because another run is already in flight surfaces through
+ * `jobError` rather than failing silently. On completion the project list and
+ * score caches are refreshed and, when the user is still on Evaluate, the
+ * finished run is selected.
+ *
+ * `storage` is injectable for tests; it defaults to localStorage.
+ */
+export function useEvaluationLifecycle({ navigation, projects, selectedProject = null, storage: _storage }) {
   const storage = _storage || localStorage;
   const { navTab, navReset } = navigation;
   const { loadProjects, setProjects, selectProjectAndRun } = projects;

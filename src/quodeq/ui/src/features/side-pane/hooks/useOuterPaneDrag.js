@@ -60,6 +60,15 @@ function makeOuterDragHandlers({
   return { onMove, onUp, cleanup };
 }
 
+/**
+ * Drag-to-resize for the side pane's outer edge, writing the width to the
+ * `--side-pane-width` custom property as the pointer moves.
+ *
+ * While a drag is live it sets `data-pane-resizing` on the document root,
+ * which CSS uses to suppress the column-width transition — without it the
+ * pane edge lags the cursor and the main column reflows on every move. Any
+ * drag still active at unmount is cleaned up.
+ */
 export function useOuterPaneDrag({ paneWidth, setPaneWidth }) {
   // While dragging either divider, set data-pane-resizing on the document
   // root. The flag is read by a CSS rule on .app-shell__body that suppresses

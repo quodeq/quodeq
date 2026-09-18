@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
 import { render } from '@testing-library/react';
-import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import SharedRepoSection from './SharedRepoSection.jsx';

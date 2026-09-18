@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from quodeq.context._project_shape_types import Deployment, ProjectShape  # noqa: F401 - re-export
+from quodeq.context._project_shape_types import Deployment, ProjectShape  # re-export
 from quodeq.context._project_shape_signals import (
     _detect_runtime_langs, _go_signals, _node_signals, _python_signals, _rust_signals,
 )

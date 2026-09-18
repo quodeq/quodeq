@@ -56,7 +56,7 @@ function AccumulatedStatStrip({ scoreDisplay, scoreDelta, grade, customFormula, 
   );
 }
 
-export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName, projectInfo, onCardNavigate, selectedSource, customFormula = false }) {
+export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, projectInfo, onCardNavigate, selectedSource, customFormula = false }) {
   const summary = accumulated?.summary;
   const scoreNum = parseFloat(summary?.numericAverage);
   const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);

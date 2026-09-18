@@ -7,6 +7,12 @@
  */
 import { useRef } from 'react';
 
+/**
+ * Timestamps of the last violation each dimension produced, so the live feed
+ * can order the most recently active dimension first.
+ *
+ * @returns {Record<string, number>}
+ */
 export function useDimensionActivity(liveViolations) {
   const lastActivityRef = useRef({});
   const prevCountsRef = useRef({});

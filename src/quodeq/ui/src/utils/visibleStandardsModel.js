@@ -3,6 +3,12 @@
  * Zero imports so it is node-testable without a DOM.
  */
 
+/**
+ * Whether two id lists hold the same ids, order and duplicates ignored.
+ * Anything that is not a pair of arrays counts as different.
+ *
+ * @returns {boolean}
+ */
 export function sameIdSet(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length === 0 && b.length === 0) return true;

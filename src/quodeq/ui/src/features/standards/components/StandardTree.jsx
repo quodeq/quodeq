@@ -124,7 +124,7 @@ function RequirementNode({ req, position, selectedNode, actions, confirmFn = win
 }
 
 function PrincipleNode({ principle, pi, selectedNode, actions, confirmFn = window.confirm, customizedIds, overrides }) {
-  const { onSelectNode, onAddRequirement, onRemovePrinciple, onRemoveRequirement, editable } = actions;
+  const { onSelectNode, onAddRequirement, onRemovePrinciple, editable } = actions;
   const isPrincipleSelected = selectedNode?.type === 'principle' && selectedNode.index === pi;
   const reqCount = principle.requirements?.length || 0;
   const handleRemovePrinciple = () => {

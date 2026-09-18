@@ -31,7 +31,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   const currentIndex = visible.indexOf(wizard.state.step) + 1;
 
   const {
-    handleSkipWelcome, handleSavedExit, handleClose, handleLaunch, nextStep, prevStep,
+    handleSkipWelcome, handleClose, handleLaunch, nextStep, prevStep,
   } = useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured });
 
   return (
@@ -54,7 +54,6 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
           nextStep={nextStep}
           prevStep={prevStep}
           handleSkipWelcome={handleSkipWelcome}
-          handleSavedExit={handleSavedExit}
           handleLaunch={handleLaunch}
         />
       </div>

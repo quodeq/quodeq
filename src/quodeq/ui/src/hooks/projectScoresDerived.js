@@ -4,11 +4,13 @@
  * that hook, so the memoization behavior (and its deps) is unchanged.
  */
 
-// Overview is anchored on completed runs. If selectedRun points at an
-// in-progress run (or one that hasn't shown up in availableRuns yet), fall
-// back to 'latest' so the cards keep showing the last finished evaluation
-// instead of going blank mid-flight. Resolution waits for latestQuery so we
-// never fire the scoped query with a stale asOf.
+/**
+ * Overview is anchored on completed runs. If selectedRun points at an
+ * in-progress run (or one that hasn't shown up in availableRuns yet), fall
+ * back to 'latest' so the cards keep showing the last finished evaluation
+ * instead of going blank mid-flight. Resolution waits for latestQuery so we
+ * never fire the scoped query with a stale asOf.
+ */
 export function resolveAsOf({ isLatestSelection, selectedRun, latestQueryData }) {
   if (isLatestSelection) return null;
   const runs = latestQueryData?.availableRuns;
@@ -19,6 +21,11 @@ export function resolveAsOf({ isLatestSelection, selectedRun, latestQueryData })
   return selectedRun;
 }
 
+/**
+ * The run list to offer the run navigator: the payload's own availableRuns
+ * when present, otherwise one synthesised from the trend rows (older payloads
+ * ship only a trend).
+ */
 export function deriveAvailableRuns({ scoresQueryData, latestQueryData }) {
   const fromPayload =
     scoresQueryData?.availableRuns || latestQueryData?.availableRuns;

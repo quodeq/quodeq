@@ -9,6 +9,11 @@ import { useApi } from '../../../api/ApiContext.jsx';
 
 const POLL_MS = 5000;
 
+/**
+ * The omlx server status at `baseUrl`, or null before the first poll resolves.
+ *
+ * @returns {{status: 'online'|'offline', address: string|null}|null}
+ */
 export function useOmlxServerStatus(baseUrl) {
   const { getOmlxStatus } = useApi();
 

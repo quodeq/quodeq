@@ -202,7 +202,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
 
 export default function FolderBrowser({ onSelect, onClose, title = t('evaluate.selectRepoFolderTitle'), confirmText = t('evaluate.useThisFolder'), showFiles = false, rootPath = null }) {
   const { browseDirectory } = useApi();
-  const [currentPath, setCurrentPath] = useState('');
+  const [, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);

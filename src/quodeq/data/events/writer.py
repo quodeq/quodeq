@@ -1,3 +1,4 @@
+"""Append-only JSONL writer for the run event log."""
 from __future__ import annotations
 
 import logging

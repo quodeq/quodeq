@@ -62,6 +62,15 @@ function groupFindingsByDimension(findings) {
   return liveViolations;
 }
 
+/**
+ * The job status and its findings, grouped by dimension.
+ *
+ * With SSE enabled the cache is fed by the event stream and these queries only
+ * subscribe; otherwise they poll. Either way a terminal job gets one final
+ * findings refetch, so the last results are never missed.
+ *
+ * @returns {{job: object|null, liveViolations: Record<string, object[]>}}
+ */
 export function useEvaluationQueries(api, jobId) {
   // --- Status (the "job" object) ---------------------------------------
   const statusQuery = useQuery({

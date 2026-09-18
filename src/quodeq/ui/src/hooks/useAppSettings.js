@@ -53,6 +53,17 @@ function applyDataTheme(value) {
   }
 }
 
+/**
+ * Owns the theme: the mode (system/light/dark) and the palette family, each
+ * persisted and reflected onto <html> through DATA_THEME_ATTR — the single
+ * attribute every other consumer reads (see useThemeIsDark).
+ *
+ * Migrates the pre-split `cc-theme` key on first use and follows the OS
+ * preference while the mode is 'system'. Invalid values are ignored rather
+ * than applied.
+ *
+ * @returns {{themeMode: string, applyMode: Function, themeFamily: string, applyFamily: Function}}
+ */
 export function useAppSettings() {
   function safeGet(key, fallback = '') {
     return readString(key) || fallback;

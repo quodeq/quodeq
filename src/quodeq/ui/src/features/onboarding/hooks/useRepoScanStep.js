@@ -41,6 +41,12 @@ function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
   };
 }
 
+/**
+ * Builds the Repo & Scan submit handler. A URL branches into the clone-target
+ * sub-step; a local path creates the project straight away. When the backend
+ * reports the repo is already registered (409), the existing project is
+ * resumed instead of failing.
+ */
 export function makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting }) {
   return async function handleSubmit() {
     const repo = state.repo.value?.trim();
@@ -70,6 +76,12 @@ export function makeHandleSubmit({ state, actions, createProject, setSubStep, se
   };
 }
 
+/**
+ * Builds the clone-target submit handler: clones the URL into the chosen
+ * destination and scans it. A non-ephemeral destination is remembered as the
+ * default for the next clone. Like handleSubmit, an already-registered repo
+ * resumes rather than fails.
+ */
 export function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
   return async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
     const repo = state.repo.value?.trim();
@@ -101,6 +113,12 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
   };
 }
 
+/**
+ * The Repo & Scan step's state and handlers: the folder browser, the
+ * input/clone-target sub-step, and the two submit paths.
+ *
+ * `getProjectScan` is injectable for tests.
+ */
 export function useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan }) {
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [subStep, setSubStep] = useState('input'); // 'input' | 'cloneTarget'

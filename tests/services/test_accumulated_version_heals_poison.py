@@ -13,8 +13,6 @@ otherwise reproduces the algo-5 keyspace), this test fails.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.score_cache import accumulated_cache_version
 
@@ -23,7 +21,6 @@ from quodeq.services.score_cache import accumulated_cache_version
 _ALGO5_HASH = "24c0a1de1b6ecbdfd056dfe5f80ba7876d1e9815babb450dec729d47d53bc09b"
 
 _FIXED_INPUT = (
-    Path("/tmp/does-not-matter"),
     DEFAULT_PARAMS,
     [("run-a", "complete", "scoped-v-1")],
     None,

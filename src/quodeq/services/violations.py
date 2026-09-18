@@ -11,7 +11,7 @@ from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdo
 from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
-from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
+from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
     _deleted_key_for_violation,
     _filter_dismissed_from_result,

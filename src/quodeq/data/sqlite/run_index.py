@@ -238,6 +238,11 @@ def list_runs_for_project(
 
 
 def get_run(db: sqlite3.Connection, job_id: str) -> RunRow | None:
+    """Return the indexed row for *job_id*, or None when the index has no such run.
+
+    A miss means the index is stale, not that the run is gone — the caller
+    falls back to the filesystem.
+    """
     row = db.execute(
         f"SELECT {_LIST_COLS} FROM runs WHERE job_id = ?", (job_id,),
     ).fetchone()

@@ -171,6 +171,16 @@ function usePublishJob({ queryClient, sharedListProjects, getSharedStatus, publi
   return { ...polling, publish, mountedRef, applyOptimisticPublish };
 }
 
+/**
+ * Publishing a project to the shared repo: the trigger plus the state the
+ * Projects page renders from (whether sharing is configured, what is published
+ * and when, the in-flight project, and any failure attributed to the project
+ * it belongs to).
+ *
+ * A publish polls to completion and patches the shared list cache optimistically
+ * so the card flips to published without waiting for the authoritative refresh.
+ * Pass `enabled: false` to mount it inert.
+ */
 export function usePublish({ enabled = true } = {}) {
   const { getSharedStatus, sharedListProjects, publishProject } = useApi();
   const queryClient = useQueryClient();

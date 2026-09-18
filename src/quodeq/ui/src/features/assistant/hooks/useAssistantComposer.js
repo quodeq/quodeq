@@ -49,6 +49,15 @@ function handleMenuKeyDown({ event, suggestions, menuIndex, setMenuIndex, setMen
   return false;
 }
 
+/**
+ * The assistant drawer's input: draft text, the slash-command menu and the
+ * keyboard handling that drives both.
+ *
+ * Enter sends, Shift+Enter breaks a line, and while the command menu is open
+ * the arrows move through it, Tab completes and Escape dismisses it. Meta
+ * commands (`/clear` and friends) are answered locally instead of being sent
+ * to the model.
+ */
 export function useAssistantComposer({ active, streaming, catalog, readOnly, uiState, sendMessage, resetConversation, addLocalExchange }) {
   const [draft, setDraft] = useState('');
   const [menuIndex, setMenuIndex] = useState(0);

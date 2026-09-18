@@ -97,7 +97,7 @@ def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
 
 
 def _parse_dimension_evidence(
-    config: RunConfig, dim_id: str, stream_file: Path, jsonl_file: Path,
+    config: RunConfig, _dim_id: str, stream_file: Path, jsonl_file: Path,
     ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Extract and parse evidence from stream/JSONL files for a single dimension.

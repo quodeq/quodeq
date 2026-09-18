@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 # Re-exported for backward compatibility with callers that still import
 # Judgment from this module.
-from quodeq.core.events.models import Judgment as Judgment  # noqa: F401
+from quodeq.core.events.models import Judgment as Judgment
 
 DEFAULT_WEIGHT = "Medium (x2)"
 _HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence

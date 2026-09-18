@@ -19,13 +19,6 @@ function normalizeRef(ref) {
   return { type: ref.type || 'url', refId: ref.refId || ref.id || '', name: ref.name || ref.label || '', url: ref.url || '' };
 }
 
-function formatRefDisplay(ref) {
-  const n = normalizeRef(ref);
-  const prefix = n.type ? n.type.toUpperCase() : '';
-  const id = n.refId ? `${prefix}-${n.refId}` : prefix;
-  return n.name ? `${id}: ${n.name}` : id;
-}
-
 const ABSTRACTION_ORDER = ['Base', 'Variant', 'Class', 'Compound', 'Pillar', 'Category'];
 
 function CweList({ filtered, onSelect, onClose }) {

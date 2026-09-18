@@ -17,18 +17,23 @@ class SharedLog:
     """LogSink that writes through the shared colored-console logger."""
 
     def info(self, message: str) -> None:
+        """Emit through ``shared.logging.log_info``."""
         log_info(message)
 
     def warning(self, message: str) -> None:
+        """Emit through ``shared.logging.log_warning``."""
         log_warning(message)
 
     def debug(self, message: str) -> None:
+        """Emit through ``shared.logging.log_debug``."""
         log_debug(message)
 
     def error(self, message: str) -> None:
+        """Emit through ``shared.logging.log_error``."""
         log_error(message)
 
     def success(self, message: str) -> None:
+        """Emit through ``shared.logging.log_success``, which renders green."""
         log_success(message)
 
 
@@ -56,18 +61,23 @@ class LoggerSink:
         self._logger = logger
 
     def info(self, message: str) -> None:
+        """Forward to the wrapped logger at INFO."""
         self._logger.info(message)
 
     def warning(self, message: str) -> None:
+        """Forward to the wrapped logger at WARNING."""
         self._logger.warning(message)
 
     def debug(self, message: str) -> None:
+        """Forward to the wrapped logger at DEBUG."""
         self._logger.debug(message)
 
     def error(self, message: str) -> None:
+        """Forward to the wrapped logger at ERROR."""
         self._logger.error(message)
 
     def success(self, message: str) -> None:
+        """Forward to the wrapped logger at INFO; the stdlib has no success level."""
         self._logger.info(message)
 
 

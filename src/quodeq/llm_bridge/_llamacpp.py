@@ -99,7 +99,7 @@ def list_llamacpp_models(base_url: str | None = None) -> list[dict]:
 
 
 def run_concurrency_test(
-    model: str,
+    _model: str,
     base_url: str | None = None,
 ) -> dict:
     """Estimate max parallel agents for the loaded llama.cpp model.

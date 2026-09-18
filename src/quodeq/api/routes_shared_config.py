@@ -22,6 +22,11 @@ from .routes_common import reports_dir
 
 
 def shared_status() -> Response:
+    """Report the shared repo connection, last sync, clone health and publish progress.
+
+    One call backs the whole Shared tab header, so the UI does not have to
+    infer "healthy but never published into" from configured + lastSynced.
+    """
     settings = read_settings()
     synced = last_synced_at(settings.url) if settings.url else None
     # The wire shape is camelCase throughout; the publish status dict is
@@ -50,6 +55,11 @@ def shared_status() -> Response:
 
 
 def shared_config_put() -> Response | tuple[Response, int]:
+    """Connect to the shared results repository at the posted ``url``.
+
+    Clones it and verifies it is a quodeq results repo before accepting, so a
+    typo or a foreign repository fails here rather than on the first publish.
+    """
     body = request.get_json(silent=True) or {}
     url = str(body.get("url") or "").strip()
     if not url:
@@ -79,6 +89,7 @@ def shared_config_put() -> Response | tuple[Response, int]:
 
 
 def shared_config_delete() -> Response:
+    """Disconnect from the shared repository and drop the local clone."""
     # Ordering + locking business rule lives in
     # services/shared_repo.disconnect_shared_repo (Task 20).
     disconnect_shared_repo(log=SHARED_LOG)
@@ -127,6 +138,7 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
 
 
 def register_shared_config_routes(app: Flask) -> None:
+    """Bind the shared-repo status, config, refresh and publish routes."""
     # refresh_shared_clone and start_publish are looked up on the
     # quodeq.api.routes_shared facade at call time (rather than imported
     # directly here) so that tests patching

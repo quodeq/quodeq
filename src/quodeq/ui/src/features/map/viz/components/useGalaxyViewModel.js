@@ -137,7 +137,7 @@ export function useGalaxyViewModel({ dimensions, standardTypes, showLabels, rese
   }, []);
 
   const { camRef, w2s, startTransition } = useGalaxyCamera({
-    canvasRef, scene, size, showLabels, savedNavRef, savedCamRef,
+    canvasRef, scene, size, showLabels, savedCamRef,
     navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef,
   });
 

@@ -42,6 +42,11 @@ function touch(store, key, value) {
   store.set(key, value);
 }
 
+/**
+ * The scope's surviving state merged over `defaults`, and a copy of
+ * `defaults` alone when the scope has nothing cached. Reading also marks the
+ * scope as recently used.
+ */
 export function readCachedState(namespace, scope, defaults) {
   const key = scope || '__global__';
   const store = storeFor(namespace);
@@ -51,6 +56,10 @@ export function readCachedState(namespace, scope, defaults) {
   return { ...defaults, ...existing };
 }
 
+/**
+ * Merges `patch` into the scope's cached state, evicting the least recently
+ * used scope once the namespace passes MAX_SCOPES_PER_NAMESPACE.
+ */
 export function writeCachedState(namespace, scope, patch) {
   const key = scope || '__global__';
   const store = storeFor(namespace);
@@ -59,6 +68,10 @@ export function writeCachedState(namespace, scope, patch) {
   if (store.size > MAX_SCOPES_PER_NAMESPACE) store.delete(store.keys().next().value);
 }
 
+/**
+ * Drops one scope, so the next read falls back to the defaults. This is the
+ * "user clicked the tab itself" reset.
+ */
 export function resetCachedScope(namespace, scope) {
   storeFor(namespace).delete(scope || '__global__');
 }

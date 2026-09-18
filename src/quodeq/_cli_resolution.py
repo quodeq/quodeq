@@ -31,7 +31,7 @@ from quodeq.analysis.manifest import SourceManifest, build_manifest, detect_lang
 from quodeq.analysis.manifest_models import AnalysisTarget
 # Re-exported: moved to the analysis layer (pure manifest logic); CLI modules
 # keep their historical `from quodeq._cli_resolution import ...` path.
-from quodeq.analysis.manifest_scope import _filter_manifest_by_scope  # noqa: F401
+from quodeq.analysis.manifest_scope import _filter_manifest_by_scope
 from quodeq.analysis.runner import load_universal_dimensions
 from quodeq.shared.log_sink import SHARED_LOG
 # Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.

@@ -38,7 +38,9 @@ class DeduplicationStore(Protocol):
     """
 
     def __contains__(self, key: tuple) -> bool: ...
-    def add(self, key: tuple) -> None: ...
+    def add(self, key: tuple) -> None:
+        """Record *key* as seen so the next finding with it is dropped."""
+        ...
 
 
 def _locked_write(fh: TextIO, line: str) -> None:

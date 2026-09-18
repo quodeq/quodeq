@@ -3,10 +3,12 @@ import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../u
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { useDismissedFindings } from '../components/useDismissedFindings.js';
 
-// Fresh tab click (tabKey changed) drops the cached file-tree path so the
-// user lands at the root, then re-reads the (possibly just-reset) cache and
-// fires the mount/round-trip refresh. Extracted from ViolationsPage.jsx
-// verbatim.
+/**
+ * Fresh tab click (tabKey changed) drops the cached file-tree path so the
+ * user lands at the root, then re-reads the (possibly just-reset) cache and
+ * fires the mount/round-trip refresh. Extracted from ViolationsPage.jsx
+ * verbatim.
+ */
 export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh }) {
   // Round-tripping through a file detail does NOT change tabKey, so the
   // cache survives unmount and the tree resumes where it was.
@@ -37,7 +39,7 @@ export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh })
  * ViolationsPage.jsx's dismissed-findings + file-tree-path + derived-summary
  * state. Extracted verbatim.
  */
-export function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
+export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
   const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
   const setFileCurrentPath = (v) => {
     writeCachedState('violations', selectedProject, { fileCurrentPath: v });
@@ -50,7 +52,7 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
   // sub-tab reflects new entries without needing the user to re-open the
   // page or switch projects.
   const { dismissed, handleRestore, handleRestoreAll, handleDelete, handleDeleteAll } =
-    useDismissedFindings({ selectedProject, onRefresh, setRestoreError, refreshKey: dismissRefreshKey, selectedSource, onReconcile });
+    useDismissedFindings({ selectedProject, setRestoreError, refreshKey: dismissRefreshKey, selectedSource, onReconcile });
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -78,15 +80,16 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
   };
 }
 
-// Composes the two hooks above the way ViolationsPage.jsx's body used to
-// inline them back to back: the tab-key-reset cache read feeds
-// useViolationsData's initialFilePath.
+/**
+ * Composes the two hooks above the way ViolationsPage.jsx's body used to
+ * inline them back to back: the tab-key-reset cache read feeds
+ * useViolationsData's initialFilePath.
+ */
 export function useViolationsPageState({ tabKey, selectedProject, onRefresh, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource }) {
   const cached = useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh });
   return useViolationsData({
     accumulatedDimensions,
     selectedProject,
-    onRefresh,
     onReconcile,
     initialFilePath: cached.fileCurrentPath,
     dismissRefreshKey,

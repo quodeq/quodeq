@@ -182,7 +182,7 @@ export function ViolationsSubTabContent(props) {
   return null;
 }
 
-export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0, subTab = 'dimension', onSubTabChange }) {
+export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = 'dimension', onSubTabChange }) {
   const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
   const { onNavigate, onRefresh, onReconcile, onRetry } = callbacks;

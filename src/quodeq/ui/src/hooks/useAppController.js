@@ -5,11 +5,13 @@ import {
 } from './useAppShellHooks.js';
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
 
-// Boot-time extras plus the dismiss-delta bridge shared by the manual dismiss
-// handlers (dismissWithReconcile callers in routes/renderers.jsx) and the
-// assistant's action-applied effect: patches the dashboard/scores caches from
-// a dismiss response's delta so the Overview updates instantly instead of
-// waiting on a refetch.
+/**
+ * Boot-time extras plus the dismiss-delta bridge shared by the manual dismiss
+ * handlers (dismissWithReconcile callers in routes/renderers.jsx) and the
+ * assistant's action-applied effect: patches the dashboard/scores caches from
+ * a dismiss response's delta so the Overview updates instantly instead of
+ * waiting on a refetch.
+ */
 export function useAppDismissBridge(state) {
   const queryClient = useQueryClient();
   const boot = useAppBootExtras();
@@ -24,8 +26,10 @@ export function useAppDismissBridge(state) {
   return { ...boot, applyDelta };
 }
 
-// Wizard lifecycle, sidebar/startup chrome, the derived view data and the
-// topbar run progress, in the order App has always called them.
+/**
+ * Wizard lifecycle, sidebar/startup chrome, the derived view data and the
+ * topbar run progress, in the order App has always called them.
+ */
 export function useAppChrome({ state, sharedSignal }) {
   const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
   const isEvaluating = computeIsEvaluating(state);

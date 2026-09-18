@@ -81,6 +81,14 @@ function useStandardMutations(standard, setStandard, setDirty, isNew, { createSt
   return { selectedNode, setSelectedNode, updateField, ...tree, save };
 }
 
+/**
+ * The standard editor's document and edit actions: field updates, the
+ * principle/requirement tree, the selected node, and save.
+ *
+ * With `isNew` it starts from a blank custom standard instead of fetching.
+ * `editable` is false for managed standards, which the UI renders read-only.
+ * `dirty` tracks unsaved edits.
+ */
 export function useStandardDetail(standardId, isNew) {
   const { getStandard, createStandard, updateStandard } = useApi();
   const [standard, setStandard] = useState(null);

@@ -27,7 +27,7 @@ from quodeq.services._wiring import (
 )
 
 # Re-export so existing external imports keep working.
-from quodeq.services._accumulated_data import _read_all_run_data  # noqa: F401
+from quodeq.services._accumulated_data import _read_all_run_data
 from quodeq.services._accumulated_data import make_slim_run_fetcher
 
 from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export

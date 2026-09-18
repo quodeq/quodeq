@@ -50,5 +50,5 @@ def register_context_tool(registry: ToolRegistry, ctx: ToolContext) -> None:
         "repository attachment, overview availability, and which tools to use next. "
         "Call this first when the session scope is unclear.",
         {"type": "object", "properties": {}},
-        lambda **kw: _get_context(ctx),
+        lambda **_kw: _get_context(ctx),
     ))

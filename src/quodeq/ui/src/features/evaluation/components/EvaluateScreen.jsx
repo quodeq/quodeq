@@ -116,7 +116,6 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           liveViolations={liveViolations}
           onDismiss={onDismiss}
           onCancel={onCancel}
-          hasEvaluations={!!selectedProject}
         />
       </div>
 

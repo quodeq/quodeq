@@ -3,12 +3,19 @@ import { SEVERITY_ORDER } from '../formatters.js';
 
 const SNIPPET_MAX_LINES = 5;
 
+/**
+ * Today as "3 Jul 2026", the date stamp every report header carries.
+ */
 export function formatDate() {
   const d = new Date();
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/**
+ * Truncates a code snippet to the first few lines, appending a count of what
+ * was dropped, so one huge finding cannot dominate a report.
+ */
 export function capSnippet(snippet) {
   if (!snippet) return '';
   const lines = snippet.split('\n');
@@ -16,6 +23,12 @@ export function capSnippet(snippet) {
   return [...lines.slice(0, SNIPPET_MAX_LINES), `... (${lines.length - SNIPPET_MAX_LINES} more lines)`].join('\n');
 }
 
+/**
+ * One violation as a Markdown block: heading, file ref, severity, reason and
+ * requirement links.
+ *
+ * @returns {string}
+ */
 export function formatViolationEntry(v) {
   const lines = [];
   const principle = v.principle || '';
@@ -42,6 +55,11 @@ export function formatViolationEntry(v) {
   return lines.join('\n');
 }
 
+/**
+ * The principle/score/grade Markdown table.
+ *
+ * @returns {string}
+ */
 export function formatPrincipleTable(principleGrades) {
   const lines = [
     '| Principle | Score | Grade |',
@@ -53,6 +71,10 @@ export function formatPrincipleTable(principleGrades) {
   return lines.join('\n');
 }
 
+/**
+ * Buckets violations by severity, with every known severity present as an
+ * empty array so callers can iterate SEVERITY_ORDER without guarding.
+ */
 export function groupBySeverity(violations) {
   const groups = {};
   for (const sev of SEVERITY_ORDER) groups[sev] = [];
@@ -63,6 +85,12 @@ export function groupBySeverity(violations) {
   return groups;
 }
 
+/**
+ * The "Violations" section, severity by severity. Returns the Markdown lines
+ * (not a joined string) so callers can splice sections together.
+ *
+ * @returns {string[]}
+ */
 export function buildViolationsSection(allViolations) {
   const lines = [];
   const bySeverity = groupBySeverity(allViolations);
@@ -83,6 +111,12 @@ export function buildViolationsSection(allViolations) {
   return lines;
 }
 
+/**
+ * The compliance count-per-principle section, or no lines at all when there
+ * is nothing compliant to report.
+ *
+ * @returns {string[]}
+ */
 export function buildComplianceSection(compliance) {
   const lines = [];
   if (compliance.length === 0) return lines;

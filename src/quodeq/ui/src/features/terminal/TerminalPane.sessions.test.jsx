@@ -45,7 +45,7 @@ vi.mock('../../api/terminal.js', () => ({
 // Mock the socket hook: jsdom has no real terminal WS to reach.
 const socketState = { status: 'open', send: vi.fn(), resize: vi.fn(), reconnectNow: vi.fn() };
 vi.mock('./useTerminalSocket.js', () => ({
-  useTerminalSocket: vi.fn((opts) => { return socketState; }),
+  useTerminalSocket: vi.fn(() => { return socketState; }),
 }));
 // The header/panel switcher read the drawer context; the pane is rendered
 // bare here, so stub the hook.

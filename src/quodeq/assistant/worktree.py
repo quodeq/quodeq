@@ -71,6 +71,11 @@ def diff_text(worktree: Path) -> str:
 
 
 def diff_stats(worktree: Path) -> list[dict]:
+    """Per-file added/deleted counts for the worktree's pending changes.
+
+    Binary files report 0/0 (numstat writes "-"). Unparseable lines are
+    skipped rather than raising.
+    """
     _run(["git", "-C", str(worktree), "add", "-N", "."])
     out = _run(["git", "-C", str(worktree), "diff", "HEAD", "--numstat"])
     stats = []
@@ -86,6 +91,8 @@ def diff_stats(worktree: Path) -> list[dict]:
 
 
 def worktrees_base() -> Path:
+    """Directory that holds every assistant worktree, overridable with
+    ``QUODEQ_WORKTREES_DIR``. Not created here."""
     return Path(os.environ.get(
         "QUODEQ_WORKTREES_DIR", str(Path.home() / ".quodeq" / "worktrees")))
 

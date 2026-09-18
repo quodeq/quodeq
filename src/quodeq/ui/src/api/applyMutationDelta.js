@@ -191,6 +191,19 @@ function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumul
   }
 }
 
+/**
+ * Folds a mutation response's `delta` into the React Query caches so scores,
+ * grades and violation lists reflect a dismiss/restore/delete immediately
+ * instead of waiting for a refetch.
+ *
+ * A dismiss splices the finding out of the cached lists (it carries the full
+ * violation key); every other kind invalidates the affected lists instead.
+ * Unknown kinds and missing arguments are no-ops.
+ *
+ * @param {import('@tanstack/react-query').QueryClient} queryClient
+ * @param {string} projectId
+ * @param {{kind: string, runId?: string, dimensions?: Array<object>, dismissed?: object}} delta
+ */
 export function applyMutationDelta(queryClient, projectId, delta) {
   if (!queryClient || !projectId || !delta) return;
   if (!KNOWN_KINDS.has(delta.kind)) return;

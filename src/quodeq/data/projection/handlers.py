@@ -1,3 +1,4 @@
+"""Per-event-type handlers the projection dispatches through."""
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,9 @@ class StateStoreWriter(Protocol):
     supersedes.
     """
 
-    def record_finding(self, payload: Any) -> None: ...
+    def record_finding(self, payload: Any) -> None:
+        """Persist one judgment payload. Re-projecting the same event is a no-op."""
+        ...
 
 
 def _handle_judgment_created(event: JudgmentCreatedEvent, store: StateStoreWriter) -> None:

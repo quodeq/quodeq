@@ -32,7 +32,7 @@ def _apply_provider_credentials(built_env: dict[str, str], options: EvaluationOp
 
 
 def build_eval_env(
-    repo: str, options: EvaluationOptions, env: dict[str, str] | None = None,
+    options: EvaluationOptions, env: dict[str, str] | None = None,
     *, ai_cmd: str, ai_model: str,
 ) -> dict[str, str]:
     """Build the subprocess environment for an evaluation run.

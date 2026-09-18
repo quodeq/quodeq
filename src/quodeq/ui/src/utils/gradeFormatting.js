@@ -34,6 +34,9 @@ export function splitScore(score) {
   return m ? { value: m[1], denom: m[2] } : { value: score, denom: '' };
 }
 
+const GRADE_CLASSES = ['grade-top', 'grade-high', 'grade-mid', 'grade-low'];
+const TIER_LETTERS = ['A', 'B', 'C', 'D'];
+
 /**
  * Map a numeric score (0–10) to a CSS grade class.
  *
@@ -44,9 +47,6 @@ export function splitScore(score) {
  * @param {number|string|null|undefined} score
  * @returns {string}
  */
-const GRADE_CLASSES = ['grade-top', 'grade-high', 'grade-mid', 'grade-low'];
-const TIER_LETTERS = ['A', 'B', 'C', 'D'];
-
 export function scoreColorClass(score) {
   const n = typeof score === 'number' ? score : parseFloat(score);
   if (Number.isNaN(n)) return 'grade-none';

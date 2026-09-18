@@ -71,10 +71,20 @@ class AssistantTurnState:
             self._cancel_tokens.pop(sid, None)
 
     def is_turn_claimed(self, sid: str) -> bool:
+        """True while a turn or workspace action holds *sid*'s slot.
+
+        A read-only probe for routes that want to 409 early; claiming is still
+        the only race-free way to take the slot.
+        """
         with self._running_lock:
             return sid in self._running_turns
 
     def cancel_token(self, sid: str) -> CancelToken | None:
+        """The in-flight /messages turn's token for *sid*, for /stop to fire.
+
+        None when nothing is running, or when the slot is held by a workspace
+        action, which is not stoppable.
+        """
         with self._running_lock:
             return self._cancel_tokens.get(sid)
 
@@ -87,11 +97,13 @@ class AssistantTurnState:
             return True
 
     def close_sse_stream(self) -> None:
+        """Give back the slot taken by ``try_open_sse_stream``. Call it from a finally."""
         with self._sse_lock:
             self._open_sse_streams -= 1
 
     @property
     def open_sse_streams(self) -> int:
+        """Current open-stream count, for the health endpoint and tests."""
         with self._sse_lock:
             return self._open_sse_streams
 

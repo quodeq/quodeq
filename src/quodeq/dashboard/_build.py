@@ -16,7 +16,7 @@ from pathlib import Path
 from quodeq.shared.logging import log_info
 
 # Re-exports so existing importers keep working
-from quodeq.dashboard._build_hash import (  # noqa: F401
+from quodeq.dashboard._build_hash import (
     _HASH_FILE,
     compute_source_hash,
     needs_rebuild,

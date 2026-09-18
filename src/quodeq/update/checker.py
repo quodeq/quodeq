@@ -30,6 +30,13 @@ def _interval(env: dict[str, str]) -> int:
 
 
 def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:
+    """Decide whether a network check is due.
+
+    False when the user turned auto-check off, when QUODEQ_NO_UPDATE_NOTIFIER
+    is set, or on CI. Otherwise the last attempt must be at least
+    QUODEQ_UPDATE_CHECK_INTERVAL seconds old (24h by default); an unreadable
+    timestamp counts as due.
+    """
     environ = env if env is not None else os.environ
     if not state.auto_check_enabled:
         return False
@@ -47,6 +54,12 @@ def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:
 
 
 def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
+    """Fetch the latest release and fold it into the on-disk state.
+
+    The attempt timestamp is stamped before the network call and persisted even
+    when the fetch fails, so a broken network cannot turn this into a per-launch
+    retry. *force* skips the ``should_check`` gate. Never raises.
+    """
     try:
         state = read_state(env)
         if not force and not should_check(state, env):
@@ -76,6 +89,7 @@ def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
 
 
 def check_async(env: dict[str, str] | None = None) -> None:
+    """Run ``run_check`` on a daemon thread so startup is never blocked."""
     try:
         threading.Thread(target=run_check, args=(env,), daemon=True).start()
     except Exception:  # pragma: no cover
@@ -83,6 +97,12 @@ def check_async(env: dict[str, str] | None = None) -> None:
 
 
 def get_status(env: dict[str, str] | None = None) -> dict:
+    """Return the update payload the UI and CLI render, read straight from state.
+
+    ``update_available`` is False for a version the user already dismissed, and
+    ``is_security`` only rides along with an available update. Reads state and
+    the install channel, never the network.
+    """
     state = read_state(env)
     available = is_newer(__version__, state.latest_version) and (
         state.latest_version != state.dismissed_version
@@ -129,6 +149,7 @@ def begin_self_update(env: dict[str, str] | None = None) -> dict:
 
 
 def dismiss(version: str, env: dict[str, str] | None = None) -> None:
+    """Silence the notice for *version*. A later release re-opens it."""
     state = read_state(env)
     state.dismissed_version = version
     write_state(state, env)
@@ -140,6 +161,7 @@ def set_settings(
     auto_check_enabled: bool | None = None,
     disclosed: bool | None = None,
 ) -> None:
+    """Update the auto-check and disclosure preferences. None leaves a field alone."""
     state = read_state(env)
     if auto_check_enabled is not None:
         state.auto_check_enabled = auto_check_enabled

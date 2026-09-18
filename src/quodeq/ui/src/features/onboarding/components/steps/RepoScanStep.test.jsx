@@ -7,7 +7,7 @@ const noop = () => {};
 
 describe('RepoScanStep', () => {
   it('idle state renders the repo input and Scan repository button', () => {
-    render(<RepoScanStep state={{ repoScanSubState: 'idle', repo: { value: '' } }} actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }} createProject={noop} onContinue={noop} onCancel={noop} />);
+    render(<RepoScanStep state={{ repoScanSubState: 'idle', repo: { value: '' } }} actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }} createProject={noop} onContinue={noop} />);
     expect(screen.getByPlaceholderText(/git@github.com/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /scan repository/i })).toBeInTheDocument();
   });
@@ -18,7 +18,6 @@ describe('RepoScanStep', () => {
       actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
       createProject={noop}
       onContinue={noop}
-      onCancel={noop}
     />);
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('FILES')).toBeInTheDocument();
@@ -31,7 +30,6 @@ describe('RepoScanStep', () => {
       actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
       createProject={noop}
       onContinue={noop}
-      onCancel={noop}
     />);
     expect(screen.getByText(/not found/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
@@ -50,7 +48,6 @@ describe('RepoScanStep', () => {
       actions={{ setRepo, startScan, succeedScan, failScan, resetScan: noop }}
       createProject={createProject}
       onContinue={noop}
-      onCancel={noop}
     />);
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
     await waitFor(() => expect(createProject).toHaveBeenCalledWith({ repo: '/some/path' }));
@@ -67,7 +64,6 @@ describe('RepoScanStep', () => {
       actions={{ setRepo: noop, startScan, succeedScan: noop, failScan, resetScan: noop }}
       createProject={createProject}
       onContinue={noop}
-      onCancel={noop}
     />);
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
     await waitFor(() => expect(failScan).toHaveBeenCalled());
@@ -92,7 +88,6 @@ describe('RepoScanStep', () => {
         createProject={createProject}
         getProjectInfo={getProjectInfo}
         onContinue={noop}
-        onCancel={noop}
       />);
       fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
       await waitFor(() => expect(succeedScan).toHaveBeenCalled());
@@ -111,7 +106,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={createProject}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -128,7 +122,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={createProject}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -143,7 +136,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={createProject}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -165,7 +157,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={vi.fn()}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -184,7 +175,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={createProject}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -204,7 +194,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={createProject}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -223,7 +212,6 @@ describe('RepoScanStep', () => {
         actions={{ setRepo: noop, startScan: noop, succeedScan: noop, failScan: noop, resetScan: noop }}
         createProject={createProject}
         onContinue={noop}
-        onCancel={noop}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /scan/i }));
@@ -246,7 +234,6 @@ describe('RepoScanStep', () => {
       createProject={createProject}
       getProjectInfo={getProjectInfo}
       onContinue={noop}
-      onCancel={noop}
     />);
     fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
     await waitFor(() => expect(failScan).toHaveBeenCalled());

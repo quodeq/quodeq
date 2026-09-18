@@ -18,7 +18,7 @@ from quodeq.config._asvs_network import (  # noqa: F401
     verify_integrity as _verify_integrity,
     _DEFAULT_FETCH_TIMEOUT_S,
 )
-from quodeq.config._asvs_parser import parse_asvs_content as _parse_asvs_content  # noqa: F401
+from quodeq.config._asvs_parser import parse_asvs_content as _parse_asvs_content
 
 _ASVS_DEFAULT_LEVEL = 1
 _ASVS_ALLOWED_HOSTS = frozenset({"raw.githubusercontent.com", "github.com", "owasp.org"})

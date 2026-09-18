@@ -100,7 +100,7 @@ function JobIdentityStrip({ job, projectLabel }) {
   );
 }
 
-export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
+export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel }) {
   const { newOnly } = useLiveFeedSettings();
   // Filter ONCE, above both consumers. JobStatStrip derives its violations
   // cell from the same object the feed lists, so filtering in each child
@@ -137,7 +137,7 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} projectLabel={projectLabel} />
       <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
-      <ScanProgress job={job} hasEvaluations={hasEvaluations} />
+      <ScanProgress job={job} />
       <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
     </div>
   );

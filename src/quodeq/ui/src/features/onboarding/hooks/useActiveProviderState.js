@@ -7,6 +7,13 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 // to feel live while the user picks; the picker is interactive and on screen.
 const ACTIVE_PROVIDER_POLL_MS = 400;
 
+/**
+ * The provider the user has selected, with its model and time limit (0 meaning
+ * unlimited, null meaning unset so the caller's default applies). All-null when
+ * nothing is selected or storage is unavailable.
+ *
+ * @returns {{id: string|null, model: string|null, timeLimitS: number|null}}
+ */
 export function readActiveProviderState() {
   try {
     const id = localStorage.getItem(ACTIVE_PROVIDER_KEY) || null;

@@ -47,6 +47,11 @@ class DismissedEntry:
 
     @property
     def line_key(self) -> tuple[str, str, int]:
+        """The ``(req, file, line)`` form, held for every entry whether fingerprinted or not.
+
+        It is what a snippet-less finding matches on, so it stays populated
+        even when ``key`` returns the fingerprint tuple.
+        """
         return (self.req, self.file, self.line)
 
 

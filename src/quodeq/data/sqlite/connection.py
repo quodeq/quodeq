@@ -25,6 +25,13 @@ def _configure(conn: sqlite3.Connection) -> None:
 
 @contextmanager
 def open_evaluation_db(run_dir: Path) -> Iterator[sqlite3.Connection]:
+    """Open (creating if needed) the run's evaluation.db with the schema applied.
+
+    Creates *run_dir* and closes the connection on the way out. Connect and IO
+    failures surface as ``RuntimeError`` naming the path; schema-version
+    mismatches and corruption stay ``sqlite3.DatabaseError`` so readers can
+    fall back to the filesystem.
+    """
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / EVALUATION_DB_FILENAME
     conn: sqlite3.Connection | None = None

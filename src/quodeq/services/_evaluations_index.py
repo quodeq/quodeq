@@ -148,7 +148,7 @@ class EvaluationsIndex:
         """
         if not job_id.startswith("ext-"):
             try:
-                internal = self._jobs.get_job(job_id, reports_root=None) if hasattr(self._jobs, "get_job") else None
+                internal = self._jobs.get_job(job_id) if hasattr(self._jobs, "get_job") else None
             except TypeError:
                 internal = None
             if internal is not None:

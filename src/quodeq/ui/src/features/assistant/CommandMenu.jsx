@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * Autocomplete popup for slash commands, anchored above the composer.

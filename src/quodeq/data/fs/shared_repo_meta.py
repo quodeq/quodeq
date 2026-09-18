@@ -21,6 +21,13 @@ _GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
 
 
 def check_repo_format(repo_root: Path) -> str:
+    """Classify a clone from its marker file: ok | empty | foreign | unsupported_version.
+
+    "empty" means a clone holding nothing but .git, which is publishable.
+    "foreign" covers an unreadable, non-dict or wrong-format marker, and any
+    repo carrying files but no marker at all -- publishing into one would
+    trample somebody else's repository.
+    """
     marker = repo_root / MARKER_FILENAME
     if marker.exists():
         try:
@@ -53,6 +60,10 @@ def check_repo_format(repo_root: Path) -> str:
 
 
 def bootstrap_repo_layout(repo_root: Path) -> None:
+    """Write the format marker, .gitignore and an empty evaluations/ into a clone.
+
+    Turns an "empty" clone into an "ok" one. Run once, before the first publish.
+    """
     marker_content = json.dumps({"format": FORMAT_NAME, "version": FORMAT_VERSION}) + "\n"
     (repo_root / MARKER_FILENAME).write_text(marker_content, encoding="utf-8")
     (repo_root / ".gitignore").write_text(_GITIGNORE_CONTENT, encoding="utf-8")
@@ -62,14 +73,20 @@ def bootstrap_repo_layout(repo_root: Path) -> None:
 
 
 def shared_index_db_path(url: str, env: dict | None = None) -> Path:
+    """Run-index db for *url*, kept beside the clone rather than inside it."""
     return shared_cache_dir(url, env) / "index.db"
 
 
 def shared_score_cache_path(url: str, env: dict | None = None) -> Path:
+    """Score cache for *url*, beside the clone so a hard reset never wipes it."""
     return shared_cache_dir(url, env) / "score_cache.db"
 
 
 def sync_shared_index(url: str, env: dict | None = None) -> None:
+    """Re-scan the clone's evaluations/ tree into the shared run index.
+
+    A no-op when the tree is missing. Call after a refresh, before listing runs.
+    """
     from quodeq.data.sqlite.run_index import open_index, sync_index
 
     root = shared_evaluations_root(url, env)

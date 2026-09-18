@@ -26,6 +26,10 @@ _logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TurnRequest:
+    """Everything one turn needs from the route: the user text, the UI state to
+    contextualize it with, the provider/model to run it on and the web/write
+    toggles."""
+
     session_id: str
     text: str
     ui_state: dict | None
@@ -250,6 +254,12 @@ def _execute_turn(request: TurnRequest, tool_ctx: ToolContext, deps: _EngineDeps
 def run_turn(request: TurnRequest, *, repository: AssistantStore,
              tool_ctx: ToolContext, engines: TurnEngines | None = None,
              cancel: CancelToken | None = None) -> None:
+    """Run one turn end to end, emitting stream events through ``deps.emit``.
+
+    Never raises: a stop becomes a ``stopped`` event (with any partial answer
+    persisted), anything else is logged and becomes a generic ``error`` event,
+    because this runs on a turn thread that must not die silently.
+    """
     deps = _build_deps(request, repository, engines or TurnEngines(), cancel or CancelToken())
     emit = deps.emit
     try:

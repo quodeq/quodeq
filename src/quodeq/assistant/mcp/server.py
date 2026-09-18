@@ -39,6 +39,12 @@ def _tools_call(registry: ToolRegistry, params: dict) -> dict:
 
 
 def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> None:
+    """Read JSON-RPC frames off *stdin* until EOF, answering on *stdout*.
+
+    One bad request never ends the loop: the detail goes to *stderr* and the
+    client gets a generic -32603 frame. Notifications carry no id and get no
+    response.
+    """
     while True:
         msg = _jsonrpc.read_message(stdin)
         if msg is None:
@@ -132,6 +138,7 @@ def _build_arg_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
 
 
 def main(argv: list[str] | None = None) -> None:
+    """CLI entry point: build the registry from argv, then serve on stdio."""
     parser = argparse.ArgumentParser()
     _build_arg_parser(parser)
     ns = parser.parse_args(argv)

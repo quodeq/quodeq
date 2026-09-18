@@ -1,3 +1,4 @@
+"""Language-plugin descriptors: what a plugin covers and which dimensions it adds."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

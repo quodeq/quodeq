@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useOverviewReturnReconcile, resolveActiveTab, TAB_OVERVIEW } from './useAppState.js';
 import { useNavStack } from './useNavStack.js';

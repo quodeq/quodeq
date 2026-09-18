@@ -30,7 +30,6 @@ vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
 }));
 
 import { LlamaCppLogProvider } from './LlamaCppLogProvider.jsx';
-import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 
 function renderProvider(fakeApi) {
   const el = (

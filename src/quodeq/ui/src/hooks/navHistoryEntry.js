@@ -21,6 +21,13 @@ export function toHistoryEntry(entry) {
   return light;
 }
 
+/**
+ * Applies a browser back/forward to the nav stack.
+ *
+ * Back truncates the stack to the target index. Forward re-appends the full
+ * entry from `entriesByIndex`, falling back to the scalar-only copy in history
+ * state for entries pushed before a reload.
+ */
 export function handlePopState(e, setNavStack, entriesByIndex) {
   const targetIndex = e.state?.navIndex ?? 0;
   setNavStack((prev) => {

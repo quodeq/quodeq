@@ -120,6 +120,15 @@ function buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvi
   };
 }
 
+/**
+ * The assistant's provider selection: whether it is enabled, the mode, the
+ * active provider and its model.
+ *
+ * Every setter persists and broadcasts, so a change made on the Settings
+ * screen reaches the drawer in the same window (a `storage` event only fires
+ * cross-tab). In follow-analysis mode the selection tracks the analysis
+ * provider instead of being set directly. `storage` is injectable for tests.
+ */
 export function useAssistantProvider({ storage = localStorage } = {}) {
   const [state, setState] = useState(() => loadState(storage));
 

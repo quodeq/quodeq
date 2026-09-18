@@ -8,6 +8,9 @@ import { request, BASE } from './request.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 
+/**
+ * Liveness probe for the backend; drives the server-status dot.
+ */
 export function getHealth() {
   return request('/health');
 }

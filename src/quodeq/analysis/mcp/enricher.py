@@ -49,7 +49,9 @@ _HOSTED_SERVICE_KEYWORDS: tuple[str, ...] = (
 @runtime_checkable
 class FileReader(Protocol):
     """Abstraction for reading source file content."""
-    def __call__(self, path: Path) -> str: ...
+    def __call__(self, path: Path) -> str:
+        """Return the text of *path* for snippet extraction."""
+        ...
 
 
 @dataclass

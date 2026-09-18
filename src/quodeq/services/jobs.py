@@ -231,7 +231,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
                     self._log.debug(f"job {job_id} process already gone during shutdown: {exc}")
             self._processes.clear()
 
-    def get_job(self, job_id: str, reports_root: Path | None = None) -> JobSnapshot | None:
+    def get_job(self, job_id: str) -> JobSnapshot | None:
         """Return the current state of an in-memory job, or None if not found.
 
         External runs (``ext-`` prefix) are not tracked in-memory — they are

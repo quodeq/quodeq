@@ -60,6 +60,16 @@ async function tryFindPort(candidates, baseUrl) {
   return found ? found.value : null;
 }
 
+/**
+ * Polls the backend and reports whether it is reachable.
+ *
+ * When a poll fails it probes the neighbouring ports and, if it finds the
+ * server there, redirects the page — covering the case where the backend
+ * restarted on a different port. The setter lets the reconnect overlay clear
+ * the disconnected state optimistically until the next poll settles it.
+ *
+ * @returns {[boolean, (next: boolean) => void, string|null]} connected, setter, server version
+ */
 export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
   // Local state is the source of truth for callers. The query side-effects
   // it on each poll resolution. setServerConnected(true) lets the reconnect

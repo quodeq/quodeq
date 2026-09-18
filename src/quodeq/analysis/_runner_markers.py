@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.shared.constants import CC_MARKER_KEY  # noqa: F401 — re-export
+from quodeq.shared.constants import CC_MARKER_KEY  # re-export
 from quodeq.shared.logging import log_info
 _SECONDS_PER_MINUTE = 60
 

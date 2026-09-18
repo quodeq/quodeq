@@ -12,9 +12,10 @@ import struct
 import subprocess
 import threading
 
-from flask import Flask, current_app, jsonify, request
+from flask import Flask, jsonify, request
 from flask_sock import Sock
 
+from quodeq.api._terminal_gate import _env_reason, _forbidden, _gate_reason
 from quodeq.api._terminal_ws_helpers import (
     pump_terminal_out,
     resolve_ws_session,
@@ -22,7 +23,6 @@ from quodeq.api._terminal_ws_helpers import (
     terminal_read_loop,
 )
 from quodeq.api.helpers import json_error
-from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.links import (
     build_open_argv,
     detect_editor,
@@ -35,28 +35,6 @@ from quodeq.terminal.sessions import TerminalSessionRegistry, shell_name
 _logger = logging.getLogger(__name__)
 
 
-def _env_reason() -> str | None:
-    # Environment availability only (no Origin) — for /status, a same-origin
-    # GET the browser sends WITHOUT an Origin header. Gating it on Origin would
-    # wrongly report the terminal disabled ("Missing Origin header").
-    return terminal_env_reason(
-        host=current_app.config.get("QUODEQ_BIND_HOST", ""),
-        api_key=current_app.config.get("QUODEQ_API_KEY"),
-        request_host=request.host,
-    )
-
-
-def _gate_reason() -> str | None:
-    # Full gate incl. Origin — for the WS handshake (browsers DO send Origin on
-    # WS) and the /kill POST (Origin also enforced by the global CSRF hook).
-    return terminal_gate_reason(
-        host=current_app.config.get("QUODEQ_BIND_HOST", ""),
-        api_key=current_app.config.get("QUODEQ_API_KEY"),
-        origin=request.headers.get("Origin"),
-        request_host=request.host,
-    )
-
-
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
 # keys off these: a retry against a held lock or a closed gate can never
 # succeed, so it must not loop — only unexpected drops are retried.
@@ -64,10 +42,6 @@ _WS_CLOSE_BUSY = 4002      # per-session connection lock held by another window
 _WS_CLOSE_REFUSED = 4003   # terminal gate refused the handshake
 # 4004 (unknown session id) lives in _terminal_ws_helpers.WS_CLOSE_NOT_FOUND —
 # it's returned from resolve_ws_session, not referenced directly here.
-
-
-def _forbidden():
-    return json_error("forbidden", 403, "FORBIDDEN")  # code + message once, for six routes
 
 
 def _coerce_int(value) -> int | None:
@@ -261,6 +235,11 @@ def _terminal_ws(registry: TerminalSessionRegistry, ws):
 
 
 def register_terminal_routes(app: Flask, registry: TerminalSessionRegistry | None = None) -> None:
+    """Bind the terminal HTTP + WebSocket routes and own the session registry.
+
+    The registry is stashed on ``app.extensions`` and its shells are killed at
+    process exit; pass *registry* to share one across apps in tests.
+    """
     sock = Sock(app)
     registry = registry or TerminalSessionRegistry()
     app.extensions["terminal_registry"] = registry
