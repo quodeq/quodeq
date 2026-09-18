@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SidePaneProvider } from './SidePaneProvider.jsx';
+import { SidePaneProvider, SidePaneToast } from './SidePaneProvider.jsx';
 import { useSidePane } from './SidePaneContext.jsx';
 
 function ToastProbe() {
@@ -24,5 +24,19 @@ describe('SidePaneProvider toast dismiss accessibility', () => {
     render(<SidePaneProvider><ToastProbe /></SidePaneProvider>);
     fireEvent.click(screen.getByText('fire'));
     expect(screen.getByRole('status')).toHaveTextContent('blocked: try again later');
+  });
+
+  it('dismisses when the container is clicked, the mouse convenience the cursor promises', () => {
+    const onDismiss = vi.fn();
+    render(<SidePaneToast notice={{ message: 'at cap' }} onDismiss={onDismiss} />);
+    fireEvent.click(screen.getByRole('status'));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses once when the dismiss button is clicked, not twice through the container', () => {
+    const onDismiss = vi.fn();
+    render(<SidePaneToast notice={{ message: 'at cap' }} onDismiss={onDismiss} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

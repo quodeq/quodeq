@@ -12,25 +12,39 @@ const MAX_WINDOWS = 3;
 const NOTICE_DISMISS_MS = 4000;
 const AT_CAP_MESSAGE = t('sidePane.atCap', { max: MAX_WINDOWS });
 
-function SidePaneToast({ notice, onDismiss }) {
+/**
+ * The transient side-pane notice. The whole toast dismisses on click, the mouse
+ * convenience its `cursor: pointer` promises, and the dismiss button is the
+ * keyboard-reachable control; two paths to the same dismiss are fine, but the
+ * button stops its click so one press does not dismiss twice.
+ *
+ * The click sits on a `role="presentation"` shell with the live region moved to
+ * the message span: jsx-a11y (rightly) refuses mouse handlers on a
+ * `role="status"` element, and the shell really is presentational.
+ */
+export function SidePaneToast({ notice, onDismiss }) {
   useEffect(() => {
     if (!notice) return undefined;
     const t = setTimeout(onDismiss, NOTICE_DISMISS_MS);
     return () => clearTimeout(t);
   }, [notice, onDismiss]);
   if (!notice) return null;
+  function handleDismissClick(e) {
+    e.stopPropagation();
+    onDismiss();
+  }
   return (
     <div
       className="job-error-toast side-pane-toast"
-      role="status"
-      aria-live="polite"
+      role="presentation"
+      onClick={onDismiss}
     >
-      {notice.message}
+      <span role="status" aria-live="polite">{notice.message}</span>
       <button
         type="button"
         className="side-pane-toast__dismiss"
         aria-label={t('common.dismissNotificationAria')}
-        onClick={onDismiss}
+        onClick={handleDismissClick}
       >
         ×
       </button>

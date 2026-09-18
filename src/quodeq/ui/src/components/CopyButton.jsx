@@ -149,8 +149,14 @@ export default function CopyButton({ onClick, label, className, icon, 'aria-labe
     setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
   };
 
+  // No aria-label when there is a visible label: an aria-label pins the name to
+  // "Copy" while the content flips to "Copied!", so the change never reaches a
+  // screen reader. The fallback is for the icon-only button, which has no
+  // content to name it.
+  const name = ariaLabel || (label ? undefined : t('common.copyToClipboardAria'));
+
   return (
-    <button className={className || 'detail-copy-btn'} onClick={handleClick} aria-label={ariaLabel || label || t('common.copyToClipboardAria')}>
+    <button className={className || 'detail-copy-btn'} onClick={handleClick} aria-label={name}>
       {icon}
       {copied ? 'Copied!' : label}
       {!icon && <CopyIcon />}

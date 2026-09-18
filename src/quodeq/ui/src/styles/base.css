@@ -617,6 +617,25 @@ textarea:focus {
   opacity: 0.9;
 }
 
+/* Keyboard-reachable dismiss inside the side-pane toast. The toast itself is
+   also clickable, so this stays chrome-free and reads as part of the message
+   instead of a browser button parked next to it. */
+.side-pane-toast__dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  padding: 0;
+  margin-left: var(--space-2, 8px);
+  cursor: pointer;
+}
+
+.side-pane-toast__dismiss:focus-visible {
+  outline: 2px solid var(--color-bg, #0d1117);
+  outline-offset: 2px;
+}
+
 .settings-info-toast {
   background: var(--color-text, #e6edf3);
   color: var(--color-bg, #0d1117);
