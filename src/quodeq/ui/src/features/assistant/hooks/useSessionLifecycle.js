@@ -175,7 +175,9 @@ function makeRefreshWorkspace({ sessionIdRef, fetchAssistantWorkspace, setWorksp
       const ws = await fetchAssistantWorkspace(sid);
       if (sessionIdRef.current !== sid) return;   // context switched mid-flight
       setWorkspace(ws.worktree);
-    } catch { /* advisory only */ }
+    } catch (err) {
+      console.warn('[useSessionLifecycle] refreshWorkspace failed:', err); // advisory only
+    }
   };
 }
 

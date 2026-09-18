@@ -25,7 +25,9 @@ export function useProjectAutoRetry({
           setProjectsLoadFailed(false);
           resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
         })
-        .catch(() => { /* still down: stay on the failed state, try again next tick */ })
+        .catch((err) => {
+          console.warn('[useProjectAutoRetry] background retry failed:', err); // still down: stay on the failed state, try again next tick
+        })
         .finally(() => { loadInFlightRef.current = false; });
     }, autoRetryMs);
     return () => clearInterval(id);

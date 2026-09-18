@@ -138,7 +138,8 @@ async function handleFileInput(e, onImported, state, importStandard) {
   try {
     const text = await file.text();
     data = JSON.parse(text);
-  } catch {
+  } catch (err) {
+    console.warn('[ImportModal] could not parse imported file:', err);
     setError(t('standards.invalidJson'));
     setStep(STEP.ERROR);
     return;

@@ -26,7 +26,8 @@ export function useOmlxServerStatus(baseUrl) {
           return { status: 'online', address: result.address ?? null };
         }
         return { status: 'offline', address: null };
-      } catch {
+      } catch (err) {
+        console.warn('[useOmlxServerStatus] status poll failed:', err);
         return { status: 'offline', address: null };
       }
     },

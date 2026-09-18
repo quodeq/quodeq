@@ -72,8 +72,9 @@ function useCheckStatus({ getSharedStatus, mountedRef, stopPolling, applyOptimis
     let data;
     try {
       data = await getSharedStatus();
-    } catch {
-      return; // transient poll failure -- the job keeps running server-side regardless; try again next tick
+    } catch (err) {
+      console.warn('[usePublishPolling] status poll failed:', err); // transient -- the job keeps running server-side regardless; try again next tick
+      return;
     }
     if (!mountedRef.current) return;
     const publish = data?.publish || {};

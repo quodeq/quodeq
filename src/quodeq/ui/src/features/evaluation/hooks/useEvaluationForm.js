@@ -25,7 +25,7 @@ function buildAndSubmit(onStart, formState) {
   if (cleanScan === CLEAN_PERSIST.ONCE) {
     Promise.resolve(result).then(
       () => setCleanScan(CLEAN_PERSIST.OFF),
-      () => {},
+      (err) => console.warn('[useEvaluationForm] start evaluation failed:', err),
     );
   }
 }

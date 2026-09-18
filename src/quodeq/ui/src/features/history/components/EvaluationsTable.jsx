@@ -26,7 +26,8 @@ function formatDateParts(dateISO, fallbackLabel) {
     const date = d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
     const time = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     return { date, time };
-  } catch {
+  } catch (err) {
+    console.warn('[EvaluationsTable] date format failed:', err);
     return { date: fallbackLabel || '', time: '' };
   }
 }

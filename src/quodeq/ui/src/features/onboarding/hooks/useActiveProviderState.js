@@ -25,7 +25,8 @@ export function readActiveProviderState() {
     const tlRaw = localStorage.getItem(providerKey(id, 'time-limit'));
     const timeLimitS = tlRaw === null ? null : Number.parseInt(tlRaw, 10);
     return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
-  } catch {
+  } catch (err) {
+    console.warn('[useActiveProviderState] could not read active provider state:', err);
     return { id: null, model: null, timeLimitS: null };
   }
 }

@@ -47,7 +47,8 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
       invalidateScoreQueries();
       requestPreview(d.current);
       return d.applied;
-    } catch {
+    } catch (err) {
+      console.warn('[useGradeFormula] apply failed:', err);
       setError(t('gradeFormula.applyFailed'));
       return null;
     } finally {
@@ -64,7 +65,8 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
       setPartialNotice(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
-    } catch {
+    } catch (err) {
+      console.warn('[useGradeFormula] reset failed:', err);
       setError(t('gradeFormula.resetFailed'));
     } finally {
       setBusy(false);

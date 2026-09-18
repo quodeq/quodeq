@@ -35,7 +35,8 @@ function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
       });
       actions.succeedScan(existingProjectId, scanData);
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('[useRepoScanStep] resume existing project failed:', err);
       return false;
     }
   };
@@ -92,7 +93,11 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
       const payload = { repo, cloneDest, ephemeral };
       const { projectId, scanData } = await createProject(payload);
       if (cloneDest && !ephemeral) {
-        try { localStorage.setItem(CLONE_DEST_STORAGE_KEY, cloneDest); } catch (_) { /* private mode */ }
+        try {
+          localStorage.setItem(CLONE_DEST_STORAGE_KEY, cloneDest);
+        } catch (err) {
+          console.warn('[useRepoScanStep] could not persist clone destination:', err); // private mode
+        }
       }
       actions.succeedScan(projectId, scanData);
       setSubStep('input');

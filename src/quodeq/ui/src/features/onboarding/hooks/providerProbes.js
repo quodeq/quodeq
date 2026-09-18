@@ -20,7 +20,8 @@ async function detectCliProvider(id) {
     const data = await res.json();
     const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli');
     return { id, classification: 'cli', detected, defaultModel: null };
-  } catch {
+  } catch (err) {
+    console.warn('[providerProbes] CLI provider probe failed:', err);
     return { id, classification: 'cli', detected: false, defaultModel: null };
   }
 }
@@ -29,7 +30,8 @@ async function detectOllamaDaemon() {
   try {
     const res = await fetch('/api/ollama/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
     return { id: 'ollama', classification: 'local-api', detected: res.ok, defaultModel: null };
-  } catch {
+  } catch (err) {
+    console.warn('[providerProbes] Ollama daemon probe failed:', err);
     return { id: 'ollama', classification: 'local-api', detected: false };
   }
 }
@@ -40,7 +42,8 @@ async function detectStoredCloudKey(providerId) {
     if (!res.ok) return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
     const data = await res.json();
     return { id: providerId, classification: 'cloud', detected: Boolean(data.configured), defaultModel: null };
-  } catch {
+  } catch (err) {
+    console.warn('[providerProbes] cloud key probe failed:', err);
     return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
   }
 }

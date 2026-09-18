@@ -7,13 +7,18 @@ export function openExternal(url) {
   let parsed;
   try {
     parsed = new URL(url);
-  } catch {
+  } catch (err) {
+    console.warn('[openExternal] could not parse url:', err);
     return;
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
   const api = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
   if (api && typeof api.open_browser === 'function') {
-    try { api.open_browser(url); return; } catch { /* fall through to window.open */ }
+    try {
+      api.open_browser(url); return;
+    } catch (err) {
+      console.warn('[openExternal] pywebview open_browser failed, falling back to window.open:', err);
+    }
   }
   if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener');
 }

@@ -49,8 +49,9 @@ export function buildAssistantActionAppliedHandler({
           event.detail.scores,
           event.detail.delta,
         );
-      } catch {
+      } catch (err) {
         // Instant patch is best-effort; the refresh/reconcile are the fallback.
+        console.warn('[assistantAppBridge] applyDelta failed:', err);
       }
     }
     bumpDismissRefresh();

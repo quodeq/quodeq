@@ -154,7 +154,13 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
     const es = new EventSource(assistantEventsUrl(sessionId, 0));
     es.onmessage = (e) => {
       resetInactivity();
-      let frame; try { frame = JSON.parse(e.data); } catch { return; }
+      let frame;
+      try {
+        frame = JSON.parse(e.data);
+      } catch (err) {
+        console.warn('[useAssistantStream] could not parse frame:', err);
+        return;
+      }
       applyFrame(frame, handlers);
     };
     es.addEventListener('done', revealer.endTurn);

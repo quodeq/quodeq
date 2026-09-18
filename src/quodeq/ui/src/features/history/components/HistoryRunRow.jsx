@@ -6,7 +6,10 @@ function formatDate(dateISO) {
   try {
     const d = new Date(dateISO);
     return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
-  } catch { return ''; }
+  } catch (err) {
+    console.warn('[HistoryRunRow] date format failed:', err);
+    return '';
+  }
 }
 
 function formatTime(dateISO) {
@@ -14,7 +17,10 @@ function formatTime(dateISO) {
   try {
     const d = new Date(dateISO);
     return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
+  } catch (err) {
+    console.warn('[HistoryRunRow] time format failed:', err);
+    return '';
+  }
 }
 
 function TrendBadge({ delta }) {

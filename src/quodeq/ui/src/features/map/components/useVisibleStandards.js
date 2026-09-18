@@ -17,7 +17,9 @@ export function useVisibleStandards() {
       const map = {};
       stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || 'custom'; });
       setStandardTypes(map);
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn('[useVisibleStandards] standards fetch failed:', err);
+    });
   }, []);
   return { standardTypes };
 }

@@ -51,7 +51,8 @@ async function applyAction({ actionId, actionType, setStatus }) {
     const res = await applyAssistantAction(actionId);
     notifyAssistantActionApplied({ actionType, scores: res?.result?.scores, delta: res?.result?.delta });
     setStatus('applied');
-  } catch {
+  } catch (err) {
+    console.warn('[ActionPreviewCard] apply action failed:', err);
     setStatus('error');
   }
 }
@@ -61,7 +62,8 @@ async function rejectAction({ actionId, setStatus }) {
   try {
     await rejectAssistantAction(actionId);
     setStatus('rejected');
-  } catch {
+  } catch (err) {
+    console.warn('[ActionPreviewCard] reject action failed:', err);
     setStatus('error');
   }
 }

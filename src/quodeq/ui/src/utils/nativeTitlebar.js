@@ -10,7 +10,8 @@ export function syncNativeTitlebar(dark) {
   if (!api || typeof api.set_titlebar_theme !== 'function') return;
   try {
     api.set_titlebar_theme(dark ? 'dark' : 'light');
-  } catch {
-    // bridge call failed — leave the titlebar at its current appearance
+  } catch (err) {
+    // leave the titlebar at its current appearance
+    console.warn('[nativeTitlebar] bridge call failed:', err);
   }
 }

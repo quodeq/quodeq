@@ -68,7 +68,11 @@ function registerLinkProviders(term, sessionId) {
     term.registerLinkProvider(createFileLinkProvider({
       readLine,
       resolvePaths: (paths) => resolveTerminalPaths(paths, sessionId),
-      openFile: (abs, line, col) => { openInEditor(abs, line, col, sessionId).catch(() => {}); },
+      openFile: (abs, line, col) => {
+        openInEditor(abs, line, col, sessionId).catch((err) => {
+          console.warn('[terminalSetup] openInEditor failed:', err);
+        });
+      },
     })),
   ];
 }

@@ -25,7 +25,10 @@ function useHistoryRunNavLabel(trend, currentOverviewRun) {
       try {
         const d = new Date(entry.dateISO);
         return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
-      } catch { return entry.dateISO || ''; }
+      } catch (err) {
+        console.warn('[HistoryPage] date format failed:', err);
+        return entry.dateISO || '';
+      }
     }
     return entry?.dateLabel || currentOverviewRun;
   }, [trend, currentOverviewRun]);

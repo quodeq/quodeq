@@ -62,4 +62,19 @@ describe('DesktopSection', () => {
     await waitFor(() => expect(fakeApi.setMenubar).toHaveBeenCalledWith(true));
     await waitFor(() => expect(onButton.className).not.toContain('settings-pill--active'));
   });
+
+  it('logs and surfaces an error when the toggle fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fakeApi.setMenubar.mockRejectedValue(new Error('nope'));
+    renderWithApi();
+    const onButton = await screen.findByRole('button', { name: /^on$/i });
+    fireEvent.click(onButton);
+    await waitFor(() => expect(fakeApi.setMenubar).toHaveBeenCalledWith(true));
+    expect(await screen.findByText('Could not update the menu bar setting. Try again.')).toBeInTheDocument();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('[DesktopSection]'),
+      expect.any(Error),
+    );
+    warn.mockRestore();
+  });
 });

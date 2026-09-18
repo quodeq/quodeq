@@ -36,9 +36,10 @@ export function useOpenPrinciple({ onOpenEvalPrincipal, openProject }) {
         target.dateLabel || '',
       )(target.principle);
       onOpenEvalPrincipal(evalPrincipal);
-    } catch {
+    } catch (err) {
       // Fetch failed (run pruned, server hiccup): stay on Compare rather
       // than landing on an empty principle page.
+      console.warn('[useOpenPrinciple] dimension eval fetch failed:', err);
     }
   }, [onOpenEvalPrincipal, queryClient, openProject]);
 
