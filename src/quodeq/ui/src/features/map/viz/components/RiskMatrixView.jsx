@@ -3,6 +3,7 @@ import { nodeColor, nodeBorderColor } from '../core/mapColors.js';
 import FileShape from './FileShape.jsx';
 import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
+import { riskBubbleKey } from './riskBubbleName.js';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
@@ -86,7 +87,7 @@ function BubbleNode({ point, px, py, br, entered, tip, setTip, onDrillDown, onFi
       ) : (
         <FileShape cx={cx} cy={cy} r={r} color={color} borderColor={border}
           glow={tip?.name === child.name}
-          ariaLabel={t('map.riskBubbleAria', { file: child.name || child.path, count: child.violations || 0 })}
+          ariaLabel={t(riskBubbleKey(child.violations), { file: child.name || child.path, count: child.violations || 0 })}
           handlers={{
             onMouseEnter: (e) => setTip({ x: e.clientX, y: e.clientY, child }),
             onMouseMove: (e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null),

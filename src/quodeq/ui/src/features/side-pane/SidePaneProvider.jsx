@@ -18,9 +18,11 @@ const AT_CAP_MESSAGE = t('sidePane.atCap', { max: MAX_WINDOWS });
  * keyboard-reachable control; two paths to the same dismiss are fine, but the
  * button stops its click so one press does not dismiss twice.
  *
- * The click sits on a `role="presentation"` shell with the live region moved to
- * the message span: jsx-a11y (rightly) refuses mouse handlers on a
- * `role="status"` element, and the shell really is presentational.
+ * The shell is `role="presentation"`, because jsx-a11y (rightly) refuses mouse
+ * handlers on a `role="status"` element and the shell really is presentational.
+ * It carries no live region at all: it is keyed by notice, so it remounts with
+ * its text already in place, which is not reliably announced. The live region
+ * is the persistent one the provider renders beside it.
  */
 export function SidePaneToast({ notice, onDismiss }) {
   useEffect(() => {
@@ -39,7 +41,7 @@ export function SidePaneToast({ notice, onDismiss }) {
       role="presentation"
       onClick={onDismiss}
     >
-      <span role="status" aria-live="polite">{notice.message}</span>
+      {notice.message}
       <button
         type="button"
         className="side-pane-toast__dismiss"
@@ -206,6 +208,10 @@ export function SidePaneProvider({ children }) {
   return (
     <SidePaneContext.Provider value={value}>
       {children}
+      {/* Always mounted, text toggled, and deliberately outside the keyed
+          shell: a live region that mounts with its text in it is not
+          reliably announced. */}
+      <span role="status" className="sr-only">{notice ? notice.message : ''}</span>
       <SidePaneToast key={notice?.key} notice={notice} onDismiss={clearNotice} />
     </SidePaneContext.Provider>
   );

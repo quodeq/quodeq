@@ -1476,11 +1476,12 @@
   "map.stateClean": "no violations",
   "map.stateCompliance": "{pct}% compliant",
   "map.riskBubbleAria": "{file}: {count} violations",
+  "map.riskBubbleAriaOne": "{file}: 1 violation",
   "map.galaxyKbdLabel": "Contents of this folder",
+  "map.galaxyKbdFolderItem": "Folder {name}",
   "violations.sortByAria": "Sort by {column}",
   "heatGrid.severityCellAria": "{severity}: {count} violations in {label}",
   "heatGrid.severityCellAriaOne": "{severity}: 1 violation in {label}",
   "heatGrid.violationsCellAriaOne": "1 violation in {label}, open details",
-  "heatGrid.unnamedRow": "row",
-  "map.galaxyKbdFolderItem": "Folder {name}"
+  "heatGrid.unnamedRow": "row"
 }

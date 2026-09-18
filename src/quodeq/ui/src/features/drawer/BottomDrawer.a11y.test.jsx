@@ -42,6 +42,20 @@ describe('BottomDrawer resize handle keyboard accessibility', () => {
     expect(drawer.setHeight).toHaveBeenCalledWith(304);
   });
 
+  it('ignores a key name that only exists on Object.prototype', () => {
+    // Guard, not a regression test: React's own getEventKey does
+    // `normalizeKey[nativeEvent.key] || nativeEvent.key` first, so these names
+    // already arrive as a function or object and miss the direction map
+    // whichever way it is read. The hasOwn check is what makes that
+    // independent of React's accident.
+    drawer.setHeight.mockClear();
+    render(<BottomDrawer uiState={{}} />);
+    const handle = screen.getByRole('separator', { name: /resize drawer/i });
+    fireEvent.keyDown(handle, { key: 'constructor' });
+    fireEvent.keyDown(handle, { key: 'toString' });
+    expect(drawer.setHeight).not.toHaveBeenCalled();
+  });
+
   it('resizing a maximized drawer with the keyboard leaves maximized and starts from the rendered height', () => {
     drawer.setHeight.mockClear();
     drawer.setMaximized.mockClear();

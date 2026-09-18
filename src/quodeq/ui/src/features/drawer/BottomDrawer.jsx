@@ -49,8 +49,10 @@ function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
   // The keyboard path is the same resize, one step at a time.
   const handleResizeKey = useCallback((event) => {
+    // hasOwn, not a bare lookup: 'constructor' and friends would otherwise
+    // resolve through Object.prototype and resize the drawer to NaN.
+    if (!Object.hasOwn(RESIZE_KEY_DIRECTION, event.key)) return;
     const direction = RESIZE_KEY_DIRECTION[event.key];
-    if (direction === undefined) return;
     event.preventDefault();
     const from = resizeStartHeight(event.currentTarget, { height, maximized, setMaximized });
     setHeight(from + direction * RESIZE_STEP_PX);

@@ -9,6 +9,7 @@ import { useGalaxyFolderCamera } from './useGalaxyFolderCamera.js';
 import { LevelInfoPanel } from './galaxyViewInfo.jsx';
 import ChartKeyboardControls from '../../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../../strings/index.js';
+import { riskBubbleKey } from './riskBubbleName.js';
 
 // One control per star, folders included, since the canvas hit-tests both.
 // Capped because a folder with hundreds of entries would bury the rest of
@@ -26,7 +27,7 @@ function starItems(scene, activateStar) {
       key,
       text: s.isFolder
         ? t('map.galaxyKbdFolderItem', { name: s.name })
-        : t('map.riskBubbleAria', { file: s.name, count: s.violations || 0 }),
+        : t(riskBubbleKey(s.violations), { file: s.name, count: s.violations || 0 }),
       onActivate: () => activateStar(key),
     };
   });

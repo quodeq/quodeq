@@ -47,6 +47,12 @@ describe('RiskMatrixView file bubble keyboard activation (6507)', () => {
     expect(screen.getByLabelText('b.js: 2 violations')).toBeInTheDocument();
   });
 
+  it('says "1 violation" for a single one', () => {
+    const node = { ...NODE, children: [NODE.children[0], { ...NODE.children[1], violations: 1, severity: { critical: 0, major: 1, minor: 0 } }] };
+    render(<RiskMatrixView node={node} onFileClick={vi.fn()} />);
+    expect(screen.getByLabelText('b.js: 1 violation')).toBeInTheDocument();
+  });
+
   it('is focusable as a button', () => {
     const { container } = render(<RiskMatrixView node={NODE} onFileClick={vi.fn()} />);
     expect(fileBubble(container)).toHaveAttribute('tabindex', '0');

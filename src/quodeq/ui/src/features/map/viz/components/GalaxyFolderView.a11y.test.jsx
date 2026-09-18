@@ -75,7 +75,7 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
     const group = screen.getByLabelText('Contents of this folder');
     expect(group).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'a.js: 2 violations' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'b.js: 1 violations' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'b.js: 1 violation' })).toBeInTheDocument();
   });
 
   it('lists the folder stars too, named as folders rather than reusing the file wording', () => {
@@ -110,7 +110,7 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
 
   it('activates from the keyboard too', () => {
     renderView();
-    const button = screen.getByRole('button', { name: 'b.js: 1 violations' });
+    const button = screen.getByRole('button', { name: 'b.js: 1 violation' });
     fireEvent.keyDown(button, { key: 'Enter' });
     expect(handleNodeClick).toHaveBeenCalledTimes(1);
     expect(handleNodeClick.mock.calls[0][1].data.path).toBe('b.js');
@@ -118,7 +118,7 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
 
   it('resolves the star by path, so a star index shifting cannot open another file', () => {
     renderView();
-    for (const [name, path] of [['a.js: 2 violations', 'a.js'], ['b.js: 1 violations', 'b.js'], ['Folder src', 'src']]) {
+    for (const [name, path] of [['a.js: 2 violations', 'a.js'], ['b.js: 1 violation', 'b.js'], ['Folder src', 'src']]) {
       handleNodeClick.mockClear();
       fireEvent.click(screen.getByRole('button', { name }));
       const [, hover] = handleNodeClick.mock.calls[0];
