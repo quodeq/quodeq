@@ -30,17 +30,25 @@ export default function CompareDimensionHeader({ view, board, onOpenDimension })
         />
       </div>
       <div className="compare-header__controls">
-        <span className="compare-sort" role="group" aria-label={t('compare.dimTabsAria')}>
-          {board.map((b) => (
-            <button
-              key={b.key}
-              type="button"
-              className={`compare-sort__btn${b.key === view.key ? ' compare-sort__btn--on' : ''}`}
-              onClick={() => onOpenDimension(b.key)}
-            >
-              {b.label.slice(0, TAB_LABEL_CHARS)}
-            </button>
-          ))}
+        {/* A tab bar in behaviour as well as looks: each button switches the
+            screen below it, so the open dimension needs aria-selected and not
+            just the --on class to be announced (U-ACC-1). */}
+        <span className="compare-sort" role="tablist" aria-label={t('compare.dimensionTabsAria')}>
+          {board.map((b) => {
+            const isSelected = b.key === view.key;
+            return (
+              <button
+                key={b.key}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                className={`compare-sort__btn${isSelected ? ' compare-sort__btn--on' : ''}`}
+                onClick={() => onOpenDimension(b.key)}
+              >
+                {b.label.slice(0, TAB_LABEL_CHARS)}
+              </button>
+            );
+          })}
         </span>
       </div>
     </div>

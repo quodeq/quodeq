@@ -4,6 +4,8 @@
  * Purely presentational; colours come from CSS classes so theming stays in
  * compare.css.
  */
+import { t } from '../../../strings/index.js';
+
 const W = 440;
 const H = 320;
 const CX = W / 2;
@@ -34,7 +36,12 @@ export default function CompareRadar({ axes, series }) {
   if (n < 3) return null;
   return (
     <div className="compare-radar">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" className="compare-radar__svg">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={t('compare.radarChartAria')}
+        className="compare-radar__svg"
+      >
         {RINGS.map((f) => (
           <polygon
             key={f}
@@ -54,7 +61,10 @@ export default function CompareRadar({ axes, series }) {
           />
         ))}
       </svg>
-      <div className="compare-radar__labels" aria-hidden="true">
+      {/* Not aria-hidden: these overlays carry the only text form of the
+          chart's data, and the svg above is a role="img" whose contents are
+          pruned, so hiding them left the scores unreachable (U-ACC-2). */}
+      <div className="compare-radar__labels">
         {axes.map((axis, i) => {
           const [x, y] = point(i, n, 1.3);
           return (

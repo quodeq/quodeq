@@ -4,6 +4,7 @@ import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { launcherMenuPos } from './compareLauncherMenu.js';
 import { useLauncherDismiss } from './useLauncherDismiss.js';
+import { useLauncherFocus } from './useLauncherFocus.js';
 import { score1 } from '../compareFormatters.js';
 
 
@@ -84,6 +85,8 @@ export default function DuelTrigger({ targets, onStart, openDirect = null }) {
   };
 
   useLauncherDismiss(open, btnRef, menuRef, close);
+  // The menu is portaled to document.body, so Tab alone would never reach it.
+  useLauncherFocus(open, btnRef, menuRef, close);
 
   return (
     <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
