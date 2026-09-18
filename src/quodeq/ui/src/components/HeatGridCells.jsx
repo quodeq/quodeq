@@ -1,5 +1,6 @@
 import { severityCellStyle, complianceRateCellStyle, severityColor, complianceRateColor } from '../features/map/viz/core/mapColors.js';
 import { t } from '../strings/index.js';
+import { activateOnKey } from '../utils/a11y.js';
 
 const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
 
@@ -31,9 +32,7 @@ function SeverityCell({ row, sev, flat, onCellClick }) {
         className={`heat-grid-cell${hasValue ? ' clickable viz-focusable' : ' empty'}`}
         style={style}
         onClick={() => hasValue && onCellClick?.({ row, severity: sev })}
-        onKeyDown={hasValue ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick?.({ row, severity: sev }); }
-        } : undefined}
+        onKeyDown={hasValue ? activateOnKey(() => onCellClick?.({ row, severity: sev })) : undefined}
         role={hasValue ? 'button' : undefined}
         tabIndex={hasValue ? 0 : undefined}
         aria-label={`${sev}: ${count} violation${count !== 1 ? 's' : ''} in ${row.name || 'row'}`}
@@ -51,9 +50,7 @@ function ViolationsCell({ row, onCellClick }) {
       <div
         className={`heat-grid-num${hasValue ? ' clickable viz-focusable' : ''}`}
         onClick={() => hasValue && onCellClick?.({ row, severity: null })}
-        onKeyDown={hasValue ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick?.({ row, severity: null }); }
-        } : undefined}
+        onKeyDown={hasValue ? activateOnKey(() => onCellClick?.({ row, severity: null })) : undefined}
         role={hasValue ? 'button' : undefined}
         tabIndex={hasValue ? 0 : undefined}
         aria-label={hasValue ? t('heatGrid.violationsCellAria', { count: row.violations, label: row.name || 'row' }) : undefined}

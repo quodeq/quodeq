@@ -19,7 +19,10 @@ describe('TopOffendingFilesTable', () => {
   it('hands the clicked file object to onFileClick', () => {
     const onFileClick = vi.fn();
     const { container } = render(<TopOffendingFilesTable files={files} onFileClick={onFileClick} />);
-    fireEvent.click(container.querySelectorAll('[role="row"]')[1]);
+    // The header row also carries role="row"; scope to the clickable data
+    // rows instead of indexing positionally across header + body.
+    const dataRows = container.querySelectorAll('.term-grid__row--clickable');
+    fireEvent.click(dataRows[1]);
     expect(onFileClick).toHaveBeenCalledWith(files[1]);
   });
 
