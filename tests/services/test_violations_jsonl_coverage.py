@@ -159,3 +159,54 @@ class TestParseViolationsFromJsonl:
             assert result is not None
             assert result.dimension == "sec"
             assert len(result.violations) == 1
+
+
+# ---------------------------------------------------------------------------
+# #1218 — the live view must accept the project's real DismissedKeys
+# ---------------------------------------------------------------------------
+
+class TestLiveViewAcceptsDismissedKeys:
+    """The live JSONL view is what the evaluation screen reads while a
+    dimension is still running, before its report exists.
+
+    Production hands it the project's ``DismissedKeys``; only tests hand it the
+    legacy bare ``{(req, file, line)}`` set. Flattening the former with
+    ``frozenset()`` yielded a set of ``DismissedEntry`` objects, which is
+    neither form, and ``as_dismissed_keys`` raised ``TypeError`` unpacking each
+    entry as a 3-tuple. Every project with a dismissal therefore got a 500 from
+    this path, and the screen it feeds showed no findings for the whole run.
+    """
+
+    def _lines(self):
+        return [
+            json.dumps({"p": "S-AUT-3", "t": "violation", "file": "a.py", "line": 1}),
+            json.dumps({"p": "S-INT-1", "t": "violation", "file": "b.py", "line": 2}),
+        ]
+
+    def test_dismissed_keys_object_does_not_raise(self):
+        from quodeq.core.dismissals import DismissedKeys
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        from quodeq.services.suppression_keys import SuppressionKeys
+
+        keys = SuppressionKeys(DismissedKeys.from_line_keys({("S-AUT-3", "a.py", 1)}), frozenset())
+        violations, _ = _parse_jsonl_findings(self._lines(), "security", keys=keys)
+        # The dismissed one is filtered, the other survives. Before the fix
+        # this raised TypeError instead of returning anything at all.
+        assert [v.file for v in violations] == ["b.py"]
+
+    def test_empty_dismissed_keys_object_does_not_raise(self):
+        from quodeq.core.dismissals import DismissedKeys
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        from quodeq.services.suppression_keys import SuppressionKeys
+
+        keys = SuppressionKeys(DismissedKeys(), frozenset())
+        violations, _ = _parse_jsonl_findings(self._lines(), "security", keys=keys)
+        assert len(violations) == 2
+
+    def test_legacy_bare_line_key_set_still_works(self):
+        from quodeq.services._violations_jsonl import _parse_jsonl_findings
+        from quodeq.services.suppression_keys import SuppressionKeys
+
+        keys = SuppressionKeys(frozenset({("S-AUT-3", "a.py", 1)}), frozenset())
+        violations, _ = _parse_jsonl_findings(self._lines(), "security", keys=keys)
+        assert [v.file for v in violations] == ["b.py"]
