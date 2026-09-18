@@ -45,6 +45,21 @@ describe('focus helpers', () => {
     expect(document.activeElement).toBe(last);
   });
 
+  it('trapTab pulls focus inside root when it started outside', () => {
+    const root = shell();
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+    const forward = { key: 'Tab', shiftKey: false, preventDefault: vi.fn() };
+    trapTab(root, forward);
+    expect(document.activeElement).toBe(focusables(root)[0]);
+    expect(forward.preventDefault).toHaveBeenCalled();
+    outside.focus();
+    const backward = { key: 'Tab', shiftKey: true, preventDefault: vi.fn() };
+    trapTab(root, backward);
+    expect(document.activeElement).toBe(focusables(root)[2]);
+  });
+
   it('trapTab ignores non-Tab keys', () => {
     const root = shell();
     const e = { key: 'Enter', preventDefault: vi.fn() };

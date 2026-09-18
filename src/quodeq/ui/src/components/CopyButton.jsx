@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '../strings/index.js';
 
 export const COPY_FEEDBACK_MS = 1500;
 
@@ -149,7 +150,7 @@ export default function CopyButton({ onClick, label, className, icon, 'aria-labe
   };
 
   return (
-    <button className={className || 'detail-copy-btn'} onClick={handleClick} aria-label={ariaLabel}>
+    <button className={className || 'detail-copy-btn'} onClick={handleClick} aria-label={ariaLabel || label || t('common.copyToClipboardAria')}>
       {icon}
       {copied ? 'Copied!' : label}
       {!icon && <CopyIcon />}

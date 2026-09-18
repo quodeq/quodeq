@@ -2252,6 +2252,14 @@ button.eval-provider-badge--clickable:focus-visible {
   border-right-color: var(--color-accent);
 }
 
+/* Non-color cue for the highlighted line, sitting in a small gutter to the
+   left of the line number so the flag survives without color perception. */
+.context-line__marker {
+  display: inline-block;
+  width: 12px;
+  color: var(--color-accent);
+}
+
 .ctx-line--toggle {
   opacity: 0.5;
   font-style: italic;

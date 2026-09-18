@@ -3,7 +3,7 @@ import { t } from '../../../strings/index.js';
 export function GroupHeader({ title, count }) {
   return (
     <div className="violation-group-header">
-      <span className="violation-group-title">{title}</span>
+      <span className="violation-group-title" role="heading" aria-level={3}>{title}</span>
       <span className="violation-group-count">{count}</span>
     </div>
   );

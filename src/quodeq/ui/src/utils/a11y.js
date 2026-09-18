@@ -7,6 +7,10 @@
  */
 const ACTIVATION_KEYS = new Set(['Enter', ' ']);
 
+// The tabindex clause does not look at `hidden`, `aria-disabled` or CSS
+// visibility; a custom role="button" that is disabled by aria alone is
+// still returned. The dialogs only ever append real <button>s, so this is
+// a known limit, not a bug in their behaviour.
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -43,10 +47,19 @@ export function trapTab(root, e) {
   }
   const first = items[0];
   const last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
+  const active = document.activeElement;
+  if (!items.includes(active)) {
+    // Focus is still outside root (an opener the caller never re-focused):
+    // pull it in instead of letting the browser walk the page behind the
+    // overlay.
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+    return;
+  }
+  if (e.shiftKey && active === first) {
     e.preventDefault();
     last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
+  } else if (!e.shiftKey && active === last) {
     e.preventDefault();
     first.focus();
   }

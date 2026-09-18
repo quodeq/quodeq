@@ -18,6 +18,15 @@
  *
  * `columns` accepts any valid grid-template-columns value.
  */
+import { createContext, useContext } from 'react';
+import { activateOnKey } from '../../utils/a11y.js';
+
+// Tracks whether the nearest ancestor GridRow is a header row, so GridCell
+// can pick role="columnheader" vs role="cell" without every caller passing
+// it down explicitly (ARIA table pattern: columnheader belongs on the cell,
+// never on the row).
+const GridHeaderContext = createContext(false);
+
 export function GridTable({ columns, children, dense = false, role = 'table' }) {
   const cls = 'term-grid' + (dense ? ' term-grid--dense' : '');
   return (
@@ -38,17 +47,18 @@ export function GridRow({ header = false, muted = false, onClick, children, aria
   if (header) classes.push('term-grid__row--header');
   if (muted) classes.push('term-grid__row--muted');
   if (onClick) classes.push('term-grid__row--clickable');
-  const role = header ? 'columnheader' : 'row';
   return (
     <div
       className={classes.join(' ')}
-      role={role}
+      role="row"
       aria-rowindex={ariaRowIndex}
       onClick={onClick}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick(e); } : undefined}
+      onKeyDown={onClick ? activateOnKey(onClick) : undefined}
     >
-      {children}
+      <GridHeaderContext.Provider value={header}>
+        {children}
+      </GridHeaderContext.Provider>
     </div>
   );
 }
@@ -63,5 +73,6 @@ export function GridCell({ align, numeric = false, muted = false, children }) {
   const classes = ['term-grid__cell', `term-grid__cell--${resolvedAlign}`];
   if (numeric) classes.push('term-grid__cell--numeric');
   if (muted) classes.push('term-grid__cell--muted');
-  return <div className={classes.join(' ')} role="cell">{children}</div>;
+  const isHeader = useContext(GridHeaderContext);
+  return <div className={classes.join(' ')} role={isHeader ? 'columnheader' : 'cell'}>{children}</div>;
 }

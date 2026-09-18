@@ -35,7 +35,14 @@ export function TopBarRunChip({ onEvaluate, evaluating, runProgress }) {
 export function TopBarProgressHairline({ evaluating, runProgress }) {
   if (!evaluating || runProgress?.percent == null) return null;
   return (
-    <span className="topbar-progress" aria-hidden="true">
+    <span
+      className="topbar-progress"
+      role="progressbar"
+      aria-label={t('topbar.runProgressAria')}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(runProgress.percent)}
+    >
       <span style={{ width: `${runProgress.percent}%` }} />
     </span>
   );

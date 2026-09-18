@@ -1,4 +1,5 @@
 import { severityCellStyle, complianceRateCellStyle, severityColor, complianceRateColor } from '../features/map/viz/core/mapColors.js';
+import { t } from '../strings/index.js';
 
 const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
 
@@ -44,16 +45,18 @@ function SeverityCell({ row, sev, flat, onCellClick }) {
 }
 
 function ViolationsCell({ row, onCellClick }) {
+  const hasValue = row.violations > 0;
   return (
     <td>
       <div
-        className={`heat-grid-num${row.violations > 0 ? ' clickable viz-focusable' : ''}`}
-        onClick={() => row.violations > 0 && onCellClick?.({ row, severity: null })}
-        onKeyDown={row.violations > 0 ? (e) => {
+        className={`heat-grid-num${hasValue ? ' clickable viz-focusable' : ''}`}
+        onClick={() => hasValue && onCellClick?.({ row, severity: null })}
+        onKeyDown={hasValue ? (e) => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick?.({ row, severity: null }); }
         } : undefined}
-        role={row.violations > 0 ? 'button' : undefined}
-        tabIndex={row.violations > 0 ? 0 : undefined}
+        role={hasValue ? 'button' : undefined}
+        tabIndex={hasValue ? 0 : undefined}
+        aria-label={hasValue ? t('heatGrid.violationsCellAria', { count: row.violations, label: row.name || 'row' }) : undefined}
       >
         {row.violations}
       </div>
