@@ -2,6 +2,9 @@
 
 Baseline lists grandfathered violations. It may shrink, never grow.
 """
+from pathlib import Path
+
+import _ratchet
 import check_sizes
 
 MAX_FILE_LINES = 300
@@ -22,16 +25,31 @@ def test_baseline_has_no_stale_entries():
     assert not stale, f"Fixed entries must be removed from size_baseline.txt: {sorted(stale)}"
 
 
-def test_tests_tree_is_scanned_at_file_level():
-    keys = {f"{rel}:{lineno}:{kind}" for rel, lineno, kind, _size in check_sizes._scan_tests()}
-    tests_keys = {k for k in check_sizes.load_baseline() if k.startswith("tests/")}
-    assert tests_keys and tests_keys <= keys, "tests/ tree is not being scanned"
-    assert all(k.endswith(":1:file") for k in keys), "tests/ is file-level only"
+def test_tests_tree_is_scanned_at_file_level(tmp_path, monkeypatch):
+    """The walk reaches tests/, and reports it by file only, never by function.
+
+    Asserted against the walk itself rather than against baseline entries:
+    the baseline is empty, so real violations can no longer prove coverage.
+    """
+    walked = {p.resolve() for p in _ratchet.iter_python_files(check_sizes.TESTS_ROOT)}
+    assert Path(__file__).resolve() in walked, "tests/ tree is not being scanned"
+
+    oversized = tmp_path / "tests" / "test_oversized.py"
+    oversized.parent.mkdir()
+    body = "def test_x():\n" + "    assert True\n" * check_sizes.MAX_FILE_LINES
+    oversized.write_text(body, encoding="utf-8")
+    monkeypatch.setattr(check_sizes, "TESTS_ROOT", oversized.parent)
+    monkeypatch.setattr(check_sizes, "REPO_ROOT", tmp_path)
+
+    found = check_sizes._scan_tests()
+    assert [(rel, lineno, kind) for rel, lineno, kind, _size in found] == [
+        ("tests/test_oversized.py", 1, "file"),
+    ], "tests/ is file-level only"
 
 
 # Revise DOWNWARD as size workstreams burn entries; NEVER raise without a
 # justification reviewed in the PR that raises it.
-BASELINE_CEILING = 69  # set to the count --update-baseline printed; lower it as entries burn down
+BASELINE_CEILING = 0  # set to the count --update-baseline printed; lower it as entries burn down
 
 
 def test_baseline_only_shrinks():

@@ -25,15 +25,12 @@ from __future__ import annotations
 
 import pytest
 
-from tests.api.test_assistant_routes import (
-    _VALID_STANDARD,
-    _drafted_action_on_shared_session,
-    _repo,
-)
-from tests.api.test_assistant_routes import app as action_app
-from tests.api.test_assistant_workspace_routes import _session_with_worktree
-from tests.api.test_assistant_workspace_routes import app as workspace_app
-from tests.api.test_assistant_workspace_routes import repo as workspace_repo
+from tests.api._assistant_routes_fixtures import _VALID_STANDARD, _repo
+from tests.api._assistant_routes_fixtures import app as action_app
+from tests.api._assistant_workspace_fixtures import _session_with_worktree
+from tests.api._assistant_workspace_fixtures import app as workspace_app
+from tests.api._assistant_workspace_fixtures import repo as workspace_repo
+from tests.api.test_assistant_routes_actions import _drafted_action_on_shared_session
 
 # Quiet unused-import lint for fixtures that are referenced only by name in
 # test function signatures, never called directly.

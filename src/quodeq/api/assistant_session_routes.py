@@ -1,15 +1,17 @@
 """Session lifecycle routes for the embedded assistant: create + catalog.
 
-Split out of assistant_routes.py (Task 10). ``_known_provider`` and
-``_shared_source_error`` are looked up on the ``assistant_routes`` facade at
-call time (rather than imported directly here) so that tests patching
+Split out of assistant_routes.py (Task 10). The provider lookup and the
+shared-clone gate are injected by the registrar (``SessionGates``): they live
+in ``assistant_routes`` so tests patching
 "quodeq.api.assistant_routes.get_provider_configs"/"read_settings"/
-"read_state" keep working after the split.
+"read_state" keep working, and this module never imports that facade.
 """
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
@@ -26,14 +28,22 @@ from quodeq.shared.constants import (
 )
 
 
-def _validate_session_request(body: dict) -> tuple[Response | tuple[Response, int] | None, str]:
+@dataclass(frozen=True)
+class SessionGates:
+    """Checks a new session must pass, supplied by the registering facade."""
+
+    known_provider: Callable[[str], dict | None]
+    shared_source_error: Callable[[], tuple[Response, int] | None]
+
+
+def _validate_session_request(
+    body: dict, gates: SessionGates,
+) -> tuple[Response | tuple[Response, int] | None, str]:
     """Validate provider + source. Returns ``(error, source)``: *error* is the
     route's early-return value (or None to proceed); *source* is the resolved
     source string, valid whether or not *error* is set.
     """
-    from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
-
-    provider_cfg = _assistant_routes._known_provider(str(body.get("provider", "")))
+    provider_cfg = gates.known_provider(str(body.get("provider", "")))
     if provider_cfg is None:
         body_, status = error_response(
             "unknown or unsupported provider", 400, "INVALID_PROVIDER")
@@ -43,7 +53,7 @@ def _validate_session_request(body: dict) -> tuple[Response | tuple[Response, in
         body_, status = error_response("invalid source", 400, "INVALID_SOURCE")
         return (jsonify(body_), status), source
     if source == SESSION_SOURCE_SHARED:
-        shared_error = _assistant_routes._shared_source_error()
+        shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error, source
     return None, source
@@ -92,14 +102,14 @@ def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | N
     return run_dir, repo_root, repo_reason
 
 
-def register_assistant_session_routes(app: Flask) -> None:
+def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
     @app.post("/api/assistant/sessions")
     def create_assistant_session():
         # First assistant request of the process: reap leaked worktrees +
         # prune stale sessions before minting a new one (one-shot, best-effort).
         _assistant_helpers.run_assistant_hygiene(app)
         body = request.get_json(silent=True) or {}
-        error, source = _validate_session_request(body)
+        error, source = _validate_session_request(body, gates)
         if error is not None:
             return error
         session_id = uuid.uuid4().hex

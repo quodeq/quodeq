@@ -4,6 +4,9 @@ from __future__ import annotations
 import pytest
 
 from quodeq.analysis._provider_cache import reset_provider_config_cache
+from quodeq.analysis.dispatch_policy import DispatchPolicy
+
+from ._api_size_cap_dispatch_helpers import CAP, _TEST_PROVIDER
 
 
 @pytest.fixture(autouse=True)
@@ -19,3 +22,53 @@ def _reset_provider_config_cache() -> None:
     reset_provider_config_cache()
     yield
     reset_provider_config_cache()
+
+
+@pytest.fixture
+def reset_cancellation() -> None:
+    """Clear the process-wide cancel event around a test that requests it."""
+    from quodeq.shared import cancellation
+
+    cancellation.reset()
+    yield
+    cancellation.reset()
+
+
+@pytest.fixture
+def api_config():
+    """ApiRunnerConfig pointed at a local endpoint (test_api_runner* siblings)."""
+    from quodeq.analysis._api_runner import ApiRunnerConfig
+
+    return ApiRunnerConfig(
+        model="test-model",
+        api_base="http://localhost:8000/v1",
+        api_key="test-key",
+    )
+
+
+@pytest.fixture
+def api_provider(monkeypatch) -> DispatchPolicy:
+    """A literal API-type DispatchPolicy.
+
+    ``default_dispatch_policy()`` (the factory every un-injected caller —
+    the module-level wrapper functions, ``RunConfig._policy()`` — resolves
+    through) reads ``get_provider_configs()`` from inside
+    ``dispatch_policy.py``'s own body. Patching it there, rather than
+    patching ``default_dispatch_policy`` itself, reaches every caller
+    regardless of which module imported the factory by name.
+    """
+    configs = {_TEST_PROVIDER: {"type": "api"}}
+    monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", str(CAP))
+    monkeypatch.setenv("AI_CMD", _TEST_PROVIDER)
+    monkeypatch.setattr("quodeq.analysis.dispatch_policy.get_provider_configs", lambda: configs)
+    return DispatchPolicy(provider_configs=configs, ai_cmd=_TEST_PROVIDER, file_size_cap=CAP)
+
+
+@pytest.fixture
+def cli_provider(monkeypatch) -> DispatchPolicy:
+    """A literal CLI-type DispatchPolicy. See :func:`api_provider`."""
+    configs = {_TEST_PROVIDER: {"type": "cli"}}
+    monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", str(CAP))
+    monkeypatch.setenv("AI_CMD", _TEST_PROVIDER)
+    monkeypatch.setattr("quodeq.analysis.dispatch_policy.get_provider_configs", lambda: configs)
+    return DispatchPolicy(provider_configs=configs, ai_cmd=_TEST_PROVIDER, file_size_cap=CAP)

@@ -16,7 +16,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Callable
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import json_error, page_params
 from quodeq.services import _fs_projects, _fs_reports
@@ -82,16 +82,28 @@ def _shared_projects(
     return jsonify(listing)
 
 
+def _load_or_500(
+    load: Callable[[], object], project: str, *, log_msg: str, error_msg: str,
+) -> tuple[object, tuple[Response, int] | None]:
+    """``(result, None)`` from *load*, or ``(None, 500 response)`` when it raises."""
+    try:
+        return load(), None
+    except Exception:
+        _logger.exception(log_msg, project)
+        return None, json_error(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+
+
 @_with_shared_root
 def shared_project_info(project: str, eval_root: Path, url: str):
     err = _validate_segment(project)
     if err:
         return err
-    try:
-        info = _fs_projects.get_project_info(str(eval_root), project)
-    except Exception:
-        _logger.exception("Failed to load shared project info for %s", project)
-        return json_error("Failed to load project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    info, err = _load_or_500(
+        lambda: _fs_projects.get_project_info(str(eval_root), project), project,
+        log_msg="Failed to load shared project info for %s", error_msg="Failed to load project info",
+    )
+    if err:
+        return err
     if not info:
         return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     # Same publishedBy/publishedAt enrichment as the list route
@@ -110,11 +122,12 @@ def shared_runs(project: str, eval_root: Path, url: str):
     err = _validate_segment(project)
     if err:
         return err
-    try:
-        runs = build_runs_unit(eval_root, shared_index_db_path(url), project)
-    except Exception:
-        _logger.exception("Failed to build shared runs unit for %s", project)
-        return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    runs, err = _load_or_500(
+        lambda: build_runs_unit(eval_root, shared_index_db_path(url), project), project,
+        log_msg="Failed to build shared runs unit for %s", error_msg="Failed to load runs",
+    )
+    if err:
+        return err
     return jsonify({"runs": runs})
 
 
@@ -149,11 +162,12 @@ def shared_scores(project: str, eval_root: Path, url: str):
     if err:
         return err
     as_of = request.args.get("asOf")
-    try:
-        result = get_project_scores(eval_root, project, as_of)
-    except Exception:
-        _logger.exception("Unexpected error fetching shared scores for project %s", project)
-        return json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    result, err = _load_or_500(
+        lambda: get_project_scores(eval_root, project, as_of), project,
+        log_msg="Unexpected error fetching shared scores for project %s", error_msg="Failed to load scores",
+    )
+    if err:
+        return err
     if result is None:
         return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(result)
@@ -164,11 +178,13 @@ def shared_compare_summary(project: str, eval_root: Path, url: str):
     err = _validate_segment(project)
     if err:
         return err
-    try:
-        result = build_compare_summary(eval_root, project)
-    except Exception:
-        _logger.exception("Unexpected error building shared compare summary for project %s", project)
-        return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+    result, err = _load_or_500(
+        lambda: build_compare_summary(eval_root, project), project,
+        log_msg="Unexpected error building shared compare summary for project %s",
+        error_msg="Failed to load compare summary",
+    )
+    if err:
+        return err
     if result is None:
         return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(result)

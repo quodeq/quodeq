@@ -11,18 +11,20 @@ Split (Task 10) into four route modules plus this thin orchestrator:
 integration tests monkeypatch "quodeq.api.assistant_routes.get_provider_
 configs", and these three helpers call it by bare name, so they must keep
 resolving it in THIS module's globals. ``_shared_source_error`` stays here
-for the same reason (``read_settings``/``read_state`` patch targets).
-``run_turn`` and ``build_tool_context`` stay imported here (unused directly)
-so tests can keep patching "quodeq.api.assistant_routes.run_turn"/
-"...build_tool_context" — the split registrars look these up on this module
-at call time rather than binding their own copies.
+for the same reason (``read_settings``/``read_state`` patch targets). The
+session registrar receives both as ``SessionGates`` instead of importing
+this facade. ``run_turn`` and ``build_tool_context`` stay imported here
+(unused directly) so tests can keep patching
+"quodeq.api.assistant_routes.run_turn"/"...build_tool_context" — the turn
+registrar looks these up on this module at call time rather than binding
+its own copies.
 """
 from __future__ import annotations
 
 from flask import Flask, Response, jsonify
 
 from quodeq.api.assistant_action_routes import register_assistant_action_routes
-from quodeq.api.assistant_session_routes import register_assistant_session_routes
+from quodeq.api.assistant_session_routes import SessionGates, register_assistant_session_routes
 from quodeq.api.assistant_turn_routes import register_assistant_turn_routes
 from quodeq.api.assistant_turn_state import (  # noqa: F401 — re-export/patch target
     AssistantTurnState,
@@ -97,6 +99,8 @@ def _turn_endpoint(provider: str, body: dict, provider_cfg: dict) -> tuple[str, 
 def register_assistant_routes(app: Flask) -> None:
     _turn_state(app)  # ensure the registry exists even on bare test apps
     register_assistant_workspace_routes(app)
-    register_assistant_session_routes(app)
+    register_assistant_session_routes(
+        app, SessionGates(known_provider=_known_provider, shared_source_error=_shared_source_error),
+    )
     register_assistant_turn_routes(app)
     register_assistant_action_routes(app)

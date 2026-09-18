@@ -10,7 +10,7 @@ fixture is reused, not copied, from test_assistant_routes.py.
 """
 from __future__ import annotations
 
-from tests.api.test_assistant_routes import app  # noqa: F401 -- pytest fixture
+from tests.api._assistant_routes_fixtures import app  # noqa: F401 -- pytest fixture
 
 
 def test_post_message_missing_text_has_code(app):
