@@ -49,7 +49,8 @@ from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.scope_gate import apply_scope_gate
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
-LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
+LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback",
+                   deployment_topology="distributed")
 security = json.load(open("<path-to-security.json>"))
 reduced = [
     {"severity": v["severity"], "req": v.get("req"), "title": v["title"],

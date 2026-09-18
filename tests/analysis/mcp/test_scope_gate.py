@@ -74,7 +74,8 @@ def test_cross_principal_untouched_when_multi_tenant():
     f = _finding(req="S-AUT-10",
                  reason="No ownership verification, so one user can reach "
                         "another user's terminal session.")
-    model = TrustModel(multi_tenant=True, network_exposure="loopback")
+    model = TrustModel(multi_tenant=True, network_exposure="loopback",
+                       deployment_topology="distributed")
     assert apply_scope_gate(f, model) is False
     assert f["severity"] == "major"
 

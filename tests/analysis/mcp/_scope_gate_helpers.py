@@ -3,9 +3,14 @@ from __future__ import annotations
 
 from quodeq.context.trust_model import TrustModel
 
-LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
-LAN = TrustModel(multi_tenant=False, network_exposure="lan")
-PUBLIC = TrustModel(multi_tenant=False, network_exposure="public")
+LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback",
+                   deployment_topology="distributed")
+LAN = TrustModel(multi_tenant=False, network_exposure="lan",
+                 deployment_topology="distributed")
+PUBLIC = TrustModel(multi_tenant=False, network_exposure="public",
+                    deployment_topology="distributed")
+SINGLE_HOST = TrustModel(multi_tenant=False, network_exposure="loopback",
+                         deployment_topology="single-host")
 
 
 def _finding(**kw) -> dict:

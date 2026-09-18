@@ -22,7 +22,8 @@ def test_scope_downgrade_is_restored_when_model_tightens():
     assert apply_scope_gate(f, LOCAL) is True
     assert f["severity"] == "minor"
 
-    tightened = TrustModel(multi_tenant=True, network_exposure="public")
+    tightened = TrustModel(multi_tenant=True, network_exposure="public",
+                           deployment_topology="distributed")
     assert apply_scope_gate(f, tightened) is True
     assert f["severity"] == "major"
     assert SCOPE_DOWNGRADE_MARKER not in f
@@ -35,7 +36,8 @@ def test_cross_principal_downgrade_is_restored_when_model_tightens():
     assert apply_scope_gate(f, LOCAL) is True
     assert f["severity"] == "minor"
 
-    tightened = TrustModel(multi_tenant=True, network_exposure="public")
+    tightened = TrustModel(multi_tenant=True, network_exposure="public",
+                           deployment_topology="distributed")
     assert apply_scope_gate(f, tightened) is True
     assert f["severity"] == "major"
     assert SCOPE_DOWNGRADE_MARKER not in f
@@ -92,7 +94,8 @@ def test_marker_left_alone_when_model_is_none():
 # without validating it. It must never raise, and must never write a
 # severity other than "major" from it.
 
-_TIGHTENED = TrustModel(multi_tenant=True, network_exposure="public")
+_TIGHTENED = TrustModel(multi_tenant=True, network_exposure="public",
+                        deployment_topology="distributed")
 
 
 @pytest.mark.parametrize("marker", [

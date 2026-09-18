@@ -6,8 +6,10 @@ from quodeq.analysis.api_prompt_assembly import _format_shape_block
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
-LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback")
-PUBLIC_SINGLE_TENANT = TrustModel(multi_tenant=False, network_exposure="public")
+LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback",
+                   deployment_topology="distributed")
+PUBLIC_SINGLE_TENANT = TrustModel(multi_tenant=False, network_exposure="public",
+                                  deployment_topology="distributed")
 DESKTOP_SHAPE = ProjectShape(deployment=Deployment.DESKTOP, is_single_user=True)
 
 

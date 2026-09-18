@@ -113,7 +113,8 @@ class TestSeverityGates:
 
         _added, evidence, jsonl = self._apply(
             project, compiled, tmp_path,
-            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback"),
+            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback",
+                                   deployment_topology="distributed"),
         )
 
         assert self._violation(evidence)["severity"] == "minor"
@@ -158,7 +159,8 @@ class TestSeverityGates:
 
         _added, evidence, _jsonl = self._apply(
             project, compiled, tmp_path,
-            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback"),
+            trust_model=TrustModel(multi_tenant=False, network_exposure="loopback",
+                                   deployment_topology="distributed"),
         )
 
         violation = self._violation(evidence)

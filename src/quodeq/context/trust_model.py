@@ -13,14 +13,15 @@ analyzed repository at ``<project root>/.quodeq/project-profile.json``,
 alongside ``standards-visibility.json`` and ``standards-overrides.json`` so the
 whole team shares it:
 
-    {"version": 1, "multiTenant": false, "networkExposure": "loopback"}
+    {"version": 1, "multiTenant": false, "networkExposure": "loopback",
+     "deploymentTopology": "single-host"}
 
 Resolution is PER FIELD: a declared value wins, ``detect_shape`` fills what is
 undeclared, and anything still unknown falls back to :data:`CONSERVATIVE`. That
 last step is the no-regression guarantee -- a project that declares nothing and
 detects as nothing is scored exactly as it was before this module existed.
 
-That per-field fallback is deliberately ASYMMETRIC between the two axes.
+That per-field fallback is deliberately ASYMMETRIC between the axes.
 ``multi_tenant`` is a property a manifest can genuinely evidence -- a CLI's
 own entry point is real proof it has one caller. Network exposure is not: a
 loopback Flask app and a hosted one are byte-identical on disk, the same
@@ -32,6 +33,9 @@ never allowed to waive a remote-reachability finding by itself. A Rust
 ``devDependencies`` all detect as desktop/CLI today; none of them may get
 ``S-AUT-3``/``S-AUT-10`` waived on that basis alone. Only a human's
 declaration in ``project-profile.json`` may relax that axis.
+``deployment_topology`` is declaration-only for exactly the same reason: a
+single-host deployment and a horizontally scaled one are byte-identical on
+disk, so detection never fills it either.
 
 Nothing here may fail a scan. Every malformed-input branch warns and degrades.
 """
@@ -56,22 +60,33 @@ SUPPORTED_VERSION = 1
 # not a trust boundary this code can reason about.
 NETWORK_EXPOSURES: frozenset[str] = frozenset({"loopback", "lan", "public"})
 
+#: Topology is never detected, for the same reason exposure is not: a
+#: single-host deployment and a horizontally scaled one are byte-identical on
+#: disk. Only a human declaration may relax F-SCL-1/2/4.
+DEPLOYMENT_TOPOLOGIES: frozenset[str] = frozenset({"single-host", "distributed"})
+
 
 @dataclass(frozen=True)
 class TrustModel:
-    """The two axes a finding's severity can legitimately turn on."""
+    """The axes a finding's severity can legitimately turn on."""
 
     multi_tenant: bool
     network_exposure: str
+    deployment_topology: str
 
     def relaxes_remote(self) -> bool:
         """True when no untrusted party can open a socket to this process."""
         return self.network_exposure == "loopback"
 
+    def is_single_host(self) -> bool:
+        """True when the team declared this runs as one process on one host."""
+        return self.deployment_topology == "single-host"
+
 
 #: What an undeclared, undetectable project gets. Deliberately the most
 #: pessimistic model, so absence of information never relaxes a finding.
-CONSERVATIVE = TrustModel(multi_tenant=True, network_exposure="public")
+CONSERVATIVE = TrustModel(
+    multi_tenant=True, network_exposure="public", deployment_topology="distributed")
 
 
 def _read_profile(project_root: Path) -> dict:
@@ -109,8 +124,8 @@ def _read_profile(project_root: Path) -> dict:
     return data
 
 
-def _declared_fields(data: dict) -> tuple[bool | None, str | None]:
-    """Extract the two axes from a parsed profile, per field.
+def _declared_fields(data: dict) -> tuple[bool | None, str | None, str | None]:
+    """Extract the three axes from a parsed profile, per field.
 
     A bad value for one axis never discards the other: the file is a
     declaration, not a transaction.
@@ -131,7 +146,17 @@ def _declared_fields(data: dict) -> tuple[bool | None, str | None]:
             "project profile: networkExposure must be one of %s, got %r",
             sorted(NETWORK_EXPOSURES), raw_exposure,
         )
-    return multi_tenant, exposure
+
+    topology: str | None = None
+    raw_topology = data.get("deploymentTopology")
+    if isinstance(raw_topology, str) and raw_topology.strip().lower() in DEPLOYMENT_TOPOLOGIES:
+        topology = raw_topology.strip().lower()
+    elif raw_topology is not None:
+        _logger.warning(
+            "project profile: deploymentTopology must be one of %s, got %r",
+            sorted(DEPLOYMENT_TOPOLOGIES), raw_topology,
+        )
+    return multi_tenant, exposure, topology
 
 
 def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
@@ -188,7 +213,7 @@ def resolve_trust_model(project_root: Path | str | None) -> TrustModel:
     if not project_root:
         return CONSERVATIVE
     root = Path(project_root)
-    declared_tenant, declared_exposure = _declared_fields(_read_profile(root))
+    declared_tenant, declared_exposure, declared_topology = _declared_fields(_read_profile(root))
     detected_tenant, detected_exposure = _detected_fields(root)
 
     multi_tenant = declared_tenant
@@ -198,4 +223,9 @@ def resolve_trust_model(project_root: Path | str | None) -> TrustModel:
         multi_tenant = CONSERVATIVE.multi_tenant
 
     exposure = declared_exposure or detected_exposure or CONSERVATIVE.network_exposure
-    return TrustModel(multi_tenant=multi_tenant, network_exposure=exposure)
+    topology = declared_topology or CONSERVATIVE.deployment_topology
+    return TrustModel(
+        multi_tenant=multi_tenant,
+        network_exposure=exposure,
+        deployment_topology=topology,
+    )
