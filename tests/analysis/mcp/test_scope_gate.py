@@ -8,7 +8,7 @@ from quodeq.analysis.mcp.scope_gate import (
 )
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
-from ._scope_gate_helpers import LAN, LOCAL, PUBLIC, _finding
+from ._scope_gate_helpers import LAN, LOCAL, PUBLIC, SINGLE_HOST, _finding
 
 
 # --- rule 1: sourceless path hardening ------------------------------------
@@ -145,6 +145,34 @@ def test_cross_principal_matches_hijacking_gerund():
     assert apply_scope_gate(f, LOCAL) is True
     assert f["severity"] == "minor"
     assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "cross_principal"
+
+
+# --- rule 3: single-host topology -----------------------------------------
+
+def test_scalability_req_capped_under_single_host():
+    f = _finding(req="F-SCL-1",
+                 w="Session state is held in a process-local dict",
+                 reason="State must be externalised to survive a second replica.")
+    assert apply_scope_gate(f, SINGLE_HOST) is True
+    assert f["severity"] == "minor"
+    assert f[SCOPE_DOWNGRADE_MARKER]["rule"] == "single_host_topology"
+
+
+def test_scalability_req_untouched_when_topology_undeclared():
+    # LOCAL is loopback but still distributed: exposure grants nothing here.
+    f = _finding(req="F-SCL-2",
+                 w="Session state is held in a process-local dict",
+                 reason="State must be externalised to survive a second replica.")
+    assert apply_scope_gate(f, LOCAL) is False
+    assert f["severity"] == "major"
+
+
+def test_non_scalability_req_untouched_under_single_host():
+    f = _finding(req="F-SCL-9",
+                 w="Session state is held in a process-local dict",
+                 reason="State must be externalised to survive a second replica.")
+    assert apply_scope_gate(f, SINGLE_HOST) is False
+    assert f["severity"] == "major"
 
 
 # --- invariants -----------------------------------------------------------

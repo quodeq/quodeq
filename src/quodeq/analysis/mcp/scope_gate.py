@@ -12,11 +12,14 @@ the process at all, and only that declaration gives this gate its authority --
 which is why an undeclared project resolves to
 ``trust_model.CONSERVATIVE`` and nothing here fires.
 
-The gate ships two rules: rule 1 relaxes an unproven-provenance path/key
+The gate ships three rules: rule 1 relaxes an unproven-provenance path/key
 finding when the model declares no untrusted party can reach the process at
-all, and rule 2 relaxes a finding whose premise is a second trust principal
+all, rule 2 relaxes a finding whose premise is a second trust principal
 when the model declares there is only one AND no untrusted party can reach
-the process AND the finding's prose does not name an external source.
+the process AND the finding's prose does not name an external source, and
+rule 3 relaxes a scalability finding whose premise is a multi-host
+deployment when the model declares the product runs as one process on one
+host.
 (Rule 2 is evaluated first in code, because its evidence is more specific
 and would otherwise be masked by rule 1 -- see the comment on
 ``apply_scope_gate``.) The third precondition for rule 2 exists because
@@ -28,9 +31,12 @@ nothing about this one, so the finding must stay major when the prose
 names how the stranger gets in. There is no third, remote-ingress rule;
 the comment below ``_CROSS_PRINCIPAL_REQS`` records why.
 
-Every rule requires BOTH a gated requirement id AND evidence in the model's
+Rules 1 and 2 require BOTH a gated requirement id AND evidence in the model's
 prose, the same two-condition shape ``provenance_gate`` uses. A finding that
-names no scope-dependent concept is never touched.
+names no scope-dependent concept is never touched. Rule 3 is the one
+carve-out: it reads no prose, because its three requirement ids have no
+second reading that survives a single-host declaration (see the comment on
+``_TOPOLOGY_REQS``).
 
 Caps ``major`` -> ``minor``; never drops. A team that later ships as a hosted
 service must be able to recover the list of what was waived, so the finding
@@ -72,6 +78,14 @@ SCOPE_DOWNGRADE_MARKER = SCOPE_DOWNGRADE
 # opinion about.
 _PATH_REQS: frozenset[str] = frozenset({"S-AUT-3", "S-INT-10"})
 _CROSS_PRINCIPAL_REQS: frozenset[str] = frozenset({"S-AUT-10", "S-AUT-3"})
+
+# Requirements whose entire premise is a multi-process, multi-host deployment:
+# externalised state (F-SCL-1), a replaceable storage backend (F-SCL-2),
+# horizontal dispatch (F-SCL-4). Unlike rules 1 and 2 this rule reads no prose
+# -- the requirement id IS the evidence. There is no second reading of
+# "externalise this state" that survives a declaration that the whole product
+# is one process on one host.
+_TOPOLOGY_REQS: frozenset[str] = frozenset({"F-SCL-1", "F-SCL-2", "F-SCL-4"})
 
 # There is deliberately no rule that relaxes a NAMED external source (e.g.
 # "request body", "query parameter") under loopback, even for reqs like
@@ -158,6 +172,11 @@ def _sourceless_path_rule_applies(model: TrustModel, req: str | None, prose: str
             and not names_operator_source(prose))
 
 
+def _topology_rule_applies(model: TrustModel, req: str | None) -> bool:
+    """True when rule 3 (single-host topology) relaxes a finding under *model*."""
+    return bool(model.is_single_host() and req in _TOPOLOGY_REQS)
+
+
 def _matched_rule(finding: dict, model: TrustModel) -> str | None:
     """Return the rule name that would relax *finding* under *model*, or
     ``None``. Pure evidence check -- independent of the finding's CURRENT
@@ -176,6 +195,8 @@ def _matched_rule(finding: dict, model: TrustModel) -> str | None:
         return "cross_principal"
     if _sourceless_path_rule_applies(model, req, prose):
         return "sourceless_path"
+    if _topology_rule_applies(model, req):
+        return "single_host_topology"
     return None
 
 

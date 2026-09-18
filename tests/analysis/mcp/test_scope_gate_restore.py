@@ -9,7 +9,7 @@ from quodeq.analysis.mcp.scope_gate import (
 )
 from quodeq.context.trust_model import CONSERVATIVE, TrustModel
 
-from ._scope_gate_helpers import LOCAL, _finding
+from ._scope_gate_helpers import LOCAL, SINGLE_HOST, _finding
 
 
 # --- I2: symmetric / idempotent under a tightened model --------------------
@@ -72,6 +72,31 @@ def test_repeated_application_stable_once_restored():
         assert apply_scope_gate(f, CONSERVATIVE) is False
     assert f["severity"] == "major"
     assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_topology_cap_restored_when_profile_widens():
+    # A team declared single-host, scanned, then honestly starts scaling out.
+    # A scalability finding capped under the old declaration must come back.
+    f = _finding(req="F-SCL-1",
+                 w="Session state is held in a process-local dict",
+                 reason="State must be externalised to survive a second replica.")
+    assert apply_scope_gate(f, SINGLE_HOST) is True
+    assert f["severity"] == "minor"
+
+    widened = TrustModel(multi_tenant=False, network_exposure="loopback",
+                         deployment_topology="distributed")
+    assert apply_scope_gate(f, widened) is True
+    assert f["severity"] == "major"
+    assert SCOPE_DOWNGRADE_MARKER not in f
+
+
+def test_topology_cap_is_idempotent():
+    f = _finding(req="F-SCL-1",
+                 w="Session state is held in a process-local dict",
+                 reason="State must be externalised to survive a second replica.")
+    assert apply_scope_gate(f, SINGLE_HOST) is True
+    assert apply_scope_gate(f, SINGLE_HOST) is False
+    assert f["severity"] == "minor"
 
 
 def test_marker_left_alone_when_model_is_none():
