@@ -4,7 +4,7 @@ import { formatLiveDimSummary } from '../utils/formatLiveDimSummary.js';
 import FittedText from '../../../components/FittedText.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
 import { t, LOCALE } from '../../../strings/index.js';
-import { activateOnKey } from '../../../utils/a11y.js';
+import { activateOnKey, isActivationKey } from '../../../utils/a11y.js';
 import { PARTIAL_STATUSES } from './historyRowAssembly.js';
 
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
@@ -83,8 +83,10 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
   // The row's own onKeyDown (activateOnKey) would otherwise see the delete
   // button's Enter/Space bubble up and open the run -- stop it here so the
   // row never activates just because the keydown started on the button.
+  // Only the activation keys: every other key (Escape for the side pane, the
+  // drawer hotkey, the pywebview shortcuts) has to keep bubbling.
   function handleDeleteKeyDown(e) {
-    e.stopPropagation();
+    if (isActivationKey(e)) e.stopPropagation();
   }
   return (
     <div

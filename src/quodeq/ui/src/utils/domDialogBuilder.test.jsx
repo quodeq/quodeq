@@ -43,6 +43,21 @@ describe('dialog shell accessibility', () => {
     expect(document.activeElement).toBe(no);
   });
 
+  it('leaves Enter to the focused action button instead of confirming', () => {
+    const onConfirm = vi.fn();
+    const { no } = open({ onConfirm });
+    no.focus();
+    no.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('confirms on Enter when no action button has focus', () => {
+    const onConfirm = vi.fn();
+    const { overlay } = open({ onConfirm });
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it('restores focus to the opener on unmount', () => {
     const outside = document.createElement('button');
     document.body.appendChild(outside);

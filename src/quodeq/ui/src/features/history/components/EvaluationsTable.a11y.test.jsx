@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
@@ -28,6 +28,11 @@ function renderTable(props = {}) {
   );
 }
 
+const documentListeners = [];
+afterEach(() => {
+  documentListeners.splice(0).forEach((fn) => document.removeEventListener('keydown', fn));
+});
+
 describe('EvaluationsTable row keyboard access and delete discoverability', () => {
   it('activates a row with Space, same as a real button', () => {
     const onRunClick = vi.fn();
@@ -56,5 +61,16 @@ describe('EvaluationsTable row keyboard access and delete discoverability', () =
     fireEvent.keyDown(deleteBtn, { key: 'Enter' });
     fireEvent.keyDown(deleteBtn, { key: ' ' });
     expect(onRunClick).not.toHaveBeenCalled();
+  });
+
+  it('lets Escape through from the focused delete button to the document', () => {
+    const onEscape = vi.fn();
+    documentListeners.push(onEscape);
+    document.addEventListener('keydown', onEscape);
+    renderTable({ onDeleteRun: vi.fn() });
+    const deleteBtn = screen.getByRole('button', { name: /delete/i });
+    deleteBtn.focus();
+    fireEvent.keyDown(deleteBtn, { key: 'Escape' });
+    expect(onEscape).toHaveBeenCalledTimes(1);
   });
 });
