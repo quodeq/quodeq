@@ -148,3 +148,10 @@ jobs:
         # above its committed ceiling. Shrunk counts are locked in with
         # `npm run lint:magic:update`.
         run: npm run lint:magic
+
+      - name: Check UI accessibility (a11y ratchet)
+        working-directory: src/quodeq/ui
+        # eslint-plugin-jsx-a11y recommended rules; existing violations are
+        # grandfathered per file in tools/a11y_baseline.json, progress is
+        # locked in with `npm run lint:a11y:update`.
+        run: npm run lint:a11y

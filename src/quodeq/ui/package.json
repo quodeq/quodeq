@@ -20,7 +20,9 @@
     "lint:hygiene": "node tools/check_hygiene.mjs",
     "lint:hygiene:update": "node tools/check_hygiene.mjs --update",
     "lint:magic": "node tools/check_magic.mjs",
-    "lint:magic:update": "node tools/check_magic.mjs --update"
+    "lint:magic:update": "node tools/check_magic.mjs --update",
+    "lint:a11y": "node tools/check_a11y.mjs",
+    "lint:a11y:update": "node tools/check_a11y.mjs --update"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.9",
@@ -42,6 +44,7 @@
     "@testing-library/user-event": "^14.6.6",
     "@vitejs/plugin-react": "6.1.1",
     "eslint": "10.10.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
     "jsdom": "^30.0.1",
     "vite": "8.3.0",
@@ -49,6 +52,9 @@
   },
   "overrides": {
     "eslint-plugin-react": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-jsx-a11y": {
       "eslint": "$eslint"
     }
   }
