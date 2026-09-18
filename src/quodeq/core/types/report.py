@@ -1,3 +1,4 @@
+"""Parsed dimension-report shapes: per-principle grades and the whole report."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

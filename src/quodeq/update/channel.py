@@ -16,6 +16,7 @@ _FALLBACK = f"pip install -U {_PACKAGE}"
 
 
 def detect_channel() -> str:
+    """Return "frozen" for the bundled app, "wheel" for a pip-style install."""
     return "frozen" if getattr(sys, "frozen", False) else "wheel"
 
 
@@ -23,6 +24,12 @@ def upgrade_command(
     env: dict[str, str] | None = None,
     package_file: str | None = None,
 ) -> str:
+    """Return the shell command that upgrades this install, "" when frozen.
+
+    Decided by where the package file sits: a pipx, uv-tool, or Homebrew root
+    in the path picks that tool's command. Anything unrecognised falls back to
+    ``pip install -U``. *env* and *package_file* exist for tests.
+    """
     if detect_channel() == "frozen":
         return ""
     environ = env if env is not None else os.environ

@@ -15,8 +15,25 @@ class GradeTablesReader(Protocol):
     SQLite file.
     """
 
-    def read_dimension_scores(self) -> list[dict]: ...
+    def read_dimension_scores(self) -> list[dict]:
+        """Return one ``{dimension, score, grade, exit_reason}`` dict per dimension.
 
-    def read_principle_grades(self) -> list[dict]: ...
+        Ordered by dimension name. A dimension that never finished has a null
+        score.
+        """
+        ...
 
-    def read_run_score_from_dim_scores(self, params: ScoringParams | None = None) -> dict: ...
+    def read_principle_grades(self) -> list[dict]:
+        """Return per-principle score, grade and finding counts.
+
+        Ordered by (dimension, principle_id).
+        """
+        ...
+
+    def read_run_score_from_dim_scores(self, params: ScoringParams | None = None) -> dict:
+        """Roll the dimension scores up into the run-level score.
+
+        Dimensions with a null score are skipped. *params* selects the
+        weighting; the caller's default applies when it is None.
+        """
+        ...

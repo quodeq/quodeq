@@ -24,10 +24,13 @@ _STATE_FILENAME = "menubar_state.json"
 
 @dataclass
 class MenubarState:
+    """Whether the user wants the menu bar icon, as persisted on disk."""
+
     enabled: bool = False
 
 
 def get_menubar_state_path(env: dict[str, str] | None = None) -> str:
+    """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
     environ = env if env is not None else os.environ
     explicit = environ.get("QUODEQ_MENUBAR_STATE_PATH")
     if explicit:
@@ -37,6 +40,11 @@ def get_menubar_state_path(env: dict[str, str] | None = None) -> str:
 
 
 def read_state(env: dict[str, str] | None = None) -> MenubarState:
+    """Load the preference, falling back to defaults on a missing or corrupt file.
+
+    Unknown keys are dropped so an older process can read a file written by a
+    newer one.
+    """
     path = Path(get_menubar_state_path(env))
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -49,6 +57,7 @@ def read_state(env: dict[str, str] | None = None) -> MenubarState:
 
 
 def write_state(state: MenubarState, env: dict[str, str] | None = None) -> None:
+    """Persist the preference atomically. Failures are logged, never raised."""
     path = Path(get_menubar_state_path(env))
     # Fresh unique temp file then os.replace() onto the target so concurrent
     # writers never share a temp path and a reader never sees a half-written
@@ -71,10 +80,12 @@ def write_state(state: MenubarState, env: dict[str, str] | None = None) -> None:
 
 
 def set_enabled(enabled: bool, env: dict[str, str] | None = None) -> None:
+    """Flip the icon preference, preserving any other fields in the file."""
     state = read_state(env)
     state.enabled = enabled
     write_state(state, env)
 
 
 def is_enabled(env: dict[str, str] | None = None) -> bool:
+    """True when the user has the menu bar icon turned on."""
     return read_state(env).enabled

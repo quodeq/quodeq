@@ -73,6 +73,11 @@ class CweCache:
             return self._cache
 
     def clear(self) -> None:
+        """Drop the cached list so the next ``get`` reloads.
+
+        Called after a write that could have changed the CWE data, and by tests
+        that would otherwise inherit a warm cache.
+        """
         self._cache = None
         self._cache_time = 0.0
 

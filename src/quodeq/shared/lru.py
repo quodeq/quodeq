@@ -77,4 +77,5 @@ class LRUDict(Generic[K, V]):
         return len(self._data)
 
     def clear(self) -> None:
+        """Drop every entry. Capacity is kept."""
         self._data.clear()

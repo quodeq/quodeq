@@ -6,7 +6,7 @@ import { LevelInfoPanel } from './galaxyViewInfo.jsx';
 import { useGalaxyViewModel } from './useGalaxyViewModel.js';
 import { t } from '../../../../strings/index.js';
 
-export default function GalaxyView({ dimensions, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '', standardTypes = {} }) {
+export default function GalaxyView({ dimensions, onNavigate, showLabels = true, darkMode, resetKey = 0, projectName = '', standardTypes = {} }) {
   useEffect(() => { invalidateThemeColors(); }, [darkMode]);
 
   const { scene, size, canvasRef, tooltipRef, liveMsg, breadcrumb, levelInfo, handlers, startTransition, saveNav } = useGalaxyViewModel({

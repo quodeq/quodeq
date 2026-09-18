@@ -11,7 +11,7 @@ import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } fro
 export function OnboardingStepSwitch({
   wizard, standards, currentIndex, visibleCount,
   createProject, getProjectInfo,
-  nextStep, prevStep, handleSkipWelcome, handleSavedExit, handleLaunch,
+  nextStep, prevStep, handleSkipWelcome, handleLaunch,
 }) {
   return (
     <>
@@ -26,7 +26,6 @@ export function OnboardingStepSwitch({
           createProject={createProject}
           getProjectInfo={getProjectInfo}
           onContinue={nextStep}
-          onCancel={handleSavedExit}
           stepIndex={currentIndex}
           stepTotal={visibleCount}
         />
@@ -49,7 +48,6 @@ export function OnboardingStepSwitch({
           actions={wizard}
           standards={standards}
           onLaunch={handleLaunch}
-          onCancel={handleSavedExit}
           onBack={prevStep}
           stepIndex={currentIndex}
           stepTotal={visibleCount}

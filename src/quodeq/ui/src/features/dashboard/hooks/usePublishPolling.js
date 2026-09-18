@@ -114,6 +114,13 @@ function usePublishJobState() {
   };
 }
 
+/**
+ * The publish job state machine: the state/error fields, and start/stop
+ * handles for the status poll that drives them.
+ *
+ * Polling stops once the job reaches a terminal state, and results arriving
+ * after unmount are dropped (`mountedRef`).
+ */
 export function usePublishPolling({ queryClient, sharedListProjects, getSharedStatus, applyOptimisticPublish, mountedRef }) {
   const {
     publishState, publishingProject, publishError, publishErrorProject,

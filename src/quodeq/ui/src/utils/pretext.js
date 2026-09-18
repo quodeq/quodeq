@@ -101,6 +101,12 @@ function prepareSegments(text, font) {
   return prepared;
 }
 
+/**
+ * Rendered width of `text` in `font`, in pixels. Segment preparation is
+ * cached, so repeated measurement of the same string is cheap.
+ *
+ * @returns {number}
+ */
 export function measureWidth(text, font) {
   if (!text) return 0;
   return measureNaturalWidth(prepareSegments(text, font));
@@ -161,6 +167,13 @@ export function fitEndTruncate(text, font, maxWidth, ellipsis = '\u2026') {
   return best;
 }
 
+/**
+ * Middle-truncates `text` to `maxWidth` in `font`, keeping as much leading and
+ * trailing context as fits around `ellipsis`. Text that already fits comes
+ * back unchanged.
+ *
+ * @returns {string}
+ */
 export function fitMiddleTruncate(text, font, maxWidth, ellipsis = '\u2026') {
   if (!text || maxWidth <= 0) return text;
   if (measureWidth(text, font) <= maxWidth) return text;

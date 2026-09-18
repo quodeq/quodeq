@@ -94,7 +94,7 @@ class _MissDispatch:
 
 
 def _handle_all_hits(
-    config: RunConfig, dim_id: str, ctx: _AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: _AnalysisContext, cctx: _CacheContext,
 ) -> Evidence | None:
     """All-hits short-circuit: no dispatch needed. Appends (not overwrites)
     since a dim may run multiple times in the same run (e.g. V1's backfill
@@ -104,7 +104,7 @@ def _handle_all_hits(
     if cctx.jsonl.exists():
         deduplicate_jsonl(cctx.jsonl)
     return parse_evidence_from_jsonl(
-        config, dim_id, ctx, cctx.jsonl,
+        config, ctx, cctx.jsonl,
         files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
     )
 
@@ -155,14 +155,14 @@ def _start_watchers(
 
 
 def _handle_breaker_trip(
-    config: RunConfig, dim_id: str, ctx: _AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: _AnalysisContext, cctx: _CacheContext,
 ) -> Evidence:
     """Salvage the completed-so-far JSONL instead of discarding the whole
     dimension, flagging failure_streak. Raises when there is nothing to
     salvage, so the dim is marked INCOMPLETE as before."""
     if cctx.jsonl.exists():
         salvaged = parse_evidence_from_jsonl(
-            config, dim_id, ctx, cctx.jsonl,
+            config, ctx, cctx.jsonl,
             files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
         )
         if salvaged is not None and salvaged.principles:
@@ -172,7 +172,7 @@ def _handle_breaker_trip(
 
 
 def _handle_dispatch_result(
-    config: RunConfig, dim_id: str, ctx: _AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: _AnalysisContext, cctx: _CacheContext,
     miss_evidence: Evidence | None,
 ) -> Evidence | None:
     """Finalize Evidence after a normal (non-tripped) dispatch return,
@@ -183,14 +183,14 @@ def _handle_dispatch_result(
         )
         if replayed_anything and cctx.jsonl.exists():
             return parse_evidence_from_jsonl(
-                config, dim_id, ctx, cctx.jsonl,
+                config, ctx, cctx.jsonl,
                 files_read=_compute_files_read(
                     cctx.classify, cctx.jsonl, cctx.files,
                 ),
             )
         return None
     return parse_evidence_from_jsonl(
-        config, dim_id, ctx, cctx.jsonl,
+        config, ctx, cctx.jsonl,
         files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
     )
 
@@ -215,9 +215,9 @@ def _dispatch_misses_with_watchers(
         watcher.join()
         breaker.stop_and_join(timeout=5.0)
     if breaker.trip_event is not None:
-        return _handle_breaker_trip(config, dim_id, dispatch.ctx, cctx)
+        return _handle_breaker_trip(config, dispatch.ctx, cctx)
     return _handle_dispatch_result(
-        config, dim_id, dispatch.ctx, cctx, miss_evidence,
+        config, dispatch.ctx, cctx, miss_evidence,
     )
 
 
@@ -232,7 +232,7 @@ def process_dimension_with_cache(
         return opts.dispatcher(config, dim_id, idx, ctx, opts.callbacks)
 
     if not cctx.classify.misses:
-        return _handle_all_hits(config, dim_id, ctx, cctx)
+        return _handle_all_hits(config, ctx, cctx)
 
     dispatch = _MissDispatch(
         miss_config=_prepare_miss_dispatch(config, dim_id, cctx),

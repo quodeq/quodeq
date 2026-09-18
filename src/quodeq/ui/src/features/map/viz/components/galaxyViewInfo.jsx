@@ -1,4 +1,3 @@
-import React from 'react';
 import { t } from '../../../../strings/index.js';
 
 /** Presentational component for the level info panel overlay */

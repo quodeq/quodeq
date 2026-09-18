@@ -35,12 +35,12 @@ from quodeq.api.zip import (
 )
 from quodeq.services.project_index import ProjectIdentity
 
-from ._import_extract import _safe_extract  # noqa: F401 — re-export
+from ._import_extract import _safe_extract  # re-export
 from ._import_identity import (
     _REPO_INFO_FILENAME,
     _find_identity_collision,
     _identity_from_info,
-    _rewrite_repository_info,  # noqa: F401 — re-export
+    _rewrite_repository_info,  # re-export
     _update_index,
 )
 from ._import_validation import (

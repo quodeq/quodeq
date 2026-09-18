@@ -4,6 +4,12 @@ import { complianceRatio } from '../textFormatting.js';
 
 const MAX_TOP_FILES = 15;
 
+/**
+ * The per-dimension score/grade/counts table, or no lines when no dimension
+ * has been evaluated.
+ *
+ * @returns {string[]}
+ */
 export function buildDimensionSummaryTable(accumulatedDimensions) {
   const lines = [];
   if (accumulatedDimensions.length === 0) return lines;
@@ -23,6 +29,12 @@ export function buildDimensionSummaryTable(accumulatedDimensions) {
   return lines;
 }
 
+/**
+ * The worst-offending-files table across every dimension, capped at
+ * MAX_TOP_FILES rows.
+ *
+ * @returns {string[]}
+ */
 export function buildTopOffendingFiles(accumulatedDimensions) {
   const fileMap = {};
   for (const dim of accumulatedDimensions) {
@@ -49,6 +61,12 @@ export function buildTopOffendingFiles(accumulatedDimensions) {
   return lines;
 }
 
+/**
+ * The critical-and-major section, grouped by dimension. Always returns a
+ * heading, saying so explicitly when there is nothing at those severities.
+ *
+ * @returns {string[]}
+ */
 export function buildCritMajorSection(accumulatedDimensions) {
   const lines = [];
   const critMajor = [];
@@ -74,6 +92,12 @@ export function buildCritMajorSection(accumulatedDimensions) {
   return lines;
 }
 
+/**
+ * The headline counts (dimensions, violations by severity, compliance and
+ * the compliance ratio) that close an overview report.
+ *
+ * @returns {string[]}
+ */
 export function buildOverviewSummarySection(summary, accumulatedDimensions) {
   const sev = summary.severity || {};
   const lines = [];

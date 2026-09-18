@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTerminalSessions } from './useTerminalSessions.js';
 import { useTerminalPaneStatus } from './hooks/useTerminalPaneStatus.js';
 import { TerminalTabStrip } from './components/TerminalTabStrip.jsx';

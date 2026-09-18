@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from quodeq.analysis.subagents._queue_state import (
-    FileQueueError,  # noqa: F401 — re-export
+    FileQueueError,  # re-export
     _QUEUE_VERSION,
     cleanup_stale_lock,
     locked,

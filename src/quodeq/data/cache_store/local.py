@@ -80,6 +80,7 @@ class LocalFileBackend:
 
     @property
     def root(self) -> Path:
+        """Directory the sharded entry tree and the index sidecar live under."""
         return self._root
 
     @property
@@ -102,6 +103,11 @@ class LocalFileBackend:
         self._mutations += 1
 
     def get(self, key: str) -> CacheEntry | None:
+        """Read the entry for *key*, or None on a miss.
+
+        Unreadable and corrupt entries count as misses; a corrupt one is
+        deleted so the next ``put`` can heal the slot.
+        """
         path = self._entry_path(key)
         try:
             text = path.read_text(encoding="utf-8")
@@ -150,9 +156,15 @@ class LocalFileBackend:
                 _logger.debug("temp cache file not removed after a failed write: %s", exc)
 
     def has(self, key: str) -> bool:
+        """Report whether an entry file exists, without reading or decoding it."""
         return self._entry_path(key).is_file()
 
     def delete(self, key: str) -> None:
+        """Remove the entry directory for *key* and its index row.
+
+        A missing key is a no-op. A failed removal is logged and leaves the
+        index row alone rather than pointing it at an entry that still exists.
+        """
         target_dir = self._dir_for(key)
         if not target_dir.exists():
             return

@@ -10,6 +10,11 @@ import { systemKeys } from '../../../api/queryKeys.js';
 
 const POLL_MS = 5000;
 
+/**
+ * The Ollama daemon status, or null before the first poll resolves.
+ *
+ * @returns {{status: 'online'|'offline', address: string|null}|null}
+ */
 export function useOllamaServerStatus() {
   const { getOllamaStatus } = useApi();
 

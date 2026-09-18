@@ -8,23 +8,35 @@ const DEFAULT_ANALYSIS_POWER = 2;
  * resolution helpers. Extracted verbatim.
  */
 
-// Storage reads degrade to '' when the backing store throws (private
-// mode, disabled storage) instead of crashing the caller, matching the
-// guarded reads below.
+/**
+ * Storage reads degrade to '' when the backing store throws (private
+ * mode, disabled storage) instead of crashing the caller, matching the
+ * guarded reads below.
+ */
 export function safeGetItem(storage, key) {
   try { return storage.getItem(key) || ''; } catch (e) { console.warn('localStorage unavailable:', e); return ''; }
 }
 
+/**
+ * The stored analysis power tier, falling back to DEFAULT_ANALYSIS_POWER when
+ * nothing is stored or the store throws.
+ */
 export function readAnalysisPower(storage) {
   try { return Number(storage.getItem(POWER_KEY)) || DEFAULT_ANALYSIS_POWER; } catch (e) { console.warn('localStorage unavailable:', e); return DEFAULT_ANALYSIS_POWER; }
 }
 
+/**
+ * Persists the analysis power tier, swallowing storage failures — the setting
+ * is a preference, not something worth failing a run over.
+ */
 export function writeAnalysisPower(storage, level) {
   try { storage.setItem(POWER_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
 }
 
-// Ollama uses a single analysis model; CLI providers use tier-based selection.
-// Falls back to the orchestrator model if no analysis-specific model is set.
+/**
+ * Ollama uses a single analysis model; CLI providers use tier-based selection.
+ * Falls back to the orchestrator model if no analysis-specific model is set.
+ */
 export function resolveSubagentModel({ get, analysisPower }) {
   const analysisModel = get('model-analysis');
   if (analysisModel) return analysisModel;

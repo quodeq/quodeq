@@ -22,75 +22,30 @@ from quodeq.llm_bridge import (
 )
 from quodeq.shared.url_validation import url_safety_error
 
-
-def _json_body() -> dict | None:
-    """Return the request's JSON body when it is an object, else None.
-
-    A body like ``[1]`` or ``"x"`` parses as valid JSON but crashes the
-    ``data.get(...)`` calls below with an AttributeError (a 500); callers
-    turn None into a 400 instead.
-    """
-    data = request.get_json(silent=True)
-    return data if isinstance(data, dict) else None
-
-
-_BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
-
-
-def _invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
-    """Return a 400 response when *base_url* fails SSRF validation, else None.
-
-    Same policy as /api/provider/test: http(s) scheme only, private/LAN
-    addresses allowed (self-hosted omlx servers are the normal case).
-    """
-    if base_url is None:
-        return None
-    err = url_safety_error(base_url, allow_private=True)
-    if err is not None:
-        return jsonify({"error": err, "code": "INVALID_URL"}), 400
-    return None
-
-
-def _invalid_model_name(model: str) -> tuple[Response, int] | None:
-    """Return a 400 response when *model* contains invalid characters, else None.
-
-    Prevents path traversal and null-byte injection.
-    """
-    if "\\" in model or ".." in model or "\0" in model:
-        return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
-    return None
-
-
-def _require_model_name(
-    data: dict, *, require_nonempty: bool,
-) -> tuple[str | None, tuple[Response, int] | None]:
-    """Validate the ``model`` field shared by the concurrency-test routes.
-
-    ollama requires a non-empty string (``require_nonempty=True``, rejects
-    ``""`` with MISSING_PARAM); llamacpp and omlx accept an empty string and
-    only reject non-strings (``require_nonempty=False``, INVALID_PARAM).
-    """
-    model = data.get("model", "")
-    if require_nonempty:
-        if not model or not isinstance(model, str):
-            return None, (jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400)
-    elif not isinstance(model, str):
-        return None, (jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400)
-    err = _invalid_model_name(model)
-    if err is not None:
-        return None, err
-    return model, None
+from quodeq.api._llm_bridge_validation import (
+    _BODY_NOT_OBJECT,
+    _invalid_base_url,
+    _json_body,
+    _require_model_name,
+)
 
 
 def ollama_status() -> Response:
+    """Report whether a local Ollama daemon is reachable and what it is serving."""
     return jsonify(get_ollama_status())
 
 
 def ollama_models() -> Response:
+    """List the models the local Ollama daemon has pulled, for the model picker."""
     return jsonify({"models": list_ollama_models()})
 
 
 def ollama_test_concurrency() -> Response:
+    """Probe how many subagents the local Ollama can serve in parallel for a model.
+
+    Runs real inference, so it is slow; the settings UI calls it once when the
+    user asks to measure rather than on every render.
+    """
     data = _json_body()
     if data is None:
         return jsonify(_BODY_NOT_OBJECT), 400
@@ -102,6 +57,11 @@ def ollama_test_concurrency() -> Response:
 
 
 def ollama_estimate_agents() -> Response:
+    """Estimate a safe subagent count from model size and GPU memory.
+
+    The cheap alternative to ``ollama_test_concurrency``: arithmetic only, no
+    inference, so the settings UI can suggest a number while the user types.
+    """
     data = _json_body()
     if data is None:
         return jsonify(_BODY_NOT_OBJECT), 400
@@ -115,14 +75,21 @@ def ollama_estimate_agents() -> Response:
 
 
 def llamacpp_status() -> Response:
+    """Report whether a local llama.cpp server is reachable and what it is serving."""
     return jsonify(get_llamacpp_status())
 
 
 def llamacpp_models() -> Response:
+    """List the models the local llama.cpp server exposes, for the model picker."""
     return jsonify({"models": list_llamacpp_models()})
 
 
 def llamacpp_test_concurrency() -> Response:
+    """Probe how many subagents the local llama.cpp server can serve in parallel.
+
+    Unlike the ollama route, an empty ``model`` is accepted: llama.cpp serves
+    whatever it was started with.
+    """
     data = _json_body()
     if data is None:
         return jsonify(_BODY_NOT_OBJECT), 400
@@ -134,6 +101,12 @@ def llamacpp_test_concurrency() -> Response:
 
 
 def omlx_status() -> Response:
+    """Report whether the omlx server at ``?base_url=`` is reachable.
+
+    The base URL is a request parameter rather than config because omlx is
+    typically self-hosted somewhere on the LAN and the user is still typing
+    the address into settings when this is called.
+    """
     base_url = request.args.get("base_url", "").strip() or None
     err = _invalid_base_url(base_url)
     if err is not None:
@@ -142,6 +115,10 @@ def omlx_status() -> Response:
 
 
 def omlx_models() -> Response:
+    """List the models the omlx server at ``?base_url=`` exposes.
+
+    The API key rides in the ``X-Api-Key`` header, never the query string.
+    """
     base_url = request.args.get("base_url", "").strip() or None
     err = _invalid_base_url(base_url)
     if err is not None:
@@ -153,6 +130,11 @@ def omlx_models() -> Response:
 
 
 def omlx_test_concurrency() -> Response:
+    """Probe how many subagents the omlx server can serve in parallel.
+
+    Takes the server address and key in the body rather than from config, so
+    the user can measure a server before saving it.
+    """
     data = _json_body()
     if data is None:
         return jsonify(_BODY_NOT_OBJECT), 400
@@ -173,6 +155,13 @@ def omlx_test_concurrency() -> Response:
 
 
 def provider_test() -> Response:
+    """Try one round-trip against a cloud provider and report the outcome.
+
+    The settings UI calls this before saving so a wrong base URL, model name
+    or missing key surfaces there instead of mid-evaluation. When the body
+    carries no key, the provider's env var is resolved by provider id, or by
+    api_base match for clients predating the ``provider`` field.
+    """
     data = _json_body()
     if data is None:
         return jsonify(_BODY_NOT_OBJECT), 400
@@ -219,6 +208,12 @@ def provider_env_check() -> Response:
 
 
 def provider_store_key() -> Response:
+    """Persist a provider API key, preferring the OS keychain.
+
+    Returns ``{"stored", "secure"}``; ``secure`` is False when the keychain
+    was unavailable and the key fell back to ``.quodeq.env`` on disk, which
+    the UI surfaces as a warning.
+    """
     data = _json_body()
     if data is None:
         return jsonify(_BODY_NOT_OBJECT), 400
@@ -248,6 +243,11 @@ def provider_store_key() -> Response:
 
 
 def provider_key_status() -> Response:
+    """Report whether a key for ``?provider=`` is in the keychain.
+
+    Only the boolean crosses the wire; the key itself never leaves the
+    server, so the UI can show "configured" without being able to read it.
+    """
     provider = request.args.get("provider", "")
     if not provider:
         return jsonify({"error": "provider is required", "code": "MISSING_PARAM"}), 400
@@ -255,10 +255,12 @@ def provider_key_status() -> Response:
 
 
 def known_models() -> Response:
+    """Return the curated model catalogue the settings model picker offers."""
     return jsonify(get_known_models())
 
 
 def provider_configs() -> Response:
+    """Return each supported cloud provider's default base URL and key env var."""
     return jsonify(get_provider_configs())
 
 

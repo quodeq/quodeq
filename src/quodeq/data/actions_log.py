@@ -32,6 +32,7 @@ class ActionLogWriter:
         self._lock = get_file_lock()
 
     def emit(self, event: BaseEvent) -> None:
+        """Append one action event. Raises if the write fails; nothing is buffered."""
         self._append([event], str(event.event_type))
 
     def emit_many(self, events: Iterable[BaseEvent]) -> None:

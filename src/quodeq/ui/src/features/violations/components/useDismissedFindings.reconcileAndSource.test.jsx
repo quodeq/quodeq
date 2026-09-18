@@ -57,17 +57,15 @@ beforeEach(() => {
 
 // The mutation handlers make exactly ONE freshness call: onReconcile (the
 // debounced ACTIVE scheduleDashboardReconcile, which marks stale synchronously
-// itself). onRefresh stays reserved for ViolationsPage's plain-navigation
-// mount effect and must NOT be called by mutations -- wiring mutations to it
-// as well was a redundant two-call ritual that call sites kept forgetting.
+// itself). ViolationsPage's plain-navigation mount effect owns the separate
+// onRefresh call; the hook does not take it.
 describe('useDismissedFindings — onReconcile (the single mutation freshness call)', () => {
-  it('handleRestore calls onReconcile and leaves onRefresh untouched on success', async () => {
+  it('handleRestore calls onReconcile on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     restoreFinding.mockResolvedValueOnce({ ok: true });
-    const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -75,7 +73,6 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     await act(async () => { await result.current.handleRestore(sampleA); });
 
     expect(onReconcile).toHaveBeenCalledTimes(1);
-    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('handleRestore does not call onReconcile on failure', async () => {
@@ -83,7 +80,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     restoreFinding.mockRejectedValueOnce(new Error('boom'));
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -93,14 +90,13 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     expect(onReconcile).not.toHaveBeenCalled();
   });
 
-  it('handleRestoreAll calls onReconcile and leaves onRefresh untouched on success', async () => {
+  it('handleRestoreAll calls onReconcile on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     confirmDialog.mockResolvedValueOnce(true);
     restoreAllFindings.mockResolvedValueOnce({ ok: true, restored: 2 });
-    const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -108,16 +104,14 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     await act(async () => { await result.current.handleRestoreAll(); });
 
     expect(onReconcile).toHaveBeenCalledTimes(1);
-    expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('handleDelete calls onReconcile and leaves onRefresh untouched on success', async () => {
+  it('handleDelete calls onReconcile on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     deleteFinding.mockResolvedValueOnce({ ok: true, swept: 1 });
-    const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -125,17 +119,15 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     await act(async () => { await result.current.handleDelete(sampleA); });
 
     expect(onReconcile).toHaveBeenCalledTimes(1);
-    expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('handleDeleteAll calls onReconcile and leaves onRefresh untouched on success', async () => {
+  it('handleDeleteAll calls onReconcile on success', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     confirmDialog.mockResolvedValueOnce(true);
     deleteAllFindings.mockResolvedValueOnce({ ok: true, deleted: 2 });
-    const onRefresh = vi.fn();
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -143,7 +135,6 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     await act(async () => { await result.current.handleDeleteAll(); });
 
     expect(onReconcile).toHaveBeenCalledTimes(1);
-    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('handleDeleteAll does not call onReconcile when the user cancels', async () => {
@@ -151,7 +142,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     confirmDialog.mockResolvedValueOnce(false);
     const onReconcile = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'local', onReconcile }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -165,7 +156,7 @@ describe('useDismissedFindings — onReconcile (the single mutation freshness ca
     listDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     restoreFinding.mockResolvedValueOnce({ ok: true });
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn() }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn() }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -186,7 +177,7 @@ describe('useDismissedFindings — shared source', () => {
   it('reads the dismissed list via the shared endpoint instead of the local one', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -197,9 +188,8 @@ describe('useDismissedFindings — shared source', () => {
 
   it('handleRestore no-ops and never calls the local restore endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
-    const onRefresh = vi.fn();
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh, setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -208,13 +198,12 @@ describe('useDismissedFindings — shared source', () => {
 
     expect(restoreFinding).not.toHaveBeenCalled();
     expect(result.current.dismissed).toEqual([sampleA]);
-    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('handleRestoreAll no-ops and never calls the local restore-all endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA, sampleB]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(2));
@@ -228,7 +217,7 @@ describe('useDismissedFindings — shared source', () => {
   it('handleDelete no-ops and never calls the local delete endpoint', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -242,7 +231,7 @@ describe('useDismissedFindings — shared source', () => {
   it('handleDeleteAll no-ops and never opens the confirm dialog', async () => {
     sharedListDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn(), refreshKey: 0, selectedSource: 'shared' }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));
@@ -257,7 +246,7 @@ describe('useDismissedFindings — shared source', () => {
   it('defaults to local source when selectedSource is omitted', async () => {
     listDismissedFindings.mockResolvedValueOnce([sampleA]);
     const { result } = renderHook(
-      () => useDismissedFindings({ selectedProject: 'proj', onRefresh: vi.fn(), setRestoreError: vi.fn() }),
+      () => useDismissedFindings({ selectedProject: 'proj', setRestoreError: vi.fn() }),
       withQueryClient(),
     );
     await waitFor(() => expect(result.current.dismissed).toHaveLength(1));

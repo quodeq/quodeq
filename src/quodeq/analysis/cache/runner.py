@@ -67,7 +67,12 @@ class DispatchResult:
 class Dispatcher(Protocol):
     """Plugs the existing analysis machinery into the cache runner."""
 
-    def __call__(self, unit: WorkUnit) -> DispatchResult: ...
+    def __call__(self, unit: WorkUnit) -> DispatchResult:
+        """Analyse *unit* and return its findings. Raise to signal failure.
+
+        Raising leaves no cache entry behind, so the next run re-dispatches.
+        """
+        ...
 
 
 @dataclass(frozen=True)

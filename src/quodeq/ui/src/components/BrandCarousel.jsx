@@ -87,7 +87,7 @@ function LogoSvg({ leftCls, rightCls, needleWobble, handleLeft, handleRight }) {
 }
 
 function LogoShell({ press, classes, needleWobble, handlers }) {
-  const { left: leftPress, setLeft: setLeftPress, right: rightPress, setRight: setRightPress } = press;
+  const { setLeft: setLeftPress, setRight: setRightPress } = press;
   const { left: leftCls, right: rightCls } = classes;
   const { left: handleLeft, right: handleRight } = handlers;
   return (

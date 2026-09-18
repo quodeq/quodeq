@@ -57,14 +57,24 @@ export function createGradeThresholdsStore() {
 /** The app-wide table every production import shares. */
 export const defaultGradeThresholdsStore = createGradeThresholdsStore();
 
+/**
+ * The app-wide threshold table, frozen. Read-only by contract.
+ */
 export function getGradeThresholds() {
   return defaultGradeThresholdsStore.get();
 }
 
+/**
+ * Replaces the app-wide table with the server's, ignoring anything that is
+ * not a complete list of [number, string] pairs.
+ */
 export function setGradeThresholds(next) {
   defaultGradeThresholdsStore.set(next);
 }
 
+/**
+ * Restores the shipped defaults.
+ */
 export function resetGradeThresholds() {
   defaultGradeThresholdsStore.reset();
 }

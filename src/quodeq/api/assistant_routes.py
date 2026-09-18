@@ -11,19 +11,19 @@ Split (Task 10) into four route modules plus this thin orchestrator:
 integration tests monkeypatch "quodeq.api.assistant_routes.get_provider_
 configs", and these three helpers call it by bare name, so they must keep
 resolving it in THIS module's globals. ``_shared_source_error`` stays here
-for the same reason (``read_settings``/``read_state`` patch targets).
-``run_turn`` and ``build_tool_context`` stay imported here (unused directly)
-so tests can keep patching "quodeq.api.assistant_routes.run_turn"/
-"...build_tool_context" — the split registrars look these up on this module
-at call time rather than binding their own copies.
+for the same reason (``read_settings``/``read_state`` patch targets), as do
+the ``_run_turn``/``_build_tool_context`` shims
+("quodeq.api.assistant_routes.run_turn"/"...build_tool_context"). The route
+modules receive them as ``SessionGates``/``TurnGates`` instead of importing
+this facade.
 """
 from __future__ import annotations
 
 from flask import Flask, Response, jsonify
 
 from quodeq.api.assistant_action_routes import register_assistant_action_routes
-from quodeq.api.assistant_session_routes import register_assistant_session_routes
-from quodeq.api.assistant_turn_routes import register_assistant_turn_routes
+from quodeq.api.assistant_session_routes import SessionGates, register_assistant_session_routes
+from quodeq.api.assistant_turn_routes import TurnGates, register_assistant_turn_routes
 from quodeq.api.assistant_turn_state import (  # noqa: F401 — re-export/patch target
     AssistantTurnState,
     _release_turn,
@@ -31,11 +31,12 @@ from quodeq.api.assistant_turn_state import (  # noqa: F401 — re-export/patch 
     _turn_state,
 )
 from quodeq.api._assistant_helpers import _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
-from quodeq.api._assistant_helpers import build_tool_context  # noqa: F401 — re-export/patch target
+from quodeq.api._assistant_helpers import build_tool_context
 from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
 from quodeq.api.helpers import error_response
 from quodeq.assistant import get_provider_configs
-from quodeq.assistant.orchestrator import run_turn  # noqa: F401 — re-export/patch target
+from quodeq.assistant.orchestrator import TurnRequest, run_turn
+from quodeq.assistant.tools import ToolContext
 from quodeq.services.shared_repo import read_state
 from quodeq.services.shared_settings import read_settings
 
@@ -94,9 +95,30 @@ def _turn_endpoint(provider: str, body: dict, provider_cfg: dict) -> tuple[str, 
     return provider_cfg.get("api_base", ""), body.get("apiKey") or provider_cfg.get("api_key")
 
 
+def _run_turn(request: TurnRequest, **kwargs) -> None:
+    """Call ``run_turn`` through this module's globals, so a monkeypatched
+    "quodeq.api.assistant_routes.run_turn" still takes effect for a turn that
+    was registered before the patch."""
+    run_turn(request, **kwargs)
+
+
+def _build_tool_context(app: Flask, session: dict) -> ToolContext:
+    """``build_tool_context`` through this module's globals (see ``_run_turn``)."""
+    return build_tool_context(app, session)
+
+
 def register_assistant_routes(app: Flask) -> None:
+    """Bind every assistant route: workspace, sessions, turns, actions."""
     _turn_state(app)  # ensure the registry exists even on bare test apps
     register_assistant_workspace_routes(app)
-    register_assistant_session_routes(app)
-    register_assistant_turn_routes(app)
+    register_assistant_session_routes(
+        app, SessionGates(known_provider=_known_provider, shared_source_error=_shared_source_error),
+    )
+    register_assistant_turn_routes(app, TurnGates(
+        api_provider=_api_provider,
+        turn_endpoint=_turn_endpoint,
+        shared_source_error=_shared_source_error,
+        run_turn=_run_turn,
+        build_tool_context=_build_tool_context,
+    ))
     register_assistant_action_routes(app)

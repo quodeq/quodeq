@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
 
+/**
+ * The Overview's navigation callbacks (dimension card, accumulated dimension,
+ * file), memoized so the cards do not re-render on every parent render.
+ *
+ * Each is a no-op without an `onNavigate`, so the page renders fine read-only.
+ */
 export function useDashboardHandlers(onNavigate, dashboard) {
   return useMemo(() => ({
     handleDimensionCardClick: (item, runId) => {

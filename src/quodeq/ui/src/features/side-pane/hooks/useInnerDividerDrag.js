@@ -60,6 +60,15 @@ function makeInnerDragHandlers({
   return { onMove, onUp, cleanup };
 }
 
+/**
+ * Drag-to-resize between stacked side-pane windows.
+ *
+ * `ratios[i]` is how much of the combined height of windows i and i+1 goes to
+ * i; the pair's total is held constant through a drag, so resizing one seam
+ * never disturbs the others. The ratios reset whenever the window count
+ * changes. The active drag's cleanup is published through
+ * `activeDragCleanupRef` so the owner can tear down leaked listeners.
+ */
 export function useInnerDividerDrag({ windowCount, containerRef, setResizingFlag, activeDragCleanupRef }) {
   // Per-resizer ratios: ratios[i] in [0,1] is the share of (weights[i] + weights[i+1])
   // that goes to weights[i]. Reset whenever the window count changes (structural reset).

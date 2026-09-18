@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { useSidePane, workspaceDiffSpec } from '../side-pane/index.js';
 import PanelSwitcher from '../drawer/PanelSwitcher.jsx';

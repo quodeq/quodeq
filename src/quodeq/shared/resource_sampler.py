@@ -102,6 +102,7 @@ class ResourceSampler:
         self._error_logged = False
 
     def start(self) -> None:
+        """Start sampling and set the elapsed-time origin. Idempotent while running."""
         if self._thread is not None and self._thread.is_alive():
             return  # idempotent
         self._stop.clear()
@@ -112,6 +113,11 @@ class ResourceSampler:
         self._thread.start()
 
     def stop(self, *, timeout: float = 2.0) -> None:
+        """Signal the loop and join it for at most *timeout* seconds.
+
+        A thread that outlives the join is kept on the instance, so a later
+        ``start`` cannot revive it in parallel with a fresh one.
+        """
         self._stop.set()
         thread = self._thread
         if thread is not None and thread.is_alive():

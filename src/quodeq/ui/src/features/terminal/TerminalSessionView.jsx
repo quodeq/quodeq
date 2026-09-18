@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSocket } from './useTerminalSocket.js';
 import { createTerminalInstance, isReservedChord } from './terminalSetup.js';

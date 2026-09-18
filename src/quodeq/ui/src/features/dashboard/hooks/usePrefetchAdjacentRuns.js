@@ -11,6 +11,12 @@
 import { useCallback } from "react";
 import { usePrefetchRun } from "./usePrefetchRun.js";
 
+/**
+ * Mouse-enter handlers for the run navigator that warm the adjacent runs'
+ * caches, so Prev/Next/Latest usually swap with no visible load.
+ *
+ * @returns {{onPrevHover: Function, onNextHover: Function, onLatestHover: Function}}
+ */
 export function usePrefetchAdjacentRuns({ selectedProject, selectedSource = "local", availableRuns, overviewRunIndex }) {
   const { prefetchRun } = usePrefetchRun(selectedProject, selectedSource);
 

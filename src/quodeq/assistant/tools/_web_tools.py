@@ -128,7 +128,7 @@ class _TextExtractor(HTMLParser):
         self._chunks: list[str] = []
         self._skip_depth = 0
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag, _attrs):
         if tag in self._SKIP:
             self._skip_depth += 1
         elif tag in self._BLOCK:

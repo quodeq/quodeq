@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
-import { tRich } from '../../../strings/rich.jsx';
 
 const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;
@@ -127,7 +126,7 @@ export function AdvancedAnalysisSettings({ state, update }) {
   );
 }
 
-export default function ProviderSettings({ state, update, providerType }) {
+export default function ProviderSettings({ state, update }) {
   return (
     <>
       <TimeLimitSetting state={state} update={update} />

@@ -41,6 +41,7 @@ class FindingTally:
 
     @property
     def total(self) -> int:
+        """Unique findings of either kind. Excludes duplicates and both exclusions."""
         return self.violations + self.compliance
 
 
@@ -182,6 +183,11 @@ class IncrementalTally:
         return f.read(len(self._tail)) == self._tail
 
     def advance(self) -> FindingTally:
+        """Fold in the bytes appended since the last call and return the running tally.
+
+        Safe to call on a partially written file and on one that does not exist
+        yet. A shrink or a rewritten tail restarts the count from zero.
+        """
         if not self.path.is_file():
             self._reset()
             return self._tally()

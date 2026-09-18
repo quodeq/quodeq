@@ -14,6 +14,13 @@ import { CLEAN_PERSIST } from '../components/scanModes.js';
 
 const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
+/**
+ * The start-evaluation request body for the selected dimensions, branch,
+ * scope and clean-scan mode. `timeLimitS` overrides the provider's configured
+ * budget for this run only.
+ *
+ * @returns {object}
+ */
 export function buildScanPayload({ info, branch, scopePath, selectedDims, cleanScan, project, timeLimitS }) {
   const payload = { repo: info.path };
   payload.dimensions = [...selectedDims];
@@ -53,6 +60,15 @@ function useSeedPreselectedDims(allDimensions, preselectDims, setSelectedDims) {
   }, [allDimensions, preselectDims]);
 }
 
+/**
+ * The re-evaluate card's dimension picker, clean-scan toggle and scan
+ * trigger.
+ *
+ * Scanning with standards available but none selected reports through
+ * `onValidationFail` instead of starting. A one-shot clean scan is consumed
+ * only once the start actually goes through, so a refused or failed start
+ * leaves the toggle armed for the retry.
+ */
 export function useDimensionSelection({ allDimensions, info, branch, scopePath, onStart, onValidationFail, preselectDims = [], project = null, timeLimitS = null }) {
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [cleanScan, setCleanScan] = useState(CLEAN_PERSIST.OFF);

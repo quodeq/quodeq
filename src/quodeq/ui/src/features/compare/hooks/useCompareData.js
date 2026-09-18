@@ -33,6 +33,16 @@ const QUERY_DEFAULTS = {
   refetchOnWindowFocus: false,
 };
 
+/**
+ * Fetches one compare summary per project and returns them keyed by row id,
+ * alongside the per-project errors so one failing project shows an error in
+ * its own row instead of blanking the table.
+ *
+ * Summaries are filtered by the browser-local visible-standards set, re-read
+ * on every mount so a Standards toggle is picked up on the next visit.
+ *
+ * @returns {{summariesById: object, errorsById: object}}
+ */
 export function useCompareData(projects) {
   const list = (projects || []).filter((p) => p && (p.id || p.name));
   const summaryResults = useQueries({

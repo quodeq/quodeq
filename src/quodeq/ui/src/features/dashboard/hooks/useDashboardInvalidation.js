@@ -83,9 +83,11 @@ function useScheduleDashboardReconcile({ queryClient, selectedProject, selectedS
   return scheduleDashboardReconcile;
 }
 
-// The three ways useDashboard invalidates the project query subtree, plus
-// the debounce ref the third one owns. Extracted verbatim from
-// useDashboard.js.
+/**
+ * The three ways useDashboard invalidates the project query subtree, plus
+ * the debounce ref the third one owns. Extracted verbatim from
+ * useDashboard.js.
+ */
 export function useDashboardInvalidation({ queryClient, selectedProject, selectedSource }) {
   const { refreshDashboard, refreshDashboardActive } = useRefreshDashboard({ queryClient, selectedProject, selectedSource });
   const scheduleDashboardReconcile = useScheduleDashboardReconcile({ queryClient, selectedProject, selectedSource });

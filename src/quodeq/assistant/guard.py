@@ -23,6 +23,12 @@ _PREAMBLE = (
 
 
 def fence(payload: str, label: str) -> str:
+    """Wrap *payload* in an untrusted-data block the model is told not to obey.
+
+    The delimiters carry a fresh random boundary per call, so a tool result
+    cannot close the fence itself and smuggle text back into the instruction
+    channel.
+    """
     boundary = secrets.token_hex(8)
     return (
         f"<<data:{label}:{boundary}>>\n{_PREAMBLE}\n---\n"
@@ -31,6 +37,12 @@ def fence(payload: str, label: str) -> str:
 
 
 def guard_tool_result(result: dict, label: str) -> tuple[str, list[str]]:
+    """Serialize a tool result, cap it at ``MAX_TOOL_RESULT_CHARS`` and fence it.
+
+    Returns (fenced_text, injection_warnings) — the warnings come from
+    ``scan_text`` over the truncated payload and are surfaced to the user, not
+    to the model.
+    """
     # Serialize once, then cut. json.dumps uses the C encoder; an iterencode
     # that stops at the cap runs the pure-Python one and measured 3.7-4.9x
     # slower below ~70 KB, the only range tool results reach (pages cap at

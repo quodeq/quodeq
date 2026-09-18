@@ -1,12 +1,12 @@
+import { useState, useEffect } from 'react';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
+
 /**
  * useReEvalInfo — loads/reloads a project's info for ReEvaluateCard, plus
  * the "restore a missing local path from its remote URL" flow.
  *
  * Split out of ReEvaluateCard.jsx verbatim.
  */
-import { useState, useEffect } from 'react';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
-
 export function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
   const [info, setInfo] = useState(initialInfo || null);
   const [error, setError] = useState(null);

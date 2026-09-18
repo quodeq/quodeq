@@ -8,6 +8,7 @@ those registrars can share one implementation instead of three copies.
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 from http import HTTPStatus
 from pathlib import Path
@@ -33,16 +34,19 @@ def _with_shared_root(fn):
     Every decorated route becomes: 409 when unconfigured, 409 when the
     clone's format is foreign or newer than this build understands, 503 when
     the clone hasn't been fetched yet at all, else the wrapped view runs with
-    ``eval_root`` (the shared clone's evaluations directory) and ``url`` (the
-    configured remote) injected as keyword arguments, with the score cache
-    transparently scoped to this clone's own cache DB (Task 9) so its rows
-    never mix with the local clone's cache.
+    ``eval_root`` (the shared clone's evaluations directory) injected as a
+    keyword argument, with the score cache transparently scoped to this
+    clone's own cache DB (Task 9) so its rows never mix with the local
+    clone's cache. Views that also declare a ``url`` parameter get the
+    configured remote; the rest are not handed one.
 
     "ok" and "empty" (cloned, never published into) both proceed: an empty
     clone is a legitimate first-connect state, not an error, and every
     wrapped list-shaped route already tolerates a missing evaluations dir by
     returning an empty result (see build_project_list) rather than raising.
     """
+
+    wants_url = "url" in inspect.signature(fn).parameters
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
@@ -72,8 +76,11 @@ def _with_shared_root(fn):
                 "SHARED_REPO_MISSING",
             )
         root = shared_evaluations_root(settings.url)
+        injected = {"eval_root": root}
+        if wants_url:
+            injected["url"] = settings.url
         with score_cache_path_override(shared_score_cache_path(settings.url)):
-            return fn(*args, eval_root=root, url=settings.url, **kwargs)
+            return fn(*args, **injected, **kwargs)
 
     return wrapper
 

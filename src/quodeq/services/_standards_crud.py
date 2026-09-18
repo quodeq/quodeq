@@ -67,7 +67,7 @@ def delete(standard_id: str, evaluators_dir: Path, compiled_dir: Path,
     store.remove(evaluators_dir, standard_id)
 
 
-def duplicate(standard_id: str, new_id: str, source_detail: StandardDetail,
+def duplicate(new_id: str, source_detail: StandardDetail,
               evaluators_dir: Path, store: StandardsStore) -> StandardDetail:
     """Duplicate an existing standard under *new_id* as a custom copy."""
     _validate_id(new_id)

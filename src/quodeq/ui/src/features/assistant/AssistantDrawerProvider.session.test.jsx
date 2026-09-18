@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { AssistantDrawerProvider, useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 
@@ -24,7 +24,7 @@ vi.mock('./useAssistantStream.js', () => ({
     return { messages: [], streaming: false, error: null, reset: vi.fn() };
   },
 }));
-import { createAssistantSession, postAssistantMessage, stopAssistantTurn, fetchAssistantCatalog } from '../../api/assistant.js';
+import { createAssistantSession, postAssistantMessage, stopAssistantTurn } from '../../api/assistant.js';
 
 function Probe() {
   const d = useAssistantDrawer();

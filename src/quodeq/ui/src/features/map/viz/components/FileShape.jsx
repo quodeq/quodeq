@@ -28,7 +28,7 @@ function buttonProps(handlers, ariaLabel) {
   return { tabIndex: 0, role: 'button', 'aria-label': ariaLabel, onKeyDown: activateOnKey(handlers.onClick) };
 }
 
-export default function FileShape({ cx, cy, r, color, borderColor, glow, handlers, ariaLabel, transition = false, parentScale = 1 }) {
+export default function FileShape({ cx, cy, r, color, borderColor, glow, handlers, ariaLabel, parentScale = 1 }) {
   const scale = r / (BASE / 2);
   // Compensate for both own scale and parent group scale to keep strokes at ~1px
   const totalScale = scale * parentScale;

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { listVerifiedFindings, unverifyFinding } from '../../../api/findings.js';
 import { sharedListVerifiedFindings } from '../../../api/shared.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT, PROJECT_SOURCE } from '../../../constants.js';

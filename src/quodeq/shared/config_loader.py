@@ -8,7 +8,7 @@ keeping a second one here.
 from __future__ import annotations
 
 from quodeq.shared._config import _DEFAULTS_PATH, _get_config as _canonical_get_config
-from quodeq.shared._config_class import Config  # noqa: F401
+from quodeq.shared._config_class import Config
 
 
 def _get_config(override: Config | None = None) -> Config:

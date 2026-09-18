@@ -1,3 +1,8 @@
+"""Domain value objects shared across layers; re-exports every per-topic module.
+
+The split into ``finding``, ``scoring``, ``report`` and the rest is a
+file-size boundary; ``__all__`` below is the public surface.
+"""
 from __future__ import annotations
 
 from .dashboard import AccumulatedSummary, DashboardSummary, TrendPoint

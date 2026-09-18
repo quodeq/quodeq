@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * The Quodeq "Q" mark without the compass needle — the same silhouette the

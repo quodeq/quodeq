@@ -24,7 +24,7 @@ function makeToggleConsole({ consoleOpen, evalLog, jobId, status, progress }) {
   };
 }
 
-export default function ScanProgress({ job, hasEvaluations = false }) {
+export default function ScanProgress({ job }) {
   const jobId = job?.jobId;
   const status = job?.status;
   const isRunning = status === 'running';

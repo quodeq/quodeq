@@ -33,6 +33,7 @@ class RunLogWriter:
 
     @property
     def path(self) -> Path:
+        """Location of the run.log this writer appends to, whether or not it opened."""
         return self._path
 
     def write(self, line: str) -> None:
@@ -56,6 +57,7 @@ class RunLogWriter:
                 self._disabled = True
 
     def close(self) -> None:
+        """Close the file handle. Idempotent; later ``write`` calls drop their line."""
         with self._lock:
             if self._fh is not None:
                 try:
@@ -80,6 +82,7 @@ class RunLogHandler(logging.Handler):
         self._writer = writer
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Format *record* and append it to run.log, routing any failure to ``handleError``."""
         try:
             self._writer.write(self.format(record))
         except (OSError, ValueError, TypeError, KeyError):

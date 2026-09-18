@@ -37,6 +37,7 @@ class ThreadBackgroundRunner:
         self._log = log
 
     def submit(self, fn: Callable[[], None], *, name: str = "") -> None:
+        """Start a daemon thread for *fn* and return at once. No queue, no back-pressure."""
         def _run() -> None:
             try:
                 fn()

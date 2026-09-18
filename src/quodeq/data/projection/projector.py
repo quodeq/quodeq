@@ -1,3 +1,4 @@
+"""Rebuild-vs-update decision and the staleness checks behind ``ensure_projected``."""
 from __future__ import annotations
 
 import threading
@@ -12,6 +13,12 @@ from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 @dataclass(frozen=True)
 class ProjectionResult:
+    """Outcome of one projection pass.
+
+    ``rebuilt`` is True when the state store was thrown away and replayed
+    from event zero rather than updated from the checkpoint.
+    """
+
     events_projected: int
     rebuilt: bool
 
@@ -47,6 +54,12 @@ class EnsureLockRegistry:
 
     @contextmanager
     def acquire(self, run_dir: Path) -> Iterator[None]:
+        """Hold the lock for *run_dir* for the duration of the block.
+
+        Blocks while another thread projects the same run. The refcount is
+        bumped under the registry lock before blocking, so the entry cannot be
+        evicted out from under a waiter.
+        """
         with self._registry_lock:
             lock = self._locks.get(run_dir)
             if lock is None:

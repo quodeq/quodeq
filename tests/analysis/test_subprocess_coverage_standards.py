@@ -1,0 +1,170 @@
+"""Tests for subprocess.py: standards rendering and loading, with param overrides."""
+from __future__ import annotations
+
+import json
+
+from quodeq.analysis.subprocess import _load_standards_text, _render_standards_grouped
+
+
+# ---------------------------------------------------------------------------
+# _render_standards_grouped
+# ---------------------------------------------------------------------------
+
+class TestRenderStandardsGrouped:
+    def test_returns_empty_for_no_principles(self):
+        assert _render_standards_grouped({}) == ""
+        assert _render_standards_grouped({"principles": []}) == ""
+
+    def test_renders_json_array(self):
+        data = {
+            "principles": [
+                {
+                    "name": "Input Validation",
+                    "requirements": [
+                        {"id": "S-INP-1", "text": "Validate all inputs"},
+                        {"id": "S-INP-2", "text": "Sanitize SQL"},
+                    ],
+                }
+            ]
+        }
+        result = _render_standards_grouped(data)
+        parsed = json.loads(result)
+        assert len(parsed) == 1
+        assert parsed[0]["principle"] == "Input Validation"
+        assert len(parsed[0]["requirements"]) == 2
+        assert parsed[0]["requirements"][0]["id"] == "S-INP-1"
+
+    def test_handles_missing_name(self):
+        data = {"principles": [{"requirements": [{"id": "X-1", "text": "rule"}]}]}
+        result = _render_standards_grouped(data)
+        parsed = json.loads(result)
+        assert parsed[0]["principle"] == "Unknown"
+
+    def test_resolves_default_params_when_no_overrides(self):
+        """With no override file, placeholders must be replaced by defaults — no raw templates in output."""
+        data = {
+            "principles": [{
+                "name": "Analyzability",
+                "requirements": [{
+                    "id": "M-ANA-2",
+                    "text": "Functions MUST NOT exceed {max_lines} lines",
+                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                            "default": 50, "min": 10, "max": 500}},
+                }],
+            }],
+        }
+        result = _render_standards_grouped(data, overrides=None)
+        parsed = json.loads(result)
+        rule = parsed[0]["requirements"][0]["rule"]
+        assert "{max_lines}" not in rule, f"raw placeholder still present: {rule!r}"
+        assert "50" in rule
+
+    def test_resolves_overridden_value(self):
+        """With an override, the tuned value appears in the emitted text."""
+        data = {
+            "principles": [{
+                "name": "Analyzability",
+                "requirements": [{
+                    "id": "M-ANA-2",
+                    "text": "Functions MUST NOT exceed {max_lines} lines",
+                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                            "default": 50, "min": 10, "max": 500}},
+                }],
+            }],
+        }
+        result = _render_standards_grouped(data, overrides={"M-ANA-2": {"max_lines": 80}})
+        parsed = json.loads(result)
+        rule = parsed[0]["requirements"][0]["rule"]
+        assert "80" in rule
+        assert "{max_lines}" not in rule
+
+
+# ---------------------------------------------------------------------------
+# _load_standards_text (override threading)
+# ---------------------------------------------------------------------------
+
+class TestLoadStandardsTextOverrides:
+    _DIM = {
+        "principles": [{
+            "name": "Analyzability",
+            "requirements": [{
+                "id": "M-ANA-2",
+                "text": "Functions MUST NOT exceed {max_lines} lines",
+                "params": {"max_lines": {"label": "Max function lines", "type": "int",
+                                         "default": 50, "min": 10, "max": 500}},
+            }],
+        }],
+    }
+
+    def test_no_override_file_uses_default(self, tmp_path):
+        """No placeholder braces in output when analyzed repo has no override file."""
+        (tmp_path / "compiled").mkdir()
+        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
+        result = _load_standards_text(tmp_path / "compiled", "maintainability", overrides=None)
+        assert "{max_lines}" not in result
+        assert "50" in result
+
+    def test_override_value_appears_in_text(self, tmp_path):
+        """When an override is supplied, the overridden value appears in the emitted text."""
+        (tmp_path / "compiled").mkdir()
+        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
+        result = _load_standards_text(
+            tmp_path / "compiled", "maintainability",
+            overrides={"M-ANA-2": {"max_lines": 75}},
+        )
+        assert "75" in result
+        assert "{max_lines}" not in result
+
+
+# ---------------------------------------------------------------------------
+# _load_standards_text
+# ---------------------------------------------------------------------------
+
+class TestLoadStandardsText:
+    def test_returns_empty_when_no_dir(self):
+        assert _load_standards_text(None, "security") == ""
+
+    def test_returns_empty_when_no_dimension(self, tmp_path):
+        assert _load_standards_text(tmp_path, None) == ""
+
+    def test_loads_from_json(self, tmp_path):
+        data = {
+            "principles": [
+                {"name": "Auth", "requirements": [{"id": "A-1", "text": "Use tokens"}]}
+            ]
+        }
+        (tmp_path / "security.json").write_text(json.dumps(data))
+        result = _load_standards_text(tmp_path, "security")
+        assert "Auth" in result
+        assert "A-1" in result
+
+    def test_falls_back_to_md(self, tmp_path):
+        md_content = "# Security Standards\n- Validate inputs"
+        (tmp_path / "security.md").write_text(md_content)
+        result = _load_standards_text(tmp_path, "security")
+        assert "Security Standards" in result
+
+    def test_truncates_long_json_standards(self, tmp_path):
+        data = {
+            "principles": [
+                {"name": f"Principle{i}", "requirements": [{"id": f"P-{i}", "text": "x" * 5000}]}
+                for i in range(20)
+            ]
+        }
+        (tmp_path / "security.json").write_text(json.dumps(data))
+        result = _load_standards_text(tmp_path, "security")
+        assert "[... standards truncated for context limits ...]" in result
+
+    def test_truncates_long_md_standards(self, tmp_path):
+        (tmp_path / "security.md").write_text("x" * 60_000)
+        result = _load_standards_text(tmp_path, "security")
+        assert "[... standards truncated for context limits ...]" in result
+
+    def test_returns_empty_on_invalid_json(self, tmp_path):
+        (tmp_path / "security.json").write_text("not valid json{{{")
+        result = _load_standards_text(tmp_path, "security")
+        # Falls back to md, which doesn't exist
+        assert result == ""
+
+    def test_returns_empty_when_files_missing(self, tmp_path):
+        assert _load_standards_text(tmp_path, "nonexistent") == ""

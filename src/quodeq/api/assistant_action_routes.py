@@ -12,6 +12,7 @@ from quodeq.assistant.apply_action import apply_drafted_action, reject_drafted_a
 
 
 def register_assistant_action_routes(app: Flask) -> None:
+    """Bind the apply/reject routes for actions the assistant has drafted."""
     @app.post("/api/assistant/actions/<action_id>/apply")
     def apply_assistant_action(action_id: str):
         repo = get_repository(app)

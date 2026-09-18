@@ -15,6 +15,12 @@ STATUS_FILENAME = "status.json"
 
 
 class RunState(str, enum.Enum):
+    """The states a run passes through, as persisted in ``status.json``.
+
+    String-valued because the value is the on-disk representation; renaming a
+    member breaks every status file already written.
+    """
+
     PENDING = "pending"
     RUNNING = "running"
     FINALIZING = "finalizing"

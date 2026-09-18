@@ -70,16 +70,19 @@ class SourceManifest:
 
     @property
     def language(self) -> str:
+        """Language of the primary target, "unknown" for an empty manifest."""
         p = self._primary
         return p.language if p else "unknown"
 
     @property
     def category(self) -> str | None:
+        """Category of the primary target, None for an empty manifest."""
         p = self._primary
         return p.category if p else None
 
     @property
     def frameworks(self) -> list[str]:
+        """Frameworks of the primary target, empty for an empty manifest."""
         p = self._primary
         return p.frameworks if p else []
 

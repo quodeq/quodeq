@@ -84,7 +84,7 @@ function RepoScanFooterActions({ sub, state, handleSubmit, onContinue, folderBro
   );
 }
 
-export default function RepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan, onContinue, onCancel, stepIndex = 0, stepTotal = 0 }) {
+export default function RepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan, onContinue, stepIndex = 0, stepTotal = 0 }) {
   const sub = state.repoScanSubState;
   const {
     folderBrowserOpen, setFolderBrowserOpen,

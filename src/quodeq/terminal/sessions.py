@@ -34,6 +34,9 @@ def shell_name() -> str:
 
 
 class TerminalSession:
+    """One tab: a PTY manager, its display name and the lock guarding its
+    single WS reader."""
+
     def __init__(self, sid: str, name: str, manager: TerminalManager, ordinal: int = 0):
         self.id = sid
         self.name = name
@@ -45,6 +48,9 @@ class TerminalSession:
         self.created_at = time.time()
 
     def to_dict(self) -> dict:
+        """Wire shape for the tab strip. ``cwd`` is the shell's current
+        directory with $HOME collapsed to ``~``, or None when the PTY is
+        gone."""
         cwd = child_cwd(self.manager.pid)
         home = os.path.expanduser("~")
         if cwd and home != "~" and (cwd == home or cwd.startswith(home + os.sep)):
@@ -59,6 +65,12 @@ class TerminalSession:
 
 
 class TerminalSessionRegistry:
+    """Server-side source of truth for the open terminal tabs.
+
+    Every mutation takes ``_lock``, so create/kill races between the HTTP
+    routes and the WS handlers can't leave a half-registered PTY behind.
+    """
+
     MAX_SESSIONS = 6
 
     def __init__(self, *, manager_factory=TerminalManager):
@@ -89,6 +101,7 @@ class TerminalSessionRegistry:
         return session
 
     def get(self, sid: str) -> TerminalSession | None:
+        """Look up a session by id. None once it has been killed."""
         with self._lock:
             return self._sessions.get(sid)
 
@@ -103,6 +116,8 @@ class TerminalSessionRegistry:
             return self._create_locked() or next(iter(self._sessions.values()))
 
     def list(self) -> list[dict]:
+        """Snapshot every session as a wire dict. The client reconciles its
+        tab strip against this instead of keeping its own list."""
         with self._lock:
             sessions = list(self._sessions.values())
         return [s.to_dict() for s in sessions]
@@ -117,6 +132,8 @@ class TerminalSessionRegistry:
         return True
 
     def kill_all(self) -> None:
+        """Empty the registry and kill every PTY. Called on server shutdown
+        so no shell outlives the process."""
         with self._lock:
             sessions = list(self._sessions.values())
             self._sessions.clear()
@@ -137,5 +154,6 @@ class TerminalSessionRegistry:
 
     @property
     def any_alive(self) -> bool:
+        """True while at least one PTY is still running."""
         with self._lock:
             return any(s.manager.alive for s in self._sessions.values())

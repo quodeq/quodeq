@@ -25,6 +25,9 @@ class TurnCancelled(Exception):
 
 
 class CancelToken:
+    """One turn's stop signal: a flag adapters poll plus kill hooks that
+    interrupt whatever blocking external the turn is parked on."""
+
     def __init__(self) -> None:
         self._event = threading.Event()
         self._lock = threading.Lock()
@@ -32,9 +35,11 @@ class CancelToken:
 
     @property
     def cancelled(self) -> bool:
+        """True once ``cancel`` has run. Polled at adapter loop boundaries."""
         return self._event.is_set()
 
     def wait(self, timeout: float | None = None) -> bool:
+        """Block until cancelled or *timeout* elapses. False on timeout."""
         return self._event.wait(timeout)
 
     def cancel(self) -> None:

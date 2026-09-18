@@ -134,6 +134,13 @@ class EvidenceScoreRequest:
 
 @dataclass(frozen=True)
 class EvidenceRescore:
+    """Return shape of ``rescore_dimension_from_evidence``.
+
+    ``result`` is None when the caller should fall back to the stored scan
+    score; ``excluded`` is the violation count the suppressions removed and is
+    meaningful even then.
+    """
+
     result: ScoringResult | None
     excluded: int
 

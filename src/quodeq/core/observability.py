@@ -19,33 +19,48 @@ class LogSink(Protocol):
     collapsing it into ``info`` would lose that on the CLI.
     """
 
-    def info(self, message: str) -> None: ...
+    def info(self, message: str) -> None:
+        """Report normal progress an operator watching the run would want."""
+        ...
 
-    def warning(self, message: str) -> None: ...
+    def warning(self, message: str) -> None:
+        """Report something the run recovered from and carried on past."""
+        ...
 
-    def debug(self, message: str) -> None: ...
+    def debug(self, message: str) -> None:
+        """Report diagnostic detail. Sinks are free to drop it entirely."""
+        ...
 
-    def error(self, message: str) -> None: ...
+    def error(self, message: str) -> None:
+        """Report a failure the caller has already dealt with; this does not raise."""
+        ...
 
-    def success(self, message: str) -> None: ...
+    def success(self, message: str) -> None:
+        """Report a completed step. Console sinks render these in green."""
+        ...
 
 
 class NullLog:
     """A :class:`LogSink` that discards every message. The safe default."""
 
     def info(self, message: str) -> None:
+        """Discard the message."""
         pass
 
     def warning(self, message: str) -> None:
+        """Discard the message."""
         pass
 
     def debug(self, message: str) -> None:
+        """Discard the message."""
         pass
 
     def error(self, message: str) -> None:
+        """Discard the message. Nothing is recorded, not even failures."""
         pass
 
     def success(self, message: str) -> None:
+        """Discard the message."""
         pass
 
 

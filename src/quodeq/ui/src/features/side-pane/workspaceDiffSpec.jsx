@@ -1,4 +1,3 @@
-import React from 'react';
 import { WorkspaceDiffPanel } from '../assistant/WorkspaceDiffPanel.jsx';
 import { t } from '../../strings/index.js';
 

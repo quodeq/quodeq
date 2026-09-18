@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildRows, buildDimensionGroup, buildPrincipleRow, comparator, getSortValue,
+  buildRows, buildDimensionGroup, comparator, getSortValue,
   DEFAULT_SEVERITY, newPrincipleEntry, flattenAndSort,
 } from './dimensionHeatGridModel.js';
 

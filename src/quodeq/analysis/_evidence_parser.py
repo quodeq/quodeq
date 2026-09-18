@@ -18,10 +18,14 @@ from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_fin
 
 
 def parse_evidence_from_jsonl(
-    config: RunConfig, dimension: str, ctx: _AnalysisContext,
+    config: RunConfig, ctx: _AnalysisContext,
     jsonl_file: Path, files_read: int,
 ) -> Evidence | None:
-    """Parse a JSONL file into Evidence."""
+    """Parse a JSONL file into Evidence.
+
+    The dimension name comes from the judgments in *jsonl_file*, not from the
+    caller.
+    """
     # File existence check is necessary — evidence may not exist yet for new dimensions.
     if not jsonl_file.exists() or jsonl_file.stat().st_size == 0:
         return None

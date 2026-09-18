@@ -113,8 +113,6 @@ function AccumulatedOverviewSections({
         accumulated={filteredAccumulated}
         scoreDelta={filteredStats.scoreDelta}
         lastDate={filteredStats.lastRun.date}
-        accumulatedDimensions={filteredDimensions}
-        projectName={data.selectedProject}
         projectInfo={data.projectInfo}
         onCardNavigate={onCardNavigate}
         selectedSource={data.selectedSource}
@@ -148,7 +146,7 @@ function AccumulatedOverviewSections({
 
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onNavigate } = callbacks;
-  const { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends } = useAccumulatedComputations(data);
+  const { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends } = useAccumulatedComputations(data);
 
   const topFiles = useMemo(
     () => withDimensionsStr(buildTopOffendingFiles(filteredDimensions || [])),

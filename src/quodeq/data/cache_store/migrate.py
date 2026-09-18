@@ -34,7 +34,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from quodeq.data.cache_store._migrate_params import (
-    derive_params_hash,  # noqa: F401 -- re-export for existing importers
+    derive_params_hash,  # re-export for existing importers
 )
 from quodeq.data.cache_store.entry import ENTRY_FORMAT_VERSION, CacheEntry
 from quodeq.data.cache_store.index import ContentIndex
@@ -53,11 +53,14 @@ _ready_memo: set[tuple[str, int]] = set()
 
 
 def ready_marker(root: Path) -> Path:
+    """Path of the sentinel written once *root* is fully migrated and indexed."""
     return root / f".schema_{SCHEMA_VERSION}_ready"
 
 
 @dataclass(frozen=True)
 class MigrationStats:
+    """Per-walk tally returned by ``migrate_entries``, for the log line."""
+
     migrated: int = 0
     deduplicated: int = 0
     indexed: int = 0

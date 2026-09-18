@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 
-// Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
-// the 409 same-uuid collision case.
+/**
+ * Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
+ * the 409 same-uuid collision case.
+ */
 export function usePullToLocal({ shared, onProjectsReload }) {
   const { showToast } = useSidePane();
   const [pullConflictId, setPullConflictId] = useState(null);

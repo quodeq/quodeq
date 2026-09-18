@@ -22,6 +22,11 @@ _TIMEOUT = 2.0
 
 @dataclass
 class LatestInfo:
+    """One release as ``fetch_latest`` saw it, ready to fold into ``UpdateState``.
+
+    ``not_modified`` means the ETag matched and no other field is meaningful.
+    """
+
     version: str | None = None
     url: str | None = None
     download_url: str | None = None
@@ -67,6 +72,14 @@ def _pick_download_url(release: dict, channel: str, platform: str) -> str | None
 def fetch_latest(
     channel: str, etag: str | None = None, platform: str | None = None
 ) -> LatestInfo | None:
+    """Ask GitHub for the latest release, returning None on any failure.
+
+    Passing the stored *etag* turns an unchanged release into a cheap 304 and a
+    ``not_modified`` result. On the wheel channel the version is then corrected
+    against PyPI, since a tag can exist before the upload lands; if that lookup
+    fails the GitHub tag stands. *platform* defaults to ``sys.platform`` and
+    only selects which frozen-app asset becomes ``download_url``.
+    """
     headers = {"User-Agent": _user_agent(), "Accept": "application/vnd.github+json"}
     if etag:
         headers["If-None-Match"] = etag

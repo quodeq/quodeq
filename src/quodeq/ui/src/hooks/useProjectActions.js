@@ -34,6 +34,12 @@ function makeFail(onError) {
   };
 }
 
+/**
+ * Builds the delete handler. It moves the selection to another project when
+ * the deleted one was selected, then reloads the list.
+ *
+ * @returns {(projectId: string) => Promise<{ok: boolean, messageKey?: string, vars?: object}>}
+ */
 export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
   return async function handleDeleteProject(projectId) {
     try {
@@ -156,6 +162,13 @@ function makeHandleImportProject({ importProject, loadProjects, fail }) {
   };
 }
 
+/**
+ * The project delete/export/relocate/import handlers, wired to the API client
+ * from context.
+ *
+ * Each handler resolves to `{ ok }` rather than throwing, and reports failures
+ * through `onError(messageKey, vars)` so the caller owns how they are shown.
+ */
 export function useProjectActions(
   { projects, selectedProject, handleProjectChange, loadProjects },
   { onError = () => {} } = {},

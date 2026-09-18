@@ -19,7 +19,7 @@ from quodeq.services.project_registration import mark_onboarding_complete, regis
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url
 
-from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, _build_evaluate_cmd  # noqa: F401 — re-export
+from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, _build_evaluate_cmd  # re-export
 from quodeq.services._evaluation_env import build_eval_env
 from quodeq.services._run_discard import (  # noqa: F401 — re-export
     _CacheEraser,
@@ -67,10 +67,10 @@ class FsEvaluationMixin:
         return SubprocessDispatcher(self._jobs)
 
     @staticmethod
-    def _build_eval_env(repo: str, options: EvaluationOptions, env: dict[str, str] | None = None) -> dict[str, str]:
+    def _build_eval_env(options: EvaluationOptions, env: dict[str, str] | None = None) -> dict[str, str]:
         """Build the subprocess environment for an evaluation run."""
         return build_eval_env(
-            repo, options, env,
+            options, env,
             ai_cmd=options.ai_cmd or get_ai_cmd(),
             ai_model=options.ai_model or get_ai_model(),
         )
@@ -103,7 +103,7 @@ class FsEvaluationMixin:
         # Guard with hasattr so custom/stub job managers remain compatible.
         if hasattr(self._jobs, "set_reports_root"):
             self._jobs.set_reports_root(Path(reports_dir))
-        env = self._build_eval_env(repo, options)
+        env = self._build_eval_env(options)
         # For files, walk up to find git root; for dirs, use as-is
         if resolved.is_file():
             candidate = resolved.parent
@@ -128,14 +128,13 @@ class FsEvaluationMixin:
         When a ``get_status_fn`` was injected at construction time, delegates
         to that function (allows a composing host to supply a richer lookup,
         e.g. via ``EvaluationsIndex``, without MRO coupling).  Otherwise falls
-        back to ``JobManager.get_job`` which handles the ``ext-`` prefix via
-        the filesystem.
+        back to ``JobManager.get_job``, which only knows in-memory jobs and
+        returns None for an ``ext-`` id.
         """
         fn = getattr(self, "_get_status_fn", None)
         if fn is not None:
             return fn(job_id, reports_dir=reports_dir)
-        reports_root = Path(reports_dir) if reports_dir else None
-        return self._jobs.get_job(job_id, reports_root=reports_root)
+        return self._jobs.get_job(job_id)
 
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,

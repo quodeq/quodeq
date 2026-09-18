@@ -188,8 +188,12 @@ class SubagentPool:
 
     @staticmethod
     def deduplicate_jsonl(jsonl_path: Path) -> int:
+        """Rewrite *jsonl_path* without duplicate findings. Returns the number
+        of lines dropped."""
         return deduplicate_jsonl(jsonl_path)
 
     @staticmethod
     def merge_jsonl(results: list[SubagentResult], output: Path) -> Path:
+        """Concatenate every agent's JSONL into *output*, deduplicating as it
+        goes. Returns *output*."""
         return merge_jsonl((r.jsonl_file for r in results), output)

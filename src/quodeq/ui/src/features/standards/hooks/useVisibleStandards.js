@@ -52,6 +52,14 @@ function makeRemove(setVisibleIds, persist) {
   };
 }
 
+/**
+ * The set of standards the user has left visible, with add/remove/toggle.
+ *
+ * Membership tests are case-insensitive: the server lowercases stored ids but
+ * imported ids are not charset-constrained, so a raw comparison would read a
+ * visible standard as hidden. Changes are persisted and, with a `projectId`,
+ * mirrored to that project's server-side visibility file.
+ */
 export function useVisibleStandards({ storage = localStorage, projectId = null } = {}) {
   const [visibleIds, setVisibleIds] = useState(() => readVisibleStandardIds(storage));
   const queryClient = useQueryClient();

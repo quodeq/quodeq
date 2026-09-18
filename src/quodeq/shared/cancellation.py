@@ -26,9 +26,11 @@ class CancellationToken:
         self._reason: str | None = None
 
     def get_event(self) -> threading.Event:
+        """Return the underlying event, for callers that want to block on it instead of poll."""
         return self._event
 
     def is_cancelled(self) -> bool:
+        """Return True once cancellation has been requested. Cheap enough for tight poll loops."""
         return self._event.is_set()
 
     def request_cancel(self, reason: str | None = None) -> None:
@@ -47,6 +49,7 @@ class CancellationToken:
         return self._reason
 
     def reset(self) -> None:
+        """Clear the flag and the recorded reason so the token can be reused."""
         self._reason = None
         self._event.clear()
 
@@ -55,20 +58,25 @@ _DEFAULT = CancellationToken()
 
 
 def get_event() -> threading.Event:
+    """Return the process-wide token's event."""
     return _DEFAULT.get_event()
 
 
 def is_cancelled() -> bool:
+    """Return True once the process-wide token has been cancelled."""
     return _DEFAULT.is_cancelled()
 
 
 def request_cancel(reason: str | None = None) -> None:
+    """Cancel the process-wide token. Called from the SIGTERM/SIGINT handler."""
     _DEFAULT.request_cancel(reason)
 
 
 def cancel_reason() -> str | None:
+    """Return the reason recorded on the process-wide token, if any."""
     return _DEFAULT.cancel_reason()
 
 
 def reset() -> None:
+    """Clear the process-wide token. Mainly for tests reusing one interpreter."""
     _DEFAULT.reset()

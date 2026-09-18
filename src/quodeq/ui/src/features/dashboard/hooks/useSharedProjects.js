@@ -128,6 +128,14 @@ function useBackgroundRevalidate(listQuerySuccess, refresh) {
   }, [listQuerySuccess, refresh]);
 }
 
+/**
+ * The shared-repo screen's data and actions: whether sharing is configured,
+ * the remote project list and its freshness, plus connect, refresh and pull.
+ *
+ * A refresh is one POST followed by a re-list, coalesced so concurrent callers
+ * share a single round; a failed round marks the list stale rather than
+ * rejecting, so the toolbar shows "stale" instead of an error.
+ */
 export function useSharedProjects() {
   const { getSharedStatus, sharedListProjects, connectShared, refreshShared, pullSharedProject } = useApi();
   const queryClient = useQueryClient();

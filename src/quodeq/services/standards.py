@@ -76,7 +76,7 @@ class StandardsService:
 
     def duplicate_standard(self, standard_id: str, new_id: str) -> StandardDetail:
         """Clone an existing standard under a new ID."""
-        return duplicate(new_id=new_id, standard_id=standard_id,
+        return duplicate(new_id=new_id,
                          source_detail=self.get_standard(standard_id),
                          evaluators_dir=self._evaluators_dir,
                          store=self._store)

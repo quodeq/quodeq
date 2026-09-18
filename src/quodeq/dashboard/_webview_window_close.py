@@ -48,7 +48,7 @@ def _alert_return_to_choice(ret: int, first: int, second: int) -> str:
     return "stay"
 
 
-def _macos_confirm_close(window: object) -> str:
+def _macos_confirm_close(_window: object) -> str:
     """Show the macOS 3-button close dialog and return 'keep', 'cancel', or 'stay'.
 
     Runs the modal on the GUI/main thread (``NSAlert.runModal`` requires it) via
@@ -57,8 +57,9 @@ def _macos_confirm_close(window: object) -> str:
     the GUI thread. Falls back to 'keep' if AppKit is unavailable or the alert
     fails, so the user is never trapped. No-op ('keep') off macOS.
 
-    The alert is app-modal (not sheeted on the window), so *window* is accepted
-    only for call-site symmetry with the 2-button branch and is unused here.
+    The alert is app-modal (not sheeted on the window), so the window argument
+    is accepted only for call-site symmetry with the 2-button branch and is
+    unused here.
     """
     if sys.platform != "darwin":
         return "keep"

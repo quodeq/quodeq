@@ -143,6 +143,7 @@ def _workspace_discard(app: Flask, sid: str):
 
 
 def register_assistant_workspace_routes(app: Flask) -> None:
+    """Bind the routes over an assistant session's worktree: status, diff, apply, PR, discard."""
     @app.get("/api/assistant/sessions/<sid>/workspace")
     def assistant_workspace_status(sid: str):
         return _workspace_status(app, sid)

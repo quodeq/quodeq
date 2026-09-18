@@ -148,6 +148,10 @@ def _unpack(blob: bytes) -> list[float]:
 
 
 def stored_fingerprints(conn: sqlite3.Connection) -> set[str]:
+    """Return the fingerprints already embedded, so callers skip re-embedding them.
+
+    One full scan of ``vectors``, fingerprints only — the blobs stay on disk.
+    """
     return {row[0] for row in conn.execute("SELECT fingerprint FROM vectors")}
 
 
@@ -218,6 +222,11 @@ def try_claim_backfill(conn: sqlite3.Connection) -> bool:
 
 
 def release_backfill_claim(conn: sqlite3.Connection) -> None:
+    """Drop the backfill claim so the next process can take it.
+
+    Swallows database errors: a claim left behind is stolen once it goes
+    stale, so failing to release is never fatal.
+    """
     try:
         conn.execute("DELETE FROM meta WHERE key = 'backfill_claim'")
         conn.commit()

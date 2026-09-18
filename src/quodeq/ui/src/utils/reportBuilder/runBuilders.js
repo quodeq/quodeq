@@ -8,6 +8,11 @@ import {
 } from './dimensionSummary.js';
 import { formatPrincipleTable } from './shared.js';
 
+/**
+ * The full Markdown report for one dimension of one run.
+ *
+ * @returns {string}
+ */
 export function buildDimensionReport({ evalData, principleGrades, allViolations, overallGrade, dateLabel, runId }) {
   const dim = (evalData?.dimension || 'unknown').toLowerCase();
   const score = overallGrade?.score || '—';
@@ -40,6 +45,12 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
   return lines.join('\n');
 }
 
+/**
+ * The full Markdown report for a project's accumulated scores, across every
+ * dimension.
+ *
+ * @returns {string}
+ */
 export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
   const summary = accumulated?.summary || {};
   const score = summary.numericAverage != null ? `${Math.round(summary.numericAverage * 10) / 10}/10` : '—';
@@ -61,6 +72,11 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
   return lines.join('\n');
 }
 
+/**
+ * The full Markdown report for a single run, dimension by dimension.
+ *
+ * @returns {string}
+ */
 export function buildRunReport({ dashboard, runSummary, projectName }) {
   const dimensions = dashboard?.dimensions || [];
   const selectedRun = dashboard?.selectedRun || {};

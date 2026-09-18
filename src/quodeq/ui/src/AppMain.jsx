@@ -56,7 +56,6 @@ function AppSidebar({ shell }) {
       {...buildSidebarProps({
         activeTab,
         navTab,
-        projectsCount: state.projects.length,
         selectedSource: state.selectedSource,
         hasCurrentProjectRuns,
         sharedProjectInfo: state.sharedProjectInfo,
@@ -83,7 +82,6 @@ function AppTopBar({ shell }) {
     <TopBar
       {...buildTopBarProps({
         resolvedDisplayName,
-        activeTab,
         serverConnected: state.serverConnected,
         sidebarProvider,
         sidebarModel,

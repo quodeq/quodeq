@@ -29,13 +29,13 @@ class TestCleanupCloneFailSoft:
         events_called = []
         monkeypatch.setattr(
             hook, "project_events",
-            lambda job_id, job, reports: events_called.append((job_id, job, reports)),
+            lambda job, reports: events_called.append((job, reports)),
         )
         job = _Job("proj-uuid", "run-1")
 
         hook("job-1", job)  # must not raise
 
-        assert events_called == [("job-1", job, tmp_path)]
+        assert events_called == [(job, tmp_path)]
 
     def test_cleanup_clone_failure_is_logged_with_job_id(self, tmp_path: Path, monkeypatch, caplog):
         hook = PostRunHook(reports_root=tmp_path)
@@ -60,11 +60,11 @@ class TestCleanupCloneFailSoft:
         events_called = []
         monkeypatch.setattr(
             hook, "project_events",
-            lambda job_id, job, reports: events_called.append((job_id, job, reports)),
+            lambda job, reports: events_called.append((job, reports)),
         )
         job = _Job("proj-uuid", "run-1")
 
         hook("job-1", job)
 
         assert cleanup_calls == [("proj-uuid", tmp_path)]
-        assert events_called == [("job-1", job, tmp_path)]
+        assert events_called == [(job, tmp_path)]

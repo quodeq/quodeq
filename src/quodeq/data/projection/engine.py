@@ -1,3 +1,4 @@
+"""Event replay into the state store: full rebuild, incremental update, actions fold."""
 from __future__ import annotations
 
 import logging

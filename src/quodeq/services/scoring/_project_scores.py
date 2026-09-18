@@ -64,7 +64,7 @@ def _resolve_accumulated(
         # the cache for parents to avoid serving stale data.
         return _compute_accumulated_payload(req, rescore_complete)
     acc_version = accumulated_cache_version(
-        req.reports_root / req.project, req.params,
+        req.params,
         per_run_versions(req.reports_root / req.project, req.project, req.params,
                          [(r.run_id, r.status) for r in all_runs]),
         req.as_of,

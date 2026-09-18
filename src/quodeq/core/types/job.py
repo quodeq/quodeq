@@ -1,3 +1,4 @@
+"""Read-side shape of a background evaluation job."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -5,6 +6,13 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class JobSnapshot:
+    """One background job frozen at the moment it was read.
+
+    Built by ``data.mappers.parse_job_snapshot`` from the job store's wire
+    dict and handed to the API and CLI. A running job's fields go stale as
+    soon as the snapshot is taken; poll again rather than caching it.
+    """
+
     job_id: str
     status: str
     command: str = ""

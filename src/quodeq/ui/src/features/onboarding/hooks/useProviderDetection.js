@@ -10,6 +10,15 @@ function rank(results) {
     .sort((a, b) => PRIORITY.indexOf(a.id) - PRIORITY.indexOf(b.id));
 }
 
+/**
+ * Detects which providers are usable on this machine and picks the best one to
+ * preselect in the wizard.
+ *
+ * `status` moves from 'detecting' to 'detected', 'none' or 'error'. Results
+ * arriving after unmount are dropped.
+ *
+ * @returns {{status: string, results: object[], preselection: {id: string, classification: string, model: string|null}|null}}
+ */
 export function useProviderDetection() {
   const [status, setStatus] = useState('detecting');
   const [results, setResults] = useState([]);

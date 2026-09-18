@@ -116,7 +116,7 @@ function computeTarget({ nav, scene, size, camRef, fz }) {
 /**
  * Manages camera state, target computation, and the animation loop for GalaxyView.
  */
-export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedNavRef, savedCamRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef }) {
+export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedCamRef, navRef, prevNavRef, animRef, mouseRef, hoveredRef, focusedIdxRef, frameRef }) {
   const camRef = useRef(savedCamRef.current ? { ...savedCamRef.current } : null);
   const frameCount = useRef(0);
   const timeRef = useRef(0);

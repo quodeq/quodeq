@@ -23,7 +23,7 @@ from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.suppression_keys import SuppressionKeys, as_dismissed_keys
-from quodeq.services._run_version_memo import (  # noqa: F401 — facade re-export
+from quodeq.services._run_version_memo import (  # facade re-export
     memoized_run_version,
     remember_run_version,
     suppression_state_fingerprint as _state_fingerprint,
@@ -122,7 +122,7 @@ def run_scoped_version(
 
 
 def accumulated_cache_version(
-    project_dir: Path, params: ScoringParams,
+    params: ScoringParams,
     run_versions: list[tuple], as_of: str | None,
     visible_dims: tuple[str, ...] | None = None,
 ) -> str:
@@ -226,6 +226,7 @@ class VersionInputs:
     def of(
         cls, params: ScoringParams, dismissed: "DismissedKeys | set[tuple]", deleted: set[tuple],
     ) -> "VersionInputs":
+        """Bundle the inputs and compute the fingerprint once, for reuse across every run."""
         return cls(params, dismissed, deleted, suppression_state_fingerprint(params, dismissed, deleted))
 
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import AssistantHeader from '../assistant/AssistantHeader.jsx';

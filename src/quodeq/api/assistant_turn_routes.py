@@ -1,17 +1,19 @@
 """Turn lifecycle routes for the embedded assistant: post message, stop, SSE
 event stream.
 
-Split out of assistant_routes.py (Task 10). ``_api_provider``,
-``_turn_endpoint``, ``run_turn``, and ``build_tool_context`` are looked up on
-the ``assistant_routes`` facade at call time (rather than imported directly
-here) so that tests patching "quodeq.api.assistant_routes.get_provider_
-configs" / "...run_turn" / "...build_tool_context" keep working after the
-split.
+Split out of assistant_routes.py (Task 10). The provider lookup, the endpoint
+resolver, the shared-clone gate and the turn/tool-context entry points are
+injected by the registrar (``TurnGates``): they live in ``assistant_routes``
+so tests patching "quodeq.api.assistant_routes.get_provider_configs" /
+"...run_turn" / "...build_tool_context" keep working, and this module never
+imports that facade.
 """
 from __future__ import annotations
 
 import json
 import threading
+from dataclasses import dataclass
+from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
@@ -26,23 +28,35 @@ from quodeq.api.assistant_turn_state import AssistantTurnState, _turn_state
 from quodeq.api.helpers import json_error
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest
+from quodeq.assistant.tools import ToolContext
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 
+@dataclass(frozen=True)
+class TurnGates:
+    """Facade entry points a turn needs, supplied by the registering facade."""
+
+    api_provider: Callable[[str], dict | None]
+    turn_endpoint: Callable[[str, dict, dict], tuple[str, str | None]]
+    shared_source_error: Callable[[], tuple[Response, int] | None]
+    run_turn: Callable[..., None]
+    build_tool_context: Callable[[Flask, dict], ToolContext]
+
+
 def _start_turn_worker(state: AssistantTurnState, turn: TurnRequest,
-                       repo, tool_ctx, cancel: CancelToken) -> None:
+                       repo, tool_ctx, cancel: CancelToken,
+                       run_turn: Callable[..., None]) -> None:
     """Run the turn on a daemon thread, freeing the session's turn slot when it
     ends however it ends. Takes *state* directly: the worker thread has no app
     context, so it cannot resolve current_app."""
     def _worker():
-        from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
         try:
             if tool_ctx.score_cache_path is not None:
                 with score_cache_path_override(tool_ctx.score_cache_path):
-                    _assistant_routes.run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+                    run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
             else:
-                _assistant_routes.run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+                run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
         finally:
             state.release_turn(turn.session_id)
 
@@ -94,11 +108,11 @@ def _sse_event_generator(repo, sid: str, after: int):
             yield sse_line(json.dumps(frame, ensure_ascii=False), event_id=seq)
 
 
-def _build_turn_request(sid: str, session: dict, body: dict, text: str) -> TurnRequest:
+def _build_turn_request(sid: str, session: dict, body: dict, text: str,
+                        gates: TurnGates) -> TurnRequest:
     """Resolve the provider endpoint and assemble the TurnRequest for *sid*."""
-    from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
-    provider_cfg = _assistant_routes._api_provider(session["provider"]) or {}
-    api_base, api_key = _assistant_routes._turn_endpoint(session["provider"], body, provider_cfg)
+    provider_cfg = gates.api_provider(session["provider"]) or {}
+    api_base, api_key = gates.turn_endpoint(session["provider"], body, provider_cfg)
     return TurnRequest(
         session_id=sid, text=text, ui_state=body.get("uiState"),
         api_base=api_base,
@@ -110,8 +124,7 @@ def _build_turn_request(sid: str, session: dict, body: dict, text: str) -> TurnR
     )
 
 
-def _post_assistant_message(app: Flask, sid: str):
-    from quodeq.api import assistant_routes as _assistant_routes  # noqa: PLC0415 — deferred: see module docstring
+def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
     repo = get_repository(app)
     session = repo.get_session(sid)
     if session is None:
@@ -123,7 +136,7 @@ def _post_assistant_message(app: Flask, sid: str):
     if local_provider_busy(session["provider"]):
         return json_error("model busy with analysis", 409, "PROVIDER_BUSY")
     if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
-        shared_error = _assistant_routes._shared_source_error()
+        shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error
     state = _turn_state(app)
@@ -135,9 +148,9 @@ def _post_assistant_message(app: Flask, sid: str):
     # up) leaves `sid` claimed forever and every future POST to this
     # session 409s permanently.
     try:
-        turn = _build_turn_request(sid, session, body, text)
-        tool_ctx = _assistant_routes.build_tool_context(app, session)
-        _start_turn_worker(state, turn, repo, tool_ctx, cancel)
+        turn = _build_turn_request(sid, session, body, text, gates)
+        tool_ctx = gates.build_tool_context(app, session)
+        _start_turn_worker(state, turn, repo, tool_ctx, cancel, gates.run_turn)
     except SharedSourceUnavailable:
         # Race between the pre-check above and this build_tool_context
         # call. Constant body, not str(exc): the pre-check already
@@ -194,10 +207,11 @@ def _assistant_events(app: Flask, sid: str):
     return resp
 
 
-def register_assistant_turn_routes(app: Flask) -> None:
+def register_assistant_turn_routes(app: Flask, gates: TurnGates) -> None:
+    """Bind the turn routes: post message, stop, SSE event stream."""
     @app.post("/api/assistant/sessions/<sid>/messages")
     def post_assistant_message(sid: str):
-        return _post_assistant_message(app, sid)
+        return _post_assistant_message(app, sid, gates)
 
     @app.post("/api/assistant/sessions/<sid>/stop")
     def stop_assistant_turn(sid: str):

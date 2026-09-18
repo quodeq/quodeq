@@ -30,6 +30,14 @@ function buildAndSubmit(onStart, formState) {
   }
 }
 
+/**
+ * The full Evaluate form: repo path, folder browser, branch and scope,
+ * dimension selection, clean-scan mode and submit.
+ *
+ * Changing the repo clears the branch and scope, since neither is meaningful
+ * against a different checkout. Submitting with standards available but none
+ * selected reports through `onValidationFail` instead of starting.
+ */
 export function useEvaluationForm(onStart, onValidationFail) {
   const [repo, setRepo] = useState('');
   const { allDimensions, dimLoadError } = usePluginDimensions();

@@ -38,6 +38,12 @@ function buildFileViolationsSection(file, severityFilter) {
   return lines;
 }
 
+/**
+ * The full Markdown report for one file. `severityFilter` narrows it to what
+ * the user is currently looking at, so the report matches the screen.
+ *
+ * @returns {string}
+ */
 export function buildFileReport(file, severityFilter) {
   const filePath = file?.file || 'unknown';
   const totalViolations = file?.total || 0;

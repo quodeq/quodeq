@@ -93,7 +93,7 @@ export function buildDimensionMatrixRows(view, onOpenProject, onOpenPrinciple) {
 }
 
 export default function CompareDimensionView({
-  view, board, fleet, onOpenDimension, onOpenProject, onOpenPrinciple,
+  view, board, onOpenDimension, onOpenProject, onOpenPrinciple,
   onOpenProjectDimension,
 }) {
   // The radar plots leader/trailer/average by default (all N polygons would
