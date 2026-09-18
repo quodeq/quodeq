@@ -66,10 +66,18 @@ class _IncrementalProgressReader:
             log_debug(f"Failed to read JSONL {self._jsonl_file}: {exc}")
 
     def _count_evidence_line(self, line: str) -> None:
+        """Count one JSONL line, and only if it is a finding.
+
+        The evidence log interleaves findings with per-file bookkeeping
+        markers (``{"_marker": "file_done", ...}``), which carry no ``t``.
+        Counting those inflated ``evidence`` by one per analysed file, so the
+        heartbeat's "N findings" grew with the scan and never agreed with the
+        violations and compliances printed beside it. Counting after the type
+        check keeps evidence == violations + compliances by construction.
+        """
         stripped = line.strip()
         if not stripped:
             return
-        self._jsonl_count += 1
         try:
             t = _json.loads(stripped).get("t", "")
         except (ValueError, AttributeError):
@@ -78,3 +86,6 @@ class _IncrementalProgressReader:
             self._violations += 1
         elif t == _TYPE_COMPLIANCE:
             self._compliances += 1
+        else:
+            return
+        self._jsonl_count += 1
