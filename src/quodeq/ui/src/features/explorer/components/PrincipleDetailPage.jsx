@@ -154,6 +154,7 @@ function PrincipleDetailBody({
           scrollElement={scrollElement}
           estimateSize={estimateItemSize(items)}
           getItemKey={itemKey(items)}
+          label={t('explorer.violationsListAria')}
           renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
         />
       </DeferredMount>

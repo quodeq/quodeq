@@ -43,4 +43,9 @@ describe('PrincipleDetailPage dismiss-button gating', () => {
     renderPage(undefined);
     expect(screen.queryByRole('button', { name: /dismiss this finding/i })).toBeNull();
   });
+
+  it('names the virtualized violations list for assistive tech', () => {
+    renderPage(vi.fn());
+    expect(screen.getByRole('list', { name: 'Violations' })).toBeInTheDocument();
+  });
 });
