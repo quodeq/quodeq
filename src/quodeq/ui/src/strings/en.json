@@ -1481,5 +1481,6 @@
   "heatGrid.severityCellAria": "{severity}: {count} violations in {label}",
   "heatGrid.severityCellAriaOne": "{severity}: 1 violation in {label}",
   "heatGrid.violationsCellAriaOne": "1 violation in {label}, open details",
-  "heatGrid.unnamedRow": "row"
+  "heatGrid.unnamedRow": "row",
+  "map.galaxyKbdFolderItem": "Folder {name}"
 }

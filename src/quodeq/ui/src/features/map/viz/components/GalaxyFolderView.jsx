@@ -15,15 +15,18 @@ import { t } from '../../../../strings/index.js';
 // the page's tab order.
 const GALAXY_KBD_MAX = 100;
 
-/** Keyboard-reachable stand-ins for the stars the canvas hit-tests. Each
- * item carries the star's path, which is what activateStar resolves on. */
+/** Keyboard-reachable stand-ins for the stars the canvas hit-tests. Each item
+ * carries the star's path, which is what activateStar resolves on: a star with
+ * neither path nor name is skipped, since no key would ever match it. */
 function starItems(scene, activateStar) {
   const stars = (scene?.rootStars || []).slice(0, GALAXY_KBD_MAX);
-  return stars.map((s, i) => {
-    const key = s.path || s.name || String(i);
+  return stars.filter((s) => s.path || s.name).map((s) => {
+    const key = s.path || s.name;
     return {
       key,
-      text: t('map.riskBubbleAria', { file: s.name, count: s.violations || 0 }),
+      text: s.isFolder
+        ? t('map.galaxyKbdFolderItem', { name: s.name })
+        : t('map.riskBubbleAria', { file: s.name, count: s.violations || 0 }),
       onActivate: () => activateStar(key),
     };
   });

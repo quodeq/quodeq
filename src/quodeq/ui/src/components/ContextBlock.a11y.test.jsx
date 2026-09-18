@@ -27,4 +27,17 @@ describe('ContextBlock violation line non-color marker', () => {
     expect(hlLine).not.toBeNull();
     expect(hlLine.textContent.startsWith('Violation on this line:')).toBe(true);
   });
+
+  it('keeps a 5-digit line number intact next to the marker', () => {
+    // The marker used to be a 12px inline-block inside the 48px gutter, which
+    // left too little room for five digits.
+    const { container } = render(<ContextBlock context={context} line={10042} />);
+    fireEvent.click(screen.getByText(/See code/));
+
+    const gutters = [...container.querySelectorAll('.ctx-gutter')];
+    const numbers = gutters.map((g) => g.textContent.replace('Violation on this line:', '').replace('▸', ''));
+    expect(numbers).toEqual(['10037', '10038', '10039']);
+    const marker = container.querySelector('.ctx-line--hl .context-line__marker');
+    expect(marker.parentElement.classList.contains('ctx-gutter')).toBe(true);
+  });
 });

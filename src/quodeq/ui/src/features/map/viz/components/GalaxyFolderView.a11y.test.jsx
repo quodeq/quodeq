@@ -78,9 +78,17 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
     expect(screen.getByRole('button', { name: 'b.js: 1 violations' })).toBeInTheDocument();
   });
 
-  it('lists the folder stars too, since they are hit-tested as well', () => {
+  it('lists the folder stars too, named as folders rather than reusing the file wording', () => {
     renderView();
-    expect(screen.getByRole('button', { name: 'src: 0 violations' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Folder src' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'src: 0 violations' })).toBeNull();
+  });
+
+  it('skips a star with neither path nor name, which activateStar could never resolve', () => {
+    const node = { ...NODE, children: [...NODE.children, { ...file('', 1), name: '', path: '' }] };
+    renderView({ node });
+    const group = screen.getByLabelText('Contents of this folder');
+    expect(group.querySelectorAll('button')).toHaveLength(NODE.children.length);
   });
 
   it('activating a control opens that star through the click path', () => {
@@ -94,7 +102,7 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
 
   it('opens a folder star as a folder', () => {
     renderView();
-    fireEvent.click(screen.getByRole('button', { name: 'src: 0 violations' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Folder src' }));
     const [, hover] = handleNodeClick.mock.calls[0];
     expect(hover.type).toBe('folder');
     expect(hover.data.path).toBe('src');
@@ -110,11 +118,11 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
 
   it('resolves the star by path, so a star index shifting cannot open another file', () => {
     renderView();
-    for (const name of ['a.js: 2 violations', 'b.js: 1 violations', 'src: 0 violations']) {
+    for (const [name, path] of [['a.js: 2 violations', 'a.js'], ['b.js: 1 violations', 'b.js'], ['Folder src', 'src']]) {
       handleNodeClick.mockClear();
       fireEvent.click(screen.getByRole('button', { name }));
       const [, hover] = handleNodeClick.mock.calls[0];
-      expect(name.startsWith(`${hover.data.path}:`)).toBe(true);
+      expect(hover.data.path).toBe(path);
       expect(hover.starIdx).toBeGreaterThanOrEqual(0);
     }
   });

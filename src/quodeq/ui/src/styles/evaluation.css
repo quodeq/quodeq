@@ -2223,7 +2223,10 @@ button.eval-provider-badge--clickable:focus-visible {
 
 .ctx-gutter {
   display: inline-block;
-  width: 48px;
+  /* 56px, not 48: five digits of 12px JetBrains Mono are 36px, and the
+     violation marker sits at the left edge of the same box. */
+  width: 56px;
+  position: relative;
   text-align: right;
   padding-right: 16px;
   color: var(--color-text-secondary);
@@ -2252,11 +2255,12 @@ button.eval-provider-badge--clickable:focus-visible {
   border-right-color: var(--color-accent);
 }
 
-/* Non-color cue for the highlighted line, sitting in a small gutter to the
-   left of the line number so the flag survives without color perception. */
+/* Non-color cue for the highlighted line, pinned to the left edge of the
+   gutter so the flag survives without color perception and costs the line
+   number no width. */
 .context-line__marker {
-  display: inline-block;
-  width: 12px;
+  position: absolute;
+  left: 2px;
   color: var(--color-accent);
 }
 

@@ -828,7 +828,9 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .vlive-detail--terminal .ctx-line {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  /* 56px gutter, not 48: five digits of 12px JetBrains Mono are 36px and the
+     violation marker sits at the left edge of the same column. */
+  grid-template-columns: 56px 1fr;
   padding: 0 var(--term-space-2);
   line-height: 18px;
 }
