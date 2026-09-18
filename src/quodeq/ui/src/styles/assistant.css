@@ -622,18 +622,6 @@
   color: var(--color-text-subtle);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* ── Tab panels (one per OPEN panel; hidden ones stay mounted) ───── */
 .drawer-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
