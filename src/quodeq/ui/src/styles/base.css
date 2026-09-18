@@ -2278,7 +2278,19 @@ fieldset.gf-tab-body:disabled .gf-boundary-divider { pointer-events: none; curso
    (Recharts bars, canvas). Each data point gets a focusable button, visually
    hidden until keyboard focus reveals it over the chart's top-left corner.
    See components/ChartKeyboardControls.jsx. */
-.chart-with-kbd { position: relative; }
+/* The wrapper sits between a flex-column panel and the chart that used to be
+   that panel's direct flex child, so it has to be transparent to the flex
+   chain. Without this it sizes to content: ResponsiveContainer's height="100%"
+   resolves against an auto-height parent, falls back to its minHeight, and the
+   panel (stretched to match its taller sibling) shows dead space under the
+   bars. The controls list is absolutely positioned, so it adds no height. */
+.chart-with-kbd {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
 .chart-kbd-controls {
   position: absolute;
   inset: 0;
