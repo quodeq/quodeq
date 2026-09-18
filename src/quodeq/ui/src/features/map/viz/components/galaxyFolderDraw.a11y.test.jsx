@@ -2,9 +2,10 @@
  * Accessibility tests for the galaxy folder draw module.
  * 6423: particle severity was encoded in colour only (the severity text
  * shows up at high zoom with labels on). starShapeFor adds a shape cue that
- * is always drawn: critical a ring plus a core dot, major a ring, minor the
- * plain dot. The pure function is tested directly; the draw routine is
- * checked through a recording ctx, so no canvas is needed.
+ * is always drawn, and the three severities differ by outline, not
+ * brightness: critical two rings, major one ring, minor none (the plain dot
+ * drawParticles already paints). The pure function is tested directly; the
+ * draw routine is checked through a recording ctx, so no canvas is needed.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { drawStars, starShapeFor } from './galaxyFolderDraw.js';
@@ -35,11 +36,11 @@ function makeMockCtx(calls) {
   return ctx;
 }
 
-function fileStarWith(severities) {
+function fileStarWith(severities, sz = 3) {
   return {
     name: 'index.js', isFolder: false, x: 100, y: 100, radius: 8, col: COL,
     pp: 0, violations: severities.length, complianceRate: 0.5,
-    particles: severities.map((sev) => ({ col: COL, sev, or: 15, os: 1, op: 0, sz: 3, ec: 1, tp: 0 })),
+    particles: severities.map((sev) => ({ col: COL, sev, or: 15, os: 1, op: 0, sz, ec: 1, tp: 0 })),
   };
 }
 
@@ -54,7 +55,7 @@ function runDrawStars(ctx, star) {
 
 describe('starShapeFor (6423)', () => {
   it('maps each severity to its own shape', () => {
-    expect(starShapeFor('critical')).toBe('ring-dot');
+    expect(starShapeFor('critical')).toBe('double-ring');
     expect(starShapeFor('major')).toBe('ring');
     expect(starShapeFor('minor')).toBe('dot');
   });
@@ -80,11 +81,11 @@ describe('galaxy particle shape cue (6423)', () => {
     expect(calls.filter((c) => c === 'stroke').length).toBe(1);
   });
 
-  it('adds a filled core dot on top of the ring for a critical particle', () => {
+  it('draws a second concentric ring for a critical particle, no fill', () => {
     const ctx = makeMockCtx(calls);
     runDrawStars(ctx, fileStarWith(['critical']));
-    expect(calls.filter((c) => c === 'stroke').length).toBe(1);
-    expect(calls.filter((c) => c === 'fill').length).toBe(1);
+    expect(calls.filter((c) => c === 'stroke').length).toBe(2);
+    expect(calls).not.toContain('fill');
   });
 
   it('leaves a minor particle as the plain dot drawParticles paints', () => {
@@ -92,5 +93,11 @@ describe('galaxy particle shape cue (6423)', () => {
     runDrawStars(ctx, fileStarWith(['minor']));
     expect(calls).not.toContain('stroke');
     expect(calls).not.toContain('fill');
+  });
+
+  it('still cues a particle small enough that only drawParticles would paint it', () => {
+    const ctx = makeMockCtx(calls);
+    runDrawStars(ctx, fileStarWith(['critical'], 0.4));
+    expect(calls.filter((c) => c === 'stroke').length).toBe(2);
   });
 });

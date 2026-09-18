@@ -49,7 +49,7 @@ describe('DimensionHeatGridView sortable header (6432)', () => {
     expect(other).toHaveAttribute('aria-sort', 'none');
   });
 
-  it('activating the header button from the keyboard sorts the column', () => {
+  it('clicking the header button sorts the column, then flips the direction', () => {
     renderGrid();
     const button = screen.getByRole('button', { name: 'Sort by Health' });
     fireEvent.click(button);

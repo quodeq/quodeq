@@ -10,22 +10,23 @@ import { LevelInfoPanel } from './galaxyViewInfo.jsx';
 import ChartKeyboardControls from '../../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../../strings/index.js';
 
-// One control per file star. The canvas hit-tests every star, but a folder
-// with hundreds of files would bury the rest of the page's tab order.
+// One control per star, folders included, since the canvas hit-tests both.
+// Capped because a folder with hundreds of entries would bury the rest of
+// the page's tab order.
 const GALAXY_KBD_MAX = 100;
 
-/** Keyboard-reachable stand-ins for the file stars the canvas hit-tests. */
-function fileStarItems(scene, activateStar) {
-  const items = [];
-  (scene?.rootStars || []).forEach((s, i) => {
-    if (s.isFolder || items.length >= GALAXY_KBD_MAX) return;
-    items.push({
-      key: s.path || s.name || String(i),
+/** Keyboard-reachable stand-ins for the stars the canvas hit-tests. Each
+ * item carries the star's path, which is what activateStar resolves on. */
+function starItems(scene, activateStar) {
+  const stars = (scene?.rootStars || []).slice(0, GALAXY_KBD_MAX);
+  return stars.map((s, i) => {
+    const key = s.path || s.name || String(i);
+    return {
+      key,
       text: t('map.riskBubbleAria', { file: s.name, count: s.violations || 0 }),
-      onActivate: () => activateStar(i),
-    });
+      onActivate: () => activateStar(key),
+    };
   });
-  return items;
 }
 
 /** Breadcrumb parts for the current nav path — project name first, then
@@ -107,7 +108,7 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
         onClick={handlers.handleClick}
         onKeyDown={handlers.handleKeyDown}
       />
-      <ChartKeyboardControls label={t('map.galaxyKbdLabel')} items={fileStarItems(scene, handlers.activateStar)} />
+      <ChartKeyboardControls label={t('map.galaxyKbdLabel')} items={starItems(scene, handlers.activateStar)} />
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
         label: bc.label,
         onClick: i < breadcrumb.length - 1 ? () => handlers.goToPathIndex(bc.idx) : undefined,

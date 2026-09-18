@@ -7,13 +7,8 @@ import { t } from '../../../strings/index.js';
 const PRINCIPLE_INDENT_PX = 24;
 
 // The header text is a real <button> so sorting is reachable from the
-// keyboard (a <th> is not focusable). The reset is inline so the cell keeps
-// looking like plain header text without a new rule in the shared sheet.
-const SORT_BUTTON_STYLE = {
-  font: 'inherit', color: 'inherit', letterSpacing: 'inherit',
-  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-};
-
+// keyboard (a <th> is not focusable). It fills the cell and looks like plain
+// header text: see `.heat-grid-th-sort > button` in styles/map.css.
 function ariaSort(isActive, sortDir) {
   if (!isActive) return 'none';
   return sortDir === 'asc' ? 'ascending' : 'descending';
@@ -40,7 +35,6 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
           >
             <button
               type="button"
-              style={SORT_BUTTON_STYLE}
               aria-label={t('violations.sortByAria', { column: col.label })}
               onClick={() => handleSort(col.id)}
             >

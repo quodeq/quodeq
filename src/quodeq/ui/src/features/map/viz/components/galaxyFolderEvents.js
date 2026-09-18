@@ -38,16 +38,19 @@ function makeClickHandler(refs, params) {
   };
 }
 
-/** Open one star by index, for the keyboard layer over the canvas: the same
+/** Open one star by path, for the keyboard layer over the canvas: the same
  * handleNodeClick a click on a hovered star reaches, with the same
- * mid-animation guard, since there is no mouse position to hit-test. */
+ * mid-animation guard, since there is no mouse position to hit-test. Keyed
+ * on path, not index, so a rebuilt scene cannot open a different star than
+ * the control the user activated. */
 function makeActivateStarHandler(refs, params) {
   const { startTransition, saveNav, scene } = params;
-  return function activateStar(starIdx) {
+  return function activateStar(starPath) {
     if (refs.animRef.current || refs.flyRef.current) return;
     const stars = (refs.sceneRef.current || scene)?.rootStars || [];
+    const starIdx = stars.findIndex((s) => (s.path || s.name) === starPath);
+    if (starIdx < 0) return;
     const s = stars[starIdx];
-    if (!s) return;
     handleNodeClick(refs, { type: s.isFolder ? 'folder' : 'file', starIdx, data: s }, { startTransition, saveNav });
   };
 }

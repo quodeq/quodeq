@@ -1,3 +1,5 @@
+import { activateOnKey } from '../utils/a11y.js';
+
 /**
  * ChartKeyboardControls — a keyboard- and screen-reader-accessible layer for
  * charts whose data points have no focusable DOM of their own (Recharts bars,
@@ -24,12 +26,7 @@ export default function ChartKeyboardControls({ label, items }) {
           <button
             type="button"
             onClick={it.onActivate}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                it.onActivate();
-              }
-            }}
+            onKeyDown={activateOnKey(() => it.onActivate())}
           >
             {it.text}
           </button>

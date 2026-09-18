@@ -70,7 +70,7 @@ function renderView(props = {}) {
 }
 
 describe('GalaxyFolderView keyboard star layer (6424)', () => {
-  it('renders one focusable control per file star, under a named group', () => {
+  it('renders one focusable control per star, under a named group', () => {
     renderView();
     const group = screen.getByLabelText('Files in this folder');
     expect(group).toBeInTheDocument();
@@ -78,9 +78,9 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
     expect(screen.getByRole('button', { name: 'b.js: 1 violations' })).toBeInTheDocument();
   });
 
-  it('does not list the folder stars, only the files', () => {
+  it('lists the folder stars too, since they are hit-tested as well', () => {
     renderView();
-    expect(screen.queryByRole('button', { name: /^src:/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'src: 0 violations' })).toBeInTheDocument();
   });
 
   it('activating a control opens that star through the click path', () => {
@@ -89,7 +89,15 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
     expect(handleNodeClick).toHaveBeenCalledTimes(1);
     const [, hover] = handleNodeClick.mock.calls[0];
     expect(hover.type).toBe('file');
-    expect(hover.data.name).toBe('a.js');
+    expect(hover.data.path).toBe('a.js');
+  });
+
+  it('opens a folder star as a folder', () => {
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'src: 0 violations' }));
+    const [, hover] = handleNodeClick.mock.calls[0];
+    expect(hover.type).toBe('folder');
+    expect(hover.data.path).toBe('src');
   });
 
   it('activates from the keyboard too', () => {
@@ -97,6 +105,17 @@ describe('GalaxyFolderView keyboard star layer (6424)', () => {
     const button = screen.getByRole('button', { name: 'b.js: 1 violations' });
     fireEvent.keyDown(button, { key: 'Enter' });
     expect(handleNodeClick).toHaveBeenCalledTimes(1);
-    expect(handleNodeClick.mock.calls[0][1].data.name).toBe('b.js');
+    expect(handleNodeClick.mock.calls[0][1].data.path).toBe('b.js');
+  });
+
+  it('resolves the star by path, so a star index shifting cannot open another file', () => {
+    renderView();
+    for (const name of ['a.js: 2 violations', 'b.js: 1 violations', 'src: 0 violations']) {
+      handleNodeClick.mockClear();
+      fireEvent.click(screen.getByRole('button', { name }));
+      const [, hover] = handleNodeClick.mock.calls[0];
+      expect(name.startsWith(`${hover.data.path}:`)).toBe(true);
+      expect(hover.starIdx).toBeGreaterThanOrEqual(0);
+    }
   });
 });
