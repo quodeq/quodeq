@@ -212,6 +212,26 @@ def _start_action_api_for(
     return ensure_api(config, api_config, probes=probes, hooks=hooks)
 
 
+def _prepare_launch(
+    config: DashboardConfig, env: dict[str, str] | None, hooks: DashboardHooks,
+) -> DashboardConfig:
+    """Resolve paths and build the UI, validate them, and apply the environment."""
+    config = _resolve_paths_and_build(config, hooks=hooks)
+    validate_paths(config)
+    _resolve_environ(config, env)
+    return config
+
+
+def _launch_preempted(config: DashboardConfig) -> bool:
+    """True when this process should exit before starting a server of its own."""
+    return _prepare_frozen_macos_launch() or _handed_off_to_running_instance(config)
+
+
+def _start_background_tasks() -> None:
+    _kick_update_check()
+    _maybe_spawn_menubar()
+
+
 def run_dashboard(
     config: DashboardConfig,
     env: dict[str, str] | None = None,
@@ -226,22 +246,11 @@ def run_dashboard(
     production collaborators of the same name (see ``dashboard/_probes.py``).
     """
     hooks = hooks or DashboardHooks()
-    config = _resolve_paths_and_build(config, hooks=hooks)
-    validate_paths(config)
-    _resolve_environ(config, env)
-
-    if _prepare_frozen_macos_launch():
+    config = _prepare_launch(config, env, hooks)
+    if _launch_preempted(config):
         return 0
-
-    if _handed_off_to_running_instance(config):
-        return 0
-
     _log_startup_banner(config)
-
     action_api_url, action_api_process = _start_action_api_for(config, probes, hooks)
-
-    _kick_update_check()
-    _maybe_spawn_menubar()
-
+    _start_background_tasks()
     _server_mod.serve_and_wait(action_api_url, action_api_process, config)
     return 0

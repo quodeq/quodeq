@@ -53,10 +53,7 @@ src/quodeq/api/app.py:198:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_runs.py:30:broad-except
-src/quodeq/api/routes_shared_mirrors.py:117:broad-except
-src/quodeq/api/routes_shared_mirrors.py:159:broad-except
-src/quodeq/api/routes_shared_mirrors.py:176:broad-except
-src/quodeq/api/routes_shared_mirrors.py:92:broad-except
+src/quodeq/api/routes_shared_mirrors.py:91:broad-except
 src/quodeq/api/security.py:266:broad-except
 src/quodeq/assistant/adapters/_api.py:117:broad-except
 src/quodeq/assistant/adapters/_capabilities.py:31:broad-except
