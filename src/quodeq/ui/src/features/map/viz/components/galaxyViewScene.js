@@ -46,10 +46,12 @@ export function countSeverities(violations) {
 
 /** Compute a principle's score from raw data, grade, or violation ratio */
 export function computePrincipleScore(rawScore, grade, violationCount, complianceCount) {
-  if (rawScore) {
-    const parsed = parseFloat(rawScore);
-    if (Number.isFinite(parsed)) return parsed;
-  }
+  // A finite numeric score -- including 0 -- is a real score. Checking
+  // `if (rawScore)` first would treat 0 as absent and fall through to the
+  // grade/ratio chain below, inconsistent with buildDimStar/
+  // updateSceneLiveData, which already keep a 0 overallScore as-is.
+  const parsed = parseFloat(rawScore);
+  if (Number.isFinite(parsed)) return parsed;
   if (grade) return gradeToScore(grade);
   const total = violationCount + complianceCount;
   return total > 0 ? (complianceCount / total) * 10 : 5;

@@ -7,26 +7,18 @@ import { useOuterPaneDrag } from './hooks/useOuterPaneDrag.js';
 import { useInnerDividerDrag, MIN_WINDOW_RATIO } from './hooks/useInnerDividerDrag.js';
 import './SidePane.css';
 
-// Guards computeWeights below against a stale ratios array (more entries
-// than windowCount - 1 dividers): warn once per session rather than on
-// every render while the mismatch persists.
-let ratioCountMismatchWarned = false;
-
 // Build weights from ratios: walk through, treating each ratios[i] as the
 // split between weights[i] and weights[i+1] of their combined share.
-// ratios can be transiently out of sync with windowCount (e.g. a window was
-// just removed and this render still holds the old ratios array); walking
-// past weights' bounds in that case would produce NaN weights, so fall back
-// to equal weights instead.
+// ratios is legitimately out of sync with windowCount for one render
+// whenever a window is added/removed: useInnerDividerDrag's windowCount
+// effect resets ratios' length, but that effect runs AFTER this render, so
+// the first render of a window-count change still holds the old-length
+// ratios array. Walking past weights' bounds in that case would produce
+// NaN weights, so fall back to equal weights for that one frame instead
+// (no warning -- this path is routine, not exceptional).
 export function computeWeights(windowCount, ratios) {
   const weights = Array(windowCount).fill(1);
-  if (ratios.length > windowCount - 1) {
-    if (!ratioCountMismatchWarned) {
-      console.warn('[SidePane] ratios length does not match window count; using equal weights', { windowCount, ratiosLength: ratios.length });
-      ratioCountMismatchWarned = true;
-    }
-    return weights;
-  }
+  if (ratios.length > windowCount - 1) return weights;
   for (let i = 0; i < ratios.length; i += 1) {
     const r = ratios[i] ?? 0.5;
     const sum = weights[i] + weights[i + 1];

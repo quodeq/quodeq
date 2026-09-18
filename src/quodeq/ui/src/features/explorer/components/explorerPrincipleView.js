@@ -23,7 +23,10 @@ export function buildEnrichedPrinciples(principleGrades, allViolations, complian
     const key = v.principle;
     if (!key) continue;
     if (!violationsByPrinciple.has(key)) violationsByPrinciple.set(key, []);
-    violationsByPrinciple.get(key)?.push(v);
+    // has()+set() above guarantee an entry here: one lookup into a local,
+    // not a re-derefed call expression (matches dimensionHeatGridModel.js).
+    const list = violationsByPrinciple.get(key);
+    list.push(v);
   }
   return (principleGrades || []).map((pg) => {
     const vs = violationsByPrinciple.get(pg.principle) || [];

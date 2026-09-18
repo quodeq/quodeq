@@ -14,6 +14,7 @@ vi.mock('../../../api/index.js', () => ({
 import { exportStandard } from '../../../api/index.js';
 import StandardsTable from './StandardsTable.jsx';
 import { UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
+import { t } from '../../../strings/index.js';
 
 const STANDARD = {
   id: 'my-std',
@@ -48,6 +49,20 @@ describe('StandardsTable customized badge', () => {
       />,
     );
     expect(screen.getByText('Mystery Standard')).toBeInTheDocument();
+  });
+
+  it('shows a translated "unknown" pill (not an empty label / "--undefined" class) when a standard has no type at all', () => {
+    const noType = { id: 'no-type', name: 'No Type Standard', type: undefined, description: '', principleCount: 0, requirementCount: 0 };
+    const { container } = render(
+      <StandardsTable
+        grouped={{ [UNKNOWN_STANDARD_TYPE]: [noType] }}
+        actions={actions}
+        customizedCounts={{}}
+      />,
+    );
+    expect(screen.getByText(t('standards.baseUnknown'))).toBeInTheDocument();
+    expect(container.querySelector('.standards-base-pill--undefined')).toBeNull();
+    expect(container.querySelector('.standards-base-pill--unknown')).toBeInTheDocument();
   });
 
   it('shows the customized badge when customizedCounts has a nonzero entry for the standard', () => {

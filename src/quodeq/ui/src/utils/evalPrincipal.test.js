@@ -9,6 +9,13 @@ test('computeComplianceByPrinciple groups compliance findings by principle', () 
   assert.equal(map.get('B').length, 1);
 });
 
+test('computeComplianceByPrinciple: a second entry for an already-seen principle lands in the same array (not a fresh one)', () => {
+  const evalData = { compliance: [{ principle: 'A', file: 'first.py' }, { principle: 'A', file: 'second.py' }] };
+  const map = computeComplianceByPrinciple(evalData);
+  const entries = map.get('A');
+  assert.deepEqual(entries.map((e) => e.file), ['first.py', 'second.py']);
+});
+
 test('buildEvalPrincipalFn builds a principal object from principles/grades', () => {
   const evalData = {
     dimension: 'security',

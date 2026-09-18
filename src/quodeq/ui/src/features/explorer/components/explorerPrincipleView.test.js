@@ -24,6 +24,18 @@ test('buildEnrichedPrinciples: groups violations by principle and counts them pe
   assert.equal(enriched[1].violationCount, 1);
 });
 
+test('buildEnrichedPrinciples: a second violation for an already-seen principle lands in the same bucket (not a fresh one)', () => {
+  const grades = [{ principle: 'A' }];
+  const violations = [
+    { principle: 'A', file: 'first.py', severity: 'major' },
+    { principle: 'A', file: 'second.py', severity: 'minor' },
+  ];
+  const enriched = buildEnrichedPrinciples(grades, violations, new Map());
+  assert.equal(enriched[0].violationCount, 2);
+  assert.equal(enriched[0].severity.major, 1);
+  assert.equal(enriched[0].severity.minor, 1);
+});
+
 test('buildEnrichedPrinciples: does not throw for inputs with no violations/compliance', () => {
   assert.doesNotThrow(() => buildEnrichedPrinciples([{ principle: 'A' }], [], null));
   const enriched = buildEnrichedPrinciples([{ principle: 'A' }], [], null);
