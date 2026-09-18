@@ -171,6 +171,7 @@ export function useGalaxyFolderCamera({ refs, scene, showLabels, saveNav, setNav
     const canvas = refs.canvasRef.current;
     if (!canvas || !scene) return undefined;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
     let running = true;
 
     function frame() {

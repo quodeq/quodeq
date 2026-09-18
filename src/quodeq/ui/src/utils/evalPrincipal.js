@@ -8,7 +8,7 @@ export function computeComplianceByPrinciple(evalData) {
   const map = new Map();
   for (const c of (evalData?.compliance || [])) {
     if (!map.has(c.principle)) map.set(c.principle, []);
-    map.get(c.principle).push(c);
+    map.get(c.principle)?.push(c);
   }
   return map;
 }

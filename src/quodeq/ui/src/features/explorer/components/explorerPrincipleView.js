@@ -23,7 +23,7 @@ export function buildEnrichedPrinciples(principleGrades, allViolations, complian
     const key = v.principle;
     if (!key) continue;
     if (!violationsByPrinciple.has(key)) violationsByPrinciple.set(key, []);
-    violationsByPrinciple.get(key).push(v);
+    violationsByPrinciple.get(key)?.push(v);
   }
   return (principleGrades || []).map((pg) => {
     const vs = violationsByPrinciple.get(pg.principle) || [];

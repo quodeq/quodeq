@@ -78,9 +78,9 @@ function _buildStandings(holders, dimensionKey, now, summariesById) {
 function _summarizeSeverity(standings) {
   return standings.reduce(
     (acc, s) => ({
-      critical: acc.critical + (s.severity.critical || 0),
-      major: acc.major + (s.severity.major || 0),
-      minor: acc.minor + (s.severity.minor || 0),
+      critical: acc.critical + (s.severity?.critical || 0),
+      major: acc.major + (s.severity?.major || 0),
+      minor: acc.minor + (s.severity?.minor || 0),
     }),
     { critical: 0, major: 0, minor: 0 },
   );
