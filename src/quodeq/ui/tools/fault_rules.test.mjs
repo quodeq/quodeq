@@ -17,6 +17,9 @@ js.run('swallowed-catch', plugin.rules['swallowed-catch'], {
     'try { f(); } catch (err) { throw err; }',
     // Surfaced in the UI.
     'try { f(); } catch (err) { setError(err.message); }',
+    // Not every logger is `console`. A warn/error/debug call on anything
+    // counts as reaching somebody.
+    "try { f(); } catch { log.warn('[m] failed'); }",
   ],
   invalid: [
     // Empty body, optional catch binding: the error is gone.
@@ -25,6 +28,12 @@ js.run('swallowed-catch', plugin.rules['swallowed-catch'], {
     { code: 'try { f(); } catch (e) { /* private mode */ }', errors: 1 },
     // Recovers, but drops the error entirely -- nothing to debug from.
     { code: 'try { f(); } catch (e) { setReady(false); }', errors: 1 },
+    // An inner catch that logs its own error says nothing about the outer
+    // one, which still drops `o` on the floor.
+    {
+      code: 'try { f(); } catch (o) { try { j(); } catch (n) { console.warn(n); } }',
+      errors: 1,
+    },
   ],
 });
 
@@ -37,6 +46,10 @@ js.run('floating-promise', plugin.rules['floating-promise'], {
     // Rejection is handled, so the statement is not floating.
     'async function a() {} async function b() { a().catch(console.warn); }',
     'f().then(g).catch(h);',
+    // A prop or parameter that happens to share a name with a file-level
+    // async function is a different binding. Resolve, do not string-match.
+    'async function load() {} export function Row({ load }) { load(); }',
+    'async function load() {} function Row(load) { load(); }',
   ],
   invalid: [
     { code: 'async function a() {} function b() { a(); }', errors: 1 },
@@ -61,6 +74,13 @@ js.run('unguarded-lookup-deref', plugin.rules['unguarded-lookup-deref'], {
     'const n = xs.find(p)?.name;',
     'const el = document.querySelector(s); if (el) el.focus();',
     'const m = s.match(re); const g = m && m[1];',
+    // `.then`/`.catch`/`.finally` on a lookup result is promise plumbing,
+    // not a dereference that can hit null.
+    'api.get(url).then(r => r.data);',
+    // `get` is only a nullable lookup on map-ish receivers. URLSearchParams
+    // and Headers are the common counter-examples.
+    "params.get('id').trim();",
+    "res.headers.get('etag').length;",
   ],
   invalid: [
     { code: 'const n = xs.find(p).name;', errors: 1 },
@@ -68,6 +88,7 @@ js.run('unguarded-lookup-deref', plugin.rules['unguarded-lookup-deref'], {
     { code: 'document.getElementById(i).value = 1;', errors: 1 },
     { code: 'const g = s.match(re)[1];', errors: 1 },
     { code: 'const v = map.get(k).value;', errors: 1 },
+    { code: 'const v = nodesByIdCache.get(k).value;', errors: 1 },
   ],
 });
 

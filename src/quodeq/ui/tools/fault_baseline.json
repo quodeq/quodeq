@@ -20,7 +20,6 @@
   "src/features/history/components/EvaluationsTable.jsx": 1,
   "src/features/history/components/HistoryPage.jsx": 1,
   "src/features/history/components/HistoryRunRow.jsx": 2,
-  "src/features/map/viz/components/galaxyViewLayout.js": 1,
   "src/features/onboarding/hooks/providerProbes.js": 3,
   "src/features/onboarding/hooks/useActiveProviderState.js": 4,
   "src/features/onboarding/hooks/useRepoScanStep.js": 3,
