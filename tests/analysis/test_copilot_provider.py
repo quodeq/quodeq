@@ -25,10 +25,13 @@ def test_copilot_is_discoverable_and_keyless(monkeypatch):
     assert PROVIDERS["copilot"] == ("", "copilot")
 
 
-def test_copilot_model_listing_does_not_launch_interactive_cli(monkeypatch):
+def test_copilot_model_listing_uses_account_discovery_not_interactive_cli(monkeypatch):
     run = Mock()
     monkeypatch.setattr("quodeq.services.tooling_mixin.run_cli_models_command", run)
-    assert FsToolingMixin().get_client_models("copilot") == {"models": ["auto"]}
+    discover = Mock(return_value={"models": ["auto", "gpt-test"]})
+    monkeypatch.setattr("quodeq.services.tooling_mixin.fetch_copilot_models", discover)
+    assert FsToolingMixin().get_client_models("copilot") == {"models": ["auto", "gpt-test"]}
+    discover.assert_called_once()
     run.assert_not_called()
 
 

@@ -4,7 +4,7 @@ import { AssistantModeRows } from './AssistantModeRows.jsx';
 import AssistantModelPicker from './AssistantModelPicker.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
-import CopilotSetupHint from './CopilotSetupHint.jsx';
+import { CopilotModelStatus } from './CopilotModelSelect.jsx';
 
 function AssistantEnableRow({ enabled, setEnabled }) {
   return (
@@ -61,7 +61,7 @@ function AssistantCustomProviderSection({ clients, activeProvider, setActiveProv
           })}
         </div>
       </div>
-      {active?.id === 'copilot' && <CopilotSetupHint />}
+      {active?.id === 'copilot' && <CopilotModelStatus />}
       {active && (
         <div className="settings-row settings-row--last">
           <div className="settings-row-label">

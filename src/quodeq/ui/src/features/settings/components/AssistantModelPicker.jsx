@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { settingsKeys } from '../../../api/queryKeys.js';
 import { classifyProvider } from './providerUtils.js';
-import { ModelTextInput } from './CliAdvancedPanel.jsx';
+import { CliModelInput } from './CliAdvancedPanel.jsx';
 import { t } from '../../../strings/index.js';
 
 const LOCAL_API_CONFIG = {
@@ -41,13 +41,11 @@ function LocalApiModelSelect({ providerId, value, onChange }) {
 }
 
 // Mirrors the evaluation's per-provider model widget: a dropdown of installed
-// models for local-api providers, a free-text model id for cli / cloud-api.
-// ariaLabel keeps this picker's own accessible name now that the text input
-// is CliAdvancedPanel's shared ModelTextInput rather than a local copy.
+// models for local-api and Copilot providers, a model id for other providers.
 export default function AssistantModelPicker({ provider, providerConfig, value, onChange }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
   if (classification === 'local-api') {
     return <LocalApiModelSelect providerId={provider.id} value={value} onChange={onChange} />;
   }
-  return <ModelTextInput value={value} onChange={onChange} ariaLabel={t('settings.assistantModelAria')} />;
+  return <CliModelInput providerId={provider.id} value={value} onChange={onChange} ariaLabel={t('settings.assistantModelAria')} />;
 }

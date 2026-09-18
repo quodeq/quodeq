@@ -32,10 +32,16 @@ COPILOT_HOME="$HOME/.quodeq/copilot" copilot login
 In PowerShell, set `$env:COPILOT_HOME="$HOME/.quodeq/copilot"` before running
 `copilot login`, then remove it with `Remove-Item Env:COPILOT_HOME`.
 
-Select **GitHub Copilot** in Settings and enter `auto` or a full model ID available
-to your account. Company policy, model access and usage limits still apply.
+Select **GitHub Copilot** in Settings. The model dropdown loads the models
+available to your signed-in account. Choose **Auto** or a specific model.
+The evaluation, assistant, and tier-override selectors use the same account list.
+Company policy, model access and usage limits still apply.
 For Enterprise Cloud data residency, add `--host YOUR-ENTERPRISE.ghe.com` to login.
 Repeat the same login command if authentication expires.
+
+The setup message is hidden after a successful model lookup. If discovery fails,
+the message and error are shown with **Retry connection**. No prompt is sent to
+a model when loading this list.
 
 The dedicated profile does not reuse your normal Copilot login, plugins or MCP
 servers. Keep it for Quodeq only. Hooks, custom instructions and built-in MCP

@@ -19,6 +19,7 @@ const fakeApi = {
   getOllamaModels: vi.fn().mockResolvedValue([{ name: 'gemma4:26b' }]),
   getLlamacppModels: vi.fn().mockResolvedValue([]),
   getOmlxModels: vi.fn().mockResolvedValue([]),
+  getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'gpt-test'] }),
 };
 
 const providerConfigs = {
@@ -93,16 +94,17 @@ describe('AssistantProviderTabs', () => {
     expect(container.querySelector('select')).toBeNull();
   });
 
-  it('supports Copilot independently and shows its dedicated login instructions', async () => {
+  it('supports Copilot account models independently and hides login instructions', async () => {
     fakeApi.getAiClients.mockResolvedValueOnce({ clients: [
       ...CLIENTS, { id: 'copilot', label: 'GitHub Copilot', type: 'cli', installed: true },
     ] });
     localStorage.setItem('cc-assistant-mode', 'custom');
     localStorage.setItem('cc-assistant-active-provider', 'copilot');
-    const { findByText, getByLabelText } = await renderPanel();
+    const { findByText, findByRole, queryByText, getByLabelText } = await renderPanel();
     expect(await findByText('GitHub Copilot')).toBeTruthy();
-    expect(await findByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeTruthy();
-    fireEvent.change(getByLabelText('Assistant model'), { target: { value: 'auto' } });
+    expect(await findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+    expect(queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
+    fireEvent.change(getByLabelText('Assistant model'), { target: { value: 'gpt-test' } });
     expect(localStorage.getItem('cc-active-provider')).toBe('claude');
   });
 

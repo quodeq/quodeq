@@ -5,7 +5,9 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 
-const fakeApi = {};
+const fakeApi = {
+  getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'claude-test'] }),
+};
 
 function makeWrapper() {
   const QueryWrapper = withQueryClient();
@@ -19,7 +21,7 @@ function makeWrapper() {
 }
 
 describe('CliProviderTab', () => {
-  it('shows the dedicated Copilot login and accepts a model ID', () => {
+  it('offers Copilot account models and hides setup after successful discovery', async () => {
     const Wrapper = makeWrapper();
     const update = vi.fn();
     render(
@@ -27,9 +29,12 @@ describe('CliProviderTab', () => {
         <CliProviderTab providerId="copilot" state={{ model: 'auto' }} update={update} />
       </Wrapper>,
     );
-    expect(screen.getByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeTruthy();
-    fireEvent.change(screen.getByDisplayValue('auto'), { target: { value: 'claude-sonnet-4.6' } });
-    expect(update).toHaveBeenCalledWith('model', 'claude-sonnet-4.6');
+    await screen.findAllByRole('option', { name: 'claude-test' });
+    expect(screen.queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
+    fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'claude-test' } });
+    expect(update).toHaveBeenCalledWith('model', 'claude-test');
+    fireEvent.change(screen.getByLabelText('Fast model'), { target: { value: 'claude-test' } });
+    expect(update).toHaveBeenCalledWith('model-fast', 'claude-test');
   });
 
   it('renders a free-text model input pre-populated from state', () => {

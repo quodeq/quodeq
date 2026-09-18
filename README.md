@@ -253,10 +253,14 @@ Cloud with data residency, add `--host YOUR-ENTERPRISE.ghe.com` to the login com
 Your organization must permit Copilot CLI and the selected model. Subscription
 limits, usage charges and company policies still apply.
 
-Select **GitHub Copilot** in the evaluation or assistant settings. Enter `auto`
-or a full model ID available to that account. Claude shortcuts such as `sonnet`
-and Codex numeric shortcuts are not translated for Copilot. Leave tier overrides
-blank to reuse the selected model.
+Select **GitHub Copilot** in the evaluation or assistant settings. Quodeq loads
+the models available to your signed-in account into a dropdown. Choose **Auto**
+or a specific model. Tier overrides use the same list; leave them on **Use main
+model** to reuse the selected model.
+
+The login instructions disappear when model discovery succeeds. If it fails,
+Quodeq shows the setup instructions, an error, and **Retry connection**. Model
+discovery queries the CLI's model API without sending a prompt or running tools.
 
 Quodeq uses `~/.quodeq/copilot`, not your normal `~/.copilot` profile. It does not
 copy credentials or inherit unrelated API keys, GitHub tokens, Copilot permission

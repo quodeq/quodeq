@@ -2,6 +2,12 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
+import CopilotModelSelect from './CopilotModelSelect.jsx';
+
+/** Use live model choices for Copilot without changing other CLI providers. */
+export function CliModelInput({ providerId, ...props }) {
+  return providerId === 'copilot' ? <CopilotModelSelect {...props} /> : <ModelTextInput {...props} />;
+}
 
 export function ModelTextInput({ label, value, placeholder, onChange, required, ariaLabel }) {
   const inputId = `model-input-${label || 'default'}`;
@@ -25,7 +31,8 @@ export function ModelTextInput({ label, value, placeholder, onChange, required, 
   );
 }
 
-function AnalysisModelsRow({ state, update, analysisHint }) {
+function AnalysisModelsRow({ providerId, state, update, analysisHint }) {
+  const placeholder = providerId === 'copilot' ? t('settings.copilotInheritModel') : undefined;
   return (
     <div className="settings-row">
       <div className="settings-row-label">
@@ -36,9 +43,9 @@ function AnalysisModelsRow({ state, update, analysisHint }) {
         <span className="settings-description">{t('settings.analysisModelsDesc')}</span>
       </div>
       <div className="settings-model-overrides">
-        <ModelTextInput label={t('settings.fast')} value={state['model-fast']} onChange={(v) => update('model-fast', v)} />
-        <ModelTextInput label={t('settings.balanced')} value={state['model-balanced']} onChange={(v) => update('model-balanced', v)} />
-        <ModelTextInput label={t('settings.thorough')} value={state['model-thorough']} onChange={(v) => update('model-thorough', v)} />
+        <CliModelInput providerId={providerId} placeholder={placeholder} label={t('settings.fast')} value={state['model-fast']} onChange={(v) => update('model-fast', v)} />
+        <CliModelInput providerId={providerId} placeholder={placeholder} label={t('settings.balanced')} value={state['model-balanced']} onChange={(v) => update('model-balanced', v)} />
+        <CliModelInput providerId={providerId} placeholder={placeholder} label={t('settings.thorough')} value={state['model-thorough']} onChange={(v) => update('model-thorough', v)} />
       </div>
     </div>
   );
@@ -103,7 +110,7 @@ export function CliAdvancedPanel({
     <details className="settings-advanced">
       <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
       <div className="settings-advanced-content">
-        <AnalysisModelsRow state={state} update={update} analysisHint={analysisHint} />
+        <AnalysisModelsRow providerId={providerId} state={state} update={update} analysisHint={analysisHint} />
         <AnalysisPowerRow power={power} setPower={setPower} persistPower={persistPower} />
         <CmdOverrideRow providerId={providerId} state={state} update={update} cmdPathError={cmdPathError} validateCmdPath={validateCmdPath} />
         <AdvancedAnalysisSettings state={state} update={update} />
