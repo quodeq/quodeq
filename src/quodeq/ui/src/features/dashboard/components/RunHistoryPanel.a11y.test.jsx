@@ -23,4 +23,16 @@ describe('RunHistoryPanel keyboard access to the run chart', () => {
     render(<RunHistoryPanel trend={TREND} selectedRunId="r1" granularity="day" />);
     expect(screen.queryByRole('button', { name: /score/ })).toBeNull();
   });
+
+  it('announces the period label the chart shows, not the day label, for month buckets', () => {
+    render(<RunHistoryPanel trend={TREND} selectedRunId="r1" granularity="month" onBarClick={vi.fn()} onGranularityChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'March 2026: score 8.5' })).toBeInTheDocument();
+  });
+
+  it('skips buckets with no runId instead of activating onBarClick with undefined', () => {
+    const trend = [...TREND, { dateISO: '2026-03-22T10:00:00', dateLabel: '22 Mar 2026', numericAverage: 8.0, overallGrade: 'Good' }];
+    render(<RunHistoryPanel trend={trend} selectedRunId="r1" granularity="day" onBarClick={vi.fn()} onGranularityChange={() => {}} />);
+    expect(screen.getAllByRole('button', { name: /score/ })).toHaveLength(TREND.length);
+    expect(screen.queryByRole('button', { name: /22 Mar 2026/ })).toBeNull();
+  });
 });

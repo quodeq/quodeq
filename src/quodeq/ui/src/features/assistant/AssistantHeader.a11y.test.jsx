@@ -24,10 +24,15 @@ describe('AssistantHeader streaming indicator accessibility', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Assistant is responding');
   });
 
-  it('renders no status region when not streaming', () => {
+  it('keeps the status region mounted and empty when not streaming, so the text lands in a live region', () => {
+    // A role="status" element inserted with its text already in it is not
+    // reliably announced: the region has to be there first and then change.
     drawer.streaming = false;
-    render(<AssistantHeader />);
-    expect(screen.queryByRole('status')).toBeNull();
-    drawer.streaming = true;
+    try {
+      render(<AssistantHeader />);
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    } finally {
+      drawer.streaming = true;
+    }
   });
 });

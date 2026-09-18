@@ -41,4 +41,20 @@ describe('BottomDrawer resize handle keyboard accessibility', () => {
     fireEvent.keyDown(handle, { key: 'ArrowDown' });
     expect(drawer.setHeight).toHaveBeenCalledWith(304);
   });
+
+  it('resizing a maximized drawer with the keyboard leaves maximized and starts from the rendered height', () => {
+    drawer.setHeight.mockClear();
+    drawer.setMaximized.mockClear();
+    drawer.maximized = true;
+    try {
+      render(<BottomDrawer uiState={{}} />);
+      const handle = screen.getByRole('separator', { name: /resize drawer/i });
+      vi.spyOn(handle.parentElement, 'getBoundingClientRect').mockReturnValue({ height: 500 });
+      fireEvent.keyDown(handle, { key: 'ArrowDown' });
+      expect(drawer.setMaximized).toHaveBeenCalledWith(false);
+      expect(drawer.setHeight).toHaveBeenCalledWith(484);
+    } finally {
+      drawer.maximized = false;
+    }
+  });
 });

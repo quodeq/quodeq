@@ -9,6 +9,17 @@ const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 // One keyboard step for the resize handle, matching the mouse-drag path's
 // granularity closely enough to feel like the same control.
 const RESIZE_STEP_PX = 16;
+// Arrow keys that resize the handle, and which way each one moves the top edge.
+const RESIZE_KEY_DIRECTION = { ArrowUp: 1, ArrowDown: -1 };
+
+// Where a manual resize starts from. A maximized drawer ignores the stored
+// height, so mutating it would move the drawer to a size nobody can see:
+// give way to the manual size and measure what is actually rendered.
+function resizeStartHeight(handleEl, { height, maximized, setMaximized }) {
+  if (!maximized) return height;
+  setMaximized(false);
+  return handleEl.parentElement?.getBoundingClientRect().height ?? height;
+}
 
 /**
  * Shared bottom drawer host: a resizable full-width shell that hosts the
@@ -31,18 +42,19 @@ function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
     window.removeEventListener('pointerup', handleDragEnd);
   }, [handleDragMove]);
   const handleDragStart = useCallback((event) => {
-    // Manual resize takes over from "maximized" — capture the real rendered
-    // height so the drag starts from where the maximized drawer actually is.
-    if (maximized) {
-      setMaximized(false);
-      const h = event.currentTarget.parentElement?.getBoundingClientRect().height ?? height;
-      dragRef.current = { startY: event.clientY, startHeight: h };
-    } else {
-      dragRef.current = { startY: event.clientY, startHeight: height };
-    }
+    const startHeight = resizeStartHeight(event.currentTarget, { height, maximized, setMaximized });
+    dragRef.current = { startY: event.clientY, startHeight };
     window.addEventListener('pointermove', handleDragMove);
     window.addEventListener('pointerup', handleDragEnd);
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
+  // The keyboard path is the same resize, one step at a time.
+  const handleResizeKey = useCallback((event) => {
+    const direction = RESIZE_KEY_DIRECTION[event.key];
+    if (direction === undefined) return;
+    event.preventDefault();
+    const from = resizeStartHeight(event.currentTarget, { height, maximized, setMaximized });
+    setHeight(from + direction * RESIZE_STEP_PX);
+  }, [height, maximized, setMaximized, setHeight]);
   // Unmounting mid-drag would leave the window listeners registered and the
   // stale handlers calling setHeight until the next pointerup; drop them.
   useEffect(() => () => {
@@ -50,13 +62,13 @@ function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
     window.removeEventListener('pointerup', handleDragEnd);
   }, [handleDragMove, handleDragEnd]);
 
-  return handleDragStart;
+  return { handleDragStart, handleResizeKey };
 }
 
 export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
   const { isOpen, height, setHeight, openPanels, activeTab,
           maximized, setMaximized } = useAssistantDrawer();
-  const handleDragStart = useDrawerDrag({ height, setHeight, maximized, setMaximized });
+  const { handleDragStart, handleResizeKey } = useDrawerDrag({ height, setHeight, maximized, setMaximized });
 
   if (!isOpen) return null;
   // Guard against a transient render where activeTab isn't (yet) an open panel.
@@ -68,10 +80,7 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
       <div className="assistant-drawer-drag" onPointerDown={handleDragStart}
         role="separator" tabIndex={0} aria-orientation="horizontal"
         aria-label={t('drawer.resizeHandleAria')} aria-valuenow={height}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowUp') { e.preventDefault(); setHeight(height + RESIZE_STEP_PX); }
-          else if (e.key === 'ArrowDown') { e.preventDefault(); setHeight(height - RESIZE_STEP_PX); }
-        }} />
+        onKeyDown={handleResizeKey} />
       {openPanels.includes('assistant') && (
         <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
           <AssistantHeader selectedProject={projectName ?? uiState?.selectedProject} onOpenSettings={onOpenSettings} />

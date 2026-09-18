@@ -173,12 +173,15 @@ function ScoreHistoryChart({ data, interaction }) {
 // per run, mirroring DimensionScoreHistoryPanel's own ChartKeyboardControls
 // usage. Empty when there is nothing to click (ChartKeyboardControls itself
 // renders null for an empty list).
+// A bucket with no runId has nothing to select, so it gets no control rather
+// than a button that calls onBarClick(undefined); the label follows the chart,
+// which shows periodLabel once the granularity is week or month.
 function buildRunKbdItems(data, onBarClick) {
   if (!onBarClick) return [];
-  return data.map((d) => ({
+  return data.filter((d) => d.runId).map((d) => ({
     key: d.runId,
     text: t('dashboard.runKbdItem', {
-      date: d.dateLabel,
+      date: d.periodLabel || d.dateLabel,
       score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?',
     }),
     onActivate: () => onBarClick(d.runId),
