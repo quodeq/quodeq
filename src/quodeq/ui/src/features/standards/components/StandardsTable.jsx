@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { STANDARD_TYPES } from '../hooks/useStandards.js';
+import { STANDARD_TYPES, UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
 import { useStandardRowModals } from '../hooks/useStandardRowModals.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
 import { t } from '../../../strings/index.js';
@@ -211,7 +211,7 @@ function StandardRow({ standard, isVisible, onEdit, onDelete, onDuplicate, onTog
 export default function StandardsTable({ grouped, actions, customizedCounts }) {
   const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
   const all = useMemo(
-    () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])],
+    () => [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || []), ...(grouped[UNKNOWN_STANDARD_TYPE] || [])],
     [grouped],
   );
 

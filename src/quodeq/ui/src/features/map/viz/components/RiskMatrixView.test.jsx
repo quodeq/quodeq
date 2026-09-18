@@ -32,6 +32,23 @@ const NODE = {
   ],
 };
 
+describe('RiskMatrixView bubble label width estimate (unguarded child.name.length)', () => {
+  it('does not throw when a child has no name', () => {
+    const node = {
+      path: 'root/',
+      name: 'root',
+      isFile: false,
+      violations: 0,
+      compliance: 0,
+      severity: {},
+      children: [
+        { path: 'root/a/', name: undefined, isFile: false, violations: 2, compliance: 0, severity: { critical: 0, major: 1, minor: 0 }, children: [] },
+      ],
+    };
+    expect(() => render(<RiskMatrixView node={node} onDrillDown={vi.fn()} />)).not.toThrow();
+  });
+});
+
 describe('RiskMatrixView drillable circle keyboard accessibility (#1936)', () => {
   function getDrillableCircle(container) {
     // The drillable circle is the one with role="button"

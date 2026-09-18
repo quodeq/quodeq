@@ -112,7 +112,7 @@ function BubbleLabels({ points, px, py, br, entered }) {
     const canDrill = !child.isFile && child.children?.length > 0;
     const labelY = canDrill ? cy - r - 4 : cy - r * 0.9 - 4;
     const fs = Math.min(LABEL_FONT_MAX, Math.max(LABEL_FONT_MIN, r / LABEL_FONT_DIVISOR));
-    const estW = child.name.length * fs * LABEL_CHAR_WIDTH_FACTOR;
+    const estW = (child.name || '').length * fs * LABEL_CHAR_WIDTH_FACTOR;
     const estH = fs + 2;
     const box = { x: cx - estW / 2, y: labelY - estH, w: estW, h: estH };
     // O(n^2) collision check is acceptable here: LABEL_PLACED_CAP limits

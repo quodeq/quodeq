@@ -123,6 +123,10 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedCamRe
 
   const w2s = useCallback((wx, wy) => {
     const cam = camRef.current;
+    // The animation loop sets camRef.current on its first tick; a caller
+    // (event handler, early render) invoking this before that tick has run
+    // gets a neutral origin rather than a crash.
+    if (!cam) return { x: 0, y: 0 };
     return { x: (wx - cam.x) * cam.z + size.w / 2, y: (wy - cam.y) * cam.z + size.h / 2 };
   }, [size.w, size.h]);
 
@@ -140,6 +144,9 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedCamRe
 
   const startTransition = useCallback((zoomingOut = false) => {
     const cam = camRef.current;
+    // No camera yet (before the first animation frame): there is nothing to
+    // transition from, so there is nothing to do.
+    if (!cam) return;
     animRef.current = { t: 0, sx: cam.x, sy: cam.y, sz: cam.z, out: zoomingOut };
   }, [animRef]);
 

@@ -13,6 +13,7 @@ vi.mock('../../../api/index.js', () => ({
 
 import { exportStandard } from '../../../api/index.js';
 import StandardsTable from './StandardsTable.jsx';
+import { UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
 
 const STANDARD = {
   id: 'my-std',
@@ -35,6 +36,18 @@ describe('StandardsTable customized badge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     exportStandard.mockResolvedValue({ data: {}, fileName: 'test.json' });
+  });
+
+  it('still renders a standard filed under the unknown-type fallback bucket instead of dropping it', () => {
+    const mystery = { id: 'mystery', name: 'Mystery Standard', type: 'mystery-type', description: '', principleCount: 0, requirementCount: 0 };
+    render(
+      <StandardsTable
+        grouped={{ [UNKNOWN_STANDARD_TYPE]: [mystery] }}
+        actions={actions}
+        customizedCounts={{}}
+      />,
+    );
+    expect(screen.getByText('Mystery Standard')).toBeInTheDocument();
   });
 
   it('shows the customized badge when customizedCounts has a nonzero entry for the standard', () => {

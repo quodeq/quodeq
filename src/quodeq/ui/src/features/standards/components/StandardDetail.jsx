@@ -69,7 +69,7 @@ export default function StandardDetail({ standard, selectedNode, onUpdateField, 
   }
 
   if (selectedNode.type === 'principle') {
-    const principle = standard.principles[selectedNode.index];
+    const principle = (standard.principles || [])[selectedNode.index];
     if (!principle) return null;
     return (
       <PrincipleForm
@@ -82,9 +82,9 @@ export default function StandardDetail({ standard, selectedNode, onUpdateField, 
   }
 
   if (selectedNode.type === 'requirement') {
-    const principle = standard.principles[selectedNode.principleIndex];
+    const principle = (standard.principles || [])[selectedNode.principleIndex];
     if (!principle) return null;
-    const requirement = principle.requirements[selectedNode.reqIndex];
+    const requirement = (principle.requirements || [])[selectedNode.reqIndex];
     if (!requirement) return null;
     return (
       <RequirementForm

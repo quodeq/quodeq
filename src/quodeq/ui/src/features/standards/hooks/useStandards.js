@@ -7,6 +7,11 @@ import { STANDARDS_CHANGED_REASON, notifyStandardsChanged } from '../../../const
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
+// Fallback bucket for a standard whose `type` doesn't match any known
+// STANDARD_TYPES value. Keeps it visible (StandardsTable folds this bucket
+// into its flat row list) instead of silently dropping it from the list.
+export const UNKNOWN_STANDARD_TYPE = 'unknown';
+
 function makeHandleDelete({ deleteStandard, setMutationError, refresh }) {
   return async (id) => {
     try {
@@ -42,9 +47,17 @@ function groupStandards(standards) {
     [STANDARD_TYPES.QUODEQ]: [],
     [STANDARD_TYPES.COMMUNITY]: [],
     [STANDARD_TYPES.CUSTOM]: [],
+    [UNKNOWN_STANDARD_TYPE]: [],
   };
   for (const s of standards) {
-    if (g[s.type]) g[s.type].push(s);
+    if (g[s.type]) {
+      g[s.type].push(s);
+    } else {
+      // Unrecognized type: keep the standard visible in its own bucket
+      // instead of dropping it from the list.
+      console.warn('[useStandards] unrecognized standard type:', s.type);
+      g[UNKNOWN_STANDARD_TYPE].push(s);
+    }
   }
   return g;
 }

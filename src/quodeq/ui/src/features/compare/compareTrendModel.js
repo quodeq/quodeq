@@ -12,6 +12,10 @@ import { scoreDomain } from '../../components/scoreChartHelpers.js';
  */
 export function trendDomain(series) {
   const entries = series.flat();
+  // An empty combined series has no min/max to speak of: Math.min/max on an
+  // empty array silently return +/-Infinity, which would poison every
+  // downstream axis computation. Surface the empty case explicitly instead.
+  if (entries.length === 0) return { t0: null, t1: null, v0: null, v1: null };
   const times = entries.map((e) => new Date(e.dateISO).getTime());
   const [v0, v1] = scoreDomain(entries.map((e) => e.value));
   return {

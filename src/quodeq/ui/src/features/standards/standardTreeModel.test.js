@@ -67,6 +67,13 @@ test('addRequirementToStandard: first requirement in an empty principle gets seq
   assert.deepEqual(selectedNode, { type: 'requirement', principleIndex: 1, reqIndex: 0 });
 });
 
+test('addRequirementToStandard: skips the mutation and selects root when principleIndex is out of range', () => {
+  const original = makeStandard();
+  const { standard, selectedNode } = addRequirementToStandard(original, 99);
+  assert.deepEqual(standard, original);
+  assert.deepEqual(selectedNode, { type: 'root' });
+});
+
 // ---------------------------------------------------------------------------
 // removeRequirementFromStandard
 // ---------------------------------------------------------------------------
@@ -76,6 +83,14 @@ test('removeRequirementFromStandard: removes the requirement and selects the par
   const { standard, selectedNode } = removeRequirementFromStandard(original, 0, 0);
   assert.equal(standard.principles[0].requirements.length, 0);
   assert.deepEqual(selectedNode, { type: 'principle', index: 0 });
+});
+
+test('removeRequirementFromStandard: does not throw when principleIndex is out of range', () => {
+  const original = makeStandard();
+  assert.doesNotThrow(() => removeRequirementFromStandard(original, 99, 0));
+  const { standard, selectedNode } = removeRequirementFromStandard(original, 99, 0);
+  assert.deepEqual(standard, original);
+  assert.deepEqual(selectedNode, { type: 'principle', index: 99 });
 });
 
 // ---------------------------------------------------------------------------

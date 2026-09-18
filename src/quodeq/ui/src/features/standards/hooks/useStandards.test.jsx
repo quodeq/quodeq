@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
-import { useStandards, STANDARD_TYPES } from './useStandards.js';
+import { useStandards, STANDARD_TYPES, UNKNOWN_STANDARD_TYPE } from './useStandards.js';
 import { STANDARDS_CHANGED_EVENT, STANDARDS_CHANGED_REASON } from '../../../constants.js';
 
 function captureStandardsChanged() {
@@ -47,6 +47,25 @@ describe('useStandards', () => {
     expect(result.current.grouped[STANDARD_TYPES.BUILTIN]).toHaveLength(1);
     expect(result.current.grouped[STANDARD_TYPES.CUSTOM]).toHaveLength(2);
     expect(result.current.error).toBeNull();
+  });
+
+  it('keeps standards with an unrecognized type visible in a fallback bucket and warns once', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      fakeApi.listStandards.mockResolvedValue([
+        { id: 'a', name: 'A', type: STANDARD_TYPES.BUILTIN },
+        { id: 'z', name: 'Z', type: 'mystery-type' },
+      ]);
+      const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
+      await waitFor(() => {
+        expect(result.current.standards).toHaveLength(2);
+      });
+      expect(result.current.grouped[UNKNOWN_STANDARD_TYPE]).toHaveLength(1);
+      expect(result.current.grouped[UNKNOWN_STANDARD_TYPE][0].id).toBe('z');
+      expect(warnSpy).toHaveBeenCalledWith('[useStandards] unrecognized standard type:', 'mystery-type');
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('exposes the error message when listStandards rejects', async () => {

@@ -11,7 +11,8 @@ export function findSubtree(root, path) {
   function walk(node, depth = 0) {
     if (depth > MAX_TREE_DEPTH) return null;
     if (node.path === path) return node;
-    for (const child of node.children) {
+    const children = Array.isArray(node?.children) ? node.children : [];
+    for (const child of children) {
       if (path === child.path || path.startsWith(child.path + '/')) {
         const found = walk(child, depth + 1);
         if (found) return found;
@@ -28,7 +29,8 @@ export function buildBreadcrumbPath(root, path) {
   const crumbs = [];
   let node = root;
   while (node && node.path !== path) {
-    const child = node.children.find((c) => path === c.path || path.startsWith(c.path + '/'));
+    const children = Array.isArray(node?.children) ? node.children : [];
+    const child = children.find((c) => path === c.path || path.startsWith(c.path + '/'));
     if (!child) break;
     crumbs.push({ name: child.name, path: child.path });
     node = child;

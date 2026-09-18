@@ -41,6 +41,20 @@ test('buildBreadcrumbPath returns the ancestor chain excluding the root', () => 
   ]);
 });
 
+test('findSubtree does not throw on a malformed node with no children array', () => {
+  const malformed = node('x', 'x');
+  delete malformed.children;
+  assert.doesNotThrow(() => findSubtree(malformed, 'x/y'));
+  assert.equal(findSubtree(malformed, 'x/y'), malformed);
+});
+
+test('buildBreadcrumbPath does not throw on a malformed node with no children array', () => {
+  const malformed = node('x', 'x');
+  delete malformed.children;
+  assert.doesNotThrow(() => buildBreadcrumbPath(malformed, 'x/y'));
+  assert.deepEqual(buildBreadcrumbPath(malformed, 'x/y'), []);
+});
+
 test('buildBreadcrumbPath is empty for no path and stops at the deepest resolvable hop', () => {
   assert.deepEqual(buildBreadcrumbPath(root, ''), []);
   // Unknown leaf under a known folder: crumbs cover the resolvable prefix.

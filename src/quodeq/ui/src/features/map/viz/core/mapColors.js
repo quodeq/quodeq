@@ -49,6 +49,7 @@ export function healthColor(complianceRate) {
 }
 
 export function worstSeverity(severity) {
+  if (!severity) return null;
   if (severity.critical > 0) return 'critical';
   if (severity.major > 0) return 'major';
   if (severity.minor > 0) return 'minor';

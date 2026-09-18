@@ -222,3 +222,32 @@ describe('useGalaxyCamera — animation-loop stale-star guard', () => {
     }).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// w2s / startTransition before the first animation frame (camRef.current
+// still null: canvasRef.current is null so the effect's rAF loop never runs).
+// ---------------------------------------------------------------------------
+describe('useGalaxyCamera — w2s/startTransition guard camRef.current before the first frame', () => {
+  it('w2s returns a neutral origin instead of throwing when camRef.current is still null', () => {
+    const scene = makeScene(2);
+    const size = { w: 800, h: 600 };
+    const refs = makeRefs({ depth: 0, dim: null, prin: null, clusterCx: null, clusterCy: null });
+
+    const { result } = renderHook(() => useGalaxyCamera({ scene, size, showLabels: false, ...refs }));
+
+    let point;
+    expect(() => { point = result.current.w2s(10, 20); }).not.toThrow();
+    expect(point).toEqual({ x: 0, y: 0 });
+  });
+
+  it('startTransition is a no-op instead of throwing when camRef.current is still null', () => {
+    const scene = makeScene(2);
+    const size = { w: 800, h: 600 };
+    const refs = makeRefs({ depth: 0, dim: null, prin: null, clusterCx: null, clusterCy: null });
+
+    const { result } = renderHook(() => useGalaxyCamera({ scene, size, showLabels: false, ...refs }));
+
+    expect(() => result.current.startTransition(true)).not.toThrow();
+    expect(refs.animRef.current).toBeNull();
+  });
+});

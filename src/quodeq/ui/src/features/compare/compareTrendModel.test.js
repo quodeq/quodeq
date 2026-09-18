@@ -35,6 +35,11 @@ test('trendDomain: flattens the series once, deriving times and values from one 
   assert.deepEqual([v0, v1], scoreDomain([6, 8]));
 });
 
+test('trendDomain: returns an explicit empty domain (not Infinity/-Infinity) for an empty combined series', () => {
+  const domain = trendDomain([[], []]);
+  assert.deepEqual(domain, { t0: null, t1: null, v0: null, v1: null });
+});
+
 // ---------------------------------------------------------------------------
 // monotonePath — exact `d`-string (rounding + spline math frozen)
 // ---------------------------------------------------------------------------
