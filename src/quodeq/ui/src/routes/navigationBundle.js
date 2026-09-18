@@ -66,7 +66,6 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
     retryLoadProjects: state.retryLoadProjects,
-    warmup: state.warmup,
     loadProjects: state.loadProjects,
     handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
     // navStack + navGoTo let a route unwind history to an earlier entry of

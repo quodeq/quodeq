@@ -17,7 +17,6 @@ export function buildDashboardDataBundle({ state, sharedHasContent = false }) {
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
     onProjectsRetry: state.retryLoadProjects,
-    warmup: state.warmup,
     dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, isFetching: state.isFetching, error: state.error,
     onRetry: state.refreshDashboardActive,
     scoresPending: state.scoresPending,

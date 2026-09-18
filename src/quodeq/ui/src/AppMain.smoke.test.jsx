@@ -54,7 +54,6 @@ function makeShell(overrides = {}) {
       serverConnected: true,
       setServerConnected: () => {},
       evalLifecycle: {},
-      warmup: null,
     },
     navTab: () => {},
     activeTab: 'overview',
@@ -108,5 +107,38 @@ describe('AppMain mount smoke test', () => {
     fireEvent.click(btn);
 
     expect(toggleTheme).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The startup loader has to mount in the shell's BODY row, never inside
+// .app-shell__main-column: that column sets `contain: layout paint`, which
+// makes it the containing block for fixed-position descendants, so a loader
+// mounted inside it gets clipped to the column -- the sidebar stays visible
+// under a supposedly fullscreen loader, and (with the base rule's
+// pointer-events: none) stays clickable too.
+describe('AppMain startup loader placement', () => {
+  it('mounts the loader in the shell body, outside the paint-contained main column', () => {
+    const { container } = renderAppMain(makeShell({ showStartupLoader: true }));
+
+    const loader = container.querySelector('.loading-screen');
+    expect(loader).toBeInTheDocument();
+    expect(loader).toHaveClass('loading-screen--shell');
+    expect(loader.parentElement).toHaveClass('app-shell__body');
+    expect(loader.closest('.app-shell__main-column')).toBeNull();
+  });
+
+  it('puts the sidebar and main column out of reach while it is up', () => {
+    const { container } = renderAppMain(makeShell({ showStartupLoader: true }));
+
+    expect(container.querySelector('.sidebar')).toHaveAttribute('inert');
+    expect(container.querySelector('.app-shell__main-column')).toHaveAttribute('inert');
+  });
+
+  it('leaves both interactive once the loader is gone', () => {
+    const { container } = renderAppMain(makeShell({ showStartupLoader: false }));
+
+    expect(container.querySelector('.loading-screen')).toBeNull();
+    expect(container.querySelector('.sidebar')).not.toHaveAttribute('inert');
+    expect(container.querySelector('.app-shell__main-column')).not.toHaveAttribute('inert');
   });
 });

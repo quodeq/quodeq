@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { QMarkIcon } from './QMarkIcon.jsx';
-import WarmupNotice from './WarmupNotice.jsx';
 import { t } from '../strings/index.js';
 
 // One short sentence each — the 5s rotation only leaves reading time for
@@ -45,7 +44,7 @@ function useRotatingTip(enabled) {
 }
 
 /**
- * @param {{ message?: string, variant?: 'fullscreen'|'inline', tips?: boolean, warmup?: object|null }} props
+ * @param {{ message?: string, variant?: 'fullscreen'|'shell'|'inline', tips?: boolean }} props
  *
  * `message` labels what is being waited on. Worth passing whenever the wait
  * follows a user action that swapped the whole page's subject (e.g. switching
@@ -54,31 +53,33 @@ function useRotatingTip(enabled) {
  *
  * `variant` (default 'fullscreen'): 'fullscreen' is for cold start only (the
  * app-level Suspense fallback and any true first-load, before there's a page
- * frame to contain a loader). 'inline' is for everything mounted within an
+ * frame to contain a loader). 'shell' is the boot overlay AppMain mounts in
+ * the app shell's body row -- it covers sidebar, main column and side pane
+ * (everything below the TopBar) and swallows clicks, so nothing underneath is
+ * reachable while it's up. 'inline' is for everything mounted within an
  * already-rendered page -- it must not compete with, or hide behind, other
  * loaders or dimmed containers on the same route.
  *
  * `tips` rotates a help tip under the logo once a wait drags past a few
- * seconds. `warmup` renders the determinate preparing-data strip when a
- * post-update warm-up is running.
+ * seconds.
  */
-export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, warmup = null, leaving = false }) {
+export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
   const tipKey = useRotatingTip(tips);
   const classes = ['loading-screen'];
   if (variant === 'inline') classes.push('loading-screen--inline');
+  if (variant === 'shell') classes.push('loading-screen--shell');
   if (leaving) classes.push('loading-screen--leaving');
   return (
     <div className={classes.join(' ')} role="status" aria-live="polite">
       <QMarkIcon className="loading-logo" />
       {message && <p className="loading-message">{message}</p>}
       {tipKey && <p className="loading-tip">{t(tipKey)}</p>}
-      <WarmupNotice warmup={warmup} />
     </div>
   );
 }
 
 /**
- * Fullscreen loader with a graceful exit. Stays mounted at a stable spot in
+ * Full-cover loader with a graceful exit. Stays mounted at a stable spot in
  * the tree; when `show` flips false it plays the fade-out (the leaving class)
  * and unmounts after it, instead of vanishing on the same frame the content
  * appears. Flipping `show` back mid-fade cancels the exit.

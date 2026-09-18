@@ -111,7 +111,7 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
       expect(result.current.projectsLoadFailed).toBe(true);
 
-      listProjects.mockResolvedValue({ projects: [{ id: 'p1', name: 'proj1' }], warmup: null });
+      listProjects.mockResolvedValue({ projects: [{ id: 'p1', name: 'proj1' }] });
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
 
       expect(result.current.projectsLoaded).toBe(true);

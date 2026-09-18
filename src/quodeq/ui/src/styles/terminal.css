@@ -1542,6 +1542,9 @@ button.term-sev-badge--clickable:focus-visible {
   flex: 1 1 auto;
   min-height: 0;
   transition: grid-template-columns 220ms ease;
+  /* Containing block for the boot loader (.loading-screen--shell), which
+     covers this whole row and nothing above it. */
+  position: relative;
 }
 /* While the user is dragging the side-pane divider, the column width
    tracks the cursor every pointermove via the --side-pane-width CSS var.

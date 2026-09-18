@@ -109,29 +109,21 @@ describe('projects-load failure gate (startup infinite spinner)', () => {
   });
 });
 
-describe('warm-up surfaces', () => {
+describe('startup surfaces', () => {
   it('renders no loader of its own before projects load (app-level overlay owns that state)', () => {
-    const warmup = { active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' };
     const { container } = render(
-      <DashboardPage data={{ projectsLoaded: false, warmup }} callbacks={{}} runMode={false} />,
+      <DashboardPage data={{ projectsLoaded: false }} callbacks={{}} runMode={false} />,
     );
     expect(container.querySelector('.loading-screen')).toBeNull();
-    expect(container.querySelector('.warmup-notice')).toBeNull();
   });
 
-  it('shows the warm-up notice above the overview skeleton while scores compute', () => {
-    const warmup = { active: true, projectsDone: 1, projectsTotal: 6, currentProjectName: 'my-app' };
+  // The warm-up progress strip used to sit here, narrating a background cache
+  // rebuild that never gated the app. The skeleton alone is the wait now.
+  it('shows only the overview skeleton while scores compute', () => {
     const { container } = render(
-      <DashboardPage data={{ ...overviewLoading, warmup }} callbacks={{}} runMode={false} />,
+      <DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />,
     );
     expect(container.querySelector('.overview-skeleton')).toBeTruthy();
-    expect(container.querySelector('.warmup-notice')).toBeTruthy();
-  });
-
-  it('renders no warm-up notice when the snapshot is inactive', () => {
-    const { container } = render(
-      <DashboardPage data={{ ...overviewLoading, warmup: { active: false, projectsDone: 2, projectsTotal: 2 } }} callbacks={{}} runMode={false} />,
-    );
     expect(container.querySelector('.warmup-notice')).toBeNull();
   });
 });

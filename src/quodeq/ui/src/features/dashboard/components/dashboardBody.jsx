@@ -1,7 +1,6 @@
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import OverviewSkeleton from './OverviewSkeleton.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
-import WarmupNotice from '../../../components/WarmupNotice.jsx';
 import { t } from '../../../strings/index.js';
 import DashboardContent from './DashboardContent.jsx';
 import { dashboardPageClassName } from './dashboardGate.jsx';
@@ -28,7 +27,7 @@ function renderReadyContent({ data, callbacks, runMode, projectInfo, selectedRun
 /**
  * @param {object} ctx
  * @param {object} ctx.data dashboard state slice (dashboard, error, isFetching,
- *   warmup, accumulated, availableRuns, dailyRuns, overviewRunIndex,
+ *   accumulated, availableRuns, dailyRuns, overviewRunIndex,
  *   selectedProject, granularity, selectedSource, scoresPending, customFormula)
  * @param {object} ctx.callbacks passed through to DashboardContent (onRunSelect,
  *   onNavigate, onGranularityChange)
@@ -47,7 +46,7 @@ function renderReadyContent({ data, callbacks, runMode, projectInfo, selectedRun
  */
 export function renderDashboardBody(ctx) {
   const { data, runMode, projectInfo, projectName, pageState, onSetupComplete } = ctx;
-  const { dashboard, error, isFetching, warmup = null } = data;
+  const { dashboard, error, isFetching } = data;
   const { contentReady, isLoading, showOverviewSkeleton, dashboardAppearClass } = pageState;
   // True while a *background* fetch is running but we're already showing
   // data (placeholderData kept the previous run on screen during a switch).
@@ -78,7 +77,6 @@ export function renderDashboardBody(ctx) {
       <div className={dashboardPageClassName({ appearClass: dashboardAppearClass, dimmed: isDimmed, refreshing: isRefreshing })}>
         <IncompleteSetupCard projectInfo={projectInfo} onComplete={onSetupComplete} />
         {error && <p className="inline-error">{t('overview.loadFailed')}</p>}
-        {showOverviewSkeleton && <WarmupNotice warmup={warmup} />}
         {showOverviewSkeleton && <OverviewSkeleton projectName={projectName} />}
         {/* No runMode equivalent of the Overview's grace-fallback loader: in
             runMode contentReady is `!!dashboard`, so the instant dashboard lands

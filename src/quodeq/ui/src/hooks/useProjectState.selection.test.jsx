@@ -116,24 +116,12 @@ describe('useProjectState — source-aware project selection', () => {
 });
 
 describe('useProjectState — warm-up pending poll', () => {
-  it('exposes the warmup snapshot from the projects envelope', async () => {
-    listProjects.mockResolvedValue({
-      projects: [{ id: 'a', name: 'A', summaryPending: false }],
-      warmup: { active: true, projectsDone: 1, projectsTotal: 3, currentProjectName: 'A' },
-    });
-    const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }));
-
-    await waitFor(() => expect(result.current.projectsLoaded).toBe(true));
-    expect(result.current.warmup).toEqual({ active: true, projectsDone: 1, projectsTotal: 3, currentProjectName: 'A' });
-  });
-
   it('polls while any summary is pending and stops when all settle', async () => {
     vi.useFakeTimers();
     try {
       listProjects
-        .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }], warmup: null })
-        .mockResolvedValue({ projects: [{ id: 'a', name: 'A', summaryPending: false }], warmup: null });
+        .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }] })
+        .mockResolvedValue({ projects: [{ id: 'a', name: 'A', summaryPending: false }] });
       const { result } = renderHook(() =>
         useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, summaryPollMs: 1000 }));
 
@@ -155,7 +143,7 @@ describe('useProjectState — warm-up pending poll', () => {
     vi.useFakeTimers();
     try {
       listProjects
-        .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }], warmup: null })
+        .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }] })
         .mockRejectedValue(new Error('down'));
       const { result } = renderHook(() =>
         useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, summaryPollMs: 1000 }));
