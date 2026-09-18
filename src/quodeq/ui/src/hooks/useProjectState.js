@@ -21,7 +21,7 @@ const DEFAULT_AUTO_RETRY_MS = 30000;
 // silently, leaving a permanent LoadingScreen even after the backend
 // recovered). A successful fetch that returns an empty array is still a
 // real "fresh user" -> onboarding.
-function makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlightRef, setProjectsLoadFailed, setWarmup, setProjects, setProjectsLoaded }) {
+function makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlightRef, setProjectsLoadFailed, setProjects, setProjectsLoaded }) {
   return function load(attempt = 0) {
     if (attempt === 0) {
       loadInFlightRef.current = true;
@@ -30,7 +30,6 @@ function makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlight
     return listProjects()
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.projects || []);
-        if (data && !Array.isArray(data)) setWarmup(data.warmup ?? null);
         setProjects(list);
         setProjectsLoaded(true);
         loadInFlightRef.current = false;
@@ -78,13 +77,12 @@ function makeSelectProjectAndRun({ setSelectedProject, setSelectedSource, setSel
 }
 
 function buildProjectStateResult({
-  projects, warmup, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,
+  projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,
   selectedProject, selectedSource, selectedRun, setSelectedRun, loadProjects,
   handleProjectChange, handleRunChange, selectProjectAndRun,
 }) {
   return {
     projects,
-    warmup,
     projectsLoaded,
     projectsLoadFailed,
     retryLoadProjects,
@@ -107,14 +105,13 @@ function useProjectStateFields(storage) {
   const [projects, setProjects] = useState([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [projectsLoadFailed, setProjectsLoadFailed] = useState(false);
-  const [warmup, setWarmup] = useState(null);
   const [selectedProject, setSelectedProject] = useState(() => readStoredProject(storage));
   const [selectedSource, setSelectedSource] = useState(() => readStoredSource(storage));
   const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
   const loadInFlightRef = useRef(false);
   return {
     projects, setProjects, projectsLoaded, setProjectsLoaded, projectsLoadFailed, setProjectsLoadFailed,
-    warmup, setWarmup, selectedProject, setSelectedProject, selectedSource, setSelectedSource,
+    selectedProject, setSelectedProject, selectedSource, setSelectedSource,
     selectedRun, setSelectedRun, loadInFlightRef,
   };
 }
@@ -129,9 +126,9 @@ function makeSelectionHandlers({ setSelectedProject, setSelectedSource, setSelec
 // The project-list fetch: the retrying loader and the Retry action that also
 // re-resolves the stored selection, like boot does.
 function useProjectListLoader({ listProjects, maxRetries, retryDelayMs, fields, handleProjectChange, onNoProjects, storage }) {
-  const { loadInFlightRef, setProjectsLoadFailed, setWarmup, setProjects, setProjectsLoaded, selectedProject, selectedSource } = fields;
+  const { loadInFlightRef, setProjectsLoadFailed, setProjects, setProjectsLoaded, selectedProject, selectedSource } = fields;
   const loadProjects = useCallback(
-    makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlightRef, setProjectsLoadFailed, setWarmup, setProjects, setProjectsLoaded }),
+    makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlightRef, setProjectsLoadFailed, setProjects, setProjectsLoaded }),
     [listProjects, maxRetries, retryDelayMs],
   );
   const retryLoadProjects = makeRetryLoadProjects({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage });
@@ -143,11 +140,11 @@ function useProjectListLoader({ listProjects, maxRetries, retryDelayMs, fields, 
 // (hooks/useProjectWarmupPoll.js).
 function useProjectBackgroundRefresh({ fields, listProjects, handleProjectChange, onNoProjects, storage, autoRetryMs, loadProjects, summaryPollMs }) {
   const {
-    projects, projectsLoaded, projectsLoadFailed, loadInFlightRef, setWarmup, setProjects,
+    projects, projectsLoaded, projectsLoadFailed, loadInFlightRef, setProjects,
     setProjectsLoaded, setProjectsLoadFailed, selectedProject, selectedSource,
   } = fields;
   useProjectAutoRetry({
-    projectsLoadFailed, projectsLoaded, loadInFlightRef, listProjects, setWarmup, setProjects,
+    projectsLoadFailed, projectsLoaded, loadInFlightRef, listProjects, setProjects,
     setProjectsLoaded, setProjectsLoadFailed, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage, autoRetryMs,
   });
   useProjectWarmupPoll({ projects, projectsLoaded, projectsLoadFailed, loadProjects, summaryPollMs });
@@ -176,7 +173,7 @@ function useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, 
  * @param {number} [params.summaryPollMs=3000] - Poll interval while any project's summary is pending.
  * @param {number} [params.autoRetryMs=30000] - Interval for the background auto-retry that runs while
  *   projectsLoadFailed is true.
- * @returns {{ projects: Array, warmup: Object|null, projectsLoaded: boolean, projectsLoadFailed: boolean,
+ * @returns {{ projects: Array, projectsLoaded: boolean, projectsLoadFailed: boolean,
  *   retryLoadProjects: Function, setProjects: Function, selectedProject: string, selectedSource: string,
  *   selectedRun: string, setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
  *   handleRunChange: Function, selectProjectAndRun: Function }}
@@ -192,7 +189,7 @@ export function useProjectState({
   const { listProjects } = useApi();
   const fields = useProjectStateFields(storage);
   const {
-    projects, setProjects, projectsLoaded, projectsLoadFailed, warmup,
+    projects, setProjects, projectsLoaded, projectsLoadFailed,
     selectedProject, setSelectedProject, selectedSource, setSelectedSource, selectedRun, setSelectedRun,
   } = fields;
 
@@ -208,7 +205,7 @@ export function useProjectState({
   useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage });
 
   return buildProjectStateResult({
-    projects, warmup, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,
+    projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,
     selectedProject, selectedSource, selectedRun, setSelectedRun, loadProjects,
     handleProjectChange, handleRunChange, selectProjectAndRun,
   });

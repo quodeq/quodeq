@@ -9,7 +9,7 @@ import { resolveInitialProject } from './projectStateStorage.js';
  */
 export function useProjectAutoRetry({
   projectsLoadFailed, projectsLoaded, loadInFlightRef, listProjects,
-  setWarmup, setProjects, setProjectsLoaded, setProjectsLoadFailed,
+  setProjects, setProjectsLoaded, setProjectsLoadFailed,
   selectedProject, selectedSource, handleProjectChange, onNoProjects, storage, autoRetryMs,
 }) {
   useEffect(() => {
@@ -20,7 +20,6 @@ export function useProjectAutoRetry({
       listProjects()
         .then((data) => {
           const list = Array.isArray(data) ? data : (data?.projects || []);
-          if (data && !Array.isArray(data)) setWarmup(data.warmup ?? null);
           setProjects(list);
           setProjectsLoaded(true);
           setProjectsLoadFailed(false);

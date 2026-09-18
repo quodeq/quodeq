@@ -28,14 +28,11 @@ const PROJECTS_LIST_TIMEOUT_MS = 120000;
 // hung backend must not leave onboarding pending forever.
 const REGISTER_PROJECT_TIMEOUT_MS = 600000; // 10 min
 
-/** @returns {Promise<{ projects: import('../models/project.js').Project[], warmup: object | null }>} */
+/** @returns {Promise<{ projects: import('../models/project.js').Project[] }>} */
 export async function listProjects() {
   const data = await request('/projects', { timeout: PROJECTS_LIST_TIMEOUT_MS });
   const list = data?.projects ?? data ?? [];
-  return {
-    projects: Array.isArray(list) ? list.map(createProject) : [],
-    warmup: (data && !Array.isArray(data) && data.warmup) || null,
-  };
+  return { projects: Array.isArray(list) ? list.map(createProject) : [] };
 }
 
 /** @returns {Promise<import('../models/project.js').Project>} */
