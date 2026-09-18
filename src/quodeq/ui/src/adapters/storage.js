@@ -11,6 +11,19 @@
  * instead of leaning on a jsdom global.
  */
 
+// Keys already warned about for a failed read or write. A poller (e.g. a
+// 400ms mirror tick reading three keys) hitting a blocked/quota-exceeded
+// backend would otherwise spam the console indefinitely; the first failure
+// per key is enough to diagnose it.
+const warnedKeys = new Set();
+
+/** True the first time this key is seen; false (skip the warn) every time after. */
+function shouldWarn(key) {
+  if (warnedKeys.has(key)) return false;
+  warnedKeys.add(key);
+  return true;
+}
+
 /** Resolve the backend, tolerating a missing/blocked `localStorage`. */
 function backend(storage) {
   if (storage !== undefined) return storage;
@@ -30,7 +43,7 @@ export function readString(key, fallback = null, storage) {
     const raw = s.getItem(key);
     return raw === null ? fallback : raw;
   } catch (err) {
-    console.warn(`[storage] could not read "${key}":`, err);
+    if (shouldWarn(key)) console.warn(`[storage] could not read "${key}":`, err);
     return fallback;
   }
 }
@@ -43,7 +56,7 @@ export function writeString(key, value, storage) {
     s.setItem(key, String(value));
     return true;
   } catch (err) {
-    console.warn(`[storage] could not write "${key}" (private mode or quota exceeded):`, err);
+    if (shouldWarn(key)) console.warn(`[storage] could not write "${key}" (private mode or quota exceeded):`, err);
     return false; // non-fatal by design
   }
 }

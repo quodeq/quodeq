@@ -12,8 +12,8 @@ export const VALID_SOURCES = Object.values(PROJECT_SOURCE);
  */
 export function persistProject(setter, name, storage = localStorage) {
   setter(name);
-  const ok = writeString(STORAGE_KEY, name, storage);
-  if (!ok) console.warn('[projectStateStorage] could not persist project'); // private browsing
+  // writeString already warns on failure; no need to log again here.
+  writeString(STORAGE_KEY, name, storage);
 }
 
 /**
@@ -24,8 +24,8 @@ export function persistProject(setter, name, storage = localStorage) {
 export function persistSource(setter, source, storage = localStorage) {
   const value = VALID_SOURCES.includes(source) ? source : DEFAULT_SOURCE;
   setter(value);
-  const ok = writeString(SOURCE_STORAGE_KEY, value, storage);
-  if (!ok) console.warn('[projectStateStorage] could not persist source'); // private browsing
+  // writeString already warns on failure; no need to log again here.
+  writeString(SOURCE_STORAGE_KEY, value, storage);
 }
 
 /**

@@ -44,7 +44,7 @@ describe('HistoryPage — chart error boundary', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const QC = withQueryClient();
-    render(
+    const { container } = render(
       <QC>
         <ApiProvider value={makeFakeApi()}>
           <HistoryPage
@@ -73,8 +73,9 @@ describe('HistoryPage — chart error boundary', () => {
 
     expect(await screen.findByText('The chart could not be displayed.')).toBeInTheDocument();
     // The rest of the page (evaluations table) must still be usable.
-    expect(screen.queryByTestId('history-chart-panel-placeholder')).not.toBeInTheDocument();
+    expect(container.querySelector('.history-table')).toBeInTheDocument();
     warn.mockRestore();
     error.mockRestore();
   });
+
 });

@@ -94,8 +94,8 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
       const payload = { repo, cloneDest, ephemeral };
       const { projectId, scanData } = await createProject(payload);
       if (cloneDest && !ephemeral) {
-        const ok = writeString(CLONE_DEST_STORAGE_KEY, cloneDest);
-        if (!ok) console.warn('[useRepoScanStep] could not persist clone destination'); // private mode
+        // writeString already warns on failure; no need to log again here.
+        writeString(CLONE_DEST_STORAGE_KEY, cloneDest);
       }
       actions.succeedScan(projectId, scanData);
       setSubStep('input');

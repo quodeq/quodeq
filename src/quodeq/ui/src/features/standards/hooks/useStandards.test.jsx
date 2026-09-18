@@ -103,12 +103,14 @@ describe('useStandards', () => {
     fakeApi.deleteStandard.mockResolvedValue({});
     const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.standards).toHaveLength(1));
+    let ok;
     await act(async () => {
-      await result.current.handleDelete('a');
+      ok = await result.current.handleDelete('a');
     });
     expect(fakeApi.deleteStandard).toHaveBeenCalledWith('a');
     // refresh triggers a refetch
     expect(fakeApi.listStandards.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(ok).toBe(true);
   });
 
   it('handleDelete surfaces the mutation error', async () => {
@@ -116,9 +118,11 @@ describe('useStandards', () => {
     fakeApi.deleteStandard.mockRejectedValue(new Error('cannot delete'));
     const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
+    let ok;
     await act(async () => {
-      await result.current.handleDelete('a');
+      ok = await result.current.handleDelete('a');
     });
     expect(result.current.error).toBe('cannot delete');
+    expect(ok).toBe(false);
   });
 });

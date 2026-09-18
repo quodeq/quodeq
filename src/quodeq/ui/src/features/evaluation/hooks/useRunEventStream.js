@@ -56,7 +56,7 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
       }
     } catch (err) {
       // malformed frame; reconnect handles recovery via Last-Event-ID
-      console.warn("[useRunEventStream] could not parse status frame:", err);
+      console.warn('[useRunEventStream] could not parse status frame:', err);
     }
   });
 
@@ -68,7 +68,7 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
         (prev = {}) => ({ ...prev, [data.dimension]: data }),
       );
     } catch (err) {
-      console.warn("[useRunEventStream] could not parse dimension-completed frame:", err);
+      console.warn('[useRunEventStream] could not parse dimension-completed frame:', err);
     }
   });
 
@@ -80,7 +80,7 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
         (prev = []) => appendBoundedFinding(prev, data),
       );
     } catch (err) {
-      console.warn("[useRunEventStream] could not parse finding frame:", err);
+      console.warn('[useRunEventStream] could not parse finding frame:', err);
     }
   });
 

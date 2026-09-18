@@ -11,10 +11,19 @@ import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 // The lazy-loaded chart panel had no error boundary around its Suspense: a
 // chunk-load failure (offline, deploy skew) or a render throw inside the
 // chart used to crash the whole History page instead of just the chart.
-class ChartErrorBoundary extends Component {
+// Reset on trend/selectedRunId change (a new run or dataset is a fresh
+// mount's worth of data) so one transient failure doesn't kill the chart
+// for the rest of the page's lifetime.
+// Exported for HistoryContent.chartBoundary.test.jsx.
+export class ChartErrorBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error, info) { console.warn('[HistoryContent] chart panel failed:', error, info); }
+  componentDidUpdate(prevProps) {
+    if (this.state.failed && (prevProps.trend !== this.props.trend || prevProps.selectedRunId !== this.props.selectedRunId)) {
+      this.setState({ failed: false });
+    }
+  }
   render() {
     if (this.state.failed) return <p className="inline-error inline-error--spaced">{t('history.chartRenderFailed')}</p>;
     return this.props.children;
@@ -129,7 +138,7 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
         availableRuns={availableRuns} runNav={runNav} onRunClick={onRunClick}
       />
 
-      <ChartErrorBoundary>
+      <ChartErrorBoundary trend={trend} selectedRunId={selectedRunId}>
         <Suspense fallback={<HistoryChartPanelPlaceholder />}>
           <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
         </Suspense>

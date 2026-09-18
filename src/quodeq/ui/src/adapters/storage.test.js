@@ -79,3 +79,12 @@ test('a null backend degrades to fallbacks instead of crashing', () => {
   assert.equal(readJSON('k', null, null), null);
   removeKey('k', null);
 });
+
+test('a repeatedly failing read for the same key warns only once', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const key = 'poll-only-warns-once';
+  readString(key, null, hostile());
+  readString(key, null, hostile());
+  readString(key, null, hostile());
+  assert.equal(warn.mock.calls.length, 1);
+});

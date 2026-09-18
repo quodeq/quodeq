@@ -23,8 +23,8 @@ export default function useLiveFeedSettings({ storage = localStorage } = {}) {
   const [newOnly, setNewOnlyState] = useState(() => loadNewOnly(storage));
 
   const setNewOnly = useCallback((value) => {
-    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? 'true' : 'false', storage);
-    if (!ok) console.warn('[useLiveFeedSettings] could not persist new-findings-only setting');
+    // writeString already warns on failure; no need to log again here.
+    writeString(NEW_FINDINGS_ONLY_KEY, value ? 'true' : 'false', storage);
     setNewOnlyState(value);
     // A 'storage' event does not fire in the tab that wrote the value, so
     // the Settings page and the evaluation screen need this to stay in
