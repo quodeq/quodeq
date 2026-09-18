@@ -133,7 +133,7 @@ def test_walk_and_group_ignores_escaping_scope(tmp_path):
     src.mkdir()
     (src / "main.py").write_text("y = 2\n")
 
-    files_by_lang, _, _ = _walk_and_group(
+    files_by_lang, _, _, _ = _walk_and_group(
         src, ManifestWalkSpec({".py": "python"}, set(), []), scope_path="../outside",
     )
     all_files = [f for files in files_by_lang.values() for f in files]
@@ -153,7 +153,7 @@ def test_walk_and_group_ignores_symlink_scope_escape(tmp_path):
     (src / "main.py").write_text("y = 2\n")
     (src / "link").symlink_to(outside)
 
-    files_by_lang, _, _ = _walk_and_group(
+    files_by_lang, _, _, _ = _walk_and_group(
         src, ManifestWalkSpec({".py": "python"}, set(), []), scope_path="link",
     )
     all_files = [f for files in files_by_lang.values() for f in files]
@@ -169,7 +169,7 @@ def test_walk_and_group_valid_scope_still_narrows(tmp_path):
     (src / "root.py").write_text("a = 1\n")
     (src / "sub" / "inner.py").write_text("b = 2\n")
 
-    files_by_lang, _, _ = _walk_and_group(
+    files_by_lang, _, _, _ = _walk_and_group(
         src, ManifestWalkSpec({".py": "python"}, set(), []), scope_path="sub",
     )
     all_files = [f for files in files_by_lang.values() for f in files]

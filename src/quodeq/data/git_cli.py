@@ -38,6 +38,45 @@ def run_git(
     return result.stdout
 
 
+def list_tracked_files(
+    path: Path | str, *, timeout: float = _DEFAULT_TIMEOUT_S,
+) -> set[Path] | None:
+    """Absolute paths of the files git tracks at or under *path*, or None.
+
+    Runs ``git ls-files -z --cached`` with *path* as the working directory,
+    which restricts the listing to that subtree and reports every path
+    relative to it, so the result is rebuilt as ``path.resolve() / rel`` and
+    needs no knowledge of where the repository root sits. ``--cached`` counts
+    a staged-but-uncommitted file as tracked. ``-z`` is not optional: git's
+    default output C-quotes any name holding a space, a quote or a non-ASCII
+    byte (``"h\\303\\251llo.py"``), so only the NUL-separated form can be
+    split back into real paths.
+
+    None means "no answer, do not filter" and is returned for every failure
+    mode: *path* is outside a git work tree, the ``git`` binary is missing,
+    the command exits non-zero, it times out, or a tracked path is not valid
+    UTF-8. Filtering on a half-answer would silently drop real source files
+    from a run, so an unanswerable question has to leave the caller's file
+    set exactly as it was.
+
+    An empty set is a real answer, not a missing one: a repository with
+    nothing in its index tracks nothing. A submodule's contents are not
+    tracked by the parent repository either, so they are absent here — a
+    submodule is its own repository and is listed by its own index.
+    """
+    try:
+        out = run_git(["-C", str(path), "ls-files", "-z", "--cached"], timeout=timeout)
+    except UnicodeDecodeError:
+        # run_git decodes stdout as strict UTF-8; a tracked path with other
+        # bytes in it is unreadable rather than absent, so do not filter.
+        _logger.debug("Undecodable tracked path under %s", path)
+        return None
+    if out is None:
+        return None
+    base = Path(path).resolve()
+    return {base / rel for rel in out.split("\0") if rel}
+
+
 def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> list[str]:
     """Local branch names of *repo_dir*; empty when not a git repo."""
     if not (repo_dir / ".git").exists():

@@ -40,6 +40,65 @@ class TestRunGit:
         assert run_git(["rev-parse", "--is-inside-work-tree"], cwd=tmp_path) is None
 
 
+def _raise_missing_git(*_args, **_kwargs):
+    raise FileNotFoundError("git")
+
+
+class TestListTrackedFiles:
+    def test_lists_committed_and_staged_paths(self, tmp_path):
+        from quodeq.data.git_cli import list_tracked_files
+
+        repo = _init_repo(tmp_path)
+        _commit(repo, "a.txt")
+        (repo / "staged.txt").write_text("y")
+        sp.run(["git", "-C", str(repo), "add", "staged.txt"], check=True)
+        (repo / "loose.txt").write_text("z")
+
+        assert list_tracked_files(repo) == {
+            (repo / "a.txt").resolve(), (repo / "staged.txt").resolve(),
+        }
+
+    def test_subtree_listing_is_absolute(self, tmp_path):
+        """Run at a subdirectory, git lists only that subtree and reports
+        paths relative to it; the helper rebases them onto the scan dir."""
+        from quodeq.data.git_cli import list_tracked_files
+
+        repo = _init_repo(tmp_path)
+        (repo / "pkg").mkdir()
+        (repo / "pkg" / "mod.py").write_text("x")
+        (repo / "top.py").write_text("x")
+        sp.run(["git", "-C", str(repo), "add", "-A"], check=True)
+
+        assert list_tracked_files(repo / "pkg") == {(repo / "pkg" / "mod.py").resolve()}
+
+    def test_empty_index_is_an_answer_not_a_failure(self, tmp_path):
+        from quodeq.data.git_cli import list_tracked_files
+
+        assert list_tracked_files(_init_repo(tmp_path)) == set()
+
+    def test_non_repo_returns_none(self, tmp_path):
+        from quodeq.data.git_cli import list_tracked_files
+
+        assert list_tracked_files(tmp_path) is None
+
+    def test_missing_git_binary_returns_none(self, tmp_path, monkeypatch):
+        from quodeq.data import git_cli
+
+        repo = _init_repo(tmp_path)
+        _commit(repo)
+        monkeypatch.setattr(git_cli.subprocess, "run", _raise_missing_git)
+        assert git_cli.list_tracked_files(repo) is None
+
+    def test_undecodable_path_returns_none(self, tmp_path, monkeypatch):
+        from quodeq.data import git_cli
+
+        def _boom(*_args, **_kwargs):
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+        monkeypatch.setattr(git_cli, "run_git", _boom)
+        assert git_cli.list_tracked_files(tmp_path) is None
+
+
 class TestListBranches:
     def test_lists_local_branches(self, tmp_path):
         from quodeq.data.git_cli import list_branches
