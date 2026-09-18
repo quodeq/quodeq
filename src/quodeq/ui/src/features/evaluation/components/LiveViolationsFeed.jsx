@@ -6,6 +6,7 @@ import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
 import { orderDimensions } from './liveViolationsOrdering.js';
+import { sumProgressViolations } from './scanProgressTotals.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 
@@ -129,7 +130,19 @@ function computeQueuedFiles(runningDim) {
     : null;
 }
 
-function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, isRunning, currentDimension }) {
+// "no new findings" is a claim about results, and it is only honest once
+// there are results to have read. A dimension publishes its report when it
+// completes, so until then this feed's source is empty no matter what the
+// agents have found, and on a single-dimension run that covers the whole
+// scan. When the run has counted violations the feed cannot list yet, say so
+// instead of reporting none.
+function emptyCounterText(pendingCount) {
+  return pendingCount > 0
+    ? t('evaluate.pendingReportCount', { count: pendingCount })
+    : t('evaluate.noNewFindings');
+}
+
+function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, isRunning, currentDimension, pendingCount = 0 }) {
   return (
     <div className="vlive-head">
       <span className="vlive-head-left">
@@ -139,7 +152,7 @@ function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, 
             ? (orderedDimsCount === 1
                 ? t('evaluate.acrossDimsOne', { count: totalCount, dims: orderedDimsCount })
                 : t('evaluate.acrossDimsMany', { count: totalCount, dims: orderedDimsCount }))
-            : t('evaluate.noNewFindings')}
+            : emptyCounterText(pendingCount)}
           {hiddenCarriedCount > 0 && (
             <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>
           )}
@@ -194,10 +207,16 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   const [openDim, setOpenDim] = useAutoOpenTopDim(orderedDims);
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
+  // Violations counted from the live evidence log, which advances during a
+  // dimension. Kept strictly separate from the listed findings above: it is
+  // raw and unconsolidated, and exists only to keep the header from claiming
+  // there is nothing while a report is still pending.
+  const pendingCount = sumProgressViolations(progress);
   // A fully-cached dimension yields zero NEW findings. Bailing out here
   // would make the feed disappear and read as "nothing found", so keep the
-  // header whenever the filter is what emptied the list.
-  if (!totalCount && !hiddenCarriedCount) return null;
+  // header whenever the filter is what emptied the list, or whenever the run
+  // has found violations that no report exposes yet.
+  if (!totalCount && !hiddenCarriedCount && !pendingCount) return null;
 
   return (
     <div className="vlive-feed">
@@ -207,6 +226,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
         hiddenCarriedCount={hiddenCarriedCount}
         isRunning={isRunning}
         currentDimension={progress?.currentDimension}
+        pendingCount={pendingCount}
       />
       {(totalCount > 0 || isRunning) && (
         <LiveViolationsCard orderedDims={orderedDims} openDim={openDim} setOpenDim={setOpenDim} isRunning={isRunning} queued={queued} />
