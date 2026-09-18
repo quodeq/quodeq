@@ -14,6 +14,7 @@ import httpx
 import openai
 
 from quodeq.analysis._api_schema import _SYSTEM_PROMPT, _parse_findings
+from quodeq.analysis._drop_stats import format_reasons as _format_drop_reasons
 from quodeq.analysis._drop_stats import record as _record_drop_stats
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.analysis_env import (
@@ -188,11 +189,12 @@ def _finish_call(
     "length"``), so findings past the cut are lost. See ``_call_api`` for
     the full lossy-vs-dropped contract.
     """
-    findings, dropped = _parse_findings(text)
+    drop_reasons: dict[str, int] = {}
+    findings, dropped = _parse_findings(text, drop_reasons=drop_reasons)
     elapsed = time.monotonic() - start
     # Feed the per-run aggregate so the dimension loops can report ONE
     # drop-ratio signal at end of run instead of N scattered per-call lines.
-    _record_drop_stats(dropped=dropped, kept=len(findings))
+    _record_drop_stats(dropped=dropped, kept=len(findings), reasons=drop_reasons)
 
     # A length-truncated response is an incomplete analysis: the model ran out of
     # output budget mid-stream, so findings after the cut are simply gone. Treat
@@ -209,8 +211,9 @@ def _finish_call(
     if dropped:
         _log.warning(
             "Model %s: dropped %d malformed finding(s) of %d parsed in %.0fs "
-            "(kept %d). The call succeeded; malformed findings were discarded.",
+            "(kept %d) -- %s. The call succeeded; malformed findings were discarded.",
             config.model, dropped, dropped + len(findings), elapsed, len(findings),
+            _format_drop_reasons(drop_reasons),
         )
     _log.debug(
         "Model %s returned %d valid findings in %.0fs (raw bytes: %d)",

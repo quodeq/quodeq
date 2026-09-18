@@ -14,7 +14,7 @@ import json
 import re
 from enum import Enum as _Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 _SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
@@ -35,6 +35,14 @@ class _Severity(str, _Enum):
     critical = "critical"
     major = "major"
     minor = "minor"
+
+
+_SEVERITY_VALUES = frozenset(s.value for s in _Severity)
+
+
+def _is_known_severity(value: object) -> bool:
+    """True when *value* names a `_Severity` member (case- and space-insensitive)."""
+    return isinstance(value, str) and value.strip().lower() in _SEVERITY_VALUES
 
 
 class _Finding(BaseModel):
@@ -87,6 +95,30 @@ class _Finding(BaseModel):
         min_length=1,
     )
 
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _coerce_unknown_severity(cls, value: object) -> object:
+        """Fall back to the default severity instead of failing the whole finding.
+
+        Local models mirror the finding *type* into this slot on compliance
+        findings (``"t": "compliance"`` alongside ``"severity": "compliance"``),
+        because the prompt marks severity required while offering only
+        violation-shaped values. Severity is not one of the grounding fields
+        #305 tightened -- it is optional here, with a default -- so an
+        unreadable value carries no less information than an absent one.
+        Discarding a finding whose ``snippet``, ``line`` and ``reason`` are
+        sound over this field loses grounded evidence for nothing.
+
+        Case and surrounding space are normalised on the way through, so
+        ``"Major"`` lands as ``major`` rather than silently degrading to the
+        default.
+        """
+        if isinstance(value, _Severity):
+            return value
+        if _is_known_severity(value):
+            return value.strip().lower()  # type: ignore[union-attr]
+        return _Severity.minor
+
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific
 # `req` identifier is a *dropped finding* attempt: counted once for observability,
@@ -112,7 +144,37 @@ def _looks_like_finding(node: dict) -> bool:
     return len(_FINDING_FIELDS.intersection(node)) >= _MIN_FINDING_FIELD_OVERLAP
 
 
-def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) -> None:
+_UNKNOWN_DROP_REASON = "unknown:unknown"
+
+
+def _record_drop_reason(exc: Exception, reasons: dict[str, int] | None) -> None:
+    """Tally *exc*'s failing ``field:error_type`` pairs into *reasons*.
+
+    The count alone says a finding was discarded but never which constraint
+    rejected it, which left a systemic output-shape problem only diagnosable
+    by replaying prompts against the model. Pydantic's ``ValidationError``
+    already carries the per-field verdict; this lifts it into a histogram the
+    caller can log. Non-pydantic failures (``KeyError``, ``TypeError``) have
+    no such detail and land under a single bucket.
+    """
+    if reasons is None:
+        return
+    errors = getattr(exc, "errors", None)
+    if not callable(errors):
+        reasons[_UNKNOWN_DROP_REASON] = reasons.get(_UNKNOWN_DROP_REASON, 0) + 1
+        return
+    for err in errors():
+        field = ".".join(str(part) for part in err.get("loc", ())) or "unknown"
+        key = f"{field}:{err.get('type', 'unknown')}"
+        reasons[key] = reasons.get(key, 0) + 1
+
+
+def _extract_finding_dicts(
+    node: object,
+    sink: list[dict],
+    dropped: list[dict],
+    reasons: dict[str, int] | None = None,
+) -> None:
     """Walk a decoded JSON value, appending any dict that parses as a `_Finding`.
 
     Recovers findings whether the model emitted them as a bare object, a list,
@@ -121,15 +183,19 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
     but is a finding attempt (carries ``req`` or otherwise looks like a finding)
     is counted as dropped, then recursion stops (mirroring the valid path). Pure
     containers (no finding-like keys) are recursed to recover nested findings.
+
+    *reasons*, when supplied, accumulates a ``field:error_type`` histogram of
+    why each dropped finding failed, for the caller to log.
     """
     if isinstance(node, dict):
         try:
             f = _Finding.model_validate(node)
             sink.append(f.model_dump())
             return
-        except (ValueError, KeyError, TypeError):
+        except (ValueError, KeyError, TypeError) as exc:
             if _DROPPED_FINDING_KEY in node:
                 dropped.append(node)
+                _record_drop_reason(exc, reasons)
                 return
             # A finding-shaped LEAF (shares finding fields, no nested containers)
             # that failed validation is a malformed finding attempt -> count it.
@@ -139,12 +205,13 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
             has_nested = any(isinstance(v, (dict, list)) for v in node.values())
             if _looks_like_finding(node) and not has_nested:
                 dropped.append(node)
+                _record_drop_reason(exc, reasons)
                 return
         for value in node.values():
-            _extract_finding_dicts(value, sink, dropped)
+            _extract_finding_dicts(value, sink, dropped, reasons)
     elif isinstance(node, list):
         for item in node:
-            _extract_finding_dicts(item, sink, dropped)
+            _extract_finding_dicts(item, sink, dropped, reasons)
 
 
 # Next JSON opener at or after a position. One search per hop keeps the walk
@@ -155,7 +222,9 @@ def _extract_finding_dicts(node: object, sink: list[dict], dropped: list[dict]) 
 _JSON_OPENER_RE = re.compile(r"[\[{]")
 
 
-def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
+def _parse_findings(
+    raw_json: str, *, drop_reasons: dict[str, int] | None = None,
+) -> tuple[list[dict], int]:
     """Parse findings from raw (possibly malformed) model output.
 
     This is the primary parser, not a fallback. Local models produce several
@@ -169,6 +238,9 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
 
     Returns ``(valid_findings, dropped_count)`` where *dropped_count* is the
     number of finding-shaped dicts that failed validation (for observability).
+    Pass *drop_reasons* to also collect a ``field:error_type`` histogram naming
+    which constraint rejected each one; the caller logs it, since this module
+    sits inside the SEP-06 no-logging boundary.
     """
     decoder = json.JSONDecoder()
     findings: list[dict] = []
@@ -181,6 +253,6 @@ def _parse_findings(raw_json: str) -> tuple[list[dict], int]:
         except json.JSONDecodeError:
             i = start + 1
             continue
-        _extract_finding_dicts(node, findings, dropped)
+        _extract_finding_dicts(node, findings, dropped, drop_reasons)
         i = end
     return findings, len(dropped)

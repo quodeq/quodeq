@@ -24,14 +24,13 @@ Each finding must be a JSON object with these fields:
     "req": string - requirement ID (e.g. "M-MOD-1", "S-CON-3")
     "t": string - "violation" or "compliance"
     "file": string - file path relative to repo root
-    "line": integer - line number
-    "severity": string - "critical", "major", or "minor"
+    "line": integer - 1-indexed line number, must be greater than 0
     "w": string - short title of the finding
     "reason": string - 1–3 sentences: what the quoted code does wrong AS WRITTEN, plus the concrete impact
     "snippet": string - offending code copied VERBATIM from the source (one or a few contiguous lines, exact characters)
   Optional:
+    "severity": string - "critical", "major", or "minor". Rates how bad a violation is, so set it only when "t" is "violation". Omit it on compliance findings; never repeat the value of "t" here.
     "end_line": integer - last line if multi-line
-    "scope": string - "file", "class", or "module"
     "vt": string - violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. "code-injection", "hardcoded-secret", "missing-error-handling"); reuse the exact same code for every finding of the same kind
 """
 
