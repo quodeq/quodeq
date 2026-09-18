@@ -2223,9 +2223,11 @@ button.eval-provider-badge--clickable:focus-visible {
 
 .ctx-gutter {
   display: inline-block;
-  /* 56px, not 48: five digits of 12px JetBrains Mono are 36px, and the
-     violation marker sits at the left edge of the same box. */
-  width: 56px;
+  /* 66px, not 48: five digits of 12px JetBrains Mono are 36px, the
+     violation marker sits in the first 14px of the same box, and this
+     variant keeps 16px of right padding (the terminal variant pads 8px), so
+     the digits start at x=14 only from 66px up. */
+  width: 66px;
   position: relative;
   text-align: right;
   padding-right: 16px;
