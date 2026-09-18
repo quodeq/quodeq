@@ -5,6 +5,11 @@
 // so the gate runs green today while blocking NEW ones. The baseline only
 // shrinks: when a file's count drops, lock the progress in with:
 //     npm run lint:a11y:update
+//
+// The runner (per-file counts, --update, ceiling check) is tools/ratchet.mjs,
+// shared with check_hygiene.mjs and check_magic.mjs; this file only names the
+// config, the rules and the messages. Reads eslint.a11y.config.js with inline
+// config disabled so an eslint-disable comment cannot waive a rule.
 import { main } from './ratchet.mjs';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 

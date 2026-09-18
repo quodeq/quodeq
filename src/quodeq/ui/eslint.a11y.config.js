@@ -3,7 +3,9 @@
 // its baseline. Consumed by tools/check_a11y.mjs with inline config disabled:
 // the only way to grandfather a violation is tools/a11y_baseline.json, which
 // may only shrink. Tests and fixtures are excluded: test markup asserts on
-// behaviour, it is not shipped UI.
+// behaviour, it is not shipped UI. Only .jsx is listed: the shared runner also
+// feeds .js files, which match no block here and so lint as a no-op (jsx-a11y
+// has nothing to say about plain modules).
 //
 // no-autofocus is off: the dialogs move focus deliberately on open, which is
 // the WAI-ARIA dialog pattern, and the rule cannot tell that apart from a
