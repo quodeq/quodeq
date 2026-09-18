@@ -22,11 +22,18 @@ function SidePaneToast({ notice, onDismiss }) {
   return (
     <div
       className="job-error-toast side-pane-toast"
-      onClick={onDismiss}
       role="status"
       aria-live="polite"
     >
       {notice.message}
+      <button
+        type="button"
+        className="side-pane-toast__dismiss"
+        aria-label={t('common.dismissNotificationAria')}
+        onClick={onDismiss}
+      >
+        ×
+      </button>
     </div>
   );
 }

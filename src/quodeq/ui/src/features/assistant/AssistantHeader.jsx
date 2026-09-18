@@ -142,6 +142,7 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <QMarkIcon className={`assistant-compass${streaming ? ' assistant-compass--think' : ''}`} />
         </span>
       )}
+      {streaming && <span className="sr-only" role="status">{t('assistant.responding')}</span>}
       <div className="assistant-panel-identity">
         <div className="assistant-panel-title">{t('assistant.assistantLabel')}</div>
         <div className="assistant-panel-subtitle">

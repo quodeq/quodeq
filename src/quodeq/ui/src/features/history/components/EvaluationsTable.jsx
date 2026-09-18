@@ -4,6 +4,7 @@ import { formatLiveDimSummary } from '../utils/formatLiveDimSummary.js';
 import FittedText from '../../../components/FittedText.jsx';
 import { abbrevDim } from '../utils/dimAbbrev.js';
 import { t, LOCALE } from '../../../strings/index.js';
+import { activateOnKey } from '../../../utils/a11y.js';
 import { PARTIAL_STATUSES } from './historyRowAssembly.js';
 
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
@@ -80,14 +81,23 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
     onDelete?.();
   }
   return (
-    <div className={common} onClick={onClick} onMouseEnter={onHover} onFocus={onHover} role={onClick ? 'button' : 'row'} tabIndex={onClick ? 0 : undefined} title={title}>
+    <div
+      className={common}
+      onClick={onClick}
+      onMouseEnter={onHover}
+      onFocus={onHover}
+      role={onClick ? 'button' : 'row'}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? activateOnKey(onClick) : undefined}
+      title={title}
+    >
       <div className="history-row__col history-row__col--date">{cells.date}</div>
       <div className="history-row__col history-row__col--time">{cells.time}</div>
       <div className="history-row__col history-row__col--grade">{cells.grade}</div>
       <div className="history-row__col history-row__col--score">{cells.score}</div>
       <div className="history-row__col history-row__col--delta">{cells.delta}</div>
       <div className="history-row__col history-row__col--dims">{cells.dims}</div>
-      <div className="history-row__col history-row__col--chevron" aria-hidden="true">
+      <div className="history-row__col history-row__col--chevron">
         {isHeader ? '' : (
           <>
             {onDelete && (
@@ -101,7 +111,7 @@ function HistoryRow({ className = '', onClick, onHover, cells, onDelete, title }
                 ×
               </button>
             )}
-            <span>›</span>
+            <span aria-hidden="true">›</span>
           </>
         )}
       </div>

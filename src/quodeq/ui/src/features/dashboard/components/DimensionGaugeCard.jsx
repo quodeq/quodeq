@@ -115,6 +115,7 @@ function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, vi
   return (
     <>
       <ScoreGauge scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset} />
+      <span className="sr-only">{t('overview.gaugeSummaryAria', { score: scoreDisplay, grade: gradeWord })}</span>
 
       <div className="dim-gauge-card__meta">
         {t('overview.violAbbrev')} · {violationCount} · {ratio}

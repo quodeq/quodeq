@@ -6,6 +6,10 @@ import { t } from '../../strings/index.js';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
+// One keyboard step for the resize handle, matching the mouse-drag path's
+// granularity closely enough to feel like the same control.
+const RESIZE_STEP_PX = 16;
+
 /**
  * Shared bottom drawer host: a resizable full-width shell that hosts the
  * open panels. There is no shared header — each panel renders its own (with
@@ -62,7 +66,12 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
     <aside className={`bottom-drawer assistant-drawer${maximized ? ' bottom-drawer--maximized' : ''}`}
       style={maximized ? undefined : { height }}>
       <div className="assistant-drawer-drag" onPointerDown={handleDragStart}
-        role="separator" aria-orientation="horizontal" aria-label={t('common.resizeDrawer')} />
+        role="separator" tabIndex={0} aria-orientation="horizontal"
+        aria-label={t('drawer.resizeHandleAria')} aria-valuenow={height}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowUp') { e.preventDefault(); setHeight(height + RESIZE_STEP_PX); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); setHeight(height - RESIZE_STEP_PX); }
+        }} />
       {openPanels.includes('assistant') && (
         <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
           <AssistantHeader selectedProject={projectName ?? uiState?.selectedProject} onOpenSettings={onOpenSettings} />
