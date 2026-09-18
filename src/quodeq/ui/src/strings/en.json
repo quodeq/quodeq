@@ -199,7 +199,6 @@
   "compare.dimReasonGap": "{gap} under the next project",
   "compare.dimReasonOutlier": "{principle} at {score}",
   "compare.dimSubtitle": "{principles} principles · {violations} violations · {projects} projects in scope",
-  "compare.dimTabsAria": "Switch dimension",
   "compare.dimensionsAria": "Dimensions across the scope",
   "compare.dimensionsHeader": "DIMENSIONS · {count}",
   "compare.dimensionsNote": "scope average per dimension · open for standings",
