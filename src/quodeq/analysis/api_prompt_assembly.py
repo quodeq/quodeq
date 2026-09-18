@@ -85,6 +85,7 @@ def _build_shape_summary_parts(
     if trust_model is not None:
         parts.append(f"multi_tenant={'true' if trust_model.multi_tenant else 'false'}")
         parts.append(f"network_exposure={trust_model.network_exposure}")
+        parts.append(f"deployment_topology={trust_model.deployment_topology}")
     if shape.runtime_langs:
         parts.append(f"runtime={'+'.join(shape.runtime_langs)}")
     if shape.web_frameworks:
@@ -118,8 +119,8 @@ def _deployment_note(shape: ProjectShape) -> str:
 def _trust_relaxation_notes(trust_model: TrustModel | None) -> str:
     """Return trust-relaxation caveats for the LLM, or "" when none apply.
 
-    Both notes below mirror scope_gate.py's own two rules, deliberately at
-    the same preconditions, so the prompt never advises something the
+    Each note below mirrors one of scope_gate.py's own rules, deliberately
+    at the same preconditions, so the prompt never advises something the
     deterministic gate would not also do. Neither ever tells the model a
     category "does not apply" -- that invites the model to omit the
     finding, which is unrecoverable, unlike a severity cap. Always report;
@@ -143,6 +144,13 @@ def _trust_relaxation_notes(trust_model: TrustModel | None) -> str:
             " finding whose only issue is reaching another user's data, still"
             " report it, at `minor` instead of `major`. Do not omit it."
         )
+    if trust_model is not None and trust_model.is_single_host():
+        note += (
+            " This product runs as one process on a single host. Do not ask it"
+            " to externalise state to a shared store or to dispatch work"
+            " horizontally. For a scalability finding whose only issue is that,"
+            " still report it, at `minor` instead of `major`. Do not omit it."
+        )
     return note
 
 
@@ -156,7 +164,8 @@ def _format_shape_block(
     answer, and suppressing it would waste the only reliable signal we have.
     """
     relaxing = trust_model is not None and (
-        trust_model.relaxes_remote() or not trust_model.multi_tenant)
+        trust_model.relaxes_remote() or not trust_model.multi_tenant
+        or trust_model.is_single_host())
     if shape.deployment is Deployment.UNKNOWN and not relaxing:
         return ""
     summary = ", ".join(_build_shape_summary_parts(shape, trust_model))
