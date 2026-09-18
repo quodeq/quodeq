@@ -85,6 +85,26 @@ def test_desktop_detection_alone_never_relaxes_remote(tmp_path):
     assert finding["severity"] == "major"
 
 
+def test_desktop_detection_alone_never_relaxes_topology(tmp_path):
+    # The topology twin of the test above. detect_shape confidently says
+    # "desktop", which is the shape most likely to be a single host, and it
+    # still must not fill the axis: a hosted service that merely LOOKS like
+    # a desktop app on disk would otherwise get F-SCL-1/2/4 capped without
+    # anyone declaring anything.
+    _desktop_manifest(tmp_path)
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.deployment_topology == "distributed"
+    assert resolved.is_single_host() is False
+
+    finding = {
+        "t": "violation", "req": "F-SCL-1", "severity": "major",
+        "w": "Session state is held in a process-local dict",
+        "reason": "State must be externalised to survive a second replica.",
+    }
+    assert apply_scope_gate(finding, resolved) is False
+    assert finding["severity"] == "major"
+
+
 def test_cli_detection_alone_never_relaxes_remote(tmp_path):
     # Same guarantee via the CLI detection path (a Go service with no web
     # framework import detects as a single-user CLI).
