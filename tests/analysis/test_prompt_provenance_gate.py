@@ -40,6 +40,22 @@ def test_rules_define_provenance_selfcheck():
     assert "hardening gap" in lower
 
 
+def test_rules_carve_out_constant_interpolated_sql():
+    """Issue #1200: constant-only SQL interpolation is not injection (S-INT-2).
+
+    The security dimension repeatedly filed four sites as major injection where
+    the only interpolated value is a module constant (a column list) or a
+    generated run of placeholder markers, with every caller value bound. There
+    is no deterministic SQL checker to teach, so the rubric carries the rule.
+    """
+    lower = RULES.lower()
+    assert "placeholder markers" in lower
+    assert "parameter list" in lower
+    # A PRAGMA value cannot be a bound parameter, so interpolation is the only
+    # option available and must not read as a finding either.
+    assert "pragma" in lower
+
+
 def test_rules_show_internal_input_examples():
     """Concrete internal-input examples anchor the gate for weaker local models."""
     lower = RULES.lower()

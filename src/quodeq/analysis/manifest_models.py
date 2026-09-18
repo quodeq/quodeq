@@ -7,17 +7,27 @@ entities here carry only data.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass(frozen=True)
 class ManifestWalkSpec:
-    """The detection.json-derived inputs shared by every filesystem walk
-    that builds a SourceManifest (single-scope or multi-scope)."""
+    """The per-run inputs shared by every filesystem walk that builds a
+    SourceManifest (single-scope or multi-scope).
+
+    Mostly detection.json, plus the two things resolved per run:
+    ``ignore_patterns`` from ``.quodeqignore`` and ``tracked_files`` from git.
+
+    ``tracked_files`` is the run's git-tracked file set as absolute paths, or
+    None when git could not answer (no repository, no git binary, a failure).
+    None means "scan everything", which is the pre-git behaviour.
+    """
 
     ext_map: dict[str, str]
     skip_dirs: set[str]
     skip_patterns: list[str]
     ignore_patterns: list[str] | None = None
+    tracked_files: set[Path] | None = None
 
 
 @dataclass
@@ -48,11 +58,20 @@ class AnalysisTarget:
 
 @dataclass
 class SourceManifest:
-    """Rich description of a repository's source structure."""
+    """Rich description of a repository's source structure.
+
+    ``skipped_untracked`` is how many otherwise-eligible source files the
+    walk dropped because git does not track them. It is a run signal, not
+    just a log line: a score the reader cannot reconcile with the files they
+    can see is worse than a lower one, so the count travels with the manifest.
+    Zero means nothing was dropped, including when there is no git repository
+    to ask.
+    """
 
     targets: list[AnalysisTarget] = field(default_factory=list)
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
+    skipped_untracked: int = 0
 
     def add_target(self, target: AnalysisTarget) -> None:
         """Add an analysis target to this manifest."""

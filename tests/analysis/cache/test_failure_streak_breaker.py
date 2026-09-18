@@ -4,8 +4,6 @@ import json
 import time
 from pathlib import Path
 
-import pytest
-
 from quodeq.shared import cancellation
 from quodeq.analysis.cache._failure_streak import (
     FailureStreakWatcher,
@@ -17,13 +15,6 @@ from quodeq.analysis.cache._failure_streak import (
 def _append(jsonl: Path, line: dict) -> None:
     with jsonl.open("a") as f:
         f.write(json.dumps(line) + "\n")
-
-
-@pytest.fixture(autouse=True)
-def _reset_cancel():
-    cancellation.reset()
-    yield
-    cancellation.reset()
 
 
 class TestFailureStreakBreaker:

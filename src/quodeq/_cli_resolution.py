@@ -142,6 +142,13 @@ def _build_manifest(
         )
         print(f"Detected: {langs}", file=sys.stderr)
     print(f"Source files: {manifest.total_files}", file=sys.stderr)
+    skipped = manifest.skipped_untracked
+    if skipped:
+        print(
+            f"Skipped {skipped} untracked file{'' if skipped == 1 else 's'} "
+            "(only what git tracks is scored)",
+            file=sys.stderr,
+        )
     return manifest
 
 

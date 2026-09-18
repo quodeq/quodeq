@@ -21,8 +21,6 @@ from quodeq.shared import cancellation
 
 from tests._analysis_helpers import _FixedRemainingQueue
 
-pytestmark = pytest.mark.usefixtures("reset_cancellation")
-
 
 class TestSpawnGate:
     def test_should_respawn_returns_zero_when_cancelled(self, tmp_path):

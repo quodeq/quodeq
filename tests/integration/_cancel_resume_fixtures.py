@@ -16,21 +16,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared import cancellation
-
-
-@pytest.fixture(autouse=True)
-def _reset_cancel():
-    cancellation.reset()
-    yield
-    cancellation.reset()
 
 
 def _make_manifest(file_names: list[str]) -> SourceManifest:

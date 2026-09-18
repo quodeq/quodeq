@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from collections import Counter
 from collections.abc import Iterator
+from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 
@@ -91,16 +92,41 @@ def _prune_ignored_dirs(
     ]
 
 
-def _iter_source_files(src: Path, walk_root: Path, walk: ManifestWalkSpec) -> Iterator[tuple[str, str, str]]:
+@dataclass
+class WalkCounts:
+    """What a walk tallied on the way past, for the caller to read afterwards.
+
+    ``_iter_source_files`` is a generator, so it cannot hand a total back
+    through a return value. The caller owns this object, passes it in and
+    reads it once the walk is exhausted.
+    """
+
+    skipped_untracked: int = 0
+
+
+def _iter_source_files(
+    src: Path, walk_root: Path, walk: ManifestWalkSpec, counts: WalkCounts,
+) -> Iterator[tuple[str, str, str]]:
     """Walk *walk_root* once, yielding ``(rel_path, suffix, language)`` per source file.
 
     Applies the walk spec's skip_dirs, skip_patterns and .quodeqignore
     patterns (anchored at *src*, not *walk_root*). Paths come back POSIX-style
     and relative to *src* so manifest paths are consistent across platforms —
     downstream consumers and scope-prefix matching all assume "/".
+
+    When *walk.tracked_files* is set, a file git does not track is skipped:
+    a scratch file no branch can reach must not move a score, and two people
+    on the same commit must get the same number. The comparison is on
+    resolved absolute paths because *walk_root* may be a subdirectory of the
+    scan root and the tracked set spans the whole run, so the two sides only
+    line up once both are absolute. Every skipped file is tallied into
+    *counts*, which the caller surfaces once per run; this module reports the
+    number and never logs it (inner-layer files take no logging framework).
     """
     ext_map = walk.ext_map
     ignore_patterns = walk.ignore_patterns or []
+    tracked = walk.tracked_files
+    src_abs = src.resolve()
     for dirpath, dirnames, filenames in os.walk(walk_root):
         dirnames[:] = [d for d in dirnames if d not in walk.skip_dirs and not d.startswith(".")]
         if ignore_patterns:
@@ -113,5 +139,8 @@ def _iter_source_files(src: Path, walk_root: Path, walk: ManifestWalkSpec) -> It
             if _matches_skip_pattern(rel, walk.skip_patterns):
                 continue
             if ignore_patterns and is_ignored(rel, ignore_patterns):
+                continue
+            if tracked is not None and src_abs / rel not in tracked:
+                counts.skipped_untracked += 1
                 continue
             yield rel, suffix, ext_map.get(suffix, _UNKNOWN_LANG)

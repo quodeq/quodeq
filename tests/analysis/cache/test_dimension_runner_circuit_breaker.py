@@ -236,13 +236,6 @@ class _AllErrorsDispatcher:
 
 
 class TestBreakerSalvage:
-    @pytest.fixture(autouse=True)
-    def _reset_cancel(self):
-        from quodeq.shared import cancellation
-        cancellation.reset()
-        yield
-        cancellation.reset()
-
     def test_breaker_trip_salvages_partial_evidence(self, tmp_path, cache):
         config, _src = _setup(tmp_path, {"a.py": "x"})
         config = replace(

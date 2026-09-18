@@ -48,7 +48,12 @@ def _filter_manifest_by_scope(
 
     if scoped_targets:
         log.info(f"Scope filter: {total} files under '{scope_path}'")
-        return SourceManifest(targets=scoped_targets, total_files=total, language_stats=all_stats)
+        # skipped_untracked travels with the manifest by contract, so carry it
+        # across the rebuild rather than resetting it to zero here.
+        return SourceManifest(
+            targets=scoped_targets, total_files=total, language_stats=all_stats,
+            skipped_untracked=manifest.skipped_untracked,
+        )
 
     log.warning(
         f"No source files found under scope '{scope_path}'. "

@@ -8,18 +8,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared import cancellation
-
-
-@pytest.fixture(autouse=True)
-def _reset_cancel():
-    cancellation.reset()
-    yield
-    cancellation.reset()
 
 
 def _mk_config(tmp_path):
