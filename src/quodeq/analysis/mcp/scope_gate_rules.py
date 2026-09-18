@@ -69,7 +69,7 @@ _TOPOLOGY_REQS: frozenset[str] = frozenset({"F-SCL-1", "F-SCL-2", "F-SCL-4"})
 # happens to be bound today. Waiving that would silently evaporate the
 # moment someone rebinds the app to 0.0.0.0, and nothing would be left to
 # re-flag it. Both rules honor this: rule 1 only fires on a SOURCELESS
-# finding, and rule 2 (see its own comment in ``apply_scope_gate``) also
+# finding, and rule 2 (see ``_cross_principal_rule_applies`` below) also
 # backs off the instant the prose names an external source, even though its
 # own trigger is a cross-principal concept, not provenance.
 
@@ -172,5 +172,3 @@ def matched_rule(finding: dict, model: TrustModel) -> str | None:
     if _topology_rule_applies(model, req):
         return "single_host_topology"
     return None
-
-
