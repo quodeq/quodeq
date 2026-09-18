@@ -3,6 +3,15 @@ import { focusables, trapTab, restoreFocus } from './a11y.js';
 // Distinct title/message ids per dialog for aria-labelledby / aria-describedby.
 let dialogSeq = 0;
 
+// True when the event started on one of the dialog's own action buttons. Such
+// a button decides Enter through its own click, so the dialog-wide
+// Enter-to-confirm must not fire on top of it: mount() focuses the first
+// action and confirmDialog's danger variant focuses Cancel, so an
+// unconditional shortcut would confirm the delete from a focused Cancel.
+function onOwnButton(overlay, target) {
+  return overlay.contains(target) && target.tagName === 'BUTTON';
+}
+
 /**
  * Shared DOM shell for confirmDialog.js and chooseDialog.js: the overlay +
  * dialog + title + message + actions row, the click-outside-to-cancel and
@@ -46,17 +55,9 @@ export function buildDialogShell({ title, message, dialogClassName, onCancel, on
 
   let opener = null;
 
-  // A focused action button decides Enter through its own click, so the
-  // dialog-wide Enter shortcut must not fire on top of it: mount() focuses
-  // the first action and confirmDialog's danger variant focuses Cancel, so
-  // an unconditional Enter-to-confirm would confirm from a focused Cancel.
-  function enterConfirms(e) {
-    return onConfirm && !(overlay.contains(e.target) && e.target.tagName === 'BUTTON');
-  }
-
   function onKey(e) {
     if (e.key === 'Escape') onCancel();
-    if (e.key === 'Enter' && enterConfirms(e)) onConfirm();
+    if (e.key === 'Enter' && onConfirm && !onOwnButton(overlay, e.target)) onConfirm();
     trapTab(overlay, e);
   }
   function onOverlayClick(e) {

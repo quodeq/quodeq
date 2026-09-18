@@ -100,4 +100,28 @@ describe('galaxy particle shape cue (6423)', () => {
     runDrawStars(ctx, fileStarWith(['critical'], 0.4));
     expect(calls.filter((c) => c === 'stroke').length).toBe(2);
   });
+
+  it('batches one severity into a single path, so four particles cost one stroke', () => {
+    const ctx = makeMockCtx(calls);
+    runDrawStars(ctx, fileStarWith(['major', 'major', 'major', 'major']));
+    expect(calls.filter((c) => c === 'stroke').length).toBe(1);
+    expect(calls.filter((c) => c === 'arc').length).toBe(4);
+    expect(calls.filter((c) => c === 'moveTo').length).toBe(4);
+  });
+
+  it('keeps a path per severity and per ring, so the two cues stay distinct', () => {
+    const ctx = makeMockCtx(calls);
+    runDrawStars(ctx, fileStarWith(['critical', 'critical', 'major', 'major']));
+    // critical's inner ring, critical's outer ring, major's one ring.
+    expect(calls.filter((c) => c === 'stroke').length).toBe(3);
+    expect(calls.filter((c) => c === 'arc').length).toBe(6);
+  });
+
+  it('splits a severity by line width, which follows the particle size', () => {
+    const ctx = makeMockCtx(calls);
+    const star = fileStarWith(['major', 'major']);
+    star.particles[1].sz = 40; // past the line-width floor, so a wider stroke
+    runDrawStars(ctx, star);
+    expect(calls.filter((c) => c === 'stroke').length).toBe(2);
+  });
 });
