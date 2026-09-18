@@ -25,16 +25,6 @@ def _reset_provider_config_cache() -> None:
 
 
 @pytest.fixture
-def reset_cancellation() -> None:
-    """Clear the process-wide cancel event around a test that requests it."""
-    from quodeq.shared import cancellation
-
-    cancellation.reset()
-    yield
-    cancellation.reset()
-
-
-@pytest.fixture
 def api_config():
     """ApiRunnerConfig pointed at a local endpoint (test_api_runner* siblings)."""
     from quodeq.analysis._api_runner import ApiRunnerConfig

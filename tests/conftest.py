@@ -152,6 +152,24 @@ def _close_content_indexes() -> None:
     close_all_for_tests()
 
 
+@pytest.fixture(autouse=True)
+def _reset_cancellation() -> None:
+    """Clear the process-wide cancellation token before and after every test.
+
+    Global and autouse rather than opt-in (#1201): the token is a single
+    process-wide flag (``quodeq/shared/cancellation.py``), so a test that
+    requests cancellation without restoring it used to leak the cancelled
+    state into whatever test ran next in the same process -- the symptom
+    surfaced as a scout burst silently taking the cancelled path in an
+    unrelated test file, not in the test that set the flag.
+    """
+    from quodeq.shared import cancellation
+
+    cancellation.reset()
+    yield
+    cancellation.reset()
+
+
 class DummyProcess:
     """Minimal process stub for tests that need a mock subprocess."""
 

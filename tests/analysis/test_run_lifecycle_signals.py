@@ -13,9 +13,6 @@ from quodeq.data.fs.run_status_store import read_status
 
 from ._run_lifecycle_helpers import _ctx
 
-pytestmark = pytest.mark.usefixtures("reset_cancellation")
-
-
 # os.kill(pid, SIGTERM) on Windows calls TerminateProcess directly — it does
 # not invoke Python signal handlers, so any test that signals its own process
 # kills the pytest runner outright. The signal-handler logic is POSIX-only

@@ -18,8 +18,6 @@ from quodeq.analysis._api_runner import (
 from quodeq.analysis._process import AnalysisError, _check_process_result
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 
-pytestmark = pytest.mark.usefixtures("reset_cancellation")
-
 
 def _openai_error(cls, status: int, message: str):
     response = httpx.Response(status, request=httpx.Request("POST", "http://test/v1"))

@@ -6,9 +6,6 @@ import logging
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-from quodeq.shared import cancellation
 from quodeq.analysis.cache._failure_streak import FailureStreakWatcher
 
 
@@ -22,13 +19,6 @@ def _enable_propagation():
     original = logger.propagate
     logger.propagate = True
     return logger, original
-
-
-@pytest.fixture(autouse=True)
-def _reset_cancel():
-    cancellation.reset()
-    yield
-    cancellation.reset()
 
 
 class TestScanOnceOSError:

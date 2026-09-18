@@ -15,13 +15,12 @@ import pytest
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 
-from tests.integration._cancel_resume_fixtures import (  # noqa: F401 -- _reset_cancel is a pytest fixture
+from tests.integration._cancel_resume_fixtures import (
     _ScriptedDispatcher,
     _finding,
     _make_callbacks,
     _make_ctx,
     _ok_marker,
-    _reset_cancel,
     _setup_run,
 )
 
