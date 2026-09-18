@@ -71,6 +71,25 @@ class TestListTrackedFiles:
 
         assert list_tracked_files(repo / "pkg") == {(repo / "pkg" / "mod.py").resolve()}
 
+    def test_subtree_with_nothing_tracked_filters_everything(self, tmp_path):
+        """A gitignored or simply untracked subtree is not a missing answer.
+
+        `ls-files` runs with -C, so it only ever lists the subtree it was
+        pointed at. An empty listing there, in a repository that tracks
+        files elsewhere, means nothing under that root belongs to the
+        codebase: the right answer is an empty set, not the unfiltered
+        working tree.
+        """
+        from quodeq.data.git_cli import list_tracked_files
+
+        repo = _init_repo(tmp_path)
+        _commit(repo, "tracked.py")
+        vendor = repo / "vendor"
+        vendor.mkdir()
+        (vendor / "bundled.py").write_text("x = 1\n")
+
+        assert list_tracked_files(vendor) == set()
+
     def test_empty_index_does_not_filter(self, tmp_path, caplog):
         """A repo before its first `git add` has no baseline to filter on.
 
@@ -85,7 +104,7 @@ class TestListTrackedFiles:
         repo = _init_repo(tmp_path)
         with caplog.at_level(logging.INFO, logger="quodeq.data.git_cli"):
             assert list_tracked_files(repo) is None
-        assert "No tracked files" in caplog.text
+        assert "Nothing tracked" in caplog.text
 
     def test_both_unicode_spellings_of_a_name_are_tracked(self, tmp_path):
         """git keeps the bytes it was given; a filesystem may compose a name

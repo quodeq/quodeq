@@ -56,46 +56,58 @@ def list_tracked_files(
     None means "no answer, do not filter" and is returned for every failure
     mode: *path* is outside a git work tree, the ``git`` binary is missing,
     the command exits non-zero, it times out, or a tracked path is not valid
-    UTF-8. Filtering on a half-answer would silently drop real source files
-    from a run, so an unanswerable question has to leave the caller's file
-    set exactly as it was.
+    UTF-8. Filtering on a half-answer would silently drop real source files,
+    so an unanswerable question leaves the caller's set as it was.
 
-    An empty index is treated as no answer too. A repository between ``git
-    init`` and its first ``git add`` tracks nothing, and filtering on that
-    would score zero files: no baseline exists yet to compare a working tree
-    against, so the honest result is the unfiltered one the caller had
-    before. A submodule's contents are not tracked by the parent repository,
-    so they are absent here and are skipped — a submodule is its own
-    repository and is listed by its own index.
+    An empty listing is two different situations and they get opposite
+    answers. A repository whose index is empty, between ``git init`` and its
+    first ``git add``, has no baseline to filter against, so it answers None
+    and the working tree is scanned as before. A repository that tracks
+    files elsewhere but none under *path*, a gitignored ``vendor`` tree for
+    instance, answers an empty set: nothing there belongs to the codebase,
+    and scoring zero files is the correct result rather than a fallback.
+    Telling them apart costs one extra listing, only when the first is
+    empty. A submodule's contents are not in the parent index, so they are
+    skipped; a submodule is its own repository with its own index.
 
-    Each name is recorded in both unicode normalisations. git stores the
-    bytes it was handed, while a filesystem may return a name composed
-    differently (a repository written as NFC and checked out onto a
-    normalising filesystem is the usual way the two diverge), and a
-    byte-exact miss would silently drop a real source file. Keeping both
-    spellings errs toward including a file, which is the safe direction.
+    Each name is recorded in both unicode normalisations, because git stores
+    the bytes it was handed while a filesystem may compose a name
+    differently, and a byte-exact miss would drop a real file silently.
+    Mixed-form paths and case-only divergence are still misses.
     """
-    try:
-        out = run_git(["-C", str(path), "ls-files", "-z", "--cached"], timeout=timeout)
-    except UnicodeDecodeError:
-        # run_git decodes stdout as strict UTF-8; a tracked path with other
-        # bytes in it is unreadable rather than absent, so do not filter.
-        _logger.debug("Undecodable tracked path under %s", path)
+    rels = _tracked_rels(path, [], timeout)
+    if rels is None:
         return None
-    if out is None:
-        return None
-    rels = [rel for rel in out.split("\0") if rel]
     if not rels:
-        _logger.info(
-            "No tracked files under %s; scoring the working tree instead", path,
-        )
-        return None
+        whole_repo = _tracked_rels(path, ["--", ":/"], timeout)
+        if whole_repo is None or not whole_repo:
+            _logger.info("Nothing tracked in %s; scoring the working tree", path)
+            return None
+        return set()
     base = Path(path).resolve()
     return {
         base / spelling
         for rel in rels
         for spelling in {unicodedata.normalize("NFC", rel), unicodedata.normalize("NFD", rel)}
     }
+
+
+def _tracked_rels(
+    path: Path | str, pathspec: list[str], timeout: float,
+) -> list[str] | None:
+    """Tracked paths as git reports them, or None when it cannot answer."""
+    try:
+        out = run_git(
+            ["-C", str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
+        )
+    except UnicodeDecodeError:
+        # run_git decodes stdout as strict UTF-8; a tracked path carrying
+        # other bytes is unreadable rather than absent, so do not filter.
+        _logger.debug("Undecodable tracked path under %s", path)
+        return None
+    if out is None:
+        return None
+    return [rel for rel in out.split("\0") if rel]
 
 
 def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> list[str]:

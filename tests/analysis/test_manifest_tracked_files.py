@@ -2,7 +2,7 @@
 
 An untracked scratch file no branch can reach must not reach a score, and the
 same commit has to produce the same manifest in anyone's checkout. Outside a
-git work tree — or when git cannot answer — nothing is filtered.
+git work tree, or when git cannot answer, nothing is filtered.
 """
 from __future__ import annotations
 
@@ -73,14 +73,21 @@ def test_skipped_untracked_is_zero_without_git(tmp_path: Path, detection: dict) 
 
 
 def test_staged_file_is_scanned(tmp_path: Path, detection: dict) -> None:
-    """--cached sees the index, so `git add` is enough to be in scope."""
+    """--cached sees the index, so `git add` is enough to be in scope.
+
+    The untracked sibling is the control: without it this passes with the
+    filter unwired entirely, which proves nothing about `--cached`.
+    """
     _repo_with_committed(tmp_path, ["app0.py", "app1.py", "app2.py"])
+    _write(tmp_path / "staged.py")
+    _run(["git", "add", "staged.py"], tmp_path)
     _write(tmp_path / "scratch.py")
-    _run(["git", "add", "scratch.py"], tmp_path)
 
     manifest = build_manifest(tmp_path, detection)
-    assert "scratch.py" in manifest.source_files
+    assert "staged.py" in manifest.source_files
+    assert "scratch.py" not in manifest.source_files
     assert manifest.total_files == 4
+    assert manifest.skipped_untracked == 1
 
 
 def test_non_git_directory_scans_everything(tmp_path: Path, detection: dict) -> None:

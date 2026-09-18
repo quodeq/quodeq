@@ -175,7 +175,7 @@ def build_manifest(
     a scratch file that no branch can reach must not move a score, and the
     same commit has to produce the same manifest in anyone's checkout. The
     tracked set is resolved once here, per run, so the walk never shells out.
-    Outside a work tree — or when git cannot answer — every file is scanned,
+    Outside a work tree, or when git cannot answer, every file is scanned,
     exactly as before. What the filter dropped is reported on the manifest as
     ``skipped_untracked`` and logged once, so a run that scores fewer files
     than the reader can see says why.
