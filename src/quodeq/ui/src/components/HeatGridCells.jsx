@@ -4,6 +4,11 @@ import { activateOnKey } from '../utils/a11y.js';
 
 const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
 
+// The catalog has no pluralisation, so a count of one takes its own key. An
+// unnamed row gets its fallback from the catalog too, not a bare literal.
+const rowLabel = (row) => row.name || t('heatGrid.unnamedRow');
+const violationsAriaKey = (count) => (count === 1 ? 'heatGrid.violationsCellAriaOne' : 'heatGrid.violationsCellAria');
+
 /**
  * Renders the severity + violations + health cells for a heat grid row.
  *
@@ -35,7 +40,7 @@ function SeverityCell({ row, sev, flat, onCellClick }) {
         onKeyDown={hasValue ? activateOnKey(() => onCellClick?.({ row, severity: sev })) : undefined}
         role={hasValue ? 'button' : undefined}
         tabIndex={hasValue ? 0 : undefined}
-        aria-label={`${sev}: ${count} violation${count !== 1 ? 's' : ''} in ${row.name || 'row'}`}
+        aria-label={t(count === 1 ? 'heatGrid.severityCellAriaOne' : 'heatGrid.severityCellAria', { severity: sev, count, label: rowLabel(row) })}
       >
         {count || '—'}
       </div>
@@ -53,7 +58,7 @@ function ViolationsCell({ row, onCellClick }) {
         onKeyDown={hasValue ? activateOnKey(() => onCellClick?.({ row, severity: null })) : undefined}
         role={hasValue ? 'button' : undefined}
         tabIndex={hasValue ? 0 : undefined}
-        aria-label={hasValue ? t('heatGrid.violationsCellAria', { count: row.violations, label: row.name || 'row' }) : undefined}
+        aria-label={hasValue ? t(violationsAriaKey(row.violations), { count: row.violations, label: rowLabel(row) }) : undefined}
       >
         {row.violations}
       </div>

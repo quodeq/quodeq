@@ -1477,5 +1477,9 @@
   "map.stateCompliance": "{pct}% compliant",
   "map.riskBubbleAria": "{file}: {count} violations",
   "map.galaxyKbdLabel": "Contents of this folder",
-  "violations.sortByAria": "Sort by {column}"
+  "violations.sortByAria": "Sort by {column}",
+  "heatGrid.severityCellAria": "{severity}: {count} violations in {label}",
+  "heatGrid.severityCellAriaOne": "{severity}: 1 violation in {label}",
+  "heatGrid.violationsCellAriaOne": "1 violation in {label}, open details",
+  "heatGrid.unnamedRow": "row"
 }
