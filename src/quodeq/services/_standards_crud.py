@@ -16,7 +16,9 @@ from quodeq.services.ports import StandardsStore
 from quodeq.services._standards_io import (
     _TYPE_CUSTOM, build_custom_meta, build_detail, count_principles_and_requirements,
 )
-from quodeq.services.import_validator import validate_import, scan_injection
+from quodeq.services.import_validator import (
+    StandardImportValidationError, validate_import, scan_injection,
+)
 
 _CUSTOM_DEFAULTS = {"type": _TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
 
@@ -85,7 +87,10 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: Stand
     """Import an evaluator from parsed file data."""
     validation = validate_import(data)
     if not validation["valid"]:
-        raise ValueError("; ".join(validation["errors"]))
+        # Typed, with the reasons attached: the API route reports them from
+        # the error instead of re-running the validator in its except block,
+        # which misread every later ValueError as a schema failure.
+        raise StandardImportValidationError(validation["errors"])
     cleaned = validation["data"]
     warnings = scan_injection(cleaned)
     standard_id = cleaned["id"]

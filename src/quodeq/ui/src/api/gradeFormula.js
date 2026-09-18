@@ -16,7 +16,7 @@ export function saveGradeFormula(params) {
 
 /** @returns {Promise<{current: Object, defaults: Object, isCustom: boolean, applied: number}>} */
 export function resetGradeFormula() {
-  return request('/grade-formula', { method: 'DELETE' });
+  return request('/grade-formula?confirm=true', { method: 'DELETE' });
 }
 
 /** @returns {Promise<{project: string, runId: string, before: Object, after: Object}>} */

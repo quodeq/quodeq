@@ -73,3 +73,29 @@ def test_clear():
     result = buf.get_lines()
     assert len(result["lines"]) == 0
     assert result["total"] == 0
+
+
+def test_append_defaults_level_to_info():
+    buf = LogBuffer(max_lines=10)
+    buf.append("line one")
+    result = buf.get_lines()
+    assert result["lines"][0]["level"] == "INFO"
+
+
+def test_append_records_given_level():
+    buf = LogBuffer(max_lines=10)
+    buf.append("uh oh", level="ERROR")
+    result = buf.get_lines()
+    assert result["lines"][0]["level"] == "ERROR"
+
+
+def test_handler_captures_record_level():
+    buf = LogBuffer(max_lines=10)
+    logger = logging.getLogger("test_handler_capture_level")
+    logger.addHandler(buf.handler)
+    logger.setLevel(logging.WARNING)
+    logger.warning("uh oh from logger")
+    result = buf.get_lines()
+    assert len(result["lines"]) == 1
+    assert result["lines"][0]["level"] == "WARNING"
+    logger.removeHandler(buf.handler)

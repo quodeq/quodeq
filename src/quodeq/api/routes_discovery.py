@@ -6,7 +6,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._evaluation_helpers import ai_cmd_path_error
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.plugin_discovery import discover_plugins
@@ -32,8 +32,7 @@ def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
         http_status, code, safe_msg = _BROWSE_ERROR_MAP.get(
             payload.get("error_code"), _BROWSE_ERROR_DEFAULT,
         )
-        body, status = error_response(safe_msg, http_status, code)
-        return jsonify(body), status
+        return json_error(safe_msg, http_status, code)
     return jsonify(payload)
 
 
@@ -65,8 +64,7 @@ def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response,
             payload.get("error_code"),
             (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
         )
-        body, status = error_response(payload["error"], http_status, code)
-        return jsonify(body), status
+        return json_error(payload["error"], http_status, code)
     return jsonify(payload)
 
 
@@ -90,7 +88,11 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         instead of when a start fails.
         """
         reason = ai_cmd_path_error(client_id, request.args.get("path"))
-        return jsonify({"ok": reason is None, "error": reason})
+        return jsonify({
+            "ok": reason is None,
+            "error": reason,
+            "code": None if reason is None else "INVALID_INPUT",
+        })
 
     @app.get("/api/plugins")
     def plugins() -> Response:

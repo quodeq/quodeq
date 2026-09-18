@@ -21,6 +21,7 @@ from quodeq.api._terminal_ws_helpers import (
     setup_terminal_session,
     terminal_read_loop,
 )
+from quodeq.api.helpers import json_error
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 from quodeq.terminal.links import (
     build_open_argv,
@@ -66,7 +67,7 @@ _WS_CLOSE_REFUSED = 4003   # terminal gate refused the handshake
 
 
 def _forbidden():
-    return jsonify({"error": "forbidden"}), 403
+    return json_error("forbidden", 403, "FORBIDDEN")  # code + message once, for six routes
 
 
 def _coerce_int(value) -> int | None:
@@ -127,7 +128,7 @@ def _terminal_session_create(registry: TerminalSessionRegistry):
         return _forbidden()
     session = registry.create()
     if session is None:
-        return jsonify({"error": "session limit reached"}), 409
+        return json_error("session limit reached", 409, "SESSION_LIMIT")
     return jsonify({"id": session.id, "name": session.name}), 201
 
 
@@ -135,7 +136,7 @@ def _terminal_session_kill(registry: TerminalSessionRegistry, sid):
     if _gate_reason() is not None:
         return _forbidden()
     if not registry.kill(sid):
-        return jsonify({"error": "unknown session"}), 404
+        return json_error("unknown session", 404, "UNKNOWN_SESSION")
     return jsonify({"ok": True})
 
 
@@ -159,7 +160,7 @@ def _terminal_resolve(registry: TerminalSessionRegistry):
     body = request.get_json(silent=True) or {}
     paths = body.get("paths")
     if not isinstance(paths, list):
-        return jsonify({"error": "paths must be a list"}), 400
+        return json_error("paths must be a list", 400, "INVALID_INPUT")
     bases = _session_bases(registry, body)
     resolved = []
     for token in paths:
@@ -196,7 +197,7 @@ def _terminal_open(registry: TerminalSessionRegistry):
     body = request.get_json(silent=True) or {}
     path = body.get("path")
     if not isinstance(path, str) or not path:
-        return jsonify({"error": "path is required"}), 400
+        return json_error("path is required", 400, "MISSING_PARAM")
     # Confine the launch to the terminal's own working directories (shell
     # cwd, server cwd, home) and normalize the untrusted path to its real,
     # canonical form. Everything below uses this sanitized value, never the

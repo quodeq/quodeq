@@ -11,9 +11,10 @@ from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Response, after_this_request, jsonify, send_file
+from flask import Response, after_this_request, send_file
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import ClientMessageError, json_error
+from quodeq.shared._env import env_int
 
 _logger = logging.getLogger(__name__)
 
@@ -30,17 +31,13 @@ _EXTRACT_HEADROOM = 10
 def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max zip export size in bytes.
 
-    *max_mb* overrides the env var for testing.
+    *max_mb* overrides the env var for testing. An unparseable
+    QUODEQ_MAX_ZIP_SIZE_MB falls back to the default, with ``env_int``
+    logging a warning that names the variable, the bad value and the
+    default.
     """
     if max_mb is None:
-        raw = (env or os.environ).get("QUODEQ_MAX_ZIP_SIZE_MB")
-        if raw is not None:
-            try:
-                max_mb = int(raw)
-            except ValueError:
-                max_mb = _DEFAULT_MAX_ZIP_SIZE_MB
-        else:
-            max_mb = _DEFAULT_MAX_ZIP_SIZE_MB
+        max_mb = env_int("QUODEQ_MAX_ZIP_SIZE_MB", _DEFAULT_MAX_ZIP_SIZE_MB, env=env)
     return max_mb * 1024 * 1024
 
 
@@ -70,23 +67,38 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
     }
 
 
+class _ZipSizeLimitError(ClientMessageError, ValueError):
+    """Raised when a zip export crosses its compressed or uncompressed size cap.
+
+    Subclasses ValueError so the existing ``except (..., ValueError)`` guards
+    around zip building still catch it, but gives the upload route a precise
+    type to key off of: the route wants to surface *this* error's own
+    actionable message (it carries the MB limits and the remediation), not a
+    generic one, without risking that treatment for an unrelated ValueError.
+
+    ``public_message`` comes from ClientMessageError: the route reads that
+    attribute rather than ``str(exc)`` so the response never depends on
+    exception formatting.
+    """
+
+
 @dataclass(frozen=True)
 class _ZipLimits:
     """Size caps for one zip export, plus the errors raised when either is crossed."""
 
     size_limit: int
     uncompressed_limit: int
-    compressed_error: ValueError
-    uncompressed_error: ValueError
+    compressed_error: _ZipSizeLimitError
+    uncompressed_error: _ZipSizeLimitError
 
     @staticmethod
     def build(size_limit: int, uncompressed_limit: int) -> "_ZipLimits":
         """Build a _ZipLimits with the (compressed, uncompressed) over-limit errors for these caps."""
-        compressed_error = ValueError(
+        compressed_error = _ZipSizeLimitError(
             f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB compressed. "
             f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
         )
-        uncompressed_error = ValueError(
+        uncompressed_error = _ZipSizeLimitError(
             f"Project exceeds maximum uncompressed size of "
             f"{uncompressed_limit // (1024 * 1024)} MB (it would be rejected on re-import). "
             f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
@@ -162,21 +174,16 @@ def _build_project_zip(project_path: Path) -> Path:
     return Path(tmp_path)
 
 
-def _zip_error(message: str, status: int, code: str) -> tuple[Response, int]:
-    body, http_status = error_response(message, status, code)
-    return jsonify(body), http_status
-
-
 def _resolve_project_path(project: str, reports_dir: str) -> tuple[Path | None, tuple[Response, int] | None]:
     """Locate *project* under *reports_dir*. Returns ``(path, None)`` or ``(None, error)``."""
     project_path = (Path(reports_dir) / project).resolve()
     if not project_path.is_relative_to(Path(reports_dir).resolve()):
-        return None, _zip_error(
+        return None, json_error(
             "Invalid project name. Use only alphanumeric characters, hyphens, and underscores (no path separators).",
             HTTPStatus.BAD_REQUEST, "BAD_REQUEST",
         )
     if not project_path.exists() or not project_path.is_dir():
-        return None, _zip_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return project_path, None
 
 
@@ -198,10 +205,16 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
         return err
     try:
         tmp_path = _build_project_zip(project_path)
-    except ValueError:
-        return _zip_error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
-    except (OSError, zipfile.BadZipFile):
-        return _zip_error(
+    except _ZipSizeLimitError as exc:
+        return json_error(exc.public_message, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+    except (OSError, zipfile.BadZipFile, ValueError) as exc:
+        # ValueError covers zipfile's own rejections (for example "ZIP does
+        # not support timestamps before 1980" from zf.write under the
+        # default strict_timestamps=True). Without this they would leave the
+        # route as Flask's default 500 page, which carries no code. The
+        # message is fixed and the exception only logged, never echoed.
+        _logger.warning("Failed to build export zip for %s: %s", project, exc)
+        return json_error(
             "Failed to build project archive. Check disk space and file permissions, then try again.",
             HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
         )
