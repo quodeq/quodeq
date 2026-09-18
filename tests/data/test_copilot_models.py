@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -58,7 +59,7 @@ def test_discovers_account_models_without_inference_and_cleans_up(cli):
     assert "--headless" in args and "--stdio" in args
     assert "--disable-builtin-mcps" in args and "--no-custom-instructions" in args
     assert "-p" not in args
-    assert kwargs["env"]["COPILOT_HOME"].endswith("/.quodeq/copilot")
+    assert Path(kwargs["env"]["COPILOT_HOME"]) == Path(env["HOME"]) / ".quodeq" / "copilot"
     assert "GITHUB_TOKEN" not in kwargs["env"]
     assert not kwargs["cwd"].exists()
     assert process.returncode is not None
