@@ -16,14 +16,24 @@ import pytest
 from quodeq.services._fs_scan import scan_project
 
 
+#: Variables that would let the developer's environment reach into the test
+#: repo even with HOME repointed: they name a config file or a repo directly,
+#: so HOME never gets consulted. Dropped rather than overridden.
+_GIT_ENV_ESCAPES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")
+
+
 def _git(repo: Path, *args: str) -> None:
     # Inherit the real environment (PATH, and on Windows SYSTEMROOT/COMSPEC,
-    # which git needs), then pin identity and HOME so the run cannot pick up
-    # the developer's git config.
-    env = {**os.environ,
-           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
-           "HOME": str(repo)}
+    # which git needs), then seal every route to a config or repo outside the
+    # tmp dir: HOME repointed, both config files sent to devnull, and the
+    # variables that bypass HOME entirely removed.
+    env = {k: v for k, v in os.environ.items() if k not in _GIT_ENV_ESCAPES}
+    env.update({
+        "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+        "HOME": str(repo),
+        "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
+    })
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, env=env)
 
 

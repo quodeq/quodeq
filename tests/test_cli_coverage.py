@@ -17,24 +17,24 @@ from quodeq.cli_parser import build_parser
 
 class TestEnvInt:
     def test_returns_default_when_unset(self):
-        from quodeq.cli import env_int
-        assert env_int("NONEXISTENT_VAR_12345", 42, env={}) == 42
+        from quodeq.cli import cli_env_int
+        assert cli_env_int("NONEXISTENT_VAR_12345", 42, env={}) == 42
 
     def test_returns_parsed_int(self):
-        from quodeq.cli import env_int
-        assert env_int("MY_VAR", 0, env={"MY_VAR": "100"}) == 100
+        from quodeq.cli import cli_env_int
+        assert cli_env_int("MY_VAR", 0, env={"MY_VAR": "100"}) == 100
 
     def test_returns_default_on_invalid(self):
-        from quodeq.cli import env_int
-        assert env_int("MY_VAR", 7, env={"MY_VAR": "not_a_number"}) == 7
+        from quodeq.cli import cli_env_int
+        assert cli_env_int("MY_VAR", 7, env={"MY_VAR": "not_a_number"}) == 7
 
     def test_returns_none_default(self):
-        from quodeq.cli import env_int
-        assert env_int("MISSING", None, env={}) is None
+        from quodeq.cli import cli_env_int
+        assert cli_env_int("MISSING", None, env={}) is None
 
     def test_negative_value(self):
-        from quodeq.cli import env_int
-        assert env_int("NEG", 0, env={"NEG": "-5"}) == -5
+        from quodeq.cli import cli_env_int
+        assert cli_env_int("NEG", 0, env={"NEG": "-5"}) == -5
 
 
 class TestSubagentModel:

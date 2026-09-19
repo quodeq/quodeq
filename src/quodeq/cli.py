@@ -23,7 +23,7 @@ from quodeq._cli_env import (  # noqa: F401 — public re-exports
     ENV_MAX_DURATION,
     ENV_MAX_TURNS,
     ENV_POOL_BUDGET,
-    env_int,
+    cli_env_int,
     no_verify,
     subagent_model,
 )

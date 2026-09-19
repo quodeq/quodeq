@@ -62,15 +62,6 @@ def _full_transcript(messages: list[dict]) -> str:
     return "\n\n".join(f"[{m['role']}]\n{m['content']}" for m in messages)
 
 
-def _raw_error_line(line: str) -> str | None:
-    text = line.strip()
-    if not text:
-        return None
-    if any(text.startswith(prefix) for prefix in _BENIGN_RAW_LINES):
-        return None
-    return text
-
-
 def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     """Wire the MCP server into the CLI invocation, per provider style.
 
