@@ -11,6 +11,7 @@ already resolved and passes it straight through.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.analysis._config import (
@@ -28,14 +29,15 @@ _DEFAULT_AI_TOOLS = "Glob,Grep,Read"
 _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
 
-def _get_ai_tools(env: dict[str, str] | None = None) -> str:
+def _get_ai_tools(env: Mapping[str, str] | None = None) -> str:
     """Return AI tools from QUODEQ_AI_TOOLS env var (default: "Glob,Grep,Read")."""
-    return (env or os.environ).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
+    return (os.environ if env is None else env).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
 
 
-def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
+def _get_base_ai_args(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     """Return base AI CLI args from QUODEQ_AI_BASE_ARGS env var."""
-    return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
+    environ = os.environ if env is None else env
+    return tuple(environ.get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
 
 def _cmd_binary(cmd: str) -> str:
@@ -48,7 +50,9 @@ def _cmd_binary(cmd: str) -> str:
     return get_ai_cmd_path() or cmd
 
 
-def _build_base_args(cmd: str, provider_cfg: dict) -> list[str]:
+def _build_base_args(
+    cmd: str, provider_cfg: dict, env: Mapping[str, str] | None = None,
+) -> list[str]:
     """Build the initial args list: binary, subcommand, base args, and tools."""
     args: list[str] = [_cmd_binary(cmd)]
     subcommand = provider_cfg.get("cmd_subcommand", "")
@@ -59,10 +63,10 @@ def _build_base_args(cmd: str, provider_cfg: dict) -> list[str]:
     if base_args_str:
         args.extend(base_args_str.split())
     else:
-        args.extend(_get_base_ai_args())
+        args.extend(_get_base_ai_args(env))
 
     if provider_cfg.get("supports_tools", True):
-        args.extend(["--tools", _get_ai_tools()])
+        args.extend(["--tools", _get_ai_tools(env)])
     return args
 
 

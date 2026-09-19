@@ -46,27 +46,27 @@ class TestBuildRunConfigAiModel:
         return inputs
 
     def test_reads_ai_model_from_env(self, tmp_path):
-        from quodeq.cli import _build_run_config
+        from quodeq.cli import build_run_config
         args = self._make_args()
         inputs = self._make_inputs(tmp_path)
         env = {"AI_MODEL": "qwen3.5:9b"}
-        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
+        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.ai_model == "qwen3.5:9b"
 
     def test_ai_model_none_when_not_set(self, tmp_path):
-        from quodeq.cli import _build_run_config
+        from quodeq.cli import build_run_config
         args = self._make_args()
         inputs = self._make_inputs(tmp_path)
         env = {}
-        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
+        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.ai_model is None
 
     def test_subagent_model_used_as_fallback(self, tmp_path):
-        from quodeq.cli import _build_run_config
+        from quodeq.cli import build_run_config
         args = self._make_args()
         inputs = self._make_inputs(tmp_path)
         env = {"SUBAGENT_MODEL": "sonnet"}
-        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
+        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.ai_model == "sonnet"
 
 

@@ -11,7 +11,8 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
 
-from quodeq.shared.utils import write_text, get_asvs_url, show_diff
+from quodeq.shared import get_asvs_url, show_diff
+from quodeq.shared.utils import write_text
 
 from quodeq.config._asvs_network import (  # noqa: F401
     fetch_with_retry as _fetch_with_retry,

@@ -60,10 +60,10 @@ function ModelChipButton({ modelLabel, onOpenSettings, closeActiveTab }) {
   );
 }
 
-function DrawerControls({
-  modelLabel, onOpenSettings, closeActiveTab, resetConversation, streaming, sessionReady,
-  repoInfo, writeEnabled, toggleWriteEnabled, provider, webEnabled, toggleWebEnabled, maximized, toggleMaximized,
-}) {
+function DrawerControls({ session, toggles, actions }) {
+  const { modelLabel, provider, streaming, sessionReady, repoInfo } = session;
+  const { writeEnabled, toggleWriteEnabled, webEnabled, toggleWebEnabled, maximized, toggleMaximized } = toggles;
+  const { onOpenSettings, closeActiveTab, resetConversation } = actions;
   return (
     <div className="assistant-drawer-controls">
       <ModelChipButton modelLabel={modelLabel} onOpenSettings={onOpenSettings} closeActiveTab={closeActiveTab} />
@@ -155,11 +155,9 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
         sessionId={sessionId} refreshWorkspace={refreshWorkspace} addWindow={addWindow}
       />
       <DrawerControls
-        modelLabel={modelLabel} onOpenSettings={onOpenSettings} closeActiveTab={closeActiveTab}
-        resetConversation={resetConversation} streaming={streaming} sessionReady={sessionReady}
-        repoInfo={repoInfo} writeEnabled={writeEnabled} toggleWriteEnabled={toggleWriteEnabled}
-        provider={provider} webEnabled={webEnabled} toggleWebEnabled={toggleWebEnabled}
-        maximized={maximized} toggleMaximized={toggleMaximized}
+        session={{ modelLabel, provider, streaming, sessionReady, repoInfo }}
+        toggles={{ writeEnabled, toggleWriteEnabled, webEnabled, toggleWebEnabled, maximized, toggleMaximized }}
+        actions={{ onOpenSettings, closeActiveTab, resetConversation }}
       />
     </header>
   );

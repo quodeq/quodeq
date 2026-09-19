@@ -82,3 +82,20 @@ def test_migration_preserves_dismissed_json_as_fallback(tmp_path: Path) -> None:
 
     # JSON file is intentionally left in place for one release.
     assert (project_dir / "dismissed.json").exists()
+
+
+def test_injected_locks_are_used_and_resettable(tmp_path: Path) -> None:
+    from quodeq.data.migrations.dismissed_json_to_actions_log import (
+        _DEFAULT_LOCKS, _MigrationLocks)
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    _write_dismissed_json(project_dir, [{"req": "R1", "file": "a.py", "line": 10}])
+
+    locks = _MigrationLocks()
+    assert migrate_if_needed(project_dir, locks=locks) == 1
+
+    # the injected table, not the process-wide one, took the lock
+    assert locks.for_project(project_dir) is not _DEFAULT_LOCKS.for_project(project_dir)
+    locks.reset()
+    assert migrate_if_needed(project_dir, locks=locks) == 0

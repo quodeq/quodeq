@@ -75,8 +75,8 @@ class FsEvaluationMixin:
             ai_model=options.ai_model or get_ai_model(),
         )
 
-    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
-        """Start an asynchronous evaluation subprocess for a repository."""
+    @staticmethod
+    def _resolve_repo_target(repo: str) -> Path:
         if is_repo_url(repo):
             raise ValueError(
                 "URL repos are not supported here. Register the project via "
@@ -88,8 +88,12 @@ class FsEvaluationMixin:
                 f"Repository not found: {repo}. "
                 f"Check that the path exists and is accessible from this machine."
             )
+        return resolved
 
-        cmd = _build_evaluate_cmd(repo, options, reports_dir)
+    @staticmethod
+    def _register_target_project(
+        repo: str, reports_dir: str, options: EvaluationOptions,
+    ) -> None:
         project_uuid = register_project(
             reports_dir, NewProjectSpec(repo, options.discipline, scope_path=options.scope_path),
         )
@@ -98,29 +102,43 @@ class FsEvaluationMixin:
         # null written at registration persists forever (the lazy backfill
         # only fills in a *missing* field, never a null one).
         mark_onboarding_complete(Path(reports_dir) / project_uuid)
+
+    @staticmethod
+    def _git_root_cwd(resolved: Path) -> str:
+        # For files, walk up to find git root; for dirs, use as-is
+        if not resolved.is_file():
+            return str(resolved)
+        candidate = resolved.parent
+        cwd = str(candidate)
+        while candidate != candidate.parent:
+            if (candidate / ".git").exists():
+                cwd = str(candidate)
+                break
+            candidate = candidate.parent
+        return cwd
+
+    def _launch_evaluation_job(
+        self, cmd: list[str], reports_dir: str, options: EvaluationOptions, resolved: Path,
+    ) -> JobSnapshot:
         # Keep JobManager aware of the current reports root so _tee_run_log
         # can resolve run.log paths for dashboard-spawned evaluations.
         # Guard with hasattr so custom/stub job managers remain compatible.
         if hasattr(self._jobs, "set_reports_root"):
             self._jobs.set_reports_root(Path(reports_dir))
         env = self._build_eval_env(options)
-        # For files, walk up to find git root; for dirs, use as-is
-        if resolved.is_file():
-            candidate = resolved.parent
-            cwd = str(candidate)
-            while candidate != candidate.parent:
-                if (candidate / ".git").exists():
-                    cwd = str(candidate)
-                    break
-                candidate = candidate.parent
-        else:
-            cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, JobLaunchOptions(
-            cwd=cwd, env=env,
+            cwd=self._git_root_cwd(resolved), env=env,
             ai_provider=options.ai_cmd,
             ai_model=options.ai_model,
             time_limit_s=options.time_limit,
         ))
+
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
+        """Start an asynchronous evaluation subprocess for a repository."""
+        resolved = self._resolve_repo_target(repo)
+        cmd = _build_evaluate_cmd(repo, options, reports_dir)
+        self._register_target_project(repo, reports_dir, options)
+        return self._launch_evaluation_job(cmd, reports_dir, options, resolved)
 
     def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return the current status of an evaluation job.

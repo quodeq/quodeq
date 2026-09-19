@@ -38,6 +38,18 @@ _POLL_INTERVAL = env_int("QUODEQ_POLL_INTERVAL", 5)
 _DEFAULT_PORTS = "7863,7864,7865,7866,7867,7868,7869"
 
 
+def _set_menu_item(item, callback) -> None:
+    """Point *item* at *callback* and grey it out when that is None.
+
+    rumps 0.4.0 exposes no enabled toggle: ``MenuItem.set_callback`` alone
+    leaves AppKit's own enabling in charge, which keeps a callback-less item
+    looking clickable. The one reach into the wrapped ``NSMenuItem`` lives
+    here so the private access has a single site.
+    """
+    item.set_callback(callback)
+    item._menuitem.setEnabled_(callback is not None)
+
+
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     _cfg_log = _logging.getLogger(__name__)
@@ -148,20 +160,9 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
 
     def _set_ui_state(self, running: bool) -> None:
         """Toggle menu items between running and stopped states."""
-        if running:
-            self._open_item.set_callback(self._on_open)
-            self._open_item._menuitem.setEnabled_(True)
-            self._start_item.set_callback(None)
-            self._start_item._menuitem.setEnabled_(False)
-            self._stop_item.set_callback(self._on_stop)
-            self._stop_item._menuitem.setEnabled_(True)
-        else:
-            self._open_item.set_callback(None)
-            self._open_item._menuitem.setEnabled_(False)
-            self._start_item.set_callback(self._on_start)
-            self._start_item._menuitem.setEnabled_(True)
-            self._stop_item.set_callback(None)
-            self._stop_item._menuitem.setEnabled_(False)
+        _set_menu_item(self._open_item, self._on_open if running else None)
+        _set_menu_item(self._start_item, None if running else self._on_start)
+        _set_menu_item(self._stop_item, self._on_stop if running else None)
 
     @rumps.timer(_POLL_INTERVAL)
     def _poll(self, _):

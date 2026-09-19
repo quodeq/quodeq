@@ -10,6 +10,8 @@ import time
 
 import pytest
 
+from quodeq.services._external_jobs import ProcessControl
+from quodeq.services._external_jobs import _wait_for_exit as _wait_for_pid_exit
 from tests._timeouts import budget
 
 
@@ -223,3 +225,30 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
     finally:
         reaper_stop.set()
         _force_cleanup(proc)
+
+
+class TestWaitForExit:
+    """The poll-until-gone loop shared by the SIGTERM and SIGKILL phases."""
+
+    def _control(self, alive_answers):
+        answers = iter(alive_answers)
+        return ProcessControl(kill_tree=lambda *_a: None, pid_alive=lambda _pid: next(answers))
+
+    def test_returns_true_as_soon_as_the_pid_is_gone(self):
+        control = self._control([True, False])
+        assert _wait_for_pid_exit(control, 1234, 5.0, interval=0.001) is True
+
+    def test_returns_false_when_the_timeout_expires(self):
+        control = ProcessControl(kill_tree=lambda *_a: None, pid_alive=lambda _pid: True)
+        assert _wait_for_pid_exit(control, 1234, 0.02, interval=0.001) is False
+
+    def test_zero_timeout_never_polls(self):
+        calls = []
+
+        def _alive(pid):
+            calls.append(pid)
+            return False
+
+        control = ProcessControl(kill_tree=lambda *_a: None, pid_alive=_alive)
+        assert _wait_for_pid_exit(control, 1234, 0.0, interval=0.001) is False
+        assert calls == []

@@ -103,15 +103,21 @@ function useWindowActions({ windows, setWindows, showAtCapNotice }) {
     [windows],
   );
 
-  const addWindow = useCallback((spec) => {
-    if (!spec || !spec.id) return;
-    if (windows.some((w) => w.id === spec.id)) return;
+  // Append unless the dock is full, in which case the caller's click turns
+  // into the at-cap snackbar instead.
+  const pushWithinCap = useCallback((spec) => {
     if (windows.length >= MAX_WINDOWS) {
       showAtCapNotice();
       return;
     }
     setWindows((prev) => [...prev, spec]);
   }, [windows, showAtCapNotice]);
+
+  const addWindow = useCallback((spec) => {
+    if (!spec || !spec.id) return;
+    if (windows.some((w) => w.id === spec.id)) return;
+    pushWithinCap(spec);
+  }, [windows, pushWithinCap]);
 
   const removeWindow = useCallback((id) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));
@@ -135,12 +141,8 @@ function useWindowActions({ windows, setWindows, showAtCapNotice }) {
       setWindows((prev) => prev.filter((w) => w.id !== spec.id));
       return;
     }
-    if (windows.length >= MAX_WINDOWS) {
-      showAtCapNotice();
-      return;
-    }
-    setWindows((prev) => [...prev, spec]);
-  }, [windows, showAtCapNotice]);
+    pushWithinCap(spec);
+  }, [windows, pushWithinCap]);
 
   const closeAll = useCallback(() => setWindows([]), []);
 

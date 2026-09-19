@@ -4,12 +4,25 @@ Input resolution lives in ``_cli_resolution.py``; run lifecycle (directory
 setup, RunLifecycleContext wiring, cleanup) lives in ``_cli_lifecycle.py``;
 env/argv helpers in ``_cli_env.py``; suppression-aware score printing lives
 in ``_cli_scoring.py``; run_evaluate's --diff-from resolution and post-run
-consolidation/SARIF finalization live in ``_cli_evaluate_finalize.py``. All
-public names stay re-exported here (and, in turn, by ``quodeq.cli``) — ~15
-test files patch ``quodeq._cli_evaluation.<name>``. The lifecycle helpers
-receive those patchable names as a ``LifecycleHooks`` bundle built here at
-call time (see ``_lifecycle_hooks``), so the re-exports below with no direct
-caller left in this module must stay importable as patch targets.
+consolidation/SARIF finalization live in ``_cli_evaluate_finalize.py``;
+``_build_run_config``'s phase helpers live in ``_cli_run_config.py``. The
+lifecycle helpers receive this module's patchable names as a
+``LifecycleHooks`` bundle built here at call time (see ``_lifecycle_hooks``).
+
+Patch targets — patch a name where the code that calls it looks it up, not
+where it happens to be re-exported:
+
+- Called from THIS module, so ``quodeq._cli_evaluation.<name>`` works:
+  ``default_paths``, ``get_ai_model``, ``_subagent_model``, ``resolve_diff_files``,
+  ``is_repo_url``, ``project_name_from_repo``, ``emit_marker``,
+  ``cleanup_cloned_repo``, ``resolve_project_uuid`` and the ``evidence_rescore``
+  pair.
+- Read by ``_cli_run_config``: ``_env_int``, ``_no_verify``,
+  ``_resolve_time_limit``, ``default_dispatch_policy``, ``expand_dimension_aliases``,
+  ``AnalysisOptions``. Patch ``quodeq._cli_run_config.<name>``; patching them
+  here is a silent no-op.
+- ``_env_int``, ``_no_verify``, ``_subagent_model`` and the ``_ENV_*`` constants
+  are re-exported below only because ``quodeq.cli`` imports them from here.
 """
 
 from __future__ import annotations
@@ -19,10 +32,10 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import NamedTuple
 
 from quodeq.config.paths import default_paths
-from quodeq.analysis.dispatch_policy import default_dispatch_policy
-from quodeq.analysis.runner import AnalysisOptions, RunConfig, run
+from quodeq.analysis.runner import RunConfig, run
 from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.services.evidence_rescore import (  # noqa: F401 — facade patch targets
     rescore_dimension_from_evidence, score_dimension_from_evidence,
@@ -34,14 +47,16 @@ from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_rep
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # facade patch target
 from quodeq.analysis._runner_markers import emit_marker  # facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
-from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import resolve_diff_files  # facade patch target
 from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
-from quodeq._cli_env import (  # noqa: F401
-    _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_POOL_BUDGET, _ENV_TIME_LIMIT,
-    _env_int, _no_verify, _resolve_time_limit, _subagent_model,
+from quodeq._cli_env import (  # noqa: F401 — _ENV_*/_env_int/_no_verify re-exported for quodeq.cli
+    _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_POOL_BUDGET,
+    _env_int, _no_verify, _subagent_model,
+)
+from quodeq._cli_run_config import (
+    _build_analysis_options, _dimensions_filter, _resolve_limits,
 )
 from quodeq._cli_resolution import (  # noqa: F401
     ResolvedInputs, _build_manifest, _cleanup_worktree, _create_worktree,
@@ -115,7 +130,24 @@ def _save_manifest(manifest, evidence_dir: Path) -> None:
             _logger.debug("Could not write manifest: %s", exc)
 
 
-def _resolve_run_config_locals(args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None):
+class _RunConfigLocals(NamedTuple):
+    """The per-run scalars `_build_run_config` resolves before assembling RunConfig.
+
+    Named rather than a bare tuple so `_cli_run_config._build_analysis_options`
+    reads them by attribute: reordering these fields can no longer silently
+    swap, say, `consolidated` and `skip_scoring` at the call site.
+    """
+    consolidated: bool
+    effective_ai_model: str | None
+    subagent_model: str | None
+    diff_from: str | None
+    diff_files: set[str] | None
+    skip_scoring: bool
+
+
+def _resolve_run_config_locals(
+    args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None,
+) -> _RunConfigLocals:
     """Resolve the per-run scalars _build_run_config needs before assembling RunConfig."""
     _env = env or os.environ
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
@@ -130,21 +162,22 @@ def _resolve_run_config_locals(args: argparse.Namespace, inputs: ResolvedInputs,
     diff_from = getattr(args, "diff_from", None)
     diff_files: set[str] | None = getattr(args, "_diff_files", None)
     skip_scoring = diff_from is not None
-    return consolidated, effective_ai_model, subagent_model_val, diff_from, diff_files, skip_scoring
+    return _RunConfigLocals(
+        consolidated=consolidated,
+        effective_ai_model=effective_ai_model,
+        subagent_model=subagent_model_val,
+        diff_from=diff_from,
+        diff_files=diff_files,
+        skip_scoring=skip_scoring,
+    )
 
 
 def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, run_dir: Path | None = None, env: dict[str, str] | None = None) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved inputs."""
     standards_dir = default_paths().standards_dir
-    expanded_dimensions = expand_dimension_aliases(args.dimensions)
-    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
-    log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
-
-    (
-        consolidated, effective_ai_model, subagent_model_val,
-        diff_from, diff_files, skip_scoring,
-    ) = _resolve_run_config_locals(args, inputs, env)
-    incremental_file_filter: set[str] | None = diff_files
+    dimensions_filter = _dimensions_filter(args)
+    resolved = _resolve_run_config_locals(args, inputs, env)
+    limits = _resolve_limits(args, env)
 
     return RunConfig(
         src=inputs.src,
@@ -156,23 +189,8 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         dimensions_data=inputs.dims_data,
         evaluators_dir=default_paths().evaluators_dir,
         prompts_dir=default_paths().prompts_dir,
-        options=AnalysisOptions(
-            ai_model=effective_ai_model,
-            dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None, env=env),
-            max_subagents=args.n_subagents,
-            subagent_model=subagent_model_val,
-            verify_findings=not _no_verify(args, env=env),
-            consolidated=consolidated,
-            time_limit=_resolve_time_limit(args, env=env),
-            incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
-            incremental_file_filter=incremental_file_filter,
-            dry_run=getattr(args, "dry_run", False),
-            diff_from=diff_from,
-            skip_scoring=skip_scoring,
-        ),
-        dispatch=default_dispatch_policy(env=env or os.environ),
+        options=_build_analysis_options(dimensions_filter, resolved, limits),
+        dispatch=limits.dispatch_policy,
     )
 
 
@@ -265,3 +283,12 @@ def run_diff_evaluation(
         argv += ["--dimensions", dimensions]
     from quodeq.cli_parser import build_parser  # noqa: PLC0415
     return run_evaluate(build_parser().parse_args(argv))
+
+
+# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
+# originals stay importable from here for in-package callers.
+build_run_config = _build_run_config
+execute_pipeline = _execute_pipeline
+run_pipeline_with_cleanup = _run_pipeline_with_cleanup
+save_manifest = _save_manifest
+setup_run_dirs = _setup_run_dirs

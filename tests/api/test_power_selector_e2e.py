@@ -150,19 +150,19 @@ class TestRunnerModelResolution:
     def _resolve(self, subagent_model: str | None = None, env_model: str | None = None) -> str:
         """Exercise the runner's resolution chain using the actual cli helper.
 
-        The env-based fallback delegates to ``quodeq.cli._subagent_model`` which
+        The env-based fallback delegates to ``quodeq.cli.subagent_model`` which
         is the same function used by the real CLI (``cli.py`` line ~43).  The
         option-level override (``subagent_model`` arg) and the final default are
         handled here in the same order as the evaluate command.
         """
-        from quodeq.cli import _subagent_model
+        from quodeq.cli import subagent_model as env_subagent_model
         from quodeq.analysis.runner import AnalysisOptions
         opts = AnalysisOptions(subagent_model=subagent_model)
         with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
             if not env_model:
                 os.environ.pop("SUBAGENT_MODEL", None)
             _FALLBACK_MODEL = _MODEL_HAIKU
-            return opts.subagent_model or _subagent_model() or _FALLBACK_MODEL
+            return opts.subagent_model or env_subagent_model() or _FALLBACK_MODEL
 
     def test_level1_fast_haiku(self) -> None:
         assert self._resolve(_MODEL_HAIKU) == _MODEL_HAIKU

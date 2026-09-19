@@ -8,8 +8,14 @@ import { writeCachedState } from '../../../utils/pageStateCache.js';
  * (show all), and the selection persists across unmount as an array.
  */
 export function useMapDimensionFilter({ allDimensions, selectedProject, cachedSelectedArr }) {
-  // Get visible standards and available dimension names
-  const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);
+  // Get visible standards and available dimension names. The ids are read on
+  // every render and the Set is keyed on them, not on `allDimensions`: hiding
+  // a standard elsewhere has to reach the map even when the same dimensions
+  // come back in.
+  const visibleIdList = readVisibleStandardIds();
+  const visibleIdKey = visibleIdList.join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const visibleIds = useMemo(() => new Set(visibleIdList), [visibleIdKey]);
   const visibleDimensions = useMemo(
     () => allDimensions.filter((d) => visibleIds.has((d.dimension || '').toLowerCase())),
     [allDimensions, visibleIds]

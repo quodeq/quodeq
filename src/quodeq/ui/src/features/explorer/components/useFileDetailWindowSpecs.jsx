@@ -2,11 +2,7 @@ import { useMemo } from 'react';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { buildFileReport } from '../../../utils/reportBuilder.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
-
-function filterTitleSuffix(filter) {
-  if (!filter || filter === 'all') return '';
-  return ` (${filter})`;
-}
+import { filterTitleSuffix } from './usePrincipleReportSpec.jsx';
 
 /** Registers the file's report + fix-plan side-pane window specs, kept in
  * sync with the active severity filter. */

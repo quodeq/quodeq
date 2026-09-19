@@ -27,10 +27,10 @@ def target_to_dict(target: AnalysisTarget) -> dict:
 
 def manifest_to_dict(manifest: SourceManifest) -> dict:
     """Serialize for JSON debugging output."""
-    # Mirrors SourceManifest._primary's delegation: describe the primary
+    # Mirrors SourceManifest.primary's delegation: describe the primary
     # target, "Unknown" when the manifest has none. The serialized
     # "project_description" KEY is part of the manifest.json shape.
-    primary = manifest._primary
+    primary = manifest.primary
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "language": manifest.language,

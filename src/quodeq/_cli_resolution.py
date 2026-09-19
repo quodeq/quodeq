@@ -265,3 +265,19 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         worktree_origin=worktree_origin, worktree_dir=worktree_dir,
         single_file=bool(single_file),
     )
+
+
+# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
+# originals stay importable from here for in-package callers.
+# ``_build_manifest`` is spelled ``build_cli_manifest``: this module already
+# binds ``build_manifest`` to the analysis-layer builder it calls.
+build_cli_manifest = _build_manifest
+cleanup_worktree = _cleanup_worktree
+create_worktree = _create_worktree
+filter_manifest_by_scope = _filter_manifest_by_scope
+override_manifest_single_file = _override_manifest_single_file
+resolve_evaluation_inputs = _resolve_evaluation_inputs
+resolve_language = _resolve_language
+resolve_repo = _resolve_repo
+resolve_scope = _resolve_scope
+resolve_single_file = _resolve_single_file

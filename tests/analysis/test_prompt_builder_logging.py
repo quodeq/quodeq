@@ -1,11 +1,11 @@
-"""Tests for builder.py — _load_evaluation_rules logs on template load failure."""
+"""Tests for builder.py — load_evaluation_rules logs on template load failure."""
 from __future__ import annotations
 
 import logging
 from unittest.mock import patch
 
 
-from quodeq.analysis.prompts.builder import _load_evaluation_rules
+from quodeq.analysis.prompts.builder import load_evaluation_rules
 
 
 def _enable_propagation():
@@ -28,7 +28,7 @@ class TestLoadEvaluationRulesLogging:
                 "quodeq.analysis.prompts.builder.load_template", side_effect=_bad_load
             ):
                 with caplog.at_level(logging.WARNING, logger="quodeq.analysis.prompts.builder"):
-                    result = _load_evaluation_rules()
+                    result = load_evaluation_rules()
         finally:
             quodeq_logger.propagate = orig
 
@@ -52,7 +52,7 @@ class TestLoadEvaluationRulesLogging:
                 "quodeq.analysis.prompts.builder.load_template", side_effect=_partial_load
             ):
                 with caplog.at_level(logging.WARNING, logger="quodeq.analysis.prompts.builder"):
-                    result = _load_evaluation_rules()
+                    result = load_evaluation_rules()
         finally:
             quodeq_logger.propagate = orig
 

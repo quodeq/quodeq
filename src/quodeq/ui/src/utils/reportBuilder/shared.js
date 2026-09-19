@@ -13,6 +13,19 @@ export function formatDate() {
 }
 
 /**
+ * An overall score as the report headers write it: one decimal out of ten,
+ * or an em dash when there is none. Accepts the number the accumulated
+ * summary carries and the numeric string a run summary carries.
+ *
+ * @param {number|string|null|undefined} value
+ * @returns {string}
+ */
+export function formatScore(value) {
+  if (value == null) return '\u2014';
+  return `${Math.round(parseFloat(value) * 10) / 10}/10`;
+}
+
+/**
  * Truncates a code snippet to the first few lines, appending a count of what
  * was dropped, so one huge finding cannot dominate a report.
  */

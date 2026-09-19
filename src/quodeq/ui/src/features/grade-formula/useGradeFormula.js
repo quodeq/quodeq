@@ -28,50 +28,53 @@ function noticeFor(d) {
  */
 export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const {
-    saved, setSaved, draft, setDraft, isCustom, setIsCustom, defaults,
-    preview, setPreview, busy, setBusy, error, setError, partialNotice, setPartialNotice,
+    saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
     debounceRef, loadedRef, invalidateScoreQueries,
+    adoptServerFormula, beginRequest, endRequest, failWith, notePartialRescore,
+    updateDraft, showPreview,
   } = useGradeFormulaState();
 
   const isDirty = saved && draft && JSON.stringify(saved) !== JSON.stringify(draft);
 
-  const { requestPreview, update } = useGradePreview({ projectId, draft, setDraft, setPreview, debounceRef, loadedRef });
+  const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loadedRef });
 
   const apply = useCallback(async () => {
-    setBusy(true); setError(null); setPartialNotice(null);
+    beginRequest();
     try {
       const d = await saveGradeFormula(draft);
-      setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
+      adoptServerFormula(d.current, d.isCustom);
       thresholdsStore.set(d.current.gradeThresholds);
-      setPartialNotice(noticeFor(d));
+      notePartialRescore(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
       return d.applied;
     } catch (err) {
       console.warn('[useGradeFormula] apply failed:', err);
-      setError(t('gradeFormula.applyFailed'));
+      failWith(t('gradeFormula.applyFailed'));
       return null;
     } finally {
-      setBusy(false);
+      endRequest();
     }
-  }, [draft, requestPreview, invalidateScoreQueries, thresholdsStore]);
+  }, [draft, requestPreview, invalidateScoreQueries, thresholdsStore,
+      beginRequest, endRequest, failWith, adoptServerFormula, notePartialRescore]);
 
   const resetToDefaults = useCallback(async () => {
-    setBusy(true); setError(null); setPartialNotice(null);
+    beginRequest();
     try {
       const d = await resetGradeFormula();
-      setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
+      adoptServerFormula(d.current, d.isCustom);
       thresholdsStore.set(d.current.gradeThresholds);
-      setPartialNotice(noticeFor(d));
+      notePartialRescore(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
     } catch (err) {
       console.warn('[useGradeFormula] reset failed:', err);
-      setError(t('gradeFormula.resetFailed'));
+      failWith(t('gradeFormula.resetFailed'));
     } finally {
-      setBusy(false);
+      endRequest();
     }
-  }, [requestPreview, invalidateScoreQueries, thresholdsStore]);
+  }, [requestPreview, invalidateScoreQueries, thresholdsStore,
+      beginRequest, endRequest, failWith, adoptServerFormula, notePartialRescore]);
 
   return { draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults };
 }

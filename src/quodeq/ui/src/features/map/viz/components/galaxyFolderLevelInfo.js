@@ -1,5 +1,23 @@
 import { t } from '../../../../strings/index.js';
 
+// Most severe first, so the panel reads the same in both branches.
+const SEVERITY_LINES = [
+  { key: 'critical', label: 'Critical', color: 'var(--color-sev-critical-text)' },
+  { key: 'major', label: 'Major', color: 'var(--color-sev-major-text)' },
+  { key: 'minor', label: 'Minor', color: 'var(--color-sev-minor-text)' },
+];
+
+// One panel line per non-zero severity. The folder branch tints its lines
+// with the severity tokens; the zoomed-file branch leaves them plain.
+function severityLines(counts, colored) {
+  const sev = counts || {};
+  return SEVERITY_LINES
+    .filter(({ key }) => sev[key] > 0)
+    .map(({ key, label, color }) => (
+      colored ? { label, value: sev[key], color } : { label, value: sev[key] }
+    ));
+}
+
 /**
  * Build the level-info panel data object for the current view state.
  */
@@ -14,9 +32,7 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
       lines: [
         { label: 'Violations', value: s.violations },
         { label: 'Compliance', value: s.compliance },
-        ...(sev.critical ? [{ label: 'Critical', value: sev.critical }] : []),
-        ...(sev.major ? [{ label: 'Major', value: sev.major }] : []),
-        ...(sev.minor ? [{ label: 'Minor', value: sev.minor }] : []),
+        ...severityLines(sev, false),
       ],
       hint: null,
       detailAction: () => { if (onFileClick) onFileClick(s._node); },
@@ -33,11 +49,7 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
     { label: 'Contents', value: folderCount + fileCount },
     { label: 'Violations', value: cn.violations },
   ];
-  if (cn.violations > 0) {
-    if (cnSev.critical > 0) lines.push({ label: 'Critical', value: cnSev.critical, color: 'var(--color-sev-critical-text)' });
-    if (cnSev.major > 0) lines.push({ label: 'Major', value: cnSev.major, color: 'var(--color-sev-major-text)' });
-    if (cnSev.minor > 0) lines.push({ label: 'Minor', value: cnSev.minor, color: 'var(--color-sev-minor-text)' });
-  }
+  if (cn.violations > 0) lines.push(...severityLines(cnSev, true));
   return {
     title: isRoot ? (projectName || 'Project') : cn.name,
     lines,

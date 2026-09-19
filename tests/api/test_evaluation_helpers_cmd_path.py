@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from flask import Flask
 
-from quodeq.api._evaluation_helpers import _validate_ai_cmd_path
+from quodeq.api._evaluation_helpers import _validate_ai_cmd_path, ai_cmd_path_error
 
 
 @pytest.fixture
@@ -105,3 +105,17 @@ class TestValidateAiCmdPath:
     def test_provider_falls_back_to_configured_cmd(self, _mock, app_ctx, bin_dir):
         binary = _make_executable(bin_dir, "claude-api")
         assert _validate_ai_cmd_path(None, binary) is None
+
+
+class TestAiCmdPathErrorEnvInjection:
+    """The PATH containment rule reads the injected env, not the host's."""
+
+    def test_injected_empty_env_rejects_an_on_path_binary(self, app_ctx, bin_dir):
+        binary = _make_executable(bin_dir, "claude-api")
+        reason = ai_cmd_path_error("claude", binary, env={})
+        assert reason is not None
+        assert "not in a directory on PATH" in reason
+
+    def test_injected_env_accepts_a_binary_on_its_own_path(self, app_ctx, bin_dir):
+        binary = _make_executable(bin_dir, "claude-api")
+        assert ai_cmd_path_error("claude", binary, env={"PATH": str(bin_dir)}) is None

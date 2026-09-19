@@ -9,14 +9,14 @@ const PREVIEW_DEBOUNCE_MS = 250;
  * function that triggers it. Extracted verbatim -- the debounce and the
  * loadedRef-gated trigger effect's deps are unchanged.
  */
-export function useGradePreview({ projectId, draft, setDraft, setPreview, debounceRef, loadedRef }) {
+export function useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loadedRef }) {
   const requestPreview = useCallback((params) => {
     if (!projectId) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       previewGradeFormula(projectId, params)
-        .then(setPreview)
-        .catch(() => setPreview(null));
+        .then(showPreview)
+        .catch(() => showPreview(null));
     }, PREVIEW_DEBOUNCE_MS);
   }, [projectId]);
 
@@ -29,7 +29,7 @@ export function useGradePreview({ projectId, draft, setDraft, setPreview, deboun
   }, [projectId, loadedRef.current]);
 
   const update = useCallback((patch) => {
-    setDraft((prev) => {
+    updateDraft((prev) => {
       const next = { ...prev, ...clampFloors(prev, patch) };
       requestPreview(next);
       return next;

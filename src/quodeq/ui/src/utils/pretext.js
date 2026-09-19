@@ -24,6 +24,15 @@ import {
 const PREPARE_CACHE_LIMIT = 1024;
 const _prepareCache = new Map();
 
+// Drop the oldest entry once `map` has reached `cap`, so the caller's next
+// set() stays within it. Map preserves insertion order: its first key is the
+// oldest.
+function evictOldest(map, cap) {
+  if (map.size < cap) return;
+  const oldest = map.keys().next().value;
+  if (oldest !== undefined) map.delete(oldest);
+}
+
 function cacheKey(text, font) {
   return `${font}\u0000${text}`;
 }
@@ -40,11 +49,7 @@ export function prepare(text, font) {
   const cached = _prepareCache.get(key);
   if (cached) return cached;
   const prepared = pretextPrepare(text, font);
-  if (_prepareCache.size >= PREPARE_CACHE_LIMIT) {
-    // Drop oldest entry — Map preserves insertion order.
-    const oldest = _prepareCache.keys().next().value;
-    if (oldest !== undefined) _prepareCache.delete(oldest);
-  }
+  evictOldest(_prepareCache, PREPARE_CACHE_LIMIT);
   _prepareCache.set(key, prepared);
   return prepared;
 }
@@ -93,10 +98,7 @@ function prepareSegments(text, font) {
   const cached = _segmentCache.get(key);
   if (cached) return cached;
   const prepared = prepareWithSegments(text, font);
-  if (_segmentCache.size >= SEGMENT_CACHE_LIMIT) {
-    const oldest = _segmentCache.keys().next().value;
-    if (oldest !== undefined) _segmentCache.delete(oldest);
-  }
+  evictOldest(_segmentCache, SEGMENT_CACHE_LIMIT);
   _segmentCache.set(key, prepared);
   return prepared;
 }

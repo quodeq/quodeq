@@ -92,8 +92,28 @@ function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject
   );
 }
 
-function LocalProjectEntry({ entry, ctx }) {
-  const { children, selectedProject, onSelect, onResumeSetup, confirming, setConfirming, onDelete, onExport, relocateActions, publishActions, localEntryById, shared } = ctx;
+// The three bundles a local card needs: what the project is, whether it is
+// the selected one, and what can be done to it.
+function localEntryProps(ctx) {
+  return {
+    project: { children: ctx.children, localEntryById: ctx.localEntryById, shared: ctx.shared },
+    selection: { selectedProject: ctx.selectedProject, onSelect: ctx.onSelect },
+    actions: {
+      onResumeSetup: ctx.onResumeSetup,
+      confirming: ctx.confirming,
+      setConfirming: ctx.setConfirming,
+      onDelete: ctx.onDelete,
+      onExport: ctx.onExport,
+      relocateActions: ctx.relocateActions,
+      publishActions: ctx.publishActions,
+    },
+  };
+}
+
+function LocalProjectEntry({ entry, project, selection, actions }) {
+  const { children, localEntryById, shared } = project;
+  const { selectedProject, onSelect } = selection;
+  const { onResumeSetup, confirming, setConfirming, onDelete, onExport, relocateActions, publishActions } = actions;
   return (
     <ProjectCardGroup
       key={entry.key}
@@ -144,11 +164,12 @@ function ProjectsCardsList({ visibleEntries, ctx }) {
   if (visibleEntries.length === 0) {
     return <div className="projects-empty">{t('projects.noMatches')}</div>;
   }
+  const localProps = localEntryProps(ctx);
   return (
     <div className="projects-cards">
       {visibleEntries.map((entry) => (
         entry.local
-          ? <LocalProjectEntry key={entry.key} entry={entry} ctx={ctx} />
+          ? <LocalProjectEntry key={entry.key} entry={entry} {...localProps} />
           : <SharedProjectEntry key={entry.key} entry={entry} ctx={ctx} />
       ))}
     </div>

@@ -10,6 +10,7 @@ from quodeq.data.fs.report_parser._totals import build_totals
 from quodeq.core.types import Finding
 from quodeq.shared.utils import read_json
 from quodeq.core.finding_builder import FindingSpec, build_finding_base
+from quodeq.core.finding_coercions import coerce_scope_downgrade
 
 _logger = logging.getLogger(__name__)
 _CURRENT_SCHEMA_VERSION = 1
@@ -40,10 +41,10 @@ def build_finding(item: dict, *, include_severity: bool) -> Finding:
         scope=item.get("scope"),
         include_severity=include_severity,
         provenance_downgrade=bool(item.get("provenance_downgrade")),
-        # Coerced to dict-or-None rather than passed through: the scope gate's
-        # restore path reads `from` off this marker and writes it to severity,
-        # so a non-dict arriving here must not reach it.
-        scope_downgrade=item.get("scope_downgrade") if isinstance(item.get("scope_downgrade"), dict) else None,
+        # Coerced rather than passed through: the scope gate's restore path
+        # reads `from` off this marker and writes it to severity, so a
+        # malformed value arriving here must not reach it.
+        scope_downgrade=coerce_scope_downgrade(item.get("scope_downgrade")),
         carried_forward=bool(item.get("carried_forward")),
     ))
 

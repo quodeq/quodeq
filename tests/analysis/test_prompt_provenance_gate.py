@@ -103,7 +103,7 @@ def test_api_prompt_renders_provenance_gate_end_to_end(tmp_path):
     The existing tests only prove the compass.md producer path carries the
     rubric. ``assemble_api_prompt`` is the prompt the ollama/api provider path
     actually sends (``subprocess.py:_run_api_analysis_bridge``); it loads the
-    rules itself via ``_load_evaluation_rules``, a separate seam that could
+    rules itself via ``load_evaluation_rules``, a separate seam that could
     regress independently. This is the structural backstop for the live
     behavioral matrix.
     """

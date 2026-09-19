@@ -52,8 +52,8 @@ function UpdateAction({ status, selfUpdate }) {
 }
 
 export default function UpdateBanner() {
-  const { status, setStatus } = useUpdateStatus();
-  const selfUpdate = useSelfUpdate(status, setStatus);
+  const { status, adopt } = useUpdateStatus();
+  const selfUpdate = useSelfUpdate(status, adopt);
   const [dismissed, setDismissed] = useState(false);
 
   // First-run disclosure: record that the user has been informed.
