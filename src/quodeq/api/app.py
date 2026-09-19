@@ -120,29 +120,39 @@ def _configure_paths_and_cleanup(app: Flask) -> None:
         app.config["ASSISTANT_DB_PATH"] = str(get_quodeq_dir() / "assistant.db")
 
 
-def create_app(
-    provider: ActionProvider | None = None,
-    static_dist: str | None = None,
-    rate_limit_store: RateLimitStore | None = None,
-    api_key: str | None = None,
-    test_config: dict | None = None,
-) -> Flask:
-    """Create and configure the Flask application with all API routes."""
-    app = Flask(__name__)
+def _configure_app(
+    app: Flask, provider: ActionProvider, test_config: dict | None,
+) -> None:
+    """Apply the caller's config overrides, then the app-level defaults and
+    extensions that every route depends on."""
     if test_config is not None:
         app.config.update(test_config)
     _configure_upload_limits(app)
-    provider = provider or _default_provider()
     app.config["_provider"] = provider
-
     _configure_extensions(app)
     _configure_paths_and_cleanup(app)
 
+
+def _build_rate_limit_store(
+    rate_limit_store: RateLimitStore | None = None,
+) -> tuple[RateLimitStore, RateLimitStore]:
+    """Return the (API, evaluation) rate-limit stores.
+
+    The API limiter honours a caller-supplied shared backend; the evaluation
+    limiter is always process-local with its own window and cap.
+    """
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
     )
+    return store, eval_store
 
+
+def _configure_request_handling(
+    app: Flask, store: RateLimitStore, api_key: str | None,
+) -> LogBuffer:
+    """Install the per-request layers (auth, compression, logging) and the
+    health endpoint. Returns the log buffer the routes stream from."""
     if api_key is None:
         _logger.warning(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
@@ -157,6 +167,22 @@ def create_app(
     app.config["QUODEQ_BIND_HOST"] = _gah()
     log_buffer, verbose = _configure_logging(app)
     _register_health_route(app, verbose)
+    return log_buffer
+
+
+def create_app(
+    provider: ActionProvider | None = None,
+    static_dist: str | None = None,
+    rate_limit_store: RateLimitStore | None = None,
+    api_key: str | None = None,
+    test_config: dict | None = None,
+) -> Flask:
+    """Create and configure the Flask application with all API routes."""
+    app = Flask(__name__)
+    provider = provider or _default_provider()
+    _configure_app(app, provider, test_config)
+    store, eval_store = _build_rate_limit_store(rate_limit_store)
+    log_buffer = _configure_request_handling(app, store, api_key)
     register_all_routes(app, provider, eval_store, static_dist, log_buffer)
     return app
 
