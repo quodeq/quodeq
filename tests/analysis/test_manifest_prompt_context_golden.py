@@ -84,5 +84,5 @@ def test_project_description_golden() -> None:
     manifest = SourceManifest(targets=[target], total_files=42, language_stats={".py": 42})
     assert describe_target(target) == "Python backend using Django, REST"
     # The manifest-level description is the primary target's.
-    assert manifest._primary is not None
-    assert describe_target(manifest._primary) == "Python backend using Django, REST"
+    assert manifest.primary is not None
+    assert describe_target(manifest.primary) == "Python backend using Django, REST"

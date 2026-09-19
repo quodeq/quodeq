@@ -97,9 +97,6 @@ def coerce_int(value: object, default: int, field: str) -> int:
         raise InvalidEvaluationOption(f"{field} must be an integer") from exc
 
 
-# Deprecated private spelling, kept one release for existing importers.
-_coerce_int = coerce_int
-
 
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages.
@@ -155,7 +152,7 @@ def _validate_ai_model(
 
 # Binary override charset: letters, digits, '.', '_', '-', ':' and path
 # separators. No whitespace or shell metacharacters, matching the posture of
-# shared.prereqs._SAFE_CMD_TOKEN_RE.
+# shared.prereqs.SAFE_CMD_TOKEN_RE.
 _SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
 
 

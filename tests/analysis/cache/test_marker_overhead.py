@@ -1,6 +1,6 @@
 """Performance microbenchmark for the marker-aware grouping function.
 
-Catches O(n^2) regressions in `_group_findings_by_file`. The 500ms budget
+Catches O(n^2) regressions in `group_findings_by_file`. The 500ms budget
 is loose to avoid CI flakes; the point is order-of-magnitude correctness,
 not micro-optimisation.
 """
@@ -9,7 +9,7 @@ import json
 import time
 from pathlib import Path
 
-from quodeq.analysis.cache.dimension_helpers import _group_findings_by_file
+from quodeq.analysis.cache.dimension_helpers import group_findings_by_file
 
 
 def test_grouping_overhead_under_budget(tmp_path: Path):
@@ -25,7 +25,7 @@ def test_grouping_overhead_under_budget(tmp_path: Path):
     jsonl.write_text("".join(json.dumps(line) + "\n" for line in lines))
 
     t0 = time.perf_counter()
-    grouped, ok_files = _group_findings_by_file(jsonl)
+    grouped, ok_files = group_findings_by_file(jsonl)
     elapsed = time.perf_counter() - t0
     assert len(ok_files) == 1000
     assert sum(len(v) for v in grouped.values()) == 10_000

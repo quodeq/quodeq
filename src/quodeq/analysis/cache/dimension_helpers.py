@@ -91,9 +91,6 @@ def group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set
     return state.grouped, state.ok_files()
 
 
-# Deprecated private spelling, kept one release for existing importers.
-_group_findings_by_file = group_findings_by_file
-
 
 def _advance_or_warn(
     state: DispatchJsonlState, jsonl_path: Path, *, include_tail: bool,

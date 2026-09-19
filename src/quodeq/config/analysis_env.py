@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.shared._env import env_int
+from quodeq.shared import env_int
 
 
 def failure_streak_override(env: dict[str, str] | None = None) -> int | None:

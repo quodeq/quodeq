@@ -10,7 +10,7 @@ from quodeq.analysis.prompts.builder import (
     build_analysis_prompt,
     build_consolidated_prompt,
     render_previous_findings_section,
-    _load_evaluation_rules,
+    load_evaluation_rules,
 )
 
 
@@ -54,17 +54,17 @@ class TestRenderPreviousFindings:
 
 
 # ---------------------------------------------------------------------------
-# _load_evaluation_rules
+# load_evaluation_rules
 # ---------------------------------------------------------------------------
 
 class TestLoadEvaluationRules:
     def test_returns_string(self):
-        result = _load_evaluation_rules()
+        result = load_evaluation_rules()
         assert isinstance(result, str)
 
     def test_returns_empty_on_missing_file(self):
         with patch("quodeq.analysis.prompts.builder.load_template", side_effect=FileNotFoundError):
-            result = _load_evaluation_rules()
+            result = load_evaluation_rules()
         assert result == ""
 
 

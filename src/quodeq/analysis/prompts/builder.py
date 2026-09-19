@@ -46,9 +46,6 @@ def load_evaluation_rules() -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-# Deprecated private spelling, kept one release for existing importers.
-_load_evaluation_rules = load_evaluation_rules
-
 
 def render_previous_findings_section(findings: list[dict]) -> str:
     """Render a prompt section listing previous findings grouped by file."""

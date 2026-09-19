@@ -45,10 +45,6 @@ def run_version_cmd(cmd: list[str]) -> str:
     return result.stdout.strip()
 
 
-# Deprecated private spellings, kept one release for existing importers.
-_SAFE_CMD_TOKEN_RE = SAFE_CMD_TOKEN_RE
-_run_version_cmd = run_version_cmd
-
 
 def _parse_major(version_str: str) -> int:
     """Extract the major version number from a version string like 'v20.11.0' or '10.2.0'."""

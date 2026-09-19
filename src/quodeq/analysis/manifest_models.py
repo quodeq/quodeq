@@ -87,8 +87,6 @@ class SourceManifest:
             return None
         return max(self.targets, key=lambda t: t.total_files)
 
-    # Deprecated private spelling, kept one release for existing readers.
-    _primary = primary
 
     @property
     def language(self) -> str:

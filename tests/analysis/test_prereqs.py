@@ -10,7 +10,7 @@ from quodeq.analysis.prereqs import (
     check_evaluate_prereqs,
 )
 from quodeq.shared.prereqs import (
-    _run_version_cmd,
+    run_version_cmd,
     check_dashboard_dev_prereqs,
     check_node,
     check_npm,
@@ -187,9 +187,9 @@ class TestCompositeChecks:
 
 
 class TestProviderInjection:
-    def test_run_version_cmd_rejects_shell_metacharacters(self):
+    def testrun_version_cmd_rejects_shell_metacharacters(self):
         with pytest.raises(ValueError, match="unsafe command token"):
-            _run_version_cmd(["x & echo PWNED", "--version"])
+            run_version_cmd(["x & echo PWNED", "--version"])
 
     def test_check_cli_provider_rejects_injection(self):
         with patch("subprocess.run") as mock_run:

@@ -20,7 +20,7 @@ from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
-    _group_findings_by_file,
+    group_findings_by_file,
     persist_dispatch_results,
 )
 
@@ -129,7 +129,7 @@ class TestAdvance:
         )
         assert jsonl.stat().st_size >= state.offset
         state.advance(jsonl)
-        expected_grouped, expected_ok = _group_findings_by_file(jsonl)
+        expected_grouped, expected_ok = group_findings_by_file(jsonl)
         assert state.grouped == expected_grouped
         assert state.ok_files() == expected_ok
         assert state.dirty == {"a.py", "b.py"}

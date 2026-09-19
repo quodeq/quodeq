@@ -11,7 +11,7 @@ import keyring
 from quodeq.config.paths import ConfigPaths, default_paths
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.logging import log_debug, log_error, log_info, log_success, log_warning
-from quodeq.shared._env_ai import get_ai_provider
+from quodeq.shared import get_ai_provider
 
 _KEYRING_SERVICE = "quodeq"
 

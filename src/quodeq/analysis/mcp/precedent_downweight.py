@@ -24,8 +24,6 @@ _PRECEDENT_DOWNWEIGHT = 25
 # Sentinel distinguishing "the caller didn't supply a score" from an
 # explicit `None` (a batch score that came back empty).
 UNSET_SCORE: float | None = object()  # type: ignore[assignment]
-# Deprecated private spelling, kept one release for existing importers.
-_UNSET = UNSET_SCORE
 
 
 def _semantic_eligible(finding: dict[str, object]) -> bool:
@@ -104,10 +102,6 @@ def apply_precedent_downweight(
     if existing is None or existing == FULL_CONFIDENCE:
         finding["confidence"] = _PRECEDENT_DOWNWEIGHT
     return tier
-
-
-# Deprecated private spelling, kept one release for existing importers.
-_apply_precedent_downweight = apply_precedent_downweight
 
 
 def precedent_scores(
