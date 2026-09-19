@@ -15,6 +15,7 @@ from quodeq.analysis.mcp.precedent_downweight import (
     _UNSET,
     _apply_precedent_downweight,
     precedent_scores as _compute_precedent_scores,
+    notify_precedent_match,
 )
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
@@ -66,6 +67,10 @@ class CompiledContext:
     trust_model: TrustModel | None = None
     precedent_fingerprints: set[str] = field(default_factory=set)
     precedent_corpus: PrecedentCorpus | None = None
+    # Called with the enriched finding on an EXACT precedent match, so the
+    # composition root can record a dismissal for it (#1208). Never for the
+    # semantic tier. Optional: None keeps precedent a confidence-only signal.
+    on_precedent_match: Callable[[dict], None] | None = None
 
 
 def _apply_path_role_downweight(finding: dict[str, object]) -> None:
@@ -143,6 +148,7 @@ class FindingEnricher:
         self._trust_model = context.trust_model
         self._precedent_fingerprints = context.precedent_fingerprints
         self._precedent_corpus = context.precedent_corpus
+        self._on_precedent_match = context.on_precedent_match
         self._log = log
         base_reader: Callable[[Path], str] = file_reader or _default_read_file
         self._file_cache: dict[Path, str] = {}
@@ -248,11 +254,13 @@ class FindingEnricher:
         class of findings ungated. See severity_gates.py for why the sequence
         lives there rather than being repeated here.
         """
-        _apply_precedent_downweight(
+        tier = _apply_precedent_downweight(
             finding, self._precedent_fingerprints, self._precedent_corpus,
             score=precedent_score, log=self._log,
         )
         apply_severity_gates(finding, self._trust_model)
+        if tier == "exact":
+            notify_precedent_match(self._on_precedent_match, finding, log=self._log)
 
     def enrich(self, args: dict, *, precedent_score: float | None = _UNSET) -> dict:
         """Return a fully enriched finding dict built from *args*.

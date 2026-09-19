@@ -11,7 +11,7 @@
 src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_api_call.py:249:broad-except
-src/quodeq/analysis/_api_runner.py:96:broad-except
+src/quodeq/analysis/_api_runner.py:99:broad-except
 src/quodeq/analysis/_loop_steps.py:130:broad-except
 src/quodeq/analysis/_loop_steps.py:173:broad-except
 src/quodeq/analysis/_loop_steps.py:175:broad-except

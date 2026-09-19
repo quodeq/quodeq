@@ -37,6 +37,8 @@ if TYPE_CHECKING:
     from quodeq.analysis._types import RunConfig
     from quodeq.data.events.writer import EventLogWriter
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
+from quodeq.services.precedent_dismiss import precedent_match_hook
+from quodeq.shared.log_sink import LoggerSink
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
@@ -92,6 +94,7 @@ def _build_router_context(
             trust_model=trust_model,
             precedent_fingerprints=precedents,
             precedent_corpus=corpus,
+            on_precedent_match=precedent_match_hook(project_dir, log=LoggerSink(_log)),
         )
     except Exception as exc:  # noqa: BLE001 - degrade gracefully to raw findings on enrichment setup failure
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)

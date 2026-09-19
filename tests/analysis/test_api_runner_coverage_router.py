@@ -97,6 +97,19 @@ class TestBuildRouterContext:
         assert ctx.trust_model.multi_tenant is False
         assert ctx.trust_model.network_exposure == "loopback"
 
+    def test_wires_precedent_auto_dismiss_when_project_dir_is_known(self, tmp_path):
+        """#1208: with a project dir the context carries the hook that records
+        a dismissal for an exact precedent match; without one there is no
+        action log to write to, so the hook stays None."""
+        with_project = _build_router_context(
+            Path("/nonexistent-compiled-dir"), None, None, tmp_path, None,
+        )
+        without_project = _build_router_context(
+            Path("/nonexistent-compiled-dir"), None, None, None, None,
+        )
+        assert with_project is not None and with_project.on_precedent_match is not None
+        assert without_project is not None and without_project.on_precedent_match is None
+
 
 # ---------------------------------------------------------------------------
 # run_api_analysis — appends to file

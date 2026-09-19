@@ -18,6 +18,7 @@ from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
 from quodeq.data.fs.standards_loader import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
+from quodeq.services.precedent_dismiss import precedent_match_hook
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
@@ -168,6 +169,7 @@ def _build_router(
         source_stamp=dismissed_source_stamp,
     )
     ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
+    ctx.on_precedent_match = precedent_match_hook(project_dir)
     from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 

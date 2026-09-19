@@ -231,3 +231,37 @@ def test_missing_cache_root_prints_clean_error_not_traceback(capsys, monkeypatch
     err = capsys.readouterr().err
     assert "Traceback" not in err
     assert "Error:" in err
+
+
+def test_build_router_auto_dismisses_a_cross_file_precedent_match(tmp_path: Path):
+    """#1208: the same requirement and code dismissed in one file is dismissed
+    in another file the moment the router receives it, through the project
+    action log, so it leaves the score the way a manual dismissal does."""
+    from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+    from quodeq.data.events.writer import EventLogWriter
+    from quodeq.data.projection.projector import Projector
+    from quodeq.services.dismissed import dismiss_finding, dismissed_keys
+    from quodeq.services.precedent_dismiss import PRECEDENT_REASON
+
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "r1"
+    run_dir.mkdir(parents=True)
+    log = run_dir / "events.jsonl"
+    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="auth.py", line=1, reason="r", req="S-CON-1", snippet="password = 'secret'",
+    )))
+    dismiss_finding(project_dir, {"req": "S-CON-1", "file": "auth.py", "line": 1})
+    Projector().ensure_projected(log, run_dir, project_dir=project_dir)
+    findings_path = project_dir / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+
+    router = _build_router(io.StringIO(), findings_path, CompiledContext(), ServerArgs())
+    router.receive({
+        "p": "P1", "t": "violation", "req": "S-CON-1", "w": "Hardcoded credential",
+        "file": "other.py", "line": 7, "snippet": "password = 'secret'",
+    })
+
+    state = dismissed_keys(project_dir)
+    assert state.matches(req="S-CON-1", file="other.py", line=7, snippet="password = 'secret'")
+    assert next(e for e in state.entries if e.file == "other.py").reason == PRECEDENT_REASON
