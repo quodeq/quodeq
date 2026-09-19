@@ -31,6 +31,7 @@ from types import TracebackType
 from typing import Any
 
 from quodeq.shared import cancellation
+from quodeq.analysis.errors import provider_exit_reason
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.analysis._run_lifecycle_support import (
@@ -194,13 +195,13 @@ class RunLifecycleContext:
         if self._current_state not in TERMINAL_STATES:
             self._transition(RunState.FAILED, exit_reason="failure_streak")
 
-    def _exit_fatal_provider(self) -> None:
+    def _exit_fatal_provider(self, exc: BaseException | None) -> None:
         """Provider reported an unrecoverable condition (quota, auth, credits).
         Distinct exit_reason so the History entry says why instead of a
         generic exception.
         """
         if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.FAILED, exit_reason="provider_fatal")
+            self._transition(RunState.FAILED, exit_reason=provider_exit_reason(getattr(exc, "reason", None)))
 
     def _exit_other_exception(self, exc_type: type[BaseException] | None) -> None:
         """Any other exception → failed."""
@@ -225,7 +226,7 @@ class RunLifecycleContext:
         elif _is_circuit_breaker_error(exc_type):
             self._exit_circuit_breaker()
         elif _is_named_error(exc_type, "FatalProviderError"):
-            self._exit_fatal_provider()
+            self._exit_fatal_provider(exc_value)
         else:
             self._exit_other_exception(exc_type)
         self._signals.restore()

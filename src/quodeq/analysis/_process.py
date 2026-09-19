@@ -39,8 +39,13 @@ def _run_with_heartbeat(
                 _terminate_process(process)
                 return timed_out
             elapsed += config.heartbeat_interval
+            progress = reader.read_progress()
+            if reader.provider_error:
+                message, reason = reader.provider_error
+                _terminate_process(process)
+                raise FatalProviderError(_sanitize_stderr(message), reason=reason)
             if config.heartbeat_callback:
-                config.heartbeat_callback(elapsed, reader.read_progress())
+                config.heartbeat_callback(elapsed, progress)
             if config.max_duration is not None and elapsed >= config.max_duration:
                 log_warning(
                     f"Analysis exceeded max duration ({config.max_duration}s) "

@@ -16,6 +16,8 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from quodeq.services._job_model import (
     InMemoryJobStore,
     Job,
@@ -162,6 +164,23 @@ class TestRunStatusDeadlineFallback:
 
         assert job.status == STATUS_FAILED
         assert job.exit_reason is None
+
+    @pytest.mark.parametrize("exit_code,status", [(1, STATUS_FAILED), (0, STATUS_DONE)])
+    def test_copilot_policy_reason_survives_job_persistence(self, tmp_path, exit_code, status):
+        mgr, job = self._manager(tmp_path)
+        run_dir = tmp_path / "proj" / "run1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "status.json").write_text(json.dumps({
+            "state": status, "exit_reason": "copilot_mcp_policy",
+        }))
+        proc = _ExitsWith(exit_code)
+        mgr._processes["j1"] = proc
+        mgr._monitor_process("j1", proc)
+        assert job.status == status
+        assert job.exit_reason == "copilot_mcp_policy"
+        restored = _job_from_json(_job_to_json(job))
+        assert restored.exit_reason == "copilot_mcp_policy"
+        assert restored.status == status
 
     def test_missing_status_json_stays_failed(self, tmp_path):
         mgr, job = self._manager(tmp_path)

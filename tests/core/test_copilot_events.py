@@ -1,7 +1,7 @@
 import pytest
 
 from quodeq.assistant.adapters import _stream
-from quodeq.core.stream.events import TEXT_EXTRACTORS, extract_files_from_event
+from quodeq.core.stream.events import TEXT_EXTRACTORS, copilot_error, extract_files_from_event
 
 
 def test_copilot_complete_text_is_shared_with_analysis():
@@ -57,3 +57,29 @@ def test_copilot_malformed_error_category_still_surfaces_message(error_type):
     assert _stream.error_message({
         "type": "session.error", "data": {"errorType": error_type, "message": "Provider failed"},
     }) == "Provider failed"
+
+
+@pytest.mark.parametrize("server", ["findings", "quodeq-assistant"])
+def test_copilot_required_mcp_policy_warning_is_fatal(server):
+    event = {"type": "session.warning", "data": {
+        "warningType": "mcp",
+        "message": f"1 MCP server was blocked by policy: '{server}'",
+    }}
+    error = copilot_error(event)
+    assert error is not None
+    message, reason = error
+    assert reason == "copilot_mcp_policy"
+    assert server in message
+    assert "administrator" in message
+    assert _stream.error_message(event) == message
+
+
+@pytest.mark.parametrize("data", [
+    None, [], {"warningType": "mcp", "message": None},
+    {"warningType": "mcp", "message": ["blocked by policy"]},
+    {"warningType": "mcp", "message": "1 MCP server was blocked by policy: 'other'"},
+    {"warningType": "mcp", "message": "Connecting to 'findings'"},
+    {"warningType": "other", "message": "blocked by policy: 'findings'"},
+])
+def test_copilot_unrelated_or_malformed_warnings_are_not_fatal(data):
+    assert copilot_error({"type": "session.warning", "data": data}) is None

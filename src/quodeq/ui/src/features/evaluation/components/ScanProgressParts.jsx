@@ -37,12 +37,13 @@ function lastRelevantLog(logs) {
 // the run recorded a recognised exit reason (status.json, surfaced through
 // the progress payload), lead with the human label and the actionable
 // hint; keep the raw log line underneath as the detail.
-export function ScanProgressBanner({ isFailed, isLost, status, progress, logs }) {
-  const failInfo = exitReasonInfo(progress?.exitReason);
+export function ScanProgressBanner({ isFailed, isLost, status, progress, logs, exitReason }) {
+  const reason = progress?.exitReason ?? exitReason;
+  const failInfo = exitReasonInfo(reason);
   const failDetail = lastRelevantLog(logs);
   if (isFailed) {
     return (
-      <div className="scan-progress__error">
+      <div className="scan-progress__error" role="alert">
         {failInfo ? (
           <>
             <div><strong>{failInfo.label}</strong>{failInfo.hint && <> · {failInfo.hint}</>}</div>
@@ -58,9 +59,9 @@ export function ScanProgressBanner({ isFailed, isLost, status, progress, logs })
   // Done-with-errors: the provider died mid-run but files had already been
   // analysed, so the run kept its partial results. Warn that the numbers
   // below cover only part of the project.
-  if (status === 'done' && failInfo && exitReasonWarn(progress?.exitReason)) {
+  if (status === 'done' && failInfo && exitReasonWarn(reason)) {
     return (
-      <div className="scan-progress__warning">
+      <div className="scan-progress__warning" role="alert">
         <strong>{failInfo.label}</strong> · {t('evaluate.runStoppedEarly')}
         {failInfo.hint && <> · {failInfo.hint}</>}
       </div>
@@ -208,7 +209,7 @@ export function ScanProgressBody({ job, status, isRunning, isFailed, isLost, pro
         </SectionLabel>
         {showCoverage && <span className="scan-progress__head-pct">{t('evaluate.pctAnalyzed', { pct: coveredPct })}</span>}
       </div>
-      <ScanProgressBanner isFailed={isFailed} isLost={isLost} status={status} progress={progress} logs={job.logs} />
+      <ScanProgressBanner isFailed={isFailed} isLost={isLost} status={status} progress={progress} logs={job.logs} exitReason={job.exitReason} />
       <ScanProgressBar
         showCoverage={showCoverage}
         cachedFiles={cachedFiles}

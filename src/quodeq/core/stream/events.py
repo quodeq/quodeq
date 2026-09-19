@@ -55,8 +55,27 @@ def texts_from_copilot(event: dict) -> list[str]:
     return [text] if isinstance(text, str) and text else []
 
 
+def _copilot_mcp_policy_error(data: dict) -> tuple[str, str] | None:
+    """A blocked required server makes the run unusable, even if the CLI continues."""
+    message = data.get("message")
+    if (data.get("warningType") != "mcp" or not isinstance(message, str)
+            or "blocked by policy" not in message.lower()):
+        return None
+    for server in ("findings", "quodeq-assistant"):
+        if f"'{server}'" in message or f'"{server}"' in message:
+            return (
+                f"Copilot policy blocked Quodeq's required MCP server '{server}'. "
+                "Ask your organization administrator to allow this MCP server. "
+                "Signing in or selecting a model does not grant MCP access.",
+                "copilot_mcp_policy",
+            )
+    return None
+
+
 def copilot_error(event: dict) -> tuple[str, str | None] | None:
     """Return a Copilot error message and optional non-retryable reason."""
+    if event.get("type") == "session.warning":
+        return _copilot_mcp_policy_error(copilot_event_data(event))
     if event.get("type") == "session.error":
         data = copilot_event_data(event)
         message = data.get("message")

@@ -8,6 +8,15 @@ test('provider_fatal maps to a label and an actionable hint', () => {
   assert.match(info.hint, /quota|credits|API key/);
 });
 
+test('Copilot MCP policy block explains approval rather than billing or login', () => {
+  assert.equal(exitReasonLabel('copilot_mcp_policy'), 'Evaluation blocked by Copilot policy');
+  assert.match(exitReasonHint('copilot_mcp_policy'), /administrator/);
+  assert.match(exitReasonHint('copilot_mcp_policy'), /findings/);
+  assert.doesNotMatch(exitReasonHint('copilot_mcp_policy'), /billing|API key|credits/);
+  assert.equal(exitReasonWarn('copilot_mcp_policy'), true);
+  assert.equal(isTimeLimitExit('copilot_mcp_policy'), false);
+});
+
 test('failure_streak and agent_failure_streak share the same guidance', () => {
   assert.deepEqual(exitReasonInfo('agent_failure_streak'), exitReasonInfo('failure_streak'));
   assert.match(exitReasonHint('failure_streak'), /running and reachable/);

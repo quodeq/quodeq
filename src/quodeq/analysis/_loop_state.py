@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.errors import FatalProviderError, provider_exit_reason
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
@@ -93,13 +93,13 @@ def _interruption_reason(exc: BaseException | None = None) -> str:
     """
     from quodeq.analysis.cache._failure_streak import CircuitBreakerError
     if isinstance(exc, FatalProviderError):
-        return "provider_fatal"
+        return provider_exit_reason(exc.reason)
     if isinstance(exc, CircuitBreakerError):
         return "circuit_breaker"
     if cancellation.is_cancelled():
         reason = cancellation.cancel_reason() or ""
         if reason.startswith("provider_fatal"):
-            return "provider_fatal"
+            return provider_exit_reason(reason)
         if reason == "agent_failure_streak":
             return "agent_failure_streak"
         return "cancelled_signal"

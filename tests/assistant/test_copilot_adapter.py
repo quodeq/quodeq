@@ -77,3 +77,20 @@ def test_copilot_partial_reply_with_error_is_not_success(tmp_path, monkeypatch):
             session=_session(_repo(tmp_path), spawn_fn=lambda *a, **kw: FakeProc(
                 [json.dumps(e) for e in events], returncode=1)),
         )
+
+
+def test_copilot_mcp_policy_warning_is_not_a_successful_turn(tmp_path):
+    events = [
+        {"type": "session.warning", "data": {
+            "warningType": "mcp",
+            "message": "1 MCP server was blocked by policy: 'quodeq-assistant'"}},
+        {"type": "assistant.message", "data": {"content": "Tools unavailable."}},
+        {"type": "result", "exitCode": 0},
+    ]
+    with pytest.raises(RuntimeError, match="administrator"):
+        run_cli_turn(
+            messages=[{"role": "user", "content": "hi"}],
+            config=replace(_config(tmp_path), provider="copilot"),
+            session=_session(_repo(tmp_path), spawn_fn=lambda *a, **kw: FakeProc(
+                [json.dumps(e) for e in events])),
+        )

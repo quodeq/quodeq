@@ -250,8 +250,9 @@ Remove-Item Env:COPILOT_HOME
 
 Use your company account if it provides your Copilot entitlement. For Enterprise
 Cloud with data residency, add `--host YOUR-ENTERPRISE.ghe.com` to the login command.
-Your organization must permit Copilot CLI and the selected model. Subscription
-limits, usage charges and company policies still apply.
+Your organization must permit Copilot CLI, the selected model, and Quodeq's MCP
+servers: `findings` for evaluations and `quodeq-assistant` for the assistant.
+Subscription limits, usage charges and company policies still apply.
 
 Select **GitHub Copilot** in the evaluation or assistant settings. Quodeq loads
 the models available to your signed-in account into a dropdown. Choose **Auto**
@@ -261,6 +262,13 @@ model** to reuse the selected model.
 The login instructions disappear when model discovery succeeds. If it fails,
 Quodeq shows the setup instructions, an error, and **Retry connection**. Model
 discovery queries the CLI's model API without sending a prompt or running tools.
+Successful login and model discovery do not verify MCP access. If Copilot reports
+that the required MCP server is blocked by policy, Quodeq stops the evaluation
+without spawning replacement agents. Ask your organization administrator to
+allow the server before retrying.
+The evaluation displays **Evaluation blocked by Copilot policy**. The reason is
+saved with the run and remains visible after refresh, even without the logs.
+If files were already completed, their results are kept with a partial-run warning.
 
 Quodeq uses `~/.quodeq/copilot`, not your normal `~/.copilot` profile. It does not
 copy credentials or inherit unrelated API keys, GitHub tokens, Copilot permission
