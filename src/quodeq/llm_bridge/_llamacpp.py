@@ -32,6 +32,10 @@ from quodeq.llm_bridge._ollama import (
 _log = logging.getLogger(__name__)
 
 _TIMEOUT_S = 3
+#: Everything a probe against a llama-server may raise: the socket/HTTP
+#: layer (URLError/ConnectionRefusedError/OSError) and a body that is not
+#: the JSON we expect (ValueError, which json.JSONDecodeError subclasses).
+_TRANSPORT_ERRORS = (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError)
 
 
 def _default_base_url(env: Mapping[str, str] | None = None) -> str:
@@ -65,7 +69,7 @@ def get_llamacpp_status(base_url: str | None = None) -> dict:
                 "status": data.get("status", "ok"),
                 "address": root.replace("http://", ""),
             }
-    except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
+    except _TRANSPORT_ERRORS as exc:
         _log.warning("llama.cpp status check failed: %s", exc)
         return {"running": False, "error": "Connection failed"}
 
@@ -93,7 +97,7 @@ def list_llamacpp_models(base_url: str | None = None) -> list[dict]:
                 for m in entries
                 if m.get("id")
             ]
-    except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
+    except _TRANSPORT_ERRORS as exc:
         _log.warning("Could not list llama.cpp models: %s", exc)
         return []
 
