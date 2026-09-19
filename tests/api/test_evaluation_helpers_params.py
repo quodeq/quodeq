@@ -1,6 +1,6 @@
 """Tests for maxSubagents/timeLimit/contextSize validation (finding 5880).
 
-_coerce_int used to swallow any TypeError/ValueError and silently return the
+coerce_int used to swallow any TypeError/ValueError and silently return the
 default, so a client sending e.g. ``maxSubagents: "abc"`` got the default
 value with no error at all. It must now raise, naming the field, for a
 present-but-malformed value, while a genuinely absent value still defaults.
@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.api._evaluation_helpers import InvalidEvaluationOption, _coerce_int
+from quodeq.api._evaluation_helpers import InvalidEvaluationOption, coerce_int
 from quodeq.api._evaluation_options import (
     _build_evaluation_options,
     _parse_flags,
@@ -23,14 +23,14 @@ from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 
 class TestCoerceInt:
     def test_missing_value_returns_default(self):
-        assert _coerce_int(None, 5, "maxSubagents") == 5
+        assert coerce_int(None, 5, "maxSubagents") == 5
 
     def test_convertible_value_converts(self):
-        assert _coerce_int("7", 5, "maxSubagents") == 7
+        assert coerce_int("7", 5, "maxSubagents") == 7
 
     def test_malformed_value_raises_naming_the_field(self):
         with pytest.raises(ValueError, match="maxSubagents"):
-            _coerce_int("abc", 5, "maxSubagents")
+            coerce_int("abc", 5, "maxSubagents")
 
     def test_malformed_value_is_not_echoed_back(self):
         """The message names the field and nothing else. Echoing the received
@@ -38,14 +38,14 @@ class TestCoerceInt:
         reflected XSS pattern); harmless under nosniff+CSP, but the API-wide
         invariant is that no request input is ever reflected back."""
         with pytest.raises(ValueError) as excinfo:
-            _coerce_int("abc", 5, "maxSubagents")
+            coerce_int("abc", 5, "maxSubagents")
         assert "abc" not in str(excinfo.value)
 
     def test_blank_value_is_treated_as_absent(self):
-        assert _coerce_int("", 5, "maxSubagents") == 5
+        assert coerce_int("", 5, "maxSubagents") == 5
 
     def test_whitespace_only_value_is_treated_as_absent(self):
-        assert _coerce_int("  ", 5, "maxSubagents") == 5
+        assert coerce_int("  ", 5, "maxSubagents") == 5
 
 
 class TestBuildEvaluationOptionsIntFields:

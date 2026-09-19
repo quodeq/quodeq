@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
 
-from quodeq.api._evaluation_helpers import _coerce_int, resolve_clean_scan
+from quodeq.api._evaluation_helpers import coerce_int, resolve_clean_scan
 from quodeq.config.ai_provider import get_api_key_secure
 from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.shared.validation import validate_relative_scope
@@ -41,12 +41,12 @@ class _Flags(NamedTuple):
 
 def _parse_limits(body: dict) -> _Limits:
     """Clamp the numeric run limits from *body* to their allowed ranges."""
-    subagents = _coerce_int(body.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS, "maxSubagents")
+    subagents = coerce_int(body.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS, "maxSubagents")
     # Read new key first; fall back to legacy `poolBudget` for back-compat.
     # The label is the key the client actually sent, so a malformed legacy
     # value is not reported against a field absent from the body.
     field = "poolBudget" if "poolBudget" in body and "timeLimit" not in body else "timeLimit"
-    raw_limit = _coerce_int(body.get("timeLimit", body.get("poolBudget")), DEFAULT_TIME_LIMIT, field)
+    raw_limit = coerce_int(body.get("timeLimit", body.get("poolBudget")), DEFAULT_TIME_LIMIT, field)
     return _Limits(
         max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, subagents)),
         0 if raw_limit == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, raw_limit)),
@@ -80,7 +80,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
     limits = _parse_limits(payload)
     flags = _parse_flags(payload)
-    context_size = _coerce_int(payload.get("contextSize"), 0, "contextSize")
+    context_size = coerce_int(payload.get("contextSize"), 0, "contextSize")
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",

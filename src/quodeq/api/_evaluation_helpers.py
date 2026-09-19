@@ -71,7 +71,7 @@ class InvalidEvaluationOption(ClientMessageError, ValueError):
     """
 
 
-def _coerce_int(value: object, default: int, field: str) -> int:
+def coerce_int(value: object, default: int, field: str) -> int:
     """Return int(*value*) when convertible; *default* when *value* is
     ``None`` (absent) or a blank/whitespace-only string. Raises
     ``InvalidEvaluationOption`` naming *field* when *value* is present but
@@ -95,6 +95,10 @@ def _coerce_int(value: object, default: int, field: str) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise InvalidEvaluationOption(f"{field} must be an integer") from exc
+
+
+# Deprecated private spelling, kept one release for existing importers.
+_coerce_int = coerce_int
 
 
 def _sanitize_url(url: str) -> str:
