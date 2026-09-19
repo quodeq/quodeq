@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.shared import utils
+from quodeq.shared._diff import show_diff
 
 
 class TestIsRepoUrl:
@@ -139,13 +140,13 @@ class TestShowDiff:
     def test_no_changes(self, tmp_path, capsys):
         f = tmp_path / "test.txt"
         f.write_text("hello\n")
-        utils.show_diff(f, "hello\n")
+        show_diff(f, "hello\n")
         assert "[no changes]" in capsys.readouterr().out
 
     def test_shows_diff(self, tmp_path, capsys):
         f = tmp_path / "test.txt"
         f.write_text("old\n")
-        utils.show_diff(f, "new\n")
+        show_diff(f, "new\n")
         output = capsys.readouterr().out
         assert "-old" in output
         assert "+new" in output

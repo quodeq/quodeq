@@ -260,3 +260,30 @@ class TestRoundTrip:
 
         assert store_api_key_secure("gemini", "sk-roundtrip") is True
         assert get_api_key_secure("gemini") == "sk-roundtrip"
+
+
+class TestInjectedPaths:
+    """An explicit *paths* wins over default_paths() on both directions."""
+
+    def test_store_writes_to_the_injected_paths(self, tmp_path, monkeypatch, no_keyring):
+        (tmp_path / "default").mkdir()
+        (tmp_path / "injected").mkdir()
+        default = ConfigPaths.from_root(tmp_path / "default")
+        injected = ConfigPaths.from_root(tmp_path / "injected")
+        monkeypatch.setattr(ai_provider, "default_paths", lambda: default)
+
+        assert store_api_key_secure("claude", "sk-injected", paths=injected) is True
+
+        assert "export ANTHROPIC_API_KEY=sk-injected" in injected.env_file.read_text()
+        assert not default.env_file.exists()
+
+    def test_get_reads_from_the_injected_paths(self, tmp_path, monkeypatch, no_keyring):
+        (tmp_path / "default").mkdir()
+        (tmp_path / "injected").mkdir()
+        default = ConfigPaths.from_root(tmp_path / "default")
+        injected = ConfigPaths.from_root(tmp_path / "injected")
+        monkeypatch.setattr(ai_provider, "default_paths", lambda: default)
+        store_api_key_secure("claude", "sk-injected", paths=injected)
+
+        assert get_api_key_secure("claude", paths=injected) == "sk-injected"
+        assert get_api_key_secure("claude") is None
