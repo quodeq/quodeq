@@ -200,3 +200,85 @@ class TestCreateMcpConfig:
             assert args[lang_idx + 1] == ""
         finally:
             config_path.unlink(missing_ok=True)
+
+
+class TestFindingsServerArgsAreShared:
+    """_create_mcp_config and _codex_mcp_config_arg must emit the same flags.
+
+    They used to hold two copies of the same 14-line block; both now go
+    through _findings_server_args.
+    """
+
+    @staticmethod
+    def _flag_values(args: list[str]) -> dict[str, str]:
+        flags = (
+            "--compiled-dir", "--dimension", "--standards-dir", "--queue",
+            "--agent-id", "--work-dir", "--cache-root", "--model-id", "--language",
+        )
+        return {a: args[i + 1] for i, a in enumerate(args) if a in flags}
+
+    def _fixture(self, tmp_path):
+        jsonl = tmp_path / "findings.jsonl"
+        jsonl.touch()
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        standards = tmp_path / "standards"
+        standards.mkdir()
+        queue = tmp_path / "queue.jsonl"
+        queue.touch()
+        work = tmp_path / "work"
+        work.mkdir()
+        ap = _AgentParams(
+            queue_path=queue, agent_id="agent-7", work_dir=work,
+            model_id="sonnet", language="python", standards_dir=standards,
+        )
+        return jsonl, compiled, ap
+
+    def test_both_emitters_agree(self, tmp_path):
+        from quodeq.analysis._mcp_config import _codex_mcp_config_arg
+
+        jsonl, compiled, ap = self._fixture(tmp_path)
+
+        config_path = _create_mcp_config(
+            jsonl, compiled_dir=compiled, dimension="security", agent_params=ap,
+        )
+        try:
+            file_args = json.loads(config_path.read_text())["mcpServers"]["findings"]["args"]
+        finally:
+            config_path.unlink(missing_ok=True)
+        codex = _codex_mcp_config_arg(
+            jsonl, compiled_dir=compiled, dimension="security", agent_params=ap,
+        )
+
+        values = self._flag_values(file_args)
+        assert values == {
+            "--compiled-dir": str(compiled.resolve()),
+            "--dimension": "security",
+            "--standards-dir": str((tmp_path / "standards").resolve()),
+            "--queue": str((tmp_path / "queue.jsonl").resolve()),
+            "--agent-id": "agent-7",
+            "--work-dir": str((tmp_path / "work").resolve()),
+            "--cache-root": values["--cache-root"],
+            "--model-id": "sonnet",
+            "--language": "python",
+        }
+        for flag, value in values.items():
+            assert flag in codex
+            assert value in codex
+
+    def test_helper_output_is_the_shared_tail(self, tmp_path):
+        from quodeq.analysis._mcp_config import _findings_server_args
+
+        jsonl, compiled, ap = self._fixture(tmp_path)
+
+        tail = _findings_server_args(compiled, "security", ap)
+
+        config_path = _create_mcp_config(
+            jsonl, compiled_dir=compiled, dimension="security", agent_params=ap,
+        )
+        try:
+            file_args = json.loads(config_path.read_text())["mcpServers"]["findings"]["args"]
+        finally:
+            config_path.unlink(missing_ok=True)
+        assert file_args[-len(tail):] == tail
+        assert file_args[-len(tail) - 1] == str(jsonl.resolve())
