@@ -825,6 +825,7 @@
   "onboarding.termRepo": "repo",
   "onboarding.termWelcome": "welcome",
   "onboarding.tryAgain": "try again",
+  "onboarding.untrackedFilesHint": "{count} untracked, not scored",
   "onboarding.useThisPath": "Use this path",
   "onboarding.welcomeTo": "welcome to",
   "overview.addProject": "Add a project",
