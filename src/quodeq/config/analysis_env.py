@@ -67,3 +67,19 @@ def default_max_turns(env: dict[str, str] | None = None) -> int:
 def default_max_duration(env: dict[str, str] | None = None) -> int:
     """Wall-clock ceiling per agent in seconds (30 min), resolved per construction."""
     return _env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800, env=env)
+
+
+_REPAIR_DISABLE_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def finding_repair_disabled(env: dict[str, str] | None = None) -> bool:
+    """Return True when QUODEQ_DISABLE_FINDING_REPAIR is truthy.
+
+    Operator kill switch for the snippet repair re-ask (one follow-up call
+    asking the model to complete findings it emitted without the required
+    verbatim ``snippet``). Off by default; set to disable the extra call for
+    a model or provider where it misbehaves.
+    """
+    environ = env if env is not None else os.environ
+    raw = environ.get("QUODEQ_DISABLE_FINDING_REPAIR", "")
+    return raw.strip().lower() in _REPAIR_DISABLE_TRUTHY

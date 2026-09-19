@@ -30,6 +30,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_analysis_context.py': 'Analysis context - dimension loading and resolution - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_api_batch.py': 'Per-dimension batch context and the sub-batch dispatch loop for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_call.py': 'Direct LLM API call: request construction, the raw chat-completion round-trip, and error classification - split out of _api_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
+    'analysis/_api_response.py': 'Completion response handling: finding parse, snippet repair re-ask, drop accounting - split out of _api_call.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_runner.py': 'API runner for direct LLM evaluation - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_api_source_gathering.py': 'Credential loading and file-batching helpers for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_standards_text.py': 'Source-file gathering and compiled-standards text for the API prompt - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
