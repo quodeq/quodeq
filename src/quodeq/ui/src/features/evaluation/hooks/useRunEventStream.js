@@ -20,6 +20,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
+import { createViolation } from "../../../models/violation.js";
 
 // Cap the per-job findings array so a long-running scan with tens of thousands
 // of findings does not grow the React Query cache without bound. The dashboard
@@ -74,7 +75,13 @@ function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
 
   source.addEventListener("finding", (e) => {
     try {
-      const data = JSON.parse(e.data);
+      // Normalised on the way in, so the cache holds one shape whichever
+      // path filled it. The frame is snake_case straight off the payload
+      // (practice_id, carried_forward), unlike the REST paths. Merged onto
+      // the raw frame rather than replacing it, so id/verdict/confidence,
+      // which the model does not carry, survive for other readers.
+      const raw = JSON.parse(e.data);
+      const data = { ...raw, ...createViolation(raw) };
       writeCache(
         evaluationKeys.findings(jobId),
         (prev = []) => appendBoundedFinding(prev, data),
