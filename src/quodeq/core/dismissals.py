@@ -208,3 +208,24 @@ def fold_dismissals(events: Iterable[BaseEvent]) -> DismissedKeys:
             active.pop(identity, None)
     entries = tuple(sorted(active.values(), key=_entry_order))
     return DismissedKeys(entries=entries)
+
+
+def restored_fingerprints(events: Iterable[BaseEvent]) -> frozenset[tuple[str, str]]:
+    """The ``(req, fingerprint)`` pairs whose LAST dismiss/undismiss event was a restore.
+
+    Keyed on the code, not the file: a user who put a finding back has judged
+    that code real, so a precedent auto-dismissal (#1208) must not hide the
+    same code elsewhere. A later dismissal of the same code, in any file,
+    lifts the block. Line-keyed events have no fingerprint and are ignored;
+    they name one location, not a piece of code.
+    """
+    last: dict[tuple[str, str], EventType] = {}
+    for event in events:
+        event_type = event.event_type
+        if event_type not in (EventType.FINDING_DISMISSED, EventType.FINDING_UNDISMISSED):
+            continue
+        fp = getattr(event.payload, "fingerprint", None) or None
+        if not fp:
+            continue
+        last[(str(event.payload.req or ""), fp)] = event_type
+    return frozenset(k for k, t in last.items() if t == EventType.FINDING_UNDISMISSED)

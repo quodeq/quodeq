@@ -9,6 +9,8 @@ finding's score with one ``PrecedentCorpus.match_many`` call instead of one
 """
 from __future__ import annotations
 
+from typing import Callable
+
 from quodeq.context.precedent import (
     PrecedentCorpus,
     fingerprint as _precedent_fingerprint,
@@ -68,31 +70,38 @@ def _apply_precedent_downweight(
     fingerprints: set[str] | None,
     corpus: PrecedentCorpus | None = None,
     *, score: float | None = _UNSET, log: LogSink = NULL_LOG,
-) -> None:
+) -> str | None:
     """Drop confidence to ~25 when this finding matches a prior dismissal.
 
     Tier 1: exact fingerprint (unchanged, SARIF-compatible). Tier 2: semantic
     similarity via the corpus, only on exact miss and only for eligible
     findings. *score* lets a caller that already ran the batch lookup
     (``precedent_scores``) skip a second ``corpus.match`` call.
+
+    Returns the tier that matched, ``"exact"`` or ``"semantic"``, or None.
+    Only the exact tier is certain enough to act on beyond the confidence
+    field (see ``FindingEnricher._after_precedent``).
     """
     matched, text = _precedent_probe(finding, fingerprints)
+    tier: str | None = "exact" if matched else None
 
     if not matched and corpus is not None and text is not None:
         if score is _UNSET:
             score = corpus.match(text)
         if score is not None and score >= corpus.threshold:
             matched = True
+            tier = "semantic"
             log.debug(
                 f"Semantic precedent match ({score:.3f}) for "
                 f"{finding.get('file')}:{finding.get('line')}"
             )
 
     if not matched:
-        return
+        return None
     existing = finding.get("confidence")
     if existing is None or existing == FULL_CONFIDENCE:
         finding["confidence"] = _PRECEDENT_DOWNWEIGHT
+    return tier
 
 
 def precedent_scores(
@@ -113,3 +122,22 @@ def precedent_scores(
         return [None] * len(findings)
     scores = iter(corpus.match_many(pending))
     return [None if t is None else next(scores) for t in texts]
+
+
+def notify_precedent_match(
+    hook: Callable[[dict], None] | None, finding: dict, *, log: LogSink = NULL_LOG,
+) -> None:
+    """Hand an exact precedent match to *hook*.
+
+    The hook appends to the project action log, outside the run. A file it
+    cannot open or lock (OSError), or an event it cannot serialize
+    (TypeError, ValueError), is logged and costs nothing: the finding itself
+    is already enriched and still written. Anything else is a bug and
+    propagates.
+    """
+    if hook is None:
+        return
+    try:
+        hook(finding)
+    except (OSError, TypeError, ValueError) as exc:
+        log.warning(f"Precedent hook failed for {finding.get('file')}:{finding.get('line')}: {exc}")
