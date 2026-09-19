@@ -47,7 +47,10 @@ export function createViolation(raw) {
     line:          raw.line ?? null,
     endLine:       raw.endLine ?? raw.end_line ?? null,
     severity:      raw.severity ?? 'minor',
-    principle:     raw.practiceId ?? raw.principle ?? null,
+    // practice_id is the SSE spelling: that serializer emits snake_case
+    // straight from the payload, unlike the REST paths which go through
+    // to_camel_dict. Missing it left every streamed finding with no principle.
+    principle:     raw.practiceId ?? raw.practice_id ?? raw.principle ?? null,
     title:         raw.title ?? null,
     reason:        raw.reason ?? raw.findings ?? null,
     snippet:       raw.snippet ?? raw.code ?? null,

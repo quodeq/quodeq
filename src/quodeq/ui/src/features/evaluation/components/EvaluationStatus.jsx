@@ -110,10 +110,10 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     const next = {};
     let hidden = 0;
     for (const [dim, vs] of Object.entries(liveViolations || {})) {
-      // The SSE stream (VITE_USE_SSE_EVENTS) writes raw wire payloads
-      // straight into the findings cache with no violation-model mapping,
-      // so those entries carry snake_case `carried_forward` instead of
-      // `carriedForward`. Accept both spellings here.
+      // Both cache writers normalise through createViolation now, so entries
+      // carry `carriedForward`. The snake_case spelling stays accepted: the
+      // SSE stream (VITE_USE_SSE_EVENTS) used to write raw wire payloads
+      // here, and an entry written before this must not read as fresh.
       const fresh = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
       hidden += (vs || []).length - fresh.length;
       if (fresh.length) next[dim] = fresh;

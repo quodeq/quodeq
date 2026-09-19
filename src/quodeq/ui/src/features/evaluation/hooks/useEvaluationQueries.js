@@ -11,6 +11,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { evaluationKeys } from "../../../api/queryKeys.js";
 import { SSE_ENABLED, findingsRefetchInterval } from "./useEvaluation.helpers.js";
+import { createViolation } from "../../../models/violation.js";
 
 const JOB_POLL_MS = 1500;
 
@@ -24,7 +25,16 @@ async function fetchFindings(api, job) {
   const results = await Promise.all(
     job.dimensions.map((d) =>
       api.getDimensionEval(job.outputProject, job.outputRunId, d)
-        .then((data) => (data?.violations || []).map((v) => ({ ...v, dimension: d })))
+        // Canonical fields merged ONTO the raw row, not substituted for it.
+        // The backend calls a finding's principle `practiceId` while every
+        // component reads `principle`, so the raw spread left the feed's rule
+        // column blank and collapsed the row key to
+        // `${dim}-${file}-undefined-${line}`. Merging rather than replacing
+        // keeps wire-only fields the model does not model (confidence, and
+        // the SSE frame's id/verdict) available to other readers.
+        .then((data) => (data?.violations || []).map(
+          (v) => ({ ...v, ...createViolation(v), dimension: d }),
+        ))
         // Tolerate not-yet-written dimension evals during live polling,
         // but leave a diagnostic so a real fetch failure is visible.
         .catch((err) => {

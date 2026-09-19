@@ -56,3 +56,34 @@ test('createViolation defaults scopeDowngrade to null when absent', () => {
   const v = createViolation({ severity: 'minor' });
   assert.equal(v.scopeDowngrade, null);
 });
+
+// The backend names a finding's principle `practiceId` on the REST paths
+// (to_camel_dict) and `practice_id` on the SSE frame, which serialises the
+// payload directly. A component reading `principle` sees neither unless this
+// model maps both, and the live feed's rule column rendered blank because of
+// the missing snake_case spelling.
+
+test('createViolation maps practiceId (camelCase from REST)', () => {
+  const v = createViolation({ severity: 'major', practiceId: 'Authenticity' });
+  assert.equal(v.principle, 'Authenticity');
+});
+
+test('createViolation maps practice_id (snake_case from the SSE frame)', () => {
+  const v = createViolation({ severity: 'major', practice_id: 'Authenticity' });
+  assert.equal(v.principle, 'Authenticity');
+});
+
+test('createViolation still honours an explicit principle', () => {
+  const v = createViolation({ severity: 'major', principle: 'Integrity' });
+  assert.equal(v.principle, 'Integrity');
+});
+
+test('createViolation prefers practiceId over a legacy principle field', () => {
+  const v = createViolation({ practiceId: 'Authenticity', principle: 'Integrity' });
+  assert.equal(v.principle, 'Authenticity');
+});
+
+test('createViolation leaves principle null when the payload carries none', () => {
+  const v = createViolation({ severity: 'minor', file: 'a.py' });
+  assert.equal(v.principle, null);
+});
