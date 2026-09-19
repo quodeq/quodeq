@@ -16,7 +16,11 @@ from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
-from quodeq.services._scan_progress_types import _DimProgress, _ProgressContext
+from quodeq.services._scan_progress_types import (
+    _DimCounts,
+    _DimProgress,
+    _ProgressContext,
+)
 from quodeq.services._wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
@@ -249,6 +253,22 @@ def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
     )
 
 
+def _dim_counts(
+    dim_id: str, ctx: _ProgressContext, dismissed, deleted, d_state: str, record: dict | None,
+) -> _DimCounts:
+    """Evidence tally, elapsed time, live agents and estimate counts for one dim."""
+    meta = ctx.dim_estimates.get(dim_id)
+    return _DimCounts(
+        tally=_dim_evidence_tally(dim_id, ctx, dismissed, deleted),
+        elapsed_s=_dim_elapsed_s(dim_id, ctx.run_dir, d_state, record),
+        active_agents=_active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0,
+        estimate_reason=meta["reason"] if meta else None,
+        files_cached=meta["cached"] if meta else None,
+        files_project_total=meta["total"] if meta else None,
+        files_excluded=meta["excluded"] if meta else None,
+    )
+
+
 def _build_dim_progress(
     dim_id: str, ctx: _ProgressContext, dismissed, deleted,
 ) -> _DimProgress:
@@ -259,32 +279,22 @@ def _build_dim_progress(
         has_evaluation=dimension_report_exists(ctx.run_dir / "evaluation", dim_id),
     )
     record = ctx.dim_records.get(dim_id) if isinstance(ctx.dim_records, dict) else None
-    files = _dim_files_summary(queue, d_state, ctx.dim_estimates, dim_id)
-
-    estimate_meta = ctx.dim_estimates.get(dim_id)
-    estimate_reason = estimate_meta["reason"] if estimate_meta else None
-    files_cached = estimate_meta["cached"] if estimate_meta else None
-    files_project_total = estimate_meta["total"] if estimate_meta else None
-    files_excluded = estimate_meta["excluded"] if estimate_meta else None
-
-    tally = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
-    elapsed = _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record)
-    active = _active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0
-
+    counts = _dim_counts(dim_id, ctx, dismissed, deleted, d_state, record)
+    tally = counts.tally
     return _DimProgress(
         id=dim_id,
         state=d_state,
-        files=files,
+        files=_dim_files_summary(queue, d_state, ctx.dim_estimates, dim_id),
         violations=tally.violations,
         compliance=tally.compliance,
         duplicates=tally.duplicates,
         suppressed=tally.suppressed,
         quarantined=tally.quarantined,
-        elapsed_s=elapsed,
-        active_agents=active,
-        estimate_reason=estimate_reason,
+        elapsed_s=counts.elapsed_s,
+        active_agents=counts.active_agents,
+        estimate_reason=counts.estimate_reason,
         exit_reason=_dim_exit_reason(record),
-        files_cached=files_cached,
-        files_project_total=files_project_total,
-        files_excluded=files_excluded,
+        files_cached=counts.files_cached,
+        files_project_total=counts.files_project_total,
+        files_excluded=counts.files_excluded,
     )

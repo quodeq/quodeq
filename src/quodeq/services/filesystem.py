@@ -91,7 +91,7 @@ class FilesystemActionProvider(ActionProvider):
 
         # Tooling collaborator: register Claude model fetcher after construction.
         self._tooling = FsToolingMixin()
-        self._tooling._model_fetchers["claude"] = self._tooling._get_claude_models
+        self._tooling.configure_model_fetchers()
 
     # -- evaluations (delegate to EvaluationsIndex) ---------------------
 

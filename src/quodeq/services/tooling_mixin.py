@@ -81,6 +81,14 @@ class FsToolingMixin:
     def __init__(self) -> None:
         self._model_fetchers: dict[str, Callable] = {}
 
+    def configure_model_fetchers(self) -> None:
+        """Route the clients that have a richer model source than the CLI probe.
+
+        Opt-in rather than done in ``__init__``: a bare mixin (tests, callers
+        that register their own fetchers) keeps the plain CLI behaviour.
+        """
+        self._model_fetchers["claude"] = self._get_claude_models
+
     @staticmethod
     def _validate_browse_path(path: str | None) -> tuple[Path, dict[str, Any] | None]:
         """Resolve and validate a browse path. Returns (target, error_or_None)."""

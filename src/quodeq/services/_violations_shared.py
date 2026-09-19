@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from quodeq.core.finding_coercions import coerce_confidence
+from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.core.evidence.parser import resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base
@@ -79,7 +79,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         scope=obj.get("scope"),
         confidence=coerce_confidence(obj.get("confidence")),
         provenance_downgrade=bool(obj.get("provenance_downgrade")),
-        scope_downgrade=obj.get("scope_downgrade") if isinstance(obj.get("scope_downgrade"), dict) else None,
+        scope_downgrade=coerce_scope_downgrade(obj.get("scope_downgrade")),
         carried_forward=bool(obj.get("carried_forward")),
     ))
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))

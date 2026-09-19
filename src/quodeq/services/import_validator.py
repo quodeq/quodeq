@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from quodeq.shared.errors import ClientMessageError
 
@@ -126,13 +127,17 @@ def validate_import(data: dict) -> dict:
     return {"valid": True, "errors": [], "data": cleaned}
 
 
+def _match_patterns(text: str, patterns: Sequence[re.Pattern]) -> list[re.Match]:
+    """Every pattern in *patterns* that hits *text*, in pattern order."""
+    return [m for m in (p.search(text) for p in patterns) if m is not None]
+
+
 def scan_text(text: str) -> list[str]:
     """Return injection warnings for arbitrary untrusted text (empty == clean)."""
-    findings = []
-    for pattern in _INJECTION_PATTERNS:
-        if pattern.search(text):
-            findings.append(f"suspicious content matches {pattern.pattern!r}")
-    return findings
+    return [
+        f"suspicious content matches {m.re.pattern!r}"
+        for m in _match_patterns(text, _INJECTION_PATTERNS)
+    ]
 
 
 def scan_injection(data: dict) -> list[str]:
@@ -143,10 +148,8 @@ def scan_injection(data: dict) -> list[str]:
     warnings: list[str] = []
 
     def _check(text: str, location: str) -> None:
-        for pattern in _INJECTION_PATTERNS:
-            m = pattern.search(text)
-            if m:
-                warnings.append(f"Suspicious text in {location}: contains '{m.group()}'")
+        for m in _match_patterns(text, _INJECTION_PATTERNS):
+            warnings.append(f"Suspicious text in {location}: contains '{m.group()}'")
 
     for field in ("name", "description", "source"):
         if isinstance(data.get(field), str):

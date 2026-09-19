@@ -162,7 +162,7 @@ class TestCollectDismissedDetails:
             return real(run_dir)
 
         monkeypatch.setattr(mod, "read_run_status_json", spy)
-        monkeypatch.setattr(mod, "_started_at_memo", {})
+        monkeypatch.setattr(mod, "_started_at_memo", mod._RecencyCache())
 
         mod.run_dirs_newest_first(project_dir)
         mod.run_dirs_newest_first(project_dir)
@@ -239,3 +239,40 @@ class TestFilterDismissedFromDimensions:
         assert len(result[0].violations) == 1
         assert result[0].violations[0].req == "B"
         assert result[0].totals.violation_count == 1
+
+
+class TestRecencyCache:
+    """The started_at memo: reads, bounded growth and an explicit reset."""
+
+    def test_set_then_get_round_trips(self):
+        from quodeq.services._run_recency import _RecencyCache
+        cache = _RecencyCache()
+        run = Path("/runs/abc")
+        assert cache.get(run) is None
+        cache.set(run, "2026-01-01T00:00:00Z")
+        assert cache.get(run) == "2026-01-01T00:00:00Z"
+
+    def test_reset_forgets_everything(self):
+        from quodeq.services._run_recency import _RecencyCache
+        cache = _RecencyCache()
+        cache.set(Path("/runs/abc"), "t")
+        cache.reset()
+        assert cache.get(Path("/runs/abc")) is None
+
+    def test_clears_when_full_instead_of_growing_without_bound(self):
+        from quodeq.services._run_recency import _RecencyCache
+        cache = _RecencyCache(max_entries=2)
+        cache.set(Path("/runs/a"), "1")
+        cache.set(Path("/runs/b"), "2")
+        cache.set(Path("/runs/c"), "3")
+        assert cache.get(Path("/runs/a")) is None
+        assert cache.get(Path("/runs/c")) == "3"
+
+    def test_run_started_at_uses_the_injected_cache(self, tmp_path):
+        from quodeq.services._run_recency import _RecencyCache, run_started_at
+        run_dir = tmp_path / "run1"
+        run_dir.mkdir()
+        (run_dir / "status.json").write_text('{"started_at": "2026-02-02T00:00:00Z"}')
+        cache = _RecencyCache()
+        assert run_started_at(run_dir, cache=cache) == "2026-02-02T00:00:00Z"
+        assert cache.get(run_dir) == "2026-02-02T00:00:00Z"

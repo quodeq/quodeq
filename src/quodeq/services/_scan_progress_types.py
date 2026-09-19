@@ -10,7 +10,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, NamedTuple
+
+if TYPE_CHECKING:
+    from quodeq.data.fs.evidence_tally import FindingTally
+
+
+class _DimCounts(NamedTuple):
+    """The count-valued fields of one dimension's progress row."""
+
+    tally: "FindingTally"
+    elapsed_s: float | None
+    active_agents: int
+    estimate_reason: str | None
+    files_cached: int | None
+    files_project_total: int | None
+    files_excluded: int | None
 
 
 @dataclass(frozen=True)
