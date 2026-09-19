@@ -9,7 +9,7 @@ over the file-length threshold -- kept separate rather than grown.
 from __future__ import annotations
 
 from quodeq.analysis._api_runner import _build_cache_writer
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis._types import AnalysisOptions, ClassifyStash, RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
@@ -48,7 +48,7 @@ def test_build_cache_writer_reuses_the_stashed_classify_time_hash(tmp_path, monk
         miss_stamps={"Foo.kt": _stat_key(src_root / "Foo.kt")},
     )
     run_config = _run_config(src_root, classify_cache={
-        "flexibility": (("Foo.kt",), classify),
+        "flexibility": ClassifyStash(("Foo.kt",), classify),
     })
 
     write = _build_cache_writer(run_config, "flexibility")

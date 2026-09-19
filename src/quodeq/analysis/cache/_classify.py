@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis._types import ClassifyStash, RunConfig
 from quodeq.analysis.cache._adoption import try_adopt
 from quodeq.analysis.cache._key_provenance import (
     _accumulate_drift,
@@ -151,5 +151,5 @@ def classify_files_via_cache(
 
     result = _partition_files_by_cache(config, dimension, files, cache, bypass_reads=bypass_reads)
     if not bypass_reads and run_cache is not None:
-        run_cache[dimension] = (files_tuple, result)
+        run_cache[dimension] = ClassifyStash(files_tuple, result)
     return result

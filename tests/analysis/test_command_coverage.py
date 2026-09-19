@@ -6,6 +6,7 @@ from unittest.mock import patch
 from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
+    _build_base_args,
     _get_ai_tools,
     _get_base_ai_args,
     _mcp_server_name,
@@ -36,6 +37,33 @@ class TestGetBaseAiArgs:
     def test_custom_args_from_env(self):
         args = _get_base_ai_args({"QUODEQ_AI_BASE_ARGS": "--json --quiet"})
         assert args == ("--json", "--quiet")
+
+
+class TestEnvInjectionIsolation:
+    """An explicit ``env={}`` must not leak the host environment."""
+
+    def test_get_ai_tools_ignores_host_env(self):
+        with patch.dict("os.environ", {"QUODEQ_AI_TOOLS": "Bash,Write"}):
+            assert _get_ai_tools({}) == "Glob,Grep,Read"
+
+    def test_get_base_ai_args_ignores_host_env(self):
+        with patch.dict("os.environ", {"QUODEQ_AI_BASE_ARGS": "--leaked"}):
+            assert "--leaked" not in _get_base_ai_args({})
+
+    def test_build_base_args_threads_injected_env(self):
+        with patch.dict("os.environ", {"QUODEQ_AI_TOOLS": "Bash,Write",
+                                       "QUODEQ_AI_BASE_ARGS": "--leaked"}):
+            args = _build_base_args("claude", {}, env={})
+        assert "--leaked" not in args
+        assert "Bash,Write" not in args
+        assert "Glob,Grep,Read" in args
+
+    def test_build_base_args_reads_injected_env(self):
+        with patch.dict("os.environ", {}, clear=True):
+            args = _build_base_args(
+                "claude", {}, env={"QUODEQ_AI_TOOLS": "Read", "QUODEQ_AI_BASE_ARGS": "--json"},
+            )
+        assert args == ["claude", "--json", "--tools", "Read"]
 
 
 # ---------------------------------------------------------------------------

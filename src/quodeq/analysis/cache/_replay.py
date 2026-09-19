@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.cache.dimension_helpers import ClassifyResult, _group_findings_by_file
+from quodeq.analysis.cache.dimension_helpers import ClassifyResult, group_findings_by_file
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel
 from quodeq.data.ports.events import EventEmitter
@@ -77,7 +77,7 @@ def _compute_files_read(
     n_hits = len(all_files) - len(classify.misses)
     if not jsonl_path.is_file():
         return n_hits
-    _grouped, ok_files = _group_findings_by_file(jsonl_path)
+    _grouped, ok_files = group_findings_by_file(jsonl_path)
     miss_set = set(classify.misses)
     n_dispatch_ok = len(ok_files & miss_set)
     return n_hits + n_dispatch_ok

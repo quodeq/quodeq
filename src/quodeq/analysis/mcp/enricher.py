@@ -12,8 +12,8 @@ from typing import Callable, Protocol, runtime_checkable
 
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.precedent_downweight import (
-    _UNSET,
-    _apply_precedent_downweight,
+    UNSET_SCORE,
+    apply_precedent_downweight,
     precedent_scores as _compute_precedent_scores,
     notify_precedent_match,
 )
@@ -238,7 +238,7 @@ class FindingEnricher:
         _apply_shape_downweight(finding, self._project_shape)
 
     def _after_precedent(
-        self, finding: dict, precedent_score: float | None = _UNSET,
+        self, finding: dict, precedent_score: float | None = UNSET_SCORE,
     ) -> None:
         """Apply the precedent downweight and the severity gates in place.
 
@@ -254,7 +254,7 @@ class FindingEnricher:
         class of findings ungated. See severity_gates.py for why the sequence
         lives there rather than being repeated here.
         """
-        tier = _apply_precedent_downweight(
+        tier = apply_precedent_downweight(
             finding, self._precedent_fingerprints, self._precedent_corpus,
             score=precedent_score, log=self._log,
         )
@@ -262,7 +262,7 @@ class FindingEnricher:
         if tier == "exact":
             notify_precedent_match(self._on_precedent_match, finding, log=self._log)
 
-    def enrich(self, args: dict, *, precedent_score: float | None = _UNSET) -> dict:
+    def enrich(self, args: dict, *, precedent_score: float | None = UNSET_SCORE) -> dict:
         """Return a fully enriched finding dict built from *args*.
 
         *precedent_score* lets a caller that already ran the batch semantic

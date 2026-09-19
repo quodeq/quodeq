@@ -24,6 +24,7 @@ import urllib.request
 from collections.abc import Mapping
 import urllib.error
 
+from quodeq.shared.constants import DEFAULT_LLAMACPP_BASE_URL
 from quodeq.llm_bridge._ollama import (
     _detect_memory,
     estimate_max_agents,
@@ -41,7 +42,7 @@ _TRANSPORT_ERRORS = (urllib.error.URLError, ConnectionRefusedError, OSError, Val
 def _default_base_url(env: Mapping[str, str] | None = None) -> str:
     """llama-server base URL: ``LLAMACPP_BASE_URL`` or the default port 8080."""
     environ = env if env is not None else os.environ
-    return environ.get("LLAMACPP_BASE_URL", "http://localhost:8080")
+    return environ.get("LLAMACPP_BASE_URL", DEFAULT_LLAMACPP_BASE_URL)
 
 
 def _normalize_base(base_url: str) -> str:

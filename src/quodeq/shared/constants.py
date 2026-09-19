@@ -21,4 +21,7 @@ SESSION_SOURCES = (SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED)
 OLLAMA_DEFAULT_PORT = "11434"
 OLLAMA_DEFAULT_BASE_URL = f"http://localhost:{OLLAMA_DEFAULT_PORT}"
 
+# llama-server's default listening address, used when LLAMACPP_BASE_URL is unset.
+DEFAULT_LLAMACPP_BASE_URL = "http://localhost:8080"
+
 SECRET_SUFFIX_CHARS = 4  # how many trailing credential characters a log or settings mask may show

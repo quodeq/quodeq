@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.prompts._template import load_template
-from quodeq.analysis.prompts.builder import _load_evaluation_rules
+from quodeq.analysis.prompts.builder import load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 from quodeq.context.path_role import Role, path_role
 from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
@@ -206,7 +206,7 @@ def assemble_api_prompt(
     gate enforces.
     """
     template = load_template(template_name="api_prompt.md")
-    rules = _load_evaluation_rules()
+    rules = load_evaluation_rules()
     files_block = _build_files_block(source_files, repo_root=project.root)
     project_shape = project.shape
     if project_shape is None and project.root is not None:

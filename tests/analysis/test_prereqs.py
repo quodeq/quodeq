@@ -132,6 +132,15 @@ class TestIsProviderExplicitlyConfigured:
         with patch.dict("os.environ", {"AI_CMD": "claude"}):
             assert _is_provider_explicitly_configured()
 
+    def test_injected_empty_env_ignores_host_environment(self):
+        """An explicit ``env={}`` must not fall back to the process env."""
+        with patch.dict("os.environ", {"AI_PROVIDER": "ollama", "AI_CMD": "claude"}):
+            assert not _is_provider_explicitly_configured(env={})
+
+    def test_injected_env_is_read_instead_of_host(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert _is_provider_explicitly_configured(env={"AI_CMD": "codex"})
+
 
 class TestCompositeChecks:
     def test_dashboard_prereqs_checks_node_and_npm(self):

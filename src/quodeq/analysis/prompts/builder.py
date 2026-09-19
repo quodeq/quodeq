@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 _TPL_EVALUATION_RULES = "EVALUATION_RULES"
 
 
-def _load_evaluation_rules() -> str:
+def load_evaluation_rules() -> str:
     """Load shared evaluation rules + reporting format.
 
     Concatenates two prompt files into the same template slot. They are
@@ -44,6 +44,10 @@ def _load_evaluation_rules() -> str:
             _logger.warning("Failed to load prompt template %s, skipping", name)
             continue
     return "\n\n".join(p for p in parts if p)
+
+
+# Deprecated private spelling, kept one release for existing importers.
+_load_evaluation_rules = load_evaluation_rules
 
 
 def render_previous_findings_section(findings: list[dict]) -> str:
@@ -136,7 +140,7 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
         "DIMENSIONS": dimensions_text,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
-        _TPL_EVALUATION_RULES: _load_evaluation_rules(),
+        _TPL_EVALUATION_RULES: load_evaluation_rules(),
     }
     if context.extra_vars:
         values.update(context.extra_vars)
@@ -173,7 +177,7 @@ def build_consolidated_prompt(
         ctx.TPL_ANALYSIS_GUIDANCE: manifest_context,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
-        _TPL_EVALUATION_RULES: _load_evaluation_rules(),
+        _TPL_EVALUATION_RULES: load_evaluation_rules(),
     }
     if context.extra_vars:
         values.update(context.extra_vars)

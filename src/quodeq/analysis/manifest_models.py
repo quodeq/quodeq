@@ -81,28 +81,31 @@ class SourceManifest:
     # --- backward-compat properties (delegate to primary target) ---
 
     @property
-    def _primary(self) -> AnalysisTarget | None:
+    def primary(self) -> AnalysisTarget | None:
         """Primary target = largest by file count."""
         if not self.targets:
             return None
         return max(self.targets, key=lambda t: t.total_files)
 
+    # Deprecated private spelling, kept one release for existing readers.
+    _primary = primary
+
     @property
     def language(self) -> str:
         """Language of the primary target, "unknown" for an empty manifest."""
-        p = self._primary
+        p = self.primary
         return p.language if p else "unknown"
 
     @property
     def category(self) -> str | None:
         """Category of the primary target, None for an empty manifest."""
-        p = self._primary
+        p = self.primary
         return p.category if p else None
 
     @property
     def frameworks(self) -> list[str]:
         """Frameworks of the primary target, empty for an empty manifest."""
-        p = self._primary
+        p = self.primary
         return p.frameworks if p else []
 
     @property
