@@ -89,7 +89,8 @@ def _build_options_or_error(payload: dict) -> tuple[Any, tuple[Response, int] | 
         return _build_evaluation_options(payload), None
     except InvalidEvaluationOption as exc:
         # exc.public_message, not str(exc): the field-naming text an
-        # InvalidEvaluationOption carries is written by _coerce_int itself
+        # InvalidEvaluationOption carries is written by _coerce_int itself,
+        # names only the field, and interpolates nothing from the request
         # (never raw exception formatting), so it is safe to return verbatim.
         return None, json_error(exc.public_message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     except ValueError:

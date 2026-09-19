@@ -53,7 +53,7 @@ describe('CliProviderTab', () => {
   it('flags an invalid command override on blur with the server reason', async () => {
     fakeApi.checkCmdPath = vi.fn().mockResolvedValue({
       ok: false,
-      error: "'claude-v' was not found or is not executable",
+      error: "the given path was not found or is not executable",
     });
     const Wrapper = makeWrapper();
     const state = { model: 'sonnet', 'cmd-path': 'claude-v' };
@@ -74,7 +74,7 @@ describe('CliProviderTab', () => {
   it('clears the override error once the value validates', async () => {
     fakeApi.checkCmdPath = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, error: "'claude-x' was not found or is not executable" })
+      .mockResolvedValueOnce({ ok: false, error: "the given path was not found or is not executable" })
       .mockResolvedValueOnce({ ok: true, error: null });
     const Wrapper = makeWrapper();
     function Host() {

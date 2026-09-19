@@ -90,7 +90,7 @@ describe("useEvaluation", () => {
     // used to collapse into the generic "Failed to start evaluation.",
     // hiding the actionable reason the backend already wrote.
     const err = new Error(
-      "Invalid AI command override: 'claude-v' was not found or is not executable",
+      "Invalid AI command override: the given path was not found or is not executable",
     );
     err.status = 400;
     err.code = "INVALID_INPUT";
@@ -99,7 +99,9 @@ describe("useEvaluation", () => {
     await expect(
       result.current.startEvaluation({ repo: "x", dimensions: [] }),
     ).rejects.toThrow();
-    await waitFor(() => expect(result.current.jobError).toMatch(/claude-v/));
+    await waitFor(() =>
+      expect(result.current.jobError).toMatch(/was not found or is not executable/),
+    );
   });
 
   it("startEvaluation shows translated copy for a mapped error code", async () => {
