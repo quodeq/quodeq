@@ -37,7 +37,7 @@ export {
 
 export {
   listEvaluations, startEvaluation, getEvaluation, getEvaluationProgress,
-  cancelEvaluation, deleteEvaluation,
+  cancelEvaluation, deleteEvaluation, runEventsUrl,
 } from './evaluations.js';
 
 export {

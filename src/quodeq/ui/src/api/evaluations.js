@@ -3,7 +3,18 @@
  */
 
 import { createJob } from '../models/job.js';
-import { request } from './request.js';
+import { BASE, request } from './request.js';
+
+/**
+ * URL of a run's server-sent-events stream. Full URL rather than a request()
+ * path, because EventSource opens the connection itself.
+ *
+ * @param {string} jobId
+ * @returns {string}
+ */
+export function runEventsUrl(jobId) {
+  return `${BASE}/evaluations/${jobId}/events`;
+}
 
 /**
  * @param {{ limit?: number, states?: string[] }} [options]

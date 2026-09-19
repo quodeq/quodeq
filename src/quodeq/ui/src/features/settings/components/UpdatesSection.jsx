@@ -100,8 +100,8 @@ function AutoCheckRow({ auto, onToggle }) {
 
 export default function UpdatesSection() {
   const { checkForUpdates, setUpdateAutoCheck } = useApi();
-  const { status, setStatus } = useUpdateStatus();
-  const selfUpdate = useSelfUpdate(status, setStatus);
+  const { status, adopt, setAutoCheck } = useUpdateStatus();
+  const selfUpdate = useSelfUpdate(status, adopt);
   const [checking, setChecking] = useState(false);
 
   // Unlike onToggle below, there is no optimistic mutation to undo here:
@@ -111,7 +111,7 @@ export default function UpdatesSection() {
   const onCheck = async () => {
     setChecking(true);
     try {
-      setStatus(await checkForUpdates());
+      adopt(await checkForUpdates());
     } catch (e) {
       console.warn('check for updates failed:', e);
     }
@@ -120,12 +120,12 @@ export default function UpdatesSection() {
 
   const onToggle = async (enabled) => {
     const previous = status?.auto_check_enabled;
-    setStatus((s) => ({ ...(s || {}), auto_check_enabled: enabled }));
+    setAutoCheck(enabled);
     try {
       await setUpdateAutoCheck(enabled);
     } catch (err) {
       console.warn('[UpdatesSection] auto-check toggle failed:', err);
-      setStatus((s) => ({ ...(s || {}), auto_check_enabled: previous }));
+      setAutoCheck(previous);
     }
   };
 
