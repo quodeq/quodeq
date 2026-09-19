@@ -26,9 +26,14 @@ class TestCoerceInt:
         with pytest.raises(ValueError, match="maxSubagents"):
             _coerce_int("abc", 5, "maxSubagents")
 
-    def test_malformed_value_names_what_was_received(self):
-        with pytest.raises(ValueError, match=r"got 'abc'"):
+    def test_malformed_value_is_not_echoed_back(self):
+        """The message names the field and nothing else. Echoing the received
+        value put request input into the response body (CodeQL alert 301,
+        reflected XSS pattern); harmless under nosniff+CSP, but the API-wide
+        invariant is that no request input is ever reflected back."""
+        with pytest.raises(ValueError) as excinfo:
             _coerce_int("abc", 5, "maxSubagents")
+        assert "abc" not in str(excinfo.value)
 
     def test_blank_value_is_treated_as_absent(self):
         assert _coerce_int("", 5, "maxSubagents") == 5

@@ -82,9 +82,15 @@ class InvalidEvaluationOption(ClientMessageError, ValueError):
 def _coerce_int(value: object, default: int, field: str) -> int:
     """Return int(*value*) when convertible; *default* when *value* is
     ``None`` (absent) or a blank/whitespace-only string. Raises
-    ``InvalidEvaluationOption`` naming *field* and the value received when
-    *value* is present but not convertible to int, so a malformed override
-    surfaces as a 400 instead of silently falling back to the default.
+    ``InvalidEvaluationOption`` naming *field* when *value* is present but
+    not convertible to int, so a malformed override surfaces as a 400
+    instead of silently falling back to the default.
+
+    The message names the field only, never the received value: this text
+    reaches the client verbatim (see _build_options_or_error), and the
+    routes hold the invariant that no request input is reflected back in a
+    response. The caller knows what they sent; the field name is the part
+    they cannot see.
 
     A blank string counts as absent: that is how a cleared form field
     arrives, and it meant "use the default" before this validation existed.
@@ -96,7 +102,7 @@ def _coerce_int(value: object, default: int, field: str) -> int:
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
-        raise InvalidEvaluationOption(f"{field} must be an integer, got {value!r}") from exc
+        raise InvalidEvaluationOption(f"{field} must be an integer") from exc
 
 
 def _sanitize_url(url: str) -> str:
@@ -194,14 +200,19 @@ def ai_cmd_path_error(ai_cmd: str | None, ai_cmd_path: str | None) -> str | None
     basename = os.path.basename(normalized)
     if not basename.startswith(provider):
         return f"binary name must start with '{provider}'"
+    # The messages below name "the given path" instead of interpolating
+    # ai_cmd_path: they reach clients verbatim (start-evaluation 400 and the
+    # Settings eager check alike), and no request input is ever reflected
+    # back in a response. The reader is looking at the field they typed the
+    # path into, so pointing at it loses nothing.
     resolved = shutil.which(ai_cmd_path)
     if resolved is None:
-        return f"'{ai_cmd_path}' was not found or is not executable"
+        return "the given path was not found or is not executable"
     resolved_dir = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(resolved))))
     if resolved_dir not in _path_dirs():
         return (
-            f"'{ai_cmd_path}' is not in a directory on PATH; move it to one "
-            f"(e.g. ~/.local/bin) or add its directory to PATH"
+            "the given path is not in a directory on PATH; move it to one "
+            "(e.g. ~/.local/bin) or add its directory to PATH"
         )
     return None
 
