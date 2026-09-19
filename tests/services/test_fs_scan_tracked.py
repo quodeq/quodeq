@@ -7,6 +7,7 @@ explanation. Real repositories, no mocks: the filter is git's answer.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -16,11 +17,14 @@ from quodeq.services._fs_scan import scan_project
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True,
-        env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
-             "GIT_COMMITTER_EMAIL": "t@t", "HOME": str(repo), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
-    )
+    # Inherit the real environment (PATH, and on Windows SYSTEMROOT/COMSPEC,
+    # which git needs), then pin identity and HOME so the run cannot pick up
+    # the developer's git config.
+    env = {**os.environ,
+           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+           "HOME": str(repo)}
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, env=env)
 
 
 @pytest.fixture
