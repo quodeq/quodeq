@@ -27,6 +27,7 @@ _logger = logging.getLogger(__name__)
 #: (not actions.jsonl's) is what makes the migration idempotent.
 MIGRATION_MARKER = ".dismissed_migrated"
 
+
 class _MigrationLocks:
     """One lock per project so a concurrent first read + first write can't double-fold."""
 

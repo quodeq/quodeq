@@ -146,8 +146,8 @@ def classify_files_via_cache(
     run_cache = config._classify_cache
     if not bypass_reads and run_cache is not None:
         stashed = run_cache.get(dimension)
-        if stashed is not None and stashed[0] == files_tuple:
-            return stashed[1]
+        if stashed is not None and stashed.files == files_tuple:
+            return stashed.result
 
     result = _partition_files_by_cache(config, dimension, files, cache, bypass_reads=bypass_reads)
     if not bypass_reads and run_cache is not None:

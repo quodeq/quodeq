@@ -160,8 +160,8 @@ class TestRateLimitStoreFactory:
 
         monkeypatch.setenv("QUODEQ_RATE_LIMIT_BACKEND", "file")
 
-        # A non-empty mapping: create_rate_limit_store does `env or os.environ`,
-        # so an empty dict would fall back to the process environment.
+        # create_rate_limit_store does `os.environ if env is None else env`:
+        # an injected mapping is used as-is, only None reads the process env.
         store, _ = _build_rate_limit_store(env={"QUODEQ_RATE_LIMIT_BACKEND": "memory"})
 
         assert isinstance(store, InMemoryRateLimitStore)
