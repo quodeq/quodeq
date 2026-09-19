@@ -10,6 +10,9 @@
 - **Subagents launch at full width after the scout**: every provider outside `QUODEQ_NON_SCOUT_PROVIDERS` (by default all but Codex and Gemini) still starts one scout agent per dimension to catch entry problems (auth, quota, oversized prompt) before committing to more. Once the scout finishes, or after up to 30 seconds (sooner under a time limit), every free `--n-subagents` slot launches at once, bounded only by the files left in the queue. Previously the number of extra agents was estimated from the file count, so dimensions with 50 or fewer files ran on a single agent and larger ones rarely reached the configured count. Local model servers still serve one request per model unless their parallelism is raised (`OLLAMA_NUM_PARALLEL`), so on those the extra agents queue rather than speed the run up; the existing startup warning covers this.
 - **Cache key schema 4**: the detected project language is no longer part of the evaluation cache key. A language-detection change (for example `build.gradle` replaced by `build.gradle.kts`) reuses all cached results instead of re-evaluating the repo. Existing entries are migrated in place, once, on the first evaluation or dashboard start after upgrading; on very large caches the one-time pass can take a few minutes.
 
+### Fixes
+- **The wizard counts the files the run will score**: inside a git work tree the project scan counts only tracked files, the same set an evaluation measures, and the FILES tile says how many untracked files were left out ("5 untracked, not scored"). Previously the wizard counted every file on disk while the run scored fewer, with nothing explaining the gap.
+
 ## [1.10.1] - 2026-08-28
 
 ### Fixes
