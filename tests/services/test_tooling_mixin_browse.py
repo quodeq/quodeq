@@ -153,3 +153,82 @@ class TestBrowseRepo:
         mixin = FsToolingMixin()
         result = mixin.browse_repo(str(Path.home()), include_files=True)
         assert "files" in result
+
+
+class TestBrowseRepoUsesTheListingHelpers:
+    """browse_repo must not keep its own copy of the listing rules: it feeds
+    one directory read to _list_directories/_list_files."""
+
+    @staticmethod
+    def _tree_under_home() -> Path:
+        import tempfile
+        base = Path(tempfile.mkdtemp(dir=Path.home(), prefix="quodeq_browse_"))
+        (base / "beta").mkdir()
+        (base / "alpha").mkdir()
+        (base / "alpha" / ".git").mkdir()
+        (base / ".hidden_dir").mkdir()
+        (base / "z.py").write_text("pass")
+        (base / "a.py").write_text("pass")
+        (base / ".env").write_text("SECRET")
+        return base
+
+    def test_matches_the_helpers_exactly(self):
+        import shutil
+        base = self._tree_under_home()
+        try:
+            result = FsToolingMixin().browse_repo(str(base), include_files=True)
+
+            assert result["directories"] == FsToolingMixin._list_directories(base)
+            assert result["files"] == FsToolingMixin._list_files(base)
+        finally:
+            shutil.rmtree(base, ignore_errors=True)
+
+    def test_omits_files_unless_asked(self):
+        import shutil
+        base = self._tree_under_home()
+        try:
+            assert "files" not in FsToolingMixin().browse_repo(str(base))
+        finally:
+            shutil.rmtree(base, ignore_errors=True)
+
+    def test_reads_the_directory_once(self, monkeypatch):
+        """The single-pass traversal is the point of browse_repo; sharing the
+        helpers must not cost a second scandir."""
+        import shutil
+        import quodeq.services.tooling_mixin as tooling_mixin
+
+        base = self._tree_under_home()
+        calls = []
+        real = tooling_mixin.safe_read_dir
+        monkeypatch.setattr(
+            tooling_mixin, "safe_read_dir",
+            lambda path: (calls.append(path), real(path))[1],
+        )
+        try:
+            FsToolingMixin().browse_repo(str(base), include_files=True)
+
+            assert calls.count(base) == 1
+        finally:
+            shutil.rmtree(base, ignore_errors=True)
+
+
+class TestListingHelpersAcceptPreReadEntries:
+    def test_list_directories_uses_supplied_entries(self, tmp_path: Path):
+        import os
+        (tmp_path / "keep").mkdir()
+        (tmp_path / "drop").mkdir()
+        entries = [e for e in os.scandir(tmp_path) if e.name == "keep"]
+
+        dirs = FsToolingMixin._list_directories(tmp_path, entries)
+
+        assert [d["name"] for d in dirs] == ["keep"]
+
+    def test_list_files_uses_supplied_entries(self, tmp_path: Path):
+        import os
+        (tmp_path / "keep.py").write_text("pass")
+        (tmp_path / "drop.py").write_text("pass")
+        entries = [e for e in os.scandir(tmp_path) if e.name == "keep.py"]
+
+        files = FsToolingMixin._list_files(tmp_path, entries)
+
+        assert [f["name"] for f in files] == ["keep.py"]

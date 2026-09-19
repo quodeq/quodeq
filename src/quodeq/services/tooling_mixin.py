@@ -95,10 +95,16 @@ class FsToolingMixin:
         return target, None
 
     @staticmethod
-    def _list_directories(target: Path) -> list[dict[str, Any]]:
-        """List readable non-hidden subdirectories of *target*."""
+    def _list_directories(
+        target: Path, entries: list[os.DirEntry[str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """List readable non-hidden subdirectories of *target*.
+
+        *entries* supplies an already-read listing so a caller that also needs
+        the files does not pay for a second scandir.
+        """
         directories = []
-        for entry in safe_read_dir(target):
+        for entry in (safe_read_dir(target) if entries is None else entries):
             if entry.name.startswith(".") or not entry.is_dir():
                 continue
             entry_path = target / entry.name
@@ -113,10 +119,15 @@ class FsToolingMixin:
         return directories
 
     @staticmethod
-    def _list_files(target: Path) -> list[dict[str, Any]]:
-        """List readable non-hidden source files in *target*."""
+    def _list_files(
+        target: Path, entries: list[os.DirEntry[str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """List readable non-hidden source files in *target*.
+
+        *entries* supplies an already-read listing, as in ``_list_directories``.
+        """
         files: list[dict[str, Any]] = []
-        for entry in safe_read_dir(target):
+        for entry in (safe_read_dir(target) if entries is None else entries):
             if entry.name.startswith(".") or not entry.is_file():
                 continue
             entry_path = target / entry.name
@@ -150,34 +161,15 @@ class FsToolingMixin:
     def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
         """List directories (and optionally files) at the given path.
 
-        Single-pass traversal: iterates directory entries once to collect both
-        directories and files, avoiding redundant filesystem scans.
+        Single-pass traversal: the directory is read once and the same entries
+        feed both listing helpers, avoiding redundant filesystem scans.
         """
         target, error = self._validate_browse_path(path)
         if error is not None:
             return error
-        directories: list[dict[str, Any]] = []
-        files: list[dict[str, Any]] | None = [] if include_files else None
-        for entry in safe_read_dir(target):
-            if entry.name.startswith("."):
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            if entry.is_dir():
-                directories.append({
-                    "name": entry.name,
-                    "path": str(entry_path),
-                    "isGitRepo": (entry_path / ".git").exists(),
-                })
-            elif include_files and entry.is_file():
-                files.append({
-                    "name": entry.name,
-                    "path": str(entry_path),
-                })
-        directories.sort(key=lambda item: item["name"])
-        if files is not None:
-            files.sort(key=lambda item: item["name"])
+        entries = safe_read_dir(target)
+        directories = self._list_directories(target, entries)
+        files = self._list_files(target, entries) if include_files else None
         return self._build_browse_response(target, directories, files)
 
     def browse_mkdir(self, parent: str, name: str) -> dict[str, Any]:
