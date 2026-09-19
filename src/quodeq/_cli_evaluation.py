@@ -283,3 +283,12 @@ def run_diff_evaluation(
         argv += ["--dimensions", dimensions]
     from quodeq.cli_parser import build_parser  # noqa: PLC0415
     return run_evaluate(build_parser().parse_args(argv))
+
+
+# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
+# originals stay importable from here for in-package callers.
+build_run_config = _build_run_config
+execute_pipeline = _execute_pipeline
+run_pipeline_with_cleanup = _run_pipeline_with_cleanup
+save_manifest = _save_manifest
+setup_run_dirs = _setup_run_dirs

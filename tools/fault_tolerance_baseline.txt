@@ -65,7 +65,7 @@ src/quodeq/assistant/tools/_read_tools_scope.py:127:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:87:broad-except
 src/quodeq/assistant/tools/_registry.py:58:broad-except
 src/quodeq/ci/cli.py:93:broad-except
-src/quodeq/cli.py:89:broad-except
+src/quodeq/cli.py:94:broad-except
 src/quodeq/config/ai_provider.py:244:broad-except
 src/quodeq/config/ai_provider.py:279:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
