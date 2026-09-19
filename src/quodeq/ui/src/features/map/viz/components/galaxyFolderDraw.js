@@ -21,27 +21,43 @@ export function drawScene(ctx, activeScene, params) {
   return { tc };
 }
 
+// The fixed shape of each nebula's blob ring. Hoisted to module scope so a
+// folder star, which draws once per star per animation frame, allocates
+// nothing: the frame's `t` is merged in once per frame and everything else
+// that varies comes in as an argument.
+const SCENE_NEBULA_BLOBS = {
+  count: 4, spin: 0.005, orbit: 0.35, sizeBase: 0.3, sizeAmp: 0.08,
+  wobble: 0.015, wobbleStep: 1.7,
+};
+const SCENE_BLOB_ALPHA = 0.008;
+const FOLDER_NEBULA_BLOBS = {
+  count: 3, spin: 0.01, orbit: 0.3, sizeBase: 0.4, sizeAmp: 0.1,
+  wobble: 0.02, wobbleStep: 2,
+};
+
 /**
  * One ring of soft, slowly orbiting texture blobs over a nebula disc. Both
  * nebulas draw the same shape, at their own count, speed, alpha and size.
  *
- * `spec` is { cx, cy, radius, col, alpha, count, spin, orbit, sizeBase,
- * sizeAmp, wobble, wobbleStep, t }: `orbit` is the blob centre's distance
- * from the nebula centre as a fraction of `radius`, and `sizeBase`/`sizeAmp`
- * the blob radius as a fraction of it, breathing at `wobble`.
+ * `spec` is one of the constants above with the frame's `t` merged in.
+ * `orbit` is the blob centre's distance from `centre` as a fraction of
+ * `radius`, and `sizeBase`/`sizeAmp` the blob radius as a fraction of it,
+ * breathing at `wobble`. Both colour stops are the same for every blob in a
+ * ring, so they are built once rather than per blob.
  */
-function drawNebulaBlobs(ctx, spec) {
-  const { cx, cy, radius, col, alpha, count, spin, orbit } = spec;
-  const { sizeBase, sizeAmp, wobble, wobbleStep, t } = spec;
+function drawNebulaBlobs(ctx, spec, centre, radius, col, alpha) {
+  const { count, spin, orbit, sizeBase, sizeAmp, wobble, wobbleStep, t } = spec;
   const { r, g, b } = col;
+  const innerStop = `rgba(${r},${g},${b},${alpha})`;
+  const outerStop = `rgba(${r},${g},${b},0)`;
   for (let bi = 0; bi < count; bi++) {
     const ba = t * spin + bi * TAU / count;
-    const bx = cx + Math.cos(ba) * radius * orbit;
-    const by = cy + Math.sin(ba) * radius * orbit;
+    const bx = centre.x + Math.cos(ba) * radius * orbit;
+    const by = centre.y + Math.sin(ba) * radius * orbit;
     const br = radius * (sizeBase + sizeAmp * Math.sin(t * wobble + bi * wobbleStep));
     const blobGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
-    blobGrad.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
-    blobGrad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    blobGrad.addColorStop(0, innerStop);
+    blobGrad.addColorStop(1, outerStop);
     ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU);
     ctx.fillStyle = blobGrad; ctx.fill();
   }
@@ -63,11 +79,9 @@ export function drawNebula(ctx, curNode, tc, frame) {
   nbGrad.addColorStop(1, `rgba(${nr},${ng},${nb},0)`);
   ctx.beginPath(); ctx.arc(W / 2, H / 2, nbR, 0, TAU);
   ctx.fillStyle = nbGrad; ctx.fill();
-  drawNebulaBlobs(ctx, {
-    cx: W / 2, cy: H / 2, radius: nbR, col: nbCol, alpha: 0.008, count: 4,
-    spin: 0.005, orbit: 0.35, sizeBase: 0.3, sizeAmp: 0.08, wobble: 0.015,
-    wobbleStep: 1.7, t,
-  });
+  drawNebulaBlobs(
+    ctx, { ...SCENE_NEBULA_BLOBS, t }, { x: W / 2, y: H / 2 }, nbR, nbCol, SCENE_BLOB_ALPHA,
+  );
 }
 
 /**
@@ -103,7 +117,7 @@ export function drawConstellationLines(ctx, activeScene, tc, w2s) {
  */
 function drawFolderNebula(ctx, star, view) {
   const { s, i, sc, sr } = star;
-  const { cam, t, curFly } = view;
+  const { cam, curFly, blobSpec } = view;
   const { r: cr, g: cg, b: cb } = s.col;
   const zoomed = cam.z > 2;
   const isFlying = curFly && !curFly.reverse && !curFly.swapped && curFly.dimStarIdx === i;
@@ -122,11 +136,7 @@ function drawFolderNebula(ctx, star, view) {
 
   // Animated texture blobs
   const blobA = (zoomed ? Math.min(0.18, (cam.z - 2) / 15) : 0.025) * nebulaFade;
-  drawNebulaBlobs(ctx, {
-    cx: sc.x, cy: sc.y, radius: nebulaR, col: s.col, alpha: blobA, count: 3,
-    spin: 0.01, orbit: 0.3, sizeBase: 0.4, sizeAmp: 0.1, wobble: 0.02,
-    wobbleStep: 2, t,
-  });
+  drawNebulaBlobs(ctx, blobSpec, sc, nebulaR, s.col, blobA);
 
   // Dashed circle border
   const borderR = sr * 3.5;
@@ -215,6 +225,8 @@ export function drawStars(ctx, activeScene, params) {
   let newHovered = null;
   const pendingLabels = [];
   const cues = newCueBatch();
+  // Built once per frame, not once per folder star.
+  const blobSpec = { ...FOLDER_NEBULA_BLOBS, t };
 
   activeScene.rootStars.forEach((s, i) => {
     const sc = w2s(s.x, s.y);
@@ -228,7 +240,7 @@ export function drawStars(ctx, activeScene, params) {
       : 1;
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: starAlpha });
 
-    if (s.isFolder) drawFolderNebula(ctx, { s, i, sc, sr }, { cam, t, curFly });
+    if (s.isFolder) drawFolderNebula(ctx, { s, i, sc, sr }, { cam, curFly, blobSpec });
     drawFileParticles(ctx, s, sc, cam, t, cues);
     drawLabeledOrbs(ctx, s, sc, params);
 

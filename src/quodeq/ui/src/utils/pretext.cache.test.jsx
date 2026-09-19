@@ -46,6 +46,22 @@ describe('pretext prepare cache', () => {
     expect(prepareCalls).toHaveLength(LIMIT + 2); // both still cached
   });
 
+  // The suite's beforeEach relies on this: if the clear missed the segment
+  // cache, the measureWidth tests below would depend on running first.
+  it('clearPrepareCache empties the segment cache too, not just the prepare cache', () => {
+    prepare('shared', FONT);
+    measureWidth('shared', FONT);
+    expect(prepareCalls).toHaveLength(1);
+    expect(segmentCalls).toHaveLength(1);
+
+    clearPrepareCache();
+
+    prepare('shared', FONT);
+    measureWidth('shared', FONT);
+    expect(prepareCalls).toHaveLength(2);
+    expect(segmentCalls).toHaveLength(2);
+  });
+
   it('caches segment preparation for measureWidth under the same policy', () => {
     const LIMIT = 512;
     for (let i = 0; i < LIMIT; i++) measureWidth(`s${i}`, FONT);
