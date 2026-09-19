@@ -9,7 +9,6 @@
   "src/features/dashboard/hooks/useSharedProjects.js": 1,
   "src/features/dashboard/projectsMerge.js": 3,
   "src/features/evaluation/components/FolderBrowser.jsx": 1,
-  "src/features/explorer/components/ExplorerStatsPanel.jsx": 1,
   "src/features/explorer/components/NavBreadcrumb.jsx": 1,
   "src/features/explorer/components/PrinciplesRadial.jsx": 1,
   "src/features/explorer/components/fileDetailWidgets.jsx": 1,

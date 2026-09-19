@@ -9,6 +9,13 @@ function clearSkip() {
 
 export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = null, isEvaluating = false }) {
   const blockedTitle = isEvaluating ? t('onboarding.cannotAddWhileRunning') : undefined;
+  // Both CTAs stay clickable while evaluating (aria-disabled, not disabled),
+  // so each handler has to swallow the click itself before clearing the skip.
+  const runAfterClearingSkip = (cb) => () => {
+    if (isEvaluating) return;
+    clearSkip();
+    cb();
+  };
   return (
     <section className="empty-state empty-state--with-tour">
       <TermHeader name="projects" sub={t('map.subNoProjects')} />
@@ -30,7 +37,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
         <button
           type="button"
           className={`${onBrowseRemote ? 'term-btn--secondary' : 'term-btn--primary'}${isEvaluating ? ' is-disabled' : ''}`}
-          onClick={() => { if (isEvaluating) return; clearSkip(); onAdd(); }}
+          onClick={runAfterClearingSkip(onAdd)}
           aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
@@ -39,7 +46,7 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
         <button
           type="button"
           className={`term-btn--secondary${isEvaluating ? ' is-disabled' : ''}`}
-          onClick={() => { if (isEvaluating) return; clearSkip(); onTour(); }}
+          onClick={runAfterClearingSkip(onTour)}
           aria-disabled={isEvaluating || undefined}
           title={blockedTitle}
         >
