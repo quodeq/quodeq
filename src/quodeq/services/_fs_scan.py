@@ -8,7 +8,7 @@ from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
 from quodeq.data.fs.project_files import write_scan_json
-from quodeq.data.git_cli import list_branches
+from quodeq.data.git_cli import list_branches, list_tracked_files
 
 _logger = logging.getLogger(__name__)
 
@@ -32,13 +32,24 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
 
     Returns a ScanData with file tree, languages, branches, and modules.
     If *output_dir* is provided, writes the result to ``scan.json`` there.
+
+    Inside a git work tree only tracked files are counted, the same set an
+    evaluation scores (``manifest_build``, #1207), so the numbers shown
+    before a run are the numbers the run measures. Files git does not track
+    are tallied in ``untracked_files`` instead of vanishing. Outside a work
+    tree, or when git cannot answer, every file counts as before.
     """
     project_dir = project_dir.resolve()
     file_tree: list[str] = []
     languages: dict[str, int] = {}
     code_file_count = 0
+    untracked_count = 0
+    tracked = list_tracked_files(project_dir, timeout=_GIT_TIMEOUT_S)
 
     for path in _walk_files(project_dir):
+        if tracked is not None and path not in tracked:
+            untracked_count += 1
+            continue
         # POSIX separators so the file_tree is consistent across platforms
         # (UI, scan.json consumers, and tests all assume "/").
         rel = path.relative_to(project_dir).as_posix()
@@ -61,6 +72,7 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
         scanned_at=scanned_at,
         total_files=len(file_tree),
         code_files=code_file_count,
+        untracked_files=untracked_count,
     )
 
     if output_dir is not None:
