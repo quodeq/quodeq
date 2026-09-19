@@ -463,8 +463,6 @@
   "evaluate.optionsHelpAria": "Evaluation options help",
   "evaluate.parentFolderAria": "Go to parent folder",
   "evaluate.pathAria": "Enter folder path",
-  "evaluate.pendingReport": "listed when the dimension finishes",
-  "evaluate.pendingReportCount": "{count} so far, listed when the dimension finishes",
   "evaluate.pathLabel": "Path:",
   "evaluate.pathPlaceholder": "Enter path and press Enter",
   "evaluate.pctAnalyzed": "{pct}% analyzed",

@@ -23,25 +23,6 @@ export function pct(taken, total) {
 }
 
 /**
- * Violations the agents have written to the evidence log so far, summed over
- * dimensions.
- *
- * This is NOT a substitute for the feed's findings, and callers must not mix
- * the two into one number (see #878). It is raw, unscored and unconsolidated,
- * where the feed reads each dimension's report, which is written only once
- * that dimension finishes. Its one job is to tell "this run has found
- * nothing" apart from "this run's findings are not readable yet" — a
- * distinction the feed cannot make on its own, and gets wrong for the whole
- * of a single-dimension run.
- *
- * @param {object|null|undefined} progress
- * @returns {number}
- */
-export function sumProgressViolations(progress) {
-  return (progress?.dimensions || []).reduce((n, d) => n + (d?.violations ?? 0), 0);
-}
-
-/**
  * Best estimate of a single-dim's file count: the largest queue total
  * observed among running/done dims. Falls back to `progress.projectFiles`
  * before any dim has started. Returns 0 if nothing is known.

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
-import { computeOverallProgress, sumProgressViolations } from './scanProgressTotals.js';
+import { computeOverallProgress } from './scanProgressTotals.js';
 import {
   buildJobStatCells, computeRate, buildEtaHint,
   buildDimensionCycle, sumSeverities, deriveScanMode,
@@ -39,9 +39,6 @@ function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal,
   return buildJobStatCells(job.status, {
     overallPct, takenFiles, totalFiles, elapsedS, liveCount, etaHint, suppressedCount,
     carriedCount: hiddenCarriedCount,
-    // Only consulted when liveCount is 0, to tell "found nothing" apart from
-    // "no dimension report on disk yet".
-    pendingCount: sumProgressViolations(progress),
     exitReason: job.exitReason,
     dimCycle: buildDimensionCycle(progress),
     sevCounts: sumSeverities(liveViolations),

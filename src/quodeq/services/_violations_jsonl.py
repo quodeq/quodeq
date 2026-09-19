@@ -76,7 +76,13 @@ def _parse_jsonl_findings(
     # tally -- see quodeq.services.suppression for the key shapes.
     matcher = SuppressionMatcher(
         dimension=dimension,
-        dismissed=frozenset(keys.dismissed or ()) if keys else frozenset(),
+        # Hand the DismissedKeys over whole. Wrapping it in frozenset() iterated
+        # it into a set of DismissedEntry objects, which is neither a
+        # DismissedKeys nor the legacy {(req, file, line)} form: as_dismissed_keys
+        # then tried to unpack each entry as a 3-tuple and raised TypeError. That
+        # made this whole live view 500 for any project with a dismissal, which
+        # is every project with a triage history.
+        dismissed=(keys.dismissed or frozenset()) if keys else frozenset(),
         deleted=frozenset(keys.deleted or ()) if keys else frozenset(),
         # Same table the quarantine check uses, so the delete key and the
         # scored report can never map a req ID to different principles.
