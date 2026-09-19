@@ -223,7 +223,10 @@ _JSON_OPENER_RE = re.compile(r"[\[{]")
 
 
 def _parse_findings(
-    raw_json: str, *, drop_reasons: dict[str, int] | None = None,
+    raw_json: str,
+    *,
+    drop_reasons: dict[str, int] | None = None,
+    dropped_sink: list[dict] | None = None,
 ) -> tuple[list[dict], int]:
     """Parse findings from raw (possibly malformed) model output.
 
@@ -240,11 +243,13 @@ def _parse_findings(
     number of finding-shaped dicts that failed validation (for observability).
     Pass *drop_reasons* to also collect a ``field:error_type`` histogram naming
     which constraint rejected each one; the caller logs it, since this module
-    sits inside the SEP-06 no-logging boundary.
+    sits inside the SEP-06 no-logging boundary. Pass *dropped_sink* to also
+    receive the rejected dicts themselves, so the caller can attempt a repair
+    re-ask instead of only counting the loss.
     """
     decoder = json.JSONDecoder()
     findings: list[dict] = []
-    dropped: list[dict] = []
+    dropped: list[dict] = dropped_sink if dropped_sink is not None else []
     i = 0
     while (opener := _JSON_OPENER_RE.search(raw_json, i)) is not None:
         start = opener.start()

@@ -13,9 +13,8 @@ from http import HTTPStatus
 import httpx
 import openai
 
-from quodeq.analysis._api_schema import _SYSTEM_PROMPT, _parse_findings
-from quodeq.analysis._drop_stats import format_reasons as _format_drop_reasons
-from quodeq.analysis._drop_stats import record as _record_drop_stats
+from quodeq.analysis._api_response import _finish_call, _repair_snippetless
+from quodeq.analysis._api_schema import _SYSTEM_PROMPT
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.analysis_env import (
     api_read_timeout_override, context_size_override, max_output_tokens_override,
@@ -179,49 +178,6 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
     return create_kwargs, is_openai
 
 
-def _finish_call(
-    config: ApiRunnerConfig, finish_reason: str | None, text: str, start: float,
-) -> tuple[list[dict], bool]:
-    """Parse *text*, record drop stats and log the call's outcome.
-
-    Returns ``(findings, was_lossy)``. ``was_lossy`` is True when the
-    response was truncated by the output budget (``finish_reason ==
-    "length"``), so findings past the cut are lost. See ``_call_api`` for
-    the full lossy-vs-dropped contract.
-    """
-    drop_reasons: dict[str, int] = {}
-    findings, dropped = _parse_findings(text, drop_reasons=drop_reasons)
-    elapsed = time.monotonic() - start
-    # Feed the per-run aggregate so the dimension loops can report ONE
-    # drop-ratio signal at end of run instead of N scattered per-call lines.
-    _record_drop_stats(dropped=dropped, kept=len(findings), reasons=drop_reasons)
-
-    # A length-truncated response is an incomplete analysis: the model ran out of
-    # output budget mid-stream, so findings after the cut are simply gone. Treat
-    # it as lossy so run_api_analysis writes an 'error' marker and the file(s)
-    # re-dispatch next run, rather than caching a partial result as 'ok'.
-    truncated = finish_reason == "length"
-    if truncated:
-        _log.warning(
-            "Model %s response was truncated (finish_reason=length) after %.0fs; "
-            "kept %d finding(s) but the analysis is incomplete and will re-dispatch. "
-            "Reduce input size or raise the model context window.",
-            config.model, elapsed, len(findings),
-        )
-    if dropped:
-        _log.warning(
-            "Model %s: dropped %d malformed finding(s) of %d parsed in %.0fs "
-            "(kept %d) -- %s. The call succeeded; malformed findings were discarded.",
-            config.model, dropped, dropped + len(findings), elapsed, len(findings),
-            _format_drop_reasons(drop_reasons),
-        )
-    _log.debug(
-        "Model %s returned %d valid findings in %.0fs (raw bytes: %d)",
-        config.model, len(findings), elapsed, len(text),
-    )
-    return findings, truncated
-
-
 def _handle_call_exception(exc: Exception, config: ApiRunnerConfig, start: float) -> None:
     """React to an exception from ``chat.completions.create``.
 
@@ -264,8 +220,10 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     "length"``), so findings past the cut are lost. A response where only
     some findings were malformed returns ``(good_findings, False)`` -- the
     call succeeded end-to-end. Dropped malformed findings are logged (count)
-    but do not set ``was_lossy``. See ``run_api_analysis`` for the marker
-    contract.
+    but do not set ``was_lossy``. Findings dropped only for a missing
+    ``snippet`` get one repair re-ask (see ``_repair_snippetless``) before
+    they count as dropped; QUODEQ_DISABLE_FINDING_REPAIR turns that off.
+    See ``run_api_analysis`` for the marker contract.
 
     The OpenAI client owns an httpx connection pool whose sockets count
     against the process FD limit; the ``with`` block closes it so a long
@@ -292,7 +250,10 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
             _handle_call_exception(exc, config, start)
             return [], True
 
-    choice = response.choices[0] if response.choices else None
-    finish_reason = getattr(choice, "finish_reason", None)
-    text = (choice.message.content or "") if choice else ""
-    return _finish_call(config, finish_reason, text, start)
+        choice = response.choices[0] if response.choices else None
+        finish_reason = getattr(choice, "finish_reason", None)
+        text = (choice.message.content or "") if choice else ""
+        # Finishing inside the with block keeps the client open for the
+        # snippet repair re-ask _finish_call may make through this partial.
+        reask = functools.partial(_repair_snippetless, client, create_kwargs, config.model)
+        return _finish_call(config.model, finish_reason, text, start, reask=reask)
