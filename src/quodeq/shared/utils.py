@@ -19,10 +19,11 @@ Categories of re-exported utilities
 4. **Platform detection** -- ``IS_WIN32``
 5. **Repository URL helpers** -- ``is_repo_url``, ``project_name_from_repo``
    (from ``_repo.py``)
-6. **Environment accessors** -- ``get_ai_provider``, ``get_dashboard_port``,
-   ``get_evaluations_dir``, ``get_anthropic_api_key``, etc.
-   (from ``_env.py``)
-7. **Diff display** -- ``show_diff`` (from ``_diff.py``)
+6. **Environment accessors** -- ``get_ai_cmd``, ``get_evaluations_dir``,
+   ``get_anthropic_api_key``, etc. (from ``_env.py``)
+
+Accessors with a single caller are NOT re-exported here: that caller
+imports them from their owning module directly.
 """
 from __future__ import annotations
 
@@ -59,18 +60,12 @@ from quodeq.shared._repo import is_repo_url, project_name_from_repo
 # ---------------------------------------------------------------------------
 
 from quodeq.shared._env import (
-    get_ai_provider, get_ai_cmd, get_ai_model, get_ai_cmd_path, _env_int,
+    get_ai_cmd, get_ai_model, get_ai_cmd_path, _env_int,
     get_action_api_port, get_action_api_host,
-    get_dashboard_port, get_static_dist, get_evaluations_dir,
-    get_anthropic_api_key, get_asvs_url,
+    get_static_dist, get_evaluations_dir,
+    get_anthropic_api_key,
     get_github_search_url, get_github_raw_base_url, get_findings_file,
 )
-
-# ---------------------------------------------------------------------------
-# Re-exports — Diff display
-# ---------------------------------------------------------------------------
-
-from quodeq.shared._diff import show_diff
 
 
 def __getattr__(name: str) -> str:
@@ -91,11 +86,9 @@ __all__ = [
     # Repo URL helpers
     "is_repo_url", "project_name_from_repo",
     # Environment accessors
-    "get_ai_provider", "get_ai_cmd", "get_ai_model", "get_ai_cmd_path", "_env_int",
+    "get_ai_cmd", "get_ai_model", "get_ai_cmd_path", "_env_int",
     "get_action_api_port", "get_action_api_host",
-    "get_dashboard_port", "get_static_dist", "get_evaluations_dir",
-    "get_anthropic_api_key", "get_asvs_url",
+    "get_static_dist", "get_evaluations_dir",
+    "get_anthropic_api_key",
     "get_github_search_url", "get_github_raw_base_url", "get_findings_file",
-    # Diff
-    "show_diff",
 ]

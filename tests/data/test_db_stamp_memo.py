@@ -44,3 +44,76 @@ def test_db_stamp_reflects_size_and_mtime(tmp_path):
     second = db_stamp(db)
     assert first is not None and second is not None
     assert first != second
+
+
+class TestMemoizedByDbStamp:
+    """memoized_by_db_stamp reuses a result while the db is unchanged."""
+
+    @staticmethod
+    def _cache():
+        from quodeq.data.sqlite._db_stamp_memo import _StampCache
+        return _StampCache()
+
+    def test_second_call_reuses_the_first_result(self, tmp_path):
+        from quodeq.data.sqlite._db_stamp_memo import memoized_by_db_stamp
+
+        db = tmp_path / "evaluation.db"
+        db.write_bytes(b"x")
+        cache = self._cache()
+        calls = []
+
+        def compute():
+            calls.append(1)
+            return {"n": len(calls)}
+
+        assert memoized_by_db_stamp(db, compute, cache=cache) == {"n": 1}
+        assert memoized_by_db_stamp(db, compute, cache=cache) == {"n": 1}
+        assert len(calls) == 1
+
+    def test_missing_db_returns_none_without_computing(self, tmp_path):
+        from quodeq.data.sqlite._db_stamp_memo import memoized_by_db_stamp
+
+        calls = []
+        result = memoized_by_db_stamp(
+            tmp_path / "absent.db", lambda: calls.append(1), cache=self._cache())
+        assert result is None
+        assert calls == []
+
+    def test_none_result_is_not_memoized(self, tmp_path):
+        from quodeq.data.sqlite._db_stamp_memo import memoized_by_db_stamp
+
+        db = tmp_path / "evaluation.db"
+        db.write_bytes(b"x")
+        cache = self._cache()
+        calls = []
+
+        def compute():
+            calls.append(1)
+            return None if len(calls) == 1 else "ok"
+
+        assert memoized_by_db_stamp(db, compute, cache=cache) is None
+        assert memoized_by_db_stamp(db, compute, cache=cache) == "ok"
+
+    def test_injected_cache_does_not_reach_the_default(self, tmp_path):
+        from quodeq.data.sqlite._db_stamp_memo import _DEFAULT_CACHE, db_stamp, memoized_by_db_stamp
+
+        db = tmp_path / "evaluation.db"
+        db.write_bytes(b"x")
+        memoized_by_db_stamp(db, lambda: "isolated", cache=self._cache())
+        assert _DEFAULT_CACHE.get(str(db), db_stamp(db)) is None
+
+    def test_clear_drops_the_memo(self, tmp_path):
+        from quodeq.data.sqlite._db_stamp_memo import memoized_by_db_stamp
+
+        db = tmp_path / "evaluation.db"
+        db.write_bytes(b"x")
+        cache = self._cache()
+        calls = []
+
+        def compute():
+            calls.append(1)
+            return len(calls)
+
+        assert memoized_by_db_stamp(db, compute, cache=cache) == 1
+        cache.clear()
+        assert memoized_by_db_stamp(db, compute, cache=cache) == 2

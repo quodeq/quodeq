@@ -159,3 +159,25 @@ def test_poll_logs_when_update_status_check_fails(monkeypatch, caplog) -> None:
     with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
         app._poll(None)
     assert "update availability check failed" in caplog.text
+
+
+def test_set_ui_state_running_enables_open_and_stop_only() -> None:
+    _, _, app = _make_app()
+    app._set_ui_state(running=True)
+    assert app._open_item.callback == app._on_open
+    assert app._start_item.callback is None
+    assert app._stop_item.callback == app._on_stop
+    app._open_item._menuitem.setEnabled_.assert_called_with(True)
+    app._start_item._menuitem.setEnabled_.assert_called_with(False)
+    app._stop_item._menuitem.setEnabled_.assert_called_with(True)
+
+
+def test_set_ui_state_stopped_enables_start_only() -> None:
+    _, _, app = _make_app()
+    app._set_ui_state(running=False)
+    assert app._open_item.callback is None
+    assert app._start_item.callback == app._on_start
+    assert app._stop_item.callback is None
+    app._open_item._menuitem.setEnabled_.assert_called_with(False)
+    app._start_item._menuitem.setEnabled_.assert_called_with(True)
+    app._stop_item._menuitem.setEnabled_.assert_called_with(False)

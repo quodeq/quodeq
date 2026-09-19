@@ -3,17 +3,18 @@ import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboard
 
 /**
  * Build the `navigation` prop bundle ROUTE_RENDERERS consume. Every
- * navigation key a route renderer reads MUST be forwarded here -- a route
+ * navigation key a route renderer reads MUST be forwarded -- a route
  * consuming a key the bundle lacks fails silently at click time (the
  * handler throws mid-event and the UI just doesn't respond; that's how the
  * repositories local/online tab flip broke when handleNavigateReplace was
- * consumed but never forwarded). Exported so producer and consumer can be
- * pinned together in tests without mounting the whole App.
+ * consumed but never forwarded). The bundle therefore spreads `state`
+ * wholesale rather than re-listing its fields, so a new state field reaches
+ * routes without an edit here. Only the caller-owned and derived fields are
+ * listed, and they are listed AFTER the spread so they win over a state key
+ * of the same name.
  *
- * Moved out of routes/renderers.jsx verbatim (move-only refactor); the
- * inline onAddProject/onImportProject/onTakeTour/onResumeSetup callbacks
- * became the named `make*` factories below for readability -- same logic,
- * same closures.
+ * Exported so producer and consumer can be pinned together in tests without
+ * mounting the whole App.
  */
 
 function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }) {
@@ -62,20 +63,8 @@ function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
 
 export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
   return {
-    selectedProject: state.selectedProject, selectedSource: state.selectedSource, selectedRun: state.selectedRun, projects: state.projects,
-    projectsLoaded: state.projectsLoaded,
-    projectsLoadFailed: state.projectsLoadFailed,
-    retryLoadProjects: state.retryLoadProjects,
-    loadProjects: state.loadProjects,
-    handleNavigate: state.handleNavigate, handleNavigateReplace: state.handleNavigateReplace, navPop: state.navPop, handleRunSelect: state.handleRunSelect,
-    // navStack + navGoTo let a route unwind history to an earlier entry of
-    // its own page (the map's drill-up) instead of pushing a duplicate.
-    navStack: state.navStack, navGoTo: state.navGoTo,
-    handleProjectChange: state.handleProjectChange, navTab, navStackLength,
-    handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject, handleImportProject: state.handleImportProject,
-    historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
-    currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
-    prefetchHandlers: state.prefetchHandlers,
+    ...state,
+    navTab, navStackLength,
     onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects: state.projects }),
     onImportProject: makeOnImportProject({ isEvaluating, showToast, handleImportProject: state.handleImportProject }),
     onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry }),

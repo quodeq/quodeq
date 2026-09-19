@@ -4,6 +4,7 @@ import { registerProject } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
+import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../constants.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -26,7 +27,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
     try {
       const result = await registerProject({ repo: repoUrl, cloneDest, ephemeral });
       if (cloneDest) {
-        writeString('quodeq.lastCloneRoot', cloneDest);
+        writeString(LAST_CLONE_ROOT_STORAGE_KEY, cloneDest);
       }
       onComplete?.(result);
     } catch (err) {

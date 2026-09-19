@@ -43,7 +43,13 @@ def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = N
 
 
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
-    """Read an environment variable as an int, returning *default* if unset or invalid."""
+    """Read an environment variable as an int, returning *default* if unset or invalid.
+
+    The CLI variant: *default* may be None (an unset flag stays unset) and the
+    caller, not this function, decides what an absent value means. Distinct from
+    ``quodeq.shared._env.env_int``, which always returns an int and warns on a
+    malformed value. Re-exported as ``cli_env_int``.
+    """
     raw = (env or os.environ).get(var)
     if raw is None:
         return default
@@ -61,3 +67,16 @@ def _subagent_model(env: dict[str, str] | None = None) -> str | None:
 def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
+
+
+# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
+# originals stay importable from here for in-package callers.
+# ``_env_int`` is spelled ``cli_env_int``: it is NOT
+# ``quodeq.shared._env.env_int``, which takes a non-optional default, a
+# keyword-only ``env``, and always returns an int.
+ENV_MAX_TURNS = _ENV_MAX_TURNS
+ENV_MAX_DURATION = _ENV_MAX_DURATION
+ENV_POOL_BUDGET = _ENV_POOL_BUDGET
+cli_env_int = _env_int
+no_verify = _no_verify
+subagent_model = _subagent_model

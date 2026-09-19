@@ -58,15 +58,28 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
     return jsonify({"status": "imported"}), 201
 
 
+def _validate_import_body(body):
+    """Split an import request body into (data, force, error_response).
+
+    *body* is whatever ``_json_object_or_error`` returned, so a non-dict is
+    already that helper's error response and is passed straight back.
+    """
+    if not isinstance(body, dict):
+        return None, None, body
+    data = body.get("data")
+    if not data or not isinstance(data, dict):
+        return None, None, error_response(
+            "'data' field is required and must be an object",
+            HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST,
+        )
+    return data, body.get("force", False), None
+
+
 def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     svc = get_service(app)
-    payload = _json_object_or_error()
-    if not isinstance(payload, dict):
-        return payload
-    data = payload.get("data")
-    if not data or not isinstance(data, dict):
-        return error_response("'data' field is required and must be an object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
-    force = payload.get("force", False)
+    data, force, err = _validate_import_body(_json_object_or_error())
+    if err is not None:
+        return err
     imported_id = data.get("id", "<unknown>")
     logger.info("standards.import id=%s", _sanitize_for_log(str(imported_id)))
     try:

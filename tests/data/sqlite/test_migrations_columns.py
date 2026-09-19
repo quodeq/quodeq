@@ -268,3 +268,28 @@ def test_upgrade_v8_to_v9_idempotent_when_column_already_present():
     conn.execute("PRAGMA user_version = 8")
     apply_evaluation_schema(conn)
     assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+
+
+# Very old (v1/v2) DBs never created `findings`; every additive upgrade skips
+# rather than raising "no such table" and bricking the run.
+def test_additive_upgrades_skip_a_db_without_findings():
+    from quodeq.data.sqlite import _migrations_additive as additive
+
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE runs (id INTEGER PRIMARY KEY)")
+    for upgrade in (additive._upgrade_v5_to_v6, additive._upgrade_v6_to_v7,
+                    additive._upgrade_v7_to_v8, additive._upgrade_v8_to_v9):
+        upgrade(conn)  # must not raise
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert tables == {"runs"}
+    conn.close()
+
+
+def test_table_exists_reports_presence():
+    from quodeq.data.sqlite._migrations_additive import _table_exists
+
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE findings (id INTEGER PRIMARY KEY)")
+    assert _table_exists(conn, "findings") is True
+    assert _table_exists(conn, "absent") is False
+    conn.close()

@@ -81,12 +81,10 @@ def _compute_result(
     return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config, params)
 
 
-def _build_accumulated_for_runs(
+def _load_run_dimensions(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> _AccumulatedResult:
-    """Read run data and assemble the accumulated result for *run_infos*."""
+) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
     _cache, _lock, _max = _resolve_cache(cache_config)
     ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, ctx)
@@ -99,12 +97,28 @@ def _build_accumulated_for_runs(
     get_run_slim = make_slim_run_fetcher(
         reports_root, project, walk_cache, walk_lock, walk_max,
     )
-    latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
+    return _read_all_run_data(
         reports_root, project, run_infos, get_run_data, get_run_slim=get_run_slim,
     )
-    project_dir = reports_root / project
+
+
+def _suppress_run_dimensions(
+    latest_by_dim: dict[str, DimensionResult], project_dir: Path,
+) -> list[DimensionResult]:
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)
-    all_dims = filter_deleted_from_dimensions(all_dims, project_dir)
+    return filter_deleted_from_dimensions(all_dims, project_dir)
+
+
+def _build_accumulated_for_runs(
+    reports_root: Path, project: str, run_infos: list[RunInfo],
+    cache_config: AccumulatedCacheConfig | None,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> _AccumulatedResult:
+    """Read run data and assemble the accumulated result for *run_infos*."""
+    latest_by_dim, prev_occurrence, prev_run_latest = _load_run_dimensions(
+        reports_root, project, run_infos, cache_config,
+    )
+    all_dims = _suppress_run_dimensions(latest_by_dim, reports_root / project)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
     severity = _aggregate_severity_counts(all_dims)
     avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest, params)

@@ -169,12 +169,23 @@ class TestIncrementalProgressReader:
         # Processing raises, but the offset must still advance past the bytes
         # already consumed, so the next read never re-processes them.
         reader.read_progress()
-        assert reader._stream_offset == len(content.encode("utf-8"))
         assert calls["count"] == 1
 
         monkeypatch.setattr(pr_module, "parse_stream_event", original_parse)
-        progress = reader.read_progress()
-        assert progress["files_read"] == 0
+        # the consumed bytes are gone for good: /a.py is never counted
+        assert reader.read_progress()["files_read"] == 0
+
+        # ...and the offset stopped exactly at EOF, not short of it and not
+        # past it, so an event appended afterwards is picked up in full.
+        appended = {
+            "type": "assistant",
+            "message": {"content": [
+                {"type": "tool_use", "name": "Read", "input": {"file_path": "/b.py"}},
+            ]}
+        }
+        with stream_file.open("ab") as fh:
+            fh.write((json.dumps(appended) + "\n").encode("utf-8"))
+        assert reader.read_progress()["files_read"] == 1
 
     def test_stream_multichunk_error_loses_only_first_chunk(self, tmp_path, monkeypatch):
         from quodeq.analysis.stream import progress_reader as pr_module
@@ -188,7 +199,10 @@ class TestIncrementalProgressReader:
             }
             return json.dumps(event)
 
-        filler_block = (event_line("/filler.py") + "\n") * 800
+        # The head line names a file nothing else does, so its absence from
+        # the counts below is what proves the errored chunk was skipped.
+        head_line = event_line("/chunk_head.py") + "\n"
+        filler_block = head_line + (event_line("/filler.py") + "\n") * 800
         sentinel_line = event_line("/tail_sentinel.py") + "\n"
         content = filler_block + sentinel_line
         filler_bytes = len(filler_block.encode("utf-8"))
@@ -209,13 +223,15 @@ class TestIncrementalProgressReader:
 
         monkeypatch.setattr(pr_module, "parse_stream_event", boom)
 
-        # Raises on the very first filler line, well inside the first chunk.
+        # Raises on the very first line, well inside the first chunk.
         reader.read_progress()
-        assert reader._stream_offset == 1 << 16
         assert calls["count"] == 1
 
         monkeypatch.setattr(pr_module, "parse_stream_event", original_parse)
-        reader.read_progress()
         # The second chunk was never eagerly consumed by the error, so a
-        # follow-up read still finds and processes the sentinel line in it.
-        assert "/tail_sentinel.py" in reader._seen_files
+        # follow-up read still finds and processes the sentinel line in it,
+        # plus the filler lines past the first chunk's boundary -- but not
+        # /chunk_head.py, which the errored chunk swallowed. Two distinct
+        # files, therefore: three would mean the offset never advanced,
+        # zero that it ran past the unread chunk.
+        assert reader.read_progress()["files_read"] == 2

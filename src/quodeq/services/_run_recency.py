@@ -18,12 +18,37 @@ from pathlib import Path
 from quodeq.services._wiring import file_mtime, read_run_status_json
 
 _STARTED_AT_MEMO_MAX = 4096
-_started_at_memo: dict[Path, str] = {}
 
 
-def run_started_at(run_dir: Path) -> str | None:
+class _RecencyCache:
+    """Bounded per-run-dir memo of ``started_at``, with an explicit reset."""
+
+    def __init__(self, max_entries: int = _STARTED_AT_MEMO_MAX) -> None:
+        self._entries: dict[Path, str] = {}
+        self._max_entries = max_entries
+
+    def get(self, run_dir: Path) -> str | None:
+        """The remembered ``started_at`` for *run_dir*, or None."""
+        return self._entries.get(run_dir)
+
+    def set(self, run_dir: Path, started: str) -> None:
+        """Remember *started* for *run_dir*, clearing the memo when it is full."""
+        if len(self._entries) >= self._max_entries:
+            self._entries.clear()
+        self._entries[run_dir] = started
+
+    def reset(self) -> None:
+        """Forget every remembered value."""
+        self._entries.clear()
+
+
+_started_at_memo = _RecencyCache()
+
+
+def run_started_at(run_dir: Path, cache: _RecencyCache | None = None) -> str | None:
     """The run's ``started_at`` as status.json records it, remembered per run dir."""
-    started = _started_at_memo.get(run_dir)
+    memo = _started_at_memo if cache is None else cache
+    started = memo.get(run_dir)
     if started is not None:
         return started
     status = read_run_status_json(run_dir)
@@ -32,9 +57,8 @@ def run_started_at(run_dir: Path) -> str | None:
     started = status.get("started_at") if isinstance(status, dict) else None
     if not started:
         return None
-    if len(_started_at_memo) >= _STARTED_AT_MEMO_MAX:
-        _started_at_memo.clear()
-    _started_at_memo[run_dir] = started = str(started)
+    started = str(started)
+    memo.set(run_dir, started)
     return started
 
 

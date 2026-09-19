@@ -2,7 +2,7 @@
 
 Split out of enricher.py to keep it under the file-size ratchet. Semantic
 similarity is consulted only on an exact-tier miss (see
-``_apply_precedent_downweight``). The batch path -- ``precedent_scores``,
+``apply_precedent_downweight``). The batch path -- ``precedent_scores``,
 called from ``FindingEnricher.precedent_scores`` -- computes every eligible
 finding's score with one ``PrecedentCorpus.match_many`` call instead of one
 ``match`` call per finding (finding 5598).
@@ -23,7 +23,7 @@ _PRECEDENT_DOWNWEIGHT = 25
 
 # Sentinel distinguishing "the caller didn't supply a score" from an
 # explicit `None` (a batch score that came back empty).
-_UNSET: float | None = object()  # type: ignore[assignment]
+UNSET_SCORE: float | None = object()  # type: ignore[assignment]
 
 
 def _semantic_eligible(finding: dict[str, object]) -> bool:
@@ -65,11 +65,11 @@ def _precedent_probe(
     return False, _precedent_text(req_s, snippet_s)
 
 
-def _apply_precedent_downweight(
+def apply_precedent_downweight(
     finding: dict[str, object],
     fingerprints: set[str] | None,
     corpus: PrecedentCorpus | None = None,
-    *, score: float | None = _UNSET, log: LogSink = NULL_LOG,
+    *, score: float | None = UNSET_SCORE, log: LogSink = NULL_LOG,
 ) -> str | None:
     """Drop confidence to ~25 when this finding matches a prior dismissal.
 
@@ -86,7 +86,7 @@ def _apply_precedent_downweight(
     tier: str | None = "exact" if matched else None
 
     if not matched and corpus is not None and text is not None:
-        if score is _UNSET:
+        if score is UNSET_SCORE:
             score = corpus.match(text)
         if score is not None and score >= corpus.threshold:
             matched = True

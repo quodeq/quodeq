@@ -20,6 +20,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
+import { runEventsUrl } from "../../../api/evaluations.js";
 import { createViolation } from "../../../models/violation.js";
 
 // Cap the per-job findings array so a long-running scan with tens of thousands
@@ -122,7 +123,7 @@ export function useRunEventStream(jobId) {
       queryClient.setQueryData(key, updater);
     };
 
-    const source = new EventSource(`/api/evaluations/${jobId}/events`);
+    const source = new EventSource(runEventsUrl(jobId));
     wireRunEventSource({ source, jobId, writeCache, queryClient });
 
     return () => source.close();

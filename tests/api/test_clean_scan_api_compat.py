@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.api import _evaluation_helpers as _eval_helpers_mod
-from quodeq.api._evaluation_helpers import _build_evaluation_options
+from quodeq.api._evaluation_options import _build_evaluation_options
 from quodeq.api.app import create_app
 from quodeq.services.base import ActionProvider
 

@@ -38,6 +38,9 @@ _logger = logging.getLogger(__name__)
 # waiting on a hung run. Overridable for ops via env var.
 _DEFAULT_GRACE_PERIOD_S = env_float("QUODEQ_CANCEL_GRACE_S", 30.0, minimum=0.0)
 _POLL_INTERVAL_S = 0.05
+# Settle window after SIGKILL, so a caller that reads status.json right
+# after cancel sees a finished state rather than a half-written one.
+_SETTLE_WAIT_S = 1.0
 # SIGKILL on POSIX; Windows has no SIGKILL but _kill_tree treats any signal as
 # "taskkill /F /T" -- the fallback to SIGTERM keeps the call valid.
 _FORCE_KILL_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
@@ -51,6 +54,16 @@ class ProcessControl:
     pid_alive: Callable[[int], bool] = is_pid_alive
 
 
+def _wait_for_exit(
+    control: ProcessControl, pid: int, timeout: float, interval: float = _POLL_INTERVAL_S,
+) -> bool:
+    """Poll until *pid* is gone or *timeout* elapses. True if it exited."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not control.pid_alive(pid):
+            return True
+        time.sleep(interval)
+    return False
 
 
 def resolve_external_run_project(
@@ -96,11 +109,8 @@ def cancel_external_run(
         return False
 
     control.kill_tree(pid, signal.SIGTERM)
-    deadline = time.monotonic() + grace
-    while time.monotonic() < deadline:
-        if not control.pid_alive(pid):
-            return True
-        time.sleep(_POLL_INTERVAL_S)
+    if _wait_for_exit(control, pid, grace):
+        return True
 
     _logger.warning(
         "SIGTERM grace window (%ss) expired for pid %s; escalating to SIGKILL",
@@ -108,9 +118,6 @@ def cancel_external_run(
     )
     control.kill_tree(pid, _FORCE_KILL_SIGNAL)
     # Brief wait so callers that immediately read status.json see a settled state.
-    final_deadline = time.monotonic() + 1.0
-    while time.monotonic() < final_deadline:
-        if not control.pid_alive(pid):
-            return True
-        time.sleep(_POLL_INTERVAL_S)
+    if _wait_for_exit(control, pid, _SETTLE_WAIT_S):
+        return True
     return not control.pid_alive(pid)

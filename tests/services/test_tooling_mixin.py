@@ -156,6 +156,12 @@ class TestGetClientModels:
         assert result == {"models": ["custom-model"]}
         custom_fetcher.assert_called_once_with("myapi")
 
+    def test_configure_model_fetchers_routes_claude_to_the_api_fetcher(self):
+        mixin = FsToolingMixin()
+        assert "claude" not in mixin._model_fetchers
+        mixin.configure_model_fetchers()
+        assert mixin._model_fetchers["claude"] == mixin._get_claude_models
+
     @patch("quodeq.services.tooling_mixin.get_allowed_client_ids", return_value=frozenset({"claude"}))
     @patch("shutil.which", return_value="/usr/bin/claude")
     @patch("subprocess.run")

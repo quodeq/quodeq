@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 
 from quodeq.services.tooling_mixin import FsToolingMixin
 
@@ -153,3 +154,81 @@ class TestBrowseRepo:
         mixin = FsToolingMixin()
         result = mixin.browse_repo(str(Path.home()), include_files=True)
         assert "files" in result
+
+
+@pytest.fixture
+def browse_tree(tmp_path: Path, monkeypatch) -> Path:
+    """A sample tree inside a redirected home.
+
+    ``_validate_browse_path`` jails browsing to ``Path.home()``, which resolves
+    ``$HOME`` at call time, so pointing HOME at tmp_path keeps the fixture out
+    of the developer's real home directory.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Path.home() reads USERPROFILE on Windows and HOME elsewhere.
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    assert Path.home() == tmp_path, "browse jail no longer follows the home env"
+    base = tmp_path / "workspace"
+    base.mkdir()
+    (base / "beta").mkdir()
+    (base / "alpha").mkdir()
+    (base / "alpha" / ".git").mkdir()
+    (base / ".hidden_dir").mkdir()
+    (base / "z.py").write_text("pass")
+    (base / "a.py").write_text("pass")
+    (base / ".env").write_text("SECRET")
+    return base
+
+
+class TestBrowseRepoUsesTheListingHelpers:
+    """browse_repo must not keep its own copy of the listing rules: it feeds
+    one directory read to _list_directories/_list_files."""
+
+    def test_matches_the_helpers_exactly(self, browse_tree: Path):
+        result = FsToolingMixin().browse_repo(str(browse_tree), include_files=True)
+
+        assert result["directories"] == FsToolingMixin._list_directories(browse_tree)
+        assert result["files"] == FsToolingMixin._list_files(browse_tree)
+        assert [d["name"] for d in result["directories"]] == ["alpha", "beta"]
+        assert [f["name"] for f in result["files"]] == ["a.py", "z.py"]
+
+    def test_omits_files_unless_asked(self, browse_tree: Path):
+        assert "files" not in FsToolingMixin().browse_repo(str(browse_tree))
+
+    def test_reads_the_directory_once(self, browse_tree: Path, monkeypatch):
+        """The single-pass traversal is the point of browse_repo; sharing the
+        helpers must not cost a second scandir."""
+        import quodeq.services.tooling_mixin as tooling_mixin
+
+        calls = []
+        real = tooling_mixin.safe_read_dir
+        monkeypatch.setattr(
+            tooling_mixin, "safe_read_dir",
+            lambda path: (calls.append(path), real(path))[1],
+        )
+
+        FsToolingMixin().browse_repo(str(browse_tree), include_files=True)
+
+        assert calls.count(browse_tree) == 1
+
+
+class TestListingHelpersAcceptPreReadEntries:
+    def test_list_directories_uses_supplied_entries(self, tmp_path: Path):
+        import os
+        (tmp_path / "keep").mkdir()
+        (tmp_path / "drop").mkdir()
+        entries = [e for e in os.scandir(tmp_path) if e.name == "keep"]
+
+        dirs = FsToolingMixin._list_directories(tmp_path, entries)
+
+        assert [d["name"] for d in dirs] == ["keep"]
+
+    def test_list_files_uses_supplied_entries(self, tmp_path: Path):
+        import os
+        (tmp_path / "keep.py").write_text("pass")
+        (tmp_path / "drop.py").write_text("pass")
+        entries = [e for e in os.scandir(tmp_path) if e.name == "keep.py"]
+
+        files = FsToolingMixin._list_files(tmp_path, entries)
+
+        assert [f["name"] for f in files] == ["keep.py"]

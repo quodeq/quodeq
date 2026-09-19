@@ -10,14 +10,13 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable
 
-from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._cli_command import (
     McpConfigRef, TurnArgvRequest, build_turn_argv)
 from quodeq.assistant.adapters._cli_cleanup import TurnResources, release_turn_resources
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
-from quodeq.assistant.adapters._linereader import iter_lines
+from quodeq.assistant.adapters._cli_events import consume_stream_events
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.mcp import _config as mcp_config
 from quodeq.data.ports.assistant import AssistantStore
@@ -26,10 +25,6 @@ from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
 _logger = logging.getLogger(__name__)
 
 TURN_TIMEOUT_S = 300
-_BENIGN_RAW_LINES = (
-    "Reading additional input from stdin",
-    "WARNING: proceeding, even though we could not create PATH aliases",
-)
 
 
 @dataclass(frozen=True)
@@ -67,15 +62,6 @@ def _full_transcript(messages: list[dict]) -> str:
     return "\n\n".join(f"[{m['role']}]\n{m['content']}" for m in messages)
 
 
-def _raw_error_line(line: str) -> str | None:
-    text = line.strip()
-    if not text:
-        return None
-    if any(text.startswith(prefix) for prefix in _BENIGN_RAW_LINES):
-        return None
-    return text
-
-
 def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     """Wire the MCP server into the CLI invocation, per provider style.
 
@@ -94,56 +80,6 @@ def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     mcp_config.register_cli_mcp(cli_cfg.cmd, cfg.mcp_server_args,
                                 separator=cli_cfg.mcp_add_separator)
     return McpConfigRef(None, None)
-
-
-def _consume_stream_events(stdout, emit: Callable[[dict], None], parsed_sid: str | None):
-    """Drain the CLI's event stream, emitting token/tool_call frames as they
-    arrive. Returns the raw pieces ``_finalize_turn_result`` assembles.
-    """
-    texts, errors, raw_errors = [], [], []
-    last_full = None  # text of the last complete message, emitted or not
-    partial_buf = ""  # delta text streamed since the last complete message
-    saw_result = False
-    for line in iter_lines(stdout):
-        event = _stream.parse_line(line)
-        if event is None:
-            raw = _raw_error_line(line)
-            if raw:
-                raw_errors.append(raw)
-            continue
-        etype = event.get("type")
-        if etype == "result" and "exitCode" not in event:
-            saw_result = True
-        err = _stream.error_message(event)
-        if err:
-            errors.append(err)
-        delta = _stream.partial_text(event)
-        if delta:
-            partial_buf += delta
-            emit({"type": "token", "text": delta})
-        event_texts = _stream.assistant_text(event)
-        if event_texts:
-            texts.extend(event_texts)
-            # complete events echo text the drawer already shows (an
-            # `assistant`/`result` message repeats streamed deltas). Gate on
-            # content, not presence, so a differing echo still emits.
-            joined = "".join(event_texts)
-            is_echo = (joined == partial_buf
-                       or (etype == "result" and joined == last_full))
-            if not is_echo:
-                for t in event_texts:
-                    emit({"type": "token", "text": t})
-            last_full = joined
-            partial_buf = ""
-        for tu in _stream.tool_use_details(event):
-            frame = {"type": "tool_call", "name": tu["name"]}
-            if tu["args_summary"]:
-                frame["argsSummary"] = tu["args_summary"]
-            emit(frame)
-        sid = _stream.session_id(event)
-        if sid:
-            parsed_sid = sid
-    return texts, errors, raw_errors, parsed_sid, partial_buf, saw_result
 
 
 def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession):
@@ -175,7 +111,7 @@ def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession
     # EOFs stdout below and lets the turn unwind (runs immediately if the
     # stop already landed).
     session.cancel.register_kill(lambda: _kill_proc_tree(proc))
-    stream_result = _consume_stream_events(proc.stdout, session.emit, spec.session_id)
+    stream_result = consume_stream_events(proc.stdout, session.emit, spec.session_id)
     return cwd, proc, timer, sandbox_cleanup, stream_result
 
 

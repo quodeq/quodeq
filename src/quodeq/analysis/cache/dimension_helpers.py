@@ -75,7 +75,7 @@ class CacheEntryTarget:
     content_stamp: tuple[int, int] | None = None
 
 
-def _group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
+def group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set[str]]:
     """Read a JSONL of findings + markers and return (grouped_findings, ok_files).
 
     One-shot form of ``DispatchJsonlState`` for callers that read a finished

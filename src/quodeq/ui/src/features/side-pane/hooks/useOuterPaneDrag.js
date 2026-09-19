@@ -1,68 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampSidePaneWidth } from '../paneWidthMath.js';
-
-/**
- * SidePane.jsx's outer pane (left-edge) drag — resizes the whole dock width
- * — plus the shared drag plumbing (the container ref the inner divider drag
- * also reaches into, the data-pane-resizing flag setter, and the
- * active-drag cleanup ref both drags register into so unmount always runs
- * whichever cleanup is live). Extracted verbatim from SidePane.jsx; the
- * pointer-down body was split into the two helpers below purely to fit the
- * size ratchet's per-function line cap — same logic, same closures.
- *
- * pointermove can fire 100+ times/sec on a 120Hz trackpad. Coalesce
- * multiple events into one CSS-var write per frame via rAF — same pattern
- * the inner divider uses for its flex writes.
- */
-function beginOuterDragUI({ setResizingFlag, setIsDragging }) {
-  setIsDragging(true);
-  setResizingFlag(true);
-  const prevCursor = document.body.style.cursor;
-  const prevSelect = document.body.style.userSelect;
-  document.body.style.cursor = 'col-resize';
-  document.body.style.userSelect = 'none';
-  return { prevCursor, prevSelect };
-}
-
-function makeOuterDragHandlers({
-  startX, startWidth, viewport, prevCursor, prevSelect, setResizingFlag, setIsDragging, setPaneWidth, activeDragCleanupRef,
-}) {
-  let pendingNext = startWidth;
-  let rafId = null;
-  const apply = () => {
-    rafId = null;
-    document.documentElement.style.setProperty('--side-pane-width', `${pendingNext}px`);
-  };
-  const onMove = (ev) => {
-    const delta = startX - ev.clientX;
-    pendingNext = clampSidePaneWidth(startWidth + delta, viewport);
-    if (rafId == null) rafId = requestAnimationFrame(apply);
-  };
-  const cleanup = () => {
-    if (rafId != null) cancelAnimationFrame(rafId);
-    setResizingFlag(false);
-    document.body.style.cursor = prevCursor;
-    document.body.style.userSelect = prevSelect;
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', onUp);
-    activeDragCleanupRef.current = null;
-  };
-  const onUp = (ev) => {
-    const delta = startX - ev.clientX;
-    const finalWidth = clampSidePaneWidth(startWidth + delta, window.innerWidth);
-    // Write final value to the var immediately so the column doesn't
-    // jump on the next React commit; setPaneWidth then persists state.
-    document.documentElement.style.setProperty('--side-pane-width', `${finalWidth}px`);
-    setPaneWidth(finalWidth);
-    setIsDragging(false);
-    cleanup();
-  };
-  return { onMove, onUp, cleanup };
-}
+import { useDragLifecycle } from './useDragLifecycle.js';
 
 /**
  * Drag-to-resize for the side pane's outer edge, writing the width to the
  * `--side-pane-width` custom property as the pointer moves.
+ *
+ * Also owns the plumbing the inner divider drag shares: the container ref it
+ * reaches into, the `data-pane-resizing` flag setter, and the active-drag
+ * cleanup ref both drags register into so unmount always runs whichever
+ * cleanup is live.
  *
  * While a drag is live it sets `data-pane-resizing` on the document root,
  * which CSS uses to suppress the column-width transition — without it the
@@ -92,20 +39,36 @@ export function useOuterPaneDrag({ paneWidth, setPaneWidth }) {
     return () => { activeDragCleanupRef.current?.(); };
   }, []);
 
+  const beginDrag = useDragLifecycle({ setResizingFlag, activeDragCleanupRef });
+
   const [isDragging, setIsDragging] = useState(false);
   const onOuterDividerPointerDown = useCallback((e) => {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = paneWidth;
     const viewport = window.innerWidth;
-    const { prevCursor, prevSelect } = beginOuterDragUI({ setResizingFlag, setIsDragging });
-    const { onMove, onUp, cleanup } = makeOuterDragHandlers({
-      startX, startWidth, viewport, prevCursor, prevSelect, setResizingFlag, setIsDragging, setPaneWidth, activeDragCleanupRef,
+
+    let pendingNext = startWidth;
+    const apply = () => {
+      document.documentElement.style.setProperty('--side-pane-width', `${pendingNext}px`);
+    };
+    setIsDragging(true);
+    beginDrag({
+      cursor: 'col-resize',
+      onMove: (ev) => {
+        pendingNext = clampSidePaneWidth(startWidth + (startX - ev.clientX), viewport);
+      },
+      onFrame: apply,
+      onEnd: (ev) => {
+        const finalWidth = clampSidePaneWidth(startWidth + (startX - ev.clientX), window.innerWidth);
+        // Write final value to the var immediately so the column doesn't
+        // jump on the next React commit; setPaneWidth then persists state.
+        document.documentElement.style.setProperty('--side-pane-width', `${finalWidth}px`);
+        setPaneWidth(finalWidth);
+        setIsDragging(false);
+      },
     });
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    activeDragCleanupRef.current = cleanup;
-  }, [paneWidth, setPaneWidth, setResizingFlag]);
+  }, [paneWidth, setPaneWidth, beginDrag]);
 
   return { containerRef, setResizingFlag, activeDragCleanupRef, isDragging, onOuterDividerPointerDown };
 }

@@ -7,6 +7,12 @@ from __future__ import annotations
 import sqlite3
 
 
+def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone() is not None
+
+
 def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     """Add the provenance_downgrade column to findings (default 0, issue #656).
 
@@ -25,10 +31,7 @@ def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     -- a plain OperationalError the scoring/dashboard read seams don't catch,
     permanently bricking the run. Skip if the column already exists.
     """
-    has_findings = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
-    ).fetchone() is not None
-    if not has_findings:
+    if not _table_exists(conn, "findings"):
         return
     columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
     if "provenance_downgrade" not in columns:
@@ -59,10 +62,7 @@ def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
     -- a plain OperationalError the scoring/dashboard read seams don't catch,
     permanently bricking the run. Skip if the column already exists.
     """
-    has_findings = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
-    ).fetchone() is not None
-    if not has_findings:
+    if not _table_exists(conn, "findings"):
         return
     columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
     if "scope_downgrade_json" not in columns:
@@ -81,10 +81,7 @@ def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     re-run safe if a crash landed the CREATE INDEX but not the later
     user_version bump (same idempotency shape as the other upgrades here).
     """
-    has_findings = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
-    ).fetchone() is not None
-    if not has_findings:
+    if not _table_exists(conn, "findings"):
         return
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_findings_req_file_line "
@@ -101,10 +98,7 @@ def _upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
     already present: the ALTER and the user_version bump commit separately,
     so a crash between them must not brick the run on re-run.
     """
-    has_findings = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
-    ).fetchone() is not None
-    if not has_findings:
+    if not _table_exists(conn, "findings"):
         return
     columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
     if "violation_type_raw" not in columns:

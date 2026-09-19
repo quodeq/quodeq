@@ -21,8 +21,7 @@ from typing import Callable
 from flask import Flask, current_app
 
 from quodeq.assistant import AssistantRepository, AssistantStore
-from quodeq.assistant.tools import ToolContext, default_findings_repo_factory
-from quodeq.assistant.tools._actions import ActionContext
+from quodeq.assistant.tools import ActionContext, ToolContext, default_findings_repo_factory
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
 from quodeq.services.shared_repo import (

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
+import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+import { computeSummaryFromDimensions } from '../../../utils/visibleStandardsSummary.js';
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { useDismissedFindings } from '../components/useDismissedFindings.js';
 

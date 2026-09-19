@@ -23,6 +23,12 @@ from quodeq.services.import_validator import (
 _CUSTOM_DEFAULTS = {"type": _TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
 
 
+def _write_and_load_detail(store: StandardsStore, path: Path, payload: dict) -> StandardDetail:
+    """Persist *payload* at *path* and build the detail from what the store reads back."""
+    store.write(path, payload)
+    return build_detail(store.read(path))
+
+
 def _validate_id(standard_id: str) -> None:
     if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id or os.sep in standard_id:
         raise ValueError(f"Invalid standard ID: {standard_id}")
@@ -36,8 +42,7 @@ def create(data: dict, evaluators_dir: Path, store: StandardsStore) -> StandardD
     if store.exists(evaluators_dir, standard_id):
         raise ValueError(f"Standard '{standard_id}' already exists")
     store.ensure_dir(evaluators_dir)
-    store.write(path, {**data, **_CUSTOM_DEFAULTS})
-    return build_detail(store.read(path))
+    return _write_and_load_detail(store, path, {**data, **_CUSTOM_DEFAULTS})
 
 
 def update(standard_id: str, data: dict, evaluators_dir: Path, store: StandardsStore) -> StandardDetail:
@@ -79,8 +84,7 @@ def duplicate(new_id: str, source_detail: StandardDetail,
     payload = {"id": new_id, "name": s.name, "description": s.description,
                "weight": s.weight, "source": s.source, "principles": s.principles,
                **_CUSTOM_DEFAULTS}
-    store.write(new_path, payload)
-    return build_detail(store.read(new_path))
+    return _write_and_load_detail(store, new_path, payload)
 
 
 def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: StandardsStore) -> dict:
@@ -103,6 +107,6 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: Stand
     if store.exists(evaluators_dir, standard_id) and force and store.read(path).get("managed", False):
         raise PermissionError(f"Cannot overwrite managed standard '{standard_id}'")
     store.ensure_dir(evaluators_dir)
-    store.write(path, {**cleaned, **_CUSTOM_DEFAULTS})
-    return {"status": "imported", "detail": build_detail(store.read(path)),
+    detail = _write_and_load_detail(store, path, {**cleaned, **_CUSTOM_DEFAULTS})
+    return {"status": "imported", "detail": detail,
             "existing": None, "warnings": warnings}

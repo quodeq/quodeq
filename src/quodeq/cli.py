@@ -1,8 +1,9 @@
 """Command-line interface for Quodeq evaluation and dashboard commands.
 
-Heavy evaluation logic lives in ``quodeq._cli_evaluation``; this module
-re-exports every public and private name so that existing ``from quodeq.cli
-import …`` statements continue to work unchanged.
+Heavy evaluation logic lives in ``quodeq._cli_evaluation`` and its siblings;
+this module re-exports their entry points under public spellings, so
+``from quodeq.cli import …`` never has to name an underscore. The underscore
+originals are still importable from the module that defines them.
 """
 
 from __future__ import annotations
@@ -16,32 +17,36 @@ from quodeq.update.checker import check_async, get_status, set_settings
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 
-# Re-export everything from _cli_evaluation so existing imports
-# (including tests doing ``from quodeq.cli import _env_int``) keep working.
-from quodeq._cli_evaluation import (  # noqa: F401 — public re-exports
+# Re-export the evaluation entry points under their public spellings. The
+# underscore originals stay importable from the module that owns them.
+from quodeq._cli_env import (  # noqa: F401 — public re-exports
+    ENV_MAX_DURATION,
+    ENV_MAX_TURNS,
+    ENV_POOL_BUDGET,
+    cli_env_int,
+    no_verify,
+    subagent_model,
+)
+from quodeq._cli_resolution import (  # noqa: F401 — public re-exports
     ResolvedInputs,
-    _ENV_MAX_TURNS,
-    _ENV_MAX_DURATION,
-    _ENV_POOL_BUDGET,
-    _build_manifest,
-    _build_run_config,
-    _cleanup_worktree,
-    _create_worktree,
-    _env_int,
-    _execute_pipeline,
-    _filter_manifest_by_scope,
-    _no_verify,
-    _override_manifest_single_file,
-    _resolve_evaluation_inputs,
-    _resolve_language,
-    _resolve_repo,
-    _resolve_scope,
-    _resolve_single_file,
-    _run_pipeline_with_cleanup,
-    _save_manifest,
-    _setup_run_dirs,
-    _subagent_model,
+    build_cli_manifest,
+    cleanup_worktree,
+    create_worktree,
+    filter_manifest_by_scope,
+    override_manifest_single_file,
+    resolve_evaluation_inputs,
+    resolve_language,
+    resolve_repo,
+    resolve_scope,
+    resolve_single_file,
+)
+from quodeq._cli_evaluation import (  # noqa: F401 — public re-exports
+    build_run_config,
+    execute_pipeline,
     run_evaluate,
+    run_pipeline_with_cleanup,
+    save_manifest,
+    setup_run_dirs,
 )
 
 _logger = logging.getLogger(__name__)

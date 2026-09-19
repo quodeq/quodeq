@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from quodeq.services._publish_git import (
@@ -47,17 +49,10 @@ class PublishError(Exception):
     """User-facing publish failure."""
 
 
-def publish_project(
-    project_id: str, url: str, *, evaluations_root: Path, env: dict | None = None
-) -> int:
-    """Stage a project's completed runs into the shared results repo and push them.
-
-    Returns the number of runs staged. Raises ``PublishError`` for anything a
-    user can act on (bad project id, missing project, git add/commit/push
-    failure). The whole clone-stage-push sequence runs under one process-wide
-    clone lock, so concurrent publishes serialise instead of racing on the
-    working tree.
-    """
+@contextmanager
+def _prepare_workspace(
+    project_id: str, url: str, evaluations_root: Path, env: dict | None,
+) -> Iterator[tuple[Path, Path]]:
     # The route validates too, but this is the last stop before project_id
     # becomes a filesystem path and a git pathspec, so guard it here as well.
     try:
@@ -75,22 +70,44 @@ def publish_project(
     # thread instead of deadlocking.
     with clone_lock(url, env):
         repo, fmt = _prepare_clone(url, env)
-        try:
-            if fmt == "empty":
+        if fmt == "empty":
+            try:
                 bootstrap_repo_layout(repo)
+            except (OSError, ValueError) as exc:
+                raise PublishError(f"failed to stage project files, {exc}") from exc
+        yield project_dir, repo
+
+
+def _commit_and_push(repo: Path, project_id: str, count: int) -> None:
+    add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
+    if (repo / "evaluations" / ".gitkeep").exists():
+        add_paths.append("evaluations/.gitkeep")
+    ok, out = run_git(["add", "--", *add_paths], cwd=repo)
+    if not ok:
+        raise PublishError(f"git add failed, {out.strip()[:300]}")
+
+    _commit_staged_changes(repo, project_id, count)
+    _push_with_rebase_fallback(repo)
+
+
+def publish_project(
+    project_id: str, url: str, *, evaluations_root: Path, env: dict | None = None
+) -> int:
+    """Stage a project's completed runs into the shared results repo and push them.
+
+    Returns the number of runs staged. Raises ``PublishError`` for anything a
+    user can act on (bad project id, missing project, git add/commit/push
+    failure). The whole clone-stage-push sequence runs under one process-wide
+    clone lock, so concurrent publishes serialise instead of racing on the
+    working tree.
+    """
+    with _prepare_workspace(project_id, url, evaluations_root, env) as (project_dir, repo):
+        try:
             count = stage_project(project_dir, repo / "evaluations" / project_id)
         except (OSError, ValueError) as exc:
             raise PublishError(f"failed to stage project files, {exc}") from exc
 
-        add_paths = [MARKER_FILENAME, ".gitignore", f"evaluations/{project_id}"]
-        if (repo / "evaluations" / ".gitkeep").exists():
-            add_paths.append("evaluations/.gitkeep")
-        ok, out = run_git(["add", "--", *add_paths], cwd=repo)
-        if not ok:
-            raise PublishError(f"git add failed, {out.strip()[:300]}")
-
-        _commit_staged_changes(repo, project_id, count)
-        _push_with_rebase_fallback(repo)
+        _commit_and_push(repo, project_id, count)
         return count
 
 

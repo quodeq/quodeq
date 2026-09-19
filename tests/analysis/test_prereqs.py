@@ -10,7 +10,7 @@ from quodeq.analysis.prereqs import (
     check_evaluate_prereqs,
 )
 from quodeq.shared.prereqs import (
-    _run_version_cmd,
+    run_version_cmd,
     check_dashboard_dev_prereqs,
     check_node,
     check_npm,
@@ -132,6 +132,15 @@ class TestIsProviderExplicitlyConfigured:
         with patch.dict("os.environ", {"AI_CMD": "claude"}):
             assert _is_provider_explicitly_configured()
 
+    def test_injected_empty_env_ignores_host_environment(self):
+        """An explicit ``env={}`` must not fall back to the process env."""
+        with patch.dict("os.environ", {"AI_PROVIDER": "ollama", "AI_CMD": "claude"}):
+            assert not _is_provider_explicitly_configured(env={})
+
+    def test_injected_env_is_read_instead_of_host(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert _is_provider_explicitly_configured(env={"AI_CMD": "codex"})
+
 
 class TestCompositeChecks:
     def test_dashboard_prereqs_checks_node_and_npm(self):
@@ -180,7 +189,7 @@ class TestCompositeChecks:
 class TestProviderInjection:
     def test_run_version_cmd_rejects_shell_metacharacters(self):
         with pytest.raises(ValueError, match="unsafe command token"):
-            _run_version_cmd(["x & echo PWNED", "--version"])
+            run_version_cmd(["x & echo PWNED", "--version"])
 
     def test_check_cli_provider_rejects_injection(self):
         with patch("subprocess.run") as mock_run:

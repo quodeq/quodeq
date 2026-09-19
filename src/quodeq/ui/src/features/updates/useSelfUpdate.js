@@ -6,9 +6,9 @@ const ACTIVE_PHASES = new Set(['downloading', 'verifying', 'installing', 'relaun
 /**
  * Drives the packaged app's update-and-relaunch flow: starts the backend
  * self-update and polls status while a phase is active so the banner can
- * render live progress.
+ * render live progress. `adoptStatus` takes each freshly fetched status.
  */
-export function useSelfUpdate(status, setStatus) {
+export function useSelfUpdate(status, adoptStatus) {
   const { getUpdateStatus, startSelfUpdate } = useApi();
   const [starting, setStarting] = useState(false);
   const selfUpdate = status?.self_update || null;
@@ -18,18 +18,18 @@ export function useSelfUpdate(status, setStatus) {
   useEffect(() => {
     if (!active) return undefined;
     const id = setInterval(() => {
-      getUpdateStatus().then(setStatus).catch((e) => console.warn('self-update status poll failed:', e));
+      getUpdateStatus().then(adoptStatus).catch((e) => console.warn('self-update status poll failed:', e));
     }, 1000);
     return () => clearInterval(id);
-  }, [active, setStatus, getUpdateStatus]);
+  }, [active, adoptStatus, getUpdateStatus]);
 
   const begin = useCallback(() => {
     setStarting(true);
     startSelfUpdate()
-      .then(() => getUpdateStatus().then(setStatus))
+      .then(() => getUpdateStatus().then(adoptStatus))
       .catch((e) => console.warn('self-update start failed:', e))
       .finally(() => setStarting(false));
-  }, [setStatus, getUpdateStatus, startSelfUpdate]);
+  }, [adoptStatus, getUpdateStatus, startSelfUpdate]);
 
   return {
     supported: Boolean(selfUpdate?.supported),

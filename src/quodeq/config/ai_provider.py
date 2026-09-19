@@ -11,7 +11,7 @@ import keyring
 from quodeq.config.paths import ConfigPaths, default_paths
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.logging import log_debug, log_error, log_info, log_success, log_warning
-from quodeq.shared.utils import get_ai_provider
+from quodeq.shared import get_ai_provider
 
 _KEYRING_SERVICE = "quodeq"
 
@@ -228,12 +228,14 @@ def _api_key_var_for(provider: str) -> str:
     return api_key_var
 
 
-def _store_api_key(provider: str, api_key: str) -> tuple[bool, bool]:
+def _store_api_key(provider: str, api_key: str,
+                   paths: ConfigPaths | None = None) -> tuple[bool, bool]:
     """Store *provider*'s key and report how. Returns (stored, secure).
 
     Raises ValueError for a provider name that is not identifier-shaped.
     Checked here, before either backend, so the keyring and the cleartext
-    paths are both covered by one guard.
+    paths are both covered by one guard. *paths* overrides where the
+    cleartext fallback writes; it defaults to ``default_paths()``.
     """
     validate_provider_name(provider)
     try:
@@ -242,7 +244,7 @@ def _store_api_key(provider: str, api_key: str) -> tuple[bool, bool]:
     except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
         log_debug(f"keyring unavailable for '{provider}', falling back to cleartext: {exc}")
 
-    paths = default_paths()
+    paths = paths if paths is not None else default_paths()
     try:
         # provider=None: saving a key must never silently switch the active
         # provider. Only configure_provider_noninteractive sets AI_PROVIDER.
@@ -254,19 +256,22 @@ def _store_api_key(provider: str, api_key: str) -> tuple[bool, bool]:
         return False, False
 
 
-def store_api_key_secure(provider: str, api_key: str) -> bool:
+def store_api_key_secure(provider: str, api_key: str,
+                         paths: ConfigPaths | None = None) -> bool:
     """Persist *provider*'s API key, preferring the OS keyring over cleartext.
 
     Tries the platform keyring first; on failure falls back to the existing
-    cleartext `.quodeq.env` write path. Returns True if either succeeded.
+    cleartext `.quodeq.env` write path, under *paths* (``default_paths()``
+    when None). Returns True if either succeeded.
     """
-    stored, _secure = _store_api_key(provider, api_key)
+    stored, _secure = _store_api_key(provider, api_key, paths)
     return stored
 
 
-def get_api_key_secure(provider: str) -> str | None:
+def get_api_key_secure(provider: str, paths: ConfigPaths | None = None) -> str | None:
     """Return *provider*'s stored API key, checking the keyring then the
-    cleartext `.quodeq.env` fallback. None if stored nowhere."""
+    cleartext `.quodeq.env` fallback under *paths* (``default_paths()`` when
+    None). None if stored nowhere."""
     try:
         value = keyring.get_password(_KEYRING_SERVICE, provider)
         if value:
@@ -274,7 +279,7 @@ def get_api_key_secure(provider: str) -> str | None:
     except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
         log_debug(f"keyring lookup failed for '{provider}': {exc}")
 
-    paths = default_paths()
+    paths = paths if paths is not None else default_paths()
     if paths.env_file is None or not paths.env_file.exists():
         return None
     api_key_var = _api_key_var_for(provider)

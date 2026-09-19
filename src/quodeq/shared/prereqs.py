@@ -19,10 +19,10 @@ _VERSION_CMD_TIMEOUT_S = 30
 # Provider/command tokens are restricted to a charset with no shell
 # metacharacters, so even on the Windows shell=True path (needed for npm
 # .cmd shim resolution) a value like "x & calc.exe" can never reach cmd.exe.
-_SAFE_CMD_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]+")
+SAFE_CMD_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
-def _run_version_cmd(cmd: list[str]) -> str:
+def run_version_cmd(cmd: list[str]) -> str:
     """Run a version command and return its stdout, or raise.
 
     On Windows ``shell=True`` is required so npm-installed ``.cmd`` shims
@@ -36,13 +36,14 @@ def _run_version_cmd(cmd: list[str]) -> str:
     if not isinstance(cmd, list):
         raise TypeError("cmd must be a list of strings, not a raw string")
     for token in cmd:
-        if not isinstance(token, str) or not _SAFE_CMD_TOKEN_RE.fullmatch(token):
+        if not isinstance(token, str) or not SAFE_CMD_TOKEN_RE.fullmatch(token):
             raise ValueError(f"unsafe command token: {token!r}")
     result = subprocess.run(
         cmd, capture_output=True, text=True, encoding="utf-8", check=True, shell=_IS_WIN32,
         timeout=_VERSION_CMD_TIMEOUT_S,
     )
     return result.stdout.strip()
+
 
 
 def _parse_major(version_str: str) -> int:
@@ -54,7 +55,7 @@ def _parse_major(version_str: str) -> int:
 def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
     """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
     try:
-        version_str = _run_version_cmd(cmd)
+        version_str = run_version_cmd(cmd)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         raise RuntimeError(
             f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
@@ -87,7 +88,7 @@ def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str |
     a single error instead of failing fast on the first one.
     """
     try:
-        version_str = _run_version_cmd(cmd)
+        version_str = run_version_cmd(cmd)
     except (FileNotFoundError, subprocess.CalledProcessError):
         return f"{tool_name} {min_major}+ not found on PATH"
     try:

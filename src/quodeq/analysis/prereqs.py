@@ -13,11 +13,11 @@ import urllib.error
 import urllib.request
 
 from quodeq.analysis._provider_cache import get_provider_configs
-from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
-from quodeq.shared.prereqs import _SAFE_CMD_TOKEN_RE, _run_version_cmd
+from quodeq.shared.constants import DEFAULT_LLAMACPP_BASE_URL, OLLAMA_DEFAULT_BASE_URL
+from quodeq.shared.prereqs import SAFE_CMD_TOKEN_RE, run_version_cmd
 from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
 
-# Like _SAFE_CMD_TOKEN_RE but for a binary override (AI_CMD_PATH): also
+# Like SAFE_CMD_TOKEN_RE but for a binary override (AI_CMD_PATH): also
 # allows path separators and the Windows drive colon. Still no whitespace
 # or shell metacharacters.
 _SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
@@ -55,15 +55,16 @@ _SETTINGS_HINT = (
 _API_CHECK_TIMEOUT_S = 5
 
 
-def _is_provider_explicitly_configured() -> bool:
+def _is_provider_explicitly_configured(env: dict[str, str] | None = None) -> bool:
     """Return True if the user has explicitly set a provider via env or config."""
-    return "AI_PROVIDER" in os.environ or "AI_CMD" in os.environ
+    _env = os.environ if env is None else env
+    return "AI_PROVIDER" in _env or "AI_CMD" in _env
 
 
 def _check_cli_binary_override(provider: str, override: str) -> None:
     """Check that an AI_CMD_PATH override resolves to an executable.
 
-    The `--version` probe is skipped here: _run_version_cmd's token charset
+    The `--version` probe is skipped here: run_version_cmd's token charset
     forbids path separators (its Windows shell=True hardening), and for an
     explicit override the failure mode being guarded against is simply
     "binary not found".
@@ -90,7 +91,7 @@ def _check_cli_binary_override(provider: str, override: str) -> None:
 
 def _check_cli_provider(provider: str) -> None:
     """Check that a CLI provider binary is available on PATH."""
-    if not _SAFE_CMD_TOKEN_RE.fullmatch(provider):
+    if not SAFE_CMD_TOKEN_RE.fullmatch(provider):
         raise RuntimeError(
             f"'{provider}' is not a valid AI provider name.\n\n"
             f"Provider names may only contain letters, digits, '.', '_', and '-'.\n\n"
@@ -102,7 +103,7 @@ def _check_cli_provider(provider: str) -> None:
         _check_cli_binary_override(provider, override)
         return
     try:
-        _run_version_cmd([provider, "--version"])
+        run_version_cmd([provider, "--version"])
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         hint = _CLI_INSTALL_HINTS.get(provider, f"Install {provider} and make sure it is on your PATH.")
         raise RuntimeError(
@@ -131,7 +132,7 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             ) from exc
     elif provider == "llamacpp":
         try:
-            _base = _env.get("LLAMACPP_BASE_URL", "http://localhost:8080")
+            _base = _env.get("LLAMACPP_BASE_URL", DEFAULT_LLAMACPP_BASE_URL)
             with urllib.request.urlopen(f"{_base}/health", timeout=_API_CHECK_TIMEOUT_S):
                 pass
         except (urllib.error.URLError, OSError) as exc:

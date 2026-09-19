@@ -60,43 +60,67 @@ def _contained_project_dir(project: str) -> Path | None:
     return project_dir
 
 
-def project_scan(project: str) -> Response | tuple[Response, int]:
-    """Return scan data for a project. Triggers scan if needed for local projects."""
+def _scan_inputs(project: str) -> tuple[Path | None, tuple[Response, int] | None]:
+    """Resolve *project* to its directory under the reports root, or an error."""
     try:
         validate_path_segment(project)
     except ValueError:
-        return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-
+        return None, json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     project_dir = _contained_project_dir(project)
     if project_dir is None:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    return project_dir, None
 
+
+def _cached_scan_response(project_dir: Path) -> Response | None:
+    """The project's existing scan.json as a response, or None to rescan."""
     scan_path = project_dir / "scan.json"
-    if scan_path.exists():
-        try:
-            data = json.loads(scan_path.read_text(encoding="utf-8"))
-            return jsonify(data)
-        except (json.JSONDecodeError, OSError) as exc:
-            _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project, exc)
+    if not scan_path.exists():
+        return None
+    try:
+        return jsonify(json.loads(scan_path.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as exc:
+        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, exc)
+        return None
 
+
+def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, int] | None]:
+    """The local source directory to scan for *project_dir*, or an error."""
     # Check if local — read the project's repository record (via the
     # service layer; the route keeps no repository_info.json knowledge).
     if not project_record_exists(project_dir):
-        return json_error("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-
+        return None, json_error("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     info = read_project_record(project_dir)
     if info is None:
-        return json_error("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
-
+        return None, json_error(
+            "Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
     if info.get("location") != "local" or not info.get("path"):
-        return json_error("Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
-
+        return None, json_error(
+            "Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
     project_path = Path(info["path"])
     if not project_path.is_dir():
-        return json_error("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
+        return None, json_error(
+            "Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
+    return project_path, None
 
-    result = scan_project(project_path, output_dir=project_dir)
+
+def _scan_response(result) -> Response:
+    """Serialize a fresh scan result as the route's JSON response."""
     return jsonify(dataclasses.asdict(result))
+
+
+def project_scan(project: str) -> Response | tuple[Response, int]:
+    """Return scan data for a project. Triggers scan if needed for local projects."""
+    project_dir, err = _scan_inputs(project)
+    if err is not None:
+        return err
+    cached = _cached_scan_response(project_dir)
+    if cached is not None:
+        return cached
+    project_path, err = _local_scan_root(project_dir)
+    if err is not None:
+        return err
+    return _scan_response(scan_project(project_path, output_dir=project_dir))
 
 
 def project_estimates(project: str) -> Response | tuple[Response, int]:

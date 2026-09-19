@@ -44,16 +44,20 @@ _PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_ma
 _UNKNOWN_PREFIX = "X-XXX"
 
 
+def _load_json_or_exit(path: Path, what: str) -> dict:
+    """Parse the JSON at *path*, or exit with a message naming *what*."""
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot load {what} {path}: {exc}") from exc
+
+
 def _load_mapping(path: Path | None = None) -> dict:
     """Load the enrichment mapping from disk.
 
     *path* overrides the default for testing.
     """
-    target = path or _MAPPING_PATH
-    try:
-        return json.loads(target.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Cannot load mapping file {target}: {exc}") from exc
+    return _load_json_or_exit(path or _MAPPING_PATH, "mapping file")
 
 
 def _load_prefix_map(path: Path | None = None) -> dict:
@@ -61,11 +65,7 @@ def _load_prefix_map(path: Path | None = None) -> dict:
 
     *path* overrides the default for testing.
     """
-    target = path or _PREFIX_MAP_PATH
-    try:
-        return json.loads(target.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Cannot load prefix map {target}: {exc}") from exc
+    return _load_json_or_exit(path or _PREFIX_MAP_PATH, "prefix map")
 
 
 def _get_existing_cwes(data: dict) -> set[int]:

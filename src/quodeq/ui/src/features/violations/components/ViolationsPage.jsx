@@ -7,53 +7,34 @@ import { renderViolationsEmptyState } from './ViolationsEmptyStates.jsx';
 import { useViolationsPageState } from '../hooks/useViolationsPageState.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
+import { walkTree } from '../../../utils/treeWalk.js';
 import { PROJECT_SOURCE } from '../../../constants.js';
-
-// buildFileTree nests one node per path segment with no cap, so every walker
-// below guards its own recursion depth; past it the path is treated as absent.
-const MAX_TREE_DEPTH = 64;
 
 function findSubtree(root, path) {
   if (!path) return root;
-  function walk(node, depth = 0) {
-    if (depth > MAX_TREE_DEPTH) return null;
-    if (node.path === path) return node;
-    for (const child of node.children) {
-      const found = walk(child, depth + 1);
-      if (found) return found;
-    }
-    return null;
-  }
-  return walk(root) || root;
+  return walkTree(root, (node) => node.path === path) || root;
 }
 
 // findParentPath and buildBreadcrumbPath are exported for
 // ViolationsPage.treeWalk.test.jsx.
 export function findParentPath(root, currentPath) {
-  function walk(node, parentPath, depth = 0) {
-    if (depth > MAX_TREE_DEPTH) return null;
-    if (node.path === currentPath) return parentPath;
-    for (const child of node.children) {
-      const found = walk(child, node.path, depth + 1);
-      if (found !== null) return found;
-    }
-    return null;
-  }
-  return walk(root, '') || '';
+  let parentPath = '';
+  walkTree(root, (node, ancestors) => {
+    if (node.path !== currentPath) return false;
+    parentPath = ancestors.length > 0 ? ancestors[ancestors.length - 1].path : '';
+    return true;
+  });
+  return parentPath;
 }
 
 export function buildBreadcrumbPath(root, path) {
   if (!path) return [];
-  const segments = [];
-  function walk(node, depth = 0) {
-    if (depth > MAX_TREE_DEPTH) return false;
-    if (node.path === path) { segments.push({ name: node.name, path: node.path }); return true; }
-    for (const child of node.children) {
-      if (walk(child, depth + 1)) { segments.unshift({ name: node.name, path: node.path }); return true; }
-    }
-    return false;
-  }
-  walk(root);
+  let segments = [];
+  walkTree(root, (node, ancestors) => {
+    if (node.path !== path) return false;
+    segments = [...ancestors, node].map((n) => ({ name: n.name, path: n.path }));
+    return true;
+  });
   return segments.filter((s) => s.path);
 }
 

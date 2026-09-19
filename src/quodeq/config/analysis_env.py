@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.shared._env import _env_int
+from quodeq.shared import env_int
 
 
 def failure_streak_override(env: dict[str, str] | None = None) -> int | None:
@@ -61,12 +61,12 @@ def context_size_override(env: dict[str, str] | None = None) -> int | None:
 
 def default_max_turns(env: dict[str, str] | None = None) -> int:
     """Turn ceiling per agent, resolved per construction (not at import)."""
-    return _env_int("QUODEQ_DEFAULT_MAX_TURNS", 200, env=env)
+    return env_int("QUODEQ_DEFAULT_MAX_TURNS", 200, env=env)
 
 
 def default_max_duration(env: dict[str, str] | None = None) -> int:
     """Wall-clock ceiling per agent in seconds (30 min), resolved per construction."""
-    return _env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800, env=env)
+    return env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800, env=env)
 
 
 _REPAIR_DISABLE_TRUTHY = frozenset({"1", "true", "yes", "on"})

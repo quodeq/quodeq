@@ -4,6 +4,9 @@ import StatGrid2x2 from './StatGrid2x2.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import { t } from '../../../strings/index.js';
 
+// The three buckets the violations stat summarises, most severe first.
+const SUMMARY_SEVERITIES = ['critical', 'major', 'minor'];
+
 /** The score/violations/compliance/ratio stat grid + the run-history bar
  * chart — the left column of the dimension page's top grid. */
 export default function ExplorerStatsPanel({
@@ -23,9 +26,14 @@ export default function ExplorerStatsPanel({
           value={allViolations.length}
           hint={(sev.critical || sev.major || sev.minor) ? (
             <span className="principle-detail-sev-row">
-              {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} onClick={onNavigate ? onSeverityBadge('critical') : undefined} />}
-              {sev.major    > 0 && <SevBadge level="major"    count={sev.major}    onClick={onNavigate ? onSeverityBadge('major') : undefined} />}
-              {sev.minor    > 0 && <SevBadge level="minor"    count={sev.minor}    onClick={onNavigate ? onSeverityBadge('minor') : undefined} />}
+              {SUMMARY_SEVERITIES.map((level) => sev[level] > 0 && (
+                <SevBadge
+                  key={level}
+                  level={level}
+                  count={sev[level]}
+                  onClick={onNavigate ? onSeverityBadge(level) : undefined}
+                />
+              ))}
             </span>
           ) : null}
           onClick={onNavigate && allViolations.length > 0 ? () => onCardNavigate('violations') : undefined}
