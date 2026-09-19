@@ -24,11 +24,11 @@ import urllib.request
 from collections.abc import Mapping
 import urllib.error
 
-from quodeq.shared.constants import DEFAULT_LLAMACPP_BASE_URL
 from quodeq.llm_bridge._ollama import (
     _detect_memory,
     estimate_max_agents,
 )
+from quodeq.shared.constants import DEFAULT_LLAMACPP_BASE_URL
 
 _log = logging.getLogger(__name__)
 
