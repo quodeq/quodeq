@@ -24,8 +24,8 @@ from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_st
 
 _logger = logging.getLogger(__name__)
 
-_EVALUATION_RATE_LIMIT_WINDOW = env_int("QUODEQ_RATE_LIMIT_WINDOW", 300)
-_EVALUATION_RATE_LIMIT_MAX = env_int("QUODEQ_RATE_LIMIT_MAX", 10)
+_DEFAULT_EVALUATION_RATE_LIMIT_WINDOW = 300
+_DEFAULT_EVALUATION_RATE_LIMIT_MAX = 10
 
 
 def _default_provider() -> ActionProvider:
@@ -140,12 +140,14 @@ def _build_rate_limit_store(
     """Return the (API, evaluation) rate-limit stores.
 
     The API limiter honours a caller-supplied shared backend; the evaluation
-    limiter is always process-local with its own window and cap. *env*
-    overrides the backend lookup for tests and defaults to ``os.environ``.
+    limiter is always process-local with its own window and cap, read here at
+    call time rather than at import. *env* overrides both lookups for tests
+    and defaults to ``os.environ``.
     """
     store = rate_limit_store or create_rate_limit_store(env=env)
     eval_store = InMemoryRateLimitStore(
-        window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
+        window=env_int("QUODEQ_RATE_LIMIT_WINDOW", _DEFAULT_EVALUATION_RATE_LIMIT_WINDOW, env=env),
+        max_requests=env_int("QUODEQ_RATE_LIMIT_MAX", _DEFAULT_EVALUATION_RATE_LIMIT_MAX, env=env),
     )
     return store, eval_store
 

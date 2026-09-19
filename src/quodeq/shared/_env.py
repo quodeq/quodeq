@@ -35,7 +35,7 @@ def env_int(
 
     When *minimum* is given, parsed values below it also fall back to *default*.
     """
-    raw = (env or os.environ).get(var)
+    raw = (os.environ if env is None else env).get(var)
     if raw is not None:
         try:
             value = int(raw)

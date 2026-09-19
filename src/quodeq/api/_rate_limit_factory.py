@@ -58,7 +58,7 @@ def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore
     compatible shared backend (e.g. Redis) to
     ``create_app(rate_limit_store=...)``.
     """
-    environ = env or os.environ
+    environ = os.environ if env is None else env
     backend = environ.get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
 
     if backend == "file":

@@ -8,27 +8,19 @@ import shutil
 import time as _time
 from collections.abc import Mapping
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 from flask import Response, request
 
 from quodeq.api.helpers import ClientMessageError, json_error
-from quodeq.config.ai_provider import get_api_key_secure
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
-from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
 from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
-from quodeq.shared.validation import validate_relative_scope
+
+if TYPE_CHECKING:
+    from quodeq.api._rate_limit import RateLimitStore
 
 _logger = logging.getLogger(__name__)
-
-
-
-# Bounds for user-supplied evaluation parameters
-_MIN_SUBAGENTS = 1
-_MAX_SUBAGENTS = 10
-_MIN_TIME_LIMIT = 60
-_MAX_TIME_LIMIT = 3600
-_MAX_CONTEXT_SIZE = 2_000_000
 
 
 def clean_scan_conflict_error(payload: dict) -> str | None:
@@ -163,13 +155,15 @@ def _validate_ai_model(
 _SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
 
 
-def _path_dirs(env: dict[str, str] | None = None) -> list[str]:
+def _path_dirs(env: Mapping[str, str] | None = None) -> list[str]:
     """Real (symlink-resolved, case-normalized) directories on the server's PATH."""
-    raw = (env or os.environ).get("PATH", "")
+    raw = (os.environ if env is None else env).get("PATH", "")
     return [os.path.normcase(os.path.realpath(d)) for d in raw.split(os.pathsep) if d]
 
 
-def ai_cmd_path_error(ai_cmd: str | None, ai_cmd_path: str | None) -> str | None:
+def ai_cmd_path_error(
+    ai_cmd: str | None, ai_cmd_path: str | None, env: Mapping[str, str] | None = None,
+) -> str | None:
     """Reason *ai_cmd_path* is not an acceptable binary override for
     provider *ai_cmd*, or None if valid (or absent).
 
@@ -185,10 +179,12 @@ def ai_cmd_path_error(ai_cmd: str | None, ai_cmd_path: str | None) -> str | None
 
     Pure rules-to-reason form so both the start-evaluation 400 and the
     Settings eager check (GET /api/ai-clients/<id>/cmd-path-check) apply
-    the same rules from one place.
+    the same rules from one place. *env* overrides the PATH lookup and
+    defaults to ``os.environ``.
     """
     if not ai_cmd_path:
         return None
+    environ = os.environ if env is None else env
     if not _SAFE_CMD_PATH_RE.fullmatch(ai_cmd_path):
         return "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
     normalized = ai_cmd_path.replace("\\", "/")
@@ -205,11 +201,11 @@ def ai_cmd_path_error(ai_cmd: str | None, ai_cmd_path: str | None) -> str | None
     # Settings eager check alike), and no request input is ever reflected
     # back in a response. The reader is looking at the field they typed the
     # path into, so pointing at it loses nothing.
-    resolved = shutil.which(ai_cmd_path)
+    resolved = shutil.which(ai_cmd_path, path=environ.get("PATH", os.defpath))
     if resolved is None:
         return "the given path was not found or is not executable"
     resolved_dir = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(resolved))))
-    if resolved_dir not in _path_dirs():
+    if resolved_dir not in _path_dirs(environ):
         return (
             "the given path is not in a directory on PATH; move it to one "
             "(e.g. ~/.local/bin) or add its directory to PATH"
@@ -233,60 +229,15 @@ def _validate_ai_cmd_path(
     )
 
 
-def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
-    """Construct and validate EvaluationOptions from the request payload."""
-    from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
-    max_subagents_raw = _coerce_int(payload.get("maxSubagents"), DEFAULT_MAX_SUBAGENTS, "maxSubagents")
-    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, max_subagents_raw))
-    # Read new key first; fall back to legacy `poolBudget` for back-compat.
-    # The label is the key the client actually sent, so a malformed legacy
-    # value is not reported against a field absent from the body.
-    time_limit_field = "poolBudget" if "poolBudget" in payload and "timeLimit" not in payload else "timeLimit"
-    time_limit_raw = _coerce_int(
-        payload.get("timeLimit", payload.get("poolBudget")), DEFAULT_TIME_LIMIT, time_limit_field,
-    )
-    time_limit = 0 if time_limit_raw == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, time_limit_raw))
-    ai_model = payload.get("aiModel") or None
-    subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
-    clean_scan = resolve_clean_scan(payload)
-    scope_path = payload.get("scopePath") or None
-    if scope_path is not None:
-        # ValueError propagates to the route's 400 INVALID_INPUT handler.
-        validate_relative_scope(str(scope_path))
-    ai_cmd = payload.get("aiCmd") or None
-    provider_api_key = str(payload.get("apiKey") or "")
-    if not provider_api_key and ai_cmd:
-        provider_api_key = get_api_key_secure(ai_cmd) or ""
-    return EvaluationOptions(
-        discipline=payload.get("discipline"),
-        dimensions=payload.get("dimensions") or "",
-        numerical=bool(payload.get("numerical")),
-        ai_cmd=ai_cmd,
-        ai_cmd_path=payload.get("aiCmdPath") or None,
-        ai_model=ai_model,
-        subagent_model=subagent_model,
-        verify_findings=bool(payload.get("verifyFindings", True)),
-        max_subagents=max_subagents,
-        time_limit=time_limit,
-        clean_scan=clean_scan,
-        per_dimension=bool(payload.get("perDimension", False)),
-        context_size=max(0, min(_MAX_CONTEXT_SIZE, _coerce_int(payload.get("contextSize"), 0, "contextSize"))),
-        branch=payload.get("branch") or None,
-        scope_path=scope_path,
-        provider_api_key=provider_api_key,
-        provider_api_base=str(payload.get("apiBase") or ""),
-    )
-
-
-def _check_eval_rate_limit(eval_rate_store: object | None) -> tuple[Response, int] | None:
+def _check_eval_rate_limit(eval_rate_store: "RateLimitStore | None") -> tuple[Response, int] | None:
     """Return an error response if the evaluation rate limit is exceeded, or None."""
     if eval_rate_store is None:
         return None
     ip = request.remote_addr or "unknown"
     now = _time.monotonic()
-    if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
+    if eval_rate_store.check(ip, now):
         return json_error(
             "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
         )
-    eval_rate_store.record(ip, now)  # type: ignore[union-attr]
+    eval_rate_store.record(ip, now)
     return None

@@ -10,7 +10,6 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._evaluation_helpers import (
     InvalidEvaluationOption,
-    _build_evaluation_options,
     _check_eval_rate_limit,
     _sanitize_url,
     _validate_ai_cmd,
@@ -18,11 +17,12 @@ from quodeq.api._evaluation_helpers import (
     _validate_ai_model,
     clean_scan_conflict_error,
 )
+from quodeq.api._evaluation_options import _build_evaluation_options
 from quodeq.api.helpers import json_error, page_params, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.shared.validation import relative_scope_error
 from quodeq.assistant import get_provider_configs
-from quodeq.api.routes import _reports_dir
+from quodeq.api.routes_common import reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation
 from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import is_repo_url
@@ -116,7 +116,7 @@ def _repo_target_error(repo: Any) -> tuple[Response, int] | None:
         return json_error("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
     if is_url:
         return None
-    err = scan_target_error(str(repo), _reports_dir())
+    err = scan_target_error(str(repo), reports_dir())
     if err is None:
         return None
     body, status = err
@@ -162,7 +162,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             limit = raw_limit
         state_arg = request.args.get("state", "").strip()
         states = {s for s in (v.strip() for v in state_arg.split(",")) if s} or None
-        items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir(), states=states)
+        items = provider.list_evaluations(limit=limit, reports_dir=reports_dir(), states=states)
         return jsonify([to_camel_dict(j) for j in items])
 
     @app.get("/api/evaluations/active")
@@ -173,7 +173,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         the staleness rule lives in services.active_evaluation, so shells
         (native window, frontend) consume it instead of re-deriving it.
         """
-        job = find_active_evaluation(provider, _reports_dir())
+        job = find_active_evaluation(provider, reports_dir())
         return jsonify(to_camel_dict(job) if job is not None else None)
 
     @app.post("/api/evaluations")
@@ -187,7 +187,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             return error
         try:
             job = provider.start_evaluation(
-                repo=start_request.repo, reports_dir=_reports_dir(), options=start_request.options,
+                repo=start_request.repo, reports_dir=reports_dir(), options=start_request.options,
             )
         except (FileNotFoundError, ValueError):
             return json_error(

@@ -30,8 +30,8 @@ _KEEPALIVE_MS = 2000
 _DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
 
 
-def _tail_max_bytes() -> int:
-    raw = os.environ.get("QUODEQ_LOG_TAIL_MAX_BYTES")
+def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
+    raw = (os.environ if env is None else env).get("QUODEQ_LOG_TAIL_MAX_BYTES")
     if not raw:
         return _DEFAULT_TAIL_MAX_BYTES
     try:
