@@ -165,7 +165,9 @@ def browse_tree(tmp_path: Path, monkeypatch) -> Path:
     of the developer's real home directory.
     """
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert Path.home() == tmp_path, "browse jail no longer follows $HOME"
+    # Path.home() reads USERPROFILE on Windows and HOME elsewhere.
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    assert Path.home() == tmp_path, "browse jail no longer follows the home env"
     base = tmp_path / "workspace"
     base.mkdir()
     (base / "beta").mkdir()

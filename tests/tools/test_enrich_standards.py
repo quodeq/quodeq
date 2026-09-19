@@ -71,20 +71,24 @@ class TestJsonLoaders:
         assert _load_prefix_map(f) == {"security": {"Confidentiality": "S-CON"}}
 
     def test_missing_mapping_exits_naming_the_file(self, tmp_path):
+        import re
+
         import pytest
 
         from enrich_standards import _load_mapping
 
         missing = tmp_path / "absent.json"
-        with pytest.raises(SystemExit, match=f"Cannot load mapping file {missing}"):
+        with pytest.raises(SystemExit, match=re.escape(f"Cannot load mapping file {missing}")):
             _load_mapping(missing)
 
     def test_malformed_prefix_map_exits_naming_the_file(self, tmp_path):
+        import re
+
         import pytest
 
         from enrich_standards import _load_prefix_map
 
         f = tmp_path / "p.json"
         f.write_text("{not json")
-        with pytest.raises(SystemExit, match=f"Cannot load prefix map {f}"):
+        with pytest.raises(SystemExit, match=re.escape(f"Cannot load prefix map {f}")):
             _load_prefix_map(f)

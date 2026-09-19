@@ -263,9 +263,11 @@ class TestFindingsServerArgsAreShared:
             "--model-id": "sonnet",
             "--language": "python",
         }
+        # The codex override is TOML, so paths are emitted through
+        # json.dumps and carry escaped backslashes on Windows.
         for flag, value in values.items():
             assert flag in codex
-            assert value in codex
+            assert json.dumps(value) in codex
 
     def test_helper_output_is_the_shared_tail(self, tmp_path):
         from quodeq.analysis._mcp_config import _findings_server_args
