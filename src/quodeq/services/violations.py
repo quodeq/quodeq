@@ -154,6 +154,25 @@ def _resolve_from_markdown(
     )
 
 
+def _suppression_keys(base: Path) -> SuppressionKeys:
+    # base.parent is the project dir: dismissals and deletions are project-wide.
+    return SuppressionKeys(_dismissed_keys(base.parent), _deleted_keys(base.parent))
+
+
+def _resolve_from_source(
+    base: Path, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+) -> ViolationResponse | dict[str, Any] | None:
+    eval_path = base / "evaluation" / f"{ctx.dimension}.json"
+    if opts.exists_fn(eval_path):
+        return _resolve_from_json_eval(eval_path, base, ctx, opts, keys)
+
+    markdown_path = base / "evaluation" / f"{ctx.dimension}_eval.md"
+    if opts.exists_fn(markdown_path):
+        return _resolve_from_markdown(markdown_path, ctx, keys)
+
+    return _try_evidence_formats(base, ctx.dimension, ctx, opts, keys)
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     options: _ResolveOptions | None = None,
@@ -176,18 +195,9 @@ def resolve_dimension_eval(
     opts = options or _ResolveOptions()
     if not _accept_known_dimension(dimension, opts.compiled_dir, opts.evaluators_dir):
         return None
-    keys = SuppressionKeys(_dismissed_keys(base.parent), _deleted_keys(base.parent))
+    keys = _suppression_keys(base)
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
-
-    eval_path = base / "evaluation" / f"{dimension}.json"
-    if opts.exists_fn(eval_path):
-        return _resolve_from_json_eval(eval_path, base, ctx, opts, keys)
-
-    markdown_path = base / "evaluation" / f"{dimension}_eval.md"
-    if opts.exists_fn(markdown_path):
-        return _resolve_from_markdown(markdown_path, ctx, keys)
-
-    return _try_evidence_formats(base, dimension, ctx, opts, keys)
+    return _resolve_from_source(base, ctx, opts, keys)
 
 
 def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
