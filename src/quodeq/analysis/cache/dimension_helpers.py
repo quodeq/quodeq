@@ -91,7 +91,6 @@ def group_findings_by_file(jsonl_path: Path) -> tuple[dict[str, list[dict]], set
     return state.grouped, state.ok_files()
 
 
-
 def _advance_or_warn(
     state: DispatchJsonlState, jsonl_path: Path, *, include_tail: bool,
 ) -> bool:

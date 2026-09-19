@@ -97,7 +97,6 @@ def coerce_int(value: object, default: int, field: str) -> int:
         raise InvalidEvaluationOption(f"{field} must be an integer") from exc
 
 
-
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages.
 

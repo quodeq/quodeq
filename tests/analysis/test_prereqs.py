@@ -187,7 +187,7 @@ class TestCompositeChecks:
 
 
 class TestProviderInjection:
-    def testrun_version_cmd_rejects_shell_metacharacters(self):
+    def test_run_version_cmd_rejects_shell_metacharacters(self):
         with pytest.raises(ValueError, match="unsafe command token"):
             run_version_cmd(["x & echo PWNED", "--version"])
 

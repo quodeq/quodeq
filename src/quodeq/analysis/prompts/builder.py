@@ -46,7 +46,6 @@ def load_evaluation_rules() -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-
 def render_previous_findings_section(findings: list[dict]) -> str:
     """Render a prompt section listing previous findings grouped by file."""
     if not findings:
