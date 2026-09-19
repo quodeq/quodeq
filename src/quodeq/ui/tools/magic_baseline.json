@@ -49,7 +49,7 @@
   "src/features/map/viz/components/ZoomablePackView.jsx": 4,
   "src/features/map/viz/components/galaxyFolderCamera.js": 29,
   "src/features/map/viz/components/galaxyFolderClickHandlers.js": 5,
-  "src/features/map/viz/components/galaxyFolderDraw.js": 77,
+  "src/features/map/viz/components/galaxyFolderDraw.js": 60,
   "src/features/map/viz/components/galaxyFolderScene.js": 34,
   "src/features/map/viz/components/galaxyViewDraw.js": 67,
   "src/features/map/viz/components/galaxyViewLayout.js": 8,

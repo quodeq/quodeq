@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { getProjectScan as apiGetProjectScan } from '../../../api/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
+import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../constants.js';
 
 const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
-const CLONE_DEST_STORAGE_KEY = 'quodeq.lastCloneRoot';
 
 // Map backend error codes (Task A8) to user-facing messages. The switch that
 // used to live here moved into strings/apiErrors.js so every screen resolves
@@ -94,7 +94,7 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
       const payload = { repo, cloneDest, ephemeral };
       const { projectId, scanData } = await createProject(payload);
       if (cloneDest && !ephemeral) {
-        const ok = writeString(CLONE_DEST_STORAGE_KEY, cloneDest);
+        const ok = writeString(LAST_CLONE_ROOT_STORAGE_KEY, cloneDest);
         if (!ok) console.warn('[useRepoScanStep] could not persist clone destination'); // private mode
       }
       actions.succeedScan(projectId, scanData);

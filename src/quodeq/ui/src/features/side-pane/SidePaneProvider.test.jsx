@@ -21,6 +21,7 @@ function Probe() {
       <button onClick={() => addWindow(spec('d'))}>add-d</button>
       <button onClick={() => removeWindow('a')}>remove-a</button>
       <button onClick={() => toggleWindow(spec('a'))}>toggle-a</button>
+      <button onClick={() => toggleWindow(spec('d'))}>toggle-d</button>
       <button onClick={closeAll}>close-all</button>
     </div>
   );
@@ -88,6 +89,16 @@ describe('SidePaneProvider', () => {
     // means an empty region, not a missing one.
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
     fireEvent.click(screen.getByText('add-d'));
+    expect(screen.getByRole('status')).toHaveTextContent(/3 panels/i);
+  });
+
+  it('toggleWindow hits the same cap and toast as addWindow', () => {
+    render(<SidePaneProvider><Probe /></SidePaneProvider>);
+    fireEvent.click(screen.getByText('add-a'));
+    fireEvent.click(screen.getByText('add-b'));
+    fireEvent.click(screen.getByText('add-c'));
+    fireEvent.click(screen.getByText('toggle-d'));
+    expect(screen.getByTestId('state')).toHaveTextContent('open:a,b,c');
     expect(screen.getByRole('status')).toHaveTextContent(/3 panels/i);
   });
 

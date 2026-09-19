@@ -3,7 +3,6 @@ import {
   STANDARDS_CHANGED_REASON, notifyStandardsChanged,
 } from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
-import { countBySeverity } from './severity.js';
 import { readJSON, writeString } from '../adapters/storage.js';
 import { decideHydration } from './visibleStandardsModel.js';
 
@@ -140,23 +139,4 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
     console.warn('hydrateVisibleStandardIds: falling back to cached value', err);
     return readVisibleStandardIds(storage);
   }
-}
-
-/**
- * Compute summary stats from a filtered dimensions array.
- */
-export function computeSummaryFromDimensions(dimensions) {
-  let totalViolations = 0;
-  let totalCompliance = 0;
-  const severity = { critical: 0, major: 0, minor: 0 };
-  for (const d of dimensions) {
-    const violations = d.violations || [];
-    totalViolations += violations.length;
-    totalCompliance += d.compliance?.length || 0;
-    const counts = countBySeverity(violations);
-    severity.critical += counts.critical;
-    severity.major += counts.major;
-    severity.minor += counts.minor;
-  }
-  return { totalViolations, totalCompliance, severity };
 }

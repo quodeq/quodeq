@@ -64,6 +64,10 @@ export function notifyStandardsChanged(reason) {
   }
 }
 
+// Last directory a repo was cloned into: offered as the default clone
+// target by onboarding and by the dashboard's complete-setup card.
+export const LAST_CLONE_ROOT_STORAGE_KEY = 'quodeq.lastCloneRoot';
+
 export const VISIBLE_STANDARDS_STORAGE_KEY = 'quodeq-visible-standards';
 export const DEFAULT_VISIBLE_STANDARDS = [
   'security', 'reliability', 'maintainability', 'performance', 'usability', 'flexibility',

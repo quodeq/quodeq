@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
 import { readString } from '../../../../adapters/storage.js';
-
-const STORAGE_KEY = 'quodeq.lastCloneRoot';
+import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../../constants.js';
 
 function readInitialDest() {
-  return readString(STORAGE_KEY) || '~';
+  return readString(LAST_CLONE_ROOT_STORAGE_KEY) || '~';
 }
 
 function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, handleSubmit, onBack }) {

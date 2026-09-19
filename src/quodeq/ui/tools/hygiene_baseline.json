@@ -16,7 +16,6 @@
   "src/features/help/components/HelpMarkdown.jsx": 1,
   "src/features/map/viz/components/PackInfoPanel.jsx": 1,
   "src/features/map/viz/components/ZoomablePackView.jsx": 2,
-  "src/features/map/viz/components/galaxyFolderLevelInfo.js": 1,
   "src/features/map/viz/components/galaxyViewDraw.js": 2,
   "src/features/map/viz/components/galaxyViewInfo.jsx": 1,
   "src/features/map/viz/components/useGalaxyCamera.js": 1,
