@@ -147,3 +147,50 @@ def test_forces_cleanup_if_cli_ignores_termination(cli, monkeypatch):
     monkeypatch.setattr("quodeq.data.copilot_models._STOP_TIMEOUT_S", 0.01)
     assert fetch_copilot_models(env=env)["models"] == ["auto", "gpt-test"]
     assert calls[0][2].returncode is not None
+
+
+def test_cleanup_handle_race_does_not_discard_the_models(cli, monkeypatch):
+    """Windows regression (flaked on PR #1220 CI): the just-terminated CLI can
+    hold a handle on its cwd for a moment, so the first rmtree fails with
+    WinError 32. That exception used to fire after the model list already
+    existed and turned a successful discovery into COPILOT_MODELS_UNAVAILABLE.
+    Cleanup must retry past the transient failure and still remove the dir."""
+    import shutil
+
+    configure, calls, env = cli
+    configure(result([{"id": "gpt-test"}]))
+    real_rmtree = shutil.rmtree
+    attempts = []
+
+    def rmtree_busy_once(path, *args, **kwargs):
+        attempts.append(path)
+        if len(attempts) == 1:
+            raise OSError(
+                "[WinError 32] The process cannot access the file because "
+                "it is being used by another process",
+            )
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "rmtree", rmtree_busy_once)
+    assert fetch_copilot_models(env=env) == {"models": ["auto", "gpt-test"]}
+    assert len(attempts) == 2
+    assert not calls[0][1]["cwd"].exists()
+
+
+def test_cleanup_never_outranks_the_result_even_when_it_keeps_failing(cli, monkeypatch):
+    """If the handle outlives every retry, the scratch dir is left to the OS
+    temp cleaner; the discovery result must still come through untouched."""
+    import shutil
+
+    configure, calls, env = cli
+    configure(result([{"id": "gpt-test"}]))
+    monkeypatch.setattr(
+        "quodeq.data.copilot_models._CLEANUP_RETRY_DELAY_S", 0.001,
+    )
+
+    def rmtree_always_busy(path, *args, **kwargs):
+        raise OSError("[WinError 32] busy")
+
+    monkeypatch.setattr(shutil, "rmtree", rmtree_always_busy)
+    assert fetch_copilot_models(env=env) == {"models": ["auto", "gpt-test"]}
+    assert calls[0][1]["cwd"].exists()

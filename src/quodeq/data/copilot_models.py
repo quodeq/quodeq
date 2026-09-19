@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -73,35 +74,67 @@ async def _read_models(stdout: asyncio.StreamReader) -> list[str]:
         return _model_ids(response.get("result"))
 
 
-async def _query_models(env: dict[str, str], timeout_s: float) -> list[str]:
-    with tempfile.TemporaryDirectory(prefix="quodeq-copilot-models-") as directory:
-        process = None
+_CLEANUP_RETRIES = 5
+_CLEANUP_RETRY_DELAY_S = 0.1
+
+
+async def _remove_scratch_dir(directory: str) -> None:
+    """Best-effort removal of the discovery scratch dir. Never raises.
+
+    On Windows the just-terminated CLI (or a child of it) can hold a handle
+    on its cwd for a moment after ``wait()`` returns, so the first rmtree can
+    fail with WinError 32. Raising here used to discard an already-successful
+    model list (the exception fired in TemporaryDirectory.__exit__, after the
+    return value existed) and report COPILOT_MODELS_UNAVAILABLE for a run
+    that worked. Retry briefly; if the handle outlives the retries, leave the
+    directory to the OS temp cleaner rather than fail the discovery.
+    """
+    for attempt in range(_CLEANUP_RETRIES):
         try:
-            async with asyncio.timeout(timeout_s):
-                process = await asyncio.create_subprocess_exec(
-                    "copilot", "--headless", "--stdio", "--no-auto-update",
-                    "--disable-builtin-mcps", "--no-custom-instructions", "--no-ask-user",
-                    cwd=Path(directory), env=env, stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            shutil.rmtree(directory)
+            return
+        except OSError as exc:
+            if attempt == _CLEANUP_RETRIES - 1:
+                _log.debug(
+                    "Leaving Copilot scratch dir %s to the OS temp cleaner: %s",
+                    directory, exc,
                 )
-                if process.stdin is None or process.stdout is None:
-                    raise RuntimeError("Could not open Copilot model discovery pipes.")
-                body = json.dumps({
-                    "jsonrpc": "2.0", "id": _REQUEST_ID, "method": "models.list", "params": {},
-                }).encode("utf-8")
-                process.stdin.write(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
-                await process.stdin.drain()
-                return await _read_models(process.stdout)
-        finally:
-            if process is not None:
-                if process.returncode is None:
-                    process.terminate()
-                try:
-                    await asyncio.wait_for(process.wait(), _STOP_TIMEOUT_S)
-                except TimeoutError:
-                    process.kill()
-                    await process.wait()
+                return
+            await asyncio.sleep(_CLEANUP_RETRY_DELAY_S)
+
+
+async def _query_models(env: dict[str, str], timeout_s: float) -> list[str]:
+    # Not TemporaryDirectory: its __exit__ raises on the Windows handle race
+    # documented on _remove_scratch_dir, and that must not outrank the result.
+    directory = tempfile.mkdtemp(prefix="quodeq-copilot-models-")
+    process = None
+    try:
+        async with asyncio.timeout(timeout_s):
+            process = await asyncio.create_subprocess_exec(
+                "copilot", "--headless", "--stdio", "--no-auto-update",
+                "--disable-builtin-mcps", "--no-custom-instructions", "--no-ask-user",
+                cwd=Path(directory), env=env, stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+            if process.stdin is None or process.stdout is None:
+                raise RuntimeError("Could not open Copilot model discovery pipes.")
+            body = json.dumps({
+                "jsonrpc": "2.0", "id": _REQUEST_ID, "method": "models.list", "params": {},
+            }).encode("utf-8")
+            process.stdin.write(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+            await process.stdin.drain()
+            return await _read_models(process.stdout)
+    finally:
+        if process is not None:
+            if process.returncode is None:
+                process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), _STOP_TIMEOUT_S)
+            except TimeoutError:
+                process.kill()
+                await process.wait()
+        await _remove_scratch_dir(directory)
 
 
 def fetch_copilot_models(
