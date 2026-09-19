@@ -6,7 +6,7 @@ finding's requirement id and prose and names the rule that fires, with no
 knowledge of severities or markers. :func:`matched_rule` is the only entry
 point.
 
-The gate ships three rules:
+The gate ships four rules:
 
 * rule 1 (``sourceless_path``) relaxes an unproven-provenance path/key
   finding when the model declares no untrusted party can reach the process
@@ -17,7 +17,10 @@ The gate ships three rules:
   name an external source;
 * rule 3 (``single_host_topology``) relaxes a scalability finding whose
   premise is a multi-host deployment when the model declares the product
-  runs as one process on one host.
+  runs as one process on one host;
+* rule 4 (``loopback_transport``) relaxes a transport-encryption finding
+  (S-CON-10) when the model declares no untrusted party can reach the
+  process AND the finding's prose does not name an outbound destination.
 
 Rule 2 is evaluated first in code, because its evidence is more specific and
 would otherwise be masked by rule 1 -- see :func:`matched_rule`. The third
@@ -29,7 +32,7 @@ second-tenant reading, but it says nothing about this one, so the finding
 must stay major when the prose names how the stranger gets in. There is no
 remote-ingress rule; the comment below ``_CROSS_PRINCIPAL_REQS`` records why.
 
-Rules 1 and 2 require BOTH a gated requirement id AND evidence in the
+Rules 1, 2 and 4 require BOTH a gated requirement id AND evidence in the
 model's prose, the same two-condition shape ``provenance_gate`` uses. A
 finding that names no scope-dependent concept is never touched. Rule 3 is
 the one carve-out: it reads no prose, because its three requirement ids have
@@ -88,6 +91,56 @@ _CROSS_PRINCIPAL_TERMS: frozenset[str] = frozenset({
 _CROSS_PATTERN = re.compile(
     "|".join(rf"\b{re.escape(t)}s?\b"
              for t in sorted(_CROSS_PRINCIPAL_TERMS, key=len, reverse=True)),
+    re.IGNORECASE,
+)
+
+# Rule 4: S-CON-10's entire premise ("sensitive data MUST be transmitted only
+# over encrypted channels", CWE-319) is an on-path observer of traffic into
+# this process. Under a DECLARED loopback exposure the only party who can
+# observe that traffic is already code running as the same principal on the
+# same machine, which can read the secret at rest anyway -- encrypting the
+# channel defends against no one. This does not repeat the deleted
+# remote-ingress failure recorded above ``_CROSS_PRINCIPAL_TERMS``: that rule
+# waived findings whose code PROVABLY reads attacker-controlled input (a code
+# property, true under any bind), whereas whether a channel needs encryption
+# is, like rule 3's topology, purely a property of who can be on the wire --
+# and if the declaration is later tightened, the gate's symmetric replay
+# restores every capped finding.
+_TRANSPORT_REQS: frozenset[str] = frozenset({"S-CON-10"})
+
+# Same distinct-WORD-forms convention as ``_CROSS_PRINCIPAL_TERMS``. The
+# prose condition is not decoration: models file non-transport findings
+# under S-CON-10 too ("API key read from environment without encryption",
+# "unvalidated URL passed to webbrowser.open"), and those name no channel
+# for a loopback declaration to have an opinion about.
+_TRANSPORT_TERMS: frozenset[str] = frozenset({
+    "transmit", "transmitted", "transmitting", "transmission", "in transit",
+    "cleartext", "clear text", "unencrypted", "encrypted channel",
+    "https", "tls", "ssl", "sniff", "sniffed", "sniffing",
+    "man-in-the-middle", "mitm",
+})
+
+_TRANSPORT_PATTERN = re.compile(
+    "|".join(rf"\b{re.escape(t)}s?\b"
+             for t in sorted(_TRANSPORT_TERMS, key=len, reverse=True)),
+    re.IGNORECASE,
+)
+
+# The back-off. A loopback declaration states who can open a socket INTO the
+# process; it says nothing about where the process SENDS data. A cleartext
+# credential posted outbound to a third-party endpoint crosses a real wire
+# whatever this process is bound to, so prose naming an outbound destination
+# keeps its finding major -- the same never-waive-proven-egress posture as
+# rule 2's ``names_external_source`` back-off, pointed the other direction.
+_OUTBOUND_TERMS: frozenset[str] = frozenset({
+    "outbound", "third-party", "third party", "external service",
+    "external server", "external endpoint", "external api",
+    "remote server", "remote host", "remote endpoint", "upstream",
+})
+
+_OUTBOUND_PATTERN = re.compile(
+    "|".join(rf"\b{re.escape(t)}s?\b"
+             for t in sorted(_OUTBOUND_TERMS, key=len, reverse=True)),
     re.IGNORECASE,
 )
 
@@ -151,6 +204,25 @@ def _topology_rule_applies(model: TrustModel, req: str | None) -> bool:
     return bool(model.is_single_host() and req in _TOPOLOGY_REQS)
 
 
+def _loopback_transport_rule_applies(model: TrustModel, req: str | None, prose: str) -> bool:
+    """True when rule 4 (loopback transport) relaxes a finding under *model*.
+
+    Two conditions and a back-off: the gated requirement id, prose naming a
+    transport-encryption concept (the rationale lives on
+    ``_TRANSPORT_REQS``), and no outbound destination in the prose (the
+    rationale lives on ``_OUTBOUND_TERMS``). ``multi_tenant`` is deliberately
+    not consulted: sniffing a loopback channel requires being on the machine,
+    which is the same-principal story regardless of how many tenants the
+    product serves.
+    """
+    return bool(
+        model.relaxes_remote()
+        and req in _TRANSPORT_REQS
+        and _TRANSPORT_PATTERN.search(prose)
+        and not _OUTBOUND_PATTERN.search(prose)
+    )
+
+
 def matched_rule(finding: dict, model: TrustModel) -> str | None:
     """Return the rule name that would relax *finding* under *model*, or
     ``None``. Pure evidence check -- independent of the finding's CURRENT
@@ -171,4 +243,6 @@ def matched_rule(finding: dict, model: TrustModel) -> str | None:
         return "sourceless_path"
     if _topology_rule_applies(model, req):
         return "single_host_topology"
+    if _loopback_transport_rule_applies(model, req, prose):
+        return "loopback_transport"
     return None
