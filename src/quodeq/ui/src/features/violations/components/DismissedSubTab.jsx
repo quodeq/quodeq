@@ -2,9 +2,22 @@ import ContextBlock from '../../../components/ContextBlock.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { filterValidRefs } from '../../../utils/reqRefs.js';
 
 function dismissedLabel(d) {
   return d.principle || d.dimension || (d.req ?? '?');
+}
+
+function DismissedRefLinks({ reqRefs }) {
+  const valid = filterValidRefs(reqRefs);
+  if (valid.length === 0) return null;
+  return (
+    <span className="cwe-link-group">
+      {valid.map((r, i) => (
+        <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
+      ))}
+    </span>
+  );
 }
 
 function DismissedCard({ d, onRestore, onDelete }) {
@@ -27,16 +40,7 @@ function DismissedCard({ d, onRestore, onDelete }) {
             <div className="dismissed-detail-section">
               <div className="dismissed-detail-header">
                 <span className="dismissed-detail-label">{t('violations.reasonLabel')}</span>
-                {(() => {
-                  const urlRefs = (d.reqRefs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
-                  return urlRefs.length > 0 && (
-                    <span className="cwe-link-group">
-                      {urlRefs.map((r, i) => (
-                        <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
-                      ))}
-                    </span>
-                  );
-                })()}
+                <DismissedRefLinks reqRefs={d.reqRefs} />
               </div>
               <p className="dismissed-detail-title">{d.title}</p>
             </div>

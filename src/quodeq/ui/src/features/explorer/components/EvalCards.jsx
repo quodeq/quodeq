@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
+import { filterValidRefs } from '../../../utils/reqRefs.js';
 import { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
@@ -16,10 +17,6 @@ const ANIM_MAX_DELAY_MS = 300;
 // (terminal.css); a font change there must be reflected here.
 const TITLE_LINE_HEIGHT_PX = 18;
 const REASON_LINE_HEIGHT_PX = 20;
-
-function filterValidRefs(refs) {
-  return (refs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
-}
 
 function useFileInfo(file, fileLine, fileEndLine) {
   const { filePath, line } = parseFileRef(file, fileLine);
