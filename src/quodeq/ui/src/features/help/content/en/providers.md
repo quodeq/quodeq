@@ -35,13 +35,20 @@ In PowerShell, set `$env:COPILOT_HOME="$HOME/.quodeq/copilot"` before running
 Select **GitHub Copilot** in Settings. The model dropdown loads the models
 available to your signed-in account. Choose **Auto** or a specific model.
 The evaluation, assistant, and tier-override selectors use the same account list.
-Company policy, model access and usage limits still apply.
+Company policy must also allow Quodeq's MCP servers: `findings` for evaluations
+and `quodeq-assistant` for the assistant. Model access and usage limits still apply.
 For Enterprise Cloud data residency, add `--host YOUR-ENTERPRISE.ghe.com` to login.
 Repeat the same login command if authentication expires.
 
 The setup message is hidden after a successful model lookup. If discovery fails,
 the message and error are shown with **Retry connection**. No prompt is sent to
 a model when loading this list.
+Successful login and model discovery do not verify MCP access. If the required
+MCP server is blocked by policy, Quodeq stops the evaluation instead of launching
+replacement agents. Ask your organization administrator to allow the server
+before retrying.
+The evaluation shows **Evaluation blocked by Copilot policy**, including after
+a refresh. Any completed results are kept with a partial-run warning.
 
 The dedicated profile does not reuse your normal Copilot login, plugins or MCP
 servers. Keep it for Quodeq only. Hooks, custom instructions and built-in MCP

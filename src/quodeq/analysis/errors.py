@@ -29,12 +29,20 @@ class FatalProviderError(ProviderError):
 
     Raised so the run aborts once with a clear cause instead of respawning
     agents against a provider that will keep rejecting every call.
-    ``reason`` is a short machine-readable code: "quota", "auth", "payment".
+    ``reason`` is a machine-readable code such as "quota", "auth",
+    "payment", "policy", or "copilot_mcp_policy".
     """
 
     def __init__(self, message: str, *, reason: str = "provider_fatal") -> None:
         super().__init__(message)
         self.reason = reason
+
+
+def provider_exit_reason(reason: str | None) -> str:
+    """Map a provider reason or cancellation cause to its persistent exit code."""
+    if reason and reason.startswith("provider_fatal:"):
+        reason = reason.split(":", 2)[1]
+    return "copilot_mcp_policy" if reason == "copilot_mcp_policy" else "provider_fatal"
 
 
 class BudgetExceededError(EvaluationError):

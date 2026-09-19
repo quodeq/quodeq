@@ -164,17 +164,16 @@ class _JobMonitorMixin:
         return run_status_exit_reason(job, self._reports_root)
 
     def _classify_exit(self, job_id: str, exit_code: int, watchdog_killed: bool) -> str | None:
-        """Resolve a time-limit ``deadline_reason``, or None for a plain exit.
+        """Resolve a deadline or Copilot policy reason, or None for a plain exit.
 
         Called before the lock is taken in ``_monitor_process`` — status.json
         I/O must not block API request paths contending on self._lock.
         """
         if watchdog_killed:
             return _EXIT_REASON_DEADLINE
-        if exit_code != 0:
-            reason = self._run_status_exit_reason(self._store.get(job_id))
-            if reason in _DEADLINE_EXIT_REASONS:
-                return reason
+        reason = self._run_status_exit_reason(self._store.get(job_id))
+        if reason == "copilot_mcp_policy" or (exit_code != 0 and reason in _DEADLINE_EXIT_REASONS):
+            return reason
         return None
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
@@ -205,19 +204,19 @@ class _JobMonitorMixin:
                     exit_code = _EXIT_CODE_TIMEOUT
                     watchdog_killed = True
                     break
-        deadline_reason = self._classify_exit(job_id, exit_code, watchdog_killed)
+        exit_reason = self._classify_exit(job_id, exit_code, watchdog_killed)
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)
             if not job or job.status == STATUS_CANCELLED:
                 return
             job.exit_code = exit_code
+            job.exit_reason = exit_reason
             job.ended_at = datetime.now(timezone.utc).isoformat()
             if exit_code == 0:
                 job.status = STATUS_DONE
-            elif deadline_reason is not None:
+            elif exit_reason in _DEADLINE_EXIT_REASONS:
                 job.status = STATUS_CANCELLED
-                job.exit_reason = deadline_reason
             else:
                 job.status = STATUS_FAILED
             self._store.put(job)

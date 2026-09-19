@@ -1,4 +1,5 @@
 import json
+import subprocess
 from unittest.mock import Mock
 
 import pytest
@@ -124,6 +125,8 @@ def test_copilot_stdout_auth_error_aborts_evaluation(tmp_path, monkeypatch):
 @pytest.mark.parametrize("event", [
     {"type": "session.error", "data": {"message": "Model unavailable"}},
     {"type": "result", "exitCode": 1},
+    {"type": "session.warning", "data": {
+        "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'"}},
 ])
 def test_copilot_error_stream_is_invalid(tmp_path, event):
     stream = tmp_path / "s.jsonl"
@@ -153,3 +156,83 @@ def test_copilot_malformed_mcp_status_is_logged_and_skipped(tmp_path, servers):
     log = Mock()
     assert get_mcp_status(stream, log=log) == "connected"
     log.debug.assert_called()
+
+
+@pytest.mark.parametrize("with_callback", [False, True])
+@pytest.mark.parametrize("prior_event", [None, {
+    "type": "session.error", "data": {"message": "Transient provider failure"},
+}])
+def test_copilot_policy_block_terminates_running_evaluation(tmp_path, monkeypatch, with_callback, prior_event):
+    from quodeq.analysis._process import _run_with_heartbeat
+
+    stream = tmp_path / "s.jsonl"
+    warning = {"type": "session.warning", "data": {
+        "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
+    }}
+    events = [prior_event, warning] if prior_event else [warning]
+    stream.write_text("".join(json.dumps(event) + "\n" for event in events))
+    process = Mock()
+    process.poll.side_effect = [None, 0]
+    process.wait.side_effect = subprocess.TimeoutExpired("copilot", 1)
+    terminate = Mock()
+    monkeypatch.setattr("quodeq.analysis._process._terminate_process", terminate)
+    cfg = AnalysisConfig(ai_cmd="copilot", heartbeat_interval=1,
+                         heartbeat_callback=Mock() if with_callback else None)
+    with pytest.raises(FatalProviderError, match="administrator") as exc:
+        _run_with_heartbeat(process, cfg, stream)
+    assert exc.value.reason == "copilot_mcp_policy"
+    terminate.assert_called_once_with(process)
+    process.wait.assert_called_once_with(timeout=1)
+
+
+def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from quodeq.analysis.subagents._pool_scaling import should_respawn
+    from quodeq.analysis.subagents._pool_worker import WorkerContext, run_single_agent
+    from quodeq.shared import cancellation
+    from tests._analysis_helpers import _FixedRemainingQueue
+
+    captured = {}
+    process = Mock()
+    process.poll.side_effect = [None, 0]
+    process.wait.side_effect = subprocess.TimeoutExpired("copilot", 1)
+
+    def spawn(args, **kwargs):
+        captured["cwd"] = Path(kwargs["cwd"])
+        captured["mcp"] = Path(args[args.index("--additional-mcp-config") + 1][1:])
+        kwargs["stdout"].write(json.dumps({"type": "session.warning", "data": {
+            "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
+        }}) + "\n")
+        kwargs["stdout"].flush()
+        return process
+
+    monkeypatch.setattr("quodeq.analysis._process.subprocess.Popen", spawn)
+    terminate = Mock()
+    monkeypatch.setattr("quodeq.analysis._process._terminate_process", terminate)
+    result = run_single_agent(
+        0, tmp_path, "Inspect sources",
+        AnalysisConfig(ai_cmd="copilot", heartbeat_interval=1),
+        WorkerContext("security", "security", tmp_path, tmp_path / "queue.json"),
+    )
+    assert not result.success
+    assert "administrator" in result.error
+    assert cancellation.cancel_reason().startswith("provider_fatal:copilot_mcp_policy:")
+    assert should_respawn(_FixedRemainingQueue(211), tmp_path / "queue.json", 0.0, 0) == 0
+    terminate.assert_called_once_with(process)
+    assert not captured["cwd"].exists()
+    assert not captured["mcp"].exists()
+    process.wait.assert_called_once_with(timeout=1)
+
+
+def test_copilot_policy_block_in_completed_stream_aborts_evaluation(tmp_path, monkeypatch):
+    def spawn(args, work_dir, env, paths, cfg):
+        paths.stream_file.write_text(json.dumps({"type": "session.warning", "data": {
+            "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
+        }}) + "\n")
+        return Mock(returncode=0), False
+
+    monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
+    with pytest.raises(FatalProviderError, match="administrator") as exc:
+        _run_cli_analysis(tmp_path, "hi", tmp_path / "s.jsonl", AnalysisConfig(ai_cmd="copilot"))
+    assert exc.value.reason == "copilot_mcp_policy"

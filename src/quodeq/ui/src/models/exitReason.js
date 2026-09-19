@@ -27,6 +27,11 @@ const FAILURE_STREAK = {
 const CANCELLED = { label: t('exitReason.cancelledLabel'), hint: null };
 
 export const EXIT_REASON_INFO = {
+  copilot_mcp_policy: {
+    label: t('exitReason.copilotMcpPolicyLabel'),
+    hint: t('exitReason.copilotMcpPolicyHint'),
+    warn: true,
+  },
   provider_fatal: {
     label: t('exitReason.providerFatalLabel'),
     hint: t('exitReason.providerFatalHint'),

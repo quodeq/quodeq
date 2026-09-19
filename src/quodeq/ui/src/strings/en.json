@@ -536,6 +536,8 @@
   "exitReason.failureStreakLabel": "repeated failures",
   "exitReason.providerFatalHint": "The AI provider rejected every request: quota exhausted, out of credits, or an invalid API key. Check your plan, billing or API key, then run again.",
   "exitReason.providerFatalLabel": "AI provider error",
+  "exitReason.copilotMcpPolicyLabel": "Evaluation blocked by Copilot policy",
+  "exitReason.copilotMcpPolicyHint": "Copilot blocked Quodeq's required findings MCP server. Ask your organization administrator to allow it before retrying. Signing in or changing models will not resolve this restriction.",
   "exitReason.timeLimitHint": "Remaining files carry over to the next run. Raise the time limit to cover more in one run.",
   "exitReason.timeLimitLabel": "time limit reached",
   "explorer.allFilesNoFilter": "All files (no filter)",

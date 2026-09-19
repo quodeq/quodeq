@@ -4,8 +4,10 @@ from __future__ import annotations
 import json as _json
 from pathlib import Path
 
+from quodeq.analysis.errors import classify_fatal_provider_message
 from quodeq.analysis.stream._incremental_lines import iter_line_batches
 from quodeq.analysis.stream.counters import extract_files_from_event, parse_stream_event
+from quodeq.core.stream.events import copilot_error
 from quodeq.shared.logging import log_debug
 
 _TYPE_VIOLATION = "violation"
@@ -24,6 +26,7 @@ class _IncrementalProgressReader:
         self._jsonl_count = 0
         self._violations = 0
         self._compliances = 0
+        self.provider_error: tuple[str, str] | None = None
 
     def read_progress(self) -> dict:
         """Return incremental progress since the last call."""
@@ -53,6 +56,13 @@ class _IncrementalProgressReader:
             data = parse_stream_event(line)
             if data is not None:
                 self._seen_files.update(extract_files_from_event(data))
+                if isinstance(data, dict) and self.provider_error is None:
+                    error = copilot_error(data)
+                    if error:
+                        message, reason = error
+                        reason = reason or classify_fatal_provider_message(message)
+                        if reason:
+                            self.provider_error = (message, reason)
 
     def _read_jsonl(self) -> None:
         if self._jsonl_file is None or not self._jsonl_file.exists():
