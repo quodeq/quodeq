@@ -236,6 +236,7 @@ class TestFindingsServerArgsAreShared:
 
     def test_both_emitters_agree(self, tmp_path):
         from quodeq.analysis._mcp_config import _codex_mcp_config_arg
+        from quodeq.analysis.cache.local import default_cache_root
 
         jsonl, compiled, ap = self._fixture(tmp_path)
 
@@ -258,7 +259,7 @@ class TestFindingsServerArgsAreShared:
             "--queue": str((tmp_path / "queue.jsonl").resolve()),
             "--agent-id": "agent-7",
             "--work-dir": str((tmp_path / "work").resolve()),
-            "--cache-root": values["--cache-root"],
+            "--cache-root": str(default_cache_root()),
             "--model-id": "sonnet",
             "--language": "python",
         }

@@ -135,13 +135,15 @@ def _configure_app(
 
 def _build_rate_limit_store(
     rate_limit_store: RateLimitStore | None = None,
+    env: dict[str, str] | None = None,
 ) -> tuple[RateLimitStore, RateLimitStore]:
     """Return the (API, evaluation) rate-limit stores.
 
     The API limiter honours a caller-supplied shared backend; the evaluation
-    limiter is always process-local with its own window and cap.
+    limiter is always process-local with its own window and cap. *env*
+    overrides the backend lookup for tests and defaults to ``os.environ``.
     """
-    store = rate_limit_store or create_rate_limit_store()
+    store = rate_limit_store or create_rate_limit_store(env=env)
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
     )

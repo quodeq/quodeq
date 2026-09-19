@@ -55,6 +55,7 @@ class TestResolveLimits:
 
 class TestBuildAnalysisOptions:
     def test_maps_resolved_locals_and_limits_onto_the_options(self):
+        from quodeq._cli_evaluation import _RunConfigLocals
         from quodeq._cli_run_config import _build_analysis_options, _resolve_limits
 
         limits = _resolve_limits(
@@ -64,7 +65,14 @@ class TestBuildAnalysisOptions:
             ),
             env={},
         )
-        resolved = (False, "claude-3", "ollama/llama3", "HEAD~1", {"a.py"}, True)
+        resolved = _RunConfigLocals(
+            consolidated=False,
+            effective_ai_model="claude-3",
+            subagent_model="ollama/llama3",
+            diff_from="HEAD~1",
+            diff_files={"a.py"},
+            skip_scoring=True,
+        )
 
         options = _build_analysis_options(["security"], resolved, limits)
 
