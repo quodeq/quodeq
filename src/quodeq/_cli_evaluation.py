@@ -21,8 +21,7 @@ import os
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
-from quodeq.analysis.dispatch_policy import default_dispatch_policy
-from quodeq.analysis.runner import AnalysisOptions, RunConfig, run
+from quodeq.analysis.runner import RunConfig, run
 from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.services.evidence_rescore import (  # noqa: F401 — facade patch targets
     rescore_dimension_from_evidence, score_dimension_from_evidence,
@@ -34,7 +33,6 @@ from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_rep
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # facade patch target
 from quodeq.analysis._runner_markers import emit_marker  # facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
-from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.analysis._diff_resolver import resolve_diff_files  # facade patch target
 from quodeq.analysis.manifest_serialization import manifest_to_dict
 
@@ -42,6 +40,9 @@ from quodeq.analysis.manifest_serialization import manifest_to_dict
 from quodeq._cli_env import (  # noqa: F401
     _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_POOL_BUDGET, _ENV_TIME_LIMIT,
     _env_int, _no_verify, _resolve_time_limit, _subagent_model,
+)
+from quodeq._cli_run_config import (
+    _build_analysis_options, _dimensions_filter, _resolve_limits,
 )
 from quodeq._cli_resolution import (  # noqa: F401
     ResolvedInputs, _build_manifest, _cleanup_worktree, _create_worktree,
@@ -136,15 +137,9 @@ def _resolve_run_config_locals(args: argparse.Namespace, inputs: ResolvedInputs,
 def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, run_dir: Path | None = None, env: dict[str, str] | None = None) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved inputs."""
     standards_dir = default_paths().standards_dir
-    expanded_dimensions = expand_dimension_aliases(args.dimensions)
-    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
-    log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
-
-    (
-        consolidated, effective_ai_model, subagent_model_val,
-        diff_from, diff_files, skip_scoring,
-    ) = _resolve_run_config_locals(args, inputs, env)
-    incremental_file_filter: set[str] | None = diff_files
+    dimensions_filter = _dimensions_filter(args)
+    resolved = _resolve_run_config_locals(args, inputs, env)
+    limits = _resolve_limits(args, env)
 
     return RunConfig(
         src=inputs.src,
@@ -156,23 +151,8 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         dimensions_data=inputs.dims_data,
         evaluators_dir=default_paths().evaluators_dir,
         prompts_dir=default_paths().prompts_dir,
-        options=AnalysisOptions(
-            ai_model=effective_ai_model,
-            dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None, env=env),
-            max_subagents=args.n_subagents,
-            subagent_model=subagent_model_val,
-            verify_findings=not _no_verify(args, env=env),
-            consolidated=consolidated,
-            time_limit=_resolve_time_limit(args, env=env),
-            incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
-            incremental_file_filter=incremental_file_filter,
-            dry_run=getattr(args, "dry_run", False),
-            diff_from=diff_from,
-            skip_scoring=skip_scoring,
-        ),
-        dispatch=default_dispatch_policy(env=env or os.environ),
+        options=_build_analysis_options(dimensions_filter, resolved, limits),
+        dispatch=limits.dispatch_policy,
     )
 
 

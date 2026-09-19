@@ -273,4 +273,3 @@ def test_diff_from_forces_clean_scan_internally(tmp_path):
     )
     config = _build_run_config(args, inputs=inputs, evidence_dir=repo / "evi")
     assert config.options.incremental is False
-
