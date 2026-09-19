@@ -12,10 +12,10 @@ the process at all, and only that declaration gives this gate its authority --
 which is why an undeclared project resolves to
 ``trust_model.CONSERVATIVE`` and nothing here fires.
 
-The gate ships three rules -- ``sourceless_path``, ``cross_principal`` and
-``single_host_topology``. Which one a finding's evidence earns lives in
-``scope_gate_rules``; this module owns only what to DO about it. A finding
-that names no scope-dependent concept is never touched.
+The gate ships four rules -- ``sourceless_path``, ``cross_principal``,
+``single_host_topology`` and ``loopback_transport``. Which one a finding's
+evidence earns lives in ``scope_gate_rules``; this module owns only what to
+DO about it. A finding that names no scope-dependent concept is never touched.
 
 Caps ``major`` -> ``minor``; never drops. A team that later ships as a hosted
 service must be able to recover the list of what was waived, so the finding
