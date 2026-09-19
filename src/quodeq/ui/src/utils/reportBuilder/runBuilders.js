@@ -1,5 +1,5 @@
 // src/quodeq/ui/src/utils/reportBuilder/runBuilders.js
-import { formatDate, buildViolationsSection, buildComplianceSection } from './shared.js';
+import { formatDate, formatScore, buildViolationsSection, buildComplianceSection } from './shared.js';
 import {
   buildDimensionSummaryTable,
   buildTopOffendingFiles,
@@ -53,7 +53,7 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
  */
 export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
   const summary = accumulated?.summary || {};
-  const score = summary.numericAverage != null ? `${Math.round(summary.numericAverage * 10) / 10}/10` : '—';
+  const score = formatScore(summary.numericAverage);
   const grade = summary.overallGrade || '—';
   const date = formatDate();
   const project = projectName || 'Project';
@@ -82,8 +82,7 @@ export function buildRunReport({ dashboard, runSummary, projectName }) {
   const selectedRun = dashboard?.selectedRun || {};
   const dateLabel = selectedRun.dateLabel || formatDate();
   const runId = selectedRun.runId || '';
-  const numeric = runSummary?.numericAverage;
-  const score = numeric != null ? `${Math.round(parseFloat(numeric) * 10) / 10}/10` : '—';
+  const score = formatScore(runSummary?.numericAverage);
   const grade = runSummary?.overallGrade || '—';
   const project = projectName || 'Run';
   const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
