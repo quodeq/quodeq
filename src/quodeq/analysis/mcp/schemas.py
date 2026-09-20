@@ -15,6 +15,16 @@ SEVERITY_CRITICAL = "critical"
 SEVERITY_MAJOR = "major"
 SEVERITY_MINOR = "minor"
 
+# mark_file_done's "status" vocabulary. router.py writes these into the JSONL
+# file_done markers; _loop_guards.py reads them back to count analysed vs
+# abandoned files, so both sides import these rather than retyping them.
+FILE_DONE_STATUS_OK = "ok"
+FILE_DONE_STATUS_ERROR = "error"
+# Accepted by the router but deliberately absent from the tool schema's enum
+# below: "skipped" is written by the server for files the worker could never
+# dispatch, not something a worker is told to report.
+FILE_DONE_STATUS_SKIPPED = "skipped"
+
 REPORT_FINDING_NAME = "report_finding"
 REPORT_FINDING_DESC = (
     "Report a code quality finding (violation or compliance). "
@@ -69,7 +79,7 @@ MARK_FILE_DONE_SCHEMA = {
     "type": "object",
     "properties": {
         "file": {"type": "string", "description": "Repo-relative file path that was just analysed"},
-        "status": {"type": "string", "enum": ["ok", "error"], "description": "ok if analysis completed, error if abandoned"},
+        "status": {"type": "string", "enum": [FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR], "description": "ok if analysis completed, error if abandoned"},
         "reason": {"type": "string", "description": "Short stable code when status=error: token_limit | parse_error | retry_exhausted | subprocess_error | timeout"},
     },
     "required": ["file", "status"],

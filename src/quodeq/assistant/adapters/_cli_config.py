@@ -10,7 +10,8 @@ from quodeq.core._constants import MCP_STYLE_CONFIG_FILE, PROMPT_FLAG_DEFAULT, P
 # (resume_style, session_id_source, system_prompt_style), sourced from the
 # ai_providers.json "assistant" block. _cli.py and _cli_command.py, the two
 # consumers, import these rather than retyping the strings.
-RESUME_STYLE_FLAG_RESUME = "flag-resume"  # --resume <id> (claude, codex)
+RESUME_STYLE_FLAG_RESUME = "flag-resume"  # --resume <id> (claude, copilot); the default when unset
+RESUME_STYLE_EXEC = "exec-resume"  # `exec resume <id>` after the subcommand (codex)
 RESUME_STYLE_GEMINI = "gemini-resume"  # -r <id>
 SESSION_ID_SOURCE_PREASSIGN = "preassign"  # --session-id <new-id> on turn 1
 SESSION_ID_SOURCE_PARSE_JSONL = "parse-jsonl"  # id parsed from the stream (codex)

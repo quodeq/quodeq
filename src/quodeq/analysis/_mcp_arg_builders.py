@@ -23,7 +23,7 @@ from quodeq.analysis._config import (
 from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.config.analysis_env import ai_tools, base_ai_args
 from quodeq.core._constants import (
-    MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
+    MCP_CONFIG_ARG_FLAG, MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
 from quodeq.shared._models import normalize_model_id
@@ -144,7 +144,7 @@ def _build_mcp_args(
     agent_params = _build_agent_params(config, work_dir)
     if mcp_style == MCP_STYLE_CONFIG_ARG:
         return [
-            "-c",
+            MCP_CONFIG_ARG_FLAG,
             _codex_mcp_config_arg(
                 config.jsonl_file, config.compiled_dir, config.dimension, agent_params,
             ),

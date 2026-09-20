@@ -3,6 +3,11 @@ import sqlite3
 from quodeq.data.sqlite._migrations import apply_evaluation_schema
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
+# The v5 baseline DDL below and the per-version upgrade cases are written
+# against v9 specifically. Bumping SCHEMA_VERSION without extending them would
+# leave the new version's upgrade path untested, so pin it here.
+assert SCHEMA_VERSION == 9
+
 
 # Findings table as it existed at SCHEMA_VERSION=5, before issue #656 added
 # the provenance_downgrade column. Used to verify the v5 -> v6 upgrade path.

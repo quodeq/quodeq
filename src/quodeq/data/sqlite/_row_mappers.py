@@ -39,7 +39,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
     practice_id = finding.get("p", "")
     file = finding.get("file", "") or ""
     line = int(finding.get("line", 0) or 0)
-    verdict = finding.get("t", "violation")
+    verdict = finding.get("t", VERDICT_VIOLATION)
     refs = finding.get("req_refs")
     return {
         "schema_version": int(finding.get("schema_version", 1)),

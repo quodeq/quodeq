@@ -9,7 +9,7 @@ from quodeq.assistant.adapters._cli_config import (
     CliChatConfig,
 )
 from quodeq.core._constants import (
-    MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
+    MCP_CONFIG_ARG_FLAG, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
 )
 from quodeq.shared._models import normalize_model_id
 
@@ -20,9 +20,9 @@ _NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
 
 # argv flag spellings this module emits. Named so a typo can't silently
 # desync the flag from what the consuming CLI actually recognises, and so
-# the MCP-config-arg flag "-c" reads distinctly from a provider's own
-# `-p`/`-r` short flags (cfg.prompt_flag / RESUME_STYLE_GEMINI's "-r").
-_FLAG_MCP_CONFIG_ARG = "-c"
+# they read distinctly from a provider's own `-p`/`-r` short flags
+# (cfg.prompt_flag / RESUME_STYLE_GEMINI's "-r"). The MCP-config-arg flag is
+# the one analysis/_mcp_arg_builders.py also emits, so it comes from core.
 _FLAG_MODEL = "--model"
 _FLAG_APPEND_SYSTEM_PROMPT = "--append-system-prompt"
 _FLAG_SESSION_ID = "--session-id"
@@ -130,7 +130,7 @@ def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec
     if request.mcp_config_path and cfg.mcp_style == MCP_STYLE_CONFIG_FILE:
         argv.extend([cfg.mcp_config_flag, f"{cfg.mcp_config_prefix}{request.mcp_config_path}"])
     if request.mcp_config_arg and cfg.mcp_style == MCP_STYLE_CONFIG_ARG:
-        argv.extend([_FLAG_MCP_CONFIG_ARG, request.mcp_config_arg])
+        argv.extend([MCP_CONFIG_ARG_FLAG, request.mcp_config_arg])
     normalized_model = _model_arg(cfg, request.model)
     if normalized_model:
         argv.extend([_FLAG_MODEL, normalized_model])
