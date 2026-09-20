@@ -1,7 +1,7 @@
 """Findings flattening and principle-row building for reports."""
 from __future__ import annotations
 
-from quodeq.data.fs.dimension_report._report_constants import (
+from quodeq.data.fs.dimension_report.report_constants import (
     COMPLIANCE_FIELDS,
     FIELD_CONFIDENCE_INTERVAL,
     FIELD_CONFIDENCE_INTERVAL_SNAKE,

@@ -8,7 +8,7 @@ from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence, violations_per_100_files
 from quodeq.data.fs.dimension_report._report_taxonomy import unmapped_types
 
-from quodeq.data.fs.dimension_report._report_constants import (
+from quodeq.data.fs.dimension_report.report_constants import (
     FIELD_WEIGHTED_SCORE,
     FIELD_WEIGHTED_SCORE_SNAKE,
     REPORT_SCHEMA_VERSION,

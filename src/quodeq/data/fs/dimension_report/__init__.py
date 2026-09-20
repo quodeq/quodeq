@@ -1,7 +1,7 @@
 """Dimension-report I/O adapter — build and persist per-dimension report files.
 
 Sub-modules:
-  _report_constants  -- field-name constants
+  report_constants   -- field-name constants
   report_scoring     -- score/grade conversion and lookup building
   report_findings    -- findings flattening and principle-row building
   report_assembly    -- report dict assembly
