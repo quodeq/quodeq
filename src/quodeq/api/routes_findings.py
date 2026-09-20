@@ -120,6 +120,11 @@ def _eval_dir(app: Flask) -> str:
     return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
 
 
+def _run_id(body: dict) -> str | None:
+    """The run id a findings request names, under either the snake or camel key."""
+    return body.get("run_id") or body.get("runId")
+
+
 def _scores_with_fallback(app: Flask, project: str, run_id: str | None) -> dict[str, Any] | None:
     return rescore_with_fallback(_eval_dir(app), project, run_id)
 
@@ -150,7 +155,7 @@ def _dismiss(app: Flask) -> tuple[Response, int]:
     target, err = _finding_target_or_error(body)
     if err is not None:
         return err
-    run_id = body.get("run_id") or body.get("runId")
+    run_id = _run_id(body)
     dismiss_finding(_project_dir(_eval_dir(app), target["project"]), body, run_id=run_id)
     scores = _scores_with_fallback(app, target["project"], run_id)
     delta = dismiss_delta(
@@ -165,7 +170,7 @@ def _restore(app: Flask) -> tuple[Response, int]:
     target, err = _finding_target_or_error(body)
     if err is not None:
         return err
-    run_id = body.get("run_id") or body.get("runId")
+    run_id = _run_id(body)
     restore_finding(_project_dir(_eval_dir(app), target["project"]), body)
     scores = _scores_with_fallback(app, target["project"], run_id)
     delta = restore_delta(
@@ -178,7 +183,7 @@ def _restore(app: Flask) -> tuple[Response, int]:
 def _restore_all(app: Flask) -> tuple[Response, int]:
     body = request.get_json(silent=True) or {}
     project = body.get("project", "")
-    run_id = body.get("run_id") or body.get("runId")
+    run_id = _run_id(body)
     if not project:
         return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
     count = restore_all_findings(_project_dir(_eval_dir(app), project))
@@ -193,7 +198,7 @@ def _delete(app: Flask) -> tuple[Response, int]:
     dimension = body.get("dimension", "")
     principle = body.get("principle", "")
     file = body.get("file", "")
-    run_id = body.get("run_id") or body.get("runId")
+    run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
         return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
@@ -215,7 +220,7 @@ def _delete_all(app: Flask) -> tuple[Response, int]:
         )
     body = request.get_json(silent=True) or {}
     project = body.get("project", "")
-    run_id = body.get("run_id") or body.get("runId")
+    run_id = _run_id(body)
     if not project:
         return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
     count = delete_all_dismissed(_project_dir(_eval_dir(app), project))

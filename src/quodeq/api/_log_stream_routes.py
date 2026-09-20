@@ -85,6 +85,26 @@ def _sse_log_response(provider, job_id: str, initial_offset: int) -> Response:
     return resp
 
 
+def _invalid_job_id() -> tuple[Response, int]:
+    """The 400 both log routes answer a malformed job id with."""
+    return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
+
+
+def _job_log_inputs(job_id: str):
+    """``(provider, log_path, status)`` for *job_id*, or None when the id is malformed.
+
+    *status* is the HTTP status ``_resolve_run_log`` chose for an absent log;
+    what an absent log means is the route's own call.
+    """
+    try:
+        validate_path_segment(job_id)
+    except ValueError:
+        return None
+    provider = current_app.config.get("_provider")
+    log_path, err = _resolve_run_log(provider, job_id)
+    return provider, log_path, err
+
+
 def register_log_stream_routes(app: Flask) -> None:
     """Register plain + SSE log-stream routes on *app*.
 
@@ -94,12 +114,10 @@ def register_log_stream_routes(app: Flask) -> None:
 
     @app.get("/api/jobs/<job_id>/logs")
     def plain_logs(job_id: str) -> Response | tuple[Response, int]:
-        try:
-            validate_path_segment(job_id)
-        except ValueError:
-            return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
-        provider = current_app.config.get("_provider")
-        log_path, err = _resolve_run_log(provider, job_id)
+        resolved = _job_log_inputs(job_id)
+        if resolved is None:
+            return _invalid_job_id()
+        provider, log_path, err = resolved
         if log_path is None:
             return jsonify({"error": "log unavailable", "code": "NOT_FOUND"}), err
         since = max(0, request.args.get("since", 0, type=int))
@@ -109,12 +127,10 @@ def register_log_stream_routes(app: Flask) -> None:
 
     @app.get("/api/jobs/<job_id>/logs/stream")
     def stream_logs(job_id: str) -> Response | tuple[Response, int]:
-        try:
-            validate_path_segment(job_id)
-        except ValueError:
-            return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
-        provider = current_app.config.get("_provider")
-        log_path, err = _resolve_run_log(provider, job_id)
+        resolved = _job_log_inputs(job_id)
+        if resolved is None:
+            return _invalid_job_id()
+        provider, log_path, err = resolved
         # If run.log isn't on disk yet but the job is still preparing
         # (no report_path marker yet, or the runner just hasn't created
         # the file), keep the SSE response open and let the generator

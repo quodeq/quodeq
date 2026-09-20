@@ -132,14 +132,9 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
     cleanScan=true each dimension reports count=total and cached=0.
     Never creates a run or writes to disk.
     """
-    try:
-        validate_path_segment(project)
-    except ValueError:
-        return json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-
-    project_dir = _contained_project_dir(project)
-    if project_dir is None:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    project_dir, err = _scan_inputs(project)
+    if err is not None:
+        return err
 
     # Lazy import: pulls in the analysis pipeline, which the API process
     # should not pay for at startup. Layer exception is baselined — same
@@ -171,8 +166,7 @@ def scan_path() -> Response | tuple[Response, int]:
     if not target_path.is_dir():
         return json_error("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
 
-    result = scan_project(target_path)
-    return jsonify(dataclasses.asdict(result))
+    return _scan_response(scan_project(target_path))
 
 
 def register_project_scan_routes(app: Flask) -> None:

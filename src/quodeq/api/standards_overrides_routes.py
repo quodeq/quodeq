@@ -12,9 +12,8 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._assistant_helpers import resolve_repo_root
-from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
-from quodeq.api.helpers import error_response
-from quodeq.shared.validation import validate_path_segment
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
+from quodeq.api.helpers import error_response, project_root_or_error
 from quodeq.core.standards.overrides import validate_overrides
 from quodeq.services.standards_overrides import changed_dimensions, override_counts_by_dimension
 from quodeq.services.standards_prefs import (
@@ -32,14 +31,7 @@ def _project_root_or_error(project_id: str) -> tuple[Path | None, Response | Non
 
     Returns ``(root, None)`` or ``(None, error_response)``.
     """
-    try:
-        validate_path_segment(project_id)
-    except ValueError:
-        return None, error_response("Invalid project id", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
-    root = resolve_repo_root(project_id)
-    if not root:
-        return None, error_response("Project has no local repository", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
-    return Path(root), None
+    return project_root_or_error(project_id, resolve_repo_root)
 
 
 def _declared_params(app: Flask) -> dict:

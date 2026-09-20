@@ -59,17 +59,25 @@ class InMemoryRateLimitStore:
         self._max_ips = max_ips
         self._last_cleanup: float = 0.0
 
+    def _is_stale(self, timestamps: list[float], now: float) -> bool:
+        """True when every timestamp recorded for an IP has aged out of the window."""
+        return all(now - t >= self._window for t in timestamps)
+
+    def _drop(self, keys: list[str]) -> None:
+        """Remove *keys* from the store."""
+        for k in keys:
+            del self._store[k]
+
     def _evict_stale(self, now: float) -> None:
         if len(self._store) <= self._max_ips:
             return
         stale = []
         for k, v in self._store.items():
-            if all(now - t >= self._window for t in v):
+            if self._is_stale(v, now):
                 stale.append(k)
             else:
                 break  # LRU order: first non-stale entry means the rest are newer
-        for k in stale:
-            del self._store[k]
+        self._drop(stale)
         if len(self._store) > self._max_ips:
             self._store.clear()
 
@@ -78,9 +86,7 @@ class InMemoryRateLimitStore:
         if now - self._last_cleanup < self._CLEANUP_INTERVAL:
             return
         self._last_cleanup = now
-        stale = [k for k, v in self._store.items() if all(now - t >= self._window for t in v)]
-        for k in stale:
-            del self._store[k]
+        self._drop([k for k, v in self._store.items() if self._is_stale(v, now)])
 
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""

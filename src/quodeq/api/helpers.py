@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
 from quodeq.shared.errors import ClientMessageError  # noqa: F401 -- re-export for api modules
+from quodeq.shared.validation import validate_path_segment
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
@@ -26,6 +28,28 @@ def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
     """
     body, status_code = error_response(message, status, code)
     return jsonify(body), status_code
+
+
+def project_root_or_error(
+    project_id: str, resolve: Callable[[str], str | None],
+) -> tuple[Path | None, Any]:
+    """Validate *project_id* and resolve its local repository root via *resolve*.
+
+    Returns ``(root, None)``, or ``(None, error)`` when the id is malformed
+    (400) or the project has no local repository on this machine (404).
+    *resolve* is passed in rather than imported so each route module keeps
+    its own patchable ``resolve_repo_root`` name.
+    """
+    try:
+        validate_path_segment(project_id)
+    except ValueError:
+        return None, error_response("Invalid project id", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    root = resolve(project_id)
+    if not root:
+        return None, error_response(
+            "Project has no local repository", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND,
+        )
+    return Path(root), None
 
 
 def _json_object_or_error(
