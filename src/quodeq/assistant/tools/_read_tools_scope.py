@@ -13,7 +13,7 @@ from quodeq.assistant.tools import _read_tools_violations as _violations_facade
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.ports.findings import FindingsRepository
-from quodeq.services import _fs_reports
+from quodeq.services import fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
@@ -59,7 +59,7 @@ def _accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] 
     """
     if ctx.reports_dir is None or ctx.project_id is None:
         return None
-    payload = _fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, None)
+    payload = fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, None)
     if payload is None:
         return None
     if rescored:

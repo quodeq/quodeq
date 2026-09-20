@@ -26,7 +26,7 @@ from typing import Any
 
 from quodeq.core.types import ProjectEntry, ViolationSummary
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import _fs_reports, fs_projects
+from quodeq.services import fs_reports, fs_projects
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
@@ -203,29 +203,29 @@ class FilesystemActionProvider(ActionProvider):
     def _build_project_list(reports_root: Path) -> list[ProjectEntry]:
         return fs_projects.build_project_list(reports_root)
 
-    # -- reports (delegate to _fs_reports) ------------------------------
+    # -- reports (delegate to fs_reports) ------------------------------
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
         """Return the dashboard payload assembled from one run's on-disk artifacts."""
-        return _fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
+        return fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
 
     def get_accumulated(
         self, reports_dir: str, project: str, as_of: str | None,
     ) -> dict[str, Any] | None:
         """Return dimension data accumulated across every run up to *as_of*, or None."""
-        return _fs_reports.get_accumulated(reports_dir, project, as_of)
+        return fs_reports.get_accumulated(reports_dir, project, as_of)
 
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
     ) -> dict[str, Any] | None:
         """Return one dimension's parsed evaluation, resolved against ``_compiled_dir``."""
-        return _fs_reports.get_dimension_eval(
+        return fs_reports.get_dimension_eval(
             reports_dir, project, run_id, dimension, compiled_dir=self._compiled_dir,
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         """Return the violation counts aggregated across a run's dimensions."""
-        return _fs_reports.get_violations(reports_dir, project, run_id, log=SHARED_LOG)
+        return fs_reports.get_violations(reports_dir, project, run_id, log=SHARED_LOG)
 
     # -- tooling (delegate to FsToolingMixin) ---------------------------
 

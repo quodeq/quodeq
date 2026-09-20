@@ -30,10 +30,10 @@ from quodeq.data.fs.report_parser.finding_details import (
 )
 from quodeq.data.ports.findings import FindingsRepository
 # Imported for its module identity, not called directly here: tests patch
-# `quodeq.assistant.tools._read_tools._fs_reports.get_accumulated`, which
-# mutates the shared `_fs_reports` module object that
+# `quodeq.assistant.tools._read_tools.fs_reports.get_accumulated`, which
+# mutates the shared `fs_reports` module object that
 # `_read_tools_scope._accumulated_dims` actually calls through.
-from quodeq.services import _fs_reports  # noqa: F401 - re-export (patch target)
+from quodeq.services import fs_reports  # noqa: F401 - re-export (patch target)
 from quodeq.services.standards import StandardsService
 
 # Dimension ids are simple slugs. The tool-call `dimension` argument is

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from quodeq.core.observability import NULL_LOG
-from quodeq.services import _fs_reports
+from quodeq.services import fs_reports
 from quodeq.shared.log_sink import SHARED_LOG
 from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- pytest fixtures
 
@@ -54,13 +54,13 @@ def test_shared_violations_invalid_run_segment(client, shared_clone_fixture):
 def test_shared_violations_passes_shared_log_sink(client, shared_clone_fixture, monkeypatch):
     """shared_violations threads log=SHARED_LOG, matching shared_dashboard (Task 3 follow-up)."""
     calls: list[object] = []
-    original = _fs_reports.get_violations
+    original = fs_reports.get_violations
 
     def spy(reports_dir, project, run_id, *, log=NULL_LOG):
         calls.append(log)
         return original(reports_dir, project, run_id, log=log)
 
-    monkeypatch.setattr(_fs_reports, "get_violations", spy)
+    monkeypatch.setattr(fs_reports, "get_violations", spy)
     resp = client.get("/api/shared/projects/proj-a/violations?run=run-1")
     assert resp.status_code == 200
     assert calls == [SHARED_LOG]
