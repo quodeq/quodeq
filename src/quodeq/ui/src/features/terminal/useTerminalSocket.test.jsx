@@ -4,6 +4,10 @@ import { useTerminalSocket } from './useTerminalSocket.js';
 
 class MockWS {
   static instances = [];
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
   constructor(url) { this.url = url; this.sent = []; this.readyState = 0; MockWS.instances.push(this);
     this.onopen = null; this.onmessage = null; this.onclose = null; }
   send(d) { this.sent.push(d); }

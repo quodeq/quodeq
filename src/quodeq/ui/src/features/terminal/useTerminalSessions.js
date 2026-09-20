@@ -8,6 +8,9 @@ import { readString, writeString } from '../../adapters/storage.js';
 // the webview page, and a stale id is harmless — reconcile validates it
 // against the server list and falls back.
 const ACTIVE_SESSION_KEY = 'quodeq.terminal.activeSession';
+// Client-side fallback session cap shown until the first list response
+// reports the server's real limit.
+const DEFAULT_SESSION_CAP = 6;
 
 function readStoredActive() {
   return readString(ACTIVE_SESSION_KEY);
@@ -121,7 +124,7 @@ export function useTerminalSessions({ enabled }) {
   const { listTerminalSessions, createTerminalSession, killTerminalSession } = useApi();
   const [sessions, setSessions] = useState([]);
   const [activeId, setActiveId] = useState(null);
-  const [max, setMax] = useState(6);
+  const [max, setMax] = useState(DEFAULT_SESSION_CAP);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
   // Serialize reconciles: a burst (N sockets all reporting 'gone' after a

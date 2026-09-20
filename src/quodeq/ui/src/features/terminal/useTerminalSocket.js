@@ -12,6 +12,10 @@ const CLOSE_GONE = 4004;     // unknown session id (e.g. server restarted)
 const RETRY_BASE_MS = 500;
 const RETRY_MAX_MS = 5000;
 
+// Wire protocol frame-type prefixes (server: api/terminal_routes.py).
+const FRAME_DATA = '0';
+const FRAME_RESIZE = '1';
+
 function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef, onDataRef, setStatus, setGen }) {
   const ws = new WebSocket(terminalSocketUrl(window.location, sessionId));
   wsRef.current = ws;
@@ -43,7 +47,7 @@ function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef
   };
   ws.onmessage = (e) => {
     const s = typeof e.data === 'string' ? e.data : '';
-    if (s[0] === '0') onDataRef.current?.(s.slice(1));
+    if (s[0] === FRAME_DATA) onDataRef.current?.(s.slice(1));
   };
   return () => {
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
@@ -87,12 +91,12 @@ export function useTerminalSocket({ active, onData, onOpen, restartKey = 0, sess
 
   const send = useCallback((data) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === 1) ws.send('0' + data);
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(FRAME_DATA + data);
   }, []);
 
   const resize = useCallback((cols, rows) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === 1) ws.send('1' + JSON.stringify({ resize: { cols, rows } }));
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(FRAME_RESIZE + JSON.stringify({ resize: { cols, rows } }));
   }, []);
 
   // Manual retry (overlay click): skip any pending backoff and go now.
