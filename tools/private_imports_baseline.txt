@@ -122,8 +122,6 @@ src/quodeq/ci/review.py:138:private-module:quodeq._cli_evaluation.run_diff_evalu
 src/quodeq/config/evidence_env.py:10:private-name:quodeq.core.evidence._refs._CWE_URL_TEMPLATE_DEFAULT
 src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/_accumulated_cache.py:16:private-name:quodeq.shared.utils._env_int
-src/quodeq/services/_external_jobs.py:25:private-module:quodeq.data.fs.report_parser._external_pid.is_safe_run_segment
-src/quodeq/services/_external_jobs.py:25:private-module:quodeq.data.fs.report_parser._external_pid.resolve_external_pid
 src/quodeq/services/_fs_project_parents.py:13:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_registration_url.py:12:private-name:quodeq.shared.repo._looks_like_authority
 src/quodeq/services/_rescore_legacy.py:11:private-module:quodeq.core.scoring._principle.compute_tallies
