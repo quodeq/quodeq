@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.services._wiring import remote_origin_url_raw
-from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
+from quodeq.shared._repo import SCHEME_RE, looks_like_authority
 
 
 
@@ -37,7 +37,7 @@ def _strip_credentials(url: str) -> str:
     if at_pos == -1:
         return url
     slash_pos = rest.find("/")
-    if -1 < slash_pos < at_pos and _looks_like_authority(rest[:slash_pos]):
+    if -1 < slash_pos < at_pos and looks_like_authority(rest[:slash_pos]):
         return url
     return scheme + rest[at_pos + 1:]
 

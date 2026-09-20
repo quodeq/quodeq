@@ -7,7 +7,7 @@ import threading
 from quodeq.core._constants import (
     MCP_STYLE_CONFIG_ARG, PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
-from quodeq.shared.provider_env import _providers_path
+from quodeq.shared.provider_env import providers_path
 
 # Fallback provider configs used when the primary JSON file
 # (data/config/ai_providers.json) cannot be loaded.
@@ -57,7 +57,7 @@ class _ProviderConfigCache:
             with self._lock:
                 if self._configs is None:
                     try:
-                        self._configs = json.loads(_providers_path().read_text(encoding="utf-8"))
+                        self._configs = json.loads(providers_path().read_text(encoding="utf-8"))
                     except (OSError, json.JSONDecodeError):
                         self._configs = _PROVIDER_CONFIGS_FALLBACK
         return self._configs

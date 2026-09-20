@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from quodeq.core.types import ProjectEntry
-from quodeq.shared.utils import _env_int
+from quodeq.shared.utils import env_int
 
 _DEFAULT_MAX_PROJECTS_LISTED = 200
 
@@ -34,7 +34,7 @@ def _max_projects_listed(override: int | None = None, env: dict[str, str] | None
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
-    return _env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
+    return env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
 
 
 def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:

@@ -72,7 +72,7 @@ def test_default_persist_dir_honours_injected_env(tmp_path: Path):
 
 
 def test_providers_path_honours_injected_env(tmp_path: Path):
-    from quodeq.shared.provider_env import _DEFAULT_PATH, _providers_path
+    from quodeq.shared.provider_env import _DEFAULT_PATH, providers_path
 
-    assert _providers_path(env={}) == _DEFAULT_PATH
-    assert _providers_path(env={"QUODEQ_AI_PROVIDERS_PATH": str(tmp_path / "p.json")}) == tmp_path / "p.json"
+    assert providers_path(env={}) == _DEFAULT_PATH
+    assert providers_path(env={"QUODEQ_AI_PROVIDERS_PATH": str(tmp_path / "p.json")}) == tmp_path / "p.json"

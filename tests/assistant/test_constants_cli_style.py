@@ -19,7 +19,7 @@ from quodeq.assistant.adapters._cli_config import (
     SESSION_ID_SOURCE_PARSE_JSONL, SESSION_ID_SOURCE_PREASSIGN,
     SYSTEM_PROMPT_STYLE_ARGV_APPEND, SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX,
 )
-from quodeq.shared.provider_env import _providers_path
+from quodeq.shared.provider_env import providers_path
 
 _RESUME_STYLES = {RESUME_STYLE_FLAG_RESUME, RESUME_STYLE_EXEC, RESUME_STYLE_GEMINI}
 _SESSION_ID_SOURCES = {SESSION_ID_SOURCE_PREASSIGN, SESSION_ID_SOURCE_PARSE_JSONL}
@@ -37,7 +37,7 @@ _CONSUMERS = {
 
 
 def _catalog():
-    return json.loads(_providers_path().read_text(encoding="utf-8"))
+    return json.loads(providers_path().read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(("module_name", "names"), sorted(_CONSUMERS.items()))

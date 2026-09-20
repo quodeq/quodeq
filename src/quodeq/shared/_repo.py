@@ -34,7 +34,7 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).resolve().name
 
 
-def _looks_like_authority(candidate: str) -> bool:
+def looks_like_authority(candidate: str) -> bool:
     """Return True if ``candidate`` is a plausible ``host[:port]`` authority.
 
     Deliberately strict: a bare single-label name is rejected so that an
@@ -69,7 +69,7 @@ def _strip_userinfo(url: str) -> str:
     if at_pos == -1:
         return url
     slash_pos = url.find("/")
-    if -1 < slash_pos < at_pos and _looks_like_authority(url[:slash_pos]):
+    if -1 < slash_pos < at_pos and looks_like_authority(url[:slash_pos]):
         return url
     return url[at_pos + 1 :]
 

@@ -15,7 +15,7 @@ from flask import Response, request
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared._env_resolve import resolve_env
-from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
+from quodeq.shared._repo import SCHEME_RE, looks_like_authority
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 
 if TYPE_CHECKING:
@@ -118,7 +118,7 @@ def _sanitize_url(url: str) -> str:
     if at_pos == -1:
         return url
     slash_pos = rest.find("/")
-    if -1 < slash_pos < at_pos and _looks_like_authority(rest[:slash_pos]):
+    if -1 < slash_pos < at_pos and looks_like_authority(rest[:slash_pos]):
         return url
     return f"{scheme}***@{rest[at_pos + 1:]}"
 
