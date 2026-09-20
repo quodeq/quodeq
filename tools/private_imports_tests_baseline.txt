@@ -1564,7 +1564,6 @@ tests/shared/test_coerce_line.py:36:private-module:quodeq.assistant.tools._read_
 tests/shared/test_config_loader.py:5:private-module:quodeq.shared._config
 tests/shared/test_copilot.py:7:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
 tests/shared/test_env_numeric.py:6:private-name:quodeq.shared._config._get_config
-tests/shared/test_env_paths_run_dir.py:8:private-module:quodeq.shared._env_paths.get_run_dir
 tests/shared/test_env_seams_t5.py:21:private-module:quodeq.shared._config.defaults_path
 tests/shared/test_env_seams_t5.py:21:private-name:quodeq.shared._config._ConfigHolder
 tests/shared/test_env_seams_t5.py:22:private-module:quodeq.shared._io.configure_stdio_utf8

@@ -1,9 +1,9 @@
 """Leaf helper for sanitizing an operator-supplied filesystem path from an env var.
 
-Split out of ``env.py`` so ``_env_paths.py``/``_env_db.py`` (which need this
+Split out of ``env.py`` so ``env_paths.py``/``_env_db.py`` (which need this
 helper) don't import it back from ``env.py`` (which imports them) -- that
 shape only worked because ``env.py`` happened to initiate the import cycle
-first every time; a direct ``import quodeq.shared._env_paths`` in isolation
+first every time; a direct ``import quodeq.shared.env_paths`` in isolation
 would hit a partially-initialized ``env`` module. This module has no
 dependents of its own, so both sides import it with no cycle.
 """

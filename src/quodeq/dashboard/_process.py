@@ -10,7 +10,7 @@ from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig, action_api_healthy, spawn_and_wait
 from quodeq.dashboard._networking import _is_port_open
-from quodeq.shared._env_paths import get_run_dir
+from quodeq.shared.env_paths import get_run_dir
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import IS_WIN32
