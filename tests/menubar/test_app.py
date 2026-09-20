@@ -11,6 +11,27 @@ import sys
 import types
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _restore_menubar_modules():
+    """``_load_app_module`` stubs ``sys.modules["rumps"]`` and reimports
+    ``quodeq.menubar.app`` against the stub. Restore both afterwards so a
+    later test (in this file or another) does not inherit the stub or the
+    module re-imported against it."""
+    original_rumps = sys.modules.get("rumps")
+    original_app = sys.modules.get("quodeq.menubar.app")
+    yield
+    if original_rumps is None:
+        sys.modules.pop("rumps", None)
+    else:
+        sys.modules["rumps"] = original_rumps
+    if original_app is None:
+        sys.modules.pop("quodeq.menubar.app", None)
+    else:
+        sys.modules["quodeq.menubar.app"] = original_app
+
 
 class _FakeMenuItem:
     """Minimal rumps.MenuItem stand-in that keeps .title a real string."""
@@ -62,8 +83,8 @@ class TestLoadConfigNonNumericEnv:
         assert port == 7863  # default
 
     def test_non_numeric_ports_falls_back_to_default(self) -> None:
-        port, ports = self._load_config(env={"QUODEQ_PORTS": "abc,def,ghi"})
-        assert isinstance(ports, tuple)
+        _port, ports = self._load_config(env={"QUODEQ_PORTS": "abc,def,ghi"})
+        assert ports == (7863, 7864, 7865, 7866, 7867, 7868, 7869)
 
     def test_valid_numeric_env_still_works(self) -> None:
         port, ports = self._load_config(env={"QUODEQ_PORT": "8080", "QUODEQ_PORTS": "8080,8081"})
