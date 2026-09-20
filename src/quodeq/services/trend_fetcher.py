@@ -9,7 +9,7 @@ SAME fast, cache-backed, scalar-only fetcher instead of reading full run data
 This module depends only on leaf modules (``_cache``, ``score_cache``,
 ``ports``, ``rescore``, ``_scoring_deps``) so it can be imported by both
 ``dashboard.py`` and ``scoring/__init__.py`` without a circular import.
-``ScoringDeps`` lives at ``quodeq.services._scoring_deps`` (a leaf outside
+``ScoringDeps`` lives at ``quodeq.services.scoring_deps`` (a leaf outside
 the ``scoring`` package), so importing it here at module load time does not
 force ``quodeq.services.scoring`` to initialize first.
 
@@ -33,7 +33,7 @@ from typing import Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.services._scoring_deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring_deps import ScoringDeps, _NO_DEPS
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.data.fs.report_parser.runs import read_run_scalars as _default_read_run_scalars

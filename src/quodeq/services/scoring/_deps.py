@@ -1,4 +1,4 @@
-"""Re-export shim: the leaf now lives at ``quodeq.services._scoring_deps``.
+"""Re-export shim: the leaf now lives at ``quodeq.services.scoring_deps``.
 
 Moved out of the ``scoring`` package so modules outside it (``_dashboard_history.py``,
 ``_trend_fetcher.py``) can import ``ScoringDeps`` without triggering
@@ -8,4 +8,4 @@ as a thin re-export so the in-package importers keep resolving unchanged.
 """
 from __future__ import annotations
 
-from quodeq.services._scoring_deps import ScoringDeps, _NO_DEPS  # noqa: F401
+from quodeq.services.scoring_deps import ScoringDeps, _NO_DEPS  # noqa: F401
