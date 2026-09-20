@@ -156,7 +156,7 @@ def load_dismissed(
 ) -> list[dict]:
     """List dismissed findings as dicts (shape matches /api/findings/dismissed response).
 
-    The listing needs ``dismissed_keys`` and lives in ``_dismissed_listing``;
+    The listing needs ``dismissed_keys`` and lives in ``dismissed_listing``;
     the import is deferred so this module stays its import root.
     """
     from quodeq.services.dismissed_listing import load_dismissed as listing  # noqa: PLC0415

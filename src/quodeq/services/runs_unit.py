@@ -53,7 +53,7 @@ def _fill_scores(entry: dict, reports_root: Path, project: str, run_id: str) -> 
     Terminal runs only; failures leave placeholders untouched. read_run_scalars
     is score-cache backed for terminal runs, so this is cheap. DimensionResult
     carries overall_score as a string ("7.5/10"); parse_numeric_score turns it
-    into a float, matching every production caller (see _dashboard_trend.py).
+    into a float, matching every production caller (see dashboard_trend.py).
     """
     if entry["status"] not in _TERMINAL:
         return

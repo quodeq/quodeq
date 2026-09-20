@@ -33,7 +33,7 @@ class ScoringDeps:
     what made the previous decomposition attempt revert.
 
     ``base_fetcher_factory`` and ``max_history`` are the exception: the
-    trend-fetcher leaf module (``_trend_fetcher.py``) has no production
+    trend-fetcher leaf module (``trend_fetcher.py``) has no production
     default for either (the former needs the non-leaf full-data fetcher;
     the latter is a caller-chosen history window size), so callers of
     ``make_trend_fetcher``/``_make_heavy_trend_fetcher`` must set them.

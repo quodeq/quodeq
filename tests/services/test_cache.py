@@ -1,4 +1,4 @@
-"""Tests for _cache.py — LRU dimension cache with inflight coordination."""
+"""Tests for cache.py — LRU dimension cache with inflight coordination."""
 
 from __future__ import annotations
 

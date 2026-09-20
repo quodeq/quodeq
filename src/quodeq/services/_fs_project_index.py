@@ -13,7 +13,7 @@ against.
 
 ``build_project_entries`` then fully hydrates exactly the ids a caller
 needs (typically one page), reusing the same threaded builder
-``_fs_projects.build_project_list`` uses for its own (unpaginated,
+``fs_projects.build_project_list`` uses for its own (unpaginated,
 untouched) full-list callers.
 
 One known trade-off vs. ``build_project_list``: a directory with run data

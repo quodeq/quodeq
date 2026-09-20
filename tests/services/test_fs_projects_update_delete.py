@@ -1,4 +1,4 @@
-"""Tests for _fs_projects.py: update_project_path and delete_project."""
+"""Tests for fs_projects.py: update_project_path and delete_project."""
 
 from __future__ import annotations
 

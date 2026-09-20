@@ -20,7 +20,7 @@ _VALID_STANDARD = {
 @pytest.fixture()
 def app(tmp_path, monkeypatch):
     # deterministic provider catalog for tests
-    # NOTE: real get_provider_configs() (quodeq.llm_bridge / analysis._provider_cache)
+    # NOTE: real get_provider_configs() (quodeq.llm_bridge / analysis.provider_cache)
     # returns dict[str, dict] keyed by provider id, not {"providers": [...]}.
     # See src/quodeq/analysis/provider_cache.py:67 and
     # src/quodeq/data/config/ai_providers.json (top-level keys are provider ids).

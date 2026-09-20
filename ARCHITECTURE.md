@@ -75,7 +75,7 @@ The Python gates share their baseline plumbing in `tools/_ratchet.py`.
 
 ## Conventions
 
-- Private modules use `_` prefix (e.g., `_fs_projects.py`).
+- Private modules use `_` prefix (e.g., `_fs_metadata.py`).
 - Public APIs live in the parent `__init__.py` with re-exports for backward compatibility.
 - Frozen dataclasses for data transfer objects.
 - `services/ports.py` and `services/wiring.py` are the single boundary between services and data layers, split by role: `ports.py` hosts only the Protocols services accept as injected seams (`StandardsStore`, `GradeTablesReader`, re-exported from `data/ports/`) and boundary error types; `wiring.py` is the composition/default-binding module, re-exporting the concrete data-layer functions services use. Services import their types from `ports.py` and their defaults from `wiring.py`, so a storage swap touches `wiring` + `data/`, never `ports` consumers. `tools/check_imports.py` allows any services→data import — this is a convention, not an enforcement point — but new or edited services code imports through `wiring.py` (or `ports.py` for Protocols).
@@ -139,7 +139,7 @@ States defined in `shared/run_status.py::RunState`. Terminal states (`done`, `fa
 | atexit fallback | `cancelled` | `atexit_unfinalized` |
 | SIGKILL / power-off | (uncatchable) → caught by heartbeat staleness | `stale_detected` |
 
-Stale detection runs inside `services/_index_sync._check_stale_and_promote` during `sync_index`: if `state ∈ {running, finalizing}` AND `.heartbeat` > 30s old AND the PID is dead, the dashboard promotes to `cancelled(stale_detected)` by calling `write_status` on the run directory — so the resolution is durable across dashboard sessions.
+Stale detection runs inside `data/sqlite/index_sync._check_stale_and_promote` during `sync_index`: if `state ∈ {running, finalizing}` AND `.heartbeat` > 30s old AND the PID is dead, the dashboard promotes to `cancelled(stale_detected)` by calling `write_status` on the run directory — so the resolution is durable across dashboard sessions.
 
 ## Data Flow — Dashboard Request
 
@@ -228,7 +228,7 @@ share one walk of the tree.
 | Heartbeat | `src/quodeq/shared/run_heartbeat.py` |
 | Lifecycle context (signals + atexit + exc) | `src/quodeq/shared/run_lifecycle.py` |
 | Run log writer | `src/quodeq/shared/run_log.py` |
-| SQLite index + sync | `src/quodeq/services/run_index.py`, `_index_sync.py` |
+| SQLite index + sync | `src/quodeq/services/run_index.py`, `src/quodeq/data/sqlite/index_sync.py` |
 | Provider (DB-backed) | `src/quodeq/services/filesystem.py` |
 | In-memory jobs | `src/quodeq/services/jobs.py` |
 | Live terminal SSE | `src/quodeq/api/_log_stream_routes.py`, `_sse_log_helpers.py` |

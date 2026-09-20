@@ -33,7 +33,7 @@ def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> N
     signal anywhere. The caller still degrades exactly as before; this only
     adds visibility. ``log`` defaults to :data:`NULL_LOG`, matching the
     injected-LogSink discipline for inner layers -- see
-    ``quodeq.core.observability``. ``_fs_metadata.py`` and ``_trend_fetcher.py``
+    ``quodeq.core.observability``. ``_fs_metadata.py`` and ``trend_fetcher.py``
     thread ``log=SHARED_LOG`` through their calls to ``cached_project_summary``
     and ``make_cache_backed_fetcher`` respectively (final review item B,
     fault-tolerance cycle 1); ``scoring/_project_scores.py``'s call to

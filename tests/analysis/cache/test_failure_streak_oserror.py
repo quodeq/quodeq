@@ -1,4 +1,4 @@
-"""Tests for _failure_streak.py — OSError handling in _scan_once."""
+"""Tests for failure_streak.py — OSError handling in _scan_once."""
 from __future__ import annotations
 
 import json

@@ -9,7 +9,7 @@ Split (Task 13) into two sibling modules plus this orchestrator:
     _find_discipline_in_run, _infer_discipline, _has_fingerprints).
 
 Both are re-exported here: _local_repo_root is used by compare.py, and
-_has_fingerprints/_infer_discipline are used by _fs_projects.py.
+_has_fingerprints/_infer_discipline are used by fs_projects.py.
 """
 
 from __future__ import annotations

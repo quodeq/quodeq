@@ -3,7 +3,7 @@ materialize it on disk and scan.
 
 Split out of ``project_registration.py`` (Task 22, M-MOD-6): that module sits
 at the 300-line size ratchet, so these steps live here instead. This module
-imports only downward (``wiring``, ``_fs_clone``, ``_fs_scan``,
+imports only downward (``wiring``, ``_fs_clone``, ``fs_scan``,
 ``_registration_scan``, ``_registration_url``, ``shared``) and never imports
 back from ``project_registration`` -- ``project_registration.py`` imports it
 at the top instead. ``_resolve_target_path``, ``_persist_repository_info``,
@@ -100,7 +100,7 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
     Called during registration (via `_resolve_project_slot`) so newly-registered
     projects start with the field set to null. Existing projects without the
     field get a backfill on read (see `_backfill_onboarding_field` in
-    _fs_project_helpers.py).
+    fs_project_helpers.py).
     """
     data = read_repository_info(project_dir)
     if data is None or "onboardingCompletedAt" in data:

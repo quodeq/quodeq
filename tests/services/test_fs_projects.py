@@ -1,4 +1,4 @@
-"""Tests for _fs_projects.py — project listing (find_children, parent/child sets, build_project_list, index)."""
+"""Tests for fs_projects.py — project listing (find_children, parent/child sets, build_project_list, index)."""
 
 from __future__ import annotations
 

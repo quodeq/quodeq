@@ -1,4 +1,4 @@
-"""Tests for _fs_projects.py: get_project_info and the ProjectEntry origin_url / latest_done_run_id fields."""
+"""Tests for fs_projects.py: get_project_info and the ProjectEntry origin_url / latest_done_run_id fields."""
 
 from __future__ import annotations
 

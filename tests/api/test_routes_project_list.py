@@ -75,7 +75,7 @@ class TestUpdateProjectPathValidation:
     def test_valid_repo_url_reaches_the_provider(self, client, provider):
         """URL relocation is supported: the UI's "Enter the URL to restore"
         flow PATCHes this route with a repository URL, and
-        _fs_projects.update_project_path stores it as an online project."""
+        fs_projects.update_project_path stores it as an online project."""
         resp = client.patch(
             "/api/projects/my-proj/path", json={"path": "https://github.com/foo/bar"},
         )

@@ -4,7 +4,7 @@ The module-level functions (``read_run_data``, ``list_runs``, etc.) are the
 filesystem implementation — there is no ``RunStorage`` protocol here. A
 caller that needs a substitute injects a reader callable instead: see
 ``ScoringDeps.read_run_data`` (``services/scoring_deps.py``) and
-``_trend_fetcher._default_read_run_scalars``.
+``trend_fetcher._default_read_run_scalars``.
 """
 
 from __future__ import annotations

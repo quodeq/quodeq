@@ -192,7 +192,7 @@ def per_run_versions(
     after the run is first observed mid-scan would not intersect the frozen set
     and would silently under-invalidate. Non-terminal runs therefore compute
     their scoped version from a fresh ``read_run_key_sets`` each call and never
-    write it back, mirroring ``_trend_fetcher.version_for``.
+    write it back, mirroring ``trend_fetcher.version_for``.
 
     That immutability also makes a terminal run's version a pure function of
     its keys and the suppression state, so :func:`memoized_run_version` serves

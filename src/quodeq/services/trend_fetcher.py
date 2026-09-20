@@ -7,7 +7,7 @@ SAME fast, cache-backed, scalar-only fetcher instead of reading full run data
 (violations, multi-MB) for every historical run.
 
 This module depends only on leaf modules (``_cache``, ``score_cache``,
-``ports``, ``rescore``, ``_scoring_deps``) so it can be imported by both
+``ports``, ``rescore``, ``scoring_deps``) so it can be imported by both
 ``dashboard.py`` and ``scoring/__init__.py`` without a circular import.
 ``ScoringDeps`` lives at ``quodeq.services.scoring_deps`` (a leaf outside
 the ``scoring`` package), so importing it here at module load time does not
@@ -15,7 +15,7 @@ force ``quodeq.services.scoring`` to initialize first.
 
 Dependency injection: the scalar reader, the dismissed/deleted lookups, the
 full-data base-fetcher factory, and the trend-window size are bundled in a
-``ScoringDeps`` (see ``_scoring_deps.py``). A ``None`` field falls back to the
+``ScoringDeps`` (see ``scoring_deps.py``). A ``None`` field falls back to the
 real function; ``scoring/__init__.py`` passes its own module-level references
 so its monkeypatch-based tests keep working; ``dashboard.py`` uses the
 defaults for everything except ``base_fetcher_factory``/``max_history``,

@@ -18,7 +18,7 @@ Categories of re-exported utilities
    (from ``_config.py``)
 4. **Platform detection** -- ``IS_WIN32``
 5. **Repository URL helpers** -- ``is_repo_url``, ``project_name_from_repo``
-   (from ``_repo.py``)
+   (from ``repo.py``)
 6. **Environment accessors** -- ``get_ai_cmd``, ``get_evaluations_dir``,
    ``get_anthropic_api_key``, etc. (from ``env.py``)
 

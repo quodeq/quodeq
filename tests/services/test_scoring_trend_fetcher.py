@@ -44,7 +44,7 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
             return [DimensionResult(dimension="security", overall_score="7.0/10", overall_grade="Fair")]
         return fetch
 
-    # The heavy-path rescoring fetcher is built by the shared _trend_fetcher
+    # The heavy-path rescoring fetcher is built by the shared trend_fetcher
     # factory (scoring._make_trend_fetcher delegates to it).
     monkeypatch.setattr("quodeq.services.trend_fetcher.make_rescoring_fetcher", fake_rescoring_fetcher)
 

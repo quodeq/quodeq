@@ -1,4 +1,4 @@
-"""Tests for _cache.py self-healing guards: stale-entry eviction, in-progress runs, custom readers."""
+"""Tests for cache.py self-healing guards: stale-entry eviction, in-progress runs, custom readers."""
 
 from __future__ import annotations
 
