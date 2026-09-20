@@ -56,6 +56,8 @@ def _extra_body(config: "ApiTurnConfig", env: Mapping[str, str] | None = None) -
 
 @dataclass(frozen=True)
 class ApiTurnConfig:
+    """Per-turn API adapter settings (endpoint, credentials, model, tool mode)."""
+
     api_base: str
     api_key: str | None
     model: str
@@ -203,6 +205,7 @@ def _dispatch_tool_calls(
 
 def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                  session: ApiTurnSession, client_factory=None) -> str:
+    """Run one assistant turn against the chat-completions API; return the reply."""
     registry, emit, cancel = session.registry, session.emit, session.cancel
     convo = list(messages)
     if not config.native_tools:

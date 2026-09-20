@@ -74,7 +74,7 @@ def app(tmp_path, monkeypatch):
         lambda *a, **k: True,
     )
     monkeypatch.setattr(
-        "quodeq.assistant.adapters._api._default_client",
+        "quodeq.assistant.adapters.api._default_client",
         lambda config: ScriptedClient(),
     )
     app = Flask(__name__)

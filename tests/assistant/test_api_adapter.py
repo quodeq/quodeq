@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from quodeq.assistant.adapters._api import ApiTurnConfig, ApiTurnSession, run_api_turn
+from quodeq.assistant.adapters.api import ApiTurnConfig, ApiTurnSession, run_api_turn
 from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
 from tests._timeouts import budget
 
@@ -150,7 +150,7 @@ def test_iteration_cap_is_config_driven():
 
 
 def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
-    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    from quodeq.assistant.adapters.api import ApiTurnConfig, _extra_body
     monkeypatch.setenv("QUODEQ_CONTEXT_SIZE", "32768")
     local = ApiTurnConfig(api_base="http://localhost:11434/v1", api_key=None, model="m", native_tools=True)
     body = _extra_body(local)
@@ -162,7 +162,7 @@ def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
 
 
 def test_extra_body_openai_uses_reasoning_effort(monkeypatch):
-    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    from quodeq.assistant.adapters.api import ApiTurnConfig, _extra_body
     monkeypatch.delenv("QUODEQ_CONTEXT_SIZE", raising=False)
     cloud = ApiTurnConfig(api_base="https://api.openai.com/v1", api_key="k", model="gpt", native_tools=True)
     body = _extra_body(cloud)

@@ -55,7 +55,7 @@ src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_runs.py:31:broad-except
 src/quodeq/api/routes_shared_mirrors.py:86:broad-except
 src/quodeq/api/security.py:275:broad-except
-src/quodeq/assistant/adapters/_api.py:117:broad-except
+src/quodeq/assistant/adapters/api.py:119:broad-except
 src/quodeq/assistant/adapters/_capabilities.py:31:broad-except
 src/quodeq/assistant/cancel.py:53:broad-except
 src/quodeq/assistant/cancel.py:66:broad-except

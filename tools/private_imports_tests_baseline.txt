@@ -599,13 +599,8 @@ tests/api/test_zip_coverage.py:58:private-name:quodeq.api.zip._ZipSizeLimitError
 tests/api/test_zip_coverage.py:65:private-name:quodeq.api.zip._build_project_zip
 tests/api/test_zip_coverage.py:83:private-name:quodeq.api.zip._build_project_zip
 tests/api/test_zip_coverage.py:97:private-name:quodeq.api.zip._build_project_zip
-tests/assistant/test_api_adapter.py:153:private-module:quodeq.assistant.adapters._api.ApiTurnConfig
-tests/assistant/test_api_adapter.py:153:private-name:quodeq.assistant.adapters._api._extra_body
-tests/assistant/test_api_adapter.py:165:private-module:quodeq.assistant.adapters._api.ApiTurnConfig
-tests/assistant/test_api_adapter.py:165:private-name:quodeq.assistant.adapters._api._extra_body
-tests/assistant/test_api_adapter.py:3:private-module:quodeq.assistant.adapters._api.ApiTurnConfig
-tests/assistant/test_api_adapter.py:3:private-module:quodeq.assistant.adapters._api.ApiTurnSession
-tests/assistant/test_api_adapter.py:3:private-module:quodeq.assistant.adapters._api.run_api_turn
+tests/assistant/test_api_adapter.py:153:private-name:quodeq.assistant.adapters.api._extra_body
+tests/assistant/test_api_adapter.py:165:private-name:quodeq.assistant.adapters.api._extra_body
 tests/assistant/test_api_adapter.py:4:private-module:quodeq.assistant.tools._registry.ToolRegistry
 tests/assistant/test_api_adapter.py:4:private-module:quodeq.assistant.tools._registry.ToolSpec
 tests/assistant/test_capabilities.py:1:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
@@ -1593,8 +1588,7 @@ tests/test_cli_worktree_cleanup.py:22:private-name:quodeq._cli_resolution._creat
 tests/test_cli_worktree_cleanup.py:52:private-name:quodeq._cli_resolution._create_worktree
 tests/test_cli_worktree_cleanup.py:81:private-name:quodeq._cli_resolution._create_worktree
 tests/test_cli_worktree_cleanup.py:99:private-name:quodeq._cli_resolution._create_worktree
-tests/test_env_seams_accessors.py:21:private-module:quodeq.assistant.adapters._api.ApiTurnConfig
-tests/test_env_seams_accessors.py:21:private-name:quodeq.assistant.adapters._api._extra_body
+tests/test_env_seams_accessors.py:21:private-name:quodeq.assistant.adapters.api._extra_body
 tests/test_env_seams_accessors.py:37:private-name:quodeq.api._sse_log_helpers._max_wait_s
 tests/test_env_seams_accessors.py:37:private-name:quodeq.api._sse_log_helpers._poll_ms
 tests/test_env_seams_accessors.py:46:private-name:quodeq.dashboard._build_npm._npm_build_timeout_s
