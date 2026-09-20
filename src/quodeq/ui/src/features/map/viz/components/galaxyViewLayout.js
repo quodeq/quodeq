@@ -1,5 +1,19 @@
 import { TAU, seedHash, seededRng } from '../core/galaxyCore.js';
 
+// Cluster centres sit on a unit circle at this fraction of the layout
+// radius, jittered by the seeded RNG so the groups do not ring evenly.
+const CLUSTER_DIST_FRACTION_MIN = 0.3;
+const CLUSTER_DIST_FRACTION_RANGE = 0.5;
+// Repulsion is O(n^2) per pass, so a crowded cluster gets fewer passes.
+const LARGE_CLUSTER_STARS = 30;
+const REPULSION_PASSES_LARGE = 3;
+const REPULSION_PASSES_SMALL = 6;
+// Floor on a star-to-star distance, so the push never divides by zero.
+const MIN_SEPARATION_PX = 0.1;
+// Extra room a constellation's ring and its label need beyond its spread.
+const CONSTELLATION_MARGIN_X_PX = 40;
+const CONSTELLATION_MARGIN_Y_PX = 50;
+
 /**
  * Compute seeded cluster positions for constellation groups.
  * Returns an array of [x, y] pairs normalized around the origin.
@@ -11,7 +25,7 @@ export function computeClusterPositions(groupKeys) {
   const clusterRng = seededRng(seedHash('clusters:' + groupKeys.join(':')));
   const positions = groupKeys.map(() => {
     const angle = clusterRng() * TAU;
-    const dist = 0.3 + clusterRng() * 0.5;
+    const dist = CLUSTER_DIST_FRACTION_MIN + clusterRng() * CLUSTER_DIST_FRACTION_RANGE;
     return [Math.cos(angle) * dist, Math.sin(angle) * dist];
   });
   let cx = 0, cy = 0;
@@ -73,13 +87,13 @@ export function buildMSTLines(clusterStars, startIdx) {
  * @param {number} [minGap=60] - Minimum distance between star edges
  */
 export function applyRepulsionAndRecenter(clusterStars, minGap = 60) {
-  const iters = clusterStars.length > 30 ? 3 : 6;
+  const iters = clusterStars.length > LARGE_CLUSTER_STARS ? REPULSION_PASSES_LARGE : REPULSION_PASSES_SMALL;
   for (let iter = 0; iter < iters; iter++) {
     for (let a = 0; a < clusterStars.length; a++) {
       for (let b = a + 1; b < clusterStars.length; b++) {
         const sa = clusterStars[a], sb = clusterStars[b];
         const dx = sb._ox - sa._ox, dy = sb._oy - sa._oy;
-        const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+        const d = Math.sqrt(dx * dx + dy * dy) || MIN_SEPARATION_PX;
         const minD = sa.radius + sb.radius + minGap;
         if (d < minD) {
           const push = (minD - d) / 2;
@@ -146,8 +160,8 @@ export function computeMaxExtent(stars, constellations) {
     if (ey > maxY) maxY = ey;
   });
   constellations.forEach(con => {
-    const ex = Math.abs(con.cx) + con.spread + 40;
-    const ey = Math.abs(con.cy) + con.spread + 50;
+    const ex = Math.abs(con.cx) + con.spread + CONSTELLATION_MARGIN_X_PX;
+    const ey = Math.abs(con.cy) + con.spread + CONSTELLATION_MARGIN_Y_PX;
     if (ex > maxX) maxX = ex;
     if (ey > maxY) maxY = ey;
   });
