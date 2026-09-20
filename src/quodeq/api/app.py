@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+from collections.abc import Mapping
 
 from flask import Flask, Response, jsonify
 
@@ -20,6 +21,7 @@ from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
 from quodeq.shared._env import env_int
+from quodeq.shared._env_inject import resolve_env
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
 
 _logger = logging.getLogger(__name__)
@@ -36,12 +38,17 @@ def _default_provider() -> ActionProvider:
     return FilesystemActionProvider(index_db_path=Path(get_index_db_path()))
 
 
-def _configure_logging(app: Flask) -> tuple[LogBuffer, bool]:
-    """Set up log buffer and request logging. Returns (log_buffer, verbose)."""
+def _configure_logging(
+    app: Flask, env: Mapping[str, str] | None = None,
+) -> tuple[LogBuffer, bool]:
+    """Set up log buffer and request logging. Returns (log_buffer, verbose).
+
+    *env* overrides the ``QUODEQ_VERBOSE`` lookup and defaults to ``os.environ``.
+    """
     log_buffer = LogBuffer()
     app.extensions["log_buffer"] = log_buffer
 
-    verbose = os.environ.get("QUODEQ_VERBOSE") == "1"
+    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == "1"
     for name in ("werkzeug", "quodeq.api"):
         lgr = logging.getLogger(name)
         lgr.handlers = [log_buffer.handler]
@@ -96,15 +103,17 @@ def _configure_extensions(app: Flask) -> None:
     app.extensions["cwe_cache"] = CweCache()
 
 
-def _configure_paths_and_cleanup(app: Flask) -> None:
+def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) -> None:
     """Sweep orphaned ephemeral clones, and default the STANDARDS_*/
-    ASSISTANT_DB_PATH config entries when the caller hasn't set them."""
+    ASSISTANT_DB_PATH config entries when the caller hasn't set them.
+
+    *env* overrides the path lookups and defaults to ``os.environ``."""
     from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
 
     try:
-        sweep_orphaned_clones(get_clones_dir(), Path(get_evaluations_dir()))
+        sweep_orphaned_clones(get_clones_dir(env), Path(get_evaluations_dir(env=env)))
     except Exception as exc:  # pragma: no cover - best-effort cleanup
         _logger.warning("Orphaned-clone sweep failed at startup: %s", exc)
 
@@ -117,11 +126,14 @@ def _configure_paths_and_cleanup(app: Flask) -> None:
     if "ASSISTANT_DB_PATH" not in app.config:
         # QUODEQ_DIR must redirect this like every other state path, else
         # env-isolated servers write sessions into the real ~/.quodeq store.
-        app.config["ASSISTANT_DB_PATH"] = str(get_quodeq_dir() / "assistant.db")
+        app.config["ASSISTANT_DB_PATH"] = str(get_quodeq_dir(env) / "assistant.db")
 
 
 def _configure_app(
-    app: Flask, provider: ActionProvider, test_config: dict | None,
+    app: Flask,
+    provider: ActionProvider,
+    test_config: dict | None,
+    env: dict[str, str] | None = None,
 ) -> None:
     """Apply the caller's config overrides, then the app-level defaults and
     extensions that every route depends on."""
@@ -130,7 +142,7 @@ def _configure_app(
     _configure_upload_limits(app)
     app.config["_provider"] = provider
     _configure_extensions(app)
-    _configure_paths_and_cleanup(app)
+    _configure_paths_and_cleanup(app, env)
 
 
 def _build_rate_limit_store(
@@ -153,7 +165,10 @@ def _build_rate_limit_store(
 
 
 def _configure_request_handling(
-    app: Flask, store: RateLimitStore, api_key: str | None,
+    app: Flask,
+    store: RateLimitStore,
+    api_key: str | None,
+    env: dict[str, str] | None = None,
 ) -> LogBuffer:
     """Install the per-request layers (auth, compression, logging) and the
     health endpoint. Returns the log buffer the routes stream from."""
@@ -163,13 +178,13 @@ def _configure_request_handling(
             "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
 
-    configure_security(app, store, api_key)
+    configure_security(app, store, api_key, env)
     from quodeq.api._compression import configure_compression
     configure_compression(app)
     app.config["QUODEQ_API_KEY"] = api_key
     from quodeq.shared.utils import get_action_api_host as _gah
-    app.config["QUODEQ_BIND_HOST"] = _gah()
-    log_buffer, verbose = _configure_logging(app)
+    app.config["QUODEQ_BIND_HOST"] = _gah(env)
+    log_buffer, verbose = _configure_logging(app, env)
     _register_health_route(app, verbose)
     return log_buffer
 
@@ -180,14 +195,21 @@ def create_app(
     rate_limit_store: RateLimitStore | None = None,
     api_key: str | None = None,
     test_config: dict | None = None,
+    env: dict[str, str] | None = None,
 ) -> Flask:
-    """Create and configure the Flask application with all API routes."""
+    """Create and configure the Flask application with all API routes.
+
+    *env* is the composition root for every environment read below it: it is
+    resolved here, at app-creation time, and handed to the configuration and
+    route-registration steps instead of each of them reaching for
+    ``os.environ``. ``None`` keeps the process environment.
+    """
     app = Flask(__name__)
     provider = provider or _default_provider()
-    _configure_app(app, provider, test_config)
-    store, eval_store = _build_rate_limit_store(rate_limit_store)
-    log_buffer = _configure_request_handling(app, store, api_key)
-    register_all_routes(app, provider, eval_store, static_dist, log_buffer)
+    _configure_app(app, provider, test_config, env)
+    store, eval_store = _build_rate_limit_store(rate_limit_store, env)
+    log_buffer = _configure_request_handling(app, store, api_key, env)
+    register_all_routes(app, provider, eval_store, static_dist, log_buffer, env)
     return app
 
 
@@ -195,10 +217,14 @@ def main(env: dict[str, str] | None = None) -> None:
     """Start the Flask development server using environment configuration."""
     from quodeq.shared._io import configure_stdio_utf8
     configure_stdio_utf8()
-    _env = env if env is not None else os.environ
+    _env = resolve_env(env)
     # SECURITY: API key read from environment. For hardened deployments,
     # consider a secrets manager or platform keychain instead.
-    app = create_app(static_dist=get_static_dist(), api_key=_env.get("QUODEQ_API_KEY"))
+    app = create_app(
+        static_dist=get_static_dist(env),
+        api_key=_env.get("QUODEQ_API_KEY"),
+        env=env,
+    )
 
     # Evaluation subprocesses are spawned with start_new_session=True so they
     # survive the API process dying. Intentionally do NOT kill them on API
@@ -228,7 +254,7 @@ def main(env: dict[str, str] | None = None) -> None:
     except Exception:  # pragma: no cover - warm-up must never block serving
         logging.getLogger(__name__).warning("warm-up start failed", exc_info=True)
 
-    app.run(host=get_action_api_host(), port=get_action_api_port(), debug=False)
+    app.run(host=get_action_api_host(env), port=get_action_api_port(env), debug=False)
 
 
 if __name__ == "__main__":

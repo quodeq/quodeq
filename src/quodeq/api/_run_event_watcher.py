@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +20,7 @@ from quodeq.api._run_event_serializers import (
     serialize_status_event,
     _payload_as_sse_finding,
 )
+from quodeq.shared._env_inject import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -45,8 +46,8 @@ is always emitted on the very first tick even when there is no status.json.
 """
 
 
-def _findings_batch_size() -> int:
-    raw = os.environ.get("QUODEQ_SSE_FINDINGS_BATCH")
+def _findings_batch_size(env: Mapping[str, str] | None = None) -> int:
+    raw = resolve_env(env).get("QUODEQ_SSE_FINDINGS_BATCH")
     if not raw:
         return _DEFAULT_FINDINGS_BATCH
     try:

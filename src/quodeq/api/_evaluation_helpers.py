@@ -14,6 +14,7 @@ from flask import Response, request
 
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
+from quodeq.shared._env_inject import resolve_env
 from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 
@@ -157,7 +158,7 @@ _SAFE_CMD_PATH_RE = re.compile(r"[A-Za-z0-9._/\\:-]+")
 
 def _path_dirs(env: Mapping[str, str] | None = None) -> list[str]:
     """Real (symlink-resolved, case-normalized) directories on the server's PATH."""
-    raw = (os.environ if env is None else env).get("PATH", "")
+    raw = resolve_env(env).get("PATH", "")
     return [os.path.normcase(os.path.realpath(d)) for d in raw.split(os.pathsep) if d]
 
 
@@ -184,7 +185,7 @@ def ai_cmd_path_error(
     """
     if not ai_cmd_path:
         return None
-    environ = os.environ if env is None else env
+    environ = resolve_env(env)
     if not _SAFE_CMD_PATH_RE.fullmatch(ai_cmd_path):
         return "only letters, digits, '.', '_', '-', ':' and path separators are allowed"
     normalized = ai_cmd_path.replace("\\", "/")

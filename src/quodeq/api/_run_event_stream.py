@@ -14,8 +14,8 @@ imports (tests import them from this module).
 from __future__ import annotations
 
 import json
-import os
 import time
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
@@ -41,6 +41,7 @@ from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.shared._env import env_float
+from quodeq.shared._env_inject import resolve_env
 
 # env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort
 # module import (it logs and falls back to 15s). minimum=0.1 keeps a bogus
@@ -50,12 +51,12 @@ _HEARTBEAT_S = env_float("QUODEQ_SSE_HEARTBEAT_S", 15.0, minimum=0.1)
 _TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
 
 
-def _tick_ms() -> int:
+def _tick_ms(env: Mapping[str, str] | None = None) -> int:
     """Read tick interval at call time so tests can set QUODEQ_SSE_TICK_MS=0
     to force a single-tick drain. Reading at module import time made the env
     var a no-op for tests that set it inside the test body."""
     try:
-        return int(os.environ.get("QUODEQ_SSE_TICK_MS", "250"))
+        return int(resolve_env(env).get("QUODEQ_SSE_TICK_MS", "250"))
     except ValueError:
         return 250
 
