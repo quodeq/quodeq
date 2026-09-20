@@ -127,8 +127,9 @@ class TestBuildAnalysisPrompt:
         template = "Standards: {{STANDARDS_CHECKLIST}} {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION}} {{SOURCE_FILE_COUNT}} {{ANALYSIS_GUIDANCE}} {{DIMENSIONS}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
         ctx = self._make_context(standards_dir=standards_dir)
         result = build_analysis_prompt(template, ctx)
-        # Should contain standards content (not the "no standards" sentinel)
-        assert "No compiled standards" not in result or "Auth" in result
+        # Must render the compiled principle, not fall back to the sentinel.
+        assert "No compiled standards" not in result
+        assert "Auth" in result
 
 
 # ---------------------------------------------------------------------------

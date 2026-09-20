@@ -36,35 +36,56 @@ def test_copilot_model_listing_uses_account_discovery_not_interactive_cli(monkey
     run.assert_not_called()
 
 
-def test_copilot_analysis_args_and_scoped_mcp(tmp_path):
+@pytest.fixture()
+def _built_ai_cmd(tmp_path):
+    """Build the copilot CLI args + scoped MCP config file once; each test
+    checks one slice of the result. Teardown removes the MCP config file
+    regardless of test outcome."""
     config = AnalysisConfig(
         ai_cmd="copilot", ai_model="claude-sonnet-4.6",
         jsonl_file=tmp_path / "findings.jsonl", queue_path=tmp_path / "queue.json",
         agent_id="agent-2", max_turns=3, analysis_budget=1,
     )
     args, path = _build_ai_cmd("Inspect sources", config, work_dir=tmp_path)
-    try:
-        assert args[0] == "copilot"
-        assert args[args.index("--output-format") + 1] == "json"
-        assert args[args.index("--additional-mcp-config") + 1] == f"@{path}"
-        assert args[args.index("--model") + 1] == "claude-sonnet-4.6"
-        assert args[args.index("--allow-tool") + 1] == "findings"
-        assert "--available-tools" in args
-        assert all(tool in args for tool in ("view", "glob", "grep", "findings"))
-        assert "--disable-builtin-mcps" in args
-        assert "--no-custom-instructions" in args
-        assert "Use view, glob and grep" in args[-1]
-        assert not {"--tools", "--strict-mcp-config", "--max-turns",
-                    "--max-budget-usd", "--allow-all-tools", "--yolo"} & set(args)
-        payload = json.loads(path.read_text())
-        server = payload["mcpServers"]["findings"]
-        assert server["tools"] == ["*"]
-        assert "agent-2" in server["args"]
-        assert str(tmp_path / "queue.json") in server["args"]
-        assert str(tmp_path.resolve()) in server["args"]
-    finally:
-        if path:
-            path.unlink(missing_ok=True)
+    yield args, path
+    if path:
+        path.unlink(missing_ok=True)
+
+
+def test_copilot_command_line_flags(_built_ai_cmd):
+    args, path = _built_ai_cmd
+    assert args[0] == "copilot"
+    assert args[args.index("--output-format") + 1] == "json"
+    assert args[args.index("--additional-mcp-config") + 1] == f"@{path}"
+    assert args[args.index("--model") + 1] == "claude-sonnet-4.6"
+    assert args[args.index("--allow-tool") + 1] == "findings"
+    assert "--available-tools" in args
+    assert all(tool in args for tool in ("view", "glob", "grep", "findings"))
+    assert "--disable-builtin-mcps" in args
+    assert "--no-custom-instructions" in args
+    assert "Use view, glob and grep" in args[-1]
+
+
+def test_copilot_forbidden_flags_are_absent(_built_ai_cmd):
+    args, _path = _built_ai_cmd
+    assert not {"--tools", "--strict-mcp-config", "--max-turns",
+                "--max-budget-usd", "--allow-all-tools", "--yolo"} & set(args)
+
+
+def test_copilot_scoped_mcp_json_exposes_only_the_findings_tool(_built_ai_cmd):
+    _args, path = _built_ai_cmd
+    payload = json.loads(path.read_text())
+    server = payload["mcpServers"]["findings"]
+    assert server["tools"] == ["*"]
+
+
+def test_copilot_scoped_mcp_server_args_identify_the_agent_and_paths(_built_ai_cmd, tmp_path):
+    _args, path = _built_ai_cmd
+    payload = json.loads(path.read_text())
+    server = payload["mcpServers"]["findings"]
+    assert "agent-2" in server["args"]
+    assert str(tmp_path / "queue.json") in server["args"]
+    assert str(tmp_path.resolve()) in server["args"]
 
 
 def test_copilot_analysis_env_uses_dedicated_profile(tmp_path, monkeypatch):

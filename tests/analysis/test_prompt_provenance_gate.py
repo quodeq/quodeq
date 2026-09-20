@@ -117,26 +117,43 @@ def test_api_prompt_renders_provenance_gate_end_to_end(tmp_path):
     assert "attacker-controlled" in prompt
 
 
-def test_fixture_matrix_is_well_formed():
+class TestFixtureMatrixIsWellFormed:
     """Guardrail: a misconfigured fixtures dir must fail loudly, not pass zero cases.
 
     Mirrors tests/config/test_discipline_corpus.py. Requires both provenance
     classes AND both dimensions to be represented, so a discovery-glob bug that
-    silently drops half the matrix is caught here in normal CI.
+    silently drops half the matrix is caught here in normal CI. Each test below
+    checks one property of the discovered matrix.
     """
-    assert _CASES, "no provenance-gate fixtures discovered"
-    internal = [c for c in _CASES if c.expected["provenance"] == "internal"]
-    external = [c for c in _CASES if c.expected["provenance"] == "external"]
-    operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
-    assert len(internal) >= 4, f"expected >=4 internal FP fixtures, got {len(internal)}"
-    assert any(c.expected["dimension"] == "reliability" for c in external), "no reliability external control"
-    assert any(c.expected["dimension"] == "security" for c in external), "no security external control"
-    assert operator, "no operator-controlled fixture: the argv/env tier is unguarded"
-    assert all(c.expected["expectation"] != "stays_critical" for c in operator), \
-        "an operator-controlled fixture expects critical; that is the bug this tier exists to prevent"
-    for case in _CASES:
+
+    def test_fixtures_are_discovered(self):
+        assert _CASES, "no provenance-gate fixtures discovered"
+
+    def test_at_least_four_internal_fixtures(self):
+        internal = [c for c in _CASES if c.expected["provenance"] == "internal"]
+        assert len(internal) >= 4, f"expected >=4 internal FP fixtures, got {len(internal)}"
+
+    def test_external_provenance_covers_both_dimensions(self):
+        external = [c for c in _CASES if c.expected["provenance"] == "external"]
+        assert any(c.expected["dimension"] == "reliability" for c in external), "no reliability external control"
+        assert any(c.expected["dimension"] == "security" for c in external), "no security external control"
+
+    def test_an_operator_controlled_fixture_exists(self):
+        operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
+        assert operator, "no operator-controlled fixture: the argv/env tier is unguarded"
+
+    def test_no_operator_controlled_fixture_expects_critical(self):
+        operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
+        assert all(c.expected["expectation"] != "stays_critical" for c in operator), \
+            "an operator-controlled fixture expects critical; that is the bug this tier exists to prevent"
+
+    @pytest.mark.parametrize("case", _CASES, ids=_CASE_IDS)
+    def test_expected_json_has_the_required_keys(self, case):
         for key in ("dimension", "req", "display_file", "target_line", "construct", "provenance", "expectation"):
             assert key in case.expected, f"{case.name}: expected.json missing {key!r}"
+
+    @pytest.mark.parametrize("case", _CASES, ids=_CASE_IDS)
+    def test_source_file_exists(self, case):
         assert case.source_file.is_file(), f"{case.name}: source file missing at {case.source_file}"
 
 

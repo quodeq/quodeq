@@ -73,10 +73,20 @@ def test_build_router_sets_corpus_none_when_flag_off(tmp_path: Path, monkeypatch
     assert ctx.precedent_corpus is None
 
 
-def test_build_router_degrades_when_flag_on_but_no_embedder(tmp_path: Path, monkeypatch):
+@pytest.fixture()
+def _reset_embedding_availability_cache():
+    """Reset the module-level embedding-availability cache before and after
+    the test, so a dead-embedder probe here can't leak into later tests."""
     from quodeq.llm_bridge.embeddings import reset_embedding_availability_cache
 
     reset_embedding_availability_cache()
+    yield
+    reset_embedding_availability_cache()
+
+
+def test_build_router_degrades_when_flag_on_but_no_embedder(
+    tmp_path: Path, monkeypatch, _reset_embedding_availability_cache,
+):
     monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
     monkeypatch.setenv("QUODEQ_EMBEDDING_BASE_URL", "http://127.0.0.1:1")  # nothing listens
 
@@ -185,21 +195,36 @@ class TestBuildCompiledContextResolvesTrustModel:
         assert ctx.trust_model is None
 
 
-def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):
+@pytest.fixture()
+def _received_finding(tmp_path: Path):
+    """Build a router and feed it one finding; return (fh, tmp_path, dup, events_log)."""
     findings_path = tmp_path / "run-1" / "evidence" / "timeliness_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
     fh = io.StringIO()
     router = _build_router(fh, findings_path, CompiledContext(), ServerArgs())
 
-    msg, dup = router.receive({
+    _msg, dup = router.receive({
         "p": "P1", "file": "x.py", "line": 1, "t": "violation",
         "severity": "medium", "d": "dim", "reason": "r", "snippet": "s",
         "w": "title",
     })
 
-    assert dup is False
-    assert fh.getvalue().count("\n") == 1
     events_log = tmp_path / "run-1" / "events.jsonl"
+    return fh, dup, events_log
+
+
+def test_build_router_reports_the_finding_as_not_a_duplicate(_received_finding):
+    _fh, dup, _events_log = _received_finding
+    assert dup is False
+
+
+def test_build_router_writes_one_jsonl_line_for_the_finding(_received_finding):
+    fh, _dup, _events_log = _received_finding
+    assert fh.getvalue().count("\n") == 1
+
+
+def test_build_router_emits_one_judgment_created_event(_received_finding):
+    _fh, _dup, events_log = _received_finding
     assert events_log.exists()
     events = EventLogReader(events_log).read_all()
     assert len(events) == 1
