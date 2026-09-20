@@ -27,7 +27,6 @@ describe('useStandardsPageActions handleDeleteWithCleanup', () => {
       expect.stringContaining('[StandardsPage]'),
       'std-1',
     );
-    warn.mockRestore();
   });
 
   it('does not restore visibility when the delete succeeds', async () => {

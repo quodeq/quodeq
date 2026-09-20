@@ -28,6 +28,5 @@ describe('MainContent unrecognized route', () => {
       'not-a-real-route',
     );
     expect(screen.getByText('Page not found')).toBeInTheDocument();
-    warn.mockRestore();
   });
 });

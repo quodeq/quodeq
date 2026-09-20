@@ -29,19 +29,31 @@ test('buildNavigationBundle forwards every state key, including ones added later
   assert.equal(bundle.aKeyAddedAfterThisBundleWasWritten, state.aKeyAddedAfterThisBundleWasWritten);
 });
 
-test('buildNavigationBundle derives the caller-owned fields on top of the state', () => {
+test('buildNavigationBundle forwards navTab, navStackLength and isEvaluating from the caller args', () => {
   const navTab = () => {};
   const bundle = buildNavigationBundle(args({ projects: [] }, { navTab, navStackLength: 3, isEvaluating: true }));
   assert.equal(bundle.navTab, navTab);
   assert.equal(bundle.navStackLength, 3);
   assert.equal(bundle.isEvaluating, true);
+});
+
+test('buildNavigationBundle derives the action handlers as functions', () => {
+  const bundle = buildNavigationBundle(args({ projects: [] }));
   assert.equal(typeof bundle.onAddProject, 'function');
   assert.equal(typeof bundle.onImportProject, 'function');
   assert.equal(typeof bundle.onTakeTour, 'function');
   assert.equal(typeof bundle.onResumeSetup, 'function');
+});
+
+test('buildNavigationBundle sets onBrowseRemote to null by default', () => {
+  const bundle = buildNavigationBundle(args({ projects: [] }));
   // Null (not a no-op handler) so consumers can hide the affordance.
   assert.equal(bundle.onBrowseRemote, null);
-  assert.equal(typeof buildNavigationBundle(args({}, { sharedHasContent: true })).onBrowseRemote, 'function');
+});
+
+test('buildNavigationBundle sets onBrowseRemote to a function when sharedHasContent is true', () => {
+  const bundle = buildNavigationBundle(args({}, { sharedHasContent: true }));
+  assert.equal(typeof bundle.onBrowseRemote, 'function');
 });
 
 test('buildNavigationBundle keeps the caller-owned fields when state carries the same names', () => {
