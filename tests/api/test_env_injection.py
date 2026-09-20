@@ -203,6 +203,23 @@ def test_create_app_hands_the_injected_env_to_the_rate_limit_factory(tmp_path: P
     assert not isinstance(_build_rate_limit_store(env={})[0], FileRateLimitStore)
 
 
+def test_create_app_hands_the_injected_env_to_the_default_provider(monkeypatch, tmp_path: Path):
+    """``_default_provider`` must not re-read ``os.environ`` after
+    ``create_app`` already resolved the caller's env -- the index DB path
+    comes from the injected mapping, not a monkeypatched process value."""
+    from quodeq.api.app import create_app
+
+    monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(tmp_path / "from-process" / "index.db"))
+
+    injected = create_app(env={**_quodeq_env(), "QUODEQ_INDEX_DB_PATH": str(tmp_path / "index.db")})
+    provider = injected.config["_provider"]
+    assert provider._evaluations.index_db_path == tmp_path / "index.db"
+
+    empty = create_app(env=_quodeq_env("QUODEQ_INDEX_DB_PATH"))
+    empty_path = str(empty.config["_provider"]._evaluations.index_db_path)
+    assert "from-process" not in empty_path
+
+
 def test_configure_paths_and_cleanup_honours_the_injected_env(monkeypatch, tmp_path: Path):
     """Two different injected homes, neither of them the process one.
 

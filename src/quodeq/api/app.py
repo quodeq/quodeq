@@ -30,12 +30,15 @@ _DEFAULT_EVALUATION_RATE_LIMIT_WINDOW = 300
 _DEFAULT_EVALUATION_RATE_LIMIT_MAX = 10
 
 
-def _default_provider() -> ActionProvider:
-    """Create the default filesystem-based provider (lazy import)."""
+def _default_provider(env: Mapping[str, str] | None = None) -> ActionProvider:
+    """Create the default filesystem-based provider (lazy import).
+
+    *env* overrides the index-DB-path lookup and defaults to ``os.environ``.
+    """
     from pathlib import Path
     from quodeq.services.filesystem import FilesystemActionProvider
     from quodeq.shared._env import get_index_db_path
-    return FilesystemActionProvider(index_db_path=Path(get_index_db_path()))
+    return FilesystemActionProvider(index_db_path=Path(get_index_db_path(env=env)))
 
 
 def _configure_logging(
@@ -211,7 +214,7 @@ def create_app(
     generators, so a test can still set one mid-run.
     """
     app = Flask(__name__)
-    provider = provider or _default_provider()
+    provider = provider or _default_provider(env)
     _configure_app(app, provider, test_config, env)
     store, eval_store = _build_rate_limit_store(rate_limit_store, env)
     log_buffer = _configure_request_handling(app, store, api_key, env)
@@ -222,7 +225,7 @@ def create_app(
 def main(env: dict[str, str] | None = None) -> None:
     """Start the Flask development server using environment configuration."""
     from quodeq.shared._io import configure_stdio_utf8
-    configure_stdio_utf8()
+    configure_stdio_utf8(env)
     _env = resolve_env(env)
     # SECURITY: API key read from environment. For hardened deployments,
     # consider a secrets manager or platform keychain instead.

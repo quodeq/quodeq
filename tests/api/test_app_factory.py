@@ -136,6 +136,22 @@ class TestMainFunction:
             mock_run.assert_called_once()
             assert mock_signal.called, "main() should install signal handlers"
 
+    def test_main_forwards_env_to_configure_stdio_utf8(self, monkeypatch):
+        """main()'s *env* must reach configure_stdio_utf8, not just
+        create_app -- otherwise stdio setup silently reads os.environ even
+        when the caller injected an isolated mapping."""
+        mock_configure = MagicMock()
+        with patch("quodeq.api.app.create_app") as mock_create, \
+             patch("quodeq.api.app.signal.signal"), \
+             patch("quodeq.shared._io.configure_stdio_utf8", mock_configure):
+            mock_app = MagicMock()
+            mock_app.config = {"_provider": MagicMock()}
+            mock_create.return_value = mock_app
+            from quodeq.api.app import main
+            injected_env = {"QUODEQ_API_KEY": "test-key"}
+            main(env=injected_env)
+            mock_configure.assert_called_once_with(injected_env)
+
 
 class TestRateLimitStoreFactory:
     def test_defaults_to_in_memory_stores(self, monkeypatch):

@@ -35,7 +35,9 @@ Known limitations, documented rather than closed (none happens by
 accident): a module that both does `from os import environ` and binds a
 local named `environ` has that local's loads flagged too (the finder
 resolves by spelling, not by scope); and a name bound to `os.environ`
-first (`e = os.environ`) is keyed at the binding line only.
+first (`e = os.environ`) is keyed at the binding line only. `os.environb`,
+`os.getenvb`, `os.putenv`, and `os.unsetenv` are not flagged (nothing in
+src uses them).
 """
 from __future__ import annotations
 
