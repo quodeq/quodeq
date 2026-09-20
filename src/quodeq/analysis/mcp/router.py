@@ -186,9 +186,11 @@ class FindingsRouter:
             at all (API size cap / missing on disk) — an explicit record that
             the file was considered, not a transient failure to retry loudly.
         """
-        if status not in (FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_SKIPPED):
+        allowed = (FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_SKIPPED)
+        if status not in allowed:
+            names = ", ".join(repr(s) for s in allowed)
             raise ValueError(
-                f"mark_file_done: status must be 'ok', 'error', or 'skipped', got {status!r}"
+                f"mark_file_done: status must be one of {names}, got {status!r}"
             )
         payload: dict = {"_marker": "file_done", "file": file, "status": status}
         if reason is not None:
