@@ -4,26 +4,22 @@
  */
 
 import { createDashboard } from '../models/dashboard.js';
-import { createDimension, createDimensionEval, createSlimDimension } from '../models/dimension.js';
+import { createDimensionEval } from '../models/dimension.js';
 import { request } from './request.js';
+import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 
 // ── Unified Scores ─────────────────────────────────────────────────────
 
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
-  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores${q}`);
-  if (data?.accumulated && Array.isArray(data.accumulated.dimensions)) {
-    data.accumulated.dimensions = data.accumulated.dimensions.map(createDimension);
-  }
-  return data;
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores${asOfQuery(asOfRun)}`);
+  return parseUnifiedScores(data);
 }
 
 /** @returns {Promise<{dimensions: Array, summary: Object}>} */
 export async function getRunScores(projectId, runId) {
   const data = await request(`/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`);
-  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
-  return data;
+  return parseSlimDimensions(data);
 }
 
 /**
@@ -34,27 +30,21 @@ export async function getRunScores(projectId, runId) {
  */
 export async function getCompareSummary(projectId) {
   const data = await request(`/projects/${encodeURIComponent(projectId)}/compare-summary`);
-  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
-  return data;
+  return parseSlimDimensions(data);
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/dashboard.js').Dashboard>} */
 export async function getDashboard(projectId, run = 'latest') {
-  const q = run ? `?run=${encodeURIComponent(run)}` : '';
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/dashboard${q}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }
 
 /** @returns {Promise<Object>} */
 export async function getAccumulated(projectId, asOfRun = null) {
-  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
-  if (data && Array.isArray(data.dimensions)) {
-    data.dimensions = data.dimensions.map(createDimension);
-  }
-  return data;
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/accumulated${asOfQuery(asOfRun)}`);
+  return parseAccumulated(data);
 }
 
 // ── Dimension Eval ──────────────────────────────────────────────────────

@@ -27,7 +27,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRunEventStream } from '../../evaluation/hooks/useRunEventStream.js';
 import { getEvaluationProgress } from '../../../api/index.js';
-import { evaluationKeys } from '../../../api/queryKeys.js';
+import { NO_JOB_ID, evaluationKeys } from '../../../api/queryKeys.js';
 
 const PROGRESS_POLL_MS = 3000;
 
@@ -52,18 +52,14 @@ export function useHistoryRunLive(runId) {
   useRunEventStream(runId);
 
   const { data: liveDims = {} } = useQuery({
-    queryKey: runId
-      ? evaluationKeys.dimensions(runId)
-      : ['evaluation', '_none_', 'dimensions'],
+    queryKey: evaluationKeys.dimensions(runId || NO_JOB_ID),
     queryFn: NEVER_QUERIED,
     enabled: false,
     staleTime: Infinity,
   });
 
   const { data: status } = useQuery({
-    queryKey: runId
-      ? evaluationKeys.status(runId)
-      : ['evaluation', '_none_', 'status'],
+    queryKey: evaluationKeys.status(runId || NO_JOB_ID),
     queryFn: NEVER_QUERIED,
     enabled: false,
     staleTime: Infinity,
@@ -72,9 +68,7 @@ export function useHistoryRunLive(runId) {
   // Unconditional (SSE-independent) poll: a pure on-disk read of per-dim
   // state, same source the running Evaluation page's progress bar uses.
   const { data: progress } = useQuery({
-    queryKey: runId
-      ? [...evaluationKeys.evaluation(runId), 'historyProgress']
-      : ['evaluation', '_none_', 'historyProgress'],
+    queryKey: [...evaluationKeys.evaluation(runId || NO_JOB_ID), 'historyProgress'],
     queryFn: () => getEvaluationProgress(runId),
     enabled: !!runId,
     staleTime: 0,

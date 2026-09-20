@@ -130,16 +130,9 @@ function makePatchAccumulatedDims(queryClient, scoreByDim, runId) {
       ...old,
       accumulated: {
         ...old.accumulated,
-        dimensions: old.accumulated.dimensions.map((dim) => {
-          if (dim?.fromRunId !== runId) return dim;
-          const resc = scoreByDim.get(dim?.dimension);
-          if (!resc) return dim;
-          return {
-            ...dim,
-            overallScore: resc.overallScore ?? dim.overallScore,
-            overallGrade: resc.overallGrade ?? dim.overallGrade,
-          };
-        }),
+        dimensions: old.accumulated.dimensions.map((dim) =>
+          dim?.fromRunId === runId ? patchDimScore(dim, scoreByDim) : dim,
+        ),
       },
     }));
   };

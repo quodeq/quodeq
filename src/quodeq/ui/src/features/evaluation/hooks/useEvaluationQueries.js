@@ -9,15 +9,11 @@
  */
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { evaluationKeys } from "../../../api/queryKeys.js";
+import { NO_JOB_ID, evaluationKeys } from "../../../api/queryKeys.js";
 import { SSE_ENABLED, findingsRefetchInterval } from "./useEvaluation.helpers.js";
 import { createViolation } from "../../../models/violation.js";
 
 const JOB_POLL_MS = 1500;
-// Stand-in job id for the disabled queries below: react-query still wants a
-// stable key while `enabled` is false, and routing it through evaluationKeys
-// keeps the placeholder inside the same cache subtree as the real entries.
-const NO_JOB_ID = "_none_";
 
 // Under SSE the cache is filled by useRunEventStream; this queryFn is a
 // no-op. Under polling, fetch each dimension's eval and flatten violations.

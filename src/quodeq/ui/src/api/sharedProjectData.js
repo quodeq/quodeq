@@ -7,8 +7,9 @@
 import { request } from './request.js';
 import { createProject } from '../models/project.js';
 import { createDashboard } from '../models/dashboard.js';
-import { createDimension, createDimensionEval, createSlimDimension } from '../models/dimension.js';
+import { createDimensionEval } from '../models/dimension.js';
 import { epochSecondsToMs } from './sharedStatus.js';
+import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 
 // ── Project List & Info ─────────────────────────────────────────────────────
 
@@ -82,8 +83,7 @@ export function sharedGetRuns(projectId) {
  * @returns {Promise<import('../models/dashboard.js').Dashboard>}
  */
 export async function sharedGetDashboard(projectId, run = 'latest') {
-  const q = run ? `?run=${encodeURIComponent(run)}` : '';
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/dashboard${q}`);
+  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }
 
@@ -96,8 +96,7 @@ export async function sharedGetDashboard(projectId, run = 'latest') {
  */
 export async function sharedGetCompareSummary(projectId) {
   const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/compare-summary`);
-  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
-  return data;
+  return parseSlimDimensions(data);
 }
 
 /**
@@ -107,12 +106,8 @@ export async function sharedGetCompareSummary(projectId) {
  * @returns {Promise<Object>}
  */
 export async function sharedGetAccumulated(projectId, asOfRun = null) {
-  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
-  if (data && Array.isArray(data.dimensions)) {
-    data.dimensions = data.dimensions.map(createDimension);
-  }
-  return data;
+  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/accumulated${asOfQuery(asOfRun)}`);
+  return parseAccumulated(data);
 }
 
 /**
@@ -122,12 +117,8 @@ export async function sharedGetAccumulated(projectId, asOfRun = null) {
  * @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>}
  */
 export async function sharedGetProjectScores(projectId, asOfRun = null) {
-  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/scores${q}`);
-  if (data?.accumulated && Array.isArray(data.accumulated.dimensions)) {
-    data.accumulated.dimensions = data.accumulated.dimensions.map(createDimension);
-  }
-  return data;
+  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/scores${asOfQuery(asOfRun)}`);
+  return parseUnifiedScores(data);
 }
 
 /**
@@ -140,8 +131,7 @@ export async function sharedGetRunScores(projectId, runId) {
   const data = await request(
     `/shared/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`
   );
-  if (Array.isArray(data?.dimensions)) data.dimensions = data.dimensions.map(createSlimDimension);
-  return data;
+  return parseSlimDimensions(data);
 }
 
 // ── Dimension Eval & Violations ─────────────────────────────────────────────
