@@ -54,10 +54,17 @@ def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response,
 
     Validation and the mkdir itself live in the provider (mirroring
     ``_handle_browse``); this handler only shapes the HTTP response.
+    Body fields are type-checked before ``.strip()`` so a null or
+    non-string value (or a non-object body) is treated as missing
+    rather than raising an unhandled 500.
     """
-    data = request.get_json(silent=True) or {}
-    parent = data.get("path", "").strip()
-    name = data.get("name", "").strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    parent = data.get("path")
+    parent = parent.strip() if isinstance(parent, str) else ""
+    name = data.get("name")
+    name = name.strip() if isinstance(name, str) else ""
     payload = provider.browse_mkdir(parent, name)
     if "error" in payload:
         http_status, code = _MKDIR_ERROR_MAP.get(
