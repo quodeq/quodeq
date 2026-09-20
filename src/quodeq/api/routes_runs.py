@@ -11,7 +11,7 @@ from quodeq.api._http_cache import conditional_json
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.services._runs_unit import build_runs_unit
-from quodeq.shared._env import get_index_db_path
+from quodeq.shared.env import get_index_db_path
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)

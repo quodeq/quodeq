@@ -33,7 +33,7 @@ from quodeq.services.jobs import (
     _REPORT_PATH_MARKER, _WATCHDOG_POLL_INTERVAL_S,
 )
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
-from quodeq.shared._env import env_float
+from quodeq.shared.env import env_float
 from quodeq.shared.constants import (
     CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
     CC_PHASE_REPORT_PATH, CC_PHASE_SCORING, CC_PHASE_SETUP,

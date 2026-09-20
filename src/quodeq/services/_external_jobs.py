@@ -27,7 +27,7 @@ from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-ex
     resolve_external_pid,
 )
 from quodeq.services._run_index_fs import _scan_reports_root_for_run
-from quodeq.shared._env import env_float
+from quodeq.shared.env import env_float
 from quodeq.shared.process import is_pid_alive
 
 _logger = logging.getLogger(__name__)

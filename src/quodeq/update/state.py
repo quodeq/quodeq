@@ -1,7 +1,7 @@
 """Shared, on-disk update state at ~/.quodeq/update_state.json.
 
 Read/written by three separate processes (dashboard, menubar, CLI), so it is
-the single source of truth. Resolution mirrors shared/_env.py: an explicit
+the single source of truth. Resolution mirrors shared/env.py: an explicit
 QUODEQ_UPDATE_STATE_PATH wins, else <QUODEQ_DIR or ~/.quodeq>/update_state.json.
 Basing the fallback on QUODEQ_DIR means the test suite's autouse
 _isolate_quodeq_home fixture isolates this file automatically.

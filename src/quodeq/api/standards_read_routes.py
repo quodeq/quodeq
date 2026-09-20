@@ -12,7 +12,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import error_response, page_params
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)

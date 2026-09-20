@@ -39,7 +39,7 @@ def _default_persist_dir(env: Mapping[str, str] | None = None) -> Path:
     explicit = resolve_env(env).get("QUODEQ_JOB_PERSIST_DIR")
     if explicit:
         return Path(explicit)
-    from quodeq.shared._env import get_index_db_path
+    from quodeq.shared.env import get_index_db_path
     return Path(get_index_db_path()).parent / "run" / "jobs"
 
 

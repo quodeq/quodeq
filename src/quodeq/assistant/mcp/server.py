@@ -81,7 +81,7 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
     if ns.reports_dir:
         reports_dir = Path(ns.reports_dir)
     else:
-        from quodeq.shared._env import get_evaluations_dir  # noqa: PLC0415
+        from quodeq.shared.env import get_evaluations_dir  # noqa: PLC0415
         reports_dir = Path(get_evaluations_dir())
     repo_root = Path(ns.repo_root) if ns.repo_root else None
     ctx = ToolContext(

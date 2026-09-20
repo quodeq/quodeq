@@ -29,7 +29,7 @@ from quodeq.services._wiring import (
     validate_remote_url,
     write_repository_info,
 )
-from quodeq.shared._env import get_clones_dir
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 _LOCATION_LOCAL = "local"

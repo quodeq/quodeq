@@ -49,7 +49,7 @@ def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -
 
     The CLI variant: *default* may be None (an unset flag stays unset) and the
     caller, not this function, decides what an absent value means. Distinct from
-    ``quodeq.shared._env.env_int``, which always returns an int and warns on a
+    ``quodeq.shared.env.env_int``, which always returns an int and warns on a
     malformed value. Re-exported as ``cli_env_int``.
     """
     raw = _environ(env).get(var)
@@ -86,7 +86,7 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
 # Public spellings of the names ``quodeq.cli`` re-exports. The underscore
 # originals stay importable from here for in-package callers.
 # ``_env_int`` is spelled ``cli_env_int``: it is NOT
-# ``quodeq.shared._env.env_int``, which takes a non-optional default, a
+# ``quodeq.shared.env.env_int``, which takes a non-optional default, a
 # keyword-only ``env``, and always returns an int.
 ENV_MAX_TURNS = _ENV_MAX_TURNS
 ENV_MAX_DURATION = _ENV_MAX_DURATION

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import STATUS_FAILED, Job
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 
 _DEFAULT_MAX_CONCURRENT_JOBS = 8
 _EXIT_CODE_TOO_MANY_JOBS = -2

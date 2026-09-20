@@ -14,7 +14,7 @@ from pathlib import Path
 from flask import Response, after_this_request, send_file
 
 from quodeq.api.helpers import ClientMessageError, json_error
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 
 _logger = logging.getLogger(__name__)
 

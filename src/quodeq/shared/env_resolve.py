@@ -12,8 +12,8 @@ set", and ``or`` would hand back the real environment instead. That
 spelling is gated separately by tests/tools/test_no_env_or_fallback.py.
 
 Like ``_env_sanitize``, this is a leaf with no imports of its own, so
-``_config.py``/``_io.py`` (which ``_env.py`` itself imports) can use it
-without an import cycle back through ``_env.py``.
+``_config.py``/``_io.py`` (which ``env.py`` itself imports) can use it
+without an import cycle back through ``env.py``.
 """
 from __future__ import annotations
 

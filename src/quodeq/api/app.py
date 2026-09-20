@@ -20,7 +20,7 @@ from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
 
@@ -38,7 +38,7 @@ def _default_provider(env: Mapping[str, str] | None = None) -> ActionProvider:
     """
     from pathlib import Path
     from quodeq.services.filesystem import FilesystemActionProvider
-    from quodeq.shared._env import get_index_db_path
+    from quodeq.shared.env import get_index_db_path
     return FilesystemActionProvider(index_db_path=Path(get_index_db_path(env=env)))
 
 
@@ -116,7 +116,7 @@ def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) 
     *env* overrides the path lookups and defaults to ``os.environ``."""
     from pathlib import Path
     from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
-    from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
+    from quodeq.shared.env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
 
     try:
         sweep_orphaned_clones(get_clones_dir(env), Path(get_evaluations_dir(env=env)))

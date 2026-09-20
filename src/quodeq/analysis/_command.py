@@ -129,7 +129,7 @@ def _is_known_cli_provider(cmd: str) -> bool:
     """Return True only if *cmd* matches a registered provider of type 'cli'.
 
     ``cmd`` ultimately comes from the user-controlled AI_CMD/AI_PROVIDER env
-    var (see ``quodeq.shared._env.get_ai_cmd``) with no prior validation. Gate
+    var (see ``quodeq.shared.env.get_ai_cmd``) with no prior validation. Gate
     subprocess execution to the known provider registry so a typo'd or
     unexpected value fails closed instead of shelling out to an arbitrary
     program. Only ``type == "cli"`` providers reach this CLI-register path;

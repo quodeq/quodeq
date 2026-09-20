@@ -21,13 +21,13 @@ from quodeq.core.scoring.params import (
     params_to_dict,
     validate_params,
 )
-from quodeq.shared._env import get_grade_formula_path
+from quodeq.shared.env import get_grade_formula_path
 
 _logger = logging.getLogger(__name__)
 
 
 def grade_formula_path() -> Path:
-    """Location of the custom-params file (env-overridable, see shared/_env)."""
+    """Location of the custom-params file (env-overridable, see shared/env)."""
     return Path(get_grade_formula_path())
 
 

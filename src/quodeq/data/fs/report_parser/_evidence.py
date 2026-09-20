@@ -12,7 +12,7 @@ from quodeq.data.fs.report_parser._evidence_sqlite import (
 )
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
 from quodeq.data.fs.report_parser.json_parser import parse_evidence_file
-from quodeq.shared._env import sqlite_disabled
+from quodeq.shared.env import sqlite_disabled
 
 _logger = logging.getLogger(__name__)
 

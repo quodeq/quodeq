@@ -118,7 +118,7 @@ def test_runrow_dataclass_fields() -> None:
 
 
 def test_get_index_db_path_default_and_env(tmp_path, monkeypatch) -> None:
-    from quodeq.shared._env import get_index_db_path
+    from quodeq.shared.env import get_index_db_path
     monkeypatch.delenv("QUODEQ_INDEX_DB_PATH", raising=False)
     p = Path(get_index_db_path())
     assert p.name == "index.db"

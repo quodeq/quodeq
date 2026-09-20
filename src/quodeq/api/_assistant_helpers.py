@@ -30,7 +30,7 @@ from quodeq.services.shared_repo import (
     shared_score_cache_path,
 )
 from quodeq.services.shared_settings import read_settings
-from quodeq.shared._env import get_evaluations_dir
+from quodeq.shared.env import get_evaluations_dir
 from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch target

@@ -55,7 +55,7 @@ from quodeq.services._score_cache_fetch import (  # noqa: F401 — facade re-exp
     cached_project_summary,
     make_cache_backed_fetcher,
 )
-from quodeq.shared._env import get_score_cache_path  # noqa: F401 — facade re-export
+from quodeq.shared.env import get_score_cache_path  # noqa: F401 — facade re-export
 
 if TYPE_CHECKING:
     from quodeq.core.dismissals import DismissedKeys

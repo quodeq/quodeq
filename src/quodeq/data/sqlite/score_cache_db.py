@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Iterator
 
 from quodeq.data.sqlite._score_cache_epoch import CACHE_WRITER_EPOCH
-from quodeq.shared._env import get_score_cache_path
+from quodeq.shared.env import get_score_cache_path
 
 _logger = logging.getLogger(__name__)
 _BUSY_TIMEOUT_MS = 5000

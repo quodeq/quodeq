@@ -40,7 +40,7 @@ from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
     compute_tick,
 )
 from quodeq.api._sse_log_helpers import sse_line
-from quodeq.shared._env import env_float
+from quodeq.shared.env import env_float
 from quodeq.shared.env_resolve import resolve_env
 
 # env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort

@@ -26,7 +26,7 @@ from quodeq.data.sqlite.run_index import (
     open_index,
     sync_project_dates,
 )
-from quodeq.shared._env import get_index_db_path
+from quodeq.shared.env import get_index_db_path
 
 _logger = logging.getLogger(__name__)
 

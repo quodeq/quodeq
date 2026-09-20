@@ -242,7 +242,7 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
     DB instead of this clone's own one. Both must hold: the per-clone cache
     gets written, and the local (sandboxed-default) cache never does."""
     from quodeq.data.fs.shared_repo import shared_score_cache_path
-    from quodeq.shared._env import get_score_cache_path
+    from quodeq.shared.env import get_score_cache_path
 
     clone_cache_path = shared_score_cache_path(shared_clone_fixture)
     local_cache_path = Path(get_score_cache_path())

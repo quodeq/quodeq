@@ -4,7 +4,7 @@ import logging
 import pytest
 
 from quodeq.shared._config import _get_config
-from quodeq.shared._env import (
+from quodeq.shared.env import (
     env_float,
     env_int,
     get_action_api_host,
@@ -25,12 +25,12 @@ class TestEnvInt:
         assert env_int("X", 5, env={}) == 5
 
     def test_invalid_returns_default_and_warns(self, caplog):
-        with caplog.at_level(logging.WARNING, logger="quodeq.shared._env"):
+        with caplog.at_level(logging.WARNING, logger="quodeq.shared.env"):
             assert env_int("X", 5, env={"X": "abc"}) == 5
         assert "Invalid X=" in caplog.text
 
     def test_below_minimum_returns_default(self, caplog):
-        with caplog.at_level(logging.WARNING, logger="quodeq.shared._env"):
+        with caplog.at_level(logging.WARNING, logger="quodeq.shared.env"):
             assert env_int("X", 5, minimum=1, env={"X": "0"}) == 5
         assert "Out-of-range X=" in caplog.text
 
@@ -46,7 +46,7 @@ class TestEnvFloat:
         assert env_float("X", 1.5, env={}) == 1.5
 
     def test_invalid_returns_default_and_warns(self, caplog):
-        with caplog.at_level(logging.WARNING, logger="quodeq.shared._env"):
+        with caplog.at_level(logging.WARNING, logger="quodeq.shared.env"):
             assert env_float("X", 1.5, env={"X": "nan-ish"}) == 1.5
         assert "Invalid X=" in caplog.text
 

@@ -20,7 +20,7 @@ from collections.abc import Mapping, MutableMapping
 
 import rumps
 
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.frozen import source_user_path as _source_user_path
 from quodeq.menubar import control as _control
