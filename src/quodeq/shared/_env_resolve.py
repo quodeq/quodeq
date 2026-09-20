@@ -7,8 +7,9 @@ the ratchet (``tools/check_env_reads.py``) flags and which makes the module
 untestable without mutating the process. Routing the fallback through this
 config-layer helper keeps the single read where it belongs.
 
-Never ``env or os.environ``: an injected ``{}`` means "no variables set"
-and truthiness would silently hand back the real environment instead.
+Never fall back on truthiness: an injected ``{}`` means "no variables
+set", and ``or`` would hand back the real environment instead. That
+spelling is gated separately by tests/tools/test_no_env_or_fallback.py.
 
 Like ``_env_sanitize``, this is a leaf with no imports of its own, so
 ``_config.py``/``_io.py`` (which ``_env.py`` itself imports) can use it
