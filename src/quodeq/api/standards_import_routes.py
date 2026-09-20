@@ -44,7 +44,7 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         return error_response(
             "A standard with this ID already exists from a different source. "
             "Duplicate it to customize your own copy, or delete the existing one, then retry.",
-            409, "conflict",
+            HTTPStatus.CONFLICT, "conflict",
         )
     except (OSError, ValueError, http.client.HTTPException) as exc:
         # See list_library: HTTPException is urllib's truncated/malformed
@@ -52,10 +52,10 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         logger.warning("Library import failed: %s", exc)
         return error_response(
             "Import from library failed. Check that the library server is reachable and the standard file is valid.",
-            502, "import_error",
+            HTTPStatus.BAD_GATEWAY, "import_error",
         )
     logger.info("standards.import_from_library file=%s", _sanitize_for_log(file_path))
-    return jsonify({"status": "imported"}), 201
+    return jsonify({"status": "imported"}), HTTPStatus.CREATED
 
 
 def _validate_import_body(body):
@@ -114,12 +114,12 @@ def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
             "status": "conflict",
             "existing": to_camel_dict(result["existing"]),
             "warnings": result["warnings"],
-        }), 409
+        }), HTTPStatus.CONFLICT
     return jsonify({
         "status": "imported",
         "detail": to_camel_dict(result["detail"]),
         "warnings": result["warnings"],
-    }), 201
+    }), HTTPStatus.CREATED
 
 
 def register_import_routes(app: Flask, get_service, get_library_client) -> None:

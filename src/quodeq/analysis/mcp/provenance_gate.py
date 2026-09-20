@@ -37,6 +37,9 @@ from __future__ import annotations
 import logging
 import re
 
+from quodeq.analysis.mcp.schemas import (
+    FINDING_TYPE_VIOLATION, SEVERITY_CRITICAL, SEVERITY_MAJOR,
+)
 from quodeq.core.finding_markers import PROVENANCE_DOWNGRADE
 
 _log = logging.getLogger(__name__)
@@ -133,16 +136,16 @@ def apply_provenance_gate(finding: dict) -> bool:
     Detection reads the model's prose (``reason`` + title ``w``) only, so it is
     language-independent; the code ``snippet`` is intentionally not consulted.
     """
-    if finding.get("t") != "violation":
+    if finding.get("t") != FINDING_TYPE_VIOLATION:
         return False
     if finding.get("req") not in PROVENANCE_GATED_REQS:
         return False
-    if finding.get("severity") != "critical":
+    if finding.get("severity") != SEVERITY_CRITICAL:
         return False
     haystack = " ".join(str(finding.get(k) or "") for k in ("reason", "w"))
     if names_external_source(haystack):
         return False
-    finding["severity"] = "major"
+    finding["severity"] = SEVERITY_MAJOR
     finding[DOWNGRADE_MARKER] = True
     _log.debug(
         "provenance gate: downgraded %s finding to major (no external source named): %s",

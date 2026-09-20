@@ -142,6 +142,9 @@ def build_tool_context(
     )
 
 
+_BUSY_CHECK_RECENT_EVALUATIONS = 20  # enough recent runs to catch any still "running"
+
+
 def local_provider_busy(provider_id: str) -> bool:
     """True when a local single-slot model is likely serving an evaluation."""
     if provider_id not in _LOCAL_PROVIDERS:
@@ -149,4 +152,6 @@ def local_provider_busy(provider_id: str) -> bool:
     provider = current_app.config.get("_provider")
     if provider is None:
         return False
-    return bool(provider.list_evaluations(limit=20, states={"running"}))
+    return bool(provider.list_evaluations(
+        limit=_BUSY_CHECK_RECENT_EVALUATIONS, states={"running"},
+    ))
