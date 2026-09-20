@@ -27,7 +27,7 @@ _log = logging.getLogger(__name__)
 _TIMEOUT_S = 3
 
 
-def _read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
+def read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
     """Return the omlx API key from OMLX_API_KEY env var or ~/.omlx/settings.json.
 
     *env* is resolved by the config layer; the variable is read per call
@@ -112,7 +112,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
     root = _normalize_base(base_url or omlx_base_url())
     try:
         req = _safe_request(f"{root}/v1/models")
-        key = api_key if api_key is not None else _read_omlx_api_key()
+        key = api_key if api_key is not None else read_omlx_api_key()
         if key:
             req.add_header("Authorization", f"Bearer {key}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:

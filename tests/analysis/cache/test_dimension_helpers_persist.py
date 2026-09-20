@@ -149,7 +149,7 @@ class TestPersist:
         # The persisted standards_hash must be the override-aware value —
         # identical to what classify computes for the same run — or the very
         # next classify would report phantom standards drift.
-        from quodeq.analysis.fingerprint import _hash_standards
+        from quodeq.analysis.fingerprint import hash_standards
 
         src = tmp_path / "src"
         files = _write_files(src, {"a.py": "x"})
@@ -175,9 +175,9 @@ class TestPersist:
 
         entry = cache.get(miss_keys["a.py"])
         assert entry is not None
-        expected = _hash_standards(standards_dir, "security", src)
+        expected = hash_standards(standards_dir, "security", src)
         assert entry.provenance["standards_hash"] == expected
-        assert entry.provenance["standards_hash"] != _hash_standards(
+        assert entry.provenance["standards_hash"] != hash_standards(
             standards_dir, "security",
         )
 

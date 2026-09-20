@@ -29,7 +29,7 @@ from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import persist_dispatch_results
-from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
+from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
 
 # How often the watcher thread persists in-flight cache entries during
 # dispatch. Smaller = less work lost on cancel; larger = less I/O during
@@ -76,7 +76,7 @@ def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> CachePers
     persist_dispatch_results recomputing them on every tick.
     """
     standards_hash = (
-        _hash_standards(config.standards_dir, dimension, config.src)
+        hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
     params_hash, effective_params = dimension_params_state(

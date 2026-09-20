@@ -30,7 +30,7 @@ from quodeq.shared.lru import LRUDict
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
 
 
-def _hash_file(path: Path) -> str | None:
+def hash_file(path: Path) -> str | None:
     """SHA-256 hash of a file's content, streamed in chunks to limit memory."""
     try:
         h = hashlib.sha256()
@@ -42,7 +42,8 @@ def _hash_file(path: Path) -> str | None:
         return None
 
 
-def _stat_key(path: Path) -> tuple[int, int] | None:
+def stat_key(path: Path) -> tuple[int, int] | None:
+    """Return (size, mtime_ns) for *path*, or None if it cannot be stat'd."""
     try:
         st = path.stat()
     except OSError:
@@ -147,8 +148,8 @@ class HashCache:
         return value
 
     def file_hash(self, path: Path, size: int, mtime_ns: int) -> str | None:
-        """Memoized :func:`_hash_file`, keyed by (path, size, mtime_ns)."""
-        return self._memo(self._file_hashes, (path, size, mtime_ns), lambda: _hash_file(path))
+        """Memoized :func:`hash_file`, keyed by (path, size, mtime_ns)."""
+        return self._memo(self._file_hashes, (path, size, mtime_ns), lambda: hash_file(path))
 
     def override_hash(self, project_root: Path, size: int, mtime_ns: int) -> str:
         """Memoized :func:`_compute_override_hash`, keyed by (path, size, mtime_ns)."""
@@ -185,7 +186,7 @@ _hash_cache = HashCache()
 def _hash_overrides(project_root: Path, *, cache: HashCache | None = None) -> str:
     """Hash of ``<project_root>/.quodeq/standards-overrides.json``; "" when
     the file is absent, empty, or malformed (analysis ignores all three)."""
-    key = _stat_key(Path(project_root) / OVERRIDES_RELPATH)
+    key = stat_key(Path(project_root) / OVERRIDES_RELPATH)
     if key is None:
         return ""
     return (cache or _hash_cache).override_hash(Path(project_root), *key)
@@ -210,21 +211,21 @@ def dimension_params_state(
     if standards_dir is None:
         return "", {}
     compiled = Path(standards_dir) / "compiled" / f"{dimension}.json"
-    ckey = _stat_key(compiled)
+    ckey = stat_key(compiled)
     if ckey is None:
         return "", {}
     root = Path(project_root) if project_root else None
-    overrides = FileStat(root, *(_stat_key(root / OVERRIDES_RELPATH) or (0, 0))) if root else None
+    overrides = FileStat(root, *(stat_key(root / OVERRIDES_RELPATH) or (0, 0))) if root else None
     return (cache or _hash_cache).dimension_params_state(FileStat(compiled, *ckey), overrides)
 
 
-def _hash_standards(
+def hash_standards(
     standards_dir: Path, dimension: str, project_root: Path | None = None,
     *, cache: HashCache | None = None,
 ) -> str | None:
     """SHA-256 of the compiled standards JSON for a dimension.
 
-    Uses the same chunked hashing approach as ``_hash_file`` to avoid
+    Uses the same chunked hashing approach as ``hash_file`` to avoid
     reading the entire file into memory at once.
 
     When *project_root* is given, the project's threshold overrides
@@ -244,7 +245,7 @@ def _hash_standards(
     """
     cache = cache or _hash_cache
     compiled = standards_dir / "compiled" / f"{dimension}.json"
-    key = _stat_key(compiled)
+    key = stat_key(compiled)
     if key is None:
         return None
     base = cache.file_hash(compiled, *key)
@@ -253,9 +254,7 @@ def _hash_standards(
     overrides_hash = _hash_overrides(project_root, cache=cache)
     if not overrides_hash:
         return base
-    return hashlib.sha256(
-        f"{base}\x00overrides\x00{overrides_hash}".encode()
-    ).hexdigest()
+    return hashlib.sha256(f"{base}\x00overrides\x00{overrides_hash}".encode()).hexdigest()
 
 
 # Prompts in this set carry the rules that classify a finding (what counts
@@ -265,7 +264,7 @@ def _hash_standards(
 _RULES_BEARING_PROMPTS: frozenset[str] = frozenset({"evaluation_rules.md"})
 
 
-def _hash_prompts_map(
+def hash_prompts_map(
     prompts_dir: Path | None, *, cache: HashCache | None = None,
 ) -> dict[str, str]:
     """Per-file SHA-256 of every *.md prompt under *prompts_dir*.
@@ -285,7 +284,7 @@ def _hash_prompts_map(
         return {}
     out: dict[str, str] = {}
     for path in sorted(prompts_dir.glob("*.md")):
-        key = _stat_key(path)
+        key = stat_key(path)
         if key is None:
             continue
         h = cache.file_hash(path, *key)

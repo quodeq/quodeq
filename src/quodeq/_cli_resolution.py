@@ -31,7 +31,7 @@ from quodeq.analysis.manifest import SourceManifest, build_manifest, detect_lang
 from quodeq.analysis.manifest_models import AnalysisTarget
 # Re-exported: moved to the analysis layer (pure manifest logic); CLI modules
 # keep their historical `from quodeq._cli_resolution import ...` path.
-from quodeq.analysis.manifest_scope import _filter_manifest_by_scope
+from quodeq.analysis.manifest_scope import filter_manifest_by_scope
 from quodeq.analysis.runner import load_universal_dimensions
 from quodeq.shared.log_sink import SHARED_LOG
 # Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.
@@ -253,7 +253,7 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     manifest = _build_manifest(args, src, paths, scope_path=scope_path)
 
     if scope_path and manifest:
-        manifest = _filter_manifest_by_scope(manifest, scope_path, log=SHARED_LOG)
+        manifest = filter_manifest_by_scope(manifest, scope_path, log=SHARED_LOG)
         if manifest is None:
             return None
 
@@ -274,7 +274,6 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
 build_cli_manifest = _build_manifest
 cleanup_worktree = _cleanup_worktree
 create_worktree = _create_worktree
-filter_manifest_by_scope = _filter_manifest_by_scope
 override_manifest_single_file = _override_manifest_single_file
 resolve_evaluation_inputs = _resolve_evaluation_inputs
 resolve_language = _resolve_language

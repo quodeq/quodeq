@@ -35,7 +35,7 @@ src/quodeq/analysis/checks/runner.py:183:broad-except
 src/quodeq/analysis/checks/runner.py:295:broad-except
 src/quodeq/analysis/checks/runner.py:52:broad-except
 src/quodeq/analysis/checks/runner.py:74:broad-except
-src/quodeq/analysis/fingerprint.py:73:broad-except
+src/quodeq/analysis/fingerprint.py:74:broad-except
 src/quodeq/analysis/mcp/router.py:167:broad-except
 src/quodeq/analysis/mcp/router.py:205:broad-except
 src/quodeq/analysis/subagents/_pool_launcher.py:85:broad-except

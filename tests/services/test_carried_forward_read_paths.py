@@ -5,8 +5,8 @@ evidence JSONL. A running dimension has only the JSONL; a finished one has
 the JSON. The live feed crosses that boundary mid-run, so a gap in either
 parser makes carried findings reappear as each dimension completes.
 """
-from quodeq.analysis._report_constants import _VIOLATION_FIELDS
-from quodeq.analysis._report_findings import _flatten_findings
+from quodeq.analysis._report_constants import VIOLATION_FIELDS
+from quodeq.analysis._report_findings import flatten_findings
 from quodeq.data.fs.report_parser._report_parsing import build_finding
 from quodeq.services.violations_parsing import _build_finding_entry
 
@@ -37,7 +37,7 @@ def test_report_json_path_carries_the_flag():
 
 
 def test_report_write_whitelist_carries_the_flag_through_flatten():
-    """_flatten_findings keeps ONLY the keys listed in _VIOLATION_FIELDS when
+    """flatten_findings keeps ONLY the keys listed in VIOLATION_FIELDS when
     writing evaluation/<dim>.json. Omission here drops the flag silently."""
     items = [
         {
@@ -50,7 +50,7 @@ def test_report_write_whitelist_carries_the_flag_through_flatten():
         },
     ]
 
-    flattened = _flatten_findings(items, "P1", _VIOLATION_FIELDS)
+    flattened = flatten_findings(items, "P1", VIOLATION_FIELDS)
 
     carried, not_carried = flattened
     assert carried["carried_forward"] is True
@@ -91,8 +91,8 @@ def test_report_json_path_carries_scope_downgrade():
 
 
 def test_report_write_whitelist_carries_scope_downgrade_through_flatten():
-    """Same whitelist gap class as carried_forward above: _flatten_findings
-    keeps ONLY the keys listed in _VIOLATION_FIELDS when writing
+    """Same whitelist gap class as carried_forward above: flatten_findings
+    keeps ONLY the keys listed in VIOLATION_FIELDS when writing
     evaluation/<dim>.json. Omission here drops the rule name silently, and a
     reader could no longer tell a waived finding from an ordinary minor."""
     marker = {"rule": "sourceless_path", "from": "major", "to": "minor"}
@@ -107,7 +107,7 @@ def test_report_write_whitelist_carries_scope_downgrade_through_flatten():
         },
     ]
 
-    flattened = _flatten_findings(items, "P1", _VIOLATION_FIELDS)
+    flattened = flatten_findings(items, "P1", VIOLATION_FIELDS)
 
     downgraded, not_downgraded = flattened
     assert downgraded["scope_downgrade"] == marker

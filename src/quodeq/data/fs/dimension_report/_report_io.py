@@ -16,7 +16,7 @@ from quodeq.data.fs.dimension_report._report_assembly import build_full_report, 
 _logger = logging.getLogger(__name__)
 
 
-def _persist_json(data: dict, path: Path) -> None:
+def persist_json(data: dict, path: Path) -> None:
     """Atomically write a report dict as formatted JSON to *path*.
 
     Dashboard readers poll these files and treat a parse failure as "the
@@ -51,8 +51,8 @@ def write_reports(
 
     dim = evidence.language
     validate_path_segment(dim)
-    _persist_json(full_report, output_dir / f"{dim}_full.json")
-    _persist_json(dashboard_report, output_dir / f"{dim}.json")
+    persist_json(full_report, output_dir / f"{dim}_full.json")
+    persist_json(dashboard_report, output_dir / f"{dim}.json")
 
 
 def write_dimension_report(
@@ -63,4 +63,4 @@ def write_dimension_report(
 
     report = build_dashboard_report(evidence, scores)
     report["dimension"] = dimension
-    _persist_json(report, output_dir / f"{dimension}.json")
+    persist_json(report, output_dir / f"{dimension}.json")

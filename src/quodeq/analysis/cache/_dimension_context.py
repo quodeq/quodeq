@@ -31,7 +31,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents._source_files import list_source_files
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 
 _logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ def _prepare_cache_context(
         cache = LocalFileBackend()
         ensure_cache_ready(cache.root)
     trust_model = resolve_trust_model(config.src) if config.src is not None else None
-    files, _ext, _excluded = _list_source_files(config, dim_id)
+    files, _ext, _excluded = list_source_files(config, dim_id)
     if not files:
         return None
 

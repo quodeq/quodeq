@@ -31,7 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis._types import RunConfig, AnalysisContext
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from quodeq.analysis.cache._dimension_context import (
     _CacheContext,
@@ -89,13 +89,13 @@ class _MissDispatch:
 
     miss_config: RunConfig
     idx: int
-    ctx: _AnalysisContext
+    ctx: AnalysisContext
     callbacks: DimensionCallbacks
     dispatcher: Callable[..., Evidence | None]
 
 
 def _handle_all_hits(
-    config: RunConfig, ctx: _AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: AnalysisContext, cctx: _CacheContext,
 ) -> Evidence | None:
     """All-hits short-circuit: no dispatch needed. Appends (not overwrites)
     since a dim may run multiple times in the same run (e.g. V1's backfill
@@ -156,7 +156,7 @@ def _start_watchers(
 
 
 def _handle_breaker_trip(
-    config: RunConfig, ctx: _AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: AnalysisContext, cctx: _CacheContext,
 ) -> Evidence:
     """Salvage the completed-so-far JSONL instead of discarding the whole
     dimension, flagging failure_streak. Raises when there is nothing to
@@ -173,7 +173,7 @@ def _handle_breaker_trip(
 
 
 def _handle_dispatch_result(
-    config: RunConfig, ctx: _AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: AnalysisContext, cctx: _CacheContext,
     miss_evidence: Evidence | None,
 ) -> Evidence | None:
     """Finalize Evidence after a normal (non-tripped) dispatch return,
@@ -223,7 +223,7 @@ def _dispatch_misses_with_watchers(
 
 
 def process_dimension_with_cache(
-    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext, opts: CacheRunOptions,
+    config: RunConfig, dim_id: str, idx: int, ctx: AnalysisContext, opts: CacheRunOptions,
 ) -> Evidence | None:
     """V2 entry point — content-addressed cache replaces V1 change
     detection. Falls through to ``opts.dispatcher`` when there's no

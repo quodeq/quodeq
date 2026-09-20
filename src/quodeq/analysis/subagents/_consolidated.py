@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis._types import RunConfig, AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
@@ -18,7 +18,7 @@ from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_pr
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
-from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents._source_files import list_source_files
 from quodeq.analysis._runner_markers import cleanup_stream
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
@@ -35,7 +35,7 @@ class _ConsolidatedPaths:
 class _ConsolidatedRunContext:
     """Grouped context for consolidated result collection."""
     dimensions: list[str]
-    ctx: _AnalysisContext
+    ctx: AnalysisContext
     results: list[Any]
     files: list[str]
     exit_reason: str | None = None
@@ -119,7 +119,7 @@ def _parse_options(config: "RunConfig", compiled_dir: "Path | None") -> Evidence
     )
 
 
-def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext) -> str:
+def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: AnalysisContext) -> str:
     """Build the consolidated prompt for multi-dimension analysis."""
     return build_consolidated_prompt(
         dimensions=dimensions,
@@ -141,7 +141,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: _AnalysisCont
 
 
 def process_consolidated_dimensions(
-    config: "RunConfig", dimensions: list[str], ctx: _AnalysisContext,
+    config: "RunConfig", dimensions: list[str], ctx: AnalysisContext,
     *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
@@ -149,7 +149,7 @@ def process_consolidated_dimensions(
     evidence_dir = config.work_dir or config.src
 
     # 1. List source files
-    files, extensions, _excluded = _list_source_files(config, dimensions[0])
+    files, extensions, _excluded = list_source_files(config, dimensions[0])
     if not files:
         log.warning("No source files for consolidated analysis")
         return {}

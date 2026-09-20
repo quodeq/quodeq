@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis._types import RunConfig, AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import (
@@ -26,7 +26,7 @@ from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_fin
 class _CollectionContext:
     """Grouped parameters for collecting evidence after a subagent pool run."""
     results: list[Any]
-    ctx: _AnalysisContext
+    ctx: AnalysisContext
     files: list[str] | None = None
     exit_reason: str | None = None
 

@@ -108,7 +108,7 @@ class TestHashInputsHoistedOncePerDispatch:
 
         with (
             patch(
-                "quodeq.analysis.cache._persist_watcher._hash_standards",
+                "quodeq.analysis.cache._persist_watcher.hash_standards",
                 mock_hash_standards,
             ),
             patch(

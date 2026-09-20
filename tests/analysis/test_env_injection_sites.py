@@ -95,7 +95,7 @@ def test_cloud_provider_key_check_honours_injected_env(monkeypatch):
 def test_omlx_credential_loader_honours_the_injected_env(monkeypatch, tmp_path: Path):
     """The registry loader reads the run's mapping, not the process.
 
-    Before the loaders took an ``env``, ``_read_omlx_api_key`` defaulted to
+    Before the loaders took an ``env``, ``read_omlx_api_key`` defaulted to
     ``os.environ`` on every call, so an injected ``{}`` still picked up an
     exported OMLX_API_KEY.
     """

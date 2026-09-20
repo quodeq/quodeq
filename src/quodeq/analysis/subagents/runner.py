@@ -11,12 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis._types import RunConfig, AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-exports from split modules -- keep the public API stable
-from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents._source_files import list_source_files
 from quodeq.analysis.subagents._prompts import _build_subagent_prompt
 from quodeq.analysis.subagents._pool_launcher import (  # noqa: F401
     LaunchPoolParams,
@@ -51,7 +51,7 @@ class _DimensionContext:
     """Grouped parameters for dimension processing."""
     dim_id: str
     idx: int
-    ctx: _AnalysisContext
+    ctx: AnalysisContext
     files: list[str]
     evidence_dir: Path
 
@@ -64,7 +64,7 @@ class _PoolExecutionParams:
 
 
 def process_consolidated_dimensions(
-    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
+    config: RunConfig, dimensions: list[str], ctx: AnalysisContext,
     *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
@@ -108,7 +108,7 @@ def _execute_pool_and_collect(
 
 
 def process_dimension_with_subagents(
-    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
+    config: RunConfig, dim_id: str, idx: int, ctx: AnalysisContext,
     callbacks: DimensionCallbacks,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents.
@@ -119,7 +119,7 @@ def process_dimension_with_subagents(
     log = callbacks.log
     evidence_dir = config.work_dir or config.src
 
-    files, extensions, _excluded = _list_source_files(config, dim_id)
+    files, extensions, _excluded = list_source_files(config, dim_id)
     if not files:
         log.warning(
             f"[{idx}/{ctx.total}] {dim_id} -- no source files for subagent queue"

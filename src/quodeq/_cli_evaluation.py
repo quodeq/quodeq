@@ -59,9 +59,9 @@ from quodeq._cli_run_config import (
 )
 from quodeq._cli_resolution import (  # noqa: F401
     ResolvedInputs, _build_manifest, _cleanup_worktree, _create_worktree,
-    _filter_manifest_by_scope, _override_manifest_single_file,
+    _override_manifest_single_file,
     _resolve_evaluation_inputs, _resolve_language, _resolve_repo,
-    _resolve_scope, _resolve_single_file,
+    _resolve_scope, _resolve_single_file, filter_manifest_by_scope,
 )
 from quodeq import _cli_lifecycle
 from quodeq._cli_lifecycle import (  # noqa: F401

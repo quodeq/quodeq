@@ -9,9 +9,9 @@ from quodeq.core.evidence.model import Evidence, violations_per_100_files
 from quodeq.data.fs.dimension_report._report_taxonomy import unmapped_types
 
 from quodeq.data.fs.dimension_report._report_constants import (
-    _FIELD_WEIGHTED_SCORE,
-    _FIELD_WEIGHTED_SCORE_SNAKE,
-    _REPORT_SCHEMA_VERSION,
+    FIELD_WEIGHTED_SCORE,
+    FIELD_WEIGHTED_SCORE_SNAKE,
+    REPORT_SCHEMA_VERSION,
 )
 from quodeq.data.fs.dimension_report._report_scoring import (
     build_score_lookup,
@@ -22,7 +22,7 @@ from quodeq.data.fs.dimension_report._report_findings import build_principle_row
 
 
 @dataclass
-class _ReportData:
+class ReportData:
     """Grouped components for assembling a report dict."""
 
     dimension: str
@@ -35,11 +35,11 @@ class _ReportData:
     sev_tally: dict
 
 
-def _assemble_report_dict(data: _ReportData) -> dict:
+def assemble_report_dict(data: ReportData) -> dict:
     """Assemble the final report dict from pre-computed components."""
     raw_meta = data.evidence.get("meta", {})
     report: dict = {
-        "schema_version": _REPORT_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "dimension": data.dimension,
         "project": data.evidence.get("repository", ""),
         "runId": "",
@@ -90,7 +90,7 @@ def build_report_json(
         evidence, lookup,
     )
 
-    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
+    weighted = aggregate.get(FIELD_WEIGHTED_SCORE) or aggregate.get(FIELD_WEIGHTED_SCORE_SNAKE)
     if weighted is not None:
         top_score = f"{round(weighted, 1)}/{MAX_SCORE}"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)
@@ -98,7 +98,7 @@ def build_report_json(
         top_score = None
         top_grade = None
 
-    return _assemble_report_dict(_ReportData(
+    return assemble_report_dict(ReportData(
         dimension=dimension, evidence=evidence, top_score=top_score,
         top_grade=top_grade, principle_rows=principle_rows,
         flat_violations=flat_violations, flat_compliance=flat_compliance,

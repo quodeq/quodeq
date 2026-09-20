@@ -76,7 +76,7 @@ def test_persist_json_logs_cleanup_unlink_failure(tmp_path) -> None:
         patch.object(_report_io._logger, "debug") as debug,
     ):
         with pytest.raises(OSError):
-            _report_io._persist_json({"ok": True}, target)  # (data, path) order
+            _report_io.persist_json({"ok": True}, target)  # (data, path) order
     assert debug.called
     assert "not removed after a failed write" in debug.call_args.args[0]
 

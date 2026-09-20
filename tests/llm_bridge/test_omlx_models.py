@@ -112,7 +112,7 @@ class TestListOmlxModels:
         mock_resp.__exit__ = MagicMock(return_value=False)
 
         with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
-             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value="test-key"):
+             patch("quodeq.llm_bridge._omlx.read_omlx_api_key", return_value="test-key"):
             list_omlx_models()
 
         req = mock_open.call_args[0][0]
@@ -126,7 +126,7 @@ class TestListOmlxModels:
         mock_resp.__exit__ = MagicMock(return_value=False)
 
         with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
-             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value=""):
+             patch("quodeq.llm_bridge._omlx.read_omlx_api_key", return_value=""):
             list_omlx_models()
 
         req = mock_open.call_args[0][0]

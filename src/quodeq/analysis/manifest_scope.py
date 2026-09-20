@@ -13,7 +13,7 @@ from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.core.observability import NULL_LOG, LogSink
 
 
-def _filter_manifest_by_scope(
+def filter_manifest_by_scope(
     manifest: SourceManifest | None, scope_path: str, *, log: LogSink = NULL_LOG,
 ) -> SourceManifest | None:
     """Narrow a manifest to only files under *scope_path*.

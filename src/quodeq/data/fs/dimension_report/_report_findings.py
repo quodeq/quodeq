@@ -2,18 +2,18 @@
 from __future__ import annotations
 
 from quodeq.data.fs.dimension_report._report_constants import (
-    _COMPLIANCE_FIELDS,
-    _FIELD_CONFIDENCE_INTERVAL,
-    _FIELD_CONFIDENCE_INTERVAL_SNAKE,
-    _FIELD_FINAL_SCORE,
-    _FIELD_FINAL_SCORE_SNAKE,
-    _GRADE_INSUFFICIENT,
-    _VIOLATION_FIELDS,
+    COMPLIANCE_FIELDS,
+    FIELD_CONFIDENCE_INTERVAL,
+    FIELD_CONFIDENCE_INTERVAL_SNAKE,
+    FIELD_FINAL_SCORE,
+    FIELD_FINAL_SCORE_SNAKE,
+    GRADE_INSUFFICIENT,
+    VIOLATION_FIELDS,
 )
 from quodeq.data.fs.dimension_report._report_scoring import grade_from_score
 
 
-def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:
+def flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:
     """Flatten a list of finding dicts, tagging each with *label* and keeping only *fields*."""
     result: list[dict] = []
     for item in items:
@@ -23,15 +23,15 @@ def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[
     return result
 
 
-def _build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
+def build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
     """Build a single principle row dict from evidence and score lookup."""
     label = pdata.get("display_name", raw_key)
     matched = lookup.get(label, {})
     grade = matched.get("grade")
-    raw_final = matched.get(_FIELD_FINAL_SCORE)
+    raw_final = matched.get(FIELD_FINAL_SCORE)
     if raw_final is None:
-        raw_final = matched.get(_FIELD_FINAL_SCORE_SNAKE)
-    if grade == _GRADE_INSUFFICIENT:
+        raw_final = matched.get(FIELD_FINAL_SCORE_SNAKE)
+    if grade == GRADE_INSUFFICIENT:
         formatted_score = None
     else:
         formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
@@ -40,7 +40,7 @@ def _build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
         "score": formatted_score,
         "grade": grade or grade_from_score(formatted_score),
     }
-    ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
+    ci = matched.get(FIELD_CONFIDENCE_INTERVAL) or matched.get(FIELD_CONFIDENCE_INTERVAL_SNAKE)
     gs = matched.get("gradeStability") or matched.get("grade_stability")
     if ci is not None:
         row["confidence_interval"] = ci
@@ -66,9 +66,9 @@ def build_principle_rows(
 
     for raw_key, pdata in evidence.get("principles", {}).items():
         label = pdata.get("display_name", raw_key)
-        principle_rows.append(_build_principle_row(raw_key, pdata, lookup))
+        principle_rows.append(build_principle_row(raw_key, pdata, lookup))
 
-        viols = _flatten_findings(pdata.get("violations", []), label, _VIOLATION_FIELDS)
+        viols = flatten_findings(pdata.get("violations", []), label, VIOLATION_FIELDS)
         flat_violations.extend(viols)
         for v in viols:
             bucket = v.get("severity", "minor")
@@ -76,7 +76,7 @@ def build_principle_rows(
                 sev_tally[bucket] += 1
 
         flat_compliance.extend(
-            _flatten_findings(pdata.get("compliance", []), label, _COMPLIANCE_FIELDS)
+            flatten_findings(pdata.get("compliance", []), label, COMPLIANCE_FIELDS)
         )
 
     return principle_rows, flat_violations, flat_compliance, sev_tally

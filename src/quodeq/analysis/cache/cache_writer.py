@@ -32,7 +32,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
+from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
 
 _logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class CacheWriteTarget:
     # falls back to hashing it directly. Empty by default so callers that
     # never pass one (e.g. the MCP server) keep hashing as before.
     content_hashes: Mapping[str, str] = field(default_factory=dict)
-    # file_path -> the file's ``_stat_key`` when classify hashed it. The
+    # file_path -> the file's ``stat_key`` when classify hashed it. The
     # hash above is reused only while it still matches; a file missing
     # here is hashed at write time. See ``_key_provenance._content_hash_for``.
     content_stamps: Mapping[str, tuple[int, int]] = field(default_factory=dict)
@@ -130,7 +130,7 @@ def _resolve_writer_provenance(
     into the standards hash — must match classify's ``_current_provenance``.
     """
     standards_hash = (
-        (_hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
+        (hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
         or ""
     )
     prompts_hash = _hash_prompts_combined(prompts_dir)

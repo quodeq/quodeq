@@ -31,7 +31,7 @@ def _resolve_priority_category(config: RunConfig) -> str | None:
     return None
 
 
-def _list_source_files(
+def list_source_files(
     config: RunConfig, dim_id: str, *, ignore_file_filter: bool = False,
 ) -> tuple[list[str], set[str], list[str]]:
     """List source files for the subagent queue from the target or manifest.

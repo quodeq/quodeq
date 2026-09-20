@@ -69,7 +69,7 @@ class CacheEntryTarget:
     model_id: str
     version: str
     content_hash: str = ""  # classify's hash for this file; "" re-hashes (legacy)
-    # The file's ``_stat_key`` when classify hashed it. The hash above is
+    # The file's ``stat_key`` when classify hashed it. The hash above is
     # reused only while it still matches; None re-hashes. See
     # ``_key_provenance._content_hash_for``.
     content_stamp: tuple[int, int] | None = None

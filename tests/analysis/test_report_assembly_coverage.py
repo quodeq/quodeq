@@ -5,22 +5,22 @@ from unittest.mock import MagicMock
 
 
 from quodeq.analysis._report_assembly import (
-    _ReportData,
-    _assemble_report_dict,
+    ReportData,
+    assemble_report_dict,
     build_report_json,
     build_full_report,
     build_dashboard_report,
 )
-from quodeq.analysis._report_constants import _REPORT_SCHEMA_VERSION
+from quodeq.analysis._report_constants import REPORT_SCHEMA_VERSION
 
 
 # ---------------------------------------------------------------------------
-# _assemble_report_dict
+# assemble_report_dict
 # ---------------------------------------------------------------------------
 
 class TestAssembleReportDict:
     def test_basic_assembly(self):
-        data = _ReportData(
+        data = ReportData(
             dimension="security",
             evidence={
                 "repository": "test-repo",
@@ -43,8 +43,8 @@ class TestAssembleReportDict:
             flat_compliance=[{"file": "b.py"}],
             sev_tally={"critical": 0, "major": 1, "minor": 0},
         )
-        report = _assemble_report_dict(data)
-        assert report["schema_version"] == _REPORT_SCHEMA_VERSION
+        report = assemble_report_dict(data)
+        assert report["schema_version"] == REPORT_SCHEMA_VERSION
         assert report["dimension"] == "security"
         assert report["project"] == "test-repo"
         assert report["discipline"] == "python"
@@ -62,7 +62,7 @@ class TestAssembleReportDict:
         assert report["totals"]["severity"] == {"critical": 0, "major": 1, "minor": 0}
 
     def test_includes_module_when_present(self):
-        data = _ReportData(
+        data = ReportData(
             dimension="security",
             evidence={"module": "auth-service", "meta": {}},
             top_score=None,
@@ -72,11 +72,11 @@ class TestAssembleReportDict:
             flat_compliance=[],
             sev_tally={},
         )
-        report = _assemble_report_dict(data)
+        report = assemble_report_dict(data)
         assert report["module"] == "auth-service"
 
     def test_no_module_key_when_absent(self):
-        data = _ReportData(
+        data = ReportData(
             dimension="security",
             evidence={"meta": {}},
             top_score=None,
@@ -86,11 +86,11 @@ class TestAssembleReportDict:
             flat_compliance=[],
             sev_tally={},
         )
-        report = _assemble_report_dict(data)
+        report = assemble_report_dict(data)
         assert "module" not in report
 
     def test_handles_empty_meta(self):
-        data = _ReportData(
+        data = ReportData(
             dimension="reliability",
             evidence={"meta": {}},
             top_score=None,
@@ -100,12 +100,12 @@ class TestAssembleReportDict:
             flat_compliance=[],
             sev_tally={},
         )
-        report = _assemble_report_dict(data)
+        report = assemble_report_dict(data)
         assert report["meta"]["analysis_prompt_version"] is None
         assert report["meta"]["scoring_prompt_version"] is None
 
     def test_null_scores(self):
-        data = _ReportData(
+        data = ReportData(
             dimension="security",
             evidence={"meta": {}},
             top_score=None,
@@ -115,7 +115,7 @@ class TestAssembleReportDict:
             flat_compliance=[],
             sev_tally={},
         )
-        report = _assemble_report_dict(data)
+        report = assemble_report_dict(data)
         assert report["overallScore"] is None
         assert report["overallGrade"] is None
 

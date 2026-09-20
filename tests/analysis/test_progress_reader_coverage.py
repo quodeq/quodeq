@@ -7,14 +7,14 @@ import json
 
 class TestIncrementalProgressReader:
     def _make_reader(self, tmp_path, stream_content="", jsonl_content=None):
-        from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
+        from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
         stream_file = tmp_path / "stream.jsonl"
         stream_file.write_text(stream_content)
         jsonl_file = None
         if jsonl_content is not None:
             jsonl_file = tmp_path / "evidence.jsonl"
             jsonl_file.write_text(jsonl_content)
-        return _IncrementalProgressReader(stream_file, jsonl_file)
+        return IncrementalProgressReader(stream_file, jsonl_file)
 
     def test_empty_files(self, tmp_path):
         reader = self._make_reader(tmp_path)
@@ -88,8 +88,8 @@ class TestIncrementalProgressReader:
     def test_incremental_reads(self, tmp_path):
         stream_file = tmp_path / "stream.jsonl"
         stream_file.write_text("")
-        from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
-        reader = _IncrementalProgressReader(stream_file, None)
+        from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
+        reader = IncrementalProgressReader(stream_file, None)
 
         # First read: empty
         p1 = reader.read_progress()
@@ -116,18 +116,18 @@ class TestIncrementalProgressReader:
         assert progress["violations"] == 1
 
     def test_no_jsonl_file(self, tmp_path):
-        from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
+        from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
         stream_file = tmp_path / "stream.jsonl"
         stream_file.write_text("")
-        reader = _IncrementalProgressReader(stream_file, tmp_path / "nonexistent.jsonl")
+        reader = IncrementalProgressReader(stream_file, tmp_path / "nonexistent.jsonl")
         progress = reader.read_progress()
         assert progress["evidence"] == 0
 
     def test_stream_read_error(self, tmp_path):
-        from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
+        from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
         stream_file = tmp_path / "stream.jsonl"
         stream_file.write_text("")
-        reader = _IncrementalProgressReader(stream_file, None)
+        reader = IncrementalProgressReader(stream_file, None)
         # Remove the file to trigger OSError on read
         stream_file.unlink()
         progress = reader.read_progress()
@@ -155,7 +155,7 @@ class TestIncrementalProgressReader:
         }
         content = json.dumps(event) + "\n"
         stream_file.write_bytes(content.encode("utf-8"))  # bytes: text mode writes CRLF on Windows
-        reader = pr_module._IncrementalProgressReader(stream_file, None)
+        reader = pr_module.IncrementalProgressReader(stream_file, None)
 
         original_parse = pr_module.parse_stream_event
         calls = {"count": 0}
@@ -212,7 +212,7 @@ class TestIncrementalProgressReader:
 
         stream_file = tmp_path / "stream.jsonl"
         stream_file.write_bytes(content.encode("utf-8"))  # bytes: text mode writes CRLF on Windows
-        reader = pr_module._IncrementalProgressReader(stream_file, None)
+        reader = pr_module.IncrementalProgressReader(stream_file, None)
 
         original_parse = pr_module.parse_stream_event
         calls = {"count": 0}

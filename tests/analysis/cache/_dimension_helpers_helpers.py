@@ -44,10 +44,10 @@ def _hash_inputs(config: RunConfig, dimension: str) -> CachePersistProvenance:
     """Compute the provenance hash inputs persist_dispatch_results now
     expects the caller to hoist and pass in."""
     from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
-    from quodeq.analysis.fingerprint import _hash_standards, dimension_params_state
+    from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
 
     standards_hash = (
-        _hash_standards(config.standards_dir, dimension, config.src)
+        hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
     params_hash, effective_params = dimension_params_state(

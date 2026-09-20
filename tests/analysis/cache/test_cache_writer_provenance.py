@@ -19,7 +19,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
         build_cache_key_for_file,
     )
     from quodeq.analysis.cache.local import LocalFileBackend
-    from quodeq.analysis.fingerprint import _hash_file
+    from quodeq.analysis.fingerprint import hash_file
 
     src_root = tmp_path / "src"
     src_root.mkdir()
@@ -41,7 +41,7 @@ def test_cache_writer_records_provenance_and_content_hash(tmp_path):
     key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
     entry = LocalFileBackend(root=cache_root).get(key)
     assert entry is not None
-    assert entry.file_content_hash == _hash_file(src_root / "Foo.kt")
+    assert entry.file_content_hash == hash_file(src_root / "Foo.kt")
     prov = entry.provenance
     assert prov["model_id"] == "sonnet"
     assert prov["standards_hash"] == ""  # standards_dir=None
@@ -57,7 +57,7 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
     from quodeq.analysis.cache.cache_writer import CacheWriterSpec, build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
-    from quodeq.analysis.fingerprint import _hash_standards
+    from quodeq.analysis.fingerprint import hash_standards
 
     src_root = tmp_path / "src"
     (src_root / ".quodeq").mkdir(parents=True)
@@ -85,9 +85,9 @@ def test_cache_writer_provenance_folds_project_overrides(tmp_path):
     key = build_cache_key_for_file(config, "Foo.kt", "flexibility")
     entry = LocalFileBackend(root=cache_root).get(key)
     assert entry is not None
-    expected = _hash_standards(standards_dir, "flexibility", src_root)
+    expected = hash_standards(standards_dir, "flexibility", src_root)
     assert entry.provenance["standards_hash"] == expected
-    assert entry.provenance["standards_hash"] != _hash_standards(
+    assert entry.provenance["standards_hash"] != hash_standards(
         standards_dir, "flexibility",
     )
 

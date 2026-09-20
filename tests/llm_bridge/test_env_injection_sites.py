@@ -50,12 +50,12 @@ def test_omlx_base_url_is_read_per_call(monkeypatch):
 
 def test_omlx_api_key_honours_injected_env(monkeypatch):
     monkeypatch.setenv("OMLX_API_KEY", "from-process")
-    assert _omlx._read_omlx_api_key(env={"OMLX_API_KEY": "sk-injected"}) == "sk-injected"
+    assert _omlx.read_omlx_api_key(env={"OMLX_API_KEY": "sk-injected"}) == "sk-injected"
     # env={} means "nothing set": the process value must not leak in. The
     # settings.json fallback is the only remaining source.
     monkeypatch.setattr(
         "quodeq.llm_bridge._omlx.Path.home", lambda: __import__("pathlib").Path("/nonexistent"))
-    assert _omlx._read_omlx_api_key(env={}) == ""
+    assert _omlx.read_omlx_api_key(env={}) == ""
 
 
 def test_local_api_markers_honours_injected_env(monkeypatch):

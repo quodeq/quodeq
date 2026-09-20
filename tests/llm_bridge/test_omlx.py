@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 from quodeq.llm_bridge._omlx import (
     _normalize_base,
-    _read_omlx_api_key,
+    read_omlx_api_key,
     get_omlx_status,
 )
 
@@ -14,13 +14,13 @@ from quodeq.llm_bridge._omlx import (
 class TestReadOmlxApiKey:
     def test_returns_env_var_when_set(self):
         with patch.dict("os.environ", {"OMLX_API_KEY": "env-key"}):
-            result = _read_omlx_api_key()
+            result = read_omlx_api_key()
         assert result == "env-key"
 
     def test_no_warning_when_env_var_set(self):
         with patch.dict("os.environ", {"OMLX_API_KEY": "env-key"}), \
              patch("quodeq.llm_bridge._omlx._log") as mock_log:
-            _read_omlx_api_key()
+            read_omlx_api_key()
         mock_log.warning.assert_not_called()
 
     def test_warning_when_file_fallback_with_key(self, tmp_path):
@@ -34,7 +34,7 @@ class TestReadOmlxApiKey:
              patch("quodeq.llm_bridge._omlx._log") as mock_log:
             mock_path_cls.home.return_value = tmp_path
 
-            result = _read_omlx_api_key()
+            result = read_omlx_api_key()
 
         assert result == "file-key"
         mock_log.warning.assert_called_once()
@@ -54,7 +54,7 @@ class TestReadOmlxApiKey:
              patch("quodeq.llm_bridge._omlx._log") as mock_log:
             mock_path_cls.home.return_value = tmp_path
 
-            result = _read_omlx_api_key()
+            result = read_omlx_api_key()
 
         assert result == ""
         mock_log.warning.assert_not_called()
@@ -65,7 +65,7 @@ class TestReadOmlxApiKey:
              patch("quodeq.llm_bridge._omlx._log") as mock_log:
             mock_path_cls.home.return_value = tmp_path
 
-            result = _read_omlx_api_key()
+            result = read_omlx_api_key()
 
         assert result == ""
         mock_log.warning.assert_not_called()
@@ -81,7 +81,7 @@ class TestReadOmlxApiKey:
              patch("quodeq.llm_bridge._omlx._log") as mock_log:
             mock_path_cls.home.return_value = tmp_path
 
-            result = _read_omlx_api_key()
+            result = read_omlx_api_key()
 
         assert result == ""
         mock_log.warning.assert_not_called()
