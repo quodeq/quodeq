@@ -1,0 +1,22 @@
+{
+  "minLines": 5,
+  "minTokens": 50,
+  "format": [
+    "python",
+    "javascript",
+    "jsx"
+  ],
+  "absolute": false,
+  "gitignore": false,
+  "ignore": [
+    "**/*.test.*",
+    "**/__snapshots__/**",
+    "**/node_modules/**",
+    "**/fixtures/**",
+    "**/dist/**"
+  ],
+  "path": [
+    "src/quodeq",
+    "src/quodeq/ui/src"
+  ]
+}

@@ -23,6 +23,7 @@
     "lint:magic:update": "node tools/check_magic.mjs --update",
     "lint:a11y": "node tools/check_a11y.mjs",
     "lint:a11y:update": "node tools/check_a11y.mjs --update",
+    "lint:clones": "cd ../../.. && uv run python tools/check_clones.py",
     "lint:fault": "node tools/check_fault.mjs",
     "lint:fault:update": "node tools/check_fault.mjs --update"
   },
@@ -49,6 +50,7 @@
     "eslint-plugin-jsdoc": "64.5.2",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
+    "jscpd": "4.3.0",
     "jsdom": "^30.0.1",
     "vite": "8.3.0",
     "vitest": "^5.0.0"
