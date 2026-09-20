@@ -8,11 +8,16 @@
  * and the historical named exports delegate to it, so the app still shares
  * a single table process-wide.
  */
+// Backend Q2 defaults (score >= threshold -> label), highest first.
+const EXEMPLARY_THRESHOLD = 9;
+const GOOD_THRESHOLD = 7;
+const ADEQUATE_THRESHOLD = 5;
+const POOR_THRESHOLD = 3;
 const DEFAULT_THRESHOLDS = Object.freeze([
-  Object.freeze([9, 'Exemplary']),
-  Object.freeze([7, 'Good']),
-  Object.freeze([5, 'Adequate']),
-  Object.freeze([3, 'Poor']),
+  Object.freeze([EXEMPLARY_THRESHOLD, 'Exemplary']),
+  Object.freeze([GOOD_THRESHOLD, 'Good']),
+  Object.freeze([ADEQUATE_THRESHOLD, 'Adequate']),
+  Object.freeze([POOR_THRESHOLD, 'Poor']),
 ]);
 // Label below the lowest row. Unlike the rows it is not server-overridable:
 // GET /api/grade-formula ships [threshold, label] pairs only, so the floor

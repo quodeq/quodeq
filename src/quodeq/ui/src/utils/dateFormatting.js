@@ -1,10 +1,12 @@
-import { isoWeekKey, localDayKey } from './dailyGrouping.js';
+import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH } from './dailyGrouping.js';
 import { LOCALE, t } from '../strings/index.js';
 
 // Intl formatters are comparatively expensive to construct, and these run in
 // list renders. Build once at module scope.
 const DAY_MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
 const MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' });
+const RUN_ID_TRUNCATE_LENGTH = 8;
+const SECONDS_PER_HOUR = 3600;
 
 /**
  * Format a date string as "20 Feb 2026" (day + abbreviated month + year).
@@ -35,7 +37,7 @@ export function formatRunId(runId, dateLabel) {
   if (!runId || runId === 'latest') return 'Latest';
   // Truncate UUID for compact display
   const s = String(runId);
-  return s.length > 8 ? s.slice(0, 8) + '…' : s;
+  return s.length > RUN_ID_TRUNCATE_LENGTH ? s.slice(0, RUN_ID_TRUNCATE_LENGTH) + '…' : s;
 }
 
 /**
@@ -49,8 +51,8 @@ export function formatRunId(runId, dateLabel) {
 export function formatDuration(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
+  const h = Math.floor(total / SECONDS_PER_HOUR);
+  const m = Math.floor((total % SECONDS_PER_HOUR) / 60);
   const sec = total % 60;
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   if (m > 0) return `${m}m ${sec}s`;
@@ -68,8 +70,8 @@ export function formatDuration(s) {
 export function formatDurationCoarse(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.round(s));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
+  const h = Math.floor(total / SECONDS_PER_HOUR);
+  const m = Math.floor((total % SECONDS_PER_HOUR) / 60);
   const parts = [];
   if (h > 0) parts.push(`${h}h`);
   if (m > 0) parts.push(`${m}m`);
@@ -97,7 +99,7 @@ export function formatPeriodLabel(entry, granularity = 'day') {
   const iso = entry?.dateISO || '';
   const fallback = entry?.dateLabel || iso;
   if (granularity === 'month') {
-    const [y, m] = localDayKey(iso).slice(0, 7).split('-');
+    const [y, m] = localDayKey(iso).slice(0, YEAR_MONTH_KEY_LENGTH).split('-');
     if (!y || !m) return fallback;
     // Format the local calendar day, not the raw instant: the bucket is a
     // local-day key, so a run near midnight must name the bucket it sits in.
