@@ -8,6 +8,7 @@ import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
 
 const EMPTY_TREND = [];
+const STALE_TIME_MS = 60_000;
 
 /**
  * @param {{
@@ -60,7 +61,7 @@ function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fe
     queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
-    staleTime: frozenRun ? Infinity : 60_000,
+    staleTime: frozenRun ? Infinity : STALE_TIME_MS,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.

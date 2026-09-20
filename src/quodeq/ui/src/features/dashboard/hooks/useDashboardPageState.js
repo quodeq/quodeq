@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 // class is held for this long so re-renders can't cut the fade short.
 const DASHBOARD_APPEAR_MS = 400;
 
+// How long a stalled load waits before falling back to the partial page
+// (frame + content spinner) instead of sitting on a blank loading screen.
+const GRACE_TIMEOUT_MS = 700;
+
 // What each view needs before it can render real content: run detail only
 // needs the dashboard payload; the Overview also needs the scores-derived
 // `accumulated` block. This is the single readiness rule for the whole page
@@ -39,7 +43,7 @@ function useContentReadiness(runMode, dashboard, accumulated, loading) {
   if (graceElapsed && (contentReady || !dashboard)) setGraceElapsed(false);
   useEffect(() => {
     if (contentReady || !dashboard) return undefined;
-    const timer = setTimeout(() => setGraceElapsed(true), 700);
+    const timer = setTimeout(() => setGraceElapsed(true), GRACE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [contentReady, dashboard]);
 

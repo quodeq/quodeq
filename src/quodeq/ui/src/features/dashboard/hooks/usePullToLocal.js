@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
+import { HTTP_STATUS } from '../../../constants.js';
 
 /**
  * Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
@@ -21,7 +22,7 @@ export function usePullToLocal({ shared, onProjectsReload }) {
       // the user has no way to tell the pull actually landed a local copy.
       await onProjectsReload?.();
     } catch (err) {
-      if (err?.status === 409) {
+      if (err?.status === HTTP_STATUS.CONFLICT) {
         setPullConflictId(id);
       } else {
         showToast(apiErrorMessage(err, 'projects.pullFailed'));

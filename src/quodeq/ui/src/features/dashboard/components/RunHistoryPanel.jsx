@@ -27,6 +27,12 @@ import {
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
+// Stroke width of the bar cell currently under the mouse.
+const HOVER_STROKE_WIDTH = 1.5;
+// Alternating reference-line opacity: even indices (0, 2, ...) render a
+// touch stronger than odd ones, breaking up the repeated dashed lines.
+const REF_LINE_OPACITY_EVEN = 0.3;
+const REF_LINE_OPACITY_ODD = 0.2;
 const GRANULARITY_SUFFIX = {
   day: t('granularity.dayAbbrev'),
   week: t('granularity.weekAbbrev'),
@@ -98,7 +104,7 @@ function ScoreBars({ data, hoveredIndex, selectedRunId }) {
           fill={scoreBarColor(entry.numericAverage)}
           opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
           stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-          strokeWidth={hoveredIndex === i ? 1.5 : 0}
+          strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
         />
       ))}
     </Bar>
@@ -159,7 +165,7 @@ function ScoreHistoryChart({ data, interaction }) {
         <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
         {refLineValues([0, 10]).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? REF_LINE_OPACITY_ODD : REF_LINE_OPACITY_EVEN} />
         ))}
         <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />
