@@ -1,13 +1,13 @@
 """Hardened subprocess spawn for assistant CLI turns (read-only, scrubbed, scratch cwd)."""
 from __future__ import annotations
 
-import os
 import platform
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 
 # The spawned agent CLI is network-capable and tool-executing; it must NOT
@@ -56,7 +56,7 @@ def _externally_sandboxed(argv: list[str]) -> bool:
 
 
 def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> dict:
-    source = env if env is not None else os.environ
+    source = resolve_env(env)
     if provider == "copilot":
         return build_copilot_env(source)
     result = {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}

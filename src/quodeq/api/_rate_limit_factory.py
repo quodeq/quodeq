@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from quodeq.api._rate_limit_config import default_rate_limit_path
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore, RateLimitStore
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore
     compatible shared backend (e.g. Redis) to
     ``create_app(rate_limit_store=...)``.
     """
-    environ = os.environ if env is None else env
+    environ = resolve_env(env)
     backend = environ.get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
 
     if backend == "file":

@@ -3,23 +3,26 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import platform
 import subprocess
 import urllib.request
 import urllib.error
 
-from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
+from quodeq.config.llm_bridge_env import ollama_base_url
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", OLLAMA_DEFAULT_BASE_URL)
 _TIMEOUT_S = 3
 _MAX_PARALLEL_AGENTS = 5
 _SYSCTL_TIMEOUT_S = 3
 _NVIDIA_SMI_TIMEOUT_S = 5
 _MIB_TO_BYTES = 1024 * 1024
+
+
+def _resolved_base(base_url: str | None) -> str:
+    """Return *base_url*, or the ``OLLAMA_BASE_URL`` default when None."""
+    return base_url if base_url is not None else ollama_base_url()
 
 
 def _safe_request(url: str) -> urllib.request.Request:
@@ -33,8 +36,13 @@ def _safe_request(url: str) -> urllib.request.Request:
     return urllib.request.Request(url)
 
 
-def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
-    """Check if the Ollama server is running."""
+def get_ollama_status(base_url: str | None = None) -> dict:
+    """Check if the Ollama server is running.
+
+    *base_url* defaults to ``OLLAMA_BASE_URL``, resolved per call (not at
+    import) so a variable set after this module loads is still honoured.
+    """
+    base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/version")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -50,8 +58,9 @@ def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
         return {"running": False, "error": "Connection failed"}
 
 
-def list_ollama_models(base_url: str = _OLLAMA_BASE) -> list[dict]:
+def list_ollama_models(base_url: str | None = None) -> list[dict]:
     """List installed Ollama models."""
+    base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/tags")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -72,8 +81,9 @@ def list_ollama_models(base_url: str = _OLLAMA_BASE) -> list[dict]:
         return []
 
 
-def get_running_model_info(base_url: str = _OLLAMA_BASE) -> dict | None:
+def get_running_model_info(base_url: str | None = None) -> dict | None:
     """Get info about the currently loaded model (from /api/ps)."""
+    base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/ps")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -150,7 +160,7 @@ _get_gpu_memory = _detect_memory
 
 def run_concurrency_test(
     model: str,
-    base_url: str = _OLLAMA_BASE,
+    base_url: str | None = None,
 ) -> dict:
     """Estimate max parallel agents based on VRAM usage.
 
@@ -158,6 +168,7 @@ def run_concurrency_test(
     and compares against available GPU memory to estimate how many
     parallel contexts can fit.
     """
+    base_url = _resolved_base(base_url)
     # Get VRAM used by the loaded model
     running = get_running_model_info(base_url)
     if not running or not running.get("size_vram"):

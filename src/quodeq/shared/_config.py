@@ -1,16 +1,26 @@
 """Config dataclass and lazy singleton loader."""
 from __future__ import annotations
 
-import os
 import threading
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared._io import read_json
 
-_DEFAULTS_PATH = Path(os.environ.get("QUODEQ_DEFAULTS_PATH", str(Path(__file__).resolve().parent / "defaults.json")))
+
+def defaults_path(env: Mapping[str, str] | None = None) -> Path:
+    """Path of ``defaults.json``; ``QUODEQ_DEFAULTS_PATH`` overrides the bundled file.
+
+    Read when the config is first loaded, not when this module is imported,
+    so the variable is honoured however late it is set (and an injected
+    *env* is honoured at all).
+    """
+    raw = resolve_env(env).get("QUODEQ_DEFAULTS_PATH")
+    return Path(raw) if raw else Path(__file__).resolve().parent / "defaults.json"
 
 # Derived constants (not URLs, safe to keep inline).
 ACTION_API_MODULE = "quodeq.api.app"
@@ -58,15 +68,16 @@ class Config:
 class _ConfigHolder:
     """Thread-safe lazy holder for the singleton Config instance."""
 
-    def __init__(self) -> None:
+    def __init__(self, env: Mapping[str, str] | None = None) -> None:
         self._lock = threading.Lock()
         self._instance: Config | None = None
+        self._env = env
 
     def get(self) -> Config:
         if self._instance is None:
             with self._lock:
                 if self._instance is None:
-                    self._instance = Config.from_file(_DEFAULTS_PATH)
+                    self._instance = Config.from_file(defaults_path(self._env))
         return self._instance
 
 

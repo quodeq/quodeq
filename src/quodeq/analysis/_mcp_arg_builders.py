@@ -10,7 +10,6 @@ already resolved and passes it straight through.
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -22,22 +21,19 @@ from quodeq.analysis._config import (
     _MCP_TOOL_REPORT_FINDING,
 )
 from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
+from quodeq.config.analysis_env import ai_tools, base_ai_args
 from quodeq.shared._models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd_path
-
-_DEFAULT_AI_TOOLS = "Glob,Grep,Read"
-_DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
 
 def _get_ai_tools(env: Mapping[str, str] | None = None) -> str:
     """Return AI tools from QUODEQ_AI_TOOLS env var (default: "Glob,Grep,Read")."""
-    return (os.environ if env is None else env).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
+    return ai_tools(env)
 
 
 def _get_base_ai_args(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     """Return base AI CLI args from QUODEQ_AI_BASE_ARGS env var."""
-    environ = os.environ if env is None else env
-    return tuple(environ.get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
+    return tuple(base_ai_args(env).split())
 
 
 def _cmd_binary(cmd: str) -> str:

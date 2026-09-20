@@ -1,13 +1,13 @@
 """Read scored dimensions for a single run from disk, with an LRU cache."""
 from __future__ import annotations
 
-import os
 import threading
 from collections import OrderedDict
 from pathlib import Path
 
 from quodeq.core.types import DimensionResult
 from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.shared._env_resolve import resolve_env
 
 _FALLBACK_CACHE_MAX = 256
 
@@ -24,7 +24,7 @@ def _resolve_cache_max(env: dict[str, str] | None = None) -> int:
     Env-injection seam (not an import-time constant) so tests and callers
     can vary the ceiling without reloading the module.
     """
-    raw = (env if env is not None else os.environ).get("QUODEQ_DEFAULT_CACHE_MAX", "")
+    raw = resolve_env(env).get("QUODEQ_DEFAULT_CACHE_MAX", "")
     return int(raw) if raw.isdigit() and int(raw) > 0 else _FALLBACK_CACHE_MAX
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from flask import Flask
 
 from quodeq.api._log_buffer import LogBuffer
@@ -41,6 +43,7 @@ def register_all_routes(
     app: Flask, provider: ActionProvider,
     eval_store: RateLimitStore, static_dist: str | None,
     log_buffer: LogBuffer | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Register all API route groups on the app.
 
@@ -49,6 +52,9 @@ def register_all_routes(
         provider: Action provider for evaluation and project operations.
         eval_store: Rate-limit store for evaluation requests.
         static_dist: Optional path to the static assets directory.
+        log_buffer: Optional buffer the log routes stream from.
+        env: Environment mapping handed to the route groups that read one,
+            captured here at app-creation time. None means ``os.environ``.
     """
     register_project_list_routes(app, provider, warmup_engine)
     register_project_data_routes(app, provider)
@@ -56,8 +62,8 @@ def register_all_routes(
     register_evaluation_item_routes(app, provider)
     register_log_stream_routes(app)
     register_run_events_routes(app)
-    register_ollama_log_routes(app)
-    register_llamacpp_log_routes(app)
+    register_ollama_log_routes(app, env)
+    register_llamacpp_log_routes(app, env)
     register_discovery_routes(app, provider)
     register_standards_routes(app)
     register_assistant_routes(app)

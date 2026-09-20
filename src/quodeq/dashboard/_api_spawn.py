@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_evaluations_dir
 
@@ -42,25 +42,30 @@ def spawn_action_api(
     api_config: ApiConfig | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.Popen:
-    """Spawn the action API subprocess and record its PID."""
+    """Spawn the action API subprocess and record its PID.
+
+    The child's environment is a copy of *env* (``os.environ`` by default)
+    plus the API's own variables. An injected ``{}`` means the child starts
+    from nothing but those.
+    """
     cfg = api_config or ApiConfig()
-    env = (env or os.environ).copy()
-    env[_ENV_ACTION_API_PORT] = str(port)
-    env.setdefault(_ENV_ACTION_API_HOST, default_host)
+    child_env = dict(resolve_env(env))
+    child_env[_ENV_ACTION_API_PORT] = str(port)
+    child_env.setdefault(_ENV_ACTION_API_HOST, default_host)
     if cfg.static_dist:
-        env[_ENV_STATIC_DIST] = str(cfg.static_dist)
-    env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir()
-    verbose = env.get("QUODEQ_VERBOSE") == "1"
+        child_env[_ENV_STATIC_DIST] = str(cfg.static_dist)
+    child_env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir(env=env)
+    verbose = child_env.get("QUODEQ_VERBOSE") == "1"
     proc = subprocess.Popen(
         subprocess_cmd("api"),
-        env=env,
+        env=child_env,
         stdout=None if verbose else subprocess.DEVNULL,
         stderr=None if verbose else subprocess.DEVNULL,
         **_popen_platform_kwargs(),
     )
     try:
         record = json.dumps(
-            {"pid": proc.pid, "host": env[_ENV_ACTION_API_HOST], "port": port},
+            {"pid": proc.pid, "host": child_env[_ENV_ACTION_API_HOST], "port": port},
         )
         pid_file_path.write_text(record, encoding="utf-8")
     except (OSError, AttributeError, TypeError) as exc:

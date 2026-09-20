@@ -5,7 +5,6 @@ module owns everything that needs the provider registry.
 """
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import subprocess
@@ -13,7 +12,8 @@ import urllib.error
 import urllib.request
 
 from quodeq.analysis._provider_cache import get_provider_configs
-from quodeq.shared.constants import DEFAULT_LLAMACPP_BASE_URL, OLLAMA_DEFAULT_BASE_URL
+from quodeq.config.analysis_env import provider_explicitly_configured
+from quodeq.config.llm_bridge_env import api_key, llamacpp_base_url, ollama_base_url
 from quodeq.shared.prereqs import SAFE_CMD_TOKEN_RE, run_version_cmd
 from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
 
@@ -57,8 +57,7 @@ _API_CHECK_TIMEOUT_S = 5
 
 def _is_provider_explicitly_configured(env: dict[str, str] | None = None) -> bool:
     """Return True if the user has explicitly set a provider via env or config."""
-    _env = os.environ if env is None else env
-    return "AI_PROVIDER" in _env or "AI_CMD" in _env
+    return provider_explicitly_configured(env)
 
 
 def _check_cli_binary_override(provider: str, override: str) -> None:
@@ -117,10 +116,9 @@ def _check_cli_provider(provider: str) -> None:
 def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)
     and that cloud providers have their required API key set."""
-    _env = os.environ if env is None else env
     if provider == "ollama":
         try:
-            _ollama_base = _env.get("OLLAMA_BASE_URL", OLLAMA_DEFAULT_BASE_URL)
+            _ollama_base = ollama_base_url(env)
             with urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S):
                 pass
         except (urllib.error.URLError, OSError) as exc:
@@ -132,7 +130,7 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             ) from exc
     elif provider == "llamacpp":
         try:
-            _base = _env.get("LLAMACPP_BASE_URL", DEFAULT_LLAMACPP_BASE_URL)
+            _base = llamacpp_base_url(env)
             with urllib.request.urlopen(f"{_base}/health", timeout=_API_CHECK_TIMEOUT_S):
                 pass
         except (urllib.error.URLError, OSError) as exc:
@@ -149,7 +147,7 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
         # instead of surfacing 401s mid-evaluation.
         provider_cfg = get_provider_configs().get(provider, {})
         key_env = provider_cfg.get("api_key_env", "")
-        if provider_cfg.get("api_key_required") and key_env and not _env.get(key_env):
+        if provider_cfg.get("api_key_required") and key_env and not api_key(key_env, env):
             browse_url = provider_cfg.get("browse_url", "")
             url_hint = f"  {browse_url}\n\n" if browse_url else ""
             raise RuntimeError(

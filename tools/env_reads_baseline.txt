@@ -1,0 +1,10 @@
+# Grandfathered process-environment reads (os.environ / os.getenv
+# outside the config layer). Do NOT add entries without
+# justification -- the goal is to burn this list to zero, not grow it.
+# The fix is an injected `env: Mapping[str, str] | None = None`
+# parameter resolved as `os.environ if env is None else env`.
+# Regenerate intentionally: python tools/check_env_reads.py --update-baseline
+# Entries are line-keyed (relpath:lineno), so an unrelated line-count
+# change above a grandfathered read shifts its entry. Prefer hand-editing
+# the baseline over blind --update-baseline regeneration, which can
+# silently absorb a genuinely new read introduced in the same change.

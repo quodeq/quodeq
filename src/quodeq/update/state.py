@@ -16,6 +16,8 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from quodeq.shared._env_resolve import resolve_env
+
 _logger = logging.getLogger(__name__)
 
 _STATE_FILENAME = "update_state.json"
@@ -42,7 +44,7 @@ class UpdateState:
 
 def get_update_state_path(env: dict[str, str] | None = None) -> str:
     """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     explicit = environ.get("QUODEQ_UPDATE_STATE_PATH")
     if explicit:
         return explicit

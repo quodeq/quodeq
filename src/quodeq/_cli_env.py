@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections.abc import Mapping
 
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
@@ -23,7 +24,7 @@ def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = N
     Emits a one-line deprecation warning when the legacy CLI flag or env var is
     the source of the value.
     """
-    src_env = env or os.environ
+    src_env = _environ(env)
     if getattr(args, "pool_budget", None) is not None:
         # argparse stores both --time-limit and --pool-budget on the same dest;
         # detect deprecated form by scanning the original argv.
@@ -50,7 +51,7 @@ def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -
     ``quodeq.shared._env.env_int``, which always returns an int and warns on a
     malformed value. Re-exported as ``cli_env_int``.
     """
-    raw = (env or os.environ).get(var)
+    raw = _environ(env).get(var)
     if raw is None:
         return default
     try:
@@ -61,12 +62,24 @@ def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -
 
 def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override from the environment, or None."""
-    return (env or os.environ).get("SUBAGENT_MODEL") or None
+    return _environ(env).get("SUBAGENT_MODEL") or None
+
+
+def _environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
+    """The CLI boundary's process-environment seam.
+
+    ``_build_run_config`` and the update notice resolve the run's
+    environment here, once, and pass the mapping on; the modules they call
+    never name ``os.environ`` themselves. The readers in this module go
+    through it too, so the module names ``os.environ`` exactly once. An
+    injected ``{}`` means "no variables set" and is returned as-is.
+    """
+    return os.environ if env is None else env
 
 
 def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
-    return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
+    return args.no_verify or _environ(env).get("QUODEQ_NO_VERIFY") == "1"
 
 
 # Public spellings of the names ``quodeq.cli`` re-exports. The underscore
@@ -78,5 +91,6 @@ ENV_MAX_TURNS = _ENV_MAX_TURNS
 ENV_MAX_DURATION = _ENV_MAX_DURATION
 ENV_POOL_BUDGET = _ENV_POOL_BUDGET
 cli_env_int = _env_int
+cli_environ = _environ
 no_verify = _no_verify
 subagent_model = _subagent_model

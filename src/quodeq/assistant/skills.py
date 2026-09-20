@@ -4,17 +4,23 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.shared._env_resolve import resolve_env
+
 _logger = logging.getLogger(__name__)
 
-_SKILLS_DIR = Path(
-    os.environ.get(
-        "QUODEQ_ASSISTANT_SKILLS_DIR",
-        str(Path(__file__).resolve().parent.parent / "data" / "assistant" / "skills"),
-    )
-)
+def skills_directory(env: Mapping[str, str] | None = None) -> Path:
+    """Directory the builtin skill packs are read from.
+
+    ``QUODEQ_ASSISTANT_SKILLS_DIR`` overrides the bundled pack. Read when a
+    skill is first loaded, not when this module is imported, so the variable
+    is honoured however late it is set.
+    """
+    raw = resolve_env(env).get("QUODEQ_ASSISTANT_SKILLS_DIR")
+    return Path(raw) if raw else Path(__file__).resolve().parent.parent / "data" / "assistant" / "skills"
 
 # Names the client answers locally; a skill file may never shadow them.
 RESERVED_COMMANDS: tuple[tuple[str, str], ...] = (
@@ -58,14 +64,18 @@ def _parse(text: str) -> Skill | None:
                  requires_write=meta.get("requires_write", "").strip().lower() == "true")
 
 
-def load_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
+def load_skills(
+    skills_dir: Path | None = None, *, env: Mapping[str, str] | None = None,
+) -> dict[str, Skill]:
     """Read every ``*.md`` in the skills directory, keyed by skill name.
 
     Malformed files and any skill whose name collides with a reserved client
     command are logged and skipped, never raised — one bad file must not take
-    the whole pack down. A missing directory yields an empty dict.
+    the whole pack down. A missing directory yields an empty dict. Without
+    *skills_dir* the directory comes from *env* (the process environment
+    when None).
     """
-    directory = skills_dir or _SKILLS_DIR
+    directory = skills_dir or skills_directory(env)
     skills: dict[str, Skill] = {}
     if not directory.is_dir():
         return skills
@@ -102,9 +112,11 @@ def _skills_stamp(directory: Path) -> tuple:
         return ()
 
 
-def cached_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
+def cached_skills(
+    skills_dir: Path | None = None, *, env: Mapping[str, str] | None = None,
+) -> dict[str, Skill]:
     """``load_skills`` memoized on the directory's file stamps; a changed, added or removed file re-parses."""
-    directory = skills_dir or _SKILLS_DIR
+    directory = skills_dir or skills_directory(env)
     stamp = _skills_stamp(directory)
     with _SKILLS_MEMO_LOCK:
         hit = _SKILLS_MEMO.get(directory)

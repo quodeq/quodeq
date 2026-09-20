@@ -10,7 +10,7 @@ is re-exported there; nothing here is itself patched by name.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from quodeq.analysis import dispatch_policy
@@ -21,15 +21,16 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 _log = logging.getLogger(__name__)
 
 
-def _read_omlx_key() -> str | None:
+def _read_omlx_key(env: Mapping[str, str] | None = None) -> str | None:
     from quodeq.llm_bridge._omlx import _read_omlx_api_key  # noqa: PLC0415
-    return _read_omlx_api_key()
+    return _read_omlx_api_key(env)
 
 
-# Registry of provider-specific credential loaders. Each callable returns the
-# API key string (or None/empty string) for that provider. New providers can
-# be added here without touching _resolve_provider_config.
-_CREDENTIAL_LOADERS: dict[str, Callable[[], str | None]] = {
+# Registry of provider-specific credential loaders. Each callable takes the
+# run's injected environment (None means the process environment) and returns
+# the API key string (or None/empty string) for that provider. New providers
+# can be added here without touching _resolve_provider_config.
+_CREDENTIAL_LOADERS: dict[str, Callable[[Mapping[str, str] | None], str | None]] = {
     "omlx": _read_omlx_key,
 }
 

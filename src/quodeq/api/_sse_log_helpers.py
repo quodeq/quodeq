@@ -1,23 +1,22 @@
 """Shared SSE helpers for log-stream routes."""
 from __future__ import annotations
 
-import os
 import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared._env_resolve import resolve_env
+
 
 def _poll_ms(env: Mapping[str, str] | None = None) -> int:
     """Poll interval between tail ticks; ``QUODEQ_LOG_STREAM_POLL_MS`` overrides."""
-    environ = env if env is not None else os.environ
-    return int(environ.get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
+    return int(resolve_env(env).get("QUODEQ_LOG_STREAM_POLL_MS", "100"))
 
 
 def _max_wait_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds to wait for a missing log file; ``QUODEQ_LOG_STREAM_MAX_WAIT_S`` overrides."""
-    environ = env if env is not None else os.environ
-    return int(environ.get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
+    return int(resolve_env(env).get("QUODEQ_LOG_STREAM_MAX_WAIT_S", "10"))
 
 
 # Cadence for SSE comments emitted while waiting on a not-yet-existing log
@@ -31,7 +30,7 @@ _DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
 
 
 def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
-    raw = (os.environ if env is None else env).get("QUODEQ_LOG_TAIL_MAX_BYTES")
+    raw = resolve_env(env).get("QUODEQ_LOG_TAIL_MAX_BYTES")
     if not raw:
         return _DEFAULT_TAIL_MAX_BYTES
     try:

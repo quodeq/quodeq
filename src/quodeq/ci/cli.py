@@ -2,20 +2,28 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.shared._env_resolve import resolve_env
 
-def handle_ci(args: argparse.Namespace) -> int:
-    """Handle the `quodeq ci` subcommand. Returns exit code."""
+
+def handle_ci(args: argparse.Namespace, env: Mapping[str, str] | None = None) -> int:
+    """Handle the `quodeq ci` subcommand. Returns exit code.
+
+    *env* is this subcommand's composition root: the only place GITHUB_TOKEN
+    is read, ``None`` meaning the real environment.
+    """
     if args.ci_action == "report":
-        return _handle_report(args)
+        return _handle_report(args, env)
     print("Usage: quodeq ci report [options]", file=sys.stderr)
     return 1
 
 
-def _resolve_report_token(args: argparse.Namespace) -> str | None:
+def _resolve_report_token(
+    args: argparse.Namespace, env: Mapping[str, str] | None = None,
+) -> str | None:
     """Validate and return the GitHub token, printing an error if missing."""
     if args.token:
         print(
@@ -23,7 +31,7 @@ def _resolve_report_token(args: argparse.Namespace) -> str | None:
             "process listings; prefer the GITHUB_TOKEN environment variable.",
             file=sys.stderr,
         )
-    token = args.token or os.environ.get("GITHUB_TOKEN")
+    token = args.token or resolve_env(env).get("GITHUB_TOKEN")
     if not token:
         print("Error: --token or GITHUB_TOKEN environment variable required", file=sys.stderr)
         return None
@@ -99,7 +107,10 @@ def _fetch_report_changed_lines(args: argparse.Namespace, token: str) -> dict[st
         return {}  # empty dict → all comments filtered out; summary still posts
 
 
-def _post_report_review(args: argparse.Namespace, reports, baseline_violations, baseline_available, changed_lines) -> None:
+def _post_report_review(
+    args: argparse.Namespace, reports, baseline_violations, baseline_available,
+    changed_lines, *, token: str,
+) -> None:
     """Build the review payload, post it, and print the run summary."""
     from quodeq.ci.reporter import ReviewOptions, build_review_payload, post_review
     from quodeq.ci.review_builder import classify_violations
@@ -120,7 +131,7 @@ def _post_report_review(args: argparse.Namespace, reports, baseline_violations, 
         repo=args.repo,
         pr_number=args.pr,
         payload=payload,
-        token=args.token or os.environ.get("GITHUB_TOKEN"),
+        token=token,
     )
 
     all_current: list[dict] = []
@@ -134,9 +145,9 @@ def _post_report_review(args: argparse.Namespace, reports, baseline_violations, 
     )
 
 
-def _handle_report(args: argparse.Namespace) -> int:
+def _handle_report(args: argparse.Namespace, env: Mapping[str, str] | None = None) -> int:
     """Post evaluation results as a GitHub PR review."""
-    token = _resolve_report_token(args)
+    token = _resolve_report_token(args, env)
     if token is None:
         return 1
 
@@ -159,5 +170,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         reports, baseline_violations, baseline_available = loaded
 
     changed_lines = _fetch_report_changed_lines(args, token)
-    _post_report_review(args, reports, baseline_violations, baseline_available, changed_lines)
+    _post_report_review(
+        args, reports, baseline_violations, baseline_available, changed_lines, token=token,
+    )
     return 0

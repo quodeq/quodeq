@@ -17,6 +17,8 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from quodeq.shared._env_resolve import resolve_env
+
 _logger = logging.getLogger(__name__)
 
 _STATE_FILENAME = "menubar_state.json"
@@ -31,7 +33,7 @@ class MenubarState:
 
 def get_menubar_state_path(env: dict[str, str] | None = None) -> str:
     """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     explicit = environ.get("QUODEQ_MENUBAR_STATE_PATH")
     if explicit:
         return explicit

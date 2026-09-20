@@ -1,10 +1,8 @@
 """Provider detection, configuration, and type classification."""
 from __future__ import annotations
 
-import os
-
 from quodeq.analysis._provider_cache import get_provider_configs as _get_cached_configs
-from quodeq.shared.constants import OLLAMA_DEFAULT_PORT
+from quodeq.config.llm_bridge_env import api_key as _api_key, local_api_markers
 
 
 def get_provider_configs() -> dict[str, dict]:
@@ -24,10 +22,6 @@ def get_provider_type(provider_id: str) -> str:
 LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
 
 
-# Default markers detect common local LLM server patterns.
-_LOCAL_API_MARKERS_DEFAULT = frozenset({OLLAMA_DEFAULT_PORT, "localhost", "127.0.0.1", "ollama"})
-
-
 def _local_api_markers(env: dict[str, str] | None = None) -> frozenset[str]:
     """Return the local-API detection markers, honoring QUODEQ_LOCAL_API_MARKERS.
 
@@ -36,13 +30,10 @@ def _local_api_markers(env: dict[str, str] | None = None) -> frozenset[str]:
     QUODEQ_LOCAL_API_MARKERS="" disables local-API detection entirely. This
     unset-vs-empty distinction is security-adjacent: classify_provider's
     result gates the assistant's in-process web tools (search_web/fetch_url
-    are only ever registered for local-api providers).
+    are only ever registered for local-api providers). The variable is
+    resolved by the config layer.
     """
-    environ = env if env is not None else os.environ
-    raw = environ.get("QUODEQ_LOCAL_API_MARKERS")
-    if raw is None:
-        return _LOCAL_API_MARKERS_DEFAULT
-    return frozenset(m.strip() for m in raw.split(",") if m.strip())
+    return local_api_markers(env)
 
 
 def _is_local_api(provider_id: str, *, markers: frozenset[str] | None = None) -> bool:
@@ -93,7 +84,5 @@ def resolve_api_key(
     unset or there is nothing to resolve; *env_name* is returned regardless,
     so a caller can report which variable is missing.
     """
-    environ = env if env is not None else os.environ
     env_name = resolve_api_key_env(provider_id, api_base)
-    key = environ.get(env_name, "") if env_name else ""
-    return key, env_name
+    return _api_key(env_name, env), env_name

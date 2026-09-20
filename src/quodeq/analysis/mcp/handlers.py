@@ -4,7 +4,6 @@ Each function handles one JSON-RPC method and returns the response dict.
 """
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from quodeq import __version__
@@ -21,6 +20,7 @@ from quodeq.analysis.mcp.schemas import (
     REPORT_FINDING_NAME,
     REPORT_FINDING_SCHEMA,
 )
+from quodeq.config.analysis_env import mcp_max_batch
 
 if TYPE_CHECKING:
     from quodeq.analysis.subagents.file_queue import FileQueue
@@ -30,19 +30,15 @@ _JSONRPC_METHOD_NOT_FOUND = -32601
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "quodeq-findings"
 _SERVER_VERSION = __version__ or "0.0.0"
-_DEFAULT_MAX_FILE_BATCH_SIZE = 1000
 
 
 def _max_file_batch_size(env: dict[str, str] | None = None) -> int:
-    """Return the per-call file-batch ceiling, honouring QUODEQ_MCP_MAX_BATCH."""
-    raw = (env if env is not None else os.environ).get("QUODEQ_MCP_MAX_BATCH")
-    if not raw:
-        return _DEFAULT_MAX_FILE_BATCH_SIZE
-    try:
-        value = int(raw)
-    except ValueError:
-        return _DEFAULT_MAX_FILE_BATCH_SIZE
-    return value if value > 0 else _DEFAULT_MAX_FILE_BATCH_SIZE
+    """Return the per-call file-batch ceiling, honouring QUODEQ_MCP_MAX_BATCH.
+
+    The variable is resolved by the config layer; nothing here reads the
+    process environment.
+    """
+    return mcp_max_batch(env)
 
 
 def handle_initialize(request_id: object, msg: dict) -> dict:

@@ -1,7 +1,6 @@
 """Scaling logic: respawn decisions, scale-up computation, future collection."""
 from __future__ import annotations
 
-import os
 import time
 from collections import OrderedDict
 from concurrent.futures import Future
@@ -15,6 +14,7 @@ from quodeq.analysis.subagents._pool_models import (
     _AGENT_ID_PREFIX,
 )
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
+from quodeq.config.analysis_env import agent_failure_streak_limit
 from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
 
@@ -118,19 +118,13 @@ def should_respawn(
     return remaining
 
 
-_DEFAULT_AGENT_FAILURE_STREAK = 5
-
-
 def _agent_failure_streak_limit(env: dict[str, str] | None = None) -> int:
     """Consecutive whole-agent failures tolerated before the run is cancelled.
 
-    Env override QUODEQ_AGENT_FAILURE_STREAK; 0 disables the backstop.
+    Env override QUODEQ_AGENT_FAILURE_STREAK (resolved by the config layer);
+    0 disables the backstop.
     """
-    raw = (env if env is not None else os.environ).get("QUODEQ_AGENT_FAILURE_STREAK", "").strip()
-    try:
-        return int(raw) if raw else _DEFAULT_AGENT_FAILURE_STREAK
-    except ValueError:
-        return _DEFAULT_AGENT_FAILURE_STREAK
+    return agent_failure_streak_limit(env)
 
 
 def check_agent_failure_streak(results: list[SubagentResult]) -> None:

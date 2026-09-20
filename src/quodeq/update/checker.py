@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from datetime import datetime, timezone
 
 from quodeq import __version__
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.update import channel as _channel
 from quodeq.update import selfupdate as _selfupdate
 from quodeq.update.compare import is_newer
@@ -37,7 +37,7 @@ def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:
     QUODEQ_UPDATE_CHECK_INTERVAL seconds old (24h by default); an unreadable
     timestamp counts as due.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     if not state.auto_check_enabled:
         return False
     if environ.get("QUODEQ_NO_UPDATE_NOTIFIER"):

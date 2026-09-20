@@ -24,10 +24,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from quodeq.config.context_env import (
+    cache_root_override,
+    git_child_env,
+    online_cache_disabled,
+)
+
 _logger = logging.getLogger(__name__)
 
-_CACHE_ENV = "QUODEQ_CACHE_ROOT"  # override the cache root for tests / sandboxing
-_DISABLE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
 _DEFAULT_CLONE_TIMEOUT_S = 300
 _MAX_CACHED_REPOS = 20  # bounds ~/.quodeq/cache/online/ disk growth; wipe_cache() clears it fully
 
@@ -38,8 +42,8 @@ def cache_root(env: dict[str, str] | None = None) -> Path:
     Defaults to ``~/.quodeq/cache``; override with ``QUODEQ_CACHE_ROOT``
     so tests can point at a sandbox without touching the user's real cache.
     """
-    raw = (env if env is not None else os.environ).get(_CACHE_ENV, "").strip()
-    base = Path(raw) if raw else Path.home() / ".quodeq" / "cache"
+    override = cache_root_override(env)
+    base = override if override is not None else Path.home() / ".quodeq" / "cache"
     online = base / "online"
     online.mkdir(parents=True, exist_ok=True)
     return online
@@ -47,7 +51,7 @@ def cache_root(env: dict[str, str] | None = None) -> Path:
 
 def cache_disabled(env: dict[str, str] | None = None) -> bool:
     """True when the user has flipped the kill switch."""
-    return (env if env is not None else os.environ).get(_DISABLE_ENV, "").strip() in {"1", "true", "yes"}
+    return online_cache_disabled(env)
 
 
 def _url_hash(url: str) -> str:
@@ -85,7 +89,7 @@ def is_inside_cache(path: str | Path) -> bool:
 
 def _git(args: list[str], *, cwd: Path | None = None,
          timeout: int = _DEFAULT_CLONE_TIMEOUT_S) -> bool:
-    env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+    env = git_child_env()
     try:
         subprocess.run(
             ["git", *args], check=True, env=env, timeout=timeout,

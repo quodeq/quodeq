@@ -6,10 +6,11 @@ Split out of _assistant_helpers.py (Task 10).
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Mapping
 
 from flask import Flask
+
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ _DEFAULT_SESSION_TTL_DAYS = 90
 
 
 def _session_ttl_days(env: Mapping[str, str] | None = None) -> int:
-    raw = (env if env is not None else os.environ).get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
+    raw = resolve_env(env).get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
     if raw is None:
         return _DEFAULT_SESSION_TTL_DAYS
     try:

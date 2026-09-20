@@ -8,7 +8,6 @@ resolved against this module.
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import sys
 import threading
@@ -28,6 +27,7 @@ from quodeq.analysis._mcp_arg_builders import (
 )
 from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
+from quodeq.config.process_env import process_environment_copy
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 from quodeq.shared.copilot import build_copilot_env
 
@@ -188,8 +188,12 @@ def _unregister_cli_mcp(cmd: str, name: str) -> None:
 
 
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the subprocess environment, removing sensitive variables."""
-    env = (env or os.environ).copy()
+    """Build the subprocess environment, removing sensitive variables.
+
+    The ``None`` default resolves to the process environment in the config
+    layer; an injected ``{}`` means "no variables set".
+    """
+    env = process_environment_copy(env)
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)
     provider_cfg = _get_provider_configs().get(ai_cmd or "", {})

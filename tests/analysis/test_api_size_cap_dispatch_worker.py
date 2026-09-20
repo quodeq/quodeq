@@ -131,7 +131,7 @@ class TestSizeAwareBatching:
         assert _batch_files_by_size([], budget=300) == []
 
     def test_bridge_makes_one_api_call_per_sub_batch(
-        self, tmp_path: Path, api_provider, monkeypatch,
+        self, tmp_path: Path, api_provider,
     ):
         from unittest.mock import patch as mpatch
         from quodeq.analysis._config import AnalysisConfig
@@ -150,7 +150,6 @@ class TestSizeAwareBatching:
             max_files_per_agent=10, agent_id="a1", dimension="security",
         )
 
-        monkeypatch.setenv("QUODEQ_MAX_API_PROMPT_CHARS", "150")
         calls: list[list[str]] = []
         with mpatch(
             "quodeq.analysis.subprocess._resolve_provider_config",
@@ -159,7 +158,13 @@ class TestSizeAwareBatching:
             "quodeq.analysis._api_runner.run_api_analysis",
             side_effect=lambda **kw: calls.append(kw["request"].source_file_paths),
         ):
-            _run_api_analysis_bridge(src, "prompt", tmp_path / "a1.stream", cfg, {})
+            # The budget is injected, not exported: the bridge's ``env``
+            # mapping IS the environment it sees, so an empty one would mean
+            # "nothing set" rather than "fall back to the process".
+            _run_api_analysis_bridge(
+                src, "prompt", tmp_path / "a1.stream", cfg,
+                {"QUODEQ_MAX_API_PROMPT_CHARS": "150"},
+            )
 
         # 120B each with a 150B budget: every file gets its own call.
         assert calls == [["a.py"], ["b.py"], ["c.py"]]

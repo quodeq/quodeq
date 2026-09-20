@@ -20,19 +20,20 @@ hides the console button. Recommended launch:
 from __future__ import annotations
 
 import logging
-import os
 import sys
+from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
 
-def _default_log_paths() -> list[Path]:
+def _default_log_paths(env: Mapping[str, str] | None = None) -> list[Path]:
     """Return locations to probe when the env var is unset.
 
     First match wins. Order:
@@ -45,7 +46,11 @@ def _default_log_paths() -> list[Path]:
        dir on Linux, LocalAppData on Windows). Honors host conventions
        and integrates with system log viewers like macOS Console.app.
     3. ``/tmp/llama-server.log`` as a lowest-friction last resort.
+
+    *env* overrides the platform-directory lookups and defaults to
+    ``os.environ``.
     """
+    environ = resolve_env(env)
     home = Path.home()
     quodeq_logs = home / ".quodeq" / "logs"
     # Create the directory eagerly so the suggested redirect command in
@@ -61,34 +66,46 @@ def _default_log_paths() -> list[Path]:
     if sys.platform == "darwin":
         candidates.append(home / "Library" / "Logs" / "llama-server.log")
     elif sys.platform == "win32":
-        local_app = os.environ.get("LOCALAPPDATA")
+        local_app = environ.get("LOCALAPPDATA")
         if local_app:
             candidates.append(Path(local_app) / "llama.cpp" / "server.log")
     else:
-        xdg_state = os.environ.get("XDG_STATE_HOME") or str(home / ".local" / "state")
+        xdg_state = environ.get("XDG_STATE_HOME") or str(home / ".local" / "state")
         candidates.append(Path(xdg_state) / "llama-server.log")
     candidates.append(Path("/tmp/llama-server.log"))
     return candidates
 
 
-def _llamacpp_log_path(_env_override: str | None = None) -> Path | None:
-    """Resolve a usable log path, or None if no candidate file exists."""
-    override = _env_override if _env_override is not None else os.environ.get("LLAMACPP_LOG_FILE")
+def _llamacpp_log_path(
+    _env_override: str | None = None, env: Mapping[str, str] | None = None,
+) -> Path | None:
+    """Resolve a usable log path, or None if no candidate file exists.
+
+    *_env_override* is the already-resolved value and wins; *env* overrides
+    the mapping the variable is read from and defaults to ``os.environ``.
+    """
+    override = (
+        _env_override if _env_override is not None
+        else resolve_env(env).get("LLAMACPP_LOG_FILE")
+    )
     if override:
         # Honor an explicit override even if the file doesn't exist yet —
         # llama-server might create it on next launch and the UI's
         # availability poll will pick it up then.
         return Path(override)
-    for candidate in _default_log_paths():
+    for candidate in _default_log_paths(env):
         if candidate.exists():
             return candidate
     return None
 
 
-def register_llamacpp_log_routes(app: Flask) -> None:
+def register_llamacpp_log_routes(app: Flask, env: Mapping[str, str] | None = None) -> None:
     """Register the /api/llamacpp/logs/{available,stream} endpoints.
 
     Auth: inherits protection from the global before_request hook.
+
+    *env* is captured once here, at app-creation time, rather than read per
+    request; ``None`` keeps the per-request lookup against ``os.environ``.
     """
 
     @app.get("/api/llamacpp/logs/available")
@@ -100,12 +117,12 @@ def register_llamacpp_log_routes(app: Flask) -> None:
         connection that immediately 404s would just produce a confusing
         red error pill.
         """
-        log_path = _llamacpp_log_path()
+        log_path = _llamacpp_log_path(env=env)
         return jsonify({"available": bool(log_path and log_path.exists())})
 
     @app.get("/api/llamacpp/logs/stream")
     def stream_llamacpp_logs() -> Response | tuple[Response, int]:
-        log_path = _llamacpp_log_path()
+        log_path = _llamacpp_log_path(env=env)
         if log_path is None or not log_path.exists():
             return (
                 jsonify({

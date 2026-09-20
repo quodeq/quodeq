@@ -16,7 +16,7 @@ def get_valid_categories(categories: str | None = None, env: dict[str, str] | No
     """
     if categories is not None:
         return frozenset(c.strip() for c in categories.split(",") if c.strip())
-    from_env = (env or os.environ).get("QUODEQ_DISCIPLINE_CATEGORIES")
+    from_env = (os.environ if env is None else env).get("QUODEQ_DISCIPLINE_CATEGORIES")
     if from_env:
         return frozenset(c.strip() for c in from_env.split(",") if c.strip())
     return _DEFAULT_CATEGORIES

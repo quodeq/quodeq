@@ -33,7 +33,7 @@ def _asvs_version(override: str | None = None, env: dict[str, str] | None = None
     """Return the ASVS version string. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return (env or os.environ).get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
+    return (os.environ if env is None else env).get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
 
 
 def fetch_asvs_l1(

@@ -7,8 +7,8 @@ re-exported here for the rest of the codebase.
 from __future__ import annotations
 
 import logging
-import os
 import sys
+from collections.abc import MutableMapping
 from pathlib import Path
 
 from quodeq.core.utils.io import (  # noqa: F401 — re-exported API
@@ -16,6 +16,7 @@ from quodeq.core.utils.io import (  # noqa: F401 — re-exported API
     open_text,
     read_json,
 )
+from quodeq.shared._env_resolve import resolve_env_mut
 
 _logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding=TEXT_ENCODING)
 
 
-def configure_stdio_utf8() -> None:
+def configure_stdio_utf8(env: MutableMapping[str, str] | None = None) -> None:
     """Ensure this process (and spawned Python children) use UTF-8 for console I/O.
 
     On Windows the console defaults to the active code page (e.g. cp1252), and a
@@ -39,8 +40,12 @@ def configure_stdio_utf8() -> None:
     stdout/stderr to UTF-8 for the current process and defaults ``PYTHONUTF8=1`` so
     spawned Python children start in UTF-8 mode too. Call once at process entry; it
     is safe and idempotent, and no-ops on streams that cannot be reconfigured.
+
+    *env* takes the ``PYTHONUTF8`` default in place of the process
+    environment, so a caller can see what would be exported without
+    mutating its own process.
     """
-    os.environ.setdefault("PYTHONUTF8", "1")
+    resolve_env_mut(env).setdefault("PYTHONUTF8", "1")
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:

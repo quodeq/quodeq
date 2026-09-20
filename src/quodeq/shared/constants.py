@@ -24,4 +24,7 @@ OLLAMA_DEFAULT_BASE_URL = f"http://localhost:{OLLAMA_DEFAULT_PORT}"
 # llama-server's default listening address, used when LLAMACPP_BASE_URL is unset.
 DEFAULT_LLAMACPP_BASE_URL = "http://localhost:8080"
 
+# omlx's default listening address, used when OMLX_BASE_URL is unset.
+OMLX_DEFAULT_BASE_URL = "http://localhost:8000"
+
 SECRET_SUFFIX_CHARS = 4  # how many trailing credential characters a log or settings mask may show

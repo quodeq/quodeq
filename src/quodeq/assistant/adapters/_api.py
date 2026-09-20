@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Callable
@@ -21,6 +20,7 @@ from quodeq.assistant.adapters._fallback import (
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
 from quodeq.assistant.tools._registry import ToolRegistry
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
@@ -47,7 +47,7 @@ def _extra_body(config: "ApiTurnConfig", env: Mapping[str, str] | None = None) -
     body["reasoning_effort"] = "none"
     if _OPENAI_API_HOST not in (config.api_base or ""):
         body["chat_template_kwargs"] = {"enable_thinking": False}
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     env_ctx = environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
     if env_ctx.isdigit() and int(env_ctx) > 0:
         body["num_ctx"] = int(env_ctx)

@@ -65,7 +65,7 @@ def env_float(
 
     When *minimum* is given, parsed values below it also fall back to *default*.
     """
-    raw = (env or os.environ).get(var)
+    raw = (os.environ if env is None else env).get(var)
     if raw is not None:
         try:
             value = float(raw)
@@ -91,7 +91,7 @@ def get_action_api_port(env: dict[str, str] | None = None) -> int:
 
 def get_action_api_host(env: dict[str, str] | None = None) -> str:
     """Return the action API host from environment or default."""
-    return (env or os.environ).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
+    return (os.environ if env is None else env).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
 
 
 def get_dashboard_port(env: dict[str, str] | None = None) -> int:
@@ -101,22 +101,22 @@ def get_dashboard_port(env: dict[str, str] | None = None) -> int:
 
 def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     """Return the Anthropic API key from environment, or None."""
-    return (env or os.environ).get("ANTHROPIC_API_KEY") or None
+    return (os.environ if env is None else env).get("ANTHROPIC_API_KEY") or None
 
 
 def get_asvs_url(env: dict[str, str] | None = None) -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return (env or os.environ).get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
+    return (os.environ if env is None else env).get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
 
 
 def get_github_search_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return (env or os.environ).get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
 
 
 def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub raw content base URL from environment or default."""
-    return (env or os.environ).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
 
 
 # ---------------------------------------------------------------------------

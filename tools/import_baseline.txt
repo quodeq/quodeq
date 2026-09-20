@@ -5,5 +5,5 @@ src/quodeq/analysis/_api_source_gathering.py:25:llm_bridge
 src/quodeq/api/routes_project_scan.py:147:analysis
 src/quodeq/ci/review.py:138:_cli_evaluation
 src/quodeq/data/fs/repo_clone.py:19:context
-src/quodeq/llm_bridge/_providers.py:6:analysis
-src/quodeq/services/tooling_mixin.py:15:analysis
+src/quodeq/llm_bridge/_providers.py:4:analysis
+src/quodeq/services/tooling_mixin.py:14:analysis

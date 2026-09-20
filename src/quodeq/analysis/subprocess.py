@@ -17,7 +17,6 @@ This module is the public entry point. Implementation is split across:
 from __future__ import annotations
 
 import logging
-import os
 import tempfile
 from contextlib import ExitStack
 from collections.abc import Mapping
@@ -49,6 +48,7 @@ from quodeq.analysis._process import AnalysisError, _check_process_result, _spaw
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
+from quodeq.config.process_env import process_environment
 from quodeq.core.stream.events import copilot_error, parse_stream_event
 from quodeq.shared.utils import sanitize_sensitive
 from quodeq.shared.utils import get_ai_cmd
@@ -165,7 +165,7 @@ def _resolve_provider_config(
     if not api_key:
         loader = _CREDENTIAL_LOADERS.get(ai_cmd)
         if loader is not None:
-            api_key = loader() or ""
+            api_key = loader(env) or ""
 
     if not model:
         raise AnalysisError(
@@ -227,6 +227,6 @@ def run_analysis(
 
     if provider_type == "api":
         _run_api_analysis_bridge(work_dir, prompt, stream_file, cfg,
-                                 os.environ if env is None else env)
+                                 process_environment(env))
     else:
         _run_cli_analysis(work_dir, prompt, stream_file, cfg)

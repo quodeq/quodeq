@@ -31,7 +31,7 @@ def clone_shallow_months(env: dict[str, str] | None = None) -> int:
     larger git churn lookback, or set to 0 to force full-history clones.
     Malformed values fall back to the default (4).
     """
-    raw = (env or os.environ).get("QUODEQ_CLONE_SHALLOW_MONTHS", "")
+    raw = (os.environ if env is None else env).get("QUODEQ_CLONE_SHALLOW_MONTHS", "")
     try:
         return int(raw) if raw else _DEFAULT_SHALLOW_MONTHS
     except ValueError:

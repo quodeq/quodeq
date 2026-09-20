@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import urllib.request
 from collections.abc import Mapping
 import urllib.error
@@ -28,7 +27,7 @@ from quodeq.llm_bridge._ollama import (
     _detect_memory,
     estimate_max_agents,
 )
-from quodeq.shared.constants import DEFAULT_LLAMACPP_BASE_URL
+from quodeq.config.llm_bridge_env import llamacpp_base_url
 
 _log = logging.getLogger(__name__)
 
@@ -40,9 +39,11 @@ _TRANSPORT_ERRORS = (urllib.error.URLError, ConnectionRefusedError, OSError, Val
 
 
 def _default_base_url(env: Mapping[str, str] | None = None) -> str:
-    """llama-server base URL: ``LLAMACPP_BASE_URL`` or the default port 8080."""
-    environ = env if env is not None else os.environ
-    return environ.get("LLAMACPP_BASE_URL", DEFAULT_LLAMACPP_BASE_URL)
+    """llama-server base URL: ``LLAMACPP_BASE_URL`` or the default port 8080.
+
+    Resolved by the config layer, so nothing here reads os.environ.
+    """
+    return llamacpp_base_url(env)
 
 
 def _normalize_base(base_url: str) -> str:

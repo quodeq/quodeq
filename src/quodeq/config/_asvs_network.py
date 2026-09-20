@@ -70,7 +70,7 @@ def verify_integrity(
     """
     actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash is None:
-        expected_hash = (env or os.environ).get("QUODEQ_ASVS_SHA256")
+        expected_hash = (os.environ if env is None else env).get("QUODEQ_ASVS_SHA256")
     if skip_integrity is None:
         skip_integrity = False
     if expected_hash and actual_hash != expected_hash:

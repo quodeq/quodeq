@@ -41,7 +41,7 @@ _CWE_API_URL = "https://cwe-api.mitre.org/api/v1/cwe"
 
 
 def _default_api_base(env: dict[str, str] | None = None) -> str:
-    """Return CWE API base URL, reading from *env* (or os.environ) lazily."""
+    """Return CWE API base URL, reading from *env* when given, else os.environ, lazily."""
     value = (env if env is not None else os.environ).get("CWE_API_BASE", _CWE_API_URL)
     if not value.startswith(("http://", "https://")):
         # Env var contains an invalid scheme; fall back to the known-good default.

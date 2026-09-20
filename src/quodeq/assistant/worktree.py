@@ -5,14 +5,16 @@ All git/gh invocations are argv lists (never shell strings) with explicit
 """
 from __future__ import annotations
 
-import os
 import subprocess
 # Not called directly in this module anymore (WorktreeManager.create_pr moved
 # to _worktree_manager.py) -- kept imported so this module still exposes a
 # `shutil` attribute: tests patch `quodeq.assistant.worktree.shutil.which`,
 # which requires that dotted path to resolve.
 import shutil  # noqa: F401 - patch target attribute holder
+from collections.abc import Mapping
 from pathlib import Path
+
+from quodeq.shared._env_resolve import resolve_env
 
 _GIT_TIMEOUT_S = 120
 
@@ -23,8 +25,8 @@ _GIT_TIMEOUT_S = 120
 _DEFAULT_WORKTREE_TTL_H = 72
 
 
-def _worktree_ttl_hours() -> int:
-    raw = os.environ.get("QUODEQ_ASSISTANT_WORKTREE_TTL_H")
+def _worktree_ttl_hours(env: Mapping[str, str] | None = None) -> int:
+    raw = resolve_env(env).get("QUODEQ_ASSISTANT_WORKTREE_TTL_H")
     if raw is None:
         return _DEFAULT_WORKTREE_TTL_H
     try:
@@ -90,11 +92,11 @@ def diff_stats(worktree: Path) -> list[dict]:
     return stats
 
 
-def worktrees_base() -> Path:
+def worktrees_base(env: Mapping[str, str] | None = None) -> Path:
     """Directory that holds every assistant worktree, overridable with
     ``QUODEQ_WORKTREES_DIR``. Not created here."""
-    return Path(os.environ.get(
-        "QUODEQ_WORKTREES_DIR", str(Path.home() / ".quodeq" / "worktrees")))
+    raw = resolve_env(env).get("QUODEQ_WORKTREES_DIR")
+    return Path(raw) if raw else Path.home() / ".quodeq" / "worktrees"
 
 
 # Re-exported: moved to _worktree_manager.py / _worktree_gc.py to keep this

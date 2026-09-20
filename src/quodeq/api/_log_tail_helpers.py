@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
+
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -25,8 +27,8 @@ _CONSOLE_HIDDEN_MARKERS: tuple[str, ...] = ("[resources]",)
 _DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
 
 
-def _tail_max_bytes() -> int:
-    raw = os.environ.get("QUODEQ_LOG_TAIL_MAX_BYTES")
+def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
+    raw = resolve_env(env).get("QUODEQ_LOG_TAIL_MAX_BYTES")
     if not raw:
         return _DEFAULT_TAIL_MAX_BYTES
     try:
@@ -53,14 +55,17 @@ def _resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
     return log_path, 0
 
 
-def _read_tail(log_path: Path, since: int) -> tuple[list[str], int]:
+def _read_tail(
+    log_path: Path, since: int, env: Mapping[str, str] | None = None,
+) -> tuple[list[str], int]:
     """Read lines starting at byte offset *since*. Returns (lines, next_offset).
 
     Drops any trailing partial line (without newline); caller polls again.
+    *env* overrides the per-poll byte cap lookup and defaults to ``os.environ``.
     """
     with open(log_path, "rb") as fh:
         fh.seek(since)
-        raw = fh.read(_tail_max_bytes())
+        raw = fh.read(_tail_max_bytes(env))
     text = raw.decode("utf-8", errors="replace")
     if not text.endswith("\n"):
         last_nl = text.rfind("\n")

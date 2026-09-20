@@ -27,6 +27,7 @@ import shutil
 import stat
 import subprocess
 import threading
+from collections.abc import Mapping
 from pathlib import Path
 
 # Re-exported so the api layer can validate a shared-repo URL without
@@ -35,6 +36,7 @@ from pathlib import Path
 # not api -> data). services/evaluation_mixin.py imports the same function
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+from quodeq.shared._env_resolve import resolve_env
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +67,8 @@ def remove_clone_dir(path: Path | str) -> None:
     shutil.rmtree(path, onexc=_clear_readonly_and_retry)
 
 
-def _git_env() -> dict[str, str]:
-    """Environment for git subprocess calls.
+def _git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Environment for git subprocess calls, layered over *env*.
 
     GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
     stops git from blocking on an interactive credential or passphrase prompt, since
@@ -78,11 +80,12 @@ def _git_env() -> dict[str, str]:
     the call only dies at the run_git timeout. ssh remotes need the host in
     known_hosts and the key in an agent (or use an https remote instead).
     """
-    return {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
+    return {**resolve_env(env), "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
 
 
 def run_git(
-    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S
+    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[bool, str]:
     """Run a git command and return ``(ok, output)``.
 
@@ -97,7 +100,7 @@ def run_git(
         proc = subprocess.run(
             ["git", *args],
             cwd=str(cwd) if cwd else None,
-            env=_git_env(),
+            env=_git_env(env),
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -118,25 +121,25 @@ def run_git(
         return False, "git command failed to run"
 
 
-def _cache_base(env: dict | None = None) -> Path:
-    e = env if env is not None else os.environ
+def _cache_base(env: Mapping[str, str] | None = None) -> Path:
+    e = resolve_env(env)
     base = e.get(_CACHE_ENV)
     root = Path(base) if base else Path.home() / ".quodeq" / "cache"
     return root / "shared"
 
 
-def shared_cache_dir(url: str, env: dict | None = None) -> Path:
+def shared_cache_dir(url: str, env: Mapping[str, str] | None = None) -> Path:
     """Per-remote cache directory, named by a 16-char digest of *url*."""
     digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()[:16]
     return _cache_base(env) / digest
 
 
-def shared_repo_path(url: str, env: dict | None = None) -> Path:
+def shared_repo_path(url: str, env: Mapping[str, str] | None = None) -> Path:
     """Clone directory for *url*. Also the key ``clone_lock`` locks on."""
     return shared_cache_dir(url, env) / "repo"
 
 
-def shared_evaluations_root(url: str, env: dict | None = None) -> Path:
+def shared_evaluations_root(url: str, env: Mapping[str, str] | None = None) -> Path:
     """The clone's evaluations/ tree, laid out like the local evaluations dir."""
     return shared_repo_path(url, env) / "evaluations"
 
@@ -145,7 +148,7 @@ _CLONE_LOCKS: dict[str, threading.RLock] = {}
 _CLONE_LOCKS_GUARD = threading.Lock()
 
 
-def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
+def clone_lock(url: str, env: Mapping[str, str] | None = None) -> threading.RLock:
     """Process-wide reentrant lock serializing git mutations on one clone.
 
     Keyed by the clone's resolved path (shared_repo_path), so any two
@@ -161,7 +164,7 @@ def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
         return _CLONE_LOCKS.setdefault(key, threading.RLock())
 
 
-def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
+def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path | None:
     """Return the clone path for *url*, cloning it once if it is not there yet.
 
     None when the clone failed; the half-written directory is removed so the
@@ -184,7 +187,7 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
 _DEFAULT_REFRESH_TIMEOUT_S = 30
 
 
-def _refresh_missing_clone(url: str, env: dict | None) -> tuple[bool, str]:
+def _refresh_missing_clone(url: str, env: Mapping[str, str] | None) -> tuple[bool, str]:
     if ensure_shared_clone(url, env) is not None:
         return True, ""
     reason = f"could not clone the repository, check that git can access {url}"
@@ -217,7 +220,7 @@ def _fetch_and_reset_clone(url: str, repo: Path, timeout: int) -> tuple[bool, st
 
 
 def refresh_shared_clone(
-    url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
+    url: str, env: Mapping[str, str] | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
 ) -> tuple[bool, str]:
     """Fetch + hard-reset the clone to the remote's HEAD.
 
@@ -252,7 +255,7 @@ def refresh_shared_clone(
         return _fetch_and_reset_clone(url, repo, timeout)
 
 
-def last_synced_at(url: str, env: dict | None = None) -> float | None:
+def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | None:
     """Unix mtime of the clone's last fetch, or None when it was never cloned.
 
     Falls back to HEAD when FETCH_HEAD is absent (cloned, never refreshed).

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hmac
 import logging
-import os
 import re
 import time
 from collections.abc import Mapping
@@ -13,6 +12,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.dashboard_ports import alt_port_origins
 
@@ -83,7 +83,7 @@ def _is_trusted_webview(user_agent: str, env: Mapping[str, str] | None = None) -
     (non-desktop) runs that never set it always fail closed here regardless
     of UA content.
     """
-    expected = (os.environ if env is None else env).get(_ENV_WEBVIEW_TOKEN)
+    expected = resolve_env(env).get(_ENV_WEBVIEW_TOKEN)
     # isascii() for the same reason _webview_token_from_ua guards the
     # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
     # and this one comes from the environment, which an operator can set by
@@ -246,8 +246,17 @@ def _log_csp_ws_failure(exc: Exception) -> None:
     )
 
 
-def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
-    """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
+def configure_security(
+    app: Flask,
+    rate_limit_store: RateLimitStore,
+    api_key: str | None,
+    env: Mapping[str, str] | None = None,
+) -> None:
+    """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers.
+
+    *env* is captured once here, at app-creation time, rather than read per
+    request; ``None`` keeps the per-request lookup against ``os.environ``.
+    """
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -266,7 +275,7 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
         except Exception as exc:
             self_ws = ""
             _log_csp_ws_failure(exc)
-        is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""))
+        is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""), env)
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
