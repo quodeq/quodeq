@@ -162,7 +162,7 @@ class _AnalysisContext:
     total: int
 
 
-# Public spelling for cross-package importers (module rename is out of scope
-# here; see the private-module ratchet). The underscore original stays
-# importable for the many in-package callers.
+# Public spelling for cross-package importers (the class itself keeps its
+# underscore name; see the private-import ratchet). The underscore original
+# stays importable for the many in-package callers.
 AnalysisContext = _AnalysisContext

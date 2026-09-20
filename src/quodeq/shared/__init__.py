@@ -1,6 +1,6 @@
 """Cross-cutting utilities and infrastructure shared across all bounded contexts.
 
-Helpers whose real home is a private submodule (``env``, ``_env_ai``,
+Helpers whose real home is a config-layer submodule (``env``, ``_env_ai``,
 ``_diff``) are re-exported here so callers import a public name from the
 package instead of reaching into the private module.
 """
