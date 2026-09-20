@@ -908,7 +908,7 @@ tests/core/test_projector_scoring_parity.py:32:private-name:quodeq.services.resc
 tests/core/test_projector_scoring_parity.py:32:private-name:quodeq.services.rescore._score_all_principles
 tests/core/test_projector_scoring_parity.py:96:private-name:quodeq.services.rescore._group_by_principle
 tests/core/test_projector_scoring_parity.py:96:private-name:quodeq.services.rescore._score_all_principles
-tests/core/test_scoring_internals.py:17:private-name:quodeq.core.scoring._constants._MAX_PENALTY_MULTIPLIER
+tests/core/test_scoring_internals.py:17:private-name:quodeq.core.scoring.constants._MAX_PENALTY_MULTIPLIER
 tests/core/test_stream_events.py:98:private-module:quodeq.services._violations_jsonl.vj
 tests/core/test_stream_events.py:99:private-module:quodeq.services._violations_stream.vs
 tests/dashboard/_runner_helpers.py:11:private-module:quodeq.dashboard._probes.DashboardHooks

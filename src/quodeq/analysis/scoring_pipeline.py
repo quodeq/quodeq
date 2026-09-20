@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.core.scoring._constants import MAX_SCORE
+from quodeq.core.scoring.constants import MAX_SCORE
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.analysis.runner import RunConfig, run_per_dimension

@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from quodeq.core.scoring._constants import (  # noqa: F401 — re-exports
+from quodeq.core.scoring.constants import (  # noqa: F401 — re-exports
     GRADE_LADDER,
     SCALE_TIER_NAMES,
     _MAX_PENALTY_MULTIPLIER,

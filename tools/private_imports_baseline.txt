@@ -63,7 +63,6 @@ src/quodeq/analysis/cache/dimension_runner.py:33:private-module:quodeq.analysis.
 src/quodeq/analysis/cache/dimension_runner.py:34:private-module:quodeq.analysis._types.RunConfig
 src/quodeq/analysis/cache/dimension_runner.py:34:private-name:quodeq.analysis._types._AnalysisContext
 src/quodeq/analysis/checks/runner.py:21:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
-src/quodeq/analysis/scoring_pipeline.py:7:private-module:quodeq.core.scoring._constants.MAX_SCORE
 src/quodeq/analysis/subagents/_consolidated.py:22:private-module:quodeq.analysis._runner_markers.cleanup_stream
 src/quodeq/analysis/subagents/_consolidated.py:8:private-module:quodeq.analysis._types.RunConfig
 src/quodeq/analysis/subagents/_consolidated.py:8:private-name:quodeq.analysis._types._AnalysisContext
@@ -126,7 +125,6 @@ src/quodeq/context/precedent_corpus.py:139:private-module:quodeq.llm_bridge._emb
 src/quodeq/context/precedent_corpus.py:139:private-module:quodeq.llm_bridge._embeddings.QUERY_TIMEOUT
 src/quodeq/context/precedent_corpus.py:139:private-module:quodeq.llm_bridge._embeddings.embed_texts
 src/quodeq/context/precedent_corpus.py:139:private-module:quodeq.llm_bridge._embeddings.embedding_model_available
-src/quodeq/data/fs/dimension_report/_report_assembly.py:6:private-module:quodeq.core.scoring._constants.MAX_SCORE
 src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/_accumulated_cache.py:16:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_evaluations_index.py:198:private-module:quodeq.data.sqlite._index_sync.force_promote_to_cancelled_stale
