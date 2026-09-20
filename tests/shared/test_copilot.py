@@ -8,7 +8,11 @@ from quodeq.assistant.adapters._cli_spawn import build_chat_env
 from quodeq.shared.copilot import build_copilot_env
 
 
-def test_profile_preserves_login_settings_and_disables_hooks(tmp_path, monkeypatch):
+@pytest.fixture()
+def _profiled_env(tmp_path, monkeypatch):
+    """Set up a dedicated copilot profile with a login file and settings,
+    call build_copilot_env once, and return everything each test below
+    checks one property of."""
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     profile = tmp_path / ".quodeq/copilot"
     profile.mkdir(parents=True)
@@ -17,11 +21,33 @@ def test_profile_preserves_login_settings_and_disables_hooks(tmp_path, monkeypat
     config = profile / "settings.json"
     config.write_text(json.dumps({"disableAllHooks": True, "ide": None}))
     env = build_copilot_env({"PATH": "/bin"})
-    settings = json.loads(config.read_text())
+    return profile, login, config, env
+
+
+def test_login_file_is_preserved_verbatim(_profiled_env):
+    _profile, login, _config, _env = _profiled_env
     assert login.read_text() == '// Managed by Copilot\n{"firstLaunchAt": "test"}'
+
+
+def test_hooks_stay_disabled(_profiled_env):
+    _profile, _login, config, _env = _profiled_env
+    settings = json.loads(config.read_text())
     assert settings["disableAllHooks"] is True
+
+
+def test_ide_auto_connect_is_disabled(_profiled_env):
+    _profile, _login, config, _env = _profiled_env
+    settings = json.loads(config.read_text())
     assert settings["ide"]["autoConnect"] is False
+
+
+def test_env_points_copilot_home_at_the_profile(_profiled_env):
+    profile, _login, _config, env = _profiled_env
     assert env["COPILOT_HOME"] == str(profile)
+
+
+def test_second_call_leaves_settings_mtime_unchanged(_profiled_env):
+    _profile, _login, config, _env = _profiled_env
     before = config.stat().st_mtime_ns
     build_copilot_env({})
     assert config.stat().st_mtime_ns == before
