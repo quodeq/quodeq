@@ -19,7 +19,7 @@ def _entry(pid: str = "p1") -> ProjectEntry:
 
 def test_cache_returns_entities_not_wire_dicts(tmp_path):
     with patch(
-        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        "quodeq.services._projects_cache.fs_projects.build_project_list",
         return_value=[_entry()],
     ):
         out = ProjectsCache().list(str(tmp_path))
@@ -30,7 +30,7 @@ def test_cache_returns_entities_not_wire_dicts(tmp_path):
 
 def test_cache_still_collapses_repeat_reads(tmp_path):
     with patch(
-        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        "quodeq.services._projects_cache.fs_projects.build_project_list",
         return_value=[_entry()],
     ) as spy:
         cache = ProjectsCache()
@@ -42,7 +42,7 @@ def test_cache_still_collapses_repeat_reads(tmp_path):
 
 def test_invalidate_forces_a_reread(tmp_path):
     with patch(
-        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        "quodeq.services._projects_cache.fs_projects.build_project_list",
         return_value=[_entry()],
     ) as spy:
         cache = ProjectsCache()
@@ -72,7 +72,7 @@ def test_concurrent_cold_reads_share_one_build(tmp_path):
         return [_entry()]
 
     with patch(
-        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        "quodeq.services._projects_cache.fs_projects.build_project_list",
         side_effect=slow_build,
     ):
         cache = ProjectsCache()
@@ -126,7 +126,7 @@ def test_pending_summaries_keep_the_cache_cold(tmp_path):
     every few seconds for grades the warm-up engine is still computing."""
     pending = ProjectEntry(id="p1", name="proj", runs_count=2, latest_run_id="r2", summary_pending=True)
     with patch(
-        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        "quodeq.services._projects_cache.fs_projects.build_project_list",
         return_value=[pending],
     ) as spy:
         cache = ProjectsCache()
@@ -138,7 +138,7 @@ def test_pending_summaries_keep_the_cache_cold(tmp_path):
 def test_settled_summaries_stamp_the_cache_again(tmp_path):
     done = ProjectEntry(id="p1", name="proj", runs_count=2, latest_run_id="r2", summary_pending=False)
     with patch(
-        "quodeq.services._projects_cache._fs_projects.build_project_list",
+        "quodeq.services._projects_cache.fs_projects.build_project_list",
         return_value=[done],
     ) as spy:
         cache = ProjectsCache()

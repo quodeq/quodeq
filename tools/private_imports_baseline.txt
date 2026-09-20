@@ -78,7 +78,6 @@ src/quodeq/analysis/subprocess.py:52:private-module:quodeq.core._constants.MCP_S
 src/quodeq/analysis/subprocess.py:52:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
 src/quodeq/api/_assistant_helpers.py:33:private-module:quodeq.shared._env.get_evaluations_dir
 src/quodeq/api/_assistant_hygiene.py:13:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/api/_assistant_location.py:15:private-module:quodeq.services._fs_projects.get_project_info
 src/quodeq/api/_evaluation_helpers.py:17:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/_evaluation_helpers.py:18:private-module:quodeq.shared._repo.SCHEME_RE
 src/quodeq/api/_evaluation_helpers.py:18:private-name:quodeq.shared._repo._looks_like_authority
@@ -103,7 +102,6 @@ src/quodeq/api/app.py:24:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/app.py:41:private-module:quodeq.shared._env.get_index_db_path
 src/quodeq/api/llm_bridge_routes.py:6:private-name:quodeq.config.ai_provider._store_api_key
 src/quodeq/api/routes_runs.py:14:private-module:quodeq.shared._env.get_index_db_path
-src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_projects
 src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_reports
 src/quodeq/api/security.py:15:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/standards_read_routes.py:15:private-module:quodeq.shared._env.env_int

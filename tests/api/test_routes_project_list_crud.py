@@ -59,7 +59,7 @@ class TestListProjects:
         """
         from flask import Flask
 
-        from quodeq.services import _fs_projects
+        from quodeq.services import fs_projects
         from quodeq.services.filesystem import FilesystemActionProvider
 
         for name in ["proj-a", "proj-b", "proj-c", "proj-d", "proj-e"]:
@@ -71,13 +71,13 @@ class TestListProjects:
             }))
 
         calls: list[str] = []
-        original = _fs_projects._build_project_entry
+        original = fs_projects._build_project_entry
 
         def _counting_build(reports_root, entry_name, runs, options, **kwargs):
             calls.append(entry_name)
             return original(reports_root, entry_name, runs, options, **kwargs)
 
-        monkeypatch.setattr(_fs_projects, "_build_project_entry", _counting_build)
+        monkeypatch.setattr(fs_projects, "_build_project_entry", _counting_build)
 
         flask_app = Flask(__name__)
         flask_app.config["TESTING"] = True

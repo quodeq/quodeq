@@ -36,7 +36,7 @@ from quodeq.services.fs_project_helpers import (
     _backfill_onboarding_field,
     _max_projects_listed,
 )
-from quodeq.services._fs_projects import (
+from quodeq.services.fs_projects import (
     _build_parent_child_sets,
     _build_project_entries_threaded,
     _collect_candidate_dirs,

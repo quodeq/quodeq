@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types import ProjectEntry
-from quodeq.services import _fs_project_index, _fs_projects
+from quodeq.services import _fs_project_index, fs_projects
 
 _DEFAULT_TTL_S = 5
 
@@ -65,7 +65,7 @@ class ProjectsCache:
         with self._lock:
             if self._is_fresh():
                 return self._payload  # type: ignore[return-value]
-            projects = _fs_projects.build_project_list(Path(reports_dir))
+            projects = fs_projects.build_project_list(Path(reports_dir))
             # Entities, not wire dicts: the route serializes per request (WS6).
             # The cached part is the expensive disk walk; camelCase mapping is
             # cheap and belongs at the boundary.
