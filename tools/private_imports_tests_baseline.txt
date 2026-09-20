@@ -717,10 +717,9 @@ tests/assistant/test_tools_web.py:9:private-module:quodeq.assistant.tools._regis
 tests/assistant/test_tools_web_ddg_parser.py:6:private-name:quodeq.assistant.tools._web_tools._DdgResultParser
 tests/assistant/test_tools_web_fetch.py:5:private-module:quodeq.assistant.tools._web_tools
 tests/assistant/test_tools_web_fetch.py:6:private-module:quodeq.assistant.tools._registry.ToolError
-tests/assistant/test_tools_write.py:140:private-name:quodeq.assistant.tools._write_tools._MAX_CONTENT_BYTES
-tests/assistant/test_tools_write.py:140:private-name:quodeq.assistant.tools._write_tools._edit_repo_file
+tests/assistant/test_tools_write.py:140:private-name:quodeq.assistant.tools.write_tools._MAX_CONTENT_BYTES
+tests/assistant/test_tools_write.py:140:private-name:quodeq.assistant.tools.write_tools._edit_repo_file
 tests/assistant/test_tools_write.py:141:private-module:quodeq.assistant.tools._registry.ToolError
-tests/assistant/test_tools_write.py:4:private-module:quodeq.assistant.tools._write_tools.register_write_tools
 tests/assistant/test_tools_write.py:5:private-name:quodeq.assistant.worktree._run
 tests/assistant/test_worktree.py:3:private-name:quodeq.assistant.worktree._run
 tests/assistant/test_worktree_rows.py:5:private-module:quodeq.data.sqlite._assistant_schema.ASSISTANT_SCHEMA_VERSION

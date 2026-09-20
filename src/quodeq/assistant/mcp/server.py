@@ -11,7 +11,7 @@ from quodeq.assistant.guard import MAX_TOOL_RESULT_CHARS
 from quodeq.assistant.mcp import _jsonrpc
 from quodeq.assistant.tools import ToolContext, build_registry
 from quodeq.assistant.tools._registry import ToolRegistry
-from quodeq.assistant.tools._write_tools import register_write_tools
+from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository

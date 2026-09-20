@@ -17,7 +17,7 @@ from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
 from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
-from quodeq.assistant.tools._write_tools import register_write_tools
+from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant.worktree import ensure_session_worktree
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.llm_bridge import LOCAL_PROVIDERS

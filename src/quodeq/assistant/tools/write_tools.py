@@ -92,6 +92,7 @@ def _get_worktree_diff(ctx: ToolContext) -> dict:
 
 
 def register_write_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
+    """Register the worktree edit/write tools on ``registry``."""
     registry.register(ToolSpec(
         "edit_repo_file",
         "Replace ONE unique occurrence of old_string with new_string in a file "

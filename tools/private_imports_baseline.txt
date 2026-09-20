@@ -134,13 +134,11 @@ src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._const
 src/quodeq/assistant/adapters/_cli_spawn.py:10:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/assistant/mcp/_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
 src/quodeq/assistant/mcp/server.py:13:private-module:quodeq.assistant.tools._registry.ToolRegistry
-src/quodeq/assistant/mcp/server.py:14:private-module:quodeq.assistant.tools._write_tools.register_write_tools
 src/quodeq/assistant/mcp/server.py:84:private-module:quodeq.shared._env.get_evaluations_dir
 src/quodeq/assistant/orchestrator.py:11:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
 src/quodeq/assistant/orchestrator.py:13:private-module:quodeq.assistant.adapters._cli_config.load_cli_chat_config
 src/quodeq/assistant/orchestrator.py:15:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
 src/quodeq/assistant/orchestrator.py:15:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
-src/quodeq/assistant/orchestrator.py:20:private-module:quodeq.assistant.tools._write_tools.register_write_tools
 src/quodeq/assistant/skills.py:11:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/assistant/tools/_read_tools.py:36:private-module:quodeq.services._fs_reports
 src/quodeq/assistant/tools/_read_tools_scope.py:16:private-module:quodeq.services._fs_reports
