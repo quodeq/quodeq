@@ -4,7 +4,7 @@ Provides ``lock_file`` and ``unlock_file`` that dispatch to the correct
 OS primitive (``fcntl`` on Unix, ``msvcrt`` on Windows).
 
 Lives in core (stdlib-only, no outward imports) so any layer can use it
-without reaching into ``data/``. ``data/_file_lock.py`` re-exports it for
+without reaching into ``data/``. ``data/file_lock.py`` re-exports it for
 the rest of the codebase.
 """
 from __future__ import annotations

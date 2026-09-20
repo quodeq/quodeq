@@ -1092,7 +1092,6 @@ tests/data/test_env_seams_t5.py:12:private-name:quodeq.data.fs.repo_clone._get_c
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._cache_base
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._git_env
 tests/data/test_file_lock.py:17:private-module:quodeq.core.utils._file_lock
-tests/data/test_file_lock.py:18:private-module:quodeq.data._file_lock
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring
 tests/data/test_git_cli.py:216:private-module:quodeq.services._fs_scan.fs_scan
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite._index_sync._is_pid_alive
