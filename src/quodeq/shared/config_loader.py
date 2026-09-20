@@ -7,7 +7,7 @@ keeping a second one here.
 """
 from __future__ import annotations
 
-from quodeq.shared._config import _DEFAULTS_PATH, _get_config as _canonical_get_config
+from quodeq.shared._config import _get_config as _canonical_get_config, defaults_path
 from quodeq.shared._config_class import Config
 
 
@@ -27,7 +27,7 @@ def _lazy_constant(key: str) -> str:
     except KeyError:
         raise KeyError(
             f"Config key {key!r} not found in defaults.json "
-            f"({_DEFAULTS_PATH}); the file may be missing or corrupt"
+            f"({defaults_path()}); the file may be missing or corrupt"
         ) from None
 
 

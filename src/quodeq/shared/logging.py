@@ -6,8 +6,9 @@ wires up the logger and exposes the ``log_*`` convenience functions.
 from __future__ import annotations
 
 import logging
-import os
+from collections.abc import Mapping
 
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared._log_format import (  # noqa: F401
     ColorFormatter as _ColorFormatter,
     StderrHandler as _StderrHandler,
@@ -26,9 +27,11 @@ _logger.propagate = False
 _logger.setLevel(logging.INFO)
 
 
-def _apply_env_log_level(level: str | None = None, env: dict | None = None) -> None:
+def _apply_env_log_level(
+    level: str | None = None, env: Mapping[str, str] | None = None,
+) -> None:
     """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""
-    env_level = (level or (os.environ if env is None else env).get("LOG_LEVEL", "")).upper()
+    env_level = (level or resolve_env(env).get("LOG_LEVEL", "")).upper()
     if env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
         _logger.setLevel(getattr(logging, env_level))
 
