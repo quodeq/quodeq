@@ -31,8 +31,8 @@ def test_suppression_keys_reads_project_dismissed_and_deleted(tmp_path: Path) ->
 
     keys = _suppression_keys(base)
 
-    assert keys.deleted
-    assert keys.dismissed is not None
+    assert keys.deleted == {("testdim", "Clear Naming", "src/app.py")}
+    assert keys.dismissed.entries == ()
 
 
 def test_suppression_keys_empty_when_project_has_no_state(tmp_path: Path) -> None:
@@ -64,13 +64,18 @@ def test_resolve_from_source_falls_back_to_markdown(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     base = project_dir / "run"
     (base / "evaluation").mkdir(parents=True)
-    (base / "evaluation" / "testdim_eval.md").write_text(
-        "# Testdim Evaluation\n\n**Overall Score**: 8.0/10\n",
-    )
+    markdown = "# Testdim Evaluation\n\n**Overall Score**: 8.0/10\n"
+    (base / "evaluation" / "testdim_eval.md").write_text(markdown)
 
     result = _resolve_from_source(base, _ctx(), _ResolveOptions(), _suppression_keys(base))
 
     assert result is not None
+    assert result["dimension"] == "testdim"
+    assert result["runId"] == "run"
+    assert result["project"] == "proj"
+    # The markdown fallback must actually have parsed *this* file's content,
+    # not merely returned a non-None placeholder.
+    assert result["rawContent"] == markdown
 
 
 def test_resolve_from_source_returns_none_when_nothing_exists(tmp_path: Path) -> None:

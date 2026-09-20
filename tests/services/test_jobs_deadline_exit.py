@@ -165,19 +165,29 @@ class TestRunStatusDeadlineFallback:
         assert job.status == STATUS_FAILED
         assert job.exit_reason is None
 
-    @pytest.mark.parametrize("exit_code,status", [(1, STATUS_FAILED), (0, STATUS_DONE)])
-    def test_copilot_policy_reason_survives_job_persistence(self, tmp_path, exit_code, status):
+    def _monitored_copilot_policy_job(self, tmp_path, exit_code, status):
+        """Write a copilot_mcp_policy status.json, run it through
+        _monitor_process, and return the resulting job."""
         mgr, job = self._manager(tmp_path)
         run_dir = tmp_path / "proj" / "run1"
         run_dir.mkdir(parents=True)
         (run_dir / "status.json").write_text(json.dumps({
             "state": status, "exit_reason": "copilot_mcp_policy",
-        }))
+        }), encoding="utf-8")
         proc = _ExitsWith(exit_code)
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)
+        return job
+
+    @pytest.mark.parametrize("exit_code,status", [(1, STATUS_FAILED), (0, STATUS_DONE)])
+    def test_copilot_policy_reason_survives_monitor_classification(self, tmp_path, exit_code, status):
+        job = self._monitored_copilot_policy_job(tmp_path, exit_code, status)
         assert job.status == status
         assert job.exit_reason == "copilot_mcp_policy"
+
+    @pytest.mark.parametrize("exit_code,status", [(1, STATUS_FAILED), (0, STATUS_DONE)])
+    def test_copilot_policy_reason_survives_json_round_trip(self, tmp_path, exit_code, status):
+        job = self._monitored_copilot_policy_job(tmp_path, exit_code, status)
         restored = _job_from_json(_job_to_json(job))
         assert restored.exit_reason == "copilot_mcp_policy"
         assert restored.status == status
