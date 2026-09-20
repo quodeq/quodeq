@@ -12,24 +12,28 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import urllib.request
 import urllib.error
 
+from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.config.llm_bridge_env import omlx_api_key, omlx_base_url
 from quodeq.llm_bridge._ollama import _detect_memory, estimate_max_agents
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_OMLX_BASE = os.environ.get("OMLX_BASE_URL", "http://localhost:8000")
 _TIMEOUT_S = 3
 
 
-def _read_omlx_api_key() -> str:
-    """Return the omlx API key from OMLX_API_KEY env var or ~/.omlx/settings.json."""
-    env_key = os.environ.get("OMLX_API_KEY", "")
+def _read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
+    """Return the omlx API key from OMLX_API_KEY env var or ~/.omlx/settings.json.
+
+    *env* is resolved by the config layer; the variable is read per call
+    (not at import), so a key exported after this module loads is honoured.
+    """
+    env_key = omlx_api_key(env)
     if env_key:
         return env_key
     try:
@@ -68,7 +72,7 @@ def _safe_request(url: str) -> urllib.request.Request:
 
 def get_omlx_status(base_url: str | None = None) -> dict:
     """Check if an omlx server is running and reachable."""
-    root = _normalize_base(base_url or _OMLX_BASE)
+    root = _normalize_base(base_url or omlx_base_url())
     try:
         req = _safe_request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -105,7 +109,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
     when the API returns nothing, which handles symlinked model directories that
     omlx does not enumerate via the OpenAI-compatible endpoint.
     """
-    root = _normalize_base(base_url or _OMLX_BASE)
+    root = _normalize_base(base_url or omlx_base_url())
     try:
         req = _safe_request(f"{root}/v1/models")
         key = api_key if api_key is not None else _read_omlx_api_key()
