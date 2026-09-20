@@ -391,10 +391,6 @@ tests/analysis/test_process_coverage.py:175:private-module:quodeq.analysis._proc
 tests/analysis/test_process_coverage.py:175:private-name:quodeq.analysis._process._check_process_result
 tests/analysis/test_process_coverage.py:184:private-module:quodeq.analysis._process.AnalysisError
 tests/analysis/test_process_coverage.py:184:private-name:quodeq.analysis._process._check_process_result
-tests/analysis/test_process_coverage.py:27:private-module:quodeq.shared._process_kill.kill_tree
-tests/analysis/test_process_coverage.py:37:private-module:quodeq.shared._process_kill.kill_tree
-tests/analysis/test_process_coverage.py:47:private-module:quodeq.shared._process_kill.kill_tree
-tests/analysis/test_process_coverage.py:53:private-module:quodeq.shared._process_kill.kill_tree
 tests/analysis/test_process_coverage.py:63:private-name:quodeq.analysis._process._terminate_process
 tests/analysis/test_process_coverage.py:72:private-name:quodeq.analysis._process._terminate_process
 tests/analysis/test_process_coverage.py:81:private-name:quodeq.analysis._process._terminate_process
@@ -1565,7 +1561,6 @@ tests/services/test_violations_stream_coverage.py:99:private-name:quodeq.service
 tests/services/test_warmup_engine.py:12:private-module:quodeq.services._warmup.WarmupEngine
 tests/services/test_warmup_engine.py:184:private-name:quodeq.services._warmup._warm_project
 tests/shared/test_cluster34_empty_except_logging.py:12:private-module:quodeq.shared._io
-tests/shared/test_cluster34_empty_except_logging.py:12:private-module:quodeq.shared._process_kill
 tests/shared/test_coerce_line.py:36:private-module:quodeq.assistant.tools._read_tools_violations
 tests/shared/test_config_loader.py:5:private-module:quodeq.shared._config
 tests/shared/test_copilot.py:7:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
@@ -1579,7 +1574,6 @@ tests/shared/test_env_seams_t5.py:24:private-name:quodeq.shared.logging._apply_e
 tests/shared/test_env_seams_t5.py:24:private-name:quodeq.shared.logging._logger
 tests/shared/test_env_seams_t5.py:25:private-name:quodeq.shared.provider_env._providers_path
 tests/shared/test_logging.py:3:private-name:quodeq.shared.logging._logger
-tests/shared/test_process_kill.py:4:private-module:quodeq.shared._process_kill.kill_proc_tree
 tests/shared/test_repo_remote_url.py:111:private-module:quodeq.shared._repo.normalize_remote_url
 tests/shared/test_repo_remote_url.py:12:private-module:quodeq.shared._repo.project_name_from_repo
 tests/shared/test_repo_remote_url.py:20:private-module:quodeq.shared._repo.project_name_from_repo

@@ -10,7 +10,7 @@ from typing import Any, Callable
 from quodeq.assistant.adapters._cli_command import McpConfigRef
 from quodeq.assistant.mcp import _config as mcp_config
 from quodeq.core.constants import MCP_STYLE_CLI_REGISTER
-from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
+from quodeq.shared.process_kill import kill_proc_tree as _kill_proc_tree
 
 
 @dataclass

@@ -23,7 +23,7 @@ from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.mcp import _config as mcp_config
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
-from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
+from quodeq.shared.process_kill import kill_proc_tree as _kill_proc_tree
 
 _logger = logging.getLogger(__name__)
 

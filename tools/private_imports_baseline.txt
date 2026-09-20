@@ -18,7 +18,6 @@ src/quodeq/analysis/_loop_guards.py:69:private-module:quodeq.analysis.cache._fai
 src/quodeq/analysis/_loop_state.py:98:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 src/quodeq/analysis/_mcp_arg_builders.py:29:private-module:quodeq.shared._models.normalize_model_id
 src/quodeq/analysis/_mcp_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
-src/quodeq/analysis/_process.py:11:private-module:quodeq.shared._process_kill.terminate_process
 src/quodeq/analysis/_process.py:9:private-name:quodeq.analysis.stream.progress_reader._IncrementalProgressReader
 src/quodeq/analysis/_provider_cache.py:10:private-name:quodeq.shared.provider_env._providers_path
 src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_dashboard_report
@@ -111,9 +110,7 @@ src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_re
 src/quodeq/api/routes_shared_mirrors.py:25:private-module:quodeq.services._runs_unit.build_runs_unit
 src/quodeq/assistant/adapters/_api.py:22:private-module:quodeq.assistant.tools._registry.ToolRegistry
 src/quodeq/assistant/adapters/_cli.py:23:private-module:quodeq.assistant.mcp._config
-src/quodeq/assistant/adapters/_cli.py:26:private-module:quodeq.shared._process_kill.kill_proc_tree
 src/quodeq/assistant/adapters/_cli_cleanup.py:11:private-module:quodeq.assistant.mcp._config
-src/quodeq/assistant/adapters/_cli_cleanup.py:13:private-module:quodeq.shared._process_kill.kill_proc_tree
 src/quodeq/assistant/adapters/_cli_command.py:14:private-module:quodeq.shared._models.normalize_model_id
 src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ACTIONS
 src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ActionConflict
@@ -155,7 +152,6 @@ src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_c
 src/quodeq/menubar/control.py:18:private-module:quodeq.shared._env_paths.get_run_dir
 src/quodeq/services/_accumulated_cache.py:16:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_evaluations_index.py:198:private-module:quodeq.data.sqlite._index_sync.force_promote_to_cancelled_stale
-src/quodeq/services/_external_jobs.py:23:private-module:quodeq.shared._process_kill.kill_tree
 src/quodeq/services/_external_jobs.py:25:private-module:quodeq.data.fs.report_parser._external_pid.is_safe_run_segment
 src/quodeq/services/_external_jobs.py:25:private-module:quodeq.data.fs.report_parser._external_pid.resolve_external_pid
 src/quodeq/services/_fs_project_parents.py:13:private-name:quodeq.shared.utils._env_int
@@ -164,8 +160,6 @@ src/quodeq/services/_registration_url.py:12:private-name:quodeq.shared._repo._lo
 src/quodeq/services/_rescore_legacy.py:11:private-module:quodeq.core.scoring._principle.compute_tallies
 src/quodeq/services/_wiring.py:38:private-module:quodeq.data.fs.dimension_report._report_io.write_dimension_report
 src/quodeq/services/_wiring.py:96:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
-src/quodeq/services/jobs.py:17:private-module:quodeq.shared._process_kill.kill_tree
-src/quodeq/services/jobs.py:17:private-module:quodeq.shared._process_kill.terminate_process
 src/quodeq/services/scoring/__init__.py:26:private-module:quodeq.services._trend_fetcher.make_rescoring_fetcher
 src/quodeq/services/scoring/__init__.py:27:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/__init__.py:31:private-module:quodeq.services._wiring.read_run_data
@@ -192,4 +186,3 @@ src/quodeq/services/scoring/_scores_raw.py:16:private-module:quodeq.services._wi
 src/quodeq/services/scoring/_scores_raw.py:16:private-module:quodeq.services._wiring.SqliteFindingsRepository
 src/quodeq/services/tooling_mixin.py:14:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/violations.py:13:private-name:quodeq.shared.utils._env_int
-src/quodeq/terminal/_pty_unix.py:15:private-module:quodeq.shared._process_kill.kill_proc_tree

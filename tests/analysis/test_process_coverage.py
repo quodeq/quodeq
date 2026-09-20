@@ -24,7 +24,7 @@ class TestKillTree:
     @patch("os.killpg")
     @patch("os.getpgid", return_value=1234)
     def test_unix_kills_process_group(self, mock_getpgid, mock_killpg):
-        from quodeq.shared._process_kill import kill_tree as _kill_tree
+        from quodeq.shared.process_kill import kill_tree as _kill_tree
         _kill_tree(1234)
         mock_killpg.assert_called_once_with(1234, signal.SIGTERM)
 
@@ -34,7 +34,7 @@ class TestKillTree:
     @patch("os.getpgid", return_value=1234)
     @patch("os.kill")
     def test_unix_fallback_to_kill(self, mock_kill, mock_getpgid, mock_killpg):
-        from quodeq.shared._process_kill import kill_tree as _kill_tree
+        from quodeq.shared.process_kill import kill_tree as _kill_tree
         _kill_tree(1234)
         mock_kill.assert_called_once_with(1234, signal.SIGTERM)
 
@@ -44,13 +44,13 @@ class TestKillTree:
     @patch("os.getpgid", return_value=1234)
     @patch("os.kill", side_effect=ProcessLookupError)
     def test_unix_both_fail(self, mock_kill, mock_getpgid, mock_killpg):
-        from quodeq.shared._process_kill import kill_tree as _kill_tree
+        from quodeq.shared.process_kill import kill_tree as _kill_tree
         _kill_tree(1234)  # should not raise
 
     @patch("sys.platform", "win32")
     @patch("subprocess.run")
     def test_windows_taskkill(self, mock_run):
-        from quodeq.shared._process_kill import kill_tree as _kill_tree
+        from quodeq.shared.process_kill import kill_tree as _kill_tree
         _kill_tree(5678)
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
@@ -64,7 +64,7 @@ class TestTerminateProcess:
         proc = MagicMock()
         proc.pid = 123
         proc.wait.return_value = 0
-        with patch("quodeq.shared._process_kill.kill_tree"):
+        with patch("quodeq.shared.process_kill.kill_tree"):
             _terminate_process(proc)
             proc.wait.assert_called_once()
 
@@ -73,7 +73,7 @@ class TestTerminateProcess:
         proc = MagicMock()
         proc.pid = 123
         proc.wait.side_effect = [subprocess.TimeoutExpired("cmd", 10), None]
-        with patch("quodeq.shared._process_kill.kill_tree") as mock_kill:
+        with patch("quodeq.shared.process_kill.kill_tree") as mock_kill:
             _terminate_process(proc)
             assert mock_kill.call_count == 2  # SIGTERM + SIGKILL
 
@@ -82,7 +82,7 @@ class TestTerminateProcess:
         proc = MagicMock()
         proc.pid = 123
         proc.wait.side_effect = subprocess.TimeoutExpired("cmd", 10)
-        with patch("quodeq.shared._process_kill.kill_tree"):
+        with patch("quodeq.shared.process_kill.kill_tree"):
             _terminate_process(proc)
             proc.kill.assert_called_once()
 

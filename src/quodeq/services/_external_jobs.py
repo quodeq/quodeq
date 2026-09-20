@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.shared._process_kill import kill_tree as _kill_tree
+from quodeq.shared.process_kill import kill_tree as _kill_tree
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-exported API
     is_safe_run_segment,

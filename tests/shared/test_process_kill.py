@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-from quodeq.shared._process_kill import kill_proc_tree
+from quodeq.shared.process_kill import kill_proc_tree
 from tests._timeouts import budget
 
 
