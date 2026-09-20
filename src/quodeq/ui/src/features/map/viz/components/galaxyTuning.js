@@ -1,25 +1,36 @@
 /**
- * galaxyTuning.js — the drawing tunables the two galaxy views share.
+ * galaxyTuning.js — the numbers that shape the two galaxy visualizations.
  *
  * GalaxyView (dimensions and principles) and GalaxyFolderView (folders and
  * files) paint the same furniture: a radial background wash over a twinkling
  * starfield, pulsing stars, nebula discs with orbiting texture blobs, and
- * labelled violation orbs once the zoom is deep enough. The numbers that
- * shape all of that live here, so one tweak lands in both views instead of
- * drifting between the draw modules.
+ * labelled violation orbs once the zoom is deep enough. The first section
+ * below holds what both views share, so one tweak lands in both; the two
+ * after it hold each view's own furniture, kept here rather than inline so
+ * the draw modules stay readable drawing code.
  *
  * Zoom breakpoints, tooltip placement and the default canvas box live in
  * ../core/galaxyTunables.js instead — those are read by the event, layout
- * and hook modules too, not only by the painters. Anything only one module
- * uses stays a `const` at the top of that module.
+ * and hook modules too, not only by the painters. Particle and starfield
+ * *generation* ranges live with their builders in ../core/galaxyCore.js.
+ * Anything only one module uses stays a `const` at the top of that module.
  *
  * Units are in the field names: `Px` screen pixels, `S` seconds, `Fraction`
- * a 0..1 multiple of some other length, `Alpha` a 0..1 opacity. A speed is
- * radians per time unit (`t`, which the animation loop advances by
- * CAMERA.frameStepS per frame) unless a comment says otherwise; a count is
- * unitless. Every object is frozen: they are module-scope singletons read on
- * every animation frame, never per-frame allocations.
+ * a 0..1 multiple of some other length, `Ratio` a multiple of a radius,
+ * `Alpha` a 0..1 opacity, `Zoom` a `cam.z` value, `Span` a width in zoom
+ * units. A speed is radians per time unit (`t`, which the animation loop
+ * advances by CAMERA.frameStepS per frame). Every object is frozen: they are
+ * module-scope singletons read on every animation frame, never per-frame
+ * allocations.
  */
+
+/* ── Shared by both views ── */
+
+/** Below this an element is invisible, so the draw is skipped entirely. */
+export const MIN_VISIBLE_ALPHA = 0.01;
+
+/** Opacity of a node's own name, in both views. */
+export const LABEL_ALPHA = 0.6;
 
 /**
  * The radial background wash, and how the starfield over it is painted. The
@@ -53,8 +64,10 @@ export const NEBULA = Object.freeze({
   sceneRadiusFraction: 0.7,
   sceneCentreAlpha: 0.015,
   sceneMidAlpha: 0.007,
-  // Where the mid colour stop sits between centre and edge.
+  // Where the mid colour stop sits between centre and edge, and how much of
+  // the centre alpha a folder nebula keeps at that stop.
   midStopOffset: 0.5,
+  midAlphaFraction: 0.5,
   // Alpha of the texture blobs orbiting over the scene disc.
   sceneBlobAlpha: 0.008,
 });
@@ -104,6 +117,11 @@ export const VIOLATION_ORBS = Object.freeze({
   labelOffsetPx: 4,
 });
 
+/** The dashed ring marking the keyboard-focused node (a11y, #675). */
+export const FOCUS_RING = Object.freeze({ padPx: 4, alpha: 0.9 });
+/** Its dash pattern, in [on, off] screen pixels. */
+export const FOCUS_RING_DASH = Object.freeze([5, 4]);
+
 /**
  * The animation clock and the framing rules both camera hooks obey. The
  * easing curves themselves are in galaxyEasing.js; the per-view lerp rates
@@ -120,4 +138,152 @@ export const CAMERA = Object.freeze({
   snapFrames: 3,
   // Fitting a scene may zoom out as far as it likes but never in past this.
   fitZoomMax: 4,
+});
+
+/* ── GalaxyView: dimension stars, constellations, principle planets ── */
+
+/** A star or cluster outside the focused constellation never fades past this. */
+export const UNFOCUSED_CLUSTER_MIN_ALPHA = 0.08;
+
+/** Zoom units over which a level's decorations fade as the camera leaves it. */
+export const DIM_FADE_SPAN = 3;
+
+/**
+ * Constellation furniture: the dashed ring around a cluster of related
+ * dimensions, the lines between its stars, and its label above the ring.
+ */
+export const CONSTELLATION = Object.freeze({
+  // Past this zoom the whole cluster layer is gone, so it is not drawn.
+  hideAtZoom: 3,
+  ringAlpha: 0.15,
+  lineAlpha: 0.4,
+  lineWidthPx: 0.8,
+  labelFontPx: 14,
+  labelAlpha: 0.55,
+});
+/** The ring's and the lines' dash patterns, in [on, off] screen pixels. */
+export const CONSTELLATION_RING_DASH = Object.freeze([8, 14]);
+export const CONSTELLATION_LINE_DASH = Object.freeze([3, 5]);
+
+/**
+ * The dot that stands in for a principle while the camera is still at
+ * dimension level: it orbits its star, breathes, paints a soft halo, and
+ * disappears once the zoom makes it too small to be worth a draw.
+ */
+export const DIM_PARTICLE = Object.freeze({
+  twinkleBase: 0.5,
+  twinkleAmp: 0.08,
+  twinkleSpeed: 0.6,
+  minSizePx: 0.3,
+  haloRatio: 2.5,
+  haloAlpha: 0.08,
+  coreAlphaBoost: 0.15,
+});
+
+/**
+ * A dimension star's name, score and hit target. Font sizes are multiplied
+ * by the label scale (the zoom, capped) and then floored, so a label stays
+ * legible zoomed out without ballooning zoomed in.
+ */
+export const DIM_LABEL = Object.freeze({
+  fontPx: 14,
+  fontMinPx: 11,
+  offsetPx: 24,
+  scoreFontPx: 12,
+  scoreFontMinPx: 9,
+  scoreAlpha: 0.8,
+  hitRadiusMinPx: 20,
+});
+
+/**
+ * Principle planets: their size, the orbit ring and link line back to their
+ * dimension star, the particles the unselected ones keep, and their labels.
+ *
+ * The unselected planets shrink their particles but keep the orbit wide, so
+ * the particles do not collide with the planet: `siblingScaleCap` caps that
+ * shrink, computed against the scale the planet had at `siblingReferenceZoom`.
+ */
+export const PRINCIPLE = Object.freeze({
+  scaleFraction: 0.12,
+  orbitRingAlpha: 0.1,
+  linkAlpha: 0.04,
+  siblingScaleCap: 0.8,
+  siblingReferenceZoom: 5,
+  // Guards the divide when the planet scale is still ~0.
+  scaleDivisorFloor: 0.01,
+  selectedParticleScale: 0.8,
+  siblingOrbitScaleMin: 0.5,
+  labelFontPx: 14,
+  scoreFontPx: 12,
+  scoreAlpha: 0.7,
+  scoreOffsetPx: 16,
+  hitPadPx: 10,
+  // Below this the planet is too faint to be worth hit-testing.
+  hitMinAlpha: 0.4,
+});
+
+/* ── GalaxyFolderView: folder clusters and file stars ── */
+
+/**
+ * A folder star's nebula and its dashed cluster border. Zoomed out the
+ * nebula is a fixed multiple of the star; zoomed past `zoomedAtZoom` it
+ * tracks the camera instead and brightens over `alphaRampSpan` zoom units.
+ */
+export const FOLDER_NEBULA = Object.freeze({
+  zoomedAtZoom: 2,
+  // A fly-into this folder fades its nebula out over this much of the fly.
+  flyFadeOutBy: 0.35,
+  zoomedPadPx: 40,
+  zoomedRadiusFraction: 0.4,
+  restRadiusRatio: 5,
+  alphaRampSpan: 3,
+  zoomedMaxAlpha: 0.35,
+  restAlpha: 0.08,
+  blobAlphaRampSpan: 15,
+  blobMaxAlpha: 0.18,
+  blobRestAlpha: 0.025,
+  borderRadiusRatio: 3.5,
+  borderAlpha: 0.1,
+  innerRingRadiusRatio: 2.2,
+  innerRingAlpha: 0.12,
+});
+/** The cluster border's dash pattern, in [on, off] screen pixels. */
+export const FOLDER_NEBULA_DASH = Object.freeze([6, 12]);
+
+/**
+ * A folder or file star itself: its particles, its violation orbs, its hit
+ * target, and the dimming that keeps a big folder star from washing out the
+ * scene as the camera zooms into it.
+ */
+export const FOLDER_STAR = Object.freeze({
+  particleScaleFraction: 0.5,
+  // File violation orbs only appear past this zoom, and only once drawn big
+  // enough to read as an orb rather than as a speck.
+  orbZoomThreshold: 2.5,
+  orbMinRadiusPx: 1.5,
+  hitRadiusMinPx: 14,
+  // A folder star wider than this fades out over the next dimFadeSpanPx.
+  dimAboveRadiusPx: 30,
+  dimFadeSpanPx: 80,
+  dimMinAlpha: 0.15,
+});
+
+/**
+ * A folder or file star's label, its violation/compliance sub-line, and the
+ * box used to keep labels from overlapping each other.
+ */
+export const FOLDER_LABEL = Object.freeze({
+  // The label scale is the zoom capped here, so labels stop growing.
+  scaleCap: 1.5,
+  fontPx: 11,
+  fontMinPx: 9,
+  offsetPx: 14,
+  // Estimated glyph width as a fraction of the font size, for the box.
+  charWidthFraction: 0.55,
+  heightPadPx: 4,
+  collisionPadXPx: 4,
+  subFontPx: 9,
+  subFontMinPx: 7,
+  subOffsetPx: 12,
+  rateAlpha: 0.5,
 });
