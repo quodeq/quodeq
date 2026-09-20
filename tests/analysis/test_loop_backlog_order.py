@@ -11,6 +11,7 @@ and runner adapter the other loop tests use).
 """
 from __future__ import annotations
 
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import DEFAULT, MagicMock, patch
@@ -20,6 +21,7 @@ import pytest
 from quodeq.analysis._dim_order import _dimension_deadline, _order_by_backlog
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop
 from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.shared import cancellation
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
 
@@ -72,17 +74,23 @@ class TestOrderByBacklog:
         assert ordered == _CONFIGURED
         assert counts is None
 
+    def test_negative_counts_clamp_to_zero(self):
+        estimates = {**_ESTIMATES, "security": {"count": -5, "reason": "incremental"}}
+        _ordered, counts = _order_by_backlog(_CONFIGURED, estimates)
+        assert counts["security"] == 0
+
 
 class TestDimensionDeadline:
-    def test_slice_is_proportional_to_pending_files(self):
+    def test_slice_is_proportional_to_what_is_left_after_the_reserves(self):
+        # 2 dims still to come after this one -> 120s reserved, 880s split.
         got = _dimension_deadline(0.0, 1000.0, [806, 187, 187], 3)
-        assert got == pytest.approx(806 / 1180 * 1000)
+        assert got == pytest.approx(806 / 1180 * 880)
 
     def test_equal_shares_when_counts_are_unknown(self):
-        assert _dimension_deadline(0.0, 900.0, None, 3) == pytest.approx(300.0)
+        assert _dimension_deadline(0.0, 900.0, None, 3) == pytest.approx(780 / 3)
 
     def test_equal_shares_when_every_count_is_zero(self):
-        assert _dimension_deadline(0.0, 900.0, [0, 0, 0], 3) == pytest.approx(300.0)
+        assert _dimension_deadline(0.0, 900.0, [0, 0, 0], 3) == pytest.approx(780 / 3)
 
     def test_last_dimension_gets_the_whole_remaining_budget(self):
         assert _dimension_deadline(500.0, 1000.0, [187], 1) == pytest.approx(1000.0)
@@ -94,6 +102,28 @@ class TestDimensionDeadline:
     def test_spent_budget_returns_the_run_deadline(self):
         # now past the run deadline: the loop's own guard must still fire.
         assert _dimension_deadline(1001.0, 1000.0, [806, 187], 2) == 1000.0
+
+
+class TestDimensionDeadlineFloor:
+    """The steady state this fix produces is one backlogged dim and the rest
+    fully cached. A pure proportional split hands the heavy dim 100% of the
+    budget, and the zero-backlog dims -- which only need seconds to replay
+    cache entries, write evidence and score -- get skipped by the loop's
+    deadline guard. Each remaining dim keeps a floor.
+    """
+
+    def test_zero_backlog_dims_keep_their_floor(self):
+        got = _dimension_deadline(0.0, 1000.0, [806, 0, 0], 3)
+        assert got <= 1000.0 - 2 * 60.0
+
+    def test_a_zero_count_dim_still_gets_the_floor(self):
+        # share is 0 here; without the floor the slice would land on `now`
+        # and the loop's guard would skip the dim outright.
+        assert _dimension_deadline(0.0, 1000.0, [0, 806], 2) == pytest.approx(60.0)
+
+    def test_budget_smaller_than_the_reserves_degrades_to_equal_shares(self):
+        # 90s for 3 dims can't reserve 60s each.
+        assert _dimension_deadline(0.0, 90.0, [806, 0, 0], 3) == pytest.approx(30.0)
 
 
 class TestIncrementalLoopDeadlineSlices:
@@ -122,7 +152,7 @@ class TestIncrementalLoopDeadlineSlices:
         deadlines = [deadline for _, deadline in seen]
         assert deadlines == sorted(deadlines)
         assert all(deadline <= 1000.0 for deadline in deadlines)
-        assert deadlines[0] == pytest.approx(806 / 1180 * 1000)
+        assert deadlines[0] == pytest.approx(806 / 1180 * 880)
         assert deadlines[-1] == pytest.approx(1000.0)
         assert cfg.options.deadline_at == 1000.0
 
@@ -163,6 +193,45 @@ class TestIncrementalLoopDeadlineSlices:
 
         # No counts -> three equal 30s slices of the 90s budget.
         assert seen == [pytest.approx(30.0), pytest.approx(60.0), pytest.approx(90.0)]
+
+    def test_deadline_restored_when_the_loop_breaks_early(self):
+        cfg = _config()
+        run_deadline = time.monotonic() + 1000.0  # real clock: the loop guard reads it
+        cfg.options.deadline_at = run_deadline
+        seen: list[str] = []
+
+        def fake_runner(_config, dim, _idx, _ctx):
+            seen.append(dim)
+            cancellation.request_cancel()  # breaker trip during the first dim
+            return _FakeEvidence()
+
+        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+            run_incremental_loop(
+                cfg, ["clean-architecture", "security"], _ctx(2),
+                LoopDeps(runner=_runner_from(fake_runner)),
+                dim_counts={"clean-architecture": 806, "security": 187},
+            )
+
+        assert seen == ["clean-architecture"]  # second dim skipped by the guard
+        assert cfg.options.deadline_at == run_deadline
+
+    def test_deadline_restored_when_the_runner_raises(self):
+        cfg = _config()
+        run_deadline = time.monotonic() + 1000.0
+        cfg.options.deadline_at = run_deadline
+
+        def fake_runner(_config, _dim, _idx, _ctx):
+            raise KeyboardInterrupt("ctrl-c mid-dimension")
+
+        with patch("quodeq.analysis._loop_steps._log_dimension_result"), \
+                pytest.raises(KeyboardInterrupt):
+            run_incremental_loop(
+                cfg, ["clean-architecture", "security"], _ctx(2),
+                LoopDeps(runner=_runner_from(fake_runner)),
+                dim_counts={"clean-architecture": 806, "security": 187},
+            )
+
+        assert cfg.options.deadline_at == run_deadline
 
 
 @contextmanager

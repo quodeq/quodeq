@@ -64,9 +64,10 @@ def run_incremental_loop(
 
     Each dimension gets its own slice of the remaining budget, sized by its
     pending file count from ``dim_counts`` (see ``_dim_order``), so a
-    truncated run no longer always cuts the last dimension short. The
-    run-level deadline is restored afterwards: scoring and the post-loop
-    guards must see the run budget, not the last dimension's slice.
+    truncated run no longer always cuts the last dimension short. Per-dim
+    scoring (``on_dimension_done``) runs inside the loop and so sees its
+    dimension's slice; the run-level deadline is restored afterwards so the
+    post-loop guards see the run budget, not the last dimension's slice.
     """
     log = deps.log
     result: dict[str, Evidence] = {}
@@ -78,6 +79,11 @@ def run_incremental_loop(
             _apply_dim_deadline(config, dimensions[idx - 1:], run_deadline, dim_counts)
             if _run_one_incremental_dim(config, dimension, idx, ctx, run):
                 break
+    # This restore would also discard a ratchet from
+    # ``_pool_launcher._extend_run_deadline``, which only fires when
+    # time_limit is None -- mutually exclusive with slicing, since a None
+    # time_limit leaves deadline_at None. That changes if an outer caller
+    # ever pre-sets deadline_at together with a time limit.
     finally:
         config.options.deadline_at = run_deadline
     log.info(

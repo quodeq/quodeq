@@ -214,6 +214,7 @@ def _dispatch_fixed_mode(
     ctx: _AnalysisContext,
     runner: DimensionRunner,
     on_dimension_done: "Callable[[str, Evidence], None] | None",
+    *,
     dim_counts: dict[str, int] | None = None,
 ) -> dict[str, Evidence] | None:
     """Diff-mode or incremental-mode dispatch; None falls through to clean-scan.
@@ -256,7 +257,7 @@ def _run_dimensions(
     _set_run_deadline(config)
 
     fixed_mode_result = _dispatch_fixed_mode(
-        config, dimensions, ctx, runner, on_dimension_done, dim_counts,
+        config, dimensions, ctx, runner, on_dimension_done, dim_counts=dim_counts,
     )
     if fixed_mode_result is not None:
         return fixed_mode_result

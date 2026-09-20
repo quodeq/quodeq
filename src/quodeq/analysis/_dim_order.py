@@ -27,6 +27,12 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 DimEstimates = dict[str, dict[str, Any]]
 
+# Floor reserved for every dimension still to run. A fully-cached dimension
+# does no AI work but still has to replay its cache entries, write evidence
+# and score, so it needs more than the zero a pure proportional split would
+# hand it once the backlog concentrates in one dimension.
+_MIN_DIM_BUDGET_S = 60.0
+
 
 def _backlog_counts(
     dimensions: Sequence[str], estimates: DimEstimates | None,
@@ -48,7 +54,7 @@ def _backlog_counts(
         count = estimate.get("count")
         if not isinstance(count, int) or isinstance(count, bool):
             return None
-        counts[dim] = count
+        counts[dim] = max(count, 0)  # a negative count would slice a deadline before now
     return counts
 
 
@@ -80,16 +86,32 @@ def _dimension_deadline(
 
     ``counts`` holds the pending file counts of the dimensions not yet run,
     the one about to run first; ``remaining_dims`` is how many are left.
-    Unknown or all-zero counts fall back to equal shares. The result is
-    never later than the run deadline, and an already-spent budget returns
-    the run deadline unchanged so the loop's own guard still stops the run.
+    Unknown or all-zero counts fall back to equal shares.
+
+    Only what is left after reserving ``_MIN_DIM_BUDGET_S`` for each of the
+    *other* remaining dimensions is split proportionally, and the current
+    dimension gets that floor even when its own share rounds to nothing.
+    Without the reserve a single backlogged dimension takes the whole
+    budget and the cheap cached ones behind it are skipped by the loop's
+    deadline guard -- the run would produce one dimension's evidence
+    instead of all of them. A budget too small to reserve a floor for
+    everyone degrades to equal shares.
+
+    The result is never later than the run deadline, and an already-spent
+    budget returns the run deadline unchanged so the loop's own guard still
+    stops the run.
     """
     budget = run_deadline - now
     if budget <= 0:
         return run_deadline
+    dims = max(remaining_dims, 1)
+    splittable = budget - _MIN_DIM_BUDGET_S * (dims - 1)
+    if splittable <= 0:
+        return min(now + budget / dims, run_deadline)
     total = sum(counts) if counts else 0
-    share = counts[0] / total if counts and total > 0 else 1.0 / max(remaining_dims, 1)
-    return min(now + budget * share, run_deadline)
+    share = counts[0] / total if counts and total > 0 else 1.0 / dims
+    slice_s = max(splittable * share, min(_MIN_DIM_BUDGET_S, budget))
+    return min(now + slice_s, run_deadline)
 
 
 def _apply_dim_deadline(
