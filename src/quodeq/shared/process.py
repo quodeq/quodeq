@@ -1,6 +1,6 @@
 """Cross-platform PID liveness probe (shared, cross-cutting).
 
-Hoisted out of ``data/sqlite/_index_sync.py`` so the cancel path
+Hoisted out of ``data/sqlite/index_sync.py`` so the cancel path
 (``services/_external_jobs.py``) and the external-run PID reader
 (``data/fs/report_parser/_external_pid.py``) can both use it without a
 cross-layer import.

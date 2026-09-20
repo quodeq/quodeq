@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from quodeq.data.fs.run_status_store import read_status
-from quodeq.data.sqlite._index_sync import _check_stale_and_promote
+from quodeq.data.sqlite.index_sync import _check_stale_and_promote
 from quodeq.data.sqlite.run_index import open_index
 
 
