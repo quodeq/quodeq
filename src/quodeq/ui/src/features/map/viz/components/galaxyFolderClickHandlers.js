@@ -1,6 +1,13 @@
 import { getThemeColors } from '../core/galaxyCore.js';
 import { buildFolderScene } from './galaxyFolderScene.js';
 
+// A click on empty space near a star should read as "zoom in on that star",
+// so the target is weighted toward the star rather than the raw cursor.
+const CURSOR_WEIGHT = 0.3;
+const NEAREST_STAR_WEIGHT = 0.7;
+// Each such click multiplies the zoom by this, capped at ten fit zooms.
+const ZOOM_STEP_MULTIPLIER = 2.5;
+
 /** Click on a hovered star: focus a folder (or drop focus if already
  * focused), or zoom into a file. */
 export function handleNodeClick(refs, h, { startTransition, saveNav }) {
@@ -45,9 +52,9 @@ function zoomTowardCursor(refs, { startTransition, saveNav, getFitZoom, scene, s
       if (d < nearestD) { nearestD = d; nearestStar = s; }
     });
   }
-  const tx = nearestStar ? wx * 0.3 + nearestStar.x * 0.7 : wx;
-  const ty = nearestStar ? wy * 0.3 + nearestStar.y * 0.7 : wy;
-  const newZ = cam.z * 2.5;
+  const tx = nearestStar ? wx * CURSOR_WEIGHT + nearestStar.x * NEAREST_STAR_WEIGHT : wx;
+  const ty = nearestStar ? wy * CURSOR_WEIGHT + nearestStar.y * NEAREST_STAR_WEIGHT : wy;
+  const newZ = cam.z * ZOOM_STEP_MULTIPLIER;
   const maxZ = getFitZoom(curScene) * 10;
   refs.zoomTargetRef.current = { x: tx, y: ty, z: Math.min(newZ, maxZ) };
   startTransition(false);

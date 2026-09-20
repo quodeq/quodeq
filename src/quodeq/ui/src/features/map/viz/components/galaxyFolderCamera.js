@@ -1,4 +1,24 @@
 import { buildFolderScene } from './galaxyFolderScene.js';
+import { CAMERA } from './galaxyTuning.js';
+import {
+  easeInOutCubic, easeInOutQuad, easeOutCubic, easeOutQuad, easeLagged,
+} from './galaxyEasing.js';
+
+// A fly transition runs in two halves. `swapAt` is the point in the fly
+// where the old scene is exchanged for the new one; before it the camera
+// works on the old scene, after it on the new one. `bloomZoomRatio` is the
+// zoom the new scene opens at, as a multiple of its own fit zoom, and the
+// bloom fades in from `bloomAlphaMin` over `bloomAlphaSpan`.
+const FLY_OUT = Object.freeze({
+  swapAt: 0.4, shrinkFraction: 0.7, fadeFraction: 0.8,
+  bloomZoomRatio: 6, bloomAlphaMin: 0.2, bloomAlphaSpan: 0.8,
+});
+const FLY_IN = Object.freeze({
+  swapAt: 0.35, zoomRatio: 4, fadeFraction: 0.85,
+  bloomZoomRatio: 0.3, bloomAlphaMin: 0.15, bloomAlphaSpan: 0.85,
+});
+// Fraction of the remaining distance the idle camera covers each frame.
+const IDLE_LERP_FRACTION = 0.08;
 
 /**
  * Fly-out (back navigation): shrink out of the current scene, then swap to
@@ -13,11 +33,11 @@ function advanceFlyOut(fly, cam, refs, params) {
   let sceneAlpha = 1;
   let bloomAlpha = 0;
 
-  const swapAt = 0.4;
+  const swapAt = FLY_OUT.swapAt;
   if (gt < swapAt) {
     const p = gt / swapAt;
-    cam.z = fly.sz * (1 - p * 0.7);
-    sceneAlpha = 1 - p * 0.8;
+    cam.z = fly.sz * (1 - p * FLY_OUT.shrinkFraction);
+    sceneAlpha = 1 - p * FLY_OUT.fadeFraction;
   }
   if (gt >= swapAt && !fly.swapped) {
     fly.swapped = true;
@@ -28,15 +48,16 @@ function advanceFlyOut(fly, cam, refs, params) {
     refs.sceneRef.current._node = fly.newPath[fly.newPath.length - 1];
     refs.nextSceneRef.current = null;
     refs.frameCount.current = 0;
-    cam.x = W / 2; cam.y = H / 2; cam.z = tFz * 6;
+    cam.x = W / 2; cam.y = H / 2; cam.z = tFz * FLY_OUT.bloomZoomRatio;
     saveNav();
   }
   if (gt >= swapAt) {
     const p = (gt - swapAt) / (1 - swapAt);
-    const pe = 1 - (1 - p) * (1 - p);
-    cam.z = tFz * 6 + (tFz - tFz * 6) * pe;
+    const pe = easeOutQuad(p);
+    const openZ = tFz * FLY_OUT.bloomZoomRatio;
+    cam.z = openZ + (tFz - openZ) * pe;
     sceneAlpha = 0;
-    bloomAlpha = 0.2 + 0.8 * pe;
+    bloomAlpha = FLY_OUT.bloomAlphaMin + FLY_OUT.bloomAlphaSpan * pe;
   }
 
   return { sceneAlpha, bloomAlpha };
@@ -54,14 +75,14 @@ function advanceFlyIn(fly, cam, refs, params) {
   let sceneAlpha = 1;
   let bloomAlpha = 0;
 
-  const swapAt = 0.35;
+  const swapAt = FLY_IN.swapAt;
   if (gt < swapAt) {
     const p = gt / swapAt;
-    const pe = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    const pe = easeInOutQuad(p);
     cam.x = fly.sx + (fly.starX - fly.sx) * pe;
     cam.y = fly.sy + (fly.starY - fly.sy) * pe;
-    cam.z = fly.sz + (fly.sz * 4 - fly.sz) * pe;
-    sceneAlpha = 1 - pe * 0.85;
+    cam.z = fly.sz + (fly.sz * FLY_IN.zoomRatio - fly.sz) * pe;
+    sceneAlpha = 1 - pe * FLY_IN.fadeFraction;
   }
   if (gt >= swapAt && !fly.swapped) {
     fly.swapped = true;
@@ -71,15 +92,16 @@ function advanceFlyIn(fly, cam, refs, params) {
     refs.sceneRef.current._node = fly.targetNode || fly.newPath[fly.newPath.length - 1];
     refs.nextSceneRef.current = null;
     refs.frameCount.current = 0;
-    cam.x = W / 2; cam.y = H / 2; cam.z = tFz * 0.3;
+    cam.x = W / 2; cam.y = H / 2; cam.z = tFz * FLY_IN.bloomZoomRatio;
     saveNav();
   }
   if (gt >= swapAt) {
     const p = (gt - swapAt) / (1 - swapAt);
-    const pe = 1 - Math.pow(1 - p, 3);
-    cam.z = tFz * 0.3 + (tFz - tFz * 0.3) * pe;
+    const pe = easeOutCubic(p);
+    const openZ = tFz * FLY_IN.bloomZoomRatio;
+    cam.z = openZ + (tFz - openZ) * pe;
     sceneAlpha = 0;
-    bloomAlpha = 0.15 + 0.85 * pe;
+    bloomAlpha = FLY_IN.bloomAlphaMin + FLY_IN.bloomAlphaSpan * pe;
   }
 
   return { sceneAlpha, bloomAlpha };
@@ -91,7 +113,7 @@ function advanceFlyIn(fly, cam, refs, params) {
  */
 export function advanceFlyTransition(fly, cam, refs, params) {
   const { FLY_DURATION, getFitZoom } = params;
-  fly.t = Math.min(1, fly.t + 0.016 / FLY_DURATION);
+  fly.t = Math.min(1, fly.t + CAMERA.frameStepS / FLY_DURATION);
   if (!fly._targetFz) {
     fly._targetFz = getFitZoom(refs.nextSceneRef.current);
   }
@@ -109,17 +131,16 @@ export function advanceCamera(cam, refs, params) {
   const anim = refs.animRef.current;
   refs.frameCount.current++;
 
-  if (!anim && refs.frameCount.current <= 3) {
+  if (!anim && refs.frameCount.current <= CAMERA.snapFrames) {
     cam.x = tg.x; cam.y = tg.y; cam.z = tg.z;
   } else if (!anim) {
-    cam.x += (tg.x - cam.x) * 0.08;
-    cam.y += (tg.y - cam.y) * 0.08;
-    cam.z += (tg.z - cam.z) * 0.08;
+    cam.x += (tg.x - cam.x) * IDLE_LERP_FRACTION;
+    cam.y += (tg.y - cam.y) * IDLE_LERP_FRACTION;
+    cam.z += (tg.z - cam.z) * IDLE_LERP_FRACTION;
   } else {
-    anim.t = Math.min(1, anim.t + 0.016 / TRANS);
-    const ease = anim.t < 0.5 ? 4 * anim.t * anim.t * anim.t : 1 - Math.pow(-2 * anim.t + 2, 3) / 2;
-    const lag = Math.pow(anim.t, 0.7);
-    const lagE = lag * lag * (3 - 2 * lag);
+    anim.t = Math.min(1, anim.t + CAMERA.frameStepS / TRANS);
+    const ease = easeInOutCubic(anim.t);
+    const lagE = easeLagged(anim.t);
     const posE = anim.out ? ease : lagE;
     const zoomE = anim.out ? lagE : ease;
     cam.x = anim.sx + (tg.x - anim.sx) * posE;

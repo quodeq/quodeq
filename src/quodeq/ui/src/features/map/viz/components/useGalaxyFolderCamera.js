@@ -5,6 +5,7 @@ import {
   drawStars, drawLabels,
 } from './galaxyFolderDraw.js';
 import { DEFAULT_CANVAS_W, DEFAULT_CANVAS_H } from '../core/galaxyTunables.js';
+import { CAMERA, MIN_VISIBLE_ALPHA } from './galaxyTuning.js';
 
 const TRANS = 0.8;
 const FLY_DURATION = 1.4;
@@ -16,6 +17,22 @@ const DRIFT_SPEED_Y = 0.012;
 const DRIFT_PHASE_X = 1.1;
 const DRIFT_PHASE_Y = 0.8;
 const DRIFT_AMPLITUDE = 2;
+// The very first frame of a fly is painted at this alpha rather than the
+// ramp's value, so the transition starts from a visible scene.
+const INITIAL_FLY_ALPHA = 0.85;
+// Fitting a scene leaves this much of the shorter viewport side as margin.
+const FIT_VIEW_MARGIN_FRACTION = 0.85;
+// A zoomed-in file is framed at its scene's fit zoom times this, never
+// below the floor — a scene of one tiny file still fills the view.
+const ZOOMED_FILE_FIT_MULTIPLE = 4;
+const ZOOMED_FILE_MIN_ZOOM = 6;
+// Previewing a focused folder before auto-entering it: the preview disc is
+// this multiple of the star's radius (or the fallback when the star is
+// gone), framed to fill this fraction of the shorter viewport side.
+const PREVIEW_RADIUS_RATIO = 4;
+const PREVIEW_RADIUS_FALLBACK_PX = 30;
+const PREVIEW_SCREEN_FRACTION = 0.3;
+const PREVIEW_HALF_RADIUS_FRACTION = 0.5;
 
 /** Advance the fly transition (if one is running) and, once it's not, the
  * idle/focus camera lerp. Returns the alpha values the draw pass needs. */
@@ -76,9 +93,9 @@ function renderFrame(ctx, activeScene, frame, refs, alphas) {
   });
   const activeFly = refs.flyRef.current;
   const effectiveAlpha = activeFly
-    ? (activeFly.swapped ? bloomAlpha : (activeFly.t === 0 ? 0.85 : sceneAlpha))
+    ? (activeFly.swapped ? bloomAlpha : (activeFly.t === 0 ? INITIAL_FLY_ALPHA : sceneAlpha))
     : 1;
-  if (effectiveAlpha < 0.01) return;
+  if (effectiveAlpha < MIN_VISIBLE_ALPHA) return;
   ctx.globalAlpha = effectiveAlpha;
 
   const curNode = refs.navRef.current.path[refs.navRef.current.path.length - 1];
@@ -123,8 +140,8 @@ function useFolderCameraSizing(refs) {
   const getFitZoom = useCallback((s) => {
     const ext = s?._maxExtent;
     if (!ext || ext <= 0) return 1;
-    const halfView = Math.min(size.w, size.h) / 2 * 0.85;
-    return Math.min(halfView / ext, 4);
+    const halfView = Math.min(size.w, size.h) / 2 * FIT_VIEW_MARGIN_FRACTION;
+    return Math.min(halfView / ext, CAMERA.fitZoomMax);
   }, [size.w, size.h]);
 
   return { size, w2s, getFitZoom };
@@ -137,15 +154,15 @@ function useComputeFocusCamera(refs, scene, size, getFitZoom) {
   return useCallback(() => {
     const fz = getFitZoom(refs.sceneRef.current);
     const zf = refs.zoomedFileRef.current;
-    if (zf) return { x: zf.x, y: zf.y, z: Math.max(6, fz * 4) };
+    if (zf) return { x: zf.x, y: zf.y, z: Math.max(ZOOMED_FILE_MIN_ZOOM, fz * ZOOMED_FILE_FIT_MULTIPLE) };
     const zt = refs.zoomTargetRef.current;
     if (zt) return { x: zt.x, y: zt.y, z: zt.z };
     const ff = refs.focusedFolderRef.current;
     if (ff) {
       const star = (refs.sceneRef.current || scene)?.rootStars?.[ff.starIdx];
-      const previewR = star ? star.radius * 4 : 30;
-      const targetScreenR = Math.min(size.w, size.h) * 0.3;
-      const focusZ = targetScreenR / (previewR * 0.5);
+      const previewR = star ? star.radius * PREVIEW_RADIUS_RATIO : PREVIEW_RADIUS_FALLBACK_PX;
+      const targetScreenR = Math.min(size.w, size.h) * PREVIEW_SCREEN_FRACTION;
+      const focusZ = targetScreenR / (previewR * PREVIEW_HALF_RADIUS_FRACTION);
       return { x: ff.x, y: ff.y, z: Math.max(fz * 2, focusZ) };
     }
     return { x: size.w / 2, y: size.h / 2, z: fz };
@@ -176,7 +193,8 @@ export function useGalaxyFolderCamera({ refs, scene, showLabels, saveNav, setNav
 
     function frame() {
       if (!running) return;
-      const t = timeRef.current += 0.016;
+      timeRef.current += CAMERA.frameStepS;
+      const t = timeRef.current;
       const W = size.w, H = size.h;
       if (!refs.camRef.current) refs.camRef.current = { x: W / 2, y: H / 2, z: getFitZoom(refs.sceneRef.current || scene) };
       const cam = refs.camRef.current;
