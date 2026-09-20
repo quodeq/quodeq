@@ -27,6 +27,7 @@ import shutil
 import stat
 import subprocess
 import threading
+from collections.abc import Mapping
 from pathlib import Path
 
 # Re-exported so the api layer can validate a shared-repo URL without
@@ -35,6 +36,7 @@ from pathlib import Path
 # not api -> data). services/evaluation_mixin.py imports the same function
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+from quodeq.shared._env_resolve import resolve_env
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +67,8 @@ def remove_clone_dir(path: Path | str) -> None:
     shutil.rmtree(path, onexc=_clear_readonly_and_retry)
 
 
-def _git_env() -> dict[str, str]:
-    """Environment for git subprocess calls.
+def _git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Environment for git subprocess calls, layered over *env*.
 
     GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
     stops git from blocking on an interactive credential or passphrase prompt, since
@@ -78,11 +80,12 @@ def _git_env() -> dict[str, str]:
     the call only dies at the run_git timeout. ssh remotes need the host in
     known_hosts and the key in an agent (or use an https remote instead).
     """
-    return {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
+    return {**resolve_env(env), "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
 
 
 def run_git(
-    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S
+    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[bool, str]:
     """Run a git command and return ``(ok, output)``.
 
@@ -97,7 +100,7 @@ def run_git(
         proc = subprocess.run(
             ["git", *args],
             cwd=str(cwd) if cwd else None,
-            env=_git_env(),
+            env=_git_env(env),
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -118,8 +121,8 @@ def run_git(
         return False, "git command failed to run"
 
 
-def _cache_base(env: dict | None = None) -> Path:
-    e = env if env is not None else os.environ
+def _cache_base(env: Mapping[str, str] | None = None) -> Path:
+    e = resolve_env(env)
     base = e.get(_CACHE_ENV)
     root = Path(base) if base else Path.home() / ".quodeq" / "cache"
     return root / "shared"

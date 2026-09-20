@@ -28,6 +28,7 @@ from pathlib import Path
 from quodeq.data.cache_store.backend import CacheStats
 from quodeq.data.cache_store.entry import CacheEntry
 from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexEntry, IndexRow
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -54,8 +55,7 @@ def default_cache_root(env: Mapping[str, str] | None = None) -> Path:
     repo cache under the same shared parent directory. *env* overrides
     ``os.environ`` when provided.
     """
-    environ = env if env is not None else os.environ
-    raw = environ.get(_ROOT_ENV, "").strip()
+    raw = resolve_env(env).get(_ROOT_ENV, "").strip()
     base = Path(raw) if raw else Path.home() / ".quodeq" / "cache"
     return base / _RESULTS_SUBDIR
 
@@ -66,8 +66,9 @@ class LocalFileBackend:
     def __init__(
         self, root: Path | None = None, *,
         index: ContentIndex | None = None, enable_index: bool = True,
+        env: Mapping[str, str] | None = None,
     ) -> None:
-        self._root = root if root is not None else default_cache_root()
+        self._root = root if root is not None else default_cache_root(env)
         if index is not None:
             self._index: ContentIndex | None = index
         elif enable_index:

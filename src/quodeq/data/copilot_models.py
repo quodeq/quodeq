@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.errors import ClientMessageError
 from quodeq.shared.utils import sanitize_sensitive
@@ -142,7 +143,7 @@ def fetch_copilot_models(
 ) -> dict[str, object]:
     """Return models or a logged discovery error, without sending a model prompt."""
     try:
-        isolated_env = build_copilot_env(dict(os.environ) if env is None else env)
+        isolated_env = build_copilot_env(dict(resolve_env(env)))
         return {"models": asyncio.run(_query_models(isolated_env, timeout_s))}
     except TimeoutError:
         message = "Copilot model discovery timed out. Check your connection and retry."

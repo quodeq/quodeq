@@ -10,10 +10,10 @@ to the legacy mkdtemp flow (one fresh clone per evaluation).
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.context.online_cache import (
@@ -22,16 +22,17 @@ from quodeq.context.online_cache import (
     is_inside_cache,
 )
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_CLONE_TIMEOUT_S = 300
 
 
-def _get_clone_timeout(env: dict[str, str] | None = None) -> int:
+def _get_clone_timeout(env: Mapping[str, str] | None = None) -> int:
     """Return the git clone timeout, reading the env var lazily."""
     try:
-        return int((os.environ if env is None else env).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
+        return int(resolve_env(env).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
     except ValueError:
         return _DEFAULT_CLONE_TIMEOUT_S
 
@@ -47,7 +48,13 @@ class GitCloneClient:
     ``clone_legacy`` is the plain mkdtemp fallback and has neither: it
     streams output straight through and never received untrusted
     dash-prefixed input in practice. Do not unify the two argv shapes.
+
+    *env* is the base environment both clones inherit; ``None`` means the
+    process environment, read when the clone runs.
     """
+
+    def __init__(self, env: Mapping[str, str] | None = None) -> None:
+        self._env = env
 
     def clone_progress(self, url: str, dest: Path, extra_args: list[str], *, timeout_s: int) -> None:
         """Run ``git clone`` for *url* into *dest*.
@@ -56,7 +63,7 @@ class GitCloneClient:
         services layer owns retry orchestration and mapping them to
         user-facing clone errors.
         """
-        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
+        env = {**resolve_env(self._env), "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
         subprocess.run(
             ["git", "clone", "--progress", *extra_args, "--", url, str(dest)],
             check=True,
@@ -67,7 +74,7 @@ class GitCloneClient:
 
     def clone_legacy(self, repo_input: str, dest: Path, *, timeout_s: int) -> None:
         """Run ``git clone`` for *repo_input* into *dest* (mkdtemp fallback path)."""
-        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+        env = {**resolve_env(self._env), "GIT_LFS_SKIP_SMUDGE": "1"}
         subprocess.run(
             ["git", "clone", "--progress", repo_input, str(dest)],
             check=True, env=env, timeout=timeout_s,
