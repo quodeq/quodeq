@@ -31,7 +31,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.subagents._source_files import list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 
 _logger = logging.getLogger(__name__)

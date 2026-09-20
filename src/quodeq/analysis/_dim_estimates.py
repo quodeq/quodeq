@@ -31,7 +31,7 @@ from typing import Any
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
 from quodeq.analysis.dispatch_policy import api_file_size_cap
-from quodeq.analysis.subagents._source_files import list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.dim_estimates_io import (
     DIM_ESTIMATES_FILENAME,

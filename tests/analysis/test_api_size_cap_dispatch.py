@@ -21,7 +21,7 @@ from unittest.mock import patch
 from quodeq.analysis._dim_estimates import compute_dim_estimates
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.dispatch_policy import DispatchPolicy
-from quodeq.analysis.subagents._source_files import list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 
 from ._api_size_cap_dispatch_helpers import CAP, _TEST_PROVIDER, _make_config, _write_repo
 

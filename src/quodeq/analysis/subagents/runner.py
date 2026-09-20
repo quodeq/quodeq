@@ -16,7 +16,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-exports from split modules -- keep the public API stable
-from quodeq.analysis.subagents._source_files import list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.analysis.subagents._prompts import _build_subagent_prompt
 from quodeq.analysis.subagents._pool_launcher import (  # noqa: F401
     LaunchPoolParams,

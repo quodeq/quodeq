@@ -18,7 +18,7 @@ from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_pr
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
-from quodeq.analysis.subagents._source_files import list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
