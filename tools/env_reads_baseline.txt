@@ -88,14 +88,6 @@ src/quodeq/services/shared_settings.py:31
 src/quodeq/services/tooling_mixin.py:229
 src/quodeq/services/tooling_mixin.py:60
 src/quodeq/shared/_config.py:13
-src/quodeq/shared/_env_db.py:20
-src/quodeq/shared/_env_db.py:36
-src/quodeq/shared/_env_db.py:47
-src/quodeq/shared/_env_db.py:57
-src/quodeq/shared/_env_embeddings.py:20
-src/quodeq/shared/_env_embeddings.py:30
-src/quodeq/shared/_env_embeddings.py:40
-src/quodeq/shared/_env_embeddings.py:51
 src/quodeq/shared/_io.py:43
 src/quodeq/shared/_log_format.py:18
 src/quodeq/shared/frozen.py:76

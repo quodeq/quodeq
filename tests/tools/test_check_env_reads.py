@@ -36,6 +36,8 @@ def test_config_layer_is_allowed(tmp_path):
         "src/quodeq/shared/_env.py",
         "src/quodeq/shared/_env_ai.py",
         "src/quodeq/shared/_env_paths.py",
+        "src/quodeq/shared/_env_db.py",
+        "src/quodeq/shared/_env_embeddings.py",
         "src/quodeq/config/loader.py",
         "src/quodeq/config/nested/deep.py",
         "src/quodeq/_cli_env.py",
@@ -44,13 +46,22 @@ def test_config_layer_is_allowed(tmp_path):
     assert check_env_reads.scan_tree(tmp_path / "src") == []
 
 
+def test_every_shared_env_module_is_allowed_but_its_siblings_are_not(tmp_path):
+    """The allowlist covers `shared/_env*`, not the rest of `shared/`."""
+    _write(tmp_path, "src/quodeq/shared/_env_whatever.py", "import os\nX = os.getenv('A')\n")
+    _write(tmp_path, "src/quodeq/shared/frozen.py", "import os\nX = os.getenv('A')\n")
+    assert [h.key for h in check_env_reads.scan_tree(tmp_path / "src")] == [
+        "src/quodeq/shared/frozen.py:2",
+    ]
+
+
 def test_allowlist_does_not_match_by_prefix(tmp_path):
-    """`shared/_env_other.py` is not `shared/_env.py`; `config_util.py` is not `config/`."""
-    _write(tmp_path, "src/quodeq/shared/_env_other.py", "import os\nX = os.getenv('A')\n")
+    """`config_util.py` is not `config/`, and `_envs/` is not a `shared/_env*` file."""
     _write(tmp_path, "src/quodeq/config_util.py", "import os\nX = os.getenv('A')\n")
+    _write(tmp_path, "src/quodeq/shared/_envs/deep.py", "import os\nX = os.getenv('A')\n")
     assert sorted(h.key for h in check_env_reads.scan_tree(tmp_path / "src")) == [
         "src/quodeq/config_util.py:2",
-        "src/quodeq/shared/_env_other.py:2",
+        "src/quodeq/shared/_envs/deep.py:2",
     ]
 
 
@@ -163,7 +174,7 @@ def test_baseline_has_no_stale_entries():
 
 # Revise DOWNWARD as PR 2 Tasks 2-5 make each read injectable; the target is
 # 0. NEVER raise without a justification reviewed in the PR that raises it.
-BASELINE_CEILING = 102
+BASELINE_CEILING = 94
 
 
 def test_baseline_only_shrinks():

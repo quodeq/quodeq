@@ -50,12 +50,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
 BASELINE_PATH = Path(__file__).resolve().parent / "env_reads_baseline.txt"
 
-# Paths (relative to the repo root) that own environment access. Entries
-# ending in "/" are directory prefixes; the rest are exact files.
+# Paths (relative to the repo root) that own environment access. An entry
+# ending in "/" is a directory prefix, one ending in ".py" is an exact
+# file, and anything else is a file-name prefix within its own directory
+# (so `src/quodeq/shared/_env` covers _env.py, _env_ai.py, _env_db.py and
+# every future sibling, but not `src/quodeq/shared/frozen.py`).
 ALLOWLIST = (
-    "src/quodeq/shared/_env.py",
-    "src/quodeq/shared/_env_ai.py",
-    "src/quodeq/shared/_env_paths.py",
+    "src/quodeq/shared/_env",
     "src/quodeq/config/",
     "src/quodeq/_cli_env.py",
 )
@@ -73,12 +74,17 @@ class Hit:
     source: str
 
 
+def _matches(rel: str, entry: str) -> bool:
+    if entry.endswith("/"):
+        return rel.startswith(entry)
+    if entry.endswith(".py"):
+        return rel == entry
+    return rel.startswith(entry) and "/" not in rel[len(entry):]
+
+
 def is_allowed(rel: str) -> bool:
     """True if *rel* (a repo-relative posix path) is in the config layer."""
-    return any(
-        rel.startswith(entry) if entry.endswith("/") else rel == entry
-        for entry in ALLOWLIST
-    )
+    return any(_matches(rel, entry) for entry in ALLOWLIST)
 
 
 def _os_module_names(tree: ast.Module) -> set[str]:
