@@ -40,7 +40,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_evidence_parser.py': 'Evidence-parsing composition wiring: imports quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring, not a logging-boundary violation',
     'analysis/_pipeline.py': 'Pipeline coordination - dimension orchestration, merging, and public API - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_process.py': 'Subprocess spawning, heartbeat monitoring, and error handling - out of scope for this sweep (not a flagged per-site conversion)',
-    'analysis/_runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
+    'analysis/runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/api_prompt_assembly.py': 'Prompt assembly for the direct API runner - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/cache/_dimension_context.py': 'Pre-dispatch setup for the V2 cache-aware dimension processor (cache backend, trust model, file listing, classification) - split out of dimension_runner.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/cache/_failure_streak.py': 'Consecutive-failure circuit breaker for the dim runner - out of scope for this sweep (not a flagged per-site conversion)',

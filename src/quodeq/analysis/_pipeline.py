@@ -21,7 +21,7 @@ from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
-from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG

@@ -44,7 +44,7 @@ from quodeq.data.fs.project_resolver import resolve_project_uuid  # facade patch
 from quodeq.shared.logging import log_error, log_info, log_warning
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text  # is_repo_url/project_name_from_repo/get_ai_model are facade patch targets
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # facade patch target
-from quodeq.analysis._runner_markers import emit_marker  # facade patch target
+from quodeq.analysis.runner_markers import emit_marker  # facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis._diff_resolver import resolve_diff_files  # facade patch target
 from quodeq.analysis.manifest_serialization import manifest_to_dict

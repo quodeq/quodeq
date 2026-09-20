@@ -14,7 +14,7 @@ from quodeq.core.evidence.parser import (
     EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis._runner_markers import make_heartbeat
+from quodeq.analysis.runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 

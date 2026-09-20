@@ -8,7 +8,7 @@ from quodeq.core.scoring._constants import MAX_SCORE
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.analysis.runner import RunConfig, run_per_dimension
-from quodeq.analysis._runner_markers import cleanup_stream
+from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.services.grade_formula import load_params
 
 if TYPE_CHECKING:

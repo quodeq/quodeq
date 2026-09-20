@@ -1,7 +1,7 @@
 """Per-dimension steps shared by the dimension loops.
 
 Split out of ``_loops.py`` (Task 22, M-MOD-6). This module imports only
-downward (``_loop_state``, ``_runner_markers``, ``run_types``, ``dimension_runner``,
+downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
 core/data/shared) and never imports back from ``_loops`` -- ``_loops.py``
 imports it at the top instead. ``_loop_should_stop`` and ``_finalize_dim_result``
 moved here too because ``run_incremental_loop``'s per-iteration step
@@ -25,7 +25,7 @@ from quodeq.analysis._loop_state import (
     _safe_write_dim_state,
     _silence_broken_stdout,
 )
-from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.shared.constants import CC_PHASE_ANALYZING

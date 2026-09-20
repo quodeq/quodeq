@@ -18,7 +18,7 @@ from quodeq.analysis.checks.runner import apply_checks_for_run
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING
 
 

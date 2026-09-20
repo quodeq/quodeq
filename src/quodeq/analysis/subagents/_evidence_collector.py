@@ -18,7 +18,7 @@ from quodeq.core.evidence.parser import (
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.subagents.pool import SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
-from quodeq.analysis._runner_markers import cleanup_stream
+from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
