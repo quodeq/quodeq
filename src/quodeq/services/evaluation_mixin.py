@@ -35,6 +35,11 @@ _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
 
 
+def _run_ref(job: JobSnapshot) -> dict[str, str | None]:
+    """The ``{"outputProject", "outputRunId"}`` payload the run-state helpers take."""
+    return {"outputProject": job.output_project, "outputRunId": job.output_run_id}
+
+
 class FsEvaluationMixin:
     """Evaluation lifecycle collaborator: start, status, cancel, score.
 
@@ -194,15 +199,9 @@ class FsEvaluationMixin:
         if ok and run_dir is not None:
             _wait_for_terminal_status(run_dir)
             if discard_partial:
-                _discard_run_state(reports_dir, {
-                    "outputProject": job.output_project,
-                    "outputRunId": job.output_run_id,
-                })
+                _discard_run_state(reports_dir, _run_ref(job))
             else:
-                score_completed_evidence(reports_dir, {
-                    "outputProject": job.output_project,
-                    "outputRunId": job.output_run_id,
-                })
+                score_completed_evidence(reports_dir, _run_ref(job))
         return ok
 
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
@@ -211,10 +210,7 @@ class FsEvaluationMixin:
         if not job or job.status not in ("failed", "cancelled"):
             return False
         if job.output_project and job.output_run_id:
-            score_completed_evidence(reports_dir, {
-                "outputProject": job.output_project,
-                "outputRunId": job.output_run_id,
-            })
+            score_completed_evidence(reports_dir, _run_ref(job))
         return True
 
     def list_evaluations(

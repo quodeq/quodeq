@@ -10,10 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
-
-if TYPE_CHECKING:
-    from quodeq.data.fs.evidence_tally import FindingTally
+from typing import Any, Literal
 
 # A dimension's live progress state, computed by _scan_progress_dims._dim_state
 # and threaded through _dim_files_summary/_dim_counts/_dim_elapsed_s. Distinct
@@ -21,18 +18,6 @@ if TYPE_CHECKING:
 # RUNNING/DONE/INCOMPLETE/PENDING machinery): this is the derived display
 # state the live-progress UI reads.
 DimProgressState = Literal["done", "running", "pending"]
-
-
-class _DimCounts(NamedTuple):
-    """The count-valued fields of one dimension's progress row."""
-
-    tally: "FindingTally"
-    elapsed_s: float | None
-    active_agents: int
-    estimate_reason: str | None
-    files_cached: int | None
-    files_project_total: int | None
-    files_excluded: int | None
 
 
 @dataclass(frozen=True)
