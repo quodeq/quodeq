@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
+from typing import TypeVar
 
 from quodeq.shared._config import _get_config
 from quodeq.shared._env_sanitize import _sanitized_env_path  # noqa: F401 — re-export
@@ -22,6 +24,41 @@ from quodeq.shared._env_sanitize import _sanitized_env_path  # noqa: F401 — re
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
     """Read an environment variable as an int, warn and return *default* on failure."""
     return env_int(var, default, env=env)
+
+
+_NumberT = TypeVar("_NumberT", int, float)
+
+
+def _env_number(
+    var: str,
+    default: _NumberT,
+    kind: Callable[[str], _NumberT],
+    minimum: _NumberT | None,
+    env: dict[str, str] | None,
+) -> _NumberT:
+    """Read an env var through *kind*; warn and return *default* on failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
+    raw = (os.environ if env is None else env).get(var)
+    if raw is not None:
+        log = logging.getLogger(__name__)
+        try:
+            value = kind(raw)
+        except ValueError:
+            log.warning(
+                "Invalid %s=%r (expected %s), using default %r",
+                var, raw, "integer" if kind is int else "number", default,
+            )
+        else:
+            if minimum is not None and value < minimum:
+                log.warning(
+                    "Out-of-range %s=%r (minimum %r), using default %r",
+                    var, raw, minimum, default,
+                )
+            else:
+                return value
+    return default
 
 
 def env_int(
@@ -35,23 +72,7 @@ def env_int(
 
     When *minimum* is given, parsed values below it also fall back to *default*.
     """
-    raw = (os.environ if env is None else env).get(var)
-    if raw is not None:
-        try:
-            value = int(raw)
-        except ValueError:
-            logging.getLogger(__name__).warning(
-                "Invalid %s=%r (expected integer), using default %r", var, raw, default,
-            )
-        else:
-            if minimum is not None and value < minimum:
-                logging.getLogger(__name__).warning(
-                    "Out-of-range %s=%r (minimum %r), using default %r",
-                    var, raw, minimum, default,
-                )
-            else:
-                return value
-    return default
+    return _env_number(var, default, int, minimum, env)
 
 
 def env_float(
@@ -65,23 +86,7 @@ def env_float(
 
     When *minimum* is given, parsed values below it also fall back to *default*.
     """
-    raw = (os.environ if env is None else env).get(var)
-    if raw is not None:
-        try:
-            value = float(raw)
-        except ValueError:
-            logging.getLogger(__name__).warning(
-                "Invalid %s=%r (expected number), using default %r", var, raw, default,
-            )
-        else:
-            if minimum is not None and value < minimum:
-                logging.getLogger(__name__).warning(
-                    "Out-of-range %s=%r (minimum %r), using default %r",
-                    var, raw, minimum, default,
-                )
-            else:
-                return value
-    return default
+    return _env_number(var, default, float, minimum, env)
 
 
 def get_action_api_port(env: dict[str, str] | None = None) -> int:
