@@ -122,10 +122,10 @@ src/quodeq/api/standards_read_routes.py:15:private-module:quodeq.shared._env.env
 src/quodeq/api/zip.py:17:private-module:quodeq.shared._env.env_int
 src/quodeq/assistant/adapters/_api.py:22:private-module:quodeq.assistant.tools._registry.ToolRegistry
 src/quodeq/assistant/adapters/_api.py:23:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/assistant/adapters/_cli.py:23:private-module:quodeq.assistant.mcp._config
-src/quodeq/assistant/adapters/_cli.py:24:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
-src/quodeq/assistant/adapters/_cli.py:24:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
-src/quodeq/assistant/adapters/_cli.py:26:private-module:quodeq.shared._process_kill.kill_proc_tree
+src/quodeq/assistant/adapters/cli.py:23:private-module:quodeq.assistant.mcp._config
+src/quodeq/assistant/adapters/cli.py:24:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
+src/quodeq/assistant/adapters/cli.py:24:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
+src/quodeq/assistant/adapters/cli.py:26:private-module:quodeq.shared._process_kill.kill_proc_tree
 src/quodeq/assistant/adapters/_cli_cleanup.py:11:private-module:quodeq.assistant.mcp._config
 src/quodeq/assistant/adapters/_cli_cleanup.py:12:private-module:quodeq.core._constants.MCP_STYLE_CLI_REGISTER
 src/quodeq/assistant/adapters/_cli_cleanup.py:13:private-module:quodeq.shared._process_kill.kill_proc_tree
@@ -146,9 +146,6 @@ src/quodeq/assistant/orchestrator.py:10:private-module:quodeq.assistant.adapters
 src/quodeq/assistant/orchestrator.py:10:private-module:quodeq.assistant.adapters._api.ApiTurnSession
 src/quodeq/assistant/orchestrator.py:10:private-module:quodeq.assistant.adapters._api.run_api_turn
 src/quodeq/assistant/orchestrator.py:11:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
-src/quodeq/assistant/orchestrator.py:12:private-module:quodeq.assistant.adapters._cli.CliTurnConfig
-src/quodeq/assistant/orchestrator.py:12:private-module:quodeq.assistant.adapters._cli.CliTurnSession
-src/quodeq/assistant/orchestrator.py:12:private-module:quodeq.assistant.adapters._cli.run_cli_turn
 src/quodeq/assistant/orchestrator.py:13:private-module:quodeq.assistant.adapters._cli_config.load_cli_chat_config
 src/quodeq/assistant/orchestrator.py:15:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
 src/quodeq/assistant/orchestrator.py:15:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE

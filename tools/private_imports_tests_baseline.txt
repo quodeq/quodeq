@@ -599,8 +599,6 @@ tests/api/test_zip_coverage.py:58:private-name:quodeq.api.zip._ZipSizeLimitError
 tests/api/test_zip_coverage.py:65:private-name:quodeq.api.zip._build_project_zip
 tests/api/test_zip_coverage.py:83:private-name:quodeq.api.zip._build_project_zip
 tests/api/test_zip_coverage.py:97:private-name:quodeq.api.zip._build_project_zip
-tests/assistant/_cli_adapter_helpers.py:4:private-module:quodeq.assistant.adapters._cli.CliTurnConfig
-tests/assistant/_cli_adapter_helpers.py:4:private-module:quodeq.assistant.adapters._cli.CliTurnSession
 tests/assistant/test_api_adapter.py:153:private-module:quodeq.assistant.adapters._api.ApiTurnConfig
 tests/assistant/test_api_adapter.py:153:private-name:quodeq.assistant.adapters._api._extra_body
 tests/assistant/test_api_adapter.py:165:private-module:quodeq.assistant.adapters._api.ApiTurnConfig
@@ -611,14 +609,7 @@ tests/assistant/test_api_adapter.py:3:private-module:quodeq.assistant.adapters._
 tests/assistant/test_api_adapter.py:4:private-module:quodeq.assistant.tools._registry.ToolRegistry
 tests/assistant/test_api_adapter.py:4:private-module:quodeq.assistant.tools._registry.ToolSpec
 tests/assistant/test_capabilities.py:1:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
-tests/assistant/test_cli_adapter.py:4:private-module:quodeq.assistant.adapters._cli.run_cli_turn
-tests/assistant/test_cli_adapter_cancel.py:4:private-module:quodeq.assistant.adapters._cli.run_cli_turn
-tests/assistant/test_cli_adapter_prompting.py:6:private-module:quodeq.assistant.adapters._cli
-tests/assistant/test_cli_adapter_prompting.py:7:private-module:quodeq.assistant.adapters._cli.CliTurnConfig
-tests/assistant/test_cli_adapter_prompting.py:7:private-module:quodeq.assistant.adapters._cli.run_cli_turn
 tests/assistant/test_cli_adapter_sandbox.py:14:private-module:quodeq.assistant.adapters._cli_spawn.sb
-tests/assistant/test_cli_adapter_sandbox.py:7:private-module:quodeq.assistant.adapters._cli
-tests/assistant/test_cli_adapter_sandbox.py:8:private-module:quodeq.assistant.adapters._cli.run_cli_turn
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.TurnArgvRequest
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.build_turn_argv
 tests/assistant/test_cli_command.py:1:private-name:quodeq.assistant.adapters._cli_command._with_web_access
@@ -671,7 +662,6 @@ tests/assistant/test_constants_provider_style.py:86:private-module:quodeq.assist
 tests/assistant/test_constants_provider_style.py:92:private-name:quodeq.assistant.orchestrator._ISOLATED_MCP_STYLES
 tests/assistant/test_context.py:1:private-module:quodeq.assistant._context.build_system_prompt
 tests/assistant/test_context.py:1:private-module:quodeq.assistant._context.build_turn_message
-tests/assistant/test_copilot_adapter.py:6:private-module:quodeq.assistant.adapters._cli.run_cli_turn
 tests/assistant/test_env_seams_t5.py:11:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
 tests/assistant/test_env_seams_t5.py:13:private-name:quodeq.assistant.worktree._DEFAULT_WORKTREE_TTL_H
 tests/assistant/test_env_seams_t5.py:13:private-name:quodeq.assistant.worktree._worktree_ttl_hours
@@ -1071,7 +1061,6 @@ tests/integration/_cancel_resume_fixtures.py:66:private-name:quodeq.analysis._di
 tests/integration/test_cancel_resume_breaker.py:14:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 tests/integration/test_cancel_resume_dispatch.py:66:private-name:quodeq.services.evaluation_mixin._discard_run_state
 tests/integration/test_copilot_cli_local.py:15:private-module:quodeq.analysis._config.AnalysisConfig
-tests/integration/test_copilot_cli_local.py:17:private-module:quodeq.assistant.adapters._cli.run_cli_turn
 tests/integration/test_sqlite_dual_write_e2e.py:15:private-module:quodeq.data.fs.report_parser._evidence.load_evidence_map
 tests/integration/test_sse_run_events_e2e.py:11:private-module:quodeq.api._run_events_routes.register_run_events_routes
 tests/integration/test_terminal_pty_reliability_e2e.py:35:private-module:quodeq.api._terminal_ws_helpers.pump_terminal_out

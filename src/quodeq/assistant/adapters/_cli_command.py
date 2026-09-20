@@ -14,7 +14,7 @@ from quodeq.core._constants import (
 from quodeq.shared._models import normalize_model_id
 
 if TYPE_CHECKING:
-    from quodeq.assistant.adapters._cli import CliTurnConfig
+    from quodeq.assistant.adapters.cli import CliTurnConfig
 
 _NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
 

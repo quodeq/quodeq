@@ -29,7 +29,7 @@ _SYSTEM_PROMPT_STYLES = {SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX, SYSTEM_PROMPT_STYLE
 # it must share with _cli_config. Keep in step with the comparisons in
 # _cli.py and _cli_command.py.
 _CONSUMERS = {
-    "quodeq.assistant.adapters._cli": ("SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX",),
+    "quodeq.assistant.adapters.cli": ("SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX",),
     "quodeq.assistant.adapters._cli_command": (
         "RESUME_STYLE_GEMINI", "SESSION_ID_SOURCE_PARSE_JSONL", "SYSTEM_PROMPT_STYLE_ARGV_APPEND",
     ),
