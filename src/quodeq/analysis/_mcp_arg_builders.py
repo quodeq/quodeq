@@ -26,7 +26,7 @@ from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
-from quodeq.shared._models import normalize_model_id
+from quodeq.shared.models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd_path
 
 

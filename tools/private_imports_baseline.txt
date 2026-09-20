@@ -16,7 +16,6 @@ src/quodeq/analysis/_api_source_gathering.py:25:private-name:quodeq.llm_bridge._
 src/quodeq/analysis/_dim_estimates.py:34:private-name:quodeq.analysis.subagents._source_files._list_source_files
 src/quodeq/analysis/_loop_guards.py:69:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 src/quodeq/analysis/_loop_state.py:98:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
-src/quodeq/analysis/_mcp_arg_builders.py:29:private-module:quodeq.shared._models.normalize_model_id
 src/quodeq/analysis/_mcp_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
 src/quodeq/analysis/_process.py:9:private-name:quodeq.analysis.stream.progress_reader._IncrementalProgressReader
 src/quodeq/analysis/_provider_cache.py:10:private-name:quodeq.shared.provider_env._providers_path
@@ -110,7 +109,6 @@ src/quodeq/api/routes_shared_mirrors.py:25:private-module:quodeq.services._runs_
 src/quodeq/assistant/adapters/_api.py:22:private-module:quodeq.assistant.tools._registry.ToolRegistry
 src/quodeq/assistant/adapters/_cli.py:23:private-module:quodeq.assistant.mcp._config
 src/quodeq/assistant/adapters/_cli_cleanup.py:11:private-module:quodeq.assistant.mcp._config
-src/quodeq/assistant/adapters/_cli_command.py:14:private-module:quodeq.shared._models.normalize_model_id
 src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ACTIONS
 src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ActionConflict
 src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ActionContext

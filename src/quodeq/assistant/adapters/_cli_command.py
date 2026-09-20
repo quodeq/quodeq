@@ -11,7 +11,7 @@ from quodeq.assistant.adapters._cli_config import (
 from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
 )
-from quodeq.shared._models import normalize_model_id
+from quodeq.shared.models import normalize_model_id
 
 if TYPE_CHECKING:
     from quodeq.assistant.adapters._cli import CliTurnConfig
