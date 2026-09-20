@@ -42,7 +42,7 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     if override is not None:
         return override
     try:
-        return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+        return int((os.environ if env is None else env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
     except (ValueError, TypeError):
         return _DEFAULT_RUN_DIM_CACHE_MAX
 

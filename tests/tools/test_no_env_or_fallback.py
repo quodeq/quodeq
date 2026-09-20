@@ -4,21 +4,15 @@
 process environment, so a test that passes `env={}` to mean "no variables
 set" gets the real environment instead. The correct spelling is
 `os.environ if env is None else env`.
-
-Marked xfail(strict) until PR 2 Task 2 rewrites the 47 remaining sites; it
-flips to a plain test in that task.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-import pytest
-
 PATTERN = re.compile(r"\bor\s+os\.environ\b")
 
 
-@pytest.mark.xfail(strict=True, reason="PR 2 Task 2 removes the 47 sites")
 def test_no_truthiness_fallback_to_process_env():
     root = Path(__file__).resolve().parents[2]
     hits = [

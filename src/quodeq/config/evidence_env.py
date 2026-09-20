@@ -16,4 +16,4 @@ def cwe_url_template(env: dict[str, str] | None = None) -> str:
     Overridable for offline or internal deployments; unset means the packaged
     default (the same one core falls back to when no template is passed).
     """
-    return (env or os.environ).get("QUODEQ_CWE_URL_TEMPLATE", _CWE_URL_TEMPLATE_DEFAULT)
+    return (os.environ if env is None else env).get("QUODEQ_CWE_URL_TEMPLATE", _CWE_URL_TEMPLATE_DEFAULT)

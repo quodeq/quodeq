@@ -31,7 +31,7 @@ _DEFAULT_CLONE_TIMEOUT_S = 300
 def _get_clone_timeout(env: dict[str, str] | None = None) -> int:
     """Return the git clone timeout, reading the env var lazily."""
     try:
-        return int((env or os.environ).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
+        return int((os.environ if env is None else env).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
     except ValueError:
         return _DEFAULT_CLONE_TIMEOUT_S
 

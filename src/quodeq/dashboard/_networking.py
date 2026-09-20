@@ -47,4 +47,4 @@ def _allow_plaintext_http(
     """Return True if plaintext HTTP to non-localhost is allowed."""
     if override is not None:
         return override
-    return (env or os.environ).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
+    return (os.environ if env is None else env).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"

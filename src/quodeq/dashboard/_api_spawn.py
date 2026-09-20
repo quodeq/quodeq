@@ -44,7 +44,7 @@ def spawn_action_api(
 ) -> subprocess.Popen:
     """Spawn the action API subprocess and record its PID."""
     cfg = api_config or ApiConfig()
-    env = (env or os.environ).copy()
+    env = (os.environ if env is None else env).copy()
     env[_ENV_ACTION_API_PORT] = str(port)
     env.setdefault(_ENV_ACTION_API_HOST, default_host)
     if cfg.static_dist:

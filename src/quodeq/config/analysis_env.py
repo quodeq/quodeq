@@ -17,7 +17,7 @@ def failure_streak_override(env: dict[str, str] | None = None) -> int | None:
     ``failure_streak_threshold``, 0 disables the breaker, negative values
     clamp to 0) stays with the caller; this only resolves the raw override.
     """
-    raw = (env or os.environ).get("QUODEQ_FAILURE_STREAK")
+    raw = (os.environ if env is None else env).get("QUODEQ_FAILURE_STREAK")
     if raw is None:
         return None
     try:
@@ -33,7 +33,7 @@ def max_output_tokens_override(env: dict[str, str] | None = None) -> int | None:
     0 disables the local cap) stays with the caller; this only resolves the
     raw override. Digit-parse only: negatives and blanks read as unset.
     """
-    raw = (env or os.environ).get("QUODEQ_MAX_OUTPUT_TOKENS", "").strip()
+    raw = (os.environ if env is None else env).get("QUODEQ_MAX_OUTPUT_TOKENS", "").strip()
     return int(raw) if raw.isdigit() else None
 
 
@@ -44,7 +44,7 @@ def api_read_timeout_override(env: dict[str, str] | None = None) -> int | None:
     stays with the caller; this only resolves the raw override. Digit-parse
     only: negatives and blanks read as unset.
     """
-    raw = (env or os.environ).get("QUODEQ_API_READ_TIMEOUT", "").strip()
+    raw = (os.environ if env is None else env).get("QUODEQ_API_READ_TIMEOUT", "").strip()
     return int(raw) if raw.isdigit() else None
 
 
@@ -55,7 +55,7 @@ def context_size_override(env: dict[str, str] | None = None) -> int | None:
     is unset, positive values forwarded as ``num_ctx``) stays with the
     caller; this only resolves the raw override.
     """
-    raw = (env or os.environ).get("QUODEQ_CONTEXT_SIZE", "").strip()
+    raw = (os.environ if env is None else env).get("QUODEQ_CONTEXT_SIZE", "").strip()
     return int(raw) if raw.isdigit() else None
 
 

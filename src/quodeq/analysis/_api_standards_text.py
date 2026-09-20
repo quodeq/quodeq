@@ -97,7 +97,7 @@ def _api_prompt_char_budget(env: dict[str, str] | None = None) -> int:
     this analysis-layer function doesn't read os.environ unprompted; also
     raised together with QUODEQ_MAX_API_FILE_SIZE for larger-context models.
     """
-    raw = (env or os.environ).get("QUODEQ_MAX_API_PROMPT_CHARS", "")
+    raw = (os.environ if env is None else env).get("QUODEQ_MAX_API_PROMPT_CHARS", "")
     try:
         return int(raw) if raw else _DEFAULT_MAX_API_PROMPT_CHARS
     except ValueError:
@@ -115,7 +115,7 @@ def _max_standards_chars(env: dict[str, str] | None = None) -> int:
     when running larger-context models. Malformed values fall back to the
     default instead of raising.
     """
-    raw = (env or os.environ).get("QUODEQ_MAX_STANDARDS_CHARS", "")
+    raw = (os.environ if env is None else env).get("QUODEQ_MAX_STANDARDS_CHARS", "")
     try:
         return int(raw) if raw else _DEFAULT_MAX_STANDARDS_CHARS
     except ValueError:

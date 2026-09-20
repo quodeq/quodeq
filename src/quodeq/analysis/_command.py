@@ -189,7 +189,7 @@ def _unregister_cli_mcp(cmd: str, name: str) -> None:
 
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
     """Build the subprocess environment, removing sensitive variables."""
-    env = (env or os.environ).copy()
+    env = (os.environ if env is None else env).copy()
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)
     provider_cfg = _get_provider_configs().get(ai_cmd or "", {})

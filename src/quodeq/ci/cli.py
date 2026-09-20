@@ -23,7 +23,7 @@ def _resolve_report_token(args: argparse.Namespace) -> str | None:
             "process listings; prefer the GITHUB_TOKEN environment variable.",
             file=sys.stderr,
         )
-    token = args.token or os.environ.get("GITHUB_TOKEN")
+    token = args.token if args.token else os.environ.get("GITHUB_TOKEN")
     if not token:
         print("Error: --token or GITHUB_TOKEN environment variable required", file=sys.stderr)
         return None
@@ -120,7 +120,7 @@ def _post_report_review(args: argparse.Namespace, reports, baseline_violations, 
         repo=args.repo,
         pr_number=args.pr,
         payload=payload,
-        token=args.token or os.environ.get("GITHUB_TOKEN"),
+        token=args.token if args.token else os.environ.get("GITHUB_TOKEN"),
     )
 
     all_current: list[dict] = []

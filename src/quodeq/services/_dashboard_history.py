@@ -47,7 +47,7 @@ _DEFAULT_MAX_HISTORY_RUNS = 100
 
 def _max_history_runs(env: dict[str, str] | None = None) -> int:
     """Return the history-scan ceiling, honouring QUODEQ_MAX_HISTORY_RUNS."""
-    raw = (env or os.environ).get("QUODEQ_MAX_HISTORY_RUNS")
+    raw = (os.environ if env is None else env).get("QUODEQ_MAX_HISTORY_RUNS")
     if not raw:
         return _DEFAULT_MAX_HISTORY_RUNS
     try:

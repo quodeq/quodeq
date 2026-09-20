@@ -28,7 +28,7 @@ _logger.setLevel(logging.INFO)
 
 def _apply_env_log_level(level: str | None = None, env: dict | None = None) -> None:
     """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""
-    env_level = (level or (env or os.environ).get("LOG_LEVEL", "")).upper()
+    env_level = (level or (os.environ if env is None else env).get("LOG_LEVEL", "")).upper()
     if env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
         _logger.setLevel(getattr(logging, env_level))
 

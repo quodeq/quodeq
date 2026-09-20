@@ -9,7 +9,7 @@ from quodeq.shared._env_sanitize import _sanitized_env_path
 
 def get_static_dist(env: dict[str, str] | None = None) -> str | None:
     """Return the static dist path from environment, or the user-level cache."""
-    from_env = (env or os.environ).get("QUODEQ_STATIC_DIST")
+    from_env = (os.environ if env is None else env).get("QUODEQ_STATIC_DIST")
     if from_env:
         return from_env
     # Check user-level cache (built on demand by `quodeq dashboard`)
@@ -26,7 +26,7 @@ def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None =
     Recomputes the default on each call so test monkeypatches of ``Path.home``
     are honored.
     """
-    from_env = (env or os.environ).get("QUODEQ_EVALUATIONS_DIR")
+    from_env = (os.environ if env is None else env).get("QUODEQ_EVALUATIONS_DIR")
     if from_env:
         return _sanitized_env_path(from_env)
     if default is not None:
@@ -36,7 +36,7 @@ def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None =
 
 def get_findings_file(env: dict[str, str] | None = None) -> str | None:
     """Return the findings file path from environment, or None."""
-    return (env or os.environ).get("FINDINGS_FILE")
+    return (os.environ if env is None else env).get("FINDINGS_FILE")
 
 
 def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
@@ -45,7 +45,7 @@ def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
     Resolution order: QUODEQ_DIR env var, then ~/.quodeq. Recomputes the
     default on each call so test monkeypatches of ``Path.home`` are honored.
     """
-    from_env = (env or os.environ).get("QUODEQ_DIR")
+    from_env = (os.environ if env is None else env).get("QUODEQ_DIR")
     if from_env:
         return Path(_sanitized_env_path(from_env))
     return Path.home() / ".quodeq"
@@ -58,7 +58,7 @@ def get_clones_dir(env: dict[str, str] | None = None) -> Path:
     Recomputes the default on each call so test monkeypatches of
     ``Path.home`` are honored.
     """
-    from_env = (env or os.environ).get("QUODEQ_CLONES_DIR")
+    from_env = (os.environ if env is None else env).get("QUODEQ_CLONES_DIR")
     if from_env:
         return Path(_sanitized_env_path(from_env))
     return Path.home() / ".quodeq" / "clones"
@@ -86,7 +86,7 @@ def get_run_dir(env: dict[str, str] | None = None) -> Path:
     absolute so two processes reading it from different working directories
     agree on the same sockets and pid files.
     """
-    raw = (env or os.environ).get("QUODEQ_RUN_DIR")
+    raw = (os.environ if env is None else env).get("QUODEQ_RUN_DIR")
     if raw and not Path(raw).is_absolute():
         raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {raw!r}")
     run_dir = Path(raw) if raw else Path.home() / ".quodeq" / "run"

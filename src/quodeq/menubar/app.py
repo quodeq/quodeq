@@ -53,7 +53,7 @@ def _set_menu_item(item, callback) -> None:
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     _cfg_log = _logging.getLogger(__name__)
-    env = env or os.environ
+    env = os.environ if env is None else env
     app_port = env_int("QUODEQ_PORT", _DEFAULT_APP_PORT, env=env)
     raw_ports = env.get("QUODEQ_PORTS", _DEFAULT_PORTS)
     ports_list = []

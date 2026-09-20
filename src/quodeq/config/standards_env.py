@@ -15,4 +15,4 @@ def evaluators_dir(env: dict[str, str] | None = None) -> Path:
     Honors QUODEQ_EVALUATORS_DIR; unset means ~/.quodeq/evaluators.
     """
     default = Path.home() / ".quodeq" / "evaluators"
-    return Path((env or os.environ).get("QUODEQ_EVALUATORS_DIR", str(default)))
+    return Path((os.environ if env is None else env).get("QUODEQ_EVALUATORS_DIR", str(default)))

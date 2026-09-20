@@ -61,7 +61,7 @@ def _resolve_limits(args: argparse.Namespace, env: dict[str, str] | None = None)
         time_limit=_resolve_time_limit(args, env=env),
         incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
         dry_run=getattr(args, "dry_run", False),
-        dispatch_policy=default_dispatch_policy(env=env or os.environ),
+        dispatch_policy=default_dispatch_policy(env=os.environ if env is None else env),
     )
 
 

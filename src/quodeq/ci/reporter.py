@@ -32,7 +32,7 @@ def _github_api_base(env: dict[str, str] | None = None) -> str:
     Defaults to github.com's API. Set QUODEQ_GITHUB_API_BASE (e.g.
     ``https://github.example.com/api/v3``) to point at a GHES instance.
     """
-    return (env or os.environ).get("QUODEQ_GITHUB_API_BASE") or _DEFAULT_GITHUB_API
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_API_BASE") or _DEFAULT_GITHUB_API
 
 
 def _parse_hunks(patch: str | None) -> set[int]:

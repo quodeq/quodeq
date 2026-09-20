@@ -23,7 +23,7 @@ def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = N
     Emits a one-line deprecation warning when the legacy CLI flag or env var is
     the source of the value.
     """
-    src_env = env or os.environ
+    src_env = os.environ if env is None else env
     if getattr(args, "pool_budget", None) is not None:
         # argparse stores both --time-limit and --pool-budget on the same dest;
         # detect deprecated form by scanning the original argv.
@@ -50,7 +50,7 @@ def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -
     ``quodeq.shared._env.env_int``, which always returns an int and warns on a
     malformed value. Re-exported as ``cli_env_int``.
     """
-    raw = (env or os.environ).get(var)
+    raw = (os.environ if env is None else env).get(var)
     if raw is None:
         return default
     try:
@@ -61,12 +61,12 @@ def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -
 
 def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override from the environment, or None."""
-    return (env or os.environ).get("SUBAGENT_MODEL") or None
+    return (os.environ if env is None else env).get("SUBAGENT_MODEL") or None
 
 
 def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
-    return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
+    return args.no_verify or (os.environ if env is None else env).get("QUODEQ_NO_VERIFY") == "1"
 
 
 # Public spellings of the names ``quodeq.cli`` re-exports. The underscore

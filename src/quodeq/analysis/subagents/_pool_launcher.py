@@ -99,7 +99,7 @@ def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     Checks SUBAGENT_MODEL first (set by dashboard/service layer),
     then QUODEQ_SUBAGENT_MODEL (direct env var override).
     """
-    _env = env or os.environ
+    _env = os.environ if env is None else env
     return _env.get("SUBAGENT_MODEL") or _env.get("QUODEQ_SUBAGENT_MODEL") or None
 
 

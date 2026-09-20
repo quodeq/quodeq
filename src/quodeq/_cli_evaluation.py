@@ -149,7 +149,7 @@ def _resolve_run_config_locals(
     args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None,
 ) -> _RunConfigLocals:
     """Resolve the per-run scalars _build_run_config needs before assembling RunConfig."""
-    _env = env or os.environ
+    _env = os.environ if env is None else env
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
     if inputs.single_file:
         consolidated = False
