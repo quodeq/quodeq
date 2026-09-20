@@ -3,6 +3,10 @@
 // counts and short labels the same way.
 import { LOCALE } from '../../strings/index.js';
 
+// Per-project principle bar height, as a percent of the bar track: a near-
+// zero score still renders a visible sliver instead of disappearing.
+export const MIN_BAR_HEIGHT_PCT = 15;
+
 export const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 export const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
 export const signed1 = (g) => (g == null ? '—' : (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1)));

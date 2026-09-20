@@ -7,6 +7,9 @@ function levelLabel(level) {
   return t(`compare.level${level.charAt(0).toUpperCase()}${level.slice(1)}`);
 }
 
+// Always-on lead-in count before the rest hides behind the expand toggle.
+const VISIBLE_COUNT = 3;
+
 function CompareAttentionItem({ item, rest }) {
   return (
     <div
@@ -48,13 +51,13 @@ function CompareAttentionItem({ item, rest }) {
 export default function CompareAttentionStrip({ ariaLabel, noteText, items }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
-  const shown = open ? items : items.slice(0, 3);
+  const shown = open ? items : items.slice(0, VISIBLE_COUNT);
   return (
     <section className="compare-panel" aria-label={ariaLabel}>
       <div className="compare-panel__head">
         <SectionLabel>{t('compare.attentionHeader', { count: items.length })}</SectionLabel>
         <span className="compare-panel__note">{noteText}</span>
-        {items.length > 3 && (
+        {items.length > VISIBLE_COUNT && (
           <button
             type="button"
             className="compare-attention__toggle"
@@ -62,7 +65,7 @@ export default function CompareAttentionStrip({ ariaLabel, noteText, items }) {
           >
             {open
               ? `${t('compare.attentionLess')} ▾`
-              : `${t('compare.attentionMore', { count: items.length - 3 })} ▸`}
+              : `${t('compare.attentionMore', { count: items.length - VISIBLE_COUNT })} ▸`}
           </button>
         )}
       </div>
@@ -71,8 +74,8 @@ export default function CompareAttentionStrip({ ariaLabel, noteText, items }) {
           <Fragment key={item.key}>
             {/* The standards list draws this same boundary: the always-on
                 trio above the line, the expanded rest dimmed below it. */}
-            {i === 3 && <div className="compare-attention__divider" aria-hidden="true" />}
-            <CompareAttentionItem item={item} rest={i >= 3} />
+            {i === VISIBLE_COUNT && <div className="compare-attention__divider" aria-hidden="true" />}
+            <CompareAttentionItem item={item} rest={i >= VISIBLE_COUNT} />
           </Fragment>
         ))}
       </div>

@@ -17,6 +17,9 @@ import CompareDimensionsBoard from './CompareDimensionsBoard.jsx';
 import CompareProjectsTable from './CompareProjectsTable.jsx';
 import { nf, score1 } from '../compareFormatters.js';
 
+// Top-N by consequence always shown in the attention strip; beyond that
+// only rows that actually flag ('watch'+) qualify (see partitionFleetRows).
+const ATTENTION_LEAD_COUNT = 3;
 
 function buildAttentionItems(attnAll, onOpenProject, openDimension) {
   return attnAll.map(({ row, level, reasons, worstDim }) => ({
@@ -79,8 +82,8 @@ function buildFleetMatrixRows(scoredRows, onOpenProject, onOpenProjectDimension)
 function partitionFleetRows(orderedRows, attention, errorsById) {
   const scoredRows = orderedRows.filter((r) => r.hasData);
   const attnAll = [
-    ...attention.slice(0, 3),
-    ...attention.slice(3).filter((a) => a.level !== 'clear'),
+    ...attention.slice(0, ATTENTION_LEAD_COUNT),
+    ...attention.slice(ATTENTION_LEAD_COUNT).filter((a) => a.level !== 'clear'),
   ];
   const isUnevaluated = (row) => row.loaded && !row.hasData && !errorsById[row.id];
   const mainRows = orderedRows.filter((row) => !isUnevaluated(row));
