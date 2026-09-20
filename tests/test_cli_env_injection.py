@@ -60,23 +60,42 @@ def _limits_args() -> argparse.Namespace:
     )
 
 
-def test_resolve_limits_reads_caps_from_the_injected_env(monkeypatch):
+def test_resolve_limits_reads_every_cap_from_the_injected_env(monkeypatch):
     from quodeq._cli_run_config import _resolve_limits
 
-    monkeypatch.setenv("QUODEQ_MAX_TURNS", "77")
-    monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", "77")
+    # Every cap this phase reads, exported in the process environment.
+    exported = {
+        "QUODEQ_MAX_TURNS": "77", "QUODEQ_MAX_DURATION": "77",
+        "QUODEQ_TIME_LIMIT": "77", "QUODEQ_NO_VERIFY": "1",
+        "QUODEQ_MAX_API_FILE_SIZE": "77", "AI_CMD": "ollama",
+    }
+    for var, value in exported.items():
+        monkeypatch.setenv(var, value)
 
     injected = _resolve_limits(_limits_args(), {
-        "QUODEQ_MAX_TURNS": "12", "QUODEQ_MAX_API_FILE_SIZE": "999",
+        "QUODEQ_MAX_TURNS": "12",
+        "QUODEQ_MAX_DURATION": "34",
+        "QUODEQ_TIME_LIMIT": "56",
+        "QUODEQ_NO_VERIFY": "1",
+        "QUODEQ_MAX_API_FILE_SIZE": "999",
+        "AI_CMD": "codex",
     })
     assert injected.max_turns == 12
+    assert injected.max_duration == 34
+    assert injected.time_limit == 56
+    assert injected.verify_findings is False
     assert injected.dispatch_policy.file_size_cap == 999
+    assert injected.dispatch_policy.ai_cmd == "codex"
 
-    # An empty mapping means "no variables set" for the dispatch policy the
-    # boundary builds. (``max_turns`` still goes through ``_cli_env._env_int``,
-    # whose own `or os.environ` fallback is a separate task's site.)
+    # An empty mapping means "no variables set": every cap falls back to its
+    # packaged default even though all six are exported in the process.
     empty = _resolve_limits(_limits_args(), {})
+    assert empty.max_turns is None
+    assert empty.max_duration is None
+    assert empty.time_limit is None
+    assert empty.verify_findings is True
     assert empty.dispatch_policy.file_size_cap == 15000
+    assert empty.dispatch_policy.ai_cmd == "claude"  # the packaged default
 
 
 def test_run_config_locals_read_consolidation_from_the_injected_env(monkeypatch):
@@ -96,10 +115,11 @@ def test_run_config_locals_read_consolidation_from_the_injected_env(monkeypatch)
     assert on.consolidated is True
 
 
-def test_run_config_locals_read_the_subagent_model_from_the_injected_env():
+def test_run_config_locals_read_the_subagent_model_from_the_injected_env(monkeypatch):
     from quodeq._cli_evaluation import _resolve_run_config_locals
     from quodeq._cli_resolution import ResolvedInputs
 
+    monkeypatch.setenv("SUBAGENT_MODEL", "from-process")
     args = argparse.Namespace(no_consolidated=False, diff_from=None, _diff_files=None)
     inputs = ResolvedInputs(
         src=".", language="python", manifest=None, dims_data=None, single_file=None,
@@ -107,3 +127,5 @@ def test_run_config_locals_read_the_subagent_model_from_the_injected_env():
 
     injected = _resolve_run_config_locals(args, inputs, {"SUBAGENT_MODEL": "m-1"})
     assert injected.subagent_model == "m-1"
+    # Empty mapping: the exported override must not be consulted.
+    assert _resolve_run_config_locals(args, inputs, {}).subagent_model is None

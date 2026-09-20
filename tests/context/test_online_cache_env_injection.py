@@ -7,10 +7,17 @@ from quodeq.context import online_cache
 
 
 def test_cache_root_honours_injected_env(tmp_path: Path, monkeypatch):
+    # cache_root() mkdirs what it returns, and the env={} branch falls back to
+    # the home directory — pin that to tmp_path so the real ~/.quodeq is never
+    # touched. Patching Path.home covers Windows too, where HOME is not read.
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
     assert online_cache.cache_root(env={"QUODEQ_CACHE_ROOT": str(tmp_path)}) == tmp_path / "online"
     # env={} means "nothing set": the exported value must not be consulted.
-    assert online_cache.cache_root(env={}) == Path.home() / ".quodeq" / "cache" / "online"
+    assert online_cache.cache_root(env={}) == home / ".quodeq" / "cache" / "online"
 
 
 def test_cache_disabled_honours_injected_env(monkeypatch):
