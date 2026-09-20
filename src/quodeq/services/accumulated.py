@@ -40,7 +40,7 @@ from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export
     clear_accumulated_process_cache,
     create_accumulated_cache,
 )
-from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
 from quodeq.services._accumulated_aggregate import (  # noqa: F401 — re-export
     _AccumulatedResult,
     _aggregate_severity_counts,

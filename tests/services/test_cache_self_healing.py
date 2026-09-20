@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
 from tests.services._cache_fixtures import _make_dim
 
 

@@ -240,8 +240,6 @@ src/quodeq/services/scoring/_project_scores.py:17:private-module:quodeq.services
 src/quodeq/services/scoring/_rescoring.py:18:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_response_builders.py:21:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_run_scores.py:10:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/services/scoring/_run_scores.py:9:private-module:quodeq.services._cache.DimensionCacheContext
-src/quodeq/services/scoring/_run_scores.py:9:private-module:quodeq.services._cache.make_lru_dimension_fetcher
 src/quodeq/services/shared_settings.py:16:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/services/tooling_mixin.py:14:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/tooling_mixin.py:17:private-module:quodeq.shared._env_resolve.resolve_env

@@ -1,7 +1,7 @@
 """Run-directory file mechanics: evaluation counts, status state, evidence
 and queue reads, scratch cleanup, fingerprints.
 
-services/_cache, services/_accumulated_data, services/score_run and
+services/cache, services/_accumulated_data, services/score_run and
 services/evaluation_mixin used to do these reads (and the discard-time
 unlinks) inline. The mechanics live here; the services keep the guard
 decisions (terminal-state sets, staleness rules, what counts as scratch).

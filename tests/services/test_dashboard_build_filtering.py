@@ -176,7 +176,7 @@ class TestHistoryContextSlimming:
             # no-events/no-db tmp project the scalar reader falls back to
             # read_run_data at the runs-module level, so patch there too.
             patch("quodeq.services.dashboard.read_run_data", side_effect=read_by_run),
-            patch("quodeq.services._cache.read_run_data", side_effect=read_by_run),
+            patch("quodeq.services.cache.read_run_data", side_effect=read_by_run),
             patch("quodeq.data.fs.report_parser.runs.read_run_data", side_effect=read_by_run),
             patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
         ):

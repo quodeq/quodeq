@@ -32,7 +32,7 @@ from typing import Callable
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
 from quodeq.services._scoring_deps import ScoringDeps, _NO_DEPS
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
