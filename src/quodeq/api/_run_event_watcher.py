@@ -20,7 +20,7 @@ from quodeq.api._run_event_serializers import (
     serialize_status_event,
     _payload_as_sse_finding,
 )
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 

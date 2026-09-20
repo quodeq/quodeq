@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from quodeq.assistant import get_provider_configs
-from quodeq.core._constants import MCP_STYLE_CONFIG_FILE, PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG
+from quodeq.core.constants import MCP_STYLE_CONFIG_FILE, PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG
 
 # Per-provider discriminators for the assistant-only CliChatConfig fields
 # (resume_style, session_id_source, system_prompt_style), sourced from the

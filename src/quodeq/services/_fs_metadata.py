@@ -246,7 +246,7 @@ def _read_accumulated_summary(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
+    from quodeq.shared.env import score_cache_disabled  # noqa: PLC0415
     scope = _summary_version(reports_root, entry_name, runs, params)
     if compute_on_miss or score_cache_disabled():
         return _compute_on_miss_summary(reports_root, entry_name, runs, params, scope)

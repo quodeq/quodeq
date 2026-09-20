@@ -151,9 +151,9 @@ class TestResolveRepo:
 # ---------------------------------------------------------------------------
 
 class TestSetupRunDirs:
-    @patch("quodeq._cli_evaluation.resolve_project_uuid", return_value="proj-uuid-123")
+    @patch("quodeq.cli_evaluation.resolve_project_uuid", return_value="proj-uuid-123")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
-    @patch("quodeq._cli_evaluation.project_name_from_repo", return_value="myproject")
+    @patch("quodeq.cli_evaluation.project_name_from_repo", return_value="myproject")
     def test_creates_directories(self, mock_name, mock_url, mock_uuid, tmp_path):
         from quodeq.cli import setup_run_dirs
         output_dir = tmp_path / "output"

@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.errors import ClientMessageError
 from quodeq.shared.utils import sanitize_sensitive

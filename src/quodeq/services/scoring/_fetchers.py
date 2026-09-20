@@ -19,7 +19,7 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._wiring import read_run_scalars
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 
 
 def _max_history_runs() -> int:

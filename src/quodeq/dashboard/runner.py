@@ -20,7 +20,7 @@ from quodeq.dashboard._server import (
     _ensure_action_api,
     _ensure_action_api_forced,
 )
-from quodeq.shared._env_resolve import resolve_env_mut
+from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.paths import resolve_path

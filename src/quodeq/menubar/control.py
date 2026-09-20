@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from quodeq.shared._env_paths import get_run_dir
+from quodeq.shared.env_paths import get_run_dir
 from quodeq.shared.frozen import is_frozen, subprocess_cmd
 
 _logger = logging.getLogger(__name__)

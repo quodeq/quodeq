@@ -12,7 +12,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s

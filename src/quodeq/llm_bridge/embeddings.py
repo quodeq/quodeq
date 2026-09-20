@@ -108,14 +108,17 @@ class EmbeddingAvailabilityCache:
         self._cache: LRUDict[tuple[str, str], bool] = LRUDict(max_entries)
 
     def get(self, key: tuple[str, str]) -> bool | None:
+        """Cached availability for *key*, or None if it was never probed."""
         with self._lock:
             return self._cache.get(key)
 
     def set(self, key: tuple[str, str], value: bool) -> None:
+        """Record the availability *value* probed for *key*."""
         with self._lock:
             self._cache.put(key, value)
 
     def clear(self) -> None:
+        """Drop every cached availability answer."""
         with self._lock:
             self._cache.clear()
 

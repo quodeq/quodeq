@@ -12,7 +12,7 @@ from quodeq.data.cache_store.entry import CacheEntry
 from quodeq.data.cache_store.index import ContentIndex
 from quodeq.data.cache_store.local import LocalFileBackend
 from quodeq.data.fs import evidence_tally, run_files, stream_files
-from quodeq.data.fs.dimension_report import _report_io
+from quodeq.data.fs.dimension_report import report_io
 from quodeq.data.sqlite import _run_index_schema, findings_queries, precedent_vectors
 
 
@@ -66,17 +66,17 @@ def test_persist_json_logs_cleanup_unlink_failure(tmp_path) -> None:
     target = tmp_path / "report.json"
     with (
         patch(
-            "quodeq.data.fs.dimension_report._report_io.os.replace",
+            "quodeq.data.fs.dimension_report.report_io.os.replace",
             side_effect=OSError("replace failed"),
         ),
         patch(
-            "quodeq.data.fs.dimension_report._report_io.os.unlink",
+            "quodeq.data.fs.dimension_report.report_io.os.unlink",
             side_effect=OSError("unlink failed"),
         ),
-        patch.object(_report_io._logger, "debug") as debug,
+        patch.object(report_io._logger, "debug") as debug,
     ):
         with pytest.raises(OSError):
-            _report_io.persist_json({"ok": True}, target)  # (data, path) order
+            report_io.persist_json({"ok": True}, target)  # (data, path) order
     assert debug.called
     assert "not removed after a failed write" in debug.call_args.args[0]
 

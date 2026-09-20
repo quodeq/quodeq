@@ -215,7 +215,7 @@ def test_callers_carry_no_subprocess_dependency():
     import quodeq.analysis.subagents._git_scoring as git_scoring
     import quodeq.services._fs_scan as fs_scan
     import quodeq.services.project_registration as project_registration
-    import quodeq.shared._repo as repo
+    import quodeq.shared.repo as repo
 
     for mod in (fs_scan, project_registration, repo, git_scoring):
         assert "subprocess" not in vars(mod), mod.__name__

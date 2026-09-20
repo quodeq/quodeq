@@ -74,7 +74,7 @@ def test_build_router_sets_corpus_none_when_flag_off(tmp_path: Path, monkeypatch
 
 
 def test_build_router_degrades_when_flag_on_but_no_embedder(tmp_path: Path, monkeypatch):
-    from quodeq.llm_bridge._embeddings import reset_embedding_availability_cache
+    from quodeq.llm_bridge.embeddings import reset_embedding_availability_cache
 
     reset_embedding_availability_cache()
     monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")

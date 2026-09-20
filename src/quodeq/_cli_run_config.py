@@ -1,14 +1,14 @@
-"""Run-config assembly phases for ``_cli_evaluation._build_run_config``.
+"""Run-config assembly phases for ``cli_evaluation._build_run_config``.
 
 Split out so the orchestrator stays a short list of phase calls: this module
 owns the dimension filter, the flag/env-derived caps (``_RunLimits``) and the
 ``AnalysisOptions`` mapping. ``_build_run_config`` itself stays in
-``_cli_evaluation`` because tests patch ``default_paths`` at that module's path.
+``cli_evaluation`` because tests patch ``default_paths`` at that module's path.
 
 Patch target note: the names below are looked up in THIS module's globals, so
 tests patch ``quodeq._cli_run_config.<name>`` — ``_env_int``, ``_no_verify``,
 ``_resolve_time_limit``, ``default_dispatch_policy``,
-``expand_dimension_aliases`` and ``AnalysisOptions``. ``_cli_evaluation``
+``expand_dimension_aliases`` and ``AnalysisOptions``. ``cli_evaluation``
 re-exports some of the same names for ``quodeq.cli``, but patching them there
 does not reach this module.
 """
@@ -35,8 +35,8 @@ from quodeq._cli_env import (
 
 if TYPE_CHECKING:
     # Annotation only — a runtime import would close the cycle, since
-    # _cli_evaluation imports this module.
-    from quodeq._cli_evaluation import _RunConfigLocals
+    # cli_evaluation imports this module.
+    from quodeq.cli_evaluation import _RunConfigLocals
 
 
 @dataclass(frozen=True, slots=True)

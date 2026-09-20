@@ -6,7 +6,7 @@ wire_dict_to_judgment and parse_jsonl_line).
 """
 from __future__ import annotations
 
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 
 
 def coerce_confidence(value: object, default: int = FULL_CONFIDENCE) -> int:

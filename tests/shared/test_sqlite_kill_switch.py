@@ -5,7 +5,7 @@ import pytest
 
 from quodeq.analysis.mcp.router import FindingsRouter
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
-from quodeq.shared._env import sqlite_disabled
+from quodeq.shared.env import sqlite_disabled
 
 
 def test_sqlite_disabled_default(monkeypatch):

@@ -5,7 +5,7 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.evidence._options import EvidenceParseOptions, MalformedLineSink
 from quodeq.core.evidence._refs import enrich_judgment
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade

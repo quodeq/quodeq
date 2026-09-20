@@ -24,7 +24,7 @@ from quodeq.dashboard._webview_token import (
     _warn_reused_api_token_mismatch,
     spawn_window_with_token,
 )
-from quodeq.shared._env_resolve import resolve_env_mut
+from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 

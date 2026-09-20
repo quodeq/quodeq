@@ -1,4 +1,4 @@
-"""quodeq.core._constants' MCP/prompt style constants agree across their
+"""quodeq.core.constants' MCP/prompt style constants agree across their
 producer (ai_providers.json, consumed via quodeq.analysis._provider_cache /
 quodeq.assistant.get_provider_configs) and its two feature consumers:
 quodeq.analysis (dimension-analysis subprocess dispatch) and
@@ -9,7 +9,7 @@ here can't silently desync one side's comparison from the other's.
 """
 from __future__ import annotations
 
-from quodeq.core._constants import (
+from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )

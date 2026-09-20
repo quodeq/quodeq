@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.core.evidence._req_mapping import principle_names_for_dimension
+from quodeq.core.evidence.req_mapping import principle_names_for_dimension
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.shared.utils import read_json
 from quodeq.data.fs.report_parser._report_parsing import build_finding, empty_severity_buckets

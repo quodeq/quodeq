@@ -32,7 +32,7 @@ class TestAnalysisOptionsDryRun:
 
 class TestCliWiring:
     def test_dry_run_wired_from_args(self, tmp_path):
-        from quodeq._cli_evaluation import _build_run_config
+        from quodeq.cli_evaluation import _build_run_config
         from quodeq._cli_resolution import ResolvedInputs
 
         args = argparse.Namespace(
@@ -55,9 +55,9 @@ class TestCliWiring:
             dims_data=dims_data,
         )
 
-        with patch("quodeq._cli_evaluation.default_paths") as mock_paths, \
-             patch("quodeq._cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq._cli_evaluation._subagent_model", return_value=None):
+        with patch("quodeq.cli_evaluation.default_paths") as mock_paths, \
+             patch("quodeq.cli_evaluation.get_ai_model", return_value=None), \
+             patch("quodeq.cli_evaluation._subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
             config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
@@ -65,7 +65,7 @@ class TestCliWiring:
         assert config.options.dry_run is True
 
     def test_dry_run_false_by_default(self, tmp_path):
-        from quodeq._cli_evaluation import _build_run_config
+        from quodeq.cli_evaluation import _build_run_config
         from quodeq._cli_resolution import ResolvedInputs
 
         args = argparse.Namespace(
@@ -88,9 +88,9 @@ class TestCliWiring:
             dims_data=dims_data,
         )
 
-        with patch("quodeq._cli_evaluation.default_paths") as mock_paths, \
-             patch("quodeq._cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq._cli_evaluation._subagent_model", return_value=None):
+        with patch("quodeq.cli_evaluation.default_paths") as mock_paths, \
+             patch("quodeq.cli_evaluation.get_ai_model", return_value=None), \
+             patch("quodeq.cli_evaluation._subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
             config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
@@ -99,7 +99,7 @@ class TestCliWiring:
 
     def test_missing_dry_run_attr_defaults_false(self, tmp_path):
         """getattr fallback: if args has no dry_run attribute, default to False."""
-        from quodeq._cli_evaluation import _build_run_config
+        from quodeq.cli_evaluation import _build_run_config
         from quodeq._cli_resolution import ResolvedInputs
 
         args = argparse.Namespace(
@@ -122,9 +122,9 @@ class TestCliWiring:
             dims_data=dims_data,
         )
 
-        with patch("quodeq._cli_evaluation.default_paths") as mock_paths, \
-             patch("quodeq._cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq._cli_evaluation._subagent_model", return_value=None):
+        with patch("quodeq.cli_evaluation.default_paths") as mock_paths, \
+             patch("quodeq.cli_evaluation.get_ai_model", return_value=None), \
+             patch("quodeq.cli_evaluation._subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
             config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")

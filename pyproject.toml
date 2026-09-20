@@ -98,7 +98,7 @@ convention = "pep257"
 [tool.ruff.lint.per-file-ignores]
 # Re-export blocks placed after the accessors they depend on; moving
 # them to the top would create an import cycle with the _env_* modules.
-"src/quodeq/shared/_env.py" = ["E402"]
+"src/quodeq/shared/env.py" = ["E402"]
 "src/quodeq/shared/utils.py" = ["E402"]
 # Standalone scripts that insert the repo root into sys.path first.
 "tools/*.py" = ["E402"]

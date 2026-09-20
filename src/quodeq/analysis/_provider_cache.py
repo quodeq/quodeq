@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import threading
 
-from quodeq.core._constants import (
+from quodeq.core.constants import (
     MCP_STYLE_CONFIG_ARG, PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
 from quodeq.shared.provider_env import providers_path

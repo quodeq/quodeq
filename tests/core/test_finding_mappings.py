@@ -86,7 +86,7 @@ class TestWireDictToJudgment:
 
     def test_violation_type_read_from_short_vt_key(self):
         """Regression: the JSONL wire format carries the taxonomy as 'vt'
-        (see core/evidence/_jsonl.py); this reader must not silently drop it
+        (see core/evidence/jsonl.py); this reader must not silently drop it
         on the event-log/SQLite path when only the short key is present."""
         j = wire_dict_to_judgment(
             {"p": "P1", "t": "violation", "d": "D", "file": "f", "line": 1,

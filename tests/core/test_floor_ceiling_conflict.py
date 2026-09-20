@@ -100,11 +100,11 @@ def test_the_evidence_path_agrees_with_the_projector() -> None:
 
     `rescore_dimensions` only falls back to the legacy no-evidence path when a
     run has no evidence on disk; every modern run goes through
-    services/evidence_rescore -> core/scoring/engine -> _principle. The
+    services/evidence_rescore -> core/scoring/engine -> principle. The
     projector-level test above does not exercise that path, so a regression
     there would leave the displayed grade unchanged while it still passed.
     """
-    from quodeq.core.scoring._principle import _score_numerical, _build_context
+    from quodeq.core.scoring.principle import _score_numerical, _build_context
 
     pdata = {
         "violations": [{"severity": "minor", "reason": f"distinct {i}"} for i in range(250)],

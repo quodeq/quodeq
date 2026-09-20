@@ -99,7 +99,7 @@ def test_resolve_limits_reads_every_cap_from_the_injected_env(monkeypatch):
 
 
 def test_run_config_locals_read_consolidation_from_the_injected_env(monkeypatch):
-    from quodeq._cli_evaluation import _resolve_run_config_locals
+    from quodeq.cli_evaluation import _resolve_run_config_locals
     from quodeq._cli_resolution import ResolvedInputs
 
     monkeypatch.setenv("QUODEQ_NO_CONSOLIDATE", "1")
@@ -116,7 +116,7 @@ def test_run_config_locals_read_consolidation_from_the_injected_env(monkeypatch)
 
 
 def test_run_config_locals_read_the_subagent_model_from_the_injected_env(monkeypatch):
-    from quodeq._cli_evaluation import _resolve_run_config_locals
+    from quodeq.cli_evaluation import _resolve_run_config_locals
     from quodeq._cli_resolution import ResolvedInputs
 
     monkeypatch.setenv("SUBAGENT_MODEL", "from-process")

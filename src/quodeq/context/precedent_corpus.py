@@ -136,7 +136,7 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     the production BATCH_TIMEOUT, used only when the loader explicitly
     overrides the query-time default for backfill chunks.
     """
-    from quodeq.llm_bridge._embeddings import (  # noqa: PLC0415
+    from quodeq.llm_bridge.embeddings import (  # noqa: PLC0415
         BATCH_TIMEOUT, QUERY_TIMEOUT, EmbeddingEndpoint, embed_texts,
         embedding_model_available)
 
@@ -185,7 +185,7 @@ def _resolve_available_embedder(
     ``load_precedent_corpus`` only has to handle a single
     None-or-proceed branch.
     """
-    from quodeq.shared._env import get_embedding_base_url, get_embedding_model  # noqa: PLC0415
+    from quodeq.shared.env import get_embedding_base_url, get_embedding_model  # noqa: PLC0415
 
     model = get_embedding_model()
     base_url = get_embedding_base_url()
@@ -264,7 +264,7 @@ def load_precedent_corpus(
     failure disables the tier for sibling agents, respawns, and per-call API
     context rebuilds.
     """
-    from quodeq.shared._env import (  # noqa: PLC0415 -- cross-cutting layer
+    from quodeq.shared.env import (  # noqa: PLC0415 -- cross-cutting layer
         get_precedent_similarity_threshold,
         semantic_precedents_enabled,
     )

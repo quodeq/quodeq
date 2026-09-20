@@ -19,7 +19,7 @@ import pytest
 
 from quodeq.shared import frozen
 from quodeq.shared._config import _ConfigHolder, defaults_path
-from quodeq.shared._io import configure_stdio_utf8
+from quodeq.shared.text_io import configure_stdio_utf8
 from quodeq.shared._log_format import _should_use_color
 from quodeq.shared.logging import _apply_env_log_level, _logger
 from quodeq.shared.provider_env import providers_path

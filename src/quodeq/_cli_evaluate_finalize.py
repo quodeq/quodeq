@@ -1,8 +1,8 @@
 """run_evaluate's diff-from resolution and post-run finalization (SARIF export).
 
-Split out of ``_cli_evaluation.py`` to keep that file under the size
+Split out of ``cli_evaluation.py`` to keep that file under the size
 ratchet's 300-line cap. ``_apply_diff_from`` and ``_finalize_run_evaluate``
-are called only from ``_cli_evaluation.run_evaluate``.
+are called only from ``cli_evaluation.run_evaluate``.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def _apply_diff_from(
     Resolved here (not inside _build_run_config) so a DiffResolveError fails
     fast before any run directory is created — once a run dir exists, its
     state is always written by RunLifecycleContext. *resolve_diff_files* is
-    passed in by ``run_evaluate`` so the ``quodeq._cli_evaluation`` patch
+    passed in by ``run_evaluate`` so the ``quodeq.cli_evaluation`` patch
     target keeps working without this module importing its importer.
     """
     diff_from = getattr(args, "diff_from", None)

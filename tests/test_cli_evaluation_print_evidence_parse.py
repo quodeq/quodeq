@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 
-from quodeq._cli_evaluation import _print_scores
+from quodeq.cli_evaluation import _print_scores
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence

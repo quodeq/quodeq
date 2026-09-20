@@ -10,7 +10,7 @@ from pathlib import Path
 
 from quodeq.core.types import PluginDimension, PluginInfo
 from quodeq.config.paths import default_paths
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)

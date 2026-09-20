@@ -2,10 +2,10 @@
 
 Sub-modules:
   _report_constants  -- field-name constants
-  _report_scoring    -- score/grade conversion and lookup building
-  _report_findings   -- findings flattening and principle-row building
-  _report_assembly   -- report dict assembly
-  _report_io         -- disk persistence (I/O adapters)
+  report_scoring     -- score/grade conversion and lookup building
+  report_findings    -- findings flattening and principle-row building
+  report_assembly    -- report dict assembly
+  report_io          -- disk persistence (I/O adapters)
 
 The reader for these files lives at ``data/fs/report_parser/``.
 ``quodeq.analysis.report`` and its sibling ``analysis/_report_*.py`` modules

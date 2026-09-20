@@ -2,13 +2,13 @@
 
 This is the only module that knows how to convert between the LLM wire format,
 the canonical Judgment, the read-side Finding view, and the API response dict.
-SQL row mapping lives in data/sqlite/_row_mappers.py.
+SQL row mapping lives in data/sqlite/row_mappers.py.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 from quodeq.core.finding_coercions import coerce_scope_downgrade
 from quodeq.core.types.finding import Finding
@@ -52,7 +52,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         end_line=d.get("end_line"),
         snippet=d.get("snippet"),
         severity=d.get("severity") or DEFAULT_SEVERITY,
-        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
+        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/jsonl.py);
         # accept the long key too so both spellings survive this seam.
         violation_type=d.get("vt") or d.get("violation_type"),
         violation_type_raw=d.get("vt_raw") or None,

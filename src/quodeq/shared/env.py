@@ -3,11 +3,11 @@
 Numeric helpers and the ports/keys/urls accessors stay here; AI-provider,
 filesystem-path, sqlite-DB, and embedding accessors live in the four
 siblings below and are re-exported so every existing import path
-(``from quodeq.shared._env import <name>``, including this project-wide
+(``from quodeq.shared.env import <name>``, including this project-wide
 fan-in's many call sites) keeps working unchanged.
 
 ``_sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
-defined here) so ``_env_paths.py``/``_env_db.py`` can import it without a
+defined here) so ``env_paths.py``/``_env_db.py`` can import it without a
 cycle back through this module -- see that module's docstring.
 """
 from __future__ import annotations
@@ -132,7 +132,7 @@ from quodeq.shared._env_ai import (  # noqa: F401 — re-export
 # ---------------------------------------------------------------------------
 # Re-exports -- filesystem paths
 # ---------------------------------------------------------------------------
-from quodeq.shared._env_paths import (  # noqa: F401 — re-export
+from quodeq.shared.env_paths import (  # noqa: F401 — re-export
     get_clones_dir,
     get_evaluations_dir,
     get_findings_file,

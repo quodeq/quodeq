@@ -1,16 +1,16 @@
 """Evaluation run lifecycle — directory setup, RunLifecycleContext wiring,
 and cleanup.
 
-Split from ``_cli_evaluation.py`` to keep each module under 300 lines.
-Re-exported from ``_cli_evaluation.py`` so existing
-``quodeq._cli_evaluation.<name>`` imports and patches keep working.
+Split from ``cli_evaluation.py`` to keep each module under 300 lines.
+Re-exported from ``cli_evaluation.py`` so existing
+``quodeq.cli_evaluation.<name>`` imports and patches keep working.
 
-The names tests patch at ``quodeq._cli_evaluation.<name>``
+The names tests patch at ``quodeq.cli_evaluation.<name>``
 (``resolve_project_uuid``, ``project_name_from_repo``, ``is_repo_url``,
 ``emit_marker``, ``cleanup_cloned_repo``, ``_cleanup_worktree``,
 ``get_ai_model``, ``_save_manifest``, ``_build_run_config``,
 ``_execute_pipeline``) reach this module as a :class:`LifecycleHooks`
-bundle that ``_cli_evaluation`` assembles at call time, so this module never
+bundle that ``cli_evaluation`` assembles at call time, so this module never
 imports its own importer.
 """
 
@@ -42,7 +42,7 @@ _logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LifecycleHooks:
-    """The ``_cli_evaluation`` collaborators a lifecycle run calls back into."""
+    """The ``cli_evaluation`` collaborators a lifecycle run calls back into."""
 
     resolve_project_uuid: Callable[..., str]
     project_name_from_repo: Callable[[str], str]

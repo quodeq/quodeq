@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.shared import _io, _process_kill, frozen, ssrf
+from quodeq.shared import text_io, process_kill, frozen, ssrf
 
 # The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
 # restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
@@ -21,10 +21,10 @@ def test_configure_stdio_utf8_logs_each_unreconfigurable_stream(monkeypatch) -> 
         def reconfigure(self, **_kwargs):
             raise ValueError("not reconfigurable")
 
-    monkeypatch.setattr(_io.sys, "stdout", _Stream())
-    monkeypatch.setattr(_io.sys, "stderr", _Stream())
-    with patch.object(_io._logger, "debug") as debug:
-        _io.configure_stdio_utf8()
+    monkeypatch.setattr(text_io.sys, "stdout", _Stream())
+    monkeypatch.setattr(text_io.sys, "stderr", _Stream())
+    with patch.object(text_io._logger, "debug") as debug:
+        text_io.configure_stdio_utf8()
     assert debug.call_count == 2
     assert "reconfigured to UTF-8" in debug.call_args.args[0]
 
@@ -34,10 +34,10 @@ def test_kill_tree_logs_when_process_is_already_gone(monkeypatch) -> None:
     def _gone(*_args):
         raise ProcessLookupError(3, "No such process")
 
-    monkeypatch.setattr(_process_kill.os, "getpgid", _gone)
-    monkeypatch.setattr(_process_kill.os, "kill", _gone)
-    with patch.object(_process_kill._logger, "debug") as debug:
-        _process_kill.kill_tree(999999, signal.SIGTERM)
+    monkeypatch.setattr(process_kill.os, "getpgid", _gone)
+    monkeypatch.setattr(process_kill.os, "kill", _gone)
+    with patch.object(process_kill._logger, "debug") as debug:
+        process_kill.kill_tree(999999, signal.SIGTERM)
     assert debug.called
     assert "already gone" in debug.call_args.args[0]
 
@@ -53,10 +53,10 @@ def test_kill_proc_tree_logs_killpg_failure_then_proc_kill_failure(monkeypatch) 
     def _denied(*_args):
         raise PermissionError(1, "Operation not permitted")
 
-    monkeypatch.setattr(_process_kill.os, "getpgid", lambda pid: pid)
-    monkeypatch.setattr(_process_kill.os, "killpg", _denied)
-    with patch.object(_process_kill._logger, "debug") as debug:
-        _process_kill.kill_proc_tree(_Proc())
+    monkeypatch.setattr(process_kill.os, "getpgid", lambda pid: pid)
+    monkeypatch.setattr(process_kill.os, "killpg", _denied)
+    with patch.object(process_kill._logger, "debug") as debug:
+        process_kill.kill_proc_tree(_Proc())
     messages = [c.args[0] for c in debug.call_args_list]
     assert any("killpg failed" in m for m in messages)
     assert any("already gone" in m for m in messages)

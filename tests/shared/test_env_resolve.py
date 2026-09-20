@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.shared._env_resolve import resolve_env, resolve_env_mut
+from quodeq.shared.env_resolve import resolve_env, resolve_env_mut
 
 
 class TestResolveEnv:

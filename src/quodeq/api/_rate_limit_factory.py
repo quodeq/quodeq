@@ -6,7 +6,7 @@ from pathlib import Path
 
 from quodeq.api._rate_limit_config import default_rate_limit_path
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore, RateLimitStore
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 

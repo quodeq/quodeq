@@ -22,7 +22,7 @@ from quodeq.services._wiring import (
     write_cached_project_summary,
     write_cached_rows,
 )
-from quodeq.shared._env import score_cache_disabled
+from quodeq.shared.env import score_cache_disabled
 
 
 def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> None:

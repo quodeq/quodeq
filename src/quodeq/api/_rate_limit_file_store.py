@@ -11,7 +11,7 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window, default_rate_limit_path
-from quodeq.core.utils._file_lock import lock_file, unlock_file
+from quodeq.core.utils.file_lock import lock_file, unlock_file
 
 _logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ _DEFAULT_PATH = str(default_rate_limit_path())
 
 # This lock is taken from a Flask before_request hook, so its wait budget
 # has to be short enough that contention never pins an HTTP worker thread.
-# The shared _file_lock default (60s, sized for the subagent pool's batch
+# The shared file_lock default (60s, sized for the subagent pool's batch
 # workload) would do exactly that, so the request path passes its own.
 _LOCK_TIMEOUT_S = 1.5
 
@@ -31,7 +31,7 @@ class FileRateLimitStore:
     through a common file without Redis. The ``threading.Lock`` below only
     serializes access within a SINGLE process; ``check_and_record()`` -- the
     actual enforcement path -- additionally takes a cross-process OS file
-    lock (a ``.lock`` sidecar next to the data file, via ``_file_lock``) and
+    lock (a ``.lock`` sidecar next to the data file, via ``file_lock``) and
     reloads fresh from disk inside it, so concurrent worker processes cannot
     interleave the read-modify-write and cannot each act on a stale
     in-memory snapshot. ``record()``/``check()`` are not on the enforcement

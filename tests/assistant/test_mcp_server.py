@@ -27,7 +27,7 @@ def test_build_registry_from_args_parses_project_scope(tmp_path):
 
 
 def test_build_registry_defaults_reports_dir(monkeypatch, tmp_path):
-    monkeypatch.setattr("quodeq.shared._env.get_evaluations_dir",
+    monkeypatch.setattr("quodeq.shared.env.get_evaluations_dir",
                         lambda: str(tmp_path / "evals"))
     parser = server.argparse.ArgumentParser()
     for a in ("--db-path", "--session-id", "--run-dir", "--repo-root",

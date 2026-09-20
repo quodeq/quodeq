@@ -15,7 +15,7 @@ from pathlib import Path
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.data.fs.grade_formula_store import load_params
-from quodeq.data.sqlite._row_mappers import row_to_finding
+from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.core.scoring.projector_scoring import (

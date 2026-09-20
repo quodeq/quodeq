@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared._log_format import (  # noqa: F401
     ColorFormatter as _ColorFormatter,
     StderrHandler as _StderrHandler,

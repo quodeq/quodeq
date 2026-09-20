@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from quodeq.core.scoring._constants import MAX_SCORE
+from quodeq.core.scoring.constants import MAX_SCORE
 from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence, violations_per_100_files
 from quodeq.data.fs.dimension_report._report_taxonomy import unmapped_types
@@ -13,12 +13,12 @@ from quodeq.data.fs.dimension_report._report_constants import (
     FIELD_WEIGHTED_SCORE_SNAKE,
     REPORT_SCHEMA_VERSION,
 )
-from quodeq.data.fs.dimension_report._report_scoring import (
+from quodeq.data.fs.dimension_report.report_scoring import (
     build_score_lookup,
     extract_scores,
     grade_from_score,
 )
-from quodeq.data.fs.dimension_report._report_findings import build_principle_rows
+from quodeq.data.fs.dimension_report.report_findings import build_principle_rows
 
 
 @dataclass

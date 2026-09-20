@@ -14,7 +14,7 @@ import unicodedata
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
-from quodeq.shared._repo import normalize_remote_url
+from quodeq.shared.repo import normalize_remote_url
 
 _logger = logging.getLogger(__name__)
 

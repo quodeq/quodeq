@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
-from quodeq.core.scoring._principle import compute_tallies
+from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.scoring.internals import (
     finding_to_scoring_dict,
     principle_score_and_grade,
@@ -84,7 +84,7 @@ def compute_principle_grade(
 ) -> dict[str, Any]:
     """Score a single principle. ``findings`` excludes dismissed.
 
-    Mirrors the CLI's ``core/scoring/_principle._score_numerical``: low
+    Mirrors the CLI's ``core/scoring/principle._score_numerical``: low
     confidence (thin evidence relative to project size) short-circuits to
     ``Insufficient`` before any scoring math runs. Without this gate,
     principles with one or two findings scored ``10.0/Exemplary`` here

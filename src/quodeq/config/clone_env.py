@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 
 # One month of slack over the default git churn lookback (git_lookback_months,
 # 3) so the boundary commit is never cut off.

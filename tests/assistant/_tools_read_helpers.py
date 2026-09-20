@@ -8,7 +8,7 @@ from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 def _finding(**over):
     # FindingsRouter wire dict: short keys per finding_dict_to_row
-    # (src/quodeq/data/sqlite/_row_mappers.py).
+    # (src/quodeq/data/sqlite/row_mappers.py).
     base = {
         "p": "req-1", "d": "security", "req": "req-1",
         "t": "violation", "severity": "major", "file": "src/a.py",

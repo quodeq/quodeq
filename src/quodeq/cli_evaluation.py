@@ -12,7 +12,7 @@ lifecycle helpers receive this module's patchable names as a
 Patch targets — patch a name where the code that calls it looks it up, not
 where it happens to be re-exported:
 
-- Called from THIS module, so ``quodeq._cli_evaluation.<name>`` works:
+- Called from THIS module, so ``quodeq.cli_evaluation.<name>`` works:
   ``default_paths``, ``get_ai_model``, ``_subagent_model``, ``resolve_diff_files``,
   ``is_repo_url``, ``project_name_from_repo``, ``emit_marker``,
   ``cleanup_cloned_repo``, ``resolve_project_uuid`` and the ``evidence_rescore``
@@ -195,7 +195,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
 
 def _lifecycle_hooks() -> LifecycleHooks:
     """Bundle this module's globals for ``_cli_lifecycle``, resolved at call
-    time so a patch on ``quodeq._cli_evaluation.<name>`` is what runs."""
+    time so a patch on ``quodeq.cli_evaluation.<name>`` is what runs."""
     return LifecycleHooks(
         resolve_project_uuid=resolve_project_uuid,
         project_name_from_repo=project_name_from_repo,

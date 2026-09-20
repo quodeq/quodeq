@@ -16,7 +16,7 @@ from typing import Callable
 
 from quodeq.core.types import DimensionResult
 from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 
 @dataclass(frozen=True, slots=True)

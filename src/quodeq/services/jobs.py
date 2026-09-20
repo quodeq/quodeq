@@ -14,7 +14,7 @@ import subprocess
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import JobSnapshot
 
-from quodeq.shared._process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
+from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,

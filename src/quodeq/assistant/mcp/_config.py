@@ -9,7 +9,7 @@ import sys
 import threading
 from pathlib import Path
 
-from quodeq.shared._mcp import codex_mcp_override
+from quodeq.shared.mcp import codex_mcp_override
 
 _logger = logging.getLogger(__name__)
 

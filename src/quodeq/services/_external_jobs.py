@@ -20,14 +20,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.shared._process_kill import kill_tree as _kill_tree
+from quodeq.shared.process_kill import kill_tree as _kill_tree
 from quodeq.core.utils.io import resolve_child_dir
-from quodeq.data.fs.report_parser._external_pid import (  # noqa: F401 — re-exported API
+from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401 — re-exported API
     is_safe_run_segment,
     resolve_external_pid,
 )
 from quodeq.services._run_index_fs import _scan_reports_root_for_run
-from quodeq.shared._env import env_float
+from quodeq.shared.env import env_float
 from quodeq.shared.process import is_pid_alive
 
 _logger = logging.getLogger(__name__)

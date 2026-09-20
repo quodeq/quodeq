@@ -18,10 +18,10 @@ pytestmark = pytest.mark.usefixtures("restore_environ")
 # ---------------------------------------------------------------------------
 
 class TestRunPipelineWithCleanup:
-    @patch("quodeq._cli_evaluation._execute_pipeline", return_value=0)
-    @patch("quodeq._cli_evaluation._build_run_config")
-    @patch("quodeq._cli_evaluation._save_manifest")
-    @patch("quodeq._cli_evaluation.emit_marker")
+    @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
+    @patch("quodeq.cli_evaluation._build_run_config")
+    @patch("quodeq.cli_evaluation._save_manifest")
+    @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
     def test_local_repo_no_cleanup(self, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path):
         from quodeq.cli import run_pipeline_with_cleanup, ResolvedInputs
@@ -36,12 +36,12 @@ class TestRunPipelineWithCleanup:
         )
         assert result == 0
 
-    @patch("quodeq._cli_evaluation._execute_pipeline", return_value=0)
-    @patch("quodeq._cli_evaluation._build_run_config")
-    @patch("quodeq._cli_evaluation._save_manifest")
-    @patch("quodeq._cli_evaluation.emit_marker")
+    @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
+    @patch("quodeq.cli_evaluation._build_run_config")
+    @patch("quodeq.cli_evaluation._save_manifest")
+    @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
-    @patch("quodeq._cli_evaluation.cleanup_cloned_repo")
+    @patch("quodeq.cli_evaluation.cleanup_cloned_repo")
     def test_remote_repo_cleanup(self, mock_cleanup, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path):
         from quodeq.cli import run_pipeline_with_cleanup, ResolvedInputs
         evidence_dir = tmp_path / "proj-uuid" / "run-id" / "evidence"
@@ -53,12 +53,12 @@ class TestRunPipelineWithCleanup:
         run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
         mock_cleanup.assert_called_once()
 
-    @patch("quodeq._cli_evaluation._execute_pipeline", return_value=0)
-    @patch("quodeq._cli_evaluation._build_run_config")
-    @patch("quodeq._cli_evaluation._save_manifest")
-    @patch("quodeq._cli_evaluation.emit_marker")
+    @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
+    @patch("quodeq.cli_evaluation._build_run_config")
+    @patch("quodeq.cli_evaluation._save_manifest")
+    @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
-    @patch("quodeq._cli_evaluation._cleanup_worktree")
+    @patch("quodeq.cli_evaluation._cleanup_worktree")
     def test_worktree_cleanup(self, mock_wt_cleanup, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path):
         from quodeq.cli import run_pipeline_with_cleanup, ResolvedInputs
         evidence_dir = tmp_path / "proj-uuid" / "run-id" / "evidence"

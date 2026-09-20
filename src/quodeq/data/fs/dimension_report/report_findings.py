@@ -10,7 +10,7 @@ from quodeq.data.fs.dimension_report._report_constants import (
     GRADE_INSUFFICIENT,
     VIOLATION_FIELDS,
 )
-from quodeq.data.fs.dimension_report._report_scoring import grade_from_score
+from quodeq.data.fs.dimension_report.report_scoring import grade_from_score
 
 
 def flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:

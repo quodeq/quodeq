@@ -8,7 +8,7 @@ from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
 from quodeq.analysis.errors import FatalProviderError, ProviderError, classify_fatal_provider_message
 from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
 from quodeq.shared import cancellation
-from quodeq.shared._process_kill import terminate_process as _terminate_process
+from quodeq.shared.process_kill import terminate_process as _terminate_process
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.data.sqlite.run_index import open_index, sync_index
-from quodeq.data.sqlite._index_sync import (
+from quodeq.data.sqlite.index_sync import (
     _is_pid_alive,
     _sync_legacy_run,
     _upsert_from_status,

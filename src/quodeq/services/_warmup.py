@@ -84,7 +84,7 @@ class WarmupEngine:
         # Warming a disabled cache stores nothing, so it would be pure wasted
         # compute every boot; the inline read-through paths already handle
         # the kill switch themselves.
-        from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
+        from quodeq.shared.env import score_cache_disabled  # noqa: PLC0415
 
         if score_cache_disabled():
             return

@@ -35,7 +35,7 @@ from quodeq.data.fs.deleted_store import (  # noqa: F401
 )
 
 # Per-dimension report file builder + writer.
-from quodeq.data.fs.dimension_report._report_io import write_dimension_report  # noqa: F401
+from quodeq.data.fs.dimension_report.report_io import write_dimension_report  # noqa: F401
 
 # NOTE: LocalFileBackend (data.cache_store.local) is deliberately NOT
 # re-exported here. Its module (via CacheEntry.quodeq_version) reaches the
@@ -93,7 +93,7 @@ from quodeq.data.sqlite.findings_queries import (  # noqa: F401
     read_active_findings,
     read_finding_details,
 )
-from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: F401
+from quodeq.data.sqlite.row_mappers import row_to_finding  # noqa: F401
 
 # Custom-standard file mechanics (see StandardsStore in services/ports.py).
 from quodeq.data.fs.standards_store import (  # noqa: F401

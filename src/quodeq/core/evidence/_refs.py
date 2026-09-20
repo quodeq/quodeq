@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from quodeq.core.evidence._options import EvidenceParseOptions
 
 # Reads ``{req_id: [{label, url, ...}, ...]}`` for (compiled_dir, dimension).
-# Mirrors the ``ReqMapReader`` seam in ``_req_mapping``: *compiled_dir* is
+# Mirrors the ``ReqMapReader`` seam in ``req_mapping``: *compiled_dir* is
 # only ever handed to the injected reader -- core performs no file I/O
 # itself. Production injects
 # ``quodeq.data.fs.standards_loader.load_compiled_refs``.

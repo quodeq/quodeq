@@ -55,7 +55,7 @@ class TestResolveLimits:
 
 class TestBuildAnalysisOptions:
     def test_maps_resolved_locals_and_limits_onto_the_options(self):
-        from quodeq._cli_evaluation import _RunConfigLocals
+        from quodeq.cli_evaluation import _RunConfigLocals
         from quodeq._cli_run_config import _build_analysis_options, _resolve_limits
 
         limits = _resolve_limits(
