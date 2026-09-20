@@ -177,6 +177,30 @@ def test_cleanup_handle_race_does_not_discard_the_models(cli, monkeypatch):
     assert not calls[0][1]["cwd"].exists()
 
 
+def test_process_factory_seam_avoids_monkeypatching_asyncio(tmp_path):
+    """fetch_copilot_models accepts a process_factory instead of requiring
+    asyncio.create_subprocess_exec itself to be monkeypatched."""
+    body = json.dumps(result([{"id": "gpt-test"}])).encode()
+    frame = f"Content-Length: {len(body)}\r\n\r\n".encode() + body
+    script = tmp_path / "fake_cli.py"
+    script.write_text(
+        "import sys,json\n"
+        "header=sys.stdin.buffer.readline()\n"
+        "sys.stdin.buffer.readline()\n"
+        "sys.stdin.buffer.read(int(header.split(b':')[1]))\n"
+        f"sys.stdout.buffer.write({frame!r})\n"
+        "sys.stdout.buffer.flush()\n"
+        "sys.stdin.buffer.read()\n"
+    )
+
+    async def factory(*args, **kwargs):
+        return await asyncio.create_subprocess_exec(sys.executable, str(script), **kwargs)
+
+    env = {"HOME": str(tmp_path), "PATH": "/bin"}
+    payload = fetch_copilot_models(env=env, process_factory=factory)
+    assert payload == {"models": ["auto", "gpt-test"]}
+
+
 def test_cleanup_never_outranks_the_result_even_when_it_keeps_failing(cli, monkeypatch):
     """If the handle outlives every retry, the scratch dir is left to the OS
     temp cleaner; the discovery result must still come through untouched."""
