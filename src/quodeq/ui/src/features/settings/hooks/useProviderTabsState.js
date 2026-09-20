@@ -3,9 +3,8 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { ACTIVE_PROVIDER_KEY, notifyProviderSettingsChanged } from '../../../constants.js';
 import { useMigrateLegacySettings } from './useMigrateLegacySettings.js';
 import { t } from '../../../strings/index.js';
+import { sortClientsByProviderOrder } from './providerClientOrder.js';
 import { readString, writeString } from '../../../adapters/storage.js';
-
-const DEFAULT_PROVIDER_ORDER = 50;
 
 /**
  * ProviderTabs.jsx's client-list fetch, active-tab state and tab-selection
@@ -23,11 +22,7 @@ export function useProviderTabsState(providerConfigs) {
     getAiClients().then((data) => {
       const raw = data.clients || [];
       // Sort by 'order' field from provider configs (ai_providers.json)
-      const list = [...raw].sort((a, b) => {
-        const oa = providerConfigs?.[a.id]?.order ?? DEFAULT_PROVIDER_ORDER;
-        const ob = providerConfigs?.[b.id]?.order ?? DEFAULT_PROVIDER_ORDER;
-        return oa - ob;
-      });
+      const list = sortClientsByProviderOrder(raw, providerConfigs);
       setClients(list);
       if (!activeTab && list.length > 0) {
         const firstInstalled = list.find((c) => c.installed !== false) || list[0];

@@ -3,7 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useOllamaModels } from '../hooks/useOllamaModels.js';
-import { useLocalApiConcurrencyTest } from '../hooks/useLocalApiConcurrencyTest.js';
+import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { useOllamaLog } from '../ollama-log/OllamaLogContext.js';
@@ -51,18 +51,13 @@ export default function OllamaTab({ state, update }) {
   const ollamaLog = useOllamaLog();
   const { ollamaStatus, models, modelsError } = useOllamaModels();
 
-  const { testing, testResult, testError: rawTestError, runTest: runConcurrencyTest } = useLocalApiConcurrencyTest(
-    () => testOllamaConcurrency(state.model).catch((err) => {
-      console.warn('Ollama concurrency test failed', err);
-      throw err;
-    }),
-  );
-  const testError = rawTestError ? t('settings.concurrencyTestFailedOllama') : null;
-  const runTest = async () => {
-    if (!state.model) return;
-    const result = await runConcurrencyTest();
-    if (result?.recommended) update('subagents', String(result.recommended));
-  };
+  const concurrency = useLocalApiTabTest({
+    probe: () => testOllamaConcurrency(state.model),
+    warnLabel: 'Ollama concurrency test failed',
+    errorKey: 'settings.concurrencyTestFailedOllama',
+    update,
+    enabled: !!state.model,
+  });
 
   return (
     <>
@@ -80,11 +75,8 @@ export default function OllamaTab({ state, update }) {
         subagentsDescription={t('settings.ollamaSubagentsDesc')}
         state={state}
         update={update}
-        testing={testing}
-        testDisabled={testing || !state.model}
-        onRunTest={runTest}
-        testResult={testResult}
-        testError={testError}
+        testDisabled={concurrency.testing || !state.model}
+        {...concurrency}
       />
     </>
   );

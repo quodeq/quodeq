@@ -3,7 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useOmlxModels } from '../hooks/useOmlxModels.js';
-import { useLocalApiConcurrencyTest } from '../hooks/useLocalApiConcurrencyTest.js';
+import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { t } from '../../../strings/index.js';
@@ -69,18 +69,13 @@ export default function OmlxTab({ state, update }) {
   const apiKey = state['api-key'] || '';
   const { omlxStatus, models, modelsError } = useOmlxModels({ apiBase, apiKey });
 
-  const { testing, testResult, testError: rawTestError, runTest: runConcurrencyTest } = useLocalApiConcurrencyTest(
-    () => testOmlxConcurrency(state.model, apiBase || undefined, apiKey || undefined).catch((err) => {
-      console.warn('omlx concurrency test failed', err);
-      throw err;
-    }),
-  );
-  const testError = rawTestError ? t('settings.concurrencyTestFailedOmlx') : null;
-  const runTest = async () => {
-    if (!state.model) return;
-    const result = await runConcurrencyTest();
-    if (result?.recommended) update('subagents', String(result.recommended));
-  };
+  const concurrency = useLocalApiTabTest({
+    probe: () => testOmlxConcurrency(state.model, apiBase || undefined, apiKey || undefined),
+    warnLabel: 'omlx concurrency test failed',
+    errorKey: 'settings.concurrencyTestFailedOmlx',
+    update,
+    enabled: !!state.model,
+  });
 
   return (
     <>
@@ -100,11 +95,8 @@ export default function OmlxTab({ state, update }) {
         subagentsDescription={t('settings.omlxSubagentsDesc')}
         state={state}
         update={update}
-        testing={testing}
-        testDisabled={testing || !state.model}
-        onRunTest={runTest}
-        testResult={testResult}
-        testError={testError}
+        testDisabled={concurrency.testing || !state.model}
+        {...concurrency}
       />
     </>
   );

@@ -2,7 +2,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useLlamaCppModels } from '../hooks/useLlamaCppModels.js';
-import { useLocalApiConcurrencyTest } from '../hooks/useLocalApiConcurrencyTest.js';
+import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { useLlamaCppLog } from '../llamacpp-log/LlamaCppLogContext.js';
@@ -47,17 +47,12 @@ export default function LlamaCppTab({ state, update }) {
   const llamacppLog = useLlamaCppLog();
   const { llamacppStatus, models, modelsError } = useLlamaCppModels({ state, update });
 
-  const { testing, testResult, testError: rawTestError, runTest: runConcurrencyTest } = useLocalApiConcurrencyTest(
-    () => testLlamacppConcurrency(state.model || (models[0]?.name ?? '')).catch((err) => {
-      console.warn('llama.cpp concurrency test failed', err);
-      throw err;
-    }),
-  );
-  const testError = rawTestError ? t('settings.concurrencyTestFailedLlamacpp') : null;
-  const runTest = async () => {
-    const result = await runConcurrencyTest();
-    if (result?.recommended) update('subagents', String(result.recommended));
-  };
+  const concurrency = useLocalApiTabTest({
+    probe: () => testLlamacppConcurrency(state.model || (models[0]?.name ?? '')),
+    warnLabel: 'llama.cpp concurrency test failed',
+    errorKey: 'settings.concurrencyTestFailedLlamacpp',
+    update,
+  });
 
   return (
     <>
@@ -80,11 +75,8 @@ export default function LlamaCppTab({ state, update }) {
         subagentsAriaLabel={t('settings.maxParallelAgents')}
         state={state}
         update={update}
-        testing={testing}
-        testDisabled={testing || !models.length}
-        onRunTest={runTest}
-        testResult={testResult}
-        testError={testError}
+        testDisabled={concurrency.testing || !models.length}
+        {...concurrency}
       />
     </>
   );
