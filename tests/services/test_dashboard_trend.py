@@ -11,7 +11,7 @@ from quodeq.core.types import DimensionResult
 from quodeq.services._dashboard_stale import (
     collect_stale_dimensions as _collect_stale_dimensions,
 )
-from quodeq.services._dashboard_trend import (
+from quodeq.services.dashboard_trend import (
     build_accumulated_trend as _build_accumulated_trend,
 )
 from quodeq.services.dashboard import (

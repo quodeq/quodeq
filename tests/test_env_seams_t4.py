@@ -40,11 +40,11 @@ class TestAnalysisConfigDefaults:
 class TestProvidersPath:
     def test_analysis_reuses_the_shared_resolver(self):
         """One lazy resolver for QUODEQ_AI_PROVIDERS_PATH, not two."""
-        from quodeq.analysis import _provider_cache
+        from quodeq.analysis import provider_cache
         from quodeq.shared.provider_env import providers_path
 
-        assert _provider_cache.providers_path is providers_path
-        assert not hasattr(_provider_cache, "_AI_PROVIDERS_PATH")
+        assert provider_cache.providers_path is providers_path
+        assert not hasattr(provider_cache, "_AI_PROVIDERS_PATH")
 
     def test_env_override_is_seen_without_reload(self, monkeypatch, tmp_path):
         from quodeq.shared.provider_env import providers_path

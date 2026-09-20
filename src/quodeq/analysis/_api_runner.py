@@ -34,7 +34,7 @@ from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 
 if TYPE_CHECKING:
-    from quodeq.analysis._types import RunConfig
+    from quodeq.analysis.run_types import RunConfig
     from quodeq.data.events.writer import EventLogWriter
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.services.precedent_dismiss import precedent_match_hook

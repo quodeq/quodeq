@@ -79,7 +79,7 @@ def test_pool_deadline_extension_reaches_status_json(tmp_path: Path) -> None:
     new deadline in status.json, where the dashboard countdown and the
     post-#956 exit-reason labeling read it."""
     import quodeq.cli_evaluation as cli
-    from quodeq.analysis._types import RunConfig
+    from quodeq.analysis.run_types import RunConfig
 
     evidence_dir = tmp_path / "proj" / "run" / "evidence"
     evaluation_dir = tmp_path / "proj" / "run" / "evaluation"

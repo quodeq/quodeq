@@ -1,7 +1,7 @@
 """Prompt construction for subagent analysis."""
 from __future__ import annotations
 
-from quodeq.analysis._types import RunConfig, AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 
 

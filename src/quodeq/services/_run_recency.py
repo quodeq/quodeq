@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.services._wiring import file_mtime, read_run_status_json
+from quodeq.services.wiring import file_mtime, read_run_status_json
 
 _STARTED_AT_MEMO_MAX = 4096
 

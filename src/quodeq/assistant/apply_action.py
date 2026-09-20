@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from quodeq.assistant.tools._actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
+from quodeq.assistant.tools.actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 

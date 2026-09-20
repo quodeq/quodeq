@@ -20,9 +20,9 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
-from quodeq.services import _fs_projects, _fs_reports
+from quodeq.services import _fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
-from quodeq.services._runs_unit import build_runs_unit
+from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_repo import (
     published_meta,
@@ -62,7 +62,7 @@ def _shared_projects(
     # inline_summaries=True: this route has no warm-up engine to fill a
     # missing project-card summary later, so a cache miss must compute
     # it inline here instead of reporting it pending forever.
-    projects = _fs_projects.build_project_list(
+    projects = fs_projects.build_project_list(
         eval_root, backfill=False, inline_summaries=True,
     )
     listing = {"projects": [to_camel_dict(p) for p in projects]}
@@ -99,7 +99,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     if err:
         return err
     info, err = _load_or_500(
-        lambda: _fs_projects.get_project_info(str(eval_root), project), project,
+        lambda: fs_projects.get_project_info(str(eval_root), project), project,
         log_msg="Failed to load shared project info for %s", error_msg="Failed to load project info",
     )
     if err:

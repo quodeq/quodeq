@@ -6,7 +6,7 @@ from collections.abc import Mapping
 
 from quodeq.analysis._dim_order import _apply_dim_deadline
 from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import LogSink
 from quodeq.data.fs.dimensions_state_store import DimState

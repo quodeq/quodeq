@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.assistant.adapters import _cli as _cli_mod
-from quodeq.assistant.adapters._cli import run_cli_turn
+from quodeq.assistant.adapters import cli as _cli_mod
+from quodeq.assistant.adapters.cli import run_cli_turn
 
 from ._cli_adapter_helpers import FakeProc, _config, _repo, _session
 

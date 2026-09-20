@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.services._wiring import remote_origin_url_raw
+from quodeq.services.wiring import remote_origin_url_raw
 from quodeq.shared.repo import SCHEME_RE, looks_like_authority
 
 

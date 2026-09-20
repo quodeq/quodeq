@@ -1,4 +1,4 @@
-"""Extended tests for quodeq.services._fs_scan — edge cases and more coverage."""
+"""Extended tests for quodeq.services.fs_scan — edge cases and more coverage."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import subprocess
 from unittest.mock import patch, MagicMock
 
 
-from quodeq.services._fs_scan import (
+from quodeq.services.fs_scan import (
     _list_branches,
     _list_modules,
     _walk_files,

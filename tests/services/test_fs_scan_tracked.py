@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.services._fs_scan import scan_project
+from quodeq.services.fs_scan import scan_project
 
 
 #: Variables that would let the developer's environment reach into the test

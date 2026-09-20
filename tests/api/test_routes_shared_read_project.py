@@ -32,7 +32,7 @@ def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
     shared_scores, shared_compare_summary) already return. This locks the
     same contract in for shared_project_info and confirms the raised
     exception's own text never reaches the response body."""
-    import quodeq.services._fs_projects as fs_projects_mod
+    import quodeq.services.fs_projects as fs_projects_mod
 
     secret_detail = "SECRET_DB_PATH=/private/leak/db.sqlite exploded"
 

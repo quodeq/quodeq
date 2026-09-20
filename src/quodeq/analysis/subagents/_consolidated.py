@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence
@@ -19,7 +19,7 @@ from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
 from quodeq.analysis.subagents._source_files import list_source_files
-from quodeq.analysis._runner_markers import cleanup_stream
+from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 

@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.shared.url_validation import validate_url_safe
 
 _SEARCH_URL = "https://html.duckduckgo.com/html/"

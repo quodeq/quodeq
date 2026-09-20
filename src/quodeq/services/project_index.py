@@ -6,7 +6,7 @@ directly (see ARCHITECTURE.md import rules), so the symbols its routes
 need are re-exported here — rather than api/ reaching into
 ``data.fs.project_index`` directly — so the api -> services -> data edge
 stays visible in one place. Service-layer code imports
-``quodeq.data.fs.project_index`` directly (see ``services/_wiring.py``).
+``quodeq.data.fs.project_index`` directly (see ``services/wiring.py``).
 """
 from quodeq.data.fs.project_index import (  # noqa: F401 — re-exported API
     ProjectIdentity,

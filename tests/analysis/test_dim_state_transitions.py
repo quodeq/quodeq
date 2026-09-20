@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from quodeq.analysis._loops import LoopDeps, run_per_dimension_loop, run_incremental_loop
-from quodeq.analysis._types import RunConfig, AnalysisOptions
+from quodeq.analysis.run_types import RunConfig, AnalysisOptions
 from quodeq.analysis.errors import REASON_CANCELLED_SIGNAL, REASON_FAILED_EXCEPTION
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import read_dimensions

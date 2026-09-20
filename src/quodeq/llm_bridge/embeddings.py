@@ -1,7 +1,7 @@
 """Embeddings client for OpenAI-compatible local providers (Ollama et al.).
 
 Deliberately separate from the chat clients (analysis/_api_runner.py,
-assistant/adapters/_api.py): embeddings use short timeouts — never the 500s
+assistant/adapters/api.py): embeddings use short timeouts — never the 500s
 chat read budget — and their model/base URL are configured independently of
 the chat provider (CLI providers have no HTTP endpoint; llama.cpp serves one
 model per process). All failures raise; callers own graceful degradation.

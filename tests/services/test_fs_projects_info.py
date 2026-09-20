@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-from quodeq.services._fs_projects import (
+from quodeq.services.fs_projects import (
     build_project_list,
     get_project_info,
 )
@@ -56,7 +56,7 @@ class TestGetProjectInfo:
             "location": "online",
             "path": "/local/path",  # Not a URL
         }))
-        with patch("quodeq.services._fs_projects._infer_discipline", return_value=None):
+        with patch("quodeq.services.fs_projects._infer_discipline", return_value=None):
             result = get_project_info(
                 str(tmp_path), "proj-uuid",
                 list_dimensions=lambda **_kw: [],

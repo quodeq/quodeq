@@ -20,7 +20,7 @@ from quodeq.analysis.mcp.provenance_gate import (
     OPERATOR_CONTROLLED_TERMS,
 )
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis.prompts._template import load_template
+from quodeq.analysis.prompts.template import load_template
 from quodeq.context.path_role import Role, path_role
 from tests.analysis._provenance_gate_support import discover_cases
 

@@ -1,4 +1,4 @@
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant import AssistantRepository
 from quodeq.assistant.tools import ToolContext, build_registry
 

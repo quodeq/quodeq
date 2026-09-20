@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services._fs_project_helpers import _ListingOptions, _build_project_entry
+from quodeq.services.fs_project_helpers import _ListingOptions, _build_project_entry
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 

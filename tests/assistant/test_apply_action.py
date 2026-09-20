@@ -9,7 +9,7 @@ import pytest
 from quodeq.assistant.apply_action import (
     ApplyOutcome, RejectOutcome, apply_drafted_action, reject_drafted_action,
 )
-from quodeq.assistant.tools._actions import ActionConflict, ActionContext, ActionSpec
+from quodeq.assistant.tools.actions import ActionConflict, ActionContext, ActionSpec
 
 
 def _ctx(tmp_path: Path) -> ActionContext:

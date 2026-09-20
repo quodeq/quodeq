@@ -1,6 +1,6 @@
 """Run-directory read mechanics live in the data layer (T1 group C2).
 
-services/_cache counted evaluation/*.json and parsed status.json inline;
+services/cache counted evaluation/*.json and parsed status.json inline;
 services/_accumulated_data walked run dirs for its stat fingerprint. The
 mechanics now live in data/fs/run_files.py; the services keep the guard
 decisions (terminal-state sets, staleness rules) and delegate the I/O.

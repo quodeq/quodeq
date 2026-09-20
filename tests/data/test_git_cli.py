@@ -1,6 +1,6 @@
 """The git CLI adapter is the single place that shells out to git.
 
-services/_fs_scan, services/project_registration, shared/_repo and
+services/fs_scan, services/project_registration, shared/_repo and
 analysis/subagents/_git_scoring used to run subprocess directly. The
 process execution now lives in ``data/git_cli.py``; the callers keep only
 their domain logic (and shared keeps the pure URL normalizer).
@@ -213,7 +213,7 @@ def test_callers_carry_no_subprocess_dependency():
     """Process execution is an adapter-layer detail: none of the former
     call sites may import subprocess at runtime."""
     import quodeq.analysis.subagents._git_scoring as git_scoring
-    import quodeq.services._fs_scan as fs_scan
+    import quodeq.services.fs_scan as fs_scan
     import quodeq.services.project_registration as project_registration
     import quodeq.shared.repo as repo
 

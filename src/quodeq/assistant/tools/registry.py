@@ -14,6 +14,8 @@ class ToolError(Exception):
 
 @dataclass(frozen=True)
 class ToolSpec:
+    """One tool's name, description, JSON-schema parameters and handler."""
+
     name: str
     description: str
     parameters: dict[str, Any]
@@ -21,18 +23,23 @@ class ToolSpec:
 
 
 class ToolRegistry:
+    """The tools one turn may call, in MCP and function-calling shapes."""
+
     def __init__(self) -> None:
         self._specs: dict[str, ToolSpec] = {}
 
     def register(self, spec: ToolSpec) -> None:
+        """Add ``spec``; raise ValueError if its name is already registered."""
         if spec.name in self._specs:
             raise ValueError(f"duplicate tool: {spec.name}")
         self._specs[spec.name] = spec
 
     def names(self) -> list[str]:
+        """Return the registered tool names, sorted."""
         return sorted(self._specs)
 
     def openai_tools(self) -> list[dict]:
+        """Return the registry as OpenAI function-calling tool definitions."""
         return [
             {
                 "type": "function",
@@ -46,6 +53,7 @@ class ToolRegistry:
         ]
 
     def dispatch(self, name: str, arguments: dict[str, Any]) -> dict:
+        """Call tool ``name`` with ``arguments``; never raise, return an ok/error dict."""
         spec = self._specs.get(name)
         if spec is None:
             return {"ok": False, "error": f"unknown tool: {name}"}

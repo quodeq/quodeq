@@ -18,7 +18,7 @@ def _clear_process_env(monkeypatch):
 
 
 def test_extra_body_reads_context_size_from_injected_env():
-    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    from quodeq.assistant.adapters.api import ApiTurnConfig, _extra_body
 
     config = ApiTurnConfig(api_base="http://localhost:11434/v1", api_key=None,
                            model="m", native_tools=False)

@@ -13,7 +13,7 @@ from quodeq.services.dashboard import (
     _enrich_dimensions_with_trend,
     build_dashboard,
 )
-from quodeq.services._dashboard_trend import build_accumulated_trend as _build_accumulated_trend
+from quodeq.services.dashboard_trend import build_accumulated_trend as _build_accumulated_trend
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 

@@ -82,7 +82,7 @@ def test_writer_hashes_when_no_classify_time_hash_is_known(tmp_path):
     from quodeq.analysis.cache.cache_writer import build_cache_writer
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
-    from quodeq.analysis._types import AnalysisOptions, RunConfig
+    from quodeq.analysis.run_types import AnalysisOptions, RunConfig
     from quodeq.analysis.fingerprint import hash_file
 
     src_root = tmp_path / "src"

@@ -5,7 +5,7 @@ import threading
 from collections import OrderedDict
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import DimensionCacheContext
+from quodeq.services.cache import DimensionCacheContext
 
 
 def _make_dim(name: str = "security") -> DimensionResult:

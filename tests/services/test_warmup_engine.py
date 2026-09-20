@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 import time
 
-from quodeq.services._warmup import WarmupEngine
+from quodeq.services.warmup import WarmupEngine
 import pytest
 
 
@@ -181,7 +181,7 @@ def test_default_warm_project_runs_against_a_real_project_dir(tmp_path, monkeypa
     Every other engine test injects warm_fn; a typo inside _warm_project
     would otherwise pass the suite and silently push every project into
     failure backoff in production."""
-    from quodeq.services._warmup import _warm_project
+    from quodeq.services.warmup import _warm_project
 
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     project = tmp_path / "proj"

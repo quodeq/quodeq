@@ -16,7 +16,7 @@ def test_cli_path_and_api_path_compute_same_cache_key(tmp_path):
     re-dispatch unnecessarily. This pins the Task 3.5 cross-path consistency
     guarantee against drift in either build_cache_writer caller.
     """
-    from quodeq.analysis._types import AnalysisOptions, RunConfig
+    from quodeq.analysis.run_types import AnalysisOptions, RunConfig
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
     from quodeq.analysis.mcp.args import ServerArgs
@@ -88,7 +88,7 @@ def test_cli_path_and_api_path_agree_with_standards_dir_and_override(tmp_path):
     wiring (compiled_dir passed as standards_dir) and passes only when the
     standards ROOT is threaded through via the new --standards-dir arg.
     """
-    from quodeq.analysis._types import AnalysisOptions, RunConfig
+    from quodeq.analysis.run_types import AnalysisOptions, RunConfig
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
     from quodeq.analysis.mcp.args import ServerArgs
@@ -171,7 +171,7 @@ def test_cli_path_key_matches_api_path_when_language_missing(tmp_path):
     between the two paths silently missing every entry) is structurally
     impossible now, and this pins that it stays so.
     """
-    from quodeq.analysis._types import AnalysisOptions, RunConfig
+    from quodeq.analysis.run_types import AnalysisOptions, RunConfig
     from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
     from quodeq.analysis.cache.local import LocalFileBackend
     from quodeq.analysis.mcp.args import ServerArgs

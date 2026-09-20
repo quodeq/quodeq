@@ -32,7 +32,7 @@ class TestSyncCacheWrite:
         """After router processes findings + mark_file_done(file=F, status='ok')
         in the API path, a cache entry for F exists on disk under cache_root.
         """
-        from quodeq.analysis._types import AnalysisOptions, RunConfig
+        from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 
         src_root = tmp_path / "src"
         src_root.mkdir()

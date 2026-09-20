@@ -31,7 +31,7 @@ def test_runs_endpoint_returns_unit(tmp_path, monkeypatch):
     _seed_index(index_db)
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(evals))
     monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(index_db))
-    import quodeq.services._runs_unit as ru
+    import quodeq.services.runs_unit as ru
     monkeypatch.setattr(ru, "read_run_scalars", lambda *a, **k: [])
 
     app = create_app(static_dist=None, api_key=None)
@@ -51,7 +51,7 @@ def test_runs_endpoint_304_on_matching_etag(tmp_path, monkeypatch):
     _seed_index(index_db)
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(evals))
     monkeypatch.setenv("QUODEQ_INDEX_DB_PATH", str(index_db))
-    import quodeq.services._runs_unit as ru
+    import quodeq.services.runs_unit as ru
     monkeypatch.setattr(ru, "read_run_scalars", lambda *a, **k: [])
 
     app = create_app(static_dist=None, api_key=None)

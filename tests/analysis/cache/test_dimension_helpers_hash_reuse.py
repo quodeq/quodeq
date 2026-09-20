@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.analysis.cache._persist_watcher import CachePersistProvenance
 from quodeq.analysis.cache.dimension_helpers import (

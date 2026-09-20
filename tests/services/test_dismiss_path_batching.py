@@ -20,8 +20,8 @@ from quodeq.core.events.models import (
 )
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
-from quodeq.services import _dismissed_listing as listing_mod
-from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services import dismissed_listing as listing_mod
+from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.deleted import _sweep_dismissed_matching, delete_all_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_all_findings
 

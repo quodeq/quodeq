@@ -32,8 +32,8 @@ from quodeq.services.suppression_keys import (  # re-exported API
     is_dismissed,
 )
 from quodeq.shared.validation import validate_path_segment
-from quodeq.services._wiring import load_suppression_rules  # re-exported API
-from quodeq.services._wiring import read_req_to_principle_map
+from quodeq.services.wiring import load_suppression_rules  # re-exported API
+from quodeq.services.wiring import read_req_to_principle_map
 
 _TYPE_VIOLATION = "violation"
 

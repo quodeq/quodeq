@@ -1,7 +1,7 @@
 """Scripted subprocess and session builders shared by the test_cli_adapter* siblings."""
 import io
 
-from quodeq.assistant.adapters._cli import CliTurnConfig, CliTurnSession
+from quodeq.assistant.adapters.cli import CliTurnConfig, CliTurnSession
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 

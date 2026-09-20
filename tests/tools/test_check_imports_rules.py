@@ -25,7 +25,7 @@ def test_strict_layer_denies_cross_cutting(tmp_path):
 def test_strict_shared_denies_analysis_and_data(tmp_path):
     f = tmp_path / "mod.py"
     f.write_text(
-        "from quodeq.analysis._provider_cache import get_provider_configs\n"
+        "from quodeq.analysis.provider_cache import get_provider_configs\n"
         "import quodeq.data\n",
         encoding="utf-8",
     )

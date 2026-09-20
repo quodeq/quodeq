@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import _jail
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
@@ -92,6 +92,7 @@ def _get_worktree_diff(ctx: ToolContext) -> dict:
 
 
 def register_write_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
+    """Register the worktree edit/write tools on ``registry``."""
     registry.register(ToolSpec(
         "edit_repo_file",
         "Replace ONE unique occurrence of old_string with new_string in a file "

@@ -17,7 +17,7 @@ from quodeq.core.events.models import (
     FindingVerifiedEvent,
 )
 from quodeq.data.ports.actions_log import ActionLog
-from quodeq.services._wiring import ActionLogWriter, read_action_events
+from quodeq.services.wiring import ActionLogWriter, read_action_events
 
 
 def verify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:

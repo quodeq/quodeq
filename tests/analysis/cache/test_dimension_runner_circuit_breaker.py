@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+from quodeq.analysis.cache.failure_streak import CircuitBreakerError
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from tests.analysis.cache.conftest import (
@@ -156,7 +156,7 @@ class TestEvidenceFileCreatedBeforeBreaker:
         handler = _ListHandler()
         handler.setLevel(logging.WARNING)
         breaker_logger = logging.getLogger(
-            "quodeq.analysis.cache._failure_streak"
+            "quodeq.analysis.cache.failure_streak"
         )
         breaker_logger.addHandler(handler)
         try:

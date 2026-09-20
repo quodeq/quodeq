@@ -25,7 +25,7 @@ from quodeq.analysis._mcp_arg_builders import (
     _resolve_model_id,
     _resolve_standards_dir,
 )
-from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.config.process_env import process_environment_copy
 from quodeq.shared.utils import get_ai_cmd, get_ai_model

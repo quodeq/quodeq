@@ -85,7 +85,7 @@ def counting_reader(monkeypatch):
         calls.append(run_id)
         return real(reports_root, project, run_id)
 
-    monkeypatch.setattr("quodeq.services._cache.read_run_data", _counted)
+    monkeypatch.setattr("quodeq.services.cache.read_run_data", _counted)
     monkeypatch.setattr("quodeq.services._accumulated_data.read_run_data", _counted)
     return calls
 

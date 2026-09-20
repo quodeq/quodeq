@@ -33,13 +33,13 @@ from quodeq.services._publish_staging import (  # noqa: F401 — re-export
     list_completed_runs,
     merge_actions_log,
 )
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     MARKER_FILENAME,
     bootstrap_repo_layout,
     clone_lock,
     run_git,
 )
-from quodeq.services._wiring import ensure_shared_clone  # noqa: F401 — re-export/patch target
+from quodeq.services.wiring import ensure_shared_clone  # noqa: F401 — re-export/patch target
 from quodeq.shared.validation import validate_path_segment
 
 logger = logging.getLogger(__name__)

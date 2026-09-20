@@ -35,7 +35,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._classify import (
     ClassifyResult,
     _classify_one_file,  # noqa: F401 -- re-export

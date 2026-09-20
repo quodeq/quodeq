@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.utils.io import resolve_child_dir
-from quodeq.services._fs_projects import get_project_info
+from quodeq.services.fs_projects import get_project_info
 from quodeq.services.shared_repo import shared_evaluations_root
 from quodeq.services.shared_settings import read_settings
 
@@ -22,7 +22,7 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
 
     Reuses the same layout the run index and project routes already rely on
     (see ``services/run_index.py``'s ``_walk_run_dirs`` and
-    ``services/_fs_projects.get_project_info``): a run lives at
+    ``services/fs_projects.get_project_info``): a run lives at
     ``<evaluations_root>/<project_id>/<run_id>`` where ``project_id`` is the
     directory name under ``get_evaluations_dir()`` (Plan-1's "project_uuid"),
     and the repo root is ``repository_info.json``'s ``path`` field, read via

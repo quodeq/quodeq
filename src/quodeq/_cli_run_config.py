@@ -19,7 +19,7 @@ import argparse
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.analysis.dimension_aliases import expand_dimension_aliases
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions
 from quodeq.shared.logging import log_info

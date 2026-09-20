@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.cli_evaluation import _execute_pipeline
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.manifest_models import SourceManifest
 from quodeq.core.evidence.model import Evidence
 

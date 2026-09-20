@@ -13,7 +13,7 @@ from typing import Callable, Iterator
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     open_score_cache,
     read_all_cached_rows,
     read_cached_accumulated,

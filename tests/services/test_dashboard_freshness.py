@@ -53,7 +53,7 @@ class TestStatusAwareFetcher:
             "quodeq.services.dashboard.read_run_data", fake_read,
         )
         monkeypatch.setattr(
-            "quodeq.services._cache.read_run_data", fake_read,
+            "quodeq.services.cache.read_run_data", fake_read,
         )
 
         fetcher = _make_status_aware_fetcher(tmp_path, "proj", runs)
@@ -98,7 +98,7 @@ class TestStatusAwareFetcher:
             "quodeq.services.dashboard.read_run_data", fake_read,
         )
         monkeypatch.setattr(
-            "quodeq.services._cache.read_run_data", fake_read,
+            "quodeq.services.cache.read_run_data", fake_read,
         )
 
         # Request 1: run is in_progress, bypass cache. Disk read.
@@ -133,7 +133,7 @@ class TestStaleCacheSelfHeal:
     """
 
     def test_count_eval_files_counts_json_only(self, tmp_path):
-        from quodeq.services._cache import _count_eval_files
+        from quodeq.services.cache import _count_eval_files
 
         eval_dir = tmp_path / "proj" / "r1" / "evaluation"
         eval_dir.mkdir(parents=True)
@@ -146,7 +146,7 @@ class TestStaleCacheSelfHeal:
         assert _count_eval_files(tmp_path, "proj", "r1") == 3
 
     def test_count_returns_zero_when_eval_dir_missing(self, tmp_path):
-        from quodeq.services._cache import _count_eval_files
+        from quodeq.services.cache import _count_eval_files
         assert _count_eval_files(tmp_path, "proj", "missing") == 0
 
     def test_stale_cache_evicted_when_dim_count_mismatches_disk(
@@ -186,7 +186,7 @@ class TestStaleCacheSelfHeal:
             "quodeq.services.dashboard.read_run_data", fake_read,
         )
         monkeypatch.setattr(
-            "quodeq.services._cache.read_run_data", fake_read,
+            "quodeq.services.cache.read_run_data", fake_read,
         )
 
         fetcher = _make_status_aware_fetcher(
@@ -235,7 +235,7 @@ class TestStaleCacheSelfHeal:
             "quodeq.services.dashboard.read_run_data", fake_read,
         )
         monkeypatch.setattr(
-            "quodeq.services._cache.read_run_data", fake_read,
+            "quodeq.services.cache.read_run_data", fake_read,
         )
 
         fetcher = _make_status_aware_fetcher(

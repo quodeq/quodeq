@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from quodeq._cli_resolution import ResolvedInputs
-from quodeq.analysis._diff_resolver import DiffResolveError
+from quodeq.analysis.diff_resolver import DiffResolveError
 from quodeq.shared.logging import log_error, log_info, log_warning
 
 

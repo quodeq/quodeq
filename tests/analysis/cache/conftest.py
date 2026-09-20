@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
@@ -71,7 +71,7 @@ def _setup(
 
 def _make_ctx():
     from quodeq.analysis._dimensions import DimensionsConfig
-    from quodeq.analysis._types import _AnalysisContext
+    from quodeq.analysis.run_types import _AnalysisContext
     return _AnalysisContext(
         dimensions_data=DimensionsConfig(dimensions={}),
         date_str="2026-01-01",

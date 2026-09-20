@@ -5,7 +5,7 @@ import pytest
 from quodeq.assistant.tools import build_registry
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._overview import _get_overview
-from quodeq.assistant.tools._registry import ToolError
+from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 _ACCUMULATED = {

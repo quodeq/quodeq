@@ -21,6 +21,8 @@ SYSTEM_PROMPT_STYLE_ARGV_APPEND = "argv-append"  # passed via --append-system-pr
 
 @dataclass(frozen=True)
 class CliChatConfig:
+    """One provider's CLI chat contract, as read from the provider catalog."""
+
     cmd: str
     cmd_subcommand: str
     base_args: list[str]
@@ -40,6 +42,7 @@ class CliChatConfig:
 
 
 def load_cli_chat_config(provider_id: str) -> CliChatConfig:
+    """Return ``provider_id``'s CLI chat config; raise KeyError if unknown."""
     catalog = get_provider_configs()
     if provider_id not in catalog:
         raise KeyError(f"unknown provider: {provider_id}")

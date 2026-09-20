@@ -6,7 +6,7 @@ import pytest
 
 import quodeq.assistant.mcp.server as mcp_server
 from quodeq.assistant.tools import ToolContext, _web_tools, build_registry, register_web_tools
-from quodeq.assistant.tools._registry import ToolError
+from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 

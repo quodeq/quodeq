@@ -23,12 +23,12 @@ from typing import Any, Callable
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
-from quodeq.services._trend_fetcher import make_rescoring_fetcher
+from quodeq.services.trend_fetcher import make_rescoring_fetcher
 from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._wiring import read_run_data
+from quodeq.services.wiring import read_run_data
 from quodeq.services.rescore import rescore_dimension
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
@@ -57,7 +57,7 @@ from quodeq.services.scoring._rescoring import (  # noqa: F401
 )
 from quodeq.services.scoring._project_scores import get_project_scores
 from quodeq.services.scoring._scores_raw import get_scores_raw, get_scores_slim
-from quodeq.services._wiring import load_suppression_rules
+from quodeq.services.wiring import load_suppression_rules
 
 
 def scored_run_dimensions(

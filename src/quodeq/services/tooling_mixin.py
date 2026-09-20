@@ -11,9 +11,9 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.data.fs.report_parser import safe_read_dir
-from quodeq.services._wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
+from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.utils import get_anthropic_api_key, read_json

@@ -22,7 +22,7 @@ _FAILURE_BACKOFF_S = 60.0
 
 def _enumerate_projects(reports_dir: str) -> list[tuple[str, str]]:
     """Return [(project_id, latest_date_iso)] for every project directory."""
-    from quodeq.services._wiring import list_runs, safe_read_dir  # noqa: PLC0415
+    from quodeq.services.wiring import list_runs, safe_read_dir  # noqa: PLC0415
 
     reports_root = Path(reports_dir)
     out: list[tuple[str, str]] = []
@@ -35,7 +35,7 @@ def _enumerate_projects(reports_dir: str) -> list[tuple[str, str]]:
 
 
 def _project_display_name(reports_dir: str, project_id: str) -> str:
-    from quodeq.services._wiring import read_repository_info  # noqa: PLC0415
+    from quodeq.services.wiring import read_repository_info  # noqa: PLC0415
 
     info = read_repository_info(Path(reports_dir) / project_id) or {}
     return info.get("displayName") or info.get("name") or project_id
@@ -47,7 +47,7 @@ def _warm_project(reports_dir: str, project_id: str) -> None:
     Both go through the single-flight read-through helpers, so this is a
     version-check no-op on a warm cache and dedupes with on-demand requests.
     """
-    from quodeq.services._wiring import find_children  # noqa: PLC0415
+    from quodeq.services.wiring import find_children  # noqa: PLC0415
     from quodeq.services._fs_metadata import warm_project_summary  # noqa: PLC0415
     from quodeq.services.scoring import get_project_scores  # noqa: PLC0415
 
@@ -81,6 +81,7 @@ class WarmupEngine:
         self._done = 0
 
     def start(self, reports_dir: str) -> None:
+        """Queue every project under ``reports_dir`` and start the worker thread."""
         # Warming a disabled cache stores nothing, so it would be pure wasted
         # compute every boot; the inline read-through paths already handle
         # the kill switch themselves.
@@ -106,6 +107,7 @@ class WarmupEngine:
             self._thread.start()
 
     def enqueue(self, project_id: str) -> None:
+        """Queue one project for warm-up (no-op before ``start`` or if already queued)."""
         with self._cond:
             if self._thread is None or project_id in self._queued:
                 return
@@ -117,6 +119,7 @@ class WarmupEngine:
             self._cond.notify()
 
     def snapshot(self) -> dict | None:
+        """Return warm-up progress for the API, or None before ``start``."""
         with self._cond:
             if self._thread is None:
                 return None
@@ -129,6 +132,7 @@ class WarmupEngine:
             }
 
     def reset_for_tests(self) -> None:
+        """Stop the worker and clear all queued state (test seam)."""
         # Signal worker to shut down and wait for it to exit
         self._shutdown.set()
         thread_to_join = None

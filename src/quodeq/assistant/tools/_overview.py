@@ -9,7 +9,7 @@ and trimming the payload to what a chat needs.
 from __future__ import annotations
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_entries_visible
 from quodeq.services import get_accumulated
 from quodeq.services.scoring import rescore_accumulated

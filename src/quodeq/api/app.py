@@ -115,7 +115,7 @@ def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) 
 
     *env* overrides the path lookups and defaults to ``os.environ``."""
     from pathlib import Path
-    from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
+    from quodeq.services.ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared.env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
 
     try:
@@ -258,7 +258,7 @@ def main(env: dict[str, str] | None = None) -> None:
     # main() only: create_app callers (tests, embedding) stay thread-free.
     try:
         from quodeq.api.routes_common import reports_dir  # noqa: PLC0415
-        from quodeq.services._warmup import engine as warmup_engine  # noqa: PLC0415
+        from quodeq.services.warmup import engine as warmup_engine  # noqa: PLC0415
         from quodeq.services.cache_maintenance import start_cache_maintenance  # noqa: PLC0415
         from quodeq.shared.log_sink import SHARED_LOG  # noqa: PLC0415
         warmup_engine.start(reports_dir())

@@ -3,7 +3,7 @@ import httpx
 import pytest
 
 from quodeq.assistant.tools import _web_tools
-from quodeq.assistant.tools._registry import ToolError
+from quodeq.assistant.tools.registry import ToolError
 
 
 class _FakeStreamResponse:

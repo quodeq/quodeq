@@ -20,7 +20,7 @@ from quodeq.core.utils.io import resolve_child_dir
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     RunInfo,
     find_children as _find_children,
     list_runs,
@@ -40,7 +40,7 @@ from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export
     clear_accumulated_process_cache,
     create_accumulated_cache,
 )
-from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
 from quodeq.services._accumulated_aggregate import (  # noqa: F401 — re-export
     _AccumulatedResult,
     _aggregate_severity_counts,

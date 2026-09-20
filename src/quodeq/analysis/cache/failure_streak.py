@@ -38,12 +38,16 @@ class CircuitBreakerError(Exception):
 
 @dataclass(frozen=True)
 class FileError:
+    """One failed file and the reason recorded for it."""
+
     file: str
     reason: str
 
 
 @dataclass
 class TripEvent:
+    """The streak length that tripped the breaker and the errors behind it."""
+
     streak: int
     recent: list[FileError] = field(default_factory=list)
 
@@ -60,6 +64,7 @@ class FailureStreakWatcher:
         self.trip_event: TripEvent | None = None
 
     def start(self) -> None:
+        """Start the watcher thread (a no-op thread when the threshold is off)."""
         if self._threshold <= 0:
             # Still start a no-op thread so callers can rely on stop_and_join.
             self._thread = threading.Thread(target=self._noop, daemon=True)
@@ -71,11 +76,13 @@ class FailureStreakWatcher:
         self._thread.start()
 
     def stop_and_join(self, *, timeout: float = 5.0) -> None:
+        """Signal the watcher to stop and wait up to ``timeout`` for it."""
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=timeout)
 
     def wait_for_trip(self, *, timeout: float) -> bool:
+        """Block until the breaker trips; return whether it did within ``timeout``."""
         return self._tripped.wait(timeout=timeout)
 
     def _noop(self) -> None:

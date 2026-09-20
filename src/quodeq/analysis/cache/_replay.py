@@ -13,7 +13,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult, group_findings_by_file
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel

@@ -75,7 +75,7 @@ def test_draft_action_rejects_invalid_payload(ctx):
 
 
 def test_actions_registry_covers_types(ctx):
-    from quodeq.assistant.tools._actions import ACTIONS, ACTION_TYPES
+    from quodeq.assistant.tools.actions import ACTIONS, ACTION_TYPES
     assert set(ACTIONS) == set(ACTION_TYPES)
     for spec in ACTIONS.values():
         assert callable(spec.validate) and callable(spec.summarize) and callable(spec.apply)

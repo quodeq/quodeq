@@ -9,7 +9,7 @@ finding on the suppression read path (silent no-op reporting dismissed: True).
 import json
 
 from quodeq.assistant.tools import ToolContext, build_registry
-from quodeq.assistant.tools._actions import ACTIONS, ActionContext
+from quodeq.assistant.tools.actions import ACTIONS, ActionContext
 from quodeq.core.types.finding import Finding
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 from quodeq.services.dismissed import dismissed_keys

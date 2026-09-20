@@ -11,7 +11,7 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.services import run_keys as run_keys_mod
 from quodeq.services import score_cache as sc
-from quodeq.services._trend_fetcher import _make_version_for
+from quodeq.services.trend_fetcher import _make_version_for
 from quodeq.services.score_cache import VersionInputs, per_run_versions
 from quodeq.services.suppression_keys import SuppressionKeys
 

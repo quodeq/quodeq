@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.services._wiring import read_repository_info, read_scan_json
+from quodeq.services.wiring import read_repository_info, read_scan_json
 
 
 def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:

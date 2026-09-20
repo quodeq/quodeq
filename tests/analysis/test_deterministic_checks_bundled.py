@@ -24,7 +24,7 @@ class TestTrustModelWiring:
     def _config(self, project, compiled_dir, tmp_path):
         from types import SimpleNamespace
 
-        from quodeq.analysis._types import RunConfig
+        from quodeq.analysis.run_types import RunConfig
 
         work_dir = tmp_path / "run" / "evidence"
         work_dir.mkdir(parents=True, exist_ok=True)

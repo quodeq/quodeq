@@ -13,7 +13,7 @@ from typing import Callable
 from quodeq.assistant.adapters._cli_command import (
     McpConfigRef, TurnArgvRequest, build_turn_argv)
 from quodeq.assistant.adapters._cli_cleanup import TurnResources, release_turn_resources
-from quodeq.assistant.adapters._cli_config import (
+from quodeq.assistant.adapters.cli_config import (
     SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX, load_cli_chat_config,
 )
 from quodeq.assistant.adapters._cli_spawn import (
@@ -33,6 +33,8 @@ _REAPER_WAIT_S = 10  # grace period after stream EOF before force-killing the pr
 
 @dataclass(frozen=True)
 class CliTurnConfig:
+    """Per-turn CLI adapter settings (provider, model, scratch, MCP wiring)."""
+
     provider: str
     model: str | None
     scratch_base: Path
@@ -46,6 +48,8 @@ class CliTurnConfig:
 
 @dataclass(frozen=True)
 class CliTurnSession:
+    """Per-turn CLI session state (ids, store, event sink, cancellation)."""
+
     session_id: str
     prior_session_id: str | None
     repository: AssistantStore
@@ -192,6 +196,7 @@ def _inject_system_prompt(cli_cfg, config: CliTurnConfig, prior_session_id: str 
 
 def run_cli_turn(*, messages: list[dict], config: CliTurnConfig,
                  session: CliTurnSession) -> str:
+    """Run one assistant turn through the provider CLI; return the session id."""
     session = replace(session, spawn_fn=session.spawn_fn or spawn_turn,
                       cancel=session.cancel or CancelToken())
     if session.cancel.cancelled:  # stop landed before the turn even spawned

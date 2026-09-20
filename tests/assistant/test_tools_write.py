@@ -1,7 +1,7 @@
 import pytest
 
 from quodeq.assistant.tools import ToolContext, ToolRegistry, build_registry
-from quodeq.assistant.tools._write_tools import register_write_tools
+from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant.worktree import WorktreeManager, _run
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -137,8 +137,8 @@ def test_edit_result_size_capped(wt_ctx):
 
 
 def test_edit_rejects_oversized_file_before_reading_it(wt_ctx):
-    from quodeq.assistant.tools._write_tools import _edit_repo_file, _MAX_CONTENT_BYTES
-    from quodeq.assistant.tools._registry import ToolError
+    from quodeq.assistant.tools.write_tools import _edit_repo_file, _MAX_CONTENT_BYTES
+    from quodeq.assistant.tools.registry import ToolError
     from unittest.mock import patch
 
     big_file = wt_ctx.worktree_dir / "big.txt"

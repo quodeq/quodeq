@@ -5,7 +5,7 @@ import json
 import pytest
 
 from quodeq.assistant.mcp import server
-from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolRegistry, ToolSpec
 
 
 def test_build_registry_from_args_parses_project_scope(tmp_path):

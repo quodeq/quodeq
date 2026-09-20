@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.services._fs_scan import scan_project
+from quodeq.services.fs_scan import scan_project
 
 
 def _zero_run_scan_fallback() -> dict:

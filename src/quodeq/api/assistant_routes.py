@@ -43,7 +43,7 @@ from quodeq.services.shared_settings import read_settings
 
 def _api_provider(provider_id: str) -> dict | None:
     # get_provider_configs() returns dict[str, dict] keyed by provider id
-    # (see src/quodeq/analysis/_provider_cache.py:67 and the top-level keys
+    # (see src/quodeq/analysis/provider_cache.py:67 and the top-level keys
     # of data/config/ai_providers.json) — not the {"providers": [...]} list
     # shape the original plan assumed.
     cfg = get_provider_configs().get(provider_id)

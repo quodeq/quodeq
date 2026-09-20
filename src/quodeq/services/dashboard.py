@@ -21,7 +21,7 @@ from quodeq.core.types import DimensionResult
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.scoring_view import is_eligible_for_default_view
 from quodeq.services.dismissed import dismissed_keys, filter_dismissed_from_dimensions
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     RunInfo,
     list_runs,
     load_suppression_rules,

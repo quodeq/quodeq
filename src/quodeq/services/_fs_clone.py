@@ -7,7 +7,7 @@ import logging
 import subprocess as _subprocess
 from pathlib import Path
 
-from quodeq.services._wiring import clone_repo, remove_clone_dir
+from quodeq.services.wiring import clone_repo, remove_clone_dir
 from quodeq.config.clone_env import clone_shallow_months, git_clone_timeout_s
 
 _logger = logging.getLogger(__name__)

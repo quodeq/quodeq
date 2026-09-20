@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis import fingerprint
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.dimension_helpers import build_cache_key_for_file
 from quodeq.core.standards.overrides import OVERRIDES_RELPATH
 

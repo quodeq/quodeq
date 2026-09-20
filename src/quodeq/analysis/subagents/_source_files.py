@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from quodeq.analysis import dispatch_policy
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 
 

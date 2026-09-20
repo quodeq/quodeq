@@ -13,7 +13,7 @@ from quodeq.services.grade_formula import load_params
 from quodeq.services.ports import StoreUnreadableError
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._wiring import SQLiteStateStore, SqliteFindingsRepository
+from quodeq.services.wiring import SQLiteStateStore, SqliteFindingsRepository
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._response_builders import (
     _build_response_from_eval_files,
