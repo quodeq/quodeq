@@ -15,17 +15,21 @@ from ._mapper_helpers import (
 )
 
 
+def _project_identity_fields(raw: dict[str, object]) -> dict[str, str | None]:
+    """The parent/display/discipline/path/location fields both project dataclasses carry."""
+    return {
+        "parent": _opt_str(raw.get("parent")),
+        "display_name": _opt_str(raw.get("displayName")),
+        "discipline": _opt_str(raw.get("discipline")),
+        "path": _opt_str(raw.get("path")),
+        "location": _opt_str(raw.get("location")),
+    }
+
+
 def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
     """Parse a raw dict into a ProjectMetadata dataclass."""
     name = _require_str(raw, "name", "ProjectMetadata")
-    return ProjectMetadata(
-        name=name,
-        parent=_opt_str(raw.get("parent")),
-        display_name=_opt_str(raw.get("displayName")),
-        discipline=_opt_str(raw.get("discipline")),
-        path=_opt_str(raw.get("path")),
-        location=_opt_str(raw.get("location")),
-    )
+    return ProjectMetadata(name=name, **_project_identity_fields(raw))
 
 
 def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
@@ -35,11 +39,7 @@ def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
     return ProjectEntry(
         id=pid,
         name=name,
-        parent=_opt_str(raw.get("parent")),
-        display_name=_opt_str(raw.get("displayName")),
-        discipline=_opt_str(raw.get("discipline")),
-        path=_opt_str(raw.get("path")),
-        location=_opt_str(raw.get("location")),
+        **_project_identity_fields(raw),
         runs_count=_int(raw, "runsCount"),
         latest_run_id=_opt_str(raw.get("latestRunId")),
         latest_date=_opt_str(raw.get("latestDate")),

@@ -29,12 +29,17 @@ def parse_principle_grade(raw: dict[str, object]) -> PrincipleGrade:
     )
 
 
+def _parse_principle_grades(raw: dict[str, object]) -> list[PrincipleGrade]:
+    """Parse the ``principles`` field of *raw*; empty when absent or not a list of dicts."""
+    principles_raw = raw.get("principles")
+    if not isinstance(principles_raw, list):
+        return []
+    return [parse_principle_grade(p) for p in principles_raw if isinstance(p, dict)]
+
+
 def parse_parsed_report(raw: dict[str, object]) -> ParsedReport:
     """Parse a raw dict into a ParsedReport dataclass."""
-    principles_raw = raw.get("principles")
-    principles: list[PrincipleGrade] = []
-    if isinstance(principles_raw, list):
-        principles = [parse_principle_grade(p) for p in principles_raw if isinstance(p, dict)]
+    principles = _parse_principle_grades(raw)
 
     violations = _parse_finding_list(raw.get("violations"))
     compliance = _parse_finding_list(raw.get("compliance"))
