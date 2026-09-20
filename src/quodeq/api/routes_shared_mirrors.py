@@ -22,7 +22,7 @@ from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
 from quodeq.services import _fs_projects, _fs_reports
 from quodeq.services.compare import build_compare_summary
-from quodeq.services._runs_unit import build_runs_unit
+from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_repo import (
     published_meta,

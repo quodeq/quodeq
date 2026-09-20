@@ -573,8 +573,6 @@ tests/api/test_run_event_stream_ticks.py:8:private-module:quodeq.api._run_event_
 tests/api/test_run_event_stream_ticks.py:8:private-module:quodeq.api._run_event_stream.run_events_generator
 tests/api/test_run_events_routes.py:11:private-module:quodeq.api._run_events_routes.register_run_events_routes
 tests/api/test_run_events_routes.py:14:private-module:quodeq.services._evaluations_index.EvaluationsIndex
-tests/api/test_runs_endpoint.py:34:private-module:quodeq.services._runs_unit.ru
-tests/api/test_runs_endpoint.py:54:private-module:quodeq.services._runs_unit.ru
 tests/api/test_scores_routes.py:114:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
 tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.sse_tail_generator
 tests/api/test_sse_log_helpers.py:14:private-name:quodeq.api._sse_log_helpers._DEFAULT_TAIL_MAX_BYTES
@@ -1386,9 +1384,8 @@ tests/services/test_run_status_readers.py:174:private-name:quodeq.services._run_
 tests/services/test_run_status_readers.py:188:private-name:quodeq.services._run_status_readers._tail_run_log
 tests/services/test_run_status_readers.py:198:private-name:quodeq.services._run_status_readers._tail_run_log
 tests/services/test_run_status_readers.py:7:private-name:quodeq.services._run_status_readers._read_enriched_status_fields
-tests/services/test_runs_unit.py:2:private-name:quodeq.services._runs_unit._row_to_run_entry
-tests/services/test_runs_unit.py:2:private-name:quodeq.services._runs_unit._ui_status
-tests/services/test_runs_unit.py:4:private-module:quodeq.services._runs_unit
+tests/services/test_runs_unit.py:2:private-name:quodeq.services.runs_unit._row_to_run_entry
+tests/services/test_runs_unit.py:2:private-name:quodeq.services.runs_unit._ui_status
 tests/services/test_scan_counter_report_parity.py:26:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
 tests/services/test_scan_counter_report_parity.py:27:private-module:quodeq.core.evidence._req_mapping.build_principle_resolver
 tests/services/test_scan_counter_report_parity.py:27:private-name:quodeq.core.evidence._req_mapping._group_judgments
