@@ -1239,6 +1239,8 @@
   "severity.unknown": "unknown",
   "sidePane.aria": "Side pane",
   "sidePane.atCap": "Up to {max} panels can be open at once. Close one first.",
+  "sidePane.copied": "Copied",
+  "sidePane.copy": "Copy",
   "sidePane.download": "Download",
   "sidePane.noContent": "No content yet.",
   "sidePane.renderFailed": "Failed to render report.",
