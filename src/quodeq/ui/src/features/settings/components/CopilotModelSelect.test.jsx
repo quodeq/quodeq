@@ -13,14 +13,33 @@ function renderModels(api, props = {}) {
   );
 }
 
-it('shows account models, shares the query, and hides login instructions on success', async () => {
-  const api = { getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'gpt-test'] }) };
-  const onChange = vi.fn();
-  renderModels(api, { onChange });
+function makeSuccessApi() {
+  return { getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'gpt-test'] }) };
+}
+
+it('shows account models on success', async () => {
+  renderModels(makeSuccessApi());
   expect(await screen.findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+});
+
+it('hides login instructions on success', async () => {
+  renderModels(makeSuccessApi());
+  await screen.findByRole('option', { name: 'gpt-test' });
   expect(screen.queryByText(/separate Quodeq profile/)).toBeNull();
+});
+
+it('calls onChange when a model is selected', async () => {
+  const onChange = vi.fn();
+  renderModels(makeSuccessApi(), { onChange });
+  await screen.findByRole('option', { name: 'gpt-test' });
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'gpt-test' } });
   expect(onChange).toHaveBeenCalledWith('gpt-test');
+});
+
+it('shares the discovery query between CopilotModelStatus and CopilotModelSelect', async () => {
+  const api = makeSuccessApi();
+  renderModels(api);
+  await screen.findByRole('option', { name: 'gpt-test' });
   expect(api.getClientModels).toHaveBeenCalledTimes(1);
   expect(api.getClientModels).toHaveBeenCalledWith('copilot');
 });
