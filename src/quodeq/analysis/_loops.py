@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 
+from quodeq.analysis._dim_order import _apply_dim_deadline
 from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
@@ -50,6 +52,7 @@ def _run_post_loop_guards(
 
 def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext, deps: LoopDeps,
+    *, dim_counts: Mapping[str, int] | None = None,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
 
@@ -58,14 +61,25 @@ def run_incremental_loop(
     an "(incremental)" suffix and logs the result itself); the full-scan
     fallback (see ``_dispatch_incremental_dim``) uses ``emit_log=True`` so
     the runner emits its own analyzing marker and success log.
+
+    Each dimension gets its own slice of the remaining budget, sized by its
+    pending file count from ``dim_counts`` (see ``_dim_order``), so a
+    truncated run no longer always cuts the last dimension short. The
+    run-level deadline is restored afterwards: scoring and the post-loop
+    guards must see the run budget, not the last dimension's slice.
     """
     log = deps.log
     result: dict[str, Evidence] = {}
     log.info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     run = _LoopRun(deps=deps, result=result)
-    for idx, dimension in enumerate(dimensions, 1):
-        if _run_one_incremental_dim(config, dimension, idx, ctx, run):
-            break
+    run_deadline = getattr(config.options, "deadline_at", None)
+    try:
+        for idx, dimension in enumerate(dimensions, 1):
+            _apply_dim_deadline(config, dimensions[idx - 1:], run_deadline, dim_counts)
+            if _run_one_incremental_dim(config, dimension, idx, ctx, run):
+                break
+    finally:
+        config.options.deadline_at = run_deadline
     log.info(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'})",

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
+from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
@@ -100,25 +101,32 @@ def _run_dry_run(
     return result
 
 
-def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> None:
+def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> DimEstimates | None:
     """Compute and persist per-dim file estimates so the dashboard total
     is accurate before any dim starts. Best-effort: a failure here must
     not break the run — the UI will fall back to the project-wide ceiling.
+
+    Returns the estimates (None when there are none) so the caller can
+    order dimensions by pending backlog without a second cache walk.
     """
     if not config.work_dir:
-        return  # dev mode (no run_dir) — nothing for the dashboard to read
+        return None  # dev mode (no run_dir) — nothing for the dashboard to read
     try:
         estimates = compute_dim_estimates(config, dimensions, log=SHARED_LOG)
     except (OSError, ValueError, KeyError, RuntimeError) as exc:
         SHARED_LOG.debug(f"dim estimates skipped; the dashboard falls back to the project-wide ceiling: {exc}")
-        return
+        return None
     write_dim_estimates(config.work_dir.parent, estimates)
+    return estimates
 
 
 def _prepare_run_context(
     config: RunConfig,
-) -> tuple[list[str], _AnalysisContext, DimensionRunner]:
+) -> tuple[list[str], _AnalysisContext, DimensionRunner, dict[str, int] | None]:
     """Load dimensions/context, warm the classify cache, and build the runner.
+
+    Dimensions come back ordered by pending backlog with their per-dim
+    counts, or in the configured order with ``None`` counts (``_dim_order``).
 
     Activates the per-run classify stash so ``_persist_dim_estimates`` below
     and the dim runner inside ``cache/dimension_runner.py`` share a single
@@ -144,12 +152,13 @@ def _prepare_run_context(
     dimensions, ctx = load_analysis_context(config)
     if config._classify_cache is None:
         config._classify_cache = {}
-    _persist_dim_estimates(config, dimensions)
+    estimates = _persist_dim_estimates(config, dimensions)
+    dimensions, dim_counts = _order_by_backlog(dimensions, estimates, log=SHARED_LOG)
 
     cache = LocalFileBackend()
     ensure_cache_ready(cache.root)
     runner = DimensionRunner(cache=cache, log=SHARED_LOG)
-    return dimensions, ctx, runner
+    return dimensions, ctx, runner, dim_counts
 
 
 def _set_run_deadline(config: RunConfig) -> None:
@@ -205,6 +214,7 @@ def _dispatch_fixed_mode(
     ctx: _AnalysisContext,
     runner: DimensionRunner,
     on_dimension_done: "Callable[[str, Evidence], None] | None",
+    dim_counts: dict[str, int] | None = None,
 ) -> dict[str, Evidence] | None:
     """Diff-mode or incremental-mode dispatch; None falls through to clean-scan.
 
@@ -227,6 +237,7 @@ def _dispatch_fixed_mode(
         return run_incremental_loop(
             config, dimensions, ctx,
             LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
+            dim_counts=dim_counts,
         )
     return None
 
@@ -241,10 +252,12 @@ def _run_dimensions(
 
     _warn_if_local_api_oversubscribed(config)
 
-    dimensions, ctx, runner = _prepare_run_context(config)
+    dimensions, ctx, runner, dim_counts = _prepare_run_context(config)
     _set_run_deadline(config)
 
-    fixed_mode_result = _dispatch_fixed_mode(config, dimensions, ctx, runner, on_dimension_done)
+    fixed_mode_result = _dispatch_fixed_mode(
+        config, dimensions, ctx, runner, on_dimension_done, dim_counts,
+    )
     if fixed_mode_result is not None:
         return fixed_mode_result
 
