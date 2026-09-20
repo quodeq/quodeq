@@ -1077,7 +1077,6 @@ tests/data/sqlite/test_schema.py:7:private-module:quodeq.data.sqlite._schema.SCH
 tests/data/sqlite/test_schema_exit_reason.py:7:private-module:quodeq.data.sqlite._migrations.apply_evaluation_schema
 tests/data/sqlite/test_schema_exit_reason.py:8:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
 tests/data/sqlite/test_v3_to_v4_rebuilds.py:84:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
-tests/data/test_cluster30_empty_except_logging.py:15:private-module:quodeq.data.fs.dimension_report._report_io
 tests/data/test_cluster30_empty_except_logging.py:16:private-module:quodeq.data.sqlite._run_index_schema
 tests/data/test_db_stamp_memo.py:106:private-module:quodeq.data.sqlite._db_stamp_memo.memoized_by_db_stamp
 tests/data/test_db_stamp_memo.py:10:private-module:quodeq.data.sqlite._db_stamp_memo.db_stamp

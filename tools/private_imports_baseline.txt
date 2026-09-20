@@ -36,9 +36,7 @@ src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimensio
 src/quodeq/analysis/_report_findings.py:10:private-module:quodeq.data.fs.dimension_report._report_findings.build_principle_rows
 src/quodeq/analysis/_report_findings.py:10:private-name:quodeq.data.fs.dimension_report._report_findings._build_principle_row
 src/quodeq/analysis/_report_findings.py:10:private-name:quodeq.data.fs.dimension_report._report_findings._flatten_findings
-src/quodeq/analysis/_report_io.py:18:private-module:quodeq.data.fs.dimension_report._report_io.write_dimension_report
-src/quodeq/analysis/_report_io.py:18:private-module:quodeq.data.fs.dimension_report._report_io.write_reports
-src/quodeq/analysis/_report_io.py:18:private-name:quodeq.data.fs.dimension_report._report_io._persist_json
+src/quodeq/analysis/_report_io.py:18:private-name:quodeq.data.fs.dimension_report.report_io._persist_json
 src/quodeq/analysis/_report_scoring.py:10:private-module:quodeq.data.fs.dimension_report._report_scoring.build_score_lookup
 src/quodeq/analysis/_report_scoring.py:10:private-module:quodeq.data.fs.dimension_report._report_scoring.extract_scores
 src/quodeq/analysis/_report_scoring.py:10:private-module:quodeq.data.fs.dimension_report._report_scoring.grade_from_score
@@ -145,7 +143,6 @@ src/quodeq/services/_external_jobs.py:25:private-module:quodeq.data.fs.report_pa
 src/quodeq/services/_fs_project_parents.py:13:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_registration_url.py:12:private-name:quodeq.shared.repo._looks_like_authority
 src/quodeq/services/_rescore_legacy.py:11:private-module:quodeq.core.scoring._principle.compute_tallies
-src/quodeq/services/_wiring.py:38:private-module:quodeq.data.fs.dimension_report._report_io.write_dimension_report
 src/quodeq/services/scoring/__init__.py:26:private-module:quodeq.services._trend_fetcher.make_rescoring_fetcher
 src/quodeq/services/scoring/__init__.py:27:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/__init__.py:31:private-module:quodeq.services._wiring.read_run_data
