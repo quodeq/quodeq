@@ -80,7 +80,9 @@ def test_read_tail_honours_the_injected_byte_cap(tmp_path: Path):
     from quodeq.api._log_tail_helpers import _read_tail
 
     log = tmp_path / "run.log"
-    log.write_text("alpha\nbeta\n", encoding="utf-8")
+    # Bytes, not text: on Windows write_text would emit \r\n and the 6-byte
+    # cap would cut the first line in half.
+    log.write_bytes(b"alpha\nbeta\n")
     lines, offset = _read_tail(log, 0, {"QUODEQ_LOG_TAIL_MAX_BYTES": "6"})
     assert lines == ["alpha"]
     assert offset == 6
