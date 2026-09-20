@@ -12,10 +12,10 @@ src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_api_call.py:249:broad-except
 src/quodeq/analysis/_api_runner.py:99:broad-except
-src/quodeq/analysis/_loop_steps.py:130:broad-except
-src/quodeq/analysis/_loop_steps.py:173:broad-except
-src/quodeq/analysis/_loop_steps.py:175:broad-except
-src/quodeq/analysis/_loop_steps.py:99:broad-except
+src/quodeq/analysis/_loop_steps.py:131:broad-except
+src/quodeq/analysis/_loop_steps.py:174:broad-except
+src/quodeq/analysis/_loop_steps.py:176:broad-except
+src/quodeq/analysis/_loop_steps.py:100:broad-except
 src/quodeq/analysis/_loops.py:130:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:112:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:120:broad-except

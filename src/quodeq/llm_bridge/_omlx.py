@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.config.llm_bridge_env import omlx_api_key, omlx_base_url
-from quodeq.llm_bridge._ollama import _detect_memory, estimate_max_agents
+from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, _detect_memory, estimate_max_agents
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ def run_concurrency_test(_model: str, base_url: str | None = None, api_key: str 
             "reason": "Could not detect host memory",
         }
 
-    vram_per_context = max(int(gpu_memory * 0.5), 1)
+    vram_per_context = max(int(gpu_memory * DEFAULT_MEMORY_FRACTION), 1)
     result = estimate_max_agents(model_size=vram_per_context, gpu_memory=gpu_memory)
     return {
         "recommended": result["estimate"],

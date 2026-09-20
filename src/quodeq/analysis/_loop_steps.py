@@ -28,6 +28,7 @@ from quodeq.analysis._loop_state import (
 from quodeq.analysis._runner_markers import emit_marker
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
+from quodeq.shared.constants import CC_PHASE_ANALYZING
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.dimensions_state_store import DimState
@@ -200,7 +201,7 @@ def _run_one_incremental_dim(
         return True
     run_dir = _run_dir_for(config)
     _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
-    emit_marker("analyzing", dimension=dimension)
+    emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
     log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
     ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, run.deps)
     if ev:

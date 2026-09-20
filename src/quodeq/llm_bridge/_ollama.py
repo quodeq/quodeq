@@ -18,6 +18,11 @@ _MAX_PARALLEL_AGENTS = 5
 _SYSCTL_TIMEOUT_S = 3
 _NVIDIA_SMI_TIMEOUT_S = 5
 _MIB_TO_BYTES = 1024 * 1024
+# Per-context host-memory budget when a backend reports no real VRAM/size
+# data (llamacpp's /v1/models and omlx alike): assume the loaded model
+# occupies this fraction of detected host memory. Shared so both bridges'
+# fallback estimate agrees.
+DEFAULT_MEMORY_FRACTION = 0.5
 
 
 def _resolved_base(base_url: str | None) -> str:

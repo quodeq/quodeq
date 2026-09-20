@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
+
 # Cancel-cause / interruption-reason codes shared by the pool workers and
 # scalers that raise them, the dim-runner circuit breaker, and the loop
 # guards / CLI lifecycle that read them back via cancellation.cancel_reason()
@@ -53,7 +55,7 @@ def provider_exit_reason(reason: str | None) -> str:
     """Map a provider reason or cancellation cause to its persistent exit code."""
     if reason and reason.startswith(f"{REASON_PROVIDER_FATAL}:"):
         reason = reason.split(":", 2)[1]
-    return "copilot_mcp_policy" if reason == "copilot_mcp_policy" else REASON_PROVIDER_FATAL
+    return COPILOT_MCP_POLICY_REASON if reason == COPILOT_MCP_POLICY_REASON else REASON_PROVIDER_FATAL
 
 
 class BudgetExceededError(EvaluationError):

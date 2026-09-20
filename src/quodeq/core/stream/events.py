@@ -25,6 +25,9 @@ EVENT_TYPE_SESSION_ERROR = "session.error"
 EVENT_TYPE_TOOL_EXECUTION_START = "tool.execution_start"
 # Copilot's tool-name equivalents of Claude's _FILE_READ_TOOLS.
 _COPILOT_FILE_READ_TOOLS = frozenset({"view", "grep"})
+# Non-retryable reason code for a Copilot MCP-policy block. Read back by
+# analysis/errors.py's provider_exit_reason and services/_job_monitor_mixin.py.
+COPILOT_MCP_POLICY_REASON = "copilot_mcp_policy"
 
 
 def texts_from_assistant(event: dict) -> list[str]:
@@ -79,7 +82,7 @@ def _copilot_mcp_policy_error(data: dict) -> tuple[str, str] | None:
                 f"Copilot policy blocked Quodeq's required MCP server '{server}'. "
                 "Ask your organization administrator to allow this MCP server. "
                 "Signing in or selecting a model does not grant MCP access.",
-                "copilot_mcp_policy",
+                COPILOT_MCP_POLICY_REASON,
             )
     return None
 

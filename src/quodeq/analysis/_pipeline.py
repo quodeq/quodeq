@@ -22,6 +22,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis._runner_markers import emit_marker
+from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
 
@@ -67,7 +68,7 @@ def _run_dry_run(
 ) -> dict[str, Evidence]:
     """Return empty Evidence per dimension without making any AI calls."""
     dimensions, ctx = load_analysis_context(config)
-    emit_marker("setup", dimensions=dimensions)
+    emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
     result: dict[str, Evidence] = {}
     date_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
     evidence_dir = config.work_dir or config.src
@@ -78,7 +79,7 @@ def _run_dry_run(
         # stamps the run exit_reason=incomplete_dimensions.
         _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=SHARED_LOG)
         log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
-        emit_marker("analyzing", dimension=dimension)
+        emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
         ev = Evidence(
             repository=str(config.src),
             language=config.language,
@@ -93,7 +94,7 @@ def _run_dry_run(
         jsonl_path.parent.mkdir(parents=True, exist_ok=True)
         if not jsonl_path.exists():
             jsonl_path.touch()
-        emit_marker("scoring", dimension=dimension)
+        emit_marker(CC_PHASE_SCORING, dimension=dimension)
         result[dimension] = ev
         _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.DONE), log=SHARED_LOG)
         if on_dimension_done:
@@ -173,7 +174,7 @@ def _set_run_deadline(config: RunConfig) -> None:
         deadline_iso = (
             datetime.now(timezone.utc) + timedelta(seconds=budget_s)
         ).isoformat()
-        emit_marker("analyzing_start", deadline_at=deadline_iso, budget_s=budget_s)
+        emit_marker(CC_PHASE_ANALYZING_START, deadline_at=deadline_iso, budget_s=budget_s)
 
 
 def _try_consolidated_mode(
@@ -224,7 +225,7 @@ def _dispatch_fixed_mode(
     cross-dimension scoring).
     """
     if config.options.diff_from:
-        emit_marker("setup", dimensions=dimensions)
+        emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
         return run_per_dimension_loop(
             config, dimensions, ctx,
             LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
@@ -234,7 +235,7 @@ def _dispatch_fixed_mode(
         # any run that hasn't explicitly opted out (via --clean-scan or
         # --diff-from at the CLI/API layer) carries forward findings for
         # unchanged files via per-dimension fingerprint lookup.
-        emit_marker("setup", dimensions=dimensions)
+        emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
             LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
@@ -265,7 +266,7 @@ def _run_dimensions(
     # Clean-scan path: full re-analysis, no carry-forward. Reached only
     # when the user requested --clean-scan or --diff-from. Consolidated
     # mode is allowed here because there is no prior fingerprint to honour.
-    emit_marker("setup", dimensions=dimensions)
+    emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
 
     consolidated_result = _try_consolidated_mode(config, dimensions, ctx)
     if consolidated_result is not None:

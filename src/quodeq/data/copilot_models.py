@@ -21,6 +21,12 @@ _STOP_TIMEOUT_S = 2
 _MAX_MESSAGE_BYTES = 1024 * 1024
 _REQUEST_ID = "quodeq-models"
 
+# LSP-style RPC framing: the writer builds the header from these, the reader
+# checks/strips the same prefix and terminator, so both sides stay in sync.
+_RPC_HEADER_NAME = "Content-Length"
+_RPC_HEADER_PREFIX = f"{_RPC_HEADER_NAME}:".encode()
+_RPC_TERMINATOR = b"\r\n\r\n"
+
 
 class _ModelDiscoveryError(ClientMessageError):
     """A safe explanation for a failed Copilot model lookup."""
@@ -59,10 +65,10 @@ def _model_ids(result: object) -> list[str]:
 
 async def _read_models(stdout: asyncio.StreamReader) -> list[str]:
     while True:
-        header = await stdout.readuntil(b"\r\n\r\n")
-        if not header.startswith(b"Content-Length:"):
+        header = await stdout.readuntil(_RPC_TERMINATOR)
+        if not header.startswith(_RPC_HEADER_PREFIX):
             raise _ModelDiscoveryError("Copilot returned an invalid RPC header.")
-        length = int(header.removeprefix(b"Content-Length:").strip())
+        length = int(header.removeprefix(_RPC_HEADER_PREFIX).strip())
         if not 0 < length <= _MAX_MESSAGE_BYTES:
             raise _ModelDiscoveryError("Copilot returned an invalid RPC message length.")
         response = json.loads(await stdout.readexactly(length))
@@ -123,7 +129,7 @@ async def _query_models(env: dict[str, str], timeout_s: float) -> list[str]:
             body = json.dumps({
                 "jsonrpc": "2.0", "id": _REQUEST_ID, "method": "models.list", "params": {},
             }).encode("utf-8")
-            process.stdin.write(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+            process.stdin.write(f"{_RPC_HEADER_NAME}: {len(body)}".encode() + _RPC_TERMINATOR + body)
             await process.stdin.drain()
             return await _read_models(process.stdout)
     finally:

@@ -24,6 +24,7 @@ from collections.abc import Mapping
 import urllib.error
 
 from quodeq.llm_bridge._ollama import (
+    DEFAULT_MEMORY_FRACTION,
     _detect_memory,
     estimate_max_agents,
 )
@@ -127,7 +128,7 @@ def run_concurrency_test(
     # No size data from /v1/models, so use a fraction of host memory as a
     # rough per-context budget. This mirrors Ollama's behavior when VRAM
     # info is missing: we still return at least 1.
-    vram_per_context = models[0].get("size", 0) or max(int(gpu_memory * 0.5), 1)
+    vram_per_context = models[0].get("size", 0) or max(int(gpu_memory * DEFAULT_MEMORY_FRACTION), 1)
 
     if gpu_memory <= 0:
         return {
