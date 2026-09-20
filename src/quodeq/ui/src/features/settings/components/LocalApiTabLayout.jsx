@@ -1,0 +1,79 @@
+/**
+ * The frame the local-API provider tabs (Ollama, llama.cpp, MLX) share:
+ * server-status pill, the models error, the provider's own model row, the
+ * shared time-limit setting and the advanced panel. Only the model row and
+ * the provider-specific labels differ, so those are passed in.
+ */
+import { useId } from 'react';
+import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
+import { t } from '../../../strings/index.js';
+import { TimeLimitSetting } from './ProviderSettings.jsx';
+import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
+
+export function LocalApiTabLayout({
+  serverStatus, offlineMessage, onToggleConsole, consoleOpen, modelsError, modelRow,
+  state, update, subagentsDescription, subagentsAriaLabel, testDisabled, concurrency,
+}) {
+  return (
+    <>
+      <ServerStatusPill
+        status={serverStatus?.status ?? 'offline'}
+        address={serverStatus?.address}
+        offlineMessage={offlineMessage}
+        onToggleConsole={onToggleConsole}
+        consoleOpen={consoleOpen}
+      />
+      {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
+      {modelRow}
+      <TimeLimitSetting state={state} update={update} providerType="local-api" />
+      <LocalApiAdvancedPanel
+        subagentsDescription={subagentsDescription}
+        subagentsAriaLabel={subagentsAriaLabel}
+        state={state}
+        update={update}
+        testDisabled={testDisabled}
+        {...concurrency}
+      />
+    </>
+  );
+}
+
+/**
+ * The model row on a local-API tab: the model label, the provider's help hint
+ * and the shared description, beside the provider's own control.
+ * `renderControl(labelId)` is handed the id that names the control.
+ */
+export function LocalApiModelRow({ hint, renderControl }) {
+  const labelId = useId();
+  return (
+    <div className="settings-row">
+      <SettingsRowLabel
+        labelId={labelId}
+        label={t('settings.modelLabel')}
+        hint={hint}
+        hintAria={t('settings.modelHelpAria')}
+        description={t('settings.thisModelEveryStep')}
+      />
+      {renderControl(labelId)}
+    </div>
+  );
+}
+
+/**
+ * The picker over the models a local-API server reports, with the empty
+ * "pick a model" entry the tabs rely on to express "nothing chosen yet".
+ */
+export function ModelPickerSelect({ value, models, onChange, labelId, className }) {
+  return (
+    <select
+      className={className}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-labelledby={labelId}
+    >
+      <option value="">{t('settings.pickAModel')}</option>
+      {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+    </select>
+  );
+}
