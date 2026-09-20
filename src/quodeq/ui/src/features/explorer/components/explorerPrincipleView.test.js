@@ -38,6 +38,9 @@ test('buildEnrichedPrinciples: a second violation for an already-seen principle 
 
 test('buildEnrichedPrinciples: does not throw for inputs with no violations/compliance', () => {
   assert.doesNotThrow(() => buildEnrichedPrinciples([{ principle: 'A' }], [], null));
+});
+
+test('buildEnrichedPrinciples: counts are zero for inputs with no violations/compliance', () => {
   const enriched = buildEnrichedPrinciples([{ principle: 'A' }], [], null);
   assert.equal(enriched[0].violationCount, 0);
   assert.equal(enriched[0].complianceCount, 0);

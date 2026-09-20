@@ -64,6 +64,13 @@ describe('ExplorerStatsPanel severity badges', () => {
     render(<ExplorerStatsPanel {...baseProps} onNavigate={() => {}} onCardNavigate={vi.fn()} />);
     const stat = screen.getByLabelText(/show all violations/i);
     expect(stat).toBeInTheDocument();
+  });
+
+  it('clicking the violations stat fires the navigation callback', () => {
+    const onCardNavigate = vi.fn();
+    render(<ExplorerStatsPanel {...baseProps} onNavigate={() => {}} onCardNavigate={onCardNavigate} />);
+    const stat = screen.getByLabelText(/show all violations/i);
     fireEvent.click(stat);
+    expect(onCardNavigate).toHaveBeenCalledWith('violations');
   });
 });
