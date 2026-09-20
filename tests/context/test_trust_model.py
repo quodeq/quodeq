@@ -63,7 +63,8 @@ def test_detection_used_when_no_profile(tmp_path):
     assert resolved.network_exposure == "public"
 
 
-def test_desktop_detection_alone_never_relaxes_remote(tmp_path):
+@pytest.fixture()
+def _desktop_detected_trust_model(tmp_path):
     # C1: detection may fill multi_tenant but must NEVER fill
     # network_exposure -- only a human declaration in
     # .quodeq/project-profile.json may waive a remote-reachability finding.
@@ -72,10 +73,17 @@ def test_desktop_detection_alone_never_relaxes_remote(tmp_path):
     # desktop/cli today; none of them may get S-AUT-3 waived on that basis
     # alone.
     _desktop_manifest(tmp_path)
-    resolved = resolve_trust_model(tmp_path)
+    return resolve_trust_model(tmp_path)
+
+
+def test_desktop_detection_alone_never_relaxes_remote(_desktop_detected_trust_model):
+    resolved = _desktop_detected_trust_model
     assert resolved.network_exposure == "public"
     assert resolved.relaxes_remote() is False
 
+
+def test_desktop_detection_alone_does_not_waive_the_scope_gate(_desktop_detected_trust_model):
+    resolved = _desktop_detected_trust_model
     finding = {
         "t": "violation", "req": "S-AUT-3", "severity": "major",
         "w": "Path traversal via job_id",
