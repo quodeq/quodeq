@@ -10,6 +10,7 @@ time, and the last two write back into the mapping instead of the process.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.shared import frozen
-from quodeq.shared._config import defaults_path
+from quodeq.shared._config import _ConfigHolder, defaults_path
 from quodeq.shared._io import configure_stdio_utf8
 from quodeq.shared._log_format import _should_use_color
 from quodeq.shared.logging import _apply_env_log_level, _logger
@@ -39,6 +40,33 @@ class TestDefaultsPath:
         target = tmp_path / "late.json"
         monkeypatch.setenv("QUODEQ_DEFAULTS_PATH", str(target))
         assert defaults_path() == target
+
+
+class TestConfigHolderTakesEnv:
+    """The holder resolves its defaults file from the mapping it was given."""
+
+    def _defaults_file(self, tmp_path, value: str):
+        path = tmp_path / "custom-defaults.json"
+        path.write_text(json.dumps({"marker": value}), encoding="utf-8")
+        return path
+
+    def test_loads_from_the_injected_value(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_DEFAULTS_PATH", str(tmp_path / "from-process.json"))
+        injected = self._defaults_file(tmp_path, "from-env")
+        holder = _ConfigHolder({"QUODEQ_DEFAULTS_PATH": str(injected)})
+        assert holder.get()["marker"] == "from-env"
+
+    def test_caches_the_config_after_the_first_load(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_DEFAULTS_PATH", str(tmp_path / "from-process.json"))
+        injected = self._defaults_file(tmp_path, "from-env")
+        holder = _ConfigHolder({"QUODEQ_DEFAULTS_PATH": str(injected)})
+        first = holder.get()
+        injected.unlink()  # a second read would raise
+        assert holder.get() is first
+
+    def test_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_DEFAULTS_PATH", str(self._defaults_file(tmp_path, "from-process")))
+        assert _ConfigHolder({}).get().get("marker") is None
 
 
 class TestProvidersPath:

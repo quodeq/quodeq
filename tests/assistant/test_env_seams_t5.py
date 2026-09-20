@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.assistant.adapters._cli_spawn import build_chat_env
-from quodeq.assistant.skills import skills_directory
+from quodeq.assistant.skills import cached_skills, load_skills, skills_directory
 from quodeq.assistant.worktree import _DEFAULT_WORKTREE_TTL_H, _worktree_ttl_hours, worktrees_base
 
 
@@ -27,6 +27,40 @@ class TestSkillsDirectory:
         """The old module constant froze this at first import; it no longer does."""
         monkeypatch.setenv("QUODEQ_ASSISTANT_SKILLS_DIR", str(tmp_path))
         assert skills_directory() == tmp_path
+
+
+_SKILL_FILE = """---
+name: injected-skill
+description: only present in the injected directory
+---
+body
+"""
+
+
+class TestLoadSkillsTakesEnv:
+    def _pack(self, tmp_path) -> Path:
+        directory = tmp_path / "pack"
+        directory.mkdir()
+        (directory / "injected.md").write_text(_SKILL_FILE, encoding="utf-8")
+        return directory
+
+    def test_uses_the_injected_value(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_ASSISTANT_SKILLS_DIR", str(tmp_path / "from-process"))
+        pack = self._pack(tmp_path)
+        assert "injected-skill" in load_skills(env={"QUODEQ_ASSISTANT_SKILLS_DIR": str(pack)})
+
+    def test_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_ASSISTANT_SKILLS_DIR", str(self._pack(tmp_path)))
+        assert "injected-skill" not in load_skills(env={})
+
+    def test_cached_skills_uses_the_injected_value(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_ASSISTANT_SKILLS_DIR", str(tmp_path / "from-process"))
+        pack = self._pack(tmp_path)
+        assert "injected-skill" in cached_skills(env={"QUODEQ_ASSISTANT_SKILLS_DIR": str(pack)})
+
+    def test_cached_skills_with_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_ASSISTANT_SKILLS_DIR", str(self._pack(tmp_path)))
+        assert "injected-skill" not in cached_skills(env={})
 
 
 class TestWorktreeTtlHours:

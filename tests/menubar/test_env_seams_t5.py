@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -44,6 +45,14 @@ class TestLoadConfig:
         port, ports = app_module._load_config({})
         assert port == 7863
         assert ports[0] == 7863
+
+
+class TestMenubarStatePathEmptyString:
+    def test_empty_string_falls_back_to_the_default_path(self):
+        from quodeq.menubar.state import get_menubar_state_path
+
+        path = get_menubar_state_path({"QUODEQ_MENUBAR_STATE_PATH": "", "QUODEQ_DIR": ""})
+        assert path == str(Path.home() / ".quodeq" / "menubar_state.json")
 
 
 class TestQuodeqAppTakesEnv:

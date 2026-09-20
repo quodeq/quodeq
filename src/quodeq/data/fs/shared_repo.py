@@ -128,7 +128,7 @@ def _cache_base(env: Mapping[str, str] | None = None) -> Path:
     return root / "shared"
 
 
-def shared_cache_dir(url: str, env: dict | None = None) -> Path:
+def shared_cache_dir(url: str, env: Mapping[str, str] | None = None) -> Path:
     """Per-remote cache directory, named by a 16-char digest of *url*."""
     digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()[:16]
     return _cache_base(env) / digest

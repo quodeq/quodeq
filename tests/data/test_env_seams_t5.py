@@ -10,7 +10,7 @@ from pathlib import Path
 
 from quodeq.data.cache_store.local import LocalFileBackend, default_cache_root
 from quodeq.data.fs.repo_clone import _DEFAULT_CLONE_TIMEOUT_S, GitCloneClient, _get_clone_timeout
-from quodeq.data.fs.shared_repo import _cache_base, _git_env
+from quodeq.data.fs.shared_repo import _cache_base, _git_env, run_git
 
 
 class TestDefaultCacheRoot:
@@ -100,6 +100,38 @@ class TestGitEnv:
         assert "VAR" not in _git_env({})
 
 
+class TestRunGitPassesEnvThrough:
+    """run_git's env reaches git via _git_env, pins included."""
+
+    def _captured_env(self, monkeypatch, env) -> dict[str, str]:
+        seen: dict[str, str] = {}
+
+        class _Proc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        def fake_run(argv, **kwargs):
+            seen.update(kwargs["env"])
+            return _Proc()
+
+        monkeypatch.setattr("quodeq.data.fs.shared_repo.subprocess.run", fake_run)
+        run_git(["status"], env=env)
+        return seen
+
+    def test_uses_the_injected_value(self, monkeypatch):
+        monkeypatch.setenv("VAR", "from-process")
+        seen = self._captured_env(monkeypatch, {"VAR": "from-env"})
+        assert seen["VAR"] == "from-env"
+        assert seen["GIT_TERMINAL_PROMPT"] == "0"
+
+    def test_empty_injected_env_ignores_the_process(self, monkeypatch):
+        monkeypatch.setenv("VAR", "from-process")
+        seen = self._captured_env(monkeypatch, {})
+        assert "VAR" not in seen
+        assert seen["GIT_LFS_SKIP_SMUDGE"] == "1"
+
+
 class TestSharedCacheBase:
     def test_uses_the_injected_value(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
@@ -109,3 +141,6 @@ class TestSharedCacheBase:
     def test_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
         assert _cache_base({}) == Path.home() / ".quodeq" / "cache" / "shared"
+
+    def test_empty_string_falls_back_to_the_default_root(self):
+        assert _cache_base({"QUODEQ_CACHE_ROOT": ""}) == Path.home() / ".quodeq" / "cache" / "shared"

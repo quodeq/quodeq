@@ -109,7 +109,7 @@ def _fetch_report_changed_lines(args: argparse.Namespace, token: str) -> dict[st
 
 def _post_report_review(
     args: argparse.Namespace, reports, baseline_violations, baseline_available,
-    changed_lines, token: str,
+    changed_lines, *, token: str,
 ) -> None:
     """Build the review payload, post it, and print the run summary."""
     from quodeq.ci.reporter import ReviewOptions, build_review_payload, post_review
@@ -170,5 +170,7 @@ def _handle_report(args: argparse.Namespace, env: Mapping[str, str] | None = Non
         reports, baseline_violations, baseline_available = loaded
 
     changed_lines = _fetch_report_changed_lines(args, token)
-    _post_report_review(args, reports, baseline_violations, baseline_available, changed_lines, token)
+    _post_report_review(
+        args, reports, baseline_violations, baseline_available, changed_lines, token=token,
+    )
     return 0
