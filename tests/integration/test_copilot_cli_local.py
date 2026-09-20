@@ -120,7 +120,12 @@ def test_real_copilot_evaluation_records_mcp_finding(tmp_path, local_model):
     assert "def example()" in json.dumps(calls[1]["messages"])
 
 
-def test_real_copilot_assistant_mcp_and_resume(tmp_path, local_model):
+@pytest.fixture
+def _first_turn(tmp_path, local_model):
+    """Run the first assistant CLI turn against the synthetic MCP model.
+    Each test below checks one behaviour of that single turn; the resume
+    test drives the second turn itself since it depends on this one's
+    session id and call log."""
     calls, tool = local_model
     tool.update(name="quodeq-assistant-list_standards", arguments={})
     (tmp_path / "d.json").write_text('{"dimensions":[]}')
@@ -139,15 +144,36 @@ def test_real_copilot_assistant_mcp_and_resume(tmp_path, local_model):
         messages=[{"role": "user", "content": "List synthetic standards."}],
         config=cfg, session=_session(repo, emit=frames.append),
     )
+    return repo, cfg, calls, text, frames
+
+
+def test_first_turn_returns_the_synthetic_answer_and_streams_frames(_first_turn):
+    _repo, _cfg, _calls, text, frames = _first_turn
     assert text == "Synthetic answer."
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Synthetic answer."]
     assert any(f["type"] == "tool_call" and f["name"] == "list_standards" for f in frames)
+
+
+def test_first_turn_tools_are_scoped_to_quodeq_assistant(_first_turn):
+    _repo, _cfg, calls, _text, _frames = _first_turn
     names = {t["function"]["name"] for t in calls[0]["tools"]}
     assert names and all(name.startswith("quodeq-assistant-") for name in names)
+
+
+def test_first_turn_tool_reply_confirms_ok(_first_turn):
+    _repo, _cfg, calls, _text, _frames = _first_turn
     tool_reply = next(m for m in calls[1]["messages"] if m["role"] == "tool")
     assert json.loads(tool_reply["content"])["ok"] is True
+
+
+def test_first_turn_persists_the_cli_session_id(_first_turn):
+    repo, _cfg, _calls, _text, _frames = _first_turn
+    assert repo.get_session("s1")["cli_session_id"]
+
+
+def test_resume_continues_with_the_same_session_and_replays_context(_first_turn):
+    repo, cfg, calls, text, _frames = _first_turn
     sid = repo.get_session("s1")["cli_session_id"]
-    assert sid
     before = len(calls)
     resumed = run_cli_turn(
         messages=[{"role": "user", "content": "List synthetic standards."},

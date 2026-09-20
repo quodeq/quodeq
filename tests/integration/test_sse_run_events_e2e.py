@@ -120,10 +120,11 @@ def test_e2e_reconnect_with_last_event_id_skips_emitted_findings(app: Flask):
 
 def test_e2e_pending_run_emits_pending_status(app: Flask):
     run_dir: Path = app.config["_run_dir"]
-    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+    (run_dir / "status.json").write_text(json.dumps({"state": "pending"}))
 
     client = app.test_client()
     resp = client.get("/api/evaluations/j/events")
     frames = _parse_sse_frames(resp.get_data(as_text=True))
     status_frames = [f for f in frames if f["event"] == "status"]
     assert len(status_frames) >= 1
+    assert json.loads(status_frames[0]["data"])["state"] == "pending"
