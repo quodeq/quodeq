@@ -177,7 +177,7 @@ def test_gate_passes_on_current_tree():
 
 # Revise DOWNWARD as over-asserting tests are split; the target is 0.
 # NEVER raise without a justification reviewed in the PR that raises it.
-BASELINE_CEILING = 250
+BASELINE_CEILING = 40
 
 
 def test_baseline_only_shrinks():

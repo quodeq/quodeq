@@ -16,7 +16,6 @@
     "**/dist/**"
   ],
   "path": [
-    "src/quodeq",
-    "src/quodeq/ui/src"
+    "src/quodeq"
   ]
 }
