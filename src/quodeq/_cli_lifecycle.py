@@ -25,7 +25,9 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
-from quodeq.analysis.errors import provider_exit_reason
+from quodeq.analysis.errors import (
+    REASON_AGENT_FAILURE_STREAK, REASON_PROVIDER_FATAL, provider_exit_reason,
+)
 from quodeq.analysis.runner import EvaluationError, RunConfig
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq._cli_env import _resolve_time_limit
@@ -121,9 +123,9 @@ def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> Non
     """
     from quodeq.shared import cancellation
     reason = cancellation.cancel_reason() or ""
-    if reason.startswith("provider_fatal"):
+    if reason.startswith(REASON_PROVIDER_FATAL):
         lifecycle.set_exit_reason(provider_exit_reason(reason))
-    elif reason == "agent_failure_streak":
+    elif reason == REASON_AGENT_FAILURE_STREAK:
         lifecycle.set_exit_reason("failure_streak")
 
 

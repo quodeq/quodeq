@@ -13,18 +13,22 @@ from typing import Callable
 from quodeq.assistant.adapters._cli_command import (
     McpConfigRef, TurnArgvRequest, build_turn_argv)
 from quodeq.assistant.adapters._cli_cleanup import TurnResources, release_turn_resources
-from quodeq.assistant.adapters._cli_config import load_cli_chat_config
+from quodeq.assistant.adapters._cli_config import (
+    SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX, load_cli_chat_config,
+)
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
 from quodeq.assistant.adapters._cli_events import consume_stream_events
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.mcp import _config as mcp_config
+from quodeq.core._constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
 
 _logger = logging.getLogger(__name__)
 
 TURN_TIMEOUT_S = 300
+_REAPER_WAIT_S = 10  # grace period after stream EOF before force-killing the process tree
 
 
 @dataclass(frozen=True)
@@ -69,12 +73,12 @@ def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     neither, for ``cli-register``). Runs OUTSIDE ``_run_once``'s try/finally:
     a failure here precedes any resource that needs cleanup.
     """
-    if cli_cfg.mcp_style == "config-file":
+    if cli_cfg.mcp_style == MCP_STYLE_CONFIG_FILE:
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         tmp.close()
         mcp_config.write_mcp_config(cfg.mcp_server_args, Path(tmp.name), tools=cli_cfg.mcp_server_tools)
         return McpConfigRef(tmp.name, None)
-    if cli_cfg.mcp_style == "config-arg":
+    if cli_cfg.mcp_style == MCP_STYLE_CONFIG_ARG:
         # codex: define the server inline per invocation; no global state to clean up.
         return McpConfigRef(None, mcp_config.codex_mcp_config_arg(cfg.mcp_server_args))
     mcp_config.register_cli_mcp(cli_cfg.cmd, cfg.mcp_server_args,
@@ -119,7 +123,7 @@ def _finalize_turn_result(proc, stream_result, *, repository: AssistantStore, se
                           ) -> tuple[str, str | None, int, str | None, str | None]:
     texts, errors, raw_errors, parsed_sid, partial_buf, saw_result = stream_result
     try:
-        returncode = proc.wait(timeout=10)
+        returncode = proc.wait(timeout=_REAPER_WAIT_S)
     except subprocess.TimeoutExpired:
         _kill_proc_tree(proc)
         returncode = proc.wait()
@@ -167,7 +171,7 @@ def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
 
 def _inject_system_prompt(cli_cfg, config: CliTurnConfig, prior_session_id: str | None,
                           prompt: str) -> str:
-    if cli_cfg.system_prompt_style != "message-prefix":
+    if cli_cfg.system_prompt_style != SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX:
         return prompt
     # argv-append providers (claude) carry the system prompt + skill inside
     # --append-system-prompt every run. message-prefix providers (codex,

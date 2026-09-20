@@ -10,6 +10,7 @@ from quodeq.analysis.cache._failure_streak import (
     TripEvent,
     CircuitBreakerError,
 )
+from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 
 
 def _append(jsonl: Path, line: dict) -> None:
@@ -132,10 +133,10 @@ class TestFailureStreakBreaker:
 
 class TestCircuitBreakerError:
     def test_error_has_reason(self):
-        exc = CircuitBreakerError("circuit_breaker")
-        assert str(exc) == "circuit_breaker"
-        assert exc.reason == "circuit_breaker"
+        exc = CircuitBreakerError(REASON_CIRCUIT_BREAKER)
+        assert str(exc) == REASON_CIRCUIT_BREAKER
+        assert exc.reason == REASON_CIRCUIT_BREAKER
 
     def test_default_reason(self):
         exc = CircuitBreakerError()
-        assert exc.reason == "circuit_breaker"
+        assert exc.reason == REASON_CIRCUIT_BREAKER

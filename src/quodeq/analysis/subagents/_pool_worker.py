@@ -10,7 +10,7 @@ from quodeq.analysis.subagents._pool_models import (
     _AGENT_ID_PREFIX,
     _DEFAULT_MAX_DURATION_S,
 )
-from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.errors import REASON_PROVIDER_FATAL, FatalProviderError
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
@@ -91,7 +91,7 @@ def run_single_agent(
             f"Subagent {agent_id} hit a fatal provider error ({exc.reason}): {exc} "
             f"-- cancelling run, no further agents will be spawned"
         )
-        cancellation.request_cancel(reason=f"provider_fatal:{exc.reason}: {exc}")
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:{exc.reason}: {exc}")
         return SubagentResult(
             agent_id=agent_id, jsonl_file=jsonl_file,
             stream_file=stream_file, success=False, error=str(exc),

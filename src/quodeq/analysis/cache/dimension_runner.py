@@ -32,6 +32,7 @@ from dataclasses import dataclass, replace
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from quodeq.analysis.cache._dimension_context import (
     _CacheContext,
     _prepare_cache_context,
@@ -168,7 +169,7 @@ def _handle_breaker_trip(
         if salvaged is not None and salvaged.principles:
             salvaged.exit_reason = "failure_streak"
             return salvaged
-    raise CircuitBreakerError("circuit_breaker")
+    raise CircuitBreakerError(REASON_CIRCUIT_BREAKER)
 
 
 def _handle_dispatch_result(

@@ -12,6 +12,7 @@ from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters._cli import CliTurnConfig, CliTurnSession, run_cli_turn
 from quodeq.assistant.adapters._cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
+from quodeq.core._constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
 from quodeq.assistant.skills import cached_skills
@@ -85,7 +86,7 @@ def _provider_type(provider: str) -> str:
 # it mutates a global settings file, so concurrent sessions could interleave
 # and a no-grant turn would spawn its MCP server against a grant turn's
 # registration, leaking write tools jailed to another session's worktree.
-_ISOLATED_MCP_STYLES = frozenset({"config-file", "config-arg"})
+_ISOLATED_MCP_STYLES = frozenset({MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG})
 
 
 def write_safe_provider(provider: str) -> bool:

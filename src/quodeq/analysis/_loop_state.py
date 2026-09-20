@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.errors import FatalProviderError, provider_exit_reason
+from quodeq.analysis.errors import (
+    REASON_AGENT_FAILURE_STREAK, REASON_CANCELLED_SIGNAL, REASON_CIRCUIT_BREAKER,
+    REASON_FAILED_EXCEPTION, REASON_PROVIDER_FATAL,
+    FatalProviderError, provider_exit_reason,
+)
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
@@ -95,15 +99,15 @@ def _interruption_reason(exc: BaseException | None = None) -> str:
     if isinstance(exc, FatalProviderError):
         return provider_exit_reason(exc.reason)
     if isinstance(exc, CircuitBreakerError):
-        return "circuit_breaker"
+        return REASON_CIRCUIT_BREAKER
     if cancellation.is_cancelled():
         reason = cancellation.cancel_reason() or ""
-        if reason.startswith("provider_fatal"):
+        if reason.startswith(REASON_PROVIDER_FATAL):
             return provider_exit_reason(reason)
-        if reason == "agent_failure_streak":
-            return "agent_failure_streak"
-        return "cancelled_signal"
-    return "failed_exception"
+        if reason == REASON_AGENT_FAILURE_STREAK:
+            return REASON_AGENT_FAILURE_STREAK
+        return REASON_CANCELLED_SIGNAL
+    return REASON_FAILED_EXCEPTION
 
 
 def _silence_broken_stdout() -> None:

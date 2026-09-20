@@ -15,6 +15,7 @@ _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 _ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
 _ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
+_ENV_NO_CONSOLIDATE = "QUODEQ_NO_CONSOLIDATE"
 
 
 def _resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = None) -> int | None:
@@ -90,6 +91,7 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
 ENV_MAX_TURNS = _ENV_MAX_TURNS
 ENV_MAX_DURATION = _ENV_MAX_DURATION
 ENV_POOL_BUDGET = _ENV_POOL_BUDGET
+ENV_NO_CONSOLIDATE = _ENV_NO_CONSOLIDATE
 cli_env_int = _env_int
 cli_environ = _environ
 no_verify = _no_verify

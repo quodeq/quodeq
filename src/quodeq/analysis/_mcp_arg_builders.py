@@ -22,6 +22,10 @@ from quodeq.analysis._config import (
 )
 from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.config.analysis_env import ai_tools, base_ai_args
+from quodeq.core._constants import (
+    MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
+    PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
+)
 from quodeq.shared._models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd_path
 
@@ -127,18 +131,18 @@ def _build_mcp_args(
     """Build MCP-related args and return the config path (if any)."""
     if config.jsonl_file is None:
         return [], None
-    mcp_style = provider_cfg.get("mcp_style", "config-file")
-    if mcp_style == "cli-register":
+    mcp_style = provider_cfg.get("mcp_style", MCP_STYLE_CONFIG_FILE)
+    if mcp_style == MCP_STYLE_CLI_REGISTER:
         # The findings server is registered out-of-band (`<cmd> mcp add` in
         # subprocess._run_cli_analysis), so no config file/arg is needed —
         # but the CLI must still receive its allow-list args (e.g. gemini's
         # --allowed-mcp-server-names) or the registered server stays blocked.
         return list(provider_cfg.get("mcp_permission_args", [])), None
-    if mcp_style not in {"config-file", "config-arg"}:
+    if mcp_style not in {MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG}:
         return [], None
 
     agent_params = _build_agent_params(config, work_dir)
-    if mcp_style == "config-arg":
+    if mcp_style == MCP_STYLE_CONFIG_ARG:
         return [
             "-c",
             _codex_mcp_config_arg(
@@ -161,11 +165,11 @@ def _build_model_budget_prompt_args(
     if provider_cfg.get("supports_turns", True) and config.max_turns is not None:
         args.extend(["--max-turns", str(config.max_turns)])
 
-    prompt_style = provider_cfg.get("prompt_style", "flag")
-    if prompt_style == "positional":
+    prompt_style = provider_cfg.get("prompt_style", PROMPT_STYLE_FLAG)
+    if prompt_style == PROMPT_STYLE_POSITIONAL:
         args.append(prompt)
     else:
-        prompt_flag = provider_cfg.get("prompt_flag", "-p")
+        prompt_flag = provider_cfg.get("prompt_flag", PROMPT_FLAG_DEFAULT)
         args.extend([prompt_flag, prompt])
     return args
 

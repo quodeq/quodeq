@@ -51,7 +51,7 @@ from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
 from quodeq._cli_env import (  # noqa: F401 — _ENV_*/_env_int/_no_verify re-exported for quodeq.cli
-    _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_POOL_BUDGET,
+    _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_NO_CONSOLIDATE, _ENV_POOL_BUDGET,
     _env_int, _environ, _no_verify, _subagent_model,
 )
 from quodeq._cli_run_config import (
@@ -149,7 +149,7 @@ def _resolve_run_config_locals(
 ) -> _RunConfigLocals:
     """Resolve the per-run scalars _build_run_config needs before assembling RunConfig."""
     _env = _environ(env)
-    consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
+    consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get(_ENV_NO_CONSOLIDATE))
     if inputs.single_file:
         consolidated = False
         log_info("Single-file mode: per-dimension analysis for deeper coverage")
@@ -266,9 +266,12 @@ def run_evaluate(args: argparse.Namespace) -> int:
     return _finalize_run_evaluate(args, evaluation_dir, result)
 
 
+_DIFF_EVAL_DEFAULT_TIME_LIMIT_S = 300  # CI diff review's own default; distinct from the CLI's DEFAULT_TIME_LIMIT
+
+
 def run_diff_evaluation(
     src: str, *, base_ref: str, output_dir: Path,
-    dimensions: str | None = None, time_limit: int = 300,
+    dimensions: str | None = None, time_limit: int = _DIFF_EVAL_DEFAULT_TIME_LIMIT_S,
 ) -> int:
     """Typed entry for CI review: evaluate *src* diffed against *base_ref*.
 

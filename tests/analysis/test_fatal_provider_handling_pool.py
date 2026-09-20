@@ -9,7 +9,10 @@ import pytest
 
 from quodeq.analysis._loops import _interruption_reason, _raise_on_fatal_cancel
 from quodeq.analysis.cache._failure_streak import CircuitBreakerError
-from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.errors import (
+    REASON_AGENT_FAILURE_STREAK, REASON_CANCELLED_SIGNAL, REASON_PROVIDER_FATAL,
+    FatalProviderError,
+)
 from quodeq.analysis.subagents._pool_models import SubagentResult
 from quodeq.analysis.subagents._pool_scaling import (
     check_agent_failure_streak,
@@ -42,7 +45,7 @@ class TestAgentFailureStreak:
     def test_trips_after_default_streak(self):
         check_agent_failure_streak([_result(False, "boom")] * 5)
         assert cancellation.is_cancelled()
-        assert cancellation.cancel_reason() == "agent_failure_streak"
+        assert cancellation.cancel_reason() == REASON_AGENT_FAILURE_STREAK
 
     def test_success_resets_streak(self):
         results = [_result(False)] * 4 + [_result(True)] + [_result(False)] * 4
@@ -80,32 +83,36 @@ class TestRunSingleAgentFatal:
         assert result.success is False
         assert "quota gone" in result.error
         assert cancellation.is_cancelled()
-        assert (cancellation.cancel_reason() or "").startswith("provider_fatal:quota")
+        assert (cancellation.cancel_reason() or "").startswith(f"{REASON_PROVIDER_FATAL}:quota")
 
 
 class TestLoopFatalMapping:
+    """_interruption_reason (consumer, quodeq.analysis._loop_state) must read back
+    exactly what the producers (_pool_worker, _pool_scaling) write via
+    cancellation.request_cancel, both sides keyed off quodeq.analysis.errors.REASON_*."""
+
     def test_interruption_reason_for_fatal_exc(self):
-        assert _interruption_reason(FatalProviderError("x")) == "provider_fatal"
+        assert _interruption_reason(FatalProviderError("x")) == REASON_PROVIDER_FATAL
 
     def test_interruption_reason_from_cancel_reason(self):
-        cancellation.request_cancel(reason="provider_fatal:quota: details")
-        assert _interruption_reason() == "provider_fatal"
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: details")
+        assert _interruption_reason() == REASON_PROVIDER_FATAL
 
     def test_interruption_reason_streak(self):
-        cancellation.request_cancel(reason="agent_failure_streak")
-        assert _interruption_reason() == "agent_failure_streak"
+        cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
+        assert _interruption_reason() == REASON_AGENT_FAILURE_STREAK
 
     def test_interruption_reason_plain_cancel(self):
         cancellation.request_cancel()
-        assert _interruption_reason() == "cancelled_signal"
+        assert _interruption_reason() == REASON_CANCELLED_SIGNAL
 
     def test_raise_on_fatal_cancel_raises_fatal(self, tmp_path):
-        cancellation.request_cancel(reason="provider_fatal:quota: credits gone")
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: credits gone")
         with pytest.raises(FatalProviderError, match="credits gone"):
             _raise_on_fatal_cancel(tmp_path)
 
     def test_raise_on_fatal_cancel_raises_breaker_for_streak(self, tmp_path):
-        cancellation.request_cancel(reason="agent_failure_streak")
+        cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
         with pytest.raises(CircuitBreakerError):
             _raise_on_fatal_cancel(tmp_path)
 
@@ -131,18 +138,18 @@ class TestLoopFatalMapping:
     def test_partial_success_keeps_run_alive(self, tmp_path):
         """Quota died halfway: files were analysed, run finalizes as done."""
         self._write_markers(tmp_path, "ok", "ok", "error")
-        cancellation.request_cancel(reason="provider_fatal:quota: credits gone")
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: credits gone")
         _raise_on_fatal_cancel(tmp_path)  # must not raise
 
     def test_partial_success_keeps_run_alive_for_streak(self, tmp_path):
         self._write_markers(tmp_path, "ok", "error", "error")
-        cancellation.request_cancel(reason="agent_failure_streak")
+        cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
         _raise_on_fatal_cancel(tmp_path)  # must not raise
 
     def test_error_only_markers_still_fail_the_run(self, tmp_path):
         """Markers exist but nothing succeeded: the run produced no analysis."""
         self._write_markers(tmp_path, "error", "error")
-        cancellation.request_cancel(reason="provider_fatal:quota: credits gone")
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: credits gone")
         with pytest.raises(FatalProviderError):
             _raise_on_fatal_cancel(tmp_path)
 
