@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services._ephemeral_cleanup import maybe_cleanup_after_job
+from quodeq.services.ephemeral_cleanup import maybe_cleanup_after_job
 
 
 def _write_info(reports_root: Path, uuid: str, *, ephemeral: bool, path: str) -> None:

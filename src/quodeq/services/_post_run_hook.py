@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from quodeq.services._ephemeral_cleanup import maybe_cleanup_after_job
+from quodeq.services.ephemeral_cleanup import maybe_cleanup_after_job
 
 _logger = logging.getLogger(__name__)
 

@@ -115,7 +115,7 @@ def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) 
 
     *env* overrides the path lookups and defaults to ``os.environ``."""
     from pathlib import Path
-    from quodeq.services._ephemeral_cleanup import sweep_orphaned_clones
+    from quodeq.services.ephemeral_cleanup import sweep_orphaned_clones
     from quodeq.shared._env import get_clones_dir, get_evaluations_dir, get_quodeq_dir
 
     try:

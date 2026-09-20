@@ -1155,9 +1155,6 @@ tests/services/test_env_seams_t5.py:13:private-name:quodeq.services.scoring._run
 tests/services/test_env_seams_t5.py:13:private-name:quodeq.services.scoring._run_scores._resolve_cache_max
 tests/services/test_env_seams_t5.py:9:private-name:quodeq.services._dashboard_cache._DEFAULT_RUN_DIM_CACHE_MAX
 tests/services/test_env_seams_t5.py:9:private-name:quodeq.services._dashboard_cache._run_dim_cache_max
-tests/services/test_ephemeral_cleanup.py:2:private-module:quodeq.services._ephemeral_cleanup.delete_ephemeral_clone
-tests/services/test_ephemeral_cleanup.py:2:private-module:quodeq.services._ephemeral_cleanup.sweep_orphaned_clones
-tests/services/test_ephemeral_cleanup_integration.py:14:private-module:quodeq.services._ephemeral_cleanup.maybe_cleanup_after_job
 tests/services/test_evaluation_branch.py:8:private-name:quodeq.services.evaluation_mixin._build_evaluate_cmd
 tests/services/test_evaluation_mixin_build.py:11:private-module:quodeq.services._job_model.JobLaunchOptions
 tests/services/test_evaluation_mixin_build.py:17:private-name:quodeq.services.evaluation_mixin._build_evaluate_cmd

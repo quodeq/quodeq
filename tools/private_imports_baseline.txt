@@ -92,7 +92,6 @@ src/quodeq/api/_run_event_stream.py:43:private-module:quodeq.shared._env.env_flo
 src/quodeq/api/_run_event_stream.py:44:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/_run_event_watcher.py:23:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/_sse_log_helpers.py:9:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/api/app.py:118:private-module:quodeq.services._ephemeral_cleanup.sweep_orphaned_clones
 src/quodeq/api/app.py:119:private-module:quodeq.shared._env.get_clones_dir
 src/quodeq/api/app.py:119:private-module:quodeq.shared._env.get_evaluations_dir
 src/quodeq/api/app.py:119:private-module:quodeq.shared._env.get_quodeq_dir
