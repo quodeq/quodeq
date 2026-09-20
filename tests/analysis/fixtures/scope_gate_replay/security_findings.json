@@ -19,7 +19,7 @@
       "req": "S-CON-9",
       "title": "normalize_remote_url does not strip embedded userinfo credentials before the value is persisted/published",
       "reason": "For a URL like `https://user:TOKEN@github.com/owner/repo.git`, after the `https://` prefix is stripped this branch splits on the first `:` (`head=\"user\"`, `tail=\"TOKEN@github.com/owner/repo.git\"`) and rebuilds `url = f\"{head}/{tail}\"`, producing `\"user/TOKEN@github.com/owner/repo\"` \u2014 the credential substring survives intact. `git_remote_url` (data/git_cli.py) feeds this straight from `git config --get remote.origin.url` into `_create_project`, which writes it verbatim to `repository_info.json` (`info[\"remote_url\"] = identity.remote_url`), and `shared_publish.stage_project` copies that file into the shared team results repo. A locally-configured credential-bearing remote therefore ends up committed in cleartext to a less-trusted, multi-user shared repository. Contrast with `_sanitize_url` in api/_evaluation_helpers.py, which does strip userinfo before a URL is logged/surfaced.",
-      "file": "src/quodeq/shared/repo.py"
+      "file": "src/quodeq/shared/_repo.py"
     },
     {
       "severity": "major",
