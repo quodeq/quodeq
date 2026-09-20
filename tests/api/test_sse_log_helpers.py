@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.api._sse_log_helpers import (
+    _DEFAULT_TAIL_MAX_BYTES,
+    _ENV_TAIL_MAX_BYTES,
     _tail_max_bytes,
     _tail_new_lines,
     sse_tail_generator,
@@ -88,23 +90,23 @@ class TestTailMaxBytes:
     """Per-tick byte cap: env override, fallbacks, and env injection."""
 
     def test_default_when_unset(self, monkeypatch):
-        monkeypatch.delenv("QUODEQ_LOG_TAIL_MAX_BYTES", raising=False)
-        assert _tail_max_bytes() == 1 * 1024 * 1024
+        monkeypatch.delenv(_ENV_TAIL_MAX_BYTES, raising=False)
+        assert _tail_max_bytes() == _DEFAULT_TAIL_MAX_BYTES
 
     def test_env_override_is_honoured(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_LOG_TAIL_MAX_BYTES", "2048")
+        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "2048")
         assert _tail_max_bytes() == 2048
 
     def test_non_numeric_and_non_positive_fall_back(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_LOG_TAIL_MAX_BYTES", "not-a-number")
-        assert _tail_max_bytes() == 1 * 1024 * 1024
-        monkeypatch.setenv("QUODEQ_LOG_TAIL_MAX_BYTES", "0")
-        assert _tail_max_bytes() == 1 * 1024 * 1024
+        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "not-a-number")
+        assert _tail_max_bytes() == _DEFAULT_TAIL_MAX_BYTES
+        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "0")
+        assert _tail_max_bytes() == _DEFAULT_TAIL_MAX_BYTES
 
     def test_injected_empty_env_ignores_host_environment(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_LOG_TAIL_MAX_BYTES", "2048")
-        assert _tail_max_bytes(env={}) == 1 * 1024 * 1024
+        monkeypatch.setenv(_ENV_TAIL_MAX_BYTES, "2048")
+        assert _tail_max_bytes(env={}) == _DEFAULT_TAIL_MAX_BYTES
 
     def test_injected_env_is_read_instead_of_host(self, monkeypatch):
-        monkeypatch.delenv("QUODEQ_LOG_TAIL_MAX_BYTES", raising=False)
-        assert _tail_max_bytes(env={"QUODEQ_LOG_TAIL_MAX_BYTES": "4096"}) == 4096
+        monkeypatch.delenv(_ENV_TAIL_MAX_BYTES, raising=False)
+        assert _tail_max_bytes(env={_ENV_TAIL_MAX_BYTES: "4096"}) == 4096

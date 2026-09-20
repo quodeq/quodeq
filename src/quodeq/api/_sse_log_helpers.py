@@ -27,10 +27,11 @@ _KEEPALIVE_MS = 2000
 # Per-tick byte cap on the SSE tail read. Caps a runaway log file from blowing
 # out RAM in a single read; remaining bytes are served on the next tick.
 _DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
+_ENV_TAIL_MAX_BYTES = "QUODEQ_LOG_TAIL_MAX_BYTES"
 
 
 def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
-    raw = resolve_env(env).get("QUODEQ_LOG_TAIL_MAX_BYTES")
+    raw = resolve_env(env).get(_ENV_TAIL_MAX_BYTES)
     if not raw:
         return _DEFAULT_TAIL_MAX_BYTES
     try:

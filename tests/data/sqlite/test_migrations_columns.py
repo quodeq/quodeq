@@ -233,7 +233,7 @@ def test_upgrade_v7_to_v8_idempotent_when_index_already_present():
 def test_fresh_db_is_v9_with_violation_type_raw():
     conn = sqlite3.connect(":memory:")
     apply_evaluation_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 9
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
     assert "violation_type_raw" in columns
 
@@ -255,7 +255,7 @@ def _v8_db() -> sqlite3.Connection:
 def test_upgrade_v8_to_v9_adds_column_and_keeps_rows():
     conn = _v8_db()
     apply_evaluation_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     assert conn.execute("SELECT violation_type_raw FROM findings").fetchone() == ("",)
 
 
@@ -267,7 +267,7 @@ def test_upgrade_v8_to_v9_idempotent_when_column_already_present():
     conn.executescript(EVALUATION_DDL)
     conn.execute("PRAGMA user_version = 8")
     apply_evaluation_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 # Very old (v1/v2) DBs never created `findings`; every additive upgrade skips

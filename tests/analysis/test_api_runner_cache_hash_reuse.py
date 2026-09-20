@@ -78,6 +78,8 @@ def test_build_cache_writer_hashes_when_the_stash_has_no_entry(tmp_path, monkeyp
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(cache_base))
     cache_root = cache_base / "results"
 
+    from quodeq.analysis.cache import cache_writer as cache_writer_module
+
     run_config = _run_config(src_root, classify_cache=None)
 
     write = _build_cache_writer(run_config, "flexibility")
@@ -85,7 +87,7 @@ def test_build_cache_writer_hashes_when_the_stash_has_no_entry(tmp_path, monkeyp
     write("Foo.kt", [])
 
     expected_key = compute_key(CacheKey(
-        schema_version=4,
+        schema_version=cache_writer_module._SCHEMA_VERSION,
         file_content_hash=_hash_file(src_root / "Foo.kt") or "",
         file_path="Foo.kt",
         dimension="flexibility",
