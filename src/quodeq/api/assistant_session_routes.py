@@ -20,7 +20,7 @@ from quodeq.api.helpers import error_response
 from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, cached_skills
-from quodeq.assistant.tools._actions import ACTION_DESCRIPTIONS, ACTION_TYPES
+from quodeq.assistant.tools.actions import ACTION_DESCRIPTIONS, ACTION_TYPES
 from quodeq.shared.constants import (
     SESSION_SOURCE_LOCAL,
     SESSION_SOURCE_SHARED,

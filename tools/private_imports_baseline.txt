@@ -112,8 +112,6 @@ src/quodeq/api/app.py:23:private-module:quodeq.shared._env.env_int
 src/quodeq/api/app.py:24:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/app.py:261:private-module:quodeq.services._warmup.engine
 src/quodeq/api/app.py:41:private-module:quodeq.shared._env.get_index_db_path
-src/quodeq/api/assistant_session_routes.py:23:private-module:quodeq.assistant.tools._actions.ACTION_DESCRIPTIONS
-src/quodeq/api/assistant_session_routes.py:23:private-module:quodeq.assistant.tools._actions.ACTION_TYPES
 src/quodeq/api/llm_bridge_routes.py:6:private-name:quodeq.config.ai_provider._store_api_key
 src/quodeq/api/routes_findings.py:22:private-module:quodeq.services._dismissed_listing.load_dismissed
 src/quodeq/api/routes_project_list.py:17:private-module:quodeq.services._warmup.WarmupEngine
@@ -149,10 +147,6 @@ src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._const
 src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
 src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
 src/quodeq/assistant/adapters/_cli_spawn.py:10:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ACTIONS
-src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ActionConflict
-src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ActionContext
-src/quodeq/assistant/apply_action.py:13:private-module:quodeq.assistant.tools._actions.ActionSpec
 src/quodeq/assistant/mcp/_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
 src/quodeq/assistant/mcp/server.py:13:private-module:quodeq.assistant.tools._registry.ToolRegistry
 src/quodeq/assistant/mcp/server.py:14:private-module:quodeq.assistant.tools._write_tools.register_write_tools

@@ -34,6 +34,8 @@ class ActionContext:
 
 @dataclass(frozen=True)
 class ActionSpec:
+    """One action type's validate/summarize/apply triple."""
+
     action_type: str
     description: str
     validate: Callable[[dict, ToolContext], dict]      # raises ToolError / returns canonical payload
@@ -221,6 +223,7 @@ def _draft_action(ctx: ToolContext, action_type: str, payload: dict) -> dict:
 
 
 def register_action_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
+    """Register the ``draft_action`` write primitive on ``registry``."""
     registry.register(ToolSpec(
         "draft_action",
         "Draft an action for the user to review and apply. The draft is shown "

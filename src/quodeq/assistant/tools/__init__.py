@@ -1,5 +1,5 @@
 """Assistant tool registry and tool implementations."""
-from quodeq.assistant.tools._actions import ActionContext, register_action_tools
+from quodeq.assistant.tools.actions import ActionContext, register_action_tools
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._context_tool import register_context_tool
 from quodeq.assistant.tools._overview import register_overview_tools
