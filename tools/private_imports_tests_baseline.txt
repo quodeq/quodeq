@@ -867,7 +867,6 @@ tests/conftest.py:12:private-module:quodeq.data.fs._index_cache.clear_index_cach
 tests/context/test_precedent_corpus.py:26:private-name:quodeq.context.precedent_store._backfill_missing
 tests/core/test_confidence_not_scored.py:17:private-name:quodeq.analysis._report_constants._COMPLIANCE_FIELDS
 tests/core/test_confidence_not_scored.py:17:private-name:quodeq.analysis._report_constants._VIOLATION_FIELDS
-tests/core/test_confidence_not_scored.py:18:private-module:quodeq.core.scoring._principle.compute_tallies
 tests/core/test_copilot_events.py:3:private-module:quodeq.assistant.adapters._stream
 tests/core/test_enrich_judgment_refs_reader.py:11:private-module:quodeq.core.evidence._options.EvidenceParseOptions
 tests/core/test_enrich_judgment_refs_reader.py:12:private-module:quodeq.core.evidence._refs.enrich_judgment
@@ -890,11 +889,10 @@ tests/core/test_finding_marker_persistence.py:40:private-name:quodeq.analysis._r
 tests/core/test_finding_marker_persistence.py:41:private-name:quodeq.analysis._report_findings._flatten_findings
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.build_finding
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.parse_report_json
-tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring._principle._build_context
-tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring._principle._score_numerical
+tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._build_context
+tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._score_numerical
 tests/core/test_judgment_to_dict_taxonomy.py:10:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
 tests/core/test_judgment_to_dict_taxonomy.py:11:private-module:quodeq.core.scoring._tallies.evidence_has_taxonomy
-tests/core/test_partial_taxonomy_coverage.py:19:private-module:quodeq.core.scoring._principle.compute_tallies
 tests/core/test_projector_scoring_custom.py:122:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:142:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:165:private-module:quodeq.data.fs.report_parser._run_info.RunInfo

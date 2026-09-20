@@ -117,7 +117,6 @@ src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_c
 src/quodeq/services/_accumulated_cache.py:16:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_fs_project_parents.py:13:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_registration_url.py:12:private-name:quodeq.shared.repo._looks_like_authority
-src/quodeq/services/_rescore_legacy.py:11:private-module:quodeq.core.scoring._principle.compute_tallies
 src/quodeq/services/scoring/__init__.py:26:private-module:quodeq.services._trend_fetcher.make_rescoring_fetcher
 src/quodeq/services/scoring/__init__.py:27:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/__init__.py:31:private-module:quodeq.services._wiring.read_run_data
