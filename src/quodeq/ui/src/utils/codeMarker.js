@@ -16,13 +16,13 @@ export function isHighlightedLine(line) {
   return typeof line === 'string' && line.startsWith('>>>');
 }
 
+const CHEVRON_LENGTH = 3; // ">>>"
+
 /**
  * Remove the highlight marker (and its single-space separator) from a line,
  * recovering the original source text with its indentation intact. Lines
  * without the marker are returned unchanged.
  */
-const CHEVRON_LENGTH = 3; // ">>>"
-
 export function stripHighlightMarker(line) {
   if (typeof line !== 'string') return line;
   if (line.startsWith(HIGHLIGHT_MARKER)) return line.slice(HIGHLIGHT_MARKER.length);

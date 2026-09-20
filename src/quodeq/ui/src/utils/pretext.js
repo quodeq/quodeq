@@ -206,6 +206,9 @@ export function fitMiddleTruncate(text, font, maxWidth, ellipsis = '\u2026') {
   return best;
 }
 
+const DEFAULT_FONT_SIZE = '13px';
+const DEFAULT_FONT_FAMILY = '"JetBrains Mono", ui-monospace, monospace';
+
 /**
  * Build a CSS-font-shorthand string that matches what the browser will use.
  * Pass the element (or any DescendantElement) whose computed style you want
@@ -214,9 +217,6 @@ export function fitMiddleTruncate(text, font, maxWidth, ellipsis = '\u2026') {
  * @param {Element | null | undefined} el
  * @returns {string}
  */
-const DEFAULT_FONT_SIZE = '13px';
-const DEFAULT_FONT_FAMILY = '"JetBrains Mono", ui-monospace, monospace';
-
 export function cssFontFromElement(el) {
   const DEFAULT = `${DEFAULT_FONT_SIZE} ${DEFAULT_FONT_FAMILY}`;
   if (!el || typeof window === 'undefined') return DEFAULT;
