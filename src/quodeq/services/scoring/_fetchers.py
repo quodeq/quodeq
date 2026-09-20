@@ -17,7 +17,7 @@ from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._wiring import read_run_scalars
+from quodeq.services.wiring import read_run_scalars
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.shared._env import env_int
 

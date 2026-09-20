@@ -1308,7 +1308,6 @@ tests/services/test_fs_project_helpers_onboarding_find_existing.py:9:private-mod
 tests/services/test_fs_projects.py:10:private-module:quodeq.services._fs_project_index.build_project_index
 tests/services/test_fs_projects.py:11:private-module:quodeq.services._fs_projects.build_project_list
 tests/services/test_fs_projects.py:11:private-name:quodeq.services._fs_projects._build_parent_child_sets
-tests/services/test_fs_projects.py:15:private-module:quodeq.services._wiring.find_children
 tests/services/test_fs_projects.py:187:private-module:quodeq.services._fs_projects.mod
 tests/services/test_fs_projects_info.py:10:private-module:quodeq.services._fs_projects.build_project_list
 tests/services/test_fs_projects_info.py:10:private-module:quodeq.services._fs_projects.get_project_info

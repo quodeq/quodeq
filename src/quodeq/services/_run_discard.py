@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Protocol
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.services._wiring import read_dispatched_cache_keys, remove_matching_files
+from quodeq.services.wiring import read_dispatched_cache_keys, remove_matching_files
 
 _TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
 _CANCEL_WAIT_TIMEOUT_S = 2.0
@@ -72,12 +72,12 @@ def _wait_for_terminal_status(
 def _open_cache():
     """Lazily construct the default cache backend (import kept local).
 
-    Deferred rather than routed through ``services._wiring``: ``_wiring`` is
+    Deferred rather than routed through ``services.wiring``: ``wiring`` is
     imported by nearly every services module (including ``services.scoring``,
     itself reachable from ``tests/core``), and ``LocalFileBackend``'s module
     reaches the top-level ``quodeq`` package (via ``CacheEntry.quodeq_version``),
     which deferred-imports ``quodeq.cli`` -> httpx/pydantic. Keeping this
-    import local keeps that framework chain out of ``_wiring``'s reach.
+    import local keeps that framework chain out of ``wiring``'s reach.
     """
     from quodeq.data.cache_store.local import LocalFileBackend
     return LocalFileBackend()

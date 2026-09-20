@@ -23,7 +23,7 @@ from quodeq.services.score_cache import (
     cached_accumulated,
     per_run_versions,
 )
-from quodeq.services._wiring import find_children, list_runs
+from quodeq.services.wiring import find_children, list_runs
 from quodeq.services.scoring import _fetchers
 from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
 from quodeq.services.scoring._rescoring import _rescore_accumulated_with_coverage

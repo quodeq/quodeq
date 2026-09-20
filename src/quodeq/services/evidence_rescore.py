@@ -23,7 +23,7 @@ from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_prin
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.services._wiring import evidence_file_size
+from quodeq.services.wiring import evidence_file_size
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings

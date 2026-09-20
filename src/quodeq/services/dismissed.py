@@ -20,7 +20,7 @@ from quodeq.core.dismissals import (
 )
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services._dismiss_fingerprints import backfill_if_needed, resolve_fingerprint
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     ActionLogWriter,
     load_suppression_rules,
     migrate_if_needed,

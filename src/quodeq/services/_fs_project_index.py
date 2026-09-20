@@ -41,7 +41,7 @@ from quodeq.services._fs_projects import (
     _build_project_entries_threaded,
     _collect_candidate_dirs,
 )
-from quodeq.services._wiring import repository_info_exists
+from quodeq.services.wiring import repository_info_exists
 
 
 def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:

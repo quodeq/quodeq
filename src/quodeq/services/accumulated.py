@@ -20,7 +20,7 @@ from quodeq.core.utils.io import resolve_child_dir
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     RunInfo,
     find_children as _find_children,
     list_runs,

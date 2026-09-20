@@ -23,7 +23,7 @@ from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services._dismissed_listing import load_dismissed
 from quodeq.services._run_recency import run_dirs_newest_first
 from quodeq.services.dismissed import dismissed_keys, undismiss_event
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     ActionLogWriter,
     find_dismissed_matching,
     locked_deleted_store,

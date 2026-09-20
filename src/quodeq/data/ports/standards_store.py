@@ -9,7 +9,7 @@ class StandardsStore(Protocol):
     """File mechanics + payload I/O seam for the standards CRUD service.
 
     The default implementation composes the ``standards_store`` re-exports
-    in ``services/_wiring.py`` with the service's injected JSON read/write
+    in ``services/wiring.py`` with the service's injected JSON read/write
     callables (built in ``services/standards.py``); tests can substitute an
     in-memory store.
     """

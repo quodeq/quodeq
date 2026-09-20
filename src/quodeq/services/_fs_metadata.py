@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
-from quodeq.services._wiring import RunInfo, read_run_data, summarize_dimensions
+from quodeq.services.wiring import RunInfo, read_run_data, summarize_dimensions
 from quodeq.services._fs_project_primitives import _local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
     _check_path_exists,

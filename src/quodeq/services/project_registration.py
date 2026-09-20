@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     read_repository_info,
     read_scan_json,
     validate_remote_url,

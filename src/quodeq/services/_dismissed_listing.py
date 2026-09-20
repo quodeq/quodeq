@@ -16,7 +16,7 @@ from pathlib import Path
 from quodeq.core.dismissals import DismissedEntry
 from quodeq.core.finding_identity import DismissKey
 from quodeq.services._run_recency import run_dirs_newest_first
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     read_finding_details,
     read_finding_details_from_json_eval,
 )

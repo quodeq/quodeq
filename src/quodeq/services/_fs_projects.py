@@ -23,7 +23,7 @@ from quodeq.services._fs_project_helpers import (
     _max_projects_listed,
 )
 from quodeq.services._repo_index import RepoIdentity, rekey_repo_index_entry, remove_repo_index_entries
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     find_children,
     is_valid_repo_url,
     list_runs,

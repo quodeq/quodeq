@@ -19,7 +19,7 @@ import json
 import time
 from pathlib import Path
 
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
     PUBLISHED_META_FILENAME,

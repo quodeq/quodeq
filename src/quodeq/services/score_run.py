@@ -19,7 +19,7 @@ from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_prin
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     dimension_queue_file,
     dimension_report_exists,
     ensure_dir,

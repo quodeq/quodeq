@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from quodeq.data.fs.report_parser.runs import RunInfo
-from quodeq.services._wiring import safe_read_dir
+from quodeq.services.wiring import safe_read_dir
 
 
 def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:

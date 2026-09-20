@@ -12,7 +12,7 @@ from quodeq.services._fs_projects import (
     _build_parent_child_sets,
     build_project_list,
 )
-from quodeq.services._wiring import find_children
+from quodeq.services.wiring import find_children
 
 
 # ---------------------------------------------------------------------------
