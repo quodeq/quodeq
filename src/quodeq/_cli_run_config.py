@@ -16,7 +16,6 @@ does not reach this module.
 from __future__ import annotations
 
 import argparse
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -29,6 +28,7 @@ from quodeq._cli_env import (
     _ENV_MAX_DURATION,
     _ENV_MAX_TURNS,
     _env_int,
+    _environ,
     _no_verify,
     _resolve_time_limit,
 )
@@ -61,7 +61,7 @@ def _resolve_limits(args: argparse.Namespace, env: dict[str, str] | None = None)
         time_limit=_resolve_time_limit(args, env=env),
         incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
         dry_run=getattr(args, "dry_run", False),
-        dispatch_policy=default_dispatch_policy(env=os.environ if env is None else env),
+        dispatch_policy=default_dispatch_policy(env=_environ(env)),
     )
 
 

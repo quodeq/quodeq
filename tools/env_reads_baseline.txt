@@ -8,21 +8,6 @@
 # change above a grandfathered read shifts its entry. Prefer hand-editing
 # the baseline over blind --update-baseline regeneration, which can
 # silently absorb a genuinely new read introduced in the same change.
-src/quodeq/_cli_evaluation.py:152
-src/quodeq/_cli_run_config.py:64
-src/quodeq/analysis/_api_standards_text.py:100
-src/quodeq/analysis/_api_standards_text.py:118
-src/quodeq/analysis/_command.py:192
-src/quodeq/analysis/_mcp_arg_builders.py:34
-src/quodeq/analysis/_mcp_arg_builders.py:39
-src/quodeq/analysis/dispatch_policy.py:45
-src/quodeq/analysis/mcp/handlers.py:38
-src/quodeq/analysis/prereqs.py:120
-src/quodeq/analysis/prereqs.py:60
-src/quodeq/analysis/subagents/_pool_launcher.py:102
-src/quodeq/analysis/subagents/_pool_launcher.py:37
-src/quodeq/analysis/subagents/_pool_scaling.py:129
-src/quodeq/analysis/subprocess.py:230
 src/quodeq/api/_assistant_hygiene.py:27
 src/quodeq/api/_evaluation_helpers.py:160
 src/quodeq/api/_evaluation_helpers.py:187
@@ -49,10 +34,6 @@ src/quodeq/assistant/worktree.py:96
 src/quodeq/ci/cli.py:123
 src/quodeq/ci/cli.py:26
 src/quodeq/ci/reporter.py:35
-src/quodeq/cli.py:70
-src/quodeq/context/online_cache.py:41
-src/quodeq/context/online_cache.py:50
-src/quodeq/context/online_cache.py:88
 src/quodeq/dashboard/_api_spawn.py:47
 src/quodeq/dashboard/_build_npm.py:16
 src/quodeq/dashboard/_build_npm.py:21
@@ -70,12 +51,6 @@ src/quodeq/data/fs/repo_clone.py:59
 src/quodeq/data/fs/repo_clone.py:70
 src/quodeq/data/fs/shared_repo.py:122
 src/quodeq/data/fs/shared_repo.py:81
-src/quodeq/llm_bridge/_llamacpp.py:44
-src/quodeq/llm_bridge/_ollama.py:17
-src/quodeq/llm_bridge/_omlx.py:26
-src/quodeq/llm_bridge/_omlx.py:32
-src/quodeq/llm_bridge/_providers.py:41
-src/quodeq/llm_bridge/_providers.py:96
 src/quodeq/menubar/app.py:56
 src/quodeq/menubar/state.py:34
 src/quodeq/services/_dashboard_cache.py:45

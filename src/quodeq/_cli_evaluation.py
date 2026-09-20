@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 from pathlib import Path
 from typing import NamedTuple
 
@@ -53,7 +52,7 @@ from quodeq.analysis.manifest_serialization import manifest_to_dict
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
 from quodeq._cli_env import (  # noqa: F401 — _ENV_*/_env_int/_no_verify re-exported for quodeq.cli
     _ENV_MAX_DURATION, _ENV_MAX_TURNS, _ENV_POOL_BUDGET,
-    _env_int, _no_verify, _subagent_model,
+    _env_int, _environ, _no_verify, _subagent_model,
 )
 from quodeq._cli_run_config import (
     _build_analysis_options, _dimensions_filter, _resolve_limits,
@@ -149,7 +148,7 @@ def _resolve_run_config_locals(
     args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None,
 ) -> _RunConfigLocals:
     """Resolve the per-run scalars _build_run_config needs before assembling RunConfig."""
-    _env = os.environ if env is None else env
+    _env = _environ(env)
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
     if inputs.single_file:
         consolidated = False

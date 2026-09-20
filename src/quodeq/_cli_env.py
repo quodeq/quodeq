@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections.abc import Mapping
 
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
@@ -64,6 +65,17 @@ def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     return (os.environ if env is None else env).get("SUBAGENT_MODEL") or None
 
 
+def _environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
+    """The CLI boundary's process-environment seam.
+
+    ``_build_run_config`` and the update notice resolve the run's
+    environment here, once, and pass the mapping on; the modules they call
+    never name ``os.environ`` themselves. An injected ``{}`` means "no
+    variables set" and is returned as-is.
+    """
+    return os.environ if env is None else env
+
+
 def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
     return args.no_verify or (os.environ if env is None else env).get("QUODEQ_NO_VERIFY") == "1"
@@ -78,5 +90,6 @@ ENV_MAX_TURNS = _ENV_MAX_TURNS
 ENV_MAX_DURATION = _ENV_MAX_DURATION
 ENV_POOL_BUDGET = _ENV_POOL_BUDGET
 cli_env_int = _env_int
+cli_environ = _environ
 no_verify = _no_verify
 subagent_model = _subagent_model
