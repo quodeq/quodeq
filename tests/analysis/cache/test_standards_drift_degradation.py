@@ -11,7 +11,7 @@ separately-tracked "remap findings to correct req IDs" follow-up.)
 """
 from __future__ import annotations
 
-from quodeq.core.evidence._req_mapping import _group_judgments
+from quodeq.core.evidence.req_mapping import _group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.core.events.models import Judgment
 from quodeq.core.scoring.engine import score_evidence

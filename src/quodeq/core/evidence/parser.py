@@ -9,7 +9,7 @@ from quodeq.core.evidence._options import EvidenceParseOptions
 from quodeq.core.evidence._refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
-from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
+from quodeq.core.evidence.req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 # Re-export for backward compatibility (external code imports these from parser)

@@ -19,7 +19,7 @@ from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
 from quodeq.core.evidence._jsonl import judgment_to_dict
-from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.data.fs.import_graph import build_import_graph
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.data.fs.stream_files import append_jsonl_rows

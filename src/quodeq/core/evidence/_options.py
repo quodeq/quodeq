@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.evidence._refs import RefsReader
-from quodeq.core.evidence._req_mapping import QuarantineSink, ReqMapReader
+from quodeq.core.evidence.req_mapping import QuarantineSink, ReqMapReader
 
 # A malformed-line message is handed to this sink instead of logged directly,
 # so core never imports a logging framework -- see quodeq.core.observability.

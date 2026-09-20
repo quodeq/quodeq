@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.evidence._refs import _CWE_URL_TEMPLATE_DEFAULT, resolve_llm_refs
-from quodeq.core.evidence._req_mapping import (
+from quodeq.core.evidence.req_mapping import (
     _resolve_req_to_principle_map,
     build_principle_resolver,
 )

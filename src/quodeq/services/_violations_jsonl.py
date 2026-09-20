@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 from quodeq.core.types import Finding, ViolationResponse
-from quodeq.core.evidence._req_mapping import PrincipleResolver, build_principle_resolver
+from quodeq.core.evidence.req_mapping import PrincipleResolver, build_principle_resolver
 from quodeq.data.fs.standards_loader import build_req_refs_lookup, read_req_to_principle_map
 from quodeq.data.fs.stream_files import count_files_in_stream
 from quodeq.services.violation_context import ViolationContext
