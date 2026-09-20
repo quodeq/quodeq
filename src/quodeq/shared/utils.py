@@ -53,7 +53,7 @@ IS_WIN32: bool = sys.platform == "win32"
 # Re-exports — Repository URL helpers
 # ---------------------------------------------------------------------------
 
-from quodeq.shared._repo import is_repo_url, project_name_from_repo
+from quodeq.shared.repo import is_repo_url, project_name_from_repo
 
 # ---------------------------------------------------------------------------
 # Re-exports — Environment accessors

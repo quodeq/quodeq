@@ -1104,7 +1104,6 @@ tests/data/test_file_lock.py:18:private-module:quodeq.data._file_lock
 tests/data/test_findings_queries_snippets.py:117:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring
 tests/data/test_git_cli.py:216:private-module:quodeq.services._fs_scan.fs_scan
-tests/data/test_git_cli.py:218:private-module:quodeq.shared._repo.repo
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite._index_sync._is_pid_alive
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite._index_sync._sync_legacy_run
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite._index_sync._upsert_from_status
@@ -1574,19 +1573,6 @@ tests/shared/test_env_seams_t5.py:24:private-name:quodeq.shared.logging._apply_e
 tests/shared/test_env_seams_t5.py:24:private-name:quodeq.shared.logging._logger
 tests/shared/test_env_seams_t5.py:25:private-name:quodeq.shared.provider_env._providers_path
 tests/shared/test_logging.py:3:private-name:quodeq.shared.logging._logger
-tests/shared/test_repo_remote_url.py:111:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:12:private-module:quodeq.shared._repo.project_name_from_repo
-tests/shared/test_repo_remote_url.py:20:private-module:quodeq.shared._repo.project_name_from_repo
-tests/shared/test_repo_remote_url.py:25:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:30:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:35:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:40:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:45:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:52:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:58:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:69:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:78:private-module:quodeq.shared._repo.normalize_remote_url
-tests/shared/test_repo_remote_url.py:92:private-module:quodeq.shared._repo.normalize_remote_url
 tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sampler._format
 tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sampler._ollama_rss_mb
 tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sampler._self_rss_mb

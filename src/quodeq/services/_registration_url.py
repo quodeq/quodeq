@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.services._wiring import remote_origin_url_raw
-from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
+from quodeq.shared.repo import SCHEME_RE, _looks_like_authority
 
 
 
