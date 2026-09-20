@@ -1,5 +1,5 @@
 """quodeq.core._constants' MCP/prompt style constants agree across their
-producer (ai_providers.json, consumed via quodeq.analysis._provider_cache /
+producer (ai_providers.json, consumed via quodeq.analysis.provider_cache /
 quodeq.assistant.get_provider_configs) and its two feature consumers:
 quodeq.analysis (dimension-analysis subprocess dispatch) and
 quodeq.assistant.adapters (interactive CLI chat). Both features import the
@@ -20,14 +20,14 @@ def test_provider_cache_fallback_catalog_uses_the_shared_constants():
     ai_providers.json cannot be read, must emit the same objects its readers
     compare against, not retyped copies of "flag"/"positional"/"config-arg".
     """
-    from quodeq.analysis import _provider_cache
+    from quodeq.analysis import provider_cache
 
-    assert _provider_cache.PROMPT_STYLE_FLAG is PROMPT_STYLE_FLAG
-    assert _provider_cache.PROMPT_STYLE_POSITIONAL is PROMPT_STYLE_POSITIONAL
-    assert _provider_cache.PROMPT_FLAG_DEFAULT is PROMPT_FLAG_DEFAULT
-    assert _provider_cache.MCP_STYLE_CONFIG_ARG is MCP_STYLE_CONFIG_ARG
+    assert provider_cache.PROMPT_STYLE_FLAG is PROMPT_STYLE_FLAG
+    assert provider_cache.PROMPT_STYLE_POSITIONAL is PROMPT_STYLE_POSITIONAL
+    assert provider_cache.PROMPT_FLAG_DEFAULT is PROMPT_FLAG_DEFAULT
+    assert provider_cache.MCP_STYLE_CONFIG_ARG is MCP_STYLE_CONFIG_ARG
 
-    fallback = _provider_cache._PROVIDER_CONFIGS_FALLBACK
+    fallback = provider_cache._PROVIDER_CONFIGS_FALLBACK
     assert fallback["claude"]["prompt_style"] is PROMPT_STYLE_FLAG
     assert fallback["claude"]["prompt_flag"] is PROMPT_FLAG_DEFAULT
     assert fallback["codex"]["prompt_style"] is PROMPT_STYLE_POSITIONAL
@@ -35,9 +35,9 @@ def test_provider_cache_fallback_catalog_uses_the_shared_constants():
 
 
 def test_fallback_catalog_styles_are_all_known_values():
-    from quodeq.analysis import _provider_cache
+    from quodeq.analysis import provider_cache
 
-    for cfg in _provider_cache._PROVIDER_CONFIGS_FALLBACK.values():
+    for cfg in provider_cache._PROVIDER_CONFIGS_FALLBACK.values():
         if "prompt_style" in cfg:
             assert cfg["prompt_style"] in {PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL}
         if "mcp_style" in cfg:

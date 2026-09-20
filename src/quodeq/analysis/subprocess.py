@@ -45,7 +45,7 @@ from quodeq.analysis._command import (
 )
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.process_env import process_environment

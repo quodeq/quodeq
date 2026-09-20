@@ -11,7 +11,7 @@ import subprocess
 import urllib.error
 import urllib.request
 
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import provider_explicitly_configured
 from quodeq.config.llm_bridge_env import api_key, llamacpp_base_url, ollama_base_url
 from quodeq.shared.prereqs import SAFE_CMD_TOKEN_RE, run_version_cmd

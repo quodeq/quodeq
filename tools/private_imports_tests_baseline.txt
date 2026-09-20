@@ -62,7 +62,6 @@ tests/analysis/cache/test_telemetry.py:51:private-name:quodeq.analysis._dimensio
 tests/analysis/cache/test_telemetry.py:51:private-name:quodeq.analysis._dimension_steps._parse_dimension_evidence
 tests/analysis/cache/test_telemetry.py:51:private-name:quodeq.analysis._dimension_steps._run_dimension_analysis
 tests/analysis/conftest.py:30:private-module:quodeq.analysis._api_runner.ApiRunnerConfig
-tests/analysis/conftest.py:6:private-module:quodeq.analysis._provider_cache.reset_provider_config_cache
 tests/analysis/mcp/test_findings_server.py:10:private-name:quodeq.analysis.mcp.findings_server._build_compiled_context
 tests/analysis/mcp/test_findings_server.py:10:private-name:quodeq.analysis.mcp.findings_server._build_router
 tests/analysis/mcp/test_findings_server.py:77:private-module:quodeq.llm_bridge._embeddings.reset_embedding_availability_cache
@@ -347,8 +346,7 @@ tests/analysis/test_provenance_gate_behavioral.py:50:private-name:quodeq.analysi
 tests/analysis/test_provenance_gate_behavioral.py:52:private-name:quodeq.analysis.subprocess._load_standards_text
 tests/analysis/test_provenance_gate_behavioral.py:53:private-module:quodeq.llm_bridge._ollama.get_ollama_status
 tests/analysis/test_provenance_gate_behavioral.py:53:private-module:quodeq.llm_bridge._ollama.list_ollama_models
-tests/analysis/test_provider_cache.py:7:private-module:quodeq.analysis._provider_cache.get_provider_configs
-tests/analysis/test_provider_cache.py:7:private-name:quodeq.analysis._provider_cache._ProviderConfigCache
+tests/analysis/test_provider_cache.py:7:private-name:quodeq.analysis.provider_cache._ProviderConfigCache
 tests/analysis/test_quodeqignore.py:10:private-module:quodeq.analysis._ignore.IGNORE_FILENAME
 tests/analysis/test_quodeqignore.py:10:private-module:quodeq.analysis._ignore.is_ignored
 tests/analysis/test_quodeqignore.py:10:private-module:quodeq.analysis._ignore.load_ignore_patterns
@@ -636,8 +634,6 @@ tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_STYLE_POSITIONAL
-tests/assistant/test_constants_provider_style.py:23:private-module:quodeq.analysis._provider_cache
-tests/assistant/test_constants_provider_style.py:38:private-module:quodeq.analysis._provider_cache
 tests/assistant/test_constants_provider_style.py:50:private-module:quodeq.analysis._mcp_arg_builders
 tests/assistant/test_constants_provider_style.py:69:private-module:quodeq.assistant.adapters._cli_config
 tests/assistant/test_constants_provider_style.py:77:private-module:quodeq.assistant.adapters._cli_command
@@ -1560,7 +1556,6 @@ tests/test_env_seams_t4.py:14:private-module:quodeq.analysis._config.AnalysisCon
 tests/test_env_seams_t4.py:20:private-module:quodeq.analysis._config.AnalysisConfig
 tests/test_env_seams_t4.py:26:private-module:quodeq.analysis._config.AnalysisConfig
 tests/test_env_seams_t4.py:34:private-module:quodeq.analysis._config.AnalysisConfig
-tests/test_env_seams_t4.py:43:private-module:quodeq.analysis._provider_cache
 tests/test_env_seams_t4.py:44:private-name:quodeq.shared.provider_env._providers_path
 tests/test_env_seams_t4.py:50:private-name:quodeq.shared.provider_env._providers_path
 tests/test_env_seams_t4.py:59:private-name:quodeq.analysis.subagents._pool_launcher._non_scout_providers

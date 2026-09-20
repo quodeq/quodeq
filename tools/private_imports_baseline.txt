@@ -24,11 +24,11 @@ src/quodeq/analysis/_mcp_arg_builders.py:29:private-module:quodeq.shared._models
 src/quodeq/analysis/_mcp_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
 src/quodeq/analysis/_process.py:11:private-module:quodeq.shared._process_kill.terminate_process
 src/quodeq/analysis/_process.py:9:private-name:quodeq.analysis.stream.progress_reader._IncrementalProgressReader
-src/quodeq/analysis/_provider_cache.py:10:private-name:quodeq.shared.provider_env._providers_path
-src/quodeq/analysis/_provider_cache.py:7:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
-src/quodeq/analysis/_provider_cache.py:7:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
-src/quodeq/analysis/_provider_cache.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
-src/quodeq/analysis/_provider_cache.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_POSITIONAL
+src/quodeq/analysis/provider_cache.py:10:private-name:quodeq.shared.provider_env._providers_path
+src/quodeq/analysis/provider_cache.py:7:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
+src/quodeq/analysis/provider_cache.py:7:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
+src/quodeq/analysis/provider_cache.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
+src/quodeq/analysis/provider_cache.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_POSITIONAL
 src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_dashboard_report
 src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_full_report
 src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_report_json
@@ -185,7 +185,6 @@ src/quodeq/data/fs/shared_repo.py:39:private-module:quodeq.shared._env_resolve.r
 src/quodeq/data/git_cli.py:17:private-module:quodeq.shared._repo.normalize_remote_url
 src/quodeq/data/projection/grade_projector.py:18:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 src/quodeq/data/sqlite/score_cache_db.py:17:private-module:quodeq.shared._env.get_score_cache_path
-src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/menubar/app.py:23:private-module:quodeq.shared._env.env_int
 src/quodeq/menubar/app.py:24:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/menubar/control.py:18:private-module:quodeq.shared._env_paths.get_run_dir
@@ -235,7 +234,6 @@ src/quodeq/services/scoring/_rescoring.py:18:private-name:quodeq.services.dashbo
 src/quodeq/services/scoring/_response_builders.py:21:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_run_scores.py:10:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/services/shared_settings.py:16:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/services/tooling_mixin.py:14:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/tooling_mixin.py:17:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/services/violations.py:13:private-name:quodeq.shared.utils._env_int
 src/quodeq/terminal/_pty_unix.py:14:private-module:quodeq.shared._env_resolve.resolve_env

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from quodeq.analysis._provider_cache import reset_provider_config_cache
+from quodeq.analysis.provider_cache import reset_provider_config_cache
 from quodeq.analysis.dispatch_policy import DispatchPolicy
 
 from ._api_size_cap_dispatch_helpers import CAP, _TEST_PROVIDER

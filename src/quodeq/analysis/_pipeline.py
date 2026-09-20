@@ -16,7 +16,7 @@ from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.data.fs.dimensions_state_store import DimState

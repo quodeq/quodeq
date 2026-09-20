@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import max_api_file_size
 from quodeq.shared.utils import get_ai_cmd
 

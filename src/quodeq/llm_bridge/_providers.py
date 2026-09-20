@@ -1,7 +1,7 @@
 """Provider detection, configuration, and type classification."""
 from __future__ import annotations
 
-from quodeq.analysis._provider_cache import get_provider_configs as _get_cached_configs
+from quodeq.analysis.provider_cache import get_provider_configs as _get_cached_configs
 from quodeq.config.llm_bridge_env import api_key as _api_key, local_api_markers
 
 

@@ -180,7 +180,7 @@ class TestCompositeChecks:
         with patch.dict("os.environ", {"AI_PROVIDER": "claude"}):
             with patch("subprocess.run", return_value=result):
                 with patch(
-                    "quodeq.analysis._provider_cache.get_provider_configs",
+                    "quodeq.analysis.provider_cache.get_provider_configs",
                     return_value={"claude": {"type": "cli", "cmd": "claude"}},
                 ):
                     check_evaluate_prereqs()
