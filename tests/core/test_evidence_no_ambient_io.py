@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.core.evidence._refs import _CWE_URL_TEMPLATE_DEFAULT, resolve_llm_refs
+from quodeq.core.evidence._refs import CWE_URL_TEMPLATE_DEFAULT, resolve_llm_refs
 from quodeq.core.evidence._req_mapping import (
     _resolve_req_to_principle_map,
     build_principle_resolver,
@@ -28,7 +28,7 @@ def test_resolve_llm_refs_default_ignores_environment(monkeypatch):
     monkeypatch.setenv("QUODEQ_CWE_URL_TEMPLATE", "https://env.example/{cwe_id}")
     refs = resolve_llm_refs(["CWE-89"], None)
     assert refs == [{"label": "CWE-89",
-                     "url": _CWE_URL_TEMPLATE_DEFAULT.format(cwe_id="89")}]
+                     "url": CWE_URL_TEMPLATE_DEFAULT.format(cwe_id="89")}]
 
 
 def test_req_map_without_reader_does_no_io(tmp_path):
