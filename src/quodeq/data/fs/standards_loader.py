@@ -240,7 +240,7 @@ def read_req_to_principle_map(directory: Path, dimension: str) -> dict[str, str]
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
     """Return ``{req_id: [{label, url}, ...]}`` for every requirement's refs.
 
-    Was a passthrough in ``core/evidence/_refs``; it belongs with the other
+    Was a passthrough in ``core/evidence/refs``; it belongs with the other
     disk loaders so the core layer performs no file access.
     """
     return load_compiled_refs(str(compiled_dir), dimension)

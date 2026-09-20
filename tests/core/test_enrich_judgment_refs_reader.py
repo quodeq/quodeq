@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.evidence._options import EvidenceParseOptions
-from quodeq.core.evidence._refs import enrich_judgment
+from quodeq.core.evidence.refs import enrich_judgment
 from quodeq.core.events.models import Judgment
 
 

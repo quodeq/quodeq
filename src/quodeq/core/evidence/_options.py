@@ -6,7 +6,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.core.evidence._refs import RefsReader
+from quodeq.core.evidence.refs import RefsReader
 from quodeq.core.evidence.req_mapping import QuarantineSink, ReqMapReader
 
 # A malformed-line message is handed to this sink instead of logged directly,

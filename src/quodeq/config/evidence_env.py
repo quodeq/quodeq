@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.core.evidence._refs import CWE_URL_TEMPLATE_DEFAULT
+from quodeq.core.evidence.refs import CWE_URL_TEMPLATE_DEFAULT
 
 
 def cwe_url_template(env: dict[str, str] | None = None) -> str:
