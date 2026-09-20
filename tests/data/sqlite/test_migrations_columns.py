@@ -4,9 +4,8 @@ from quodeq.data.sqlite._migrations import apply_evaluation_schema
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 def test_schema_version_is_pinned():
-    # The v5 baseline DDL below and the per-version upgrade cases are written
-    # against v9 specifically. Bumping SCHEMA_VERSION without extending them
-    # would leave the new version's upgrade path untested, so pin it here.
+    # The v5 baseline DDL and the per-version upgrade cases below target v9;
+    # bumping SCHEMA_VERSION without extending them leaves the new path untested.
     assert SCHEMA_VERSION == 9
 
 
