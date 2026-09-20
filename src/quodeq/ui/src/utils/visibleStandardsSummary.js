@@ -6,15 +6,15 @@ import { countBySeverity } from './severity.js';
 export function computeSummaryFromDimensions(dimensions) {
   let totalViolations = 0;
   let totalCompliance = 0;
-  const severity = { critical: 0, major: 0, minor: 0 };
+  // Zeroed via countBySeverity's own bucket shape instead of re-listing the
+  // severity names here, so a new bucket only needs adding in severity.js.
+  const severity = countBySeverity([]);
   for (const d of dimensions) {
     const violations = d.violations || [];
     totalViolations += violations.length;
     totalCompliance += d.compliance?.length || 0;
     const counts = countBySeverity(violations);
-    severity.critical += counts.critical;
-    severity.major += counts.major;
-    severity.minor += counts.minor;
+    for (const key of Object.keys(severity)) severity[key] += counts[key];
   }
   return { totalViolations, totalCompliance, severity };
 }

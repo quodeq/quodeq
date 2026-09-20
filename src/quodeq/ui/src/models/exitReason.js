@@ -81,5 +81,5 @@ export function exitReasonWarn(code) {
  * neutral styling instead of failure styling.
  */
 export function isTimeLimitExit(code) {
-  return code === 'deadline' || code === 'time_limit';
+  return exitReasonInfo(code) === TIME_LIMIT;
 }

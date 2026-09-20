@@ -214,12 +214,15 @@ export function fitMiddleTruncate(text, font, maxWidth, ellipsis = '\u2026') {
  * @param {Element | null | undefined} el
  * @returns {string}
  */
+const DEFAULT_FONT_SIZE = '13px';
+const DEFAULT_FONT_FAMILY = '"JetBrains Mono", ui-monospace, monospace';
+
 export function cssFontFromElement(el) {
-  const DEFAULT = '13px "JetBrains Mono", ui-monospace, monospace';
+  const DEFAULT = `${DEFAULT_FONT_SIZE} ${DEFAULT_FONT_FAMILY}`;
   if (!el || typeof window === 'undefined') return DEFAULT;
   const cs = window.getComputedStyle(el);
-  const size = cs.fontSize || '13px';
-  const family = cs.fontFamily || '"JetBrains Mono", ui-monospace, monospace';
+  const size = cs.fontSize || DEFAULT_FONT_SIZE;
+  const family = cs.fontFamily || DEFAULT_FONT_FAMILY;
   const weight = cs.fontWeight && cs.fontWeight !== '400' ? `${cs.fontWeight} ` : '';
   const style = cs.fontStyle && cs.fontStyle !== 'normal' ? `${cs.fontStyle} ` : '';
   return `${style}${weight}${size} ${family}`.trim();

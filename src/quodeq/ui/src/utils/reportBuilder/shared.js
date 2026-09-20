@@ -2,6 +2,10 @@
 import { SEVERITY_ORDER } from '../formatters.js';
 
 const SNIPPET_MAX_LINES = 5;
+// Short run-id shown in report headers ("**Run:** 3f9c1a2b").
+export const RUN_ID_DISPLAY_LENGTH = 8;
+// Fallback for a score/grade the payload doesn't carry.
+export const EMPTY_VALUE_PLACEHOLDER = '—';
 
 /**
  * Today as "3 Jul 2026", the date stamp every report header carries.

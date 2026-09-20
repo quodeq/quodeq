@@ -1,5 +1,8 @@
 // src/quodeq/ui/src/utils/reportBuilder/runBuilders.js
-import { formatDate, formatScore, buildViolationsSection, buildComplianceSection } from './shared.js';
+import {
+  formatDate, formatScore, buildViolationsSection, buildComplianceSection,
+  RUN_ID_DISPLAY_LENGTH, EMPTY_VALUE_PLACEHOLDER,
+} from './shared.js';
 import {
   buildDimensionSummaryTable,
   buildTopOffendingFiles,
@@ -15,11 +18,11 @@ import { formatPrincipleTable } from './shared.js';
  */
 export function buildDimensionReport({ evalData, principleGrades, allViolations, overallGrade, dateLabel, runId }) {
   const dim = (evalData?.dimension || 'unknown').toLowerCase();
-  const score = overallGrade?.score || '—';
-  const grade = overallGrade?.grade || '—';
+  const score = overallGrade?.score || EMPTY_VALUE_PLACEHOLDER;
+  const grade = overallGrade?.grade || EMPTY_VALUE_PLACEHOLDER;
   const compliance = evalData?.compliance || [];
   const date = dateLabel || formatDate();
-  const rid = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
+  const rid = runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
 
   const lines = [];
   lines.push(`# ${dim} report`);
@@ -54,7 +57,7 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
 export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
   const summary = accumulated?.summary || {};
   const score = formatScore(summary.numericAverage);
-  const grade = summary.overallGrade || '—';
+  const grade = summary.overallGrade || EMPTY_VALUE_PLACEHOLDER;
   const date = formatDate();
   const project = projectName || 'Project';
 
@@ -83,9 +86,9 @@ export function buildRunReport({ dashboard, runSummary, projectName }) {
   const dateLabel = selectedRun.dateLabel || formatDate();
   const runId = selectedRun.runId || '';
   const score = formatScore(runSummary?.numericAverage);
-  const grade = runSummary?.overallGrade || '—';
+  const grade = runSummary?.overallGrade || EMPTY_VALUE_PLACEHOLDER;
   const project = projectName || 'Run';
-  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
+  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
 
   const lines = [];
   lines.push(`# ${project} run report`);
