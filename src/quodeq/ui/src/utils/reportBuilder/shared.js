@@ -106,26 +106,63 @@ export function groupBySeverity(violations) {
  * The "Violations" section, severity by severity. Returns the Markdown lines
  * (not a joined string) so callers can splice sections together.
  *
+ * @param {{total: number, bySeverity: Object, severityFilter?: string}} options
+ *   `total` is the count shown in the heading, `bySeverity` the entries keyed
+ *   by severity, `severityFilter` the active filter (absent = everything).
  * @returns {string[]}
  */
-export function buildViolationsSection(allViolations) {
+export function buildViolationsSection({ total, bySeverity, severityFilter }) {
   const lines = [];
-  const bySeverity = groupBySeverity(allViolations);
-  lines.push(`## Violations (${allViolations.length})`);
+  lines.push(`## Violations (${total})`);
   lines.push('');
-  if (allViolations.length === 0) {
+  if (total === 0) {
     lines.push('No violations found.');
     lines.push('');
-  } else {
-    for (const sev of SEVERITY_ORDER) {
-      const vs = bySeverity[sev];
-      if (!vs || vs.length === 0) continue;
-      lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
-      lines.push('');
-      for (const v of vs) lines.push(formatViolationEntry(v));
-    }
+    return lines;
+  }
+  for (const sev of SEVERITY_ORDER) {
+    if (!severityMatches(severityFilter, sev)) continue;
+    const vs = bySeverity?.[sev] || [];
+    if (vs.length === 0) continue;
+    lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
+    lines.push('');
+    for (const v of vs) lines.push(formatViolationEntry(v));
   }
   return lines;
+}
+
+/**
+ * The ` · **Run:** <short id>` fragment a report header carries when it is
+ * scoped to one run, or '' when it is not.
+ *
+ * @param {string|null|undefined} runId
+ * @returns {string}
+ */
+export function runSuffix(runId) {
+  return runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
+}
+
+/**
+ * Whether the active severity filter admits `severity`. An absent filter and
+ * the 'all' filter admit every severity.
+ *
+ * @param {string|undefined} severityFilter
+ * @param {string} severity
+ * @returns {boolean}
+ */
+export function severityMatches(severityFilter, severity) {
+  return !severityFilter || severityFilter === 'all' || severityFilter === severity;
+}
+
+/**
+ * Whether a report built under `severityFilter` includes its compliance
+ * section: only the unfiltered views and the compliance view itself do.
+ *
+ * @param {string|undefined} severityFilter
+ * @returns {boolean}
+ */
+export function showsCompliance(severityFilter) {
+  return severityMatches(severityFilter, 'compliance');
 }
 
 /**

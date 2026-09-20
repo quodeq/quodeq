@@ -114,6 +114,57 @@ export function measureWidth(text, font) {
   return measureNaturalWidth(prepareSegments(text, font));
 }
 
+// Shared skeleton for the fit* truncators below: the three guards (nothing to
+// do, already fits, ellipsis alone too wide) and the binary search over how
+// many characters to keep. Only `buildCandidate` differs between end and
+// middle truncation, so the search itself is written once.
+function fitTruncate({ text, font, maxWidth, ellipsis, minKeep, buildCandidate }) {
+  if (!text || maxWidth <= 0) return text;
+  if (measureWidth(text, font) <= maxWidth) return text;
+
+  const ellipsisWidth = measureWidth(ellipsis, font);
+  if (ellipsisWidth > maxWidth) return ellipsis;
+
+  let lo = minKeep;
+  let hi = text.length - 1;
+  let best = ellipsis;
+  while (lo <= hi) {
+    const keep = (lo + hi) >> 1;
+    const candidate = buildCandidate(keep);
+    if (measureWidth(candidate, font) <= maxWidth) {
+      best = candidate;
+      lo = keep + 1;
+    } else {
+      hi = keep - 1;
+    }
+  }
+  return best;
+}
+
+/**
+ * Fit `text` to `maxWidth` using end truncation. Preserves the leading
+ * characters and drops the tail behind an ellipsis. Use this when the head
+ * of the string is the informative part (e.g. a comma-separated list where
+ * the first items are most important).
+ *
+ * @param {string} text
+ * @param {string} font
+ * @param {number} maxWidth
+ * @param {string} [ellipsis='…']
+ * @returns {string}
+ */
+export function fitEndTruncate(text, font, maxWidth, ellipsis = '\u2026') {
+  return fitTruncate({
+    text,
+    font,
+    maxWidth,
+    ellipsis,
+    // An end-truncated candidate may keep zero leading characters.
+    minKeep: 0,
+    buildCandidate: (keep) => text.slice(0, keep) + ellipsis,
+  });
+}
+
 /**
  * Fit `text` to `maxWidth` using middle truncation. If the text already fits,
  * returns it unchanged. Otherwise keeps as much leading and trailing context
@@ -133,77 +184,25 @@ export function measureWidth(text, font) {
  * @param {string} [ellipsis='…']
  * @returns {string}
  */
-/**
- * Fit `text` to `maxWidth` using end truncation. Preserves the leading
- * characters and drops the tail behind an ellipsis. Use this when the head
- * of the string is the informative part (e.g. a comma-separated list where
- * the first items are most important).
- *
- * @param {string} text
- * @param {string} font
- * @param {number} maxWidth
- * @param {string} [ellipsis='…']
- * @returns {string}
- */
-export function fitEndTruncate(text, font, maxWidth, ellipsis = '\u2026') {
-  if (!text || maxWidth <= 0) return text;
-  if (measureWidth(text, font) <= maxWidth) return text;
-
-  const ellipsisWidth = measureWidth(ellipsis, font);
-  if (ellipsisWidth > maxWidth) return ellipsis;
-
-  const n = text.length;
-  let lo = 0;
-  let hi = n - 1;
-  let best = ellipsis;
-  while (lo <= hi) {
-    const keep = (lo + hi) >> 1;
-    const candidate = text.slice(0, keep) + ellipsis;
-    if (measureWidth(candidate, font) <= maxWidth) {
-      best = candidate;
-      lo = keep + 1;
-    } else {
-      hi = keep - 1;
-    }
-  }
-  return best;
-}
-
-/**
- * Middle-truncates `text` to `maxWidth` in `font`, keeping as much leading and
- * trailing context as fits around `ellipsis`. Text that already fits comes
- * back unchanged.
- *
- * @returns {string}
- */
 export function fitMiddleTruncate(text, font, maxWidth, ellipsis = '\u2026') {
-  if (!text || maxWidth <= 0) return text;
-  if (measureWidth(text, font) <= maxWidth) return text;
-
-  const ellipsisWidth = measureWidth(ellipsis, font);
-  if (ellipsisWidth > maxWidth) return ellipsis;
-
-  const n = text.length;
-  // Binary search on number of visible characters preserved.
-  // Keep roughly equal halves; bias to the tail so the line:column stays
-  // visible for file refs like 'a/b/c/file.py:42'.
-  let lo = 1;
-  let hi = n - 1;
-  let best = ellipsis;
-  while (lo <= hi) {
-    const keep = (lo + hi) >> 1;
-    // Favour the tail by 1 char when total is odd.
-    const tail = Math.ceil(keep / 2);
-    const head = keep - tail;
-    const candidate = text.slice(0, head) + ellipsis + text.slice(n - tail);
-    if (measureWidth(candidate, font) <= maxWidth) {
-      best = candidate;
-      lo = keep + 1;
-    } else {
-      hi = keep - 1;
-    }
-  }
-  return best;
+  const n = text ? text.length : 0;
+  return fitTruncate({
+    text,
+    font,
+    maxWidth,
+    ellipsis,
+    // Binary search on number of visible characters preserved; a middle
+    // truncation always keeps at least one.
+    minKeep: 1,
+    buildCandidate: (keep) => {
+      // Keep roughly equal halves, favouring the tail by 1 char when the
+      // total is odd, so the line:column stays visible for file refs like
+      // 'a/b/c/file.py:42'.
+      const tail = Math.ceil(keep / 2);
+      const head = keep - tail;
+      return text.slice(0, head) + ellipsis + text.slice(n - tail);
+    },
+  });
 }
 
 const DEFAULT_FONT_SIZE = '13px';

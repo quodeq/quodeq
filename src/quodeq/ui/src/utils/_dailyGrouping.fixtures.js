@@ -53,12 +53,13 @@ export const DIM_TREND = [
 ];
 
 /** The local calendar day the UI displays for an instant (what
- * formatShortDate/toLocaleDateString render), as YYYY-MM-DD. */
+ * formatShortDate/toLocaleDateString render), as YYYY-MM-DD.
+ *
+ * Deliberately NOT localDayKey() from dailyGrouping.js: this is the oracle the
+ * key builders are asserted against, so it has to be derived independently or
+ * the assertions compare the implementation with itself. */
 export function displayedLocalDay(iso) {
   const d = new Date(iso);
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
-  ].join('-');
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

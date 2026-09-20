@@ -1,10 +1,9 @@
 // src/quodeq/ui/src/utils/reportBuilder/principleBuilder.js
-import { SEVERITY_ORDER } from '../formatters.js';
-import { formatDate, formatViolationEntry, groupBySeverity, buildComplianceSection, RUN_ID_DISPLAY_LENGTH } from './shared.js';
+import { formatDate, groupBySeverity, buildComplianceSection, buildViolationsSection, showsCompliance, runSuffix } from './shared.js';
 
 function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData }) {
   const date = dateLabel || formatDate();
-  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
+  const ridSuffix = runSuffix(runId);
   const dimSuffix = dimension ? ` · **Dimension:** ${dimension}` : '';
   const scoreDisplay = score ? `${String(score).replace('/10', '')}/10` : '—';
 
@@ -29,25 +28,6 @@ function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId
   return lines;
 }
 
-function buildPrincipleViolationsSection({ filteredViolations, bySeverity, severityFilter }) {
-  const lines = [];
-  lines.push(`## Violations (${filteredViolations.length})`);
-  lines.push('');
-  if (filteredViolations.length === 0) {
-    lines.push('No violations found.');
-    lines.push('');
-  } else {
-    for (const sev of SEVERITY_ORDER) {
-      if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) continue;
-      const vs = bySeverity[sev] || [];
-      if (vs.length === 0) continue;
-      lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
-      lines.push('');
-      for (const v of vs) lines.push(formatViolationEntry(v));
-    }
-  }
-  return lines;
-}
 
 /**
  * The full Markdown report for one principle. `severityFilter` narrows it to
@@ -63,7 +43,7 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
   const lines = buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData });
 
   const showViolations = severityFilter !== 'compliance';
-  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
+  const showCompliance = showsCompliance(severityFilter);
 
   const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
     ? rawViolations.filter((v) => (v.severity || 'minor').toLowerCase() === severityFilter)
@@ -72,7 +52,7 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
     ? violationsBySeverity
     : groupBySeverity(filteredViolations);
 
-  lines.push(...buildPrincipleViolationsSection({ filteredViolations, bySeverity, severityFilter }));
+  lines.push(...buildViolationsSection({ total: filteredViolations.length, bySeverity, severityFilter }));
 
   if (showCompliance) {
     lines.push(...buildComplianceSection(complianceList));
