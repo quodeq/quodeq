@@ -54,7 +54,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "title": finding.get("w", "") or "",
         "reason": finding.get("reason", "") or "",
         "snippet": finding.get("snippet", "") or "",
-        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
+        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/jsonl.py);
         # accept the long key too so both spellings survive this seam.
         "violation_type": finding.get("vt") or finding.get("violation_type") or "",
         "violation_type_raw": finding.get("vt_raw") or "",

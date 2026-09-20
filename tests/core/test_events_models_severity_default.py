@@ -30,9 +30,9 @@ def test_evidence_parser_uses_the_shared_default():
 
 
 def test_jsonl_parser_uses_the_shared_default():
-    from quodeq.core.evidence import _jsonl
+    from quodeq.core.evidence import jsonl
 
-    assert _jsonl.DEFAULT_SEVERITY is DEFAULT_SEVERITY
+    assert jsonl.DEFAULT_SEVERITY is DEFAULT_SEVERITY
 
 
 def test_sqlite_row_mappers_use_the_shared_default_and_verdict():

@@ -6,7 +6,7 @@ seam drops it, every carried finding reads as new and the filter is inert.
 """
 import json
 
-from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line
+from quodeq.core.evidence.jsonl import judgment_to_dict, parse_jsonl_line
 from quodeq.core.finding_mappings import wire_dict_to_judgment
 
 

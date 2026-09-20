@@ -18,7 +18,7 @@ from quodeq.analysis.mcp.scope_gate import SCOPE_DOWNGRADE_MARKER
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
-from quodeq.core.evidence._jsonl import judgment_to_dict
+from quodeq.core.evidence.jsonl import judgment_to_dict
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.data.fs.import_graph import build_import_graph
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
@@ -82,7 +82,7 @@ def deterministic_judgments(
 def _to_wire(j: Judgment) -> dict:
     """Serialize a Judgment into the short-key JSONL row an LLM would have written.
 
-    Symmetric with ``core/evidence/_jsonl.parse_jsonl_line`` so a deterministic
+    Symmetric with ``core/evidence/jsonl.parse_jsonl_line`` so a deterministic
     finding re-reads exactly like any other: p=practice_id, t=verdict,
     d=dimension, w=title, vt=violation_type.
     """

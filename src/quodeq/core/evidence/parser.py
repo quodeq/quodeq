@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
+from quodeq.core.evidence.jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
 from quodeq.core.evidence._options import EvidenceParseOptions
 from quodeq.core.evidence._refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text

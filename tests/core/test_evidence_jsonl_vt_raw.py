@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
-from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line
+from quodeq.core.evidence.jsonl import judgment_to_dict, parse_jsonl_line
 from quodeq.core.finding_mappings import judgment_to_finding, wire_dict_to_judgment
 from quodeq.data.events.codec import event_from_dict, event_to_json
 

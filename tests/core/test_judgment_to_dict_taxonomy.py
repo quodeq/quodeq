@@ -7,7 +7,7 @@ grouping silently disables on the production parse->score path.
 from __future__ import annotations
 
 from quodeq.core.events.models import Judgment
-from quodeq.core.evidence._jsonl import judgment_to_dict
+from quodeq.core.evidence.jsonl import judgment_to_dict
 from quodeq.core.scoring._tallies import evidence_has_taxonomy
 
 

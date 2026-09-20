@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
-from quodeq.core.evidence._jsonl import parse_jsonl_line
+from quodeq.core.evidence.jsonl import parse_jsonl_line
 from quodeq.core.evidence.req_mapping import _group_judgments, build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 

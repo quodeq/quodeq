@@ -237,7 +237,6 @@ tests/analysis/test_copilot_provider.py:8:private-module:quodeq.analysis._config
 tests/analysis/test_custom_dimension_id_guard.py:3:private-name:quodeq.analysis._analysis_context._load_custom_dimensions
 tests/analysis/test_deterministic_checks_bundled.py:27:private-module:quodeq.analysis._types.RunConfig
 tests/analysis/test_deterministic_checks_run.py:143:private-module:quodeq.analysis._types.RunConfig
-tests/analysis/test_deterministic_checks_run.py:98:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
 tests/analysis/test_diff_mode_pipeline.py:7:private-name:quodeq.analysis._pipeline._run_dimensions
 tests/analysis/test_diff_mode_pipeline.py:8:private-module:quodeq.analysis._types.AnalysisOptions
 tests/analysis/test_diff_mode_pipeline.py:8:private-module:quodeq.analysis._types.RunConfig
@@ -870,19 +869,12 @@ tests/core/test_confidence_not_scored.py:17:private-name:quodeq.analysis._report
 tests/core/test_copilot_events.py:3:private-module:quodeq.assistant.adapters._stream
 tests/core/test_enrich_judgment_refs_reader.py:11:private-module:quodeq.core.evidence._options.EvidenceParseOptions
 tests/core/test_enrich_judgment_refs_reader.py:12:private-module:quodeq.core.evidence._refs.enrich_judgment
-tests/core/test_events_models_severity_default.py:33:private-module:quodeq.core.evidence._jsonl
-tests/core/test_evidence_jsonl_carried_forward.py:9:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
-tests/core/test_evidence_jsonl_carried_forward.py:9:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
-tests/core/test_evidence_jsonl_vt_raw.py:7:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
-tests/core/test_evidence_jsonl_vt_raw.py:7:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
 tests/core/test_evidence_no_ambient_io.py:11:private-module:quodeq.core.evidence._refs.resolve_llm_refs
 tests/core/test_evidence_no_ambient_io.py:11:private-name:quodeq.core.evidence._refs._CWE_URL_TEMPLATE_DEFAULT
 tests/core/test_evidence_no_ambient_io.py:12:private-name:quodeq.core.evidence.req_mapping._resolve_req_to_principle_map
 tests/core/test_evidence_parser.py:273:private-name:quodeq.core.evidence.parser._build_evidence
 tests/core/test_evidence_parser.py:283:private-name:quodeq.core.evidence.parser._build_evidence
-tests/core/test_evidence_parser_line.py:143:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
 tests/core/test_evidence_parser_line.py:6:private-name:quodeq.core.evidence.parser._parse_jsonl_line
-tests/core/test_evidence_parser_line.py:78:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
 tests/core/test_evidence_parser_unmapped_principle.py:15:private-name:quodeq.core.evidence.req_mapping._group_judgments
 tests/core/test_finding_marker_persistence.py:39:private-module:quodeq.analysis._report_assembly.build_report_json
 tests/core/test_finding_marker_persistence.py:40:private-name:quodeq.analysis._report_constants._VIOLATION_FIELDS
@@ -891,7 +883,6 @@ tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.r
 tests/core/test_finding_marker_persistence.py:46:private-module:quodeq.data.fs.report_parser._report_parsing.parse_report_json
 tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._build_context
 tests/core/test_floor_ceiling_conflict.py:107:private-name:quodeq.core.scoring.principle._score_numerical
-tests/core/test_judgment_to_dict_taxonomy.py:10:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
 tests/core/test_judgment_to_dict_taxonomy.py:11:private-module:quodeq.core.scoring._tallies.evidence_has_taxonomy
 tests/core/test_projector_scoring_custom.py:122:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:142:private-module:quodeq.services.scoring._summary.recompute_summary
@@ -1440,7 +1431,6 @@ tests/services/test_run_status_readers.py:7:private-name:quodeq.services._run_st
 tests/services/test_runs_unit.py:2:private-name:quodeq.services._runs_unit._row_to_run_entry
 tests/services/test_runs_unit.py:2:private-name:quodeq.services._runs_unit._ui_status
 tests/services/test_runs_unit.py:4:private-module:quodeq.services._runs_unit
-tests/services/test_scan_counter_report_parity.py:26:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
 tests/services/test_scan_counter_report_parity.py:27:private-name:quodeq.core.evidence.req_mapping._group_judgments
 tests/services/test_scan_progress_live_tally.py:175:private-module:quodeq.services._scan_progress_dims.dims
 tests/services/test_scan_progress_live_tally.py:20:private-module:quodeq.services._scan_progress_dims.forget_live_tallies
