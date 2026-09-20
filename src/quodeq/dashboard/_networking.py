@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import socket
 
-from quodeq.shared._env_inject import resolve_env
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 
 _DEFAULT_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})

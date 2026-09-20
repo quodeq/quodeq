@@ -41,7 +41,7 @@ from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.shared._env import env_float
-from quodeq.shared._env_inject import resolve_env
+from quodeq.shared._env_resolve import resolve_env
 
 # env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort
 # module import (it logs and falls back to 15s). minimum=0.1 keeps a bogus

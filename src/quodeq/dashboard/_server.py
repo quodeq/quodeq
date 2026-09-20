@@ -24,7 +24,7 @@ from quodeq.dashboard._webview_token import (
     _warn_reused_api_token_mismatch,
     spawn_window_with_token,
 )
-from quodeq.shared._env_inject import resolve_mutable_env
+from quodeq.shared._env_resolve import resolve_env_mut
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
@@ -76,7 +76,7 @@ def _ensure_action_api(
                 _warn_reused_api_token_mismatch(base_url)
                 return base_url, None
             continue
-        resolve_mutable_env(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+        resolve_env_mut(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
         return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
@@ -103,7 +103,7 @@ def _ensure_action_api_forced(
             _warn_reused_api_token_mismatch(base_url)
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    resolve_mutable_env(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+    resolve_env_mut(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
     return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )

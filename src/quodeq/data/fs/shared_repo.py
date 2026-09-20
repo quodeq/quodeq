@@ -134,12 +134,12 @@ def shared_cache_dir(url: str, env: Mapping[str, str] | None = None) -> Path:
     return _cache_base(env) / digest
 
 
-def shared_repo_path(url: str, env: dict | None = None) -> Path:
+def shared_repo_path(url: str, env: Mapping[str, str] | None = None) -> Path:
     """Clone directory for *url*. Also the key ``clone_lock`` locks on."""
     return shared_cache_dir(url, env) / "repo"
 
 
-def shared_evaluations_root(url: str, env: dict | None = None) -> Path:
+def shared_evaluations_root(url: str, env: Mapping[str, str] | None = None) -> Path:
     """The clone's evaluations/ tree, laid out like the local evaluations dir."""
     return shared_repo_path(url, env) / "evaluations"
 
@@ -148,7 +148,7 @@ _CLONE_LOCKS: dict[str, threading.RLock] = {}
 _CLONE_LOCKS_GUARD = threading.Lock()
 
 
-def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
+def clone_lock(url: str, env: Mapping[str, str] | None = None) -> threading.RLock:
     """Process-wide reentrant lock serializing git mutations on one clone.
 
     Keyed by the clone's resolved path (shared_repo_path), so any two
@@ -164,7 +164,7 @@ def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
         return _CLONE_LOCKS.setdefault(key, threading.RLock())
 
 
-def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
+def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path | None:
     """Return the clone path for *url*, cloning it once if it is not there yet.
 
     None when the clone failed; the half-written directory is removed so the
@@ -187,7 +187,7 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
 _DEFAULT_REFRESH_TIMEOUT_S = 30
 
 
-def _refresh_missing_clone(url: str, env: dict | None) -> tuple[bool, str]:
+def _refresh_missing_clone(url: str, env: Mapping[str, str] | None) -> tuple[bool, str]:
     if ensure_shared_clone(url, env) is not None:
         return True, ""
     reason = f"could not clone the repository, check that git can access {url}"
@@ -220,7 +220,7 @@ def _fetch_and_reset_clone(url: str, repo: Path, timeout: int) -> tuple[bool, st
 
 
 def refresh_shared_clone(
-    url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
+    url: str, env: Mapping[str, str] | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
 ) -> tuple[bool, str]:
     """Fetch + hard-reset the clone to the remote's HEAD.
 
@@ -255,7 +255,7 @@ def refresh_shared_clone(
         return _fetch_and_reset_clone(url, repo, timeout)
 
 
-def last_synced_at(url: str, env: dict | None = None) -> float | None:
+def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | None:
     """Unix mtime of the clone's last fetch, or None when it was never cloned.
 
     Falls back to HEAD when FETCH_HEAD is absent (cloned, never refreshed).

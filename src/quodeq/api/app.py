@@ -21,7 +21,7 @@ from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
 from quodeq.shared._env import env_int
-from quodeq.shared._env_inject import resolve_env
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
 
 _logger = logging.getLogger(__name__)

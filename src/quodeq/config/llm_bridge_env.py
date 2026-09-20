@@ -13,9 +13,8 @@ from quodeq.shared.constants import (
     DEFAULT_LLAMACPP_BASE_URL,
     OLLAMA_DEFAULT_BASE_URL,
     OLLAMA_DEFAULT_PORT,
+    OMLX_DEFAULT_BASE_URL,
 )
-
-OMLX_DEFAULT_BASE_URL = "http://localhost:8000"
 
 #: Markers that identify a local model server by its ``api_base``.
 LOCAL_API_MARKERS_DEFAULT = frozenset(

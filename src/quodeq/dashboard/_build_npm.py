@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
-from quodeq.shared._env_inject import resolve_env
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import _SYNC_ITEMS

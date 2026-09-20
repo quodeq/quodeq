@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 
-from quodeq.shared._env_inject import resolve_env
+from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
