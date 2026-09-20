@@ -180,10 +180,10 @@ class TestServiceDelegation:
         assert data["onboardingCompletedAt"] == "2026-01-01"
 
     def test_scan_write_delegates_to_adapter(self, tmp_path):
-        from quodeq.services import _fs_scan
+        from quodeq.services import fs_scan
 
         scan = ScanData(scanned_at="2026-08-01T00:00:00Z")
-        with patch("quodeq.services._fs_scan.write_scan_json") as spy:
-            _fs_scan._write_scan_json(scan, tmp_path)
+        with patch("quodeq.services.fs_scan.write_scan_json") as spy:
+            fs_scan._write_scan_json(scan, tmp_path)
 
         spy.assert_called_once_with(scan, tmp_path)

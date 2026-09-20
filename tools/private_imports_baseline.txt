@@ -102,7 +102,6 @@ src/quodeq/api/app.py:23:private-module:quodeq.shared._env.env_int
 src/quodeq/api/app.py:24:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/app.py:41:private-module:quodeq.shared._env.get_index_db_path
 src/quodeq/api/llm_bridge_routes.py:6:private-name:quodeq.config.ai_provider._store_api_key
-src/quodeq/api/routes_project_scan.py:34:private-module:quodeq.services._fs_scan.scan_project
 src/quodeq/api/routes_runs.py:14:private-module:quodeq.shared._env.get_index_db_path
 src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_projects
 src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_reports
