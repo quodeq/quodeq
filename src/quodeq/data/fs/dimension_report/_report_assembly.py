@@ -13,7 +13,7 @@ from quodeq.data.fs.dimension_report._report_constants import (
     _FIELD_WEIGHTED_SCORE_SNAKE,
     _REPORT_SCHEMA_VERSION,
 )
-from quodeq.data.fs.dimension_report._report_scoring import (
+from quodeq.data.fs.dimension_report.report_scoring import (
     build_score_lookup,
     extract_scores,
     grade_from_score,
