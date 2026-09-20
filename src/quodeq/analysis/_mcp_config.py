@@ -9,7 +9,7 @@ from pathlib import Path
 
 from quodeq.analysis._config import _AgentParams
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
-from quodeq.shared._mcp import codex_mcp_override
+from quodeq.shared.mcp import codex_mcp_override
 
 _SERVER_NAME = "findings"
 _SERVER_MODULE = ["-m", "quodeq.analysis.mcp.findings_server"]
