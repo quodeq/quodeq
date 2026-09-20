@@ -11,8 +11,11 @@ layer can import it (including modules ``_env.py`` itself imports) without
 a cycle.
 
 ``None`` means "not injected, use the process environment". An injected
-``{}`` means "no variables set" and is honoured as such -- never spell this
-``env or os.environ``, which turns that empty mapping back into the real one.
+``{}`` means "no variables set" and is honoured as such -- hence the
+``is None`` test rather than a truthiness fallback, which would turn that
+empty mapping back into the real one (gated by
+tests/tools/test_no_env_or_fallback.py, a line regex, so do not spell the
+banned form here either).
 """
 from __future__ import annotations
 
