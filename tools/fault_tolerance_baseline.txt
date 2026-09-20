@@ -49,7 +49,7 @@ src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:71:broad-except
 src/quodeq/api/app.py:117:broad-except
-src/quodeq/api/app.py:254:broad-except
+src/quodeq/api/app.py:260:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:70:broad-except
 src/quodeq/api/routes_runs.py:31:broad-except

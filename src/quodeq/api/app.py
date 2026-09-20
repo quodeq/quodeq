@@ -199,10 +199,16 @@ def create_app(
 ) -> Flask:
     """Create and configure the Flask application with all API routes.
 
-    *env* is the composition root for every environment read below it: it is
-    resolved here, at app-creation time, and handed to the configuration and
-    route-registration steps instead of each of them reaching for
+    *env* is the composition root for every environment read the
+    configuration and route-registration steps do: it is resolved here, at
+    app-creation time, and handed to them instead of each one reaching for
     ``os.environ``. ``None`` keeps the process environment.
+
+    It does not cover the SSE/tail tuning variables — ``QUODEQ_SSE_TICK_MS``,
+    ``QUODEQ_SSE_FINDINGS_BATCH``, ``QUODEQ_LOG_STREAM_POLL_MS``,
+    ``QUODEQ_LOG_STREAM_MAX_WAIT_S``, ``QUODEQ_LOG_TAIL_MAX_BYTES`` — which
+    stay process-scoped and are read per request inside the stream
+    generators, so a test can still set one mid-run.
     """
     app = Flask(__name__)
     provider = provider or _default_provider()

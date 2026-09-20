@@ -140,6 +140,38 @@ def test_create_app_hands_the_injected_env_to_the_log_routes(monkeypatch, tmp_pa
         assert c.get("/api/llamacpp/logs/available").get_json() == {"available": False}
 
 
+def test_create_app_hands_the_injected_env_to_the_ollama_log_route(monkeypatch, tmp_path: Path):
+    """The Ollama twin of the llama.cpp case: registration-time env, no
+    per-request parameter, and ``env={}`` does not see the process value."""
+    from quodeq.api import _ollama_log_routes as routes
+    from quodeq.api.app import create_app
+
+    log_file = tmp_path / "server.log"
+    log_file.write_text("[GIN] ready\n", encoding="utf-8")
+    monkeypatch.setenv("QUODEQ_OLLAMA_LOG", str(log_file))
+
+    injected = create_app(env={**_quodeq_env(), "QUODEQ_OLLAMA_LOG": str(log_file)})
+    empty = create_app(env=_quodeq_env("QUODEQ_OLLAMA_LOG"))
+
+    # Pin the no-override fallback (~/.ollama/logs/server.log) at an empty
+    # dir so a developer who actually runs Ollama doesn't flip the second
+    # half to 200, and keep the SSE generator finite.
+    seen: list[Path] = []
+    monkeypatch.setattr(routes.Path, "home", lambda: tmp_path / "no-ollama")
+    monkeypatch.setattr(
+        routes, "sse_tail_generator",
+        lambda path, offset, **kw: seen.append(path) or iter(("data: ok\n\n",)),
+    )
+
+    with injected.test_client() as c:
+        assert c.get("/api/ollama/logs/stream").status_code == 200
+    assert seen == [log_file]
+
+    with empty.test_client() as c:
+        assert c.get("/api/ollama/logs/stream").status_code == 404
+    assert seen == [log_file], "the empty mapping must not resurrect the process value"
+
+
 def test_create_app_hands_the_injected_env_to_the_security_hooks(monkeypatch):
     from quodeq.api import security
     from quodeq.api.app import create_app
@@ -171,9 +203,26 @@ def test_create_app_hands_the_injected_env_to_the_rate_limit_factory(tmp_path: P
     assert not isinstance(_build_rate_limit_store(env={})[0], FileRateLimitStore)
 
 
-def test_configure_paths_and_cleanup_honours_the_injected_env(tmp_path: Path):
+def test_configure_paths_and_cleanup_honours_the_injected_env(monkeypatch, tmp_path: Path):
+    """Two different injected homes, neither of them the process one.
+
+    ``env={}`` is not usable here: it would send the sweep at the
+    developer's real ``~/.quodeq``. Two distinct mappings make the same
+    point -- the value comes from the argument, not from ``os.environ``.
+    """
     from quodeq.api.app import _configure_app
 
-    app = Flask(__name__)
-    _configure_app(app, object(), None, {"QUODEQ_DIR": str(tmp_path)})
-    assert app.config["ASSISTANT_DB_PATH"] == str(tmp_path / "assistant.db")
+    from_process = tmp_path / "from-process"
+    monkeypatch.setenv("QUODEQ_DIR", str(from_process))
+    first, second = tmp_path / "first", tmp_path / "second"
+
+    app_a = Flask(__name__)
+    _configure_app(app_a, object(), None, {"QUODEQ_DIR": str(first)})
+    assert app_a.config["ASSISTANT_DB_PATH"] == str(first / "assistant.db")
+
+    app_b = Flask(__name__)
+    _configure_app(app_b, object(), None, {"QUODEQ_DIR": str(second)})
+    assert app_b.config["ASSISTANT_DB_PATH"] == str(second / "assistant.db")
+
+    assert str(from_process) not in app_a.config["ASSISTANT_DB_PATH"]
+    assert str(from_process) not in app_b.config["ASSISTANT_DB_PATH"]
