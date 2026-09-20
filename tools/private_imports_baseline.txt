@@ -236,12 +236,10 @@ src/quodeq/services/jobs.py:17:private-module:quodeq.shared._process_kill.kill_t
 src/quodeq/services/jobs.py:17:private-module:quodeq.shared._process_kill.terminate_process
 src/quodeq/services/plugin_discovery.py:13:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/services/score_cache.py:58:private-module:quodeq.shared._env.get_score_cache_path
-src/quodeq/services/scoring/__init__.py:26:private-module:quodeq.services._trend_fetcher.make_rescoring_fetcher
 src/quodeq/services/scoring/__init__.py:27:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/__init__.py:32:private-name:quodeq.services.rescore._rescore_dimension
 src/quodeq/services/scoring/_deps.py:11:private-module:quodeq.services._scoring_deps.ScoringDeps
 src/quodeq/services/scoring/_deps.py:11:private-name:quodeq.services._scoring_deps._NO_DEPS
-src/quodeq/services/scoring/_fetchers.py:16:private-module:quodeq.services._trend_fetcher.make_trend_fetcher
 src/quodeq/services/scoring/_fetchers.py:17:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_fetchers.py:22:private-module:quodeq.shared._env.env_int
 src/quodeq/services/scoring/_project_scores.py:17:private-module:quodeq.services._dashboard_trend.build_accumulated_trend

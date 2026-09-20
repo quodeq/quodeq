@@ -1359,7 +1359,7 @@ tests/services/test_jobs_run_log.py:12:private-module:quodeq.services._job_log_t
 tests/services/test_jobs_run_log_batching.py:9:private-name:quodeq.services._job_log_tee._iter_line_batches
 tests/services/test_mutation_rescore_seams.py:17:private-name:quodeq.services.mutation_rescore._project_all_runs
 tests/services/test_mutation_scoring_logging.py:7:private-name:quodeq.services._mutation_scoring._resolve_default_run_id
-tests/services/test_per_run_versions_memo.py:14:private-name:quodeq.services._trend_fetcher._make_version_for
+tests/services/test_per_run_versions_memo.py:14:private-name:quodeq.services.trend_fetcher._make_version_for
 tests/services/test_plugin_discovery.py:6:private-name:quodeq.services.plugin_discovery._discover_from_detection
 tests/services/test_post_run_hook.py:14:private-module:quodeq.services._post_run_hook.PostRunHook
 tests/services/test_project_summary_cache.py:4:private-module:quodeq.services._fs_metadata
@@ -1408,8 +1408,6 @@ tests/services/test_scoring_parity.py:124:private-name:quodeq.services._fs_metad
 tests/services/test_scoring_parity.py:94:private-name:quodeq.services._fs_metadata._read_accumulated_summary
 tests/services/test_scoring_parity_assistant.py:91:private-module:quodeq.assistant.tools._read_tools.finding_keys_in_scope
 tests/services/test_scoring_scalar_parity.py:34:private-module:quodeq.services.scoring._fetchers
-tests/services/test_scoring_trend_fetcher.py:7:private-module:quodeq.services._trend_fetcher.make_rescoring_fetcher
-tests/services/test_scoring_trend_fetcher.py:7:private-module:quodeq.services._trend_fetcher.make_trend_fetcher
 tests/services/test_scoring_trend_fetcher.py:8:private-name:quodeq.services.scoring._make_trend_fetcher
 tests/services/test_scoring_view_predicates.py:164:private-name:quodeq.services.scoring_view._resolution._is_trustworthy_eval
 tests/services/test_scoring_view_predicates.py:168:private-name:quodeq.services.scoring_view._resolution._is_trustworthy_eval

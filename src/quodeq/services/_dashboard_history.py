@@ -18,7 +18,7 @@ from quodeq.services._dashboard_cache import DashboardCacheConfig, _make_run_dim
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._scoring_deps import ScoringDeps
-from quodeq.services._trend_fetcher import make_trend_fetcher
+from quodeq.services.trend_fetcher import make_trend_fetcher
 from quodeq.services.wiring import RunInfo, calculate_trend, read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.shared._env_resolve import resolve_env

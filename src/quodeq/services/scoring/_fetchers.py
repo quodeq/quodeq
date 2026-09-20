@@ -13,7 +13,7 @@ from typing import Callable
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
-from quodeq.services._trend_fetcher import make_trend_fetcher
+from quodeq.services.trend_fetcher import make_trend_fetcher
 from quodeq.services.dashboard import _make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
