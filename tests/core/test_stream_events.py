@@ -99,5 +99,6 @@ def test_violation_services_no_longer_import_analysis():
     import quodeq.services._violations_stream as vs
 
     for mod in (vs, vj):
-        src = open(mod.__file__).read()
+        with open(mod.__file__, encoding="utf-8") as fh:
+            src = fh.read()
         assert "quodeq.analysis" not in src, mod.__name__

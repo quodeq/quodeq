@@ -35,20 +35,35 @@ def test_copilot_file_read_progress(tool):
     assert extract_files_from_event(event) == {"/repo/main.py"}
 
 
-def test_copilot_structured_error_and_session_id():
+def test_copilot_structured_error_message_is_extracted():
     assert _stream.error_message({
         "type": "session.error", "data": {"message": "Model blocked by policy"},
     }) == "Model blocked by policy"
     assert _stream.error_message({"type": "result", "exitCode": 1}) is not None
+
+
+def test_copilot_session_id_is_extracted():
     assert _stream.session_id({"type": "result", "sessionId": "copilot-session"}) == "copilot-session"
     assert _stream.session_id({"type": "session.start", "data": {"sessionId": "sid"}}) == "sid"
 
 
 @pytest.mark.parametrize("data", [None, [], "text", {"content": 123, "arguments": []}])
-def test_copilot_malformed_event_data_is_ignored(data):
+def test_copilot_malformed_data_yields_no_assistant_text(data):
     assert _stream.assistant_text({"type": "assistant.message", "data": data}) == []
+
+
+@pytest.mark.parametrize("data", [None, [], "text", {"content": 123, "arguments": []}])
+def test_copilot_malformed_data_yields_no_partial_text(data):
     assert _stream.partial_text({"type": "assistant.message_delta", "data": data}) is None
+
+
+@pytest.mark.parametrize("data", [None, [], "text", {"content": 123, "arguments": []}])
+def test_copilot_malformed_data_yields_no_tool_use_details(data):
     assert _stream.tool_use_details({"type": "tool.execution_start", "data": data}) == []
+
+
+@pytest.mark.parametrize("data", [None, [], "text", {"content": 123, "arguments": []}])
+def test_copilot_malformed_data_yields_no_extracted_files(data):
     assert extract_files_from_event({"type": "tool.execution_start", "data": data}) == set()
 
 
