@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`galaxyFolderClickHandlers zoom-toward-cursor values > biases the target between the cursor and the nearest star and steps the zoom > zoom-toward-cursor-target 1`] = `
+{
+  "x": 500,
+  "y": 215,
+  "z": 5,
+}
+`;
+
+exports[`galaxyFolderClickHandlers zoom-toward-cursor values > clamps the stepped zoom to the fit-zoom cap > zoom-toward-cursor-cap 1`] = `10`;
+
+exports[`galaxyFolderClickHandlers zoom-toward-cursor values > falls back to the raw cursor position when the scene has no stars > zoom-toward-cursor-no-stars 1`] = `
+{
+  "x": 500,
+  "y": 250,
+}
+`;

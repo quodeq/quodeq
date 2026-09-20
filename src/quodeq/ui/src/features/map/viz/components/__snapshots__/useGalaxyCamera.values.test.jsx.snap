@@ -1,0 +1,182 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useGalaxyCamera value characterization > computes the per-depth zoom targets and the cluster fit margin > depth-targets 1`] = `
+{
+  "cluster": {
+    "x": 440,
+    "y": 280,
+    "z": 3.6,
+  },
+  "dimension": {
+    "x": 0,
+    "y": 0,
+    "z": 5,
+  },
+  "galaxy": {
+    "x": 400,
+    "y": 300,
+    "z": 1.866667,
+  },
+  "principle": {
+    "x": 0,
+    "y": 0,
+    "z": 50,
+  },
+  "unknown-cluster": {
+    "x": 407,
+    "y": 307,
+    "z": 3.375,
+  },
+}
+`;
+
+exports[`useGalaxyCamera value characterization > drifts circular-layout stars at the recorded speeds, phases and amplitudes > circular-star-drift 1`] = `
+[
+  {
+    "x": 537,
+    "y": 300.005261,
+  },
+  {
+    "x": 466.190824,
+    "y": 419.949051,
+  },
+  {
+    "x": 328.022111,
+    "y": 416.568364,
+  },
+]
+`;
+
+exports[`useGalaxyCamera value characterization > drifts circular-layout stars at the recorded speeds, phases and amplitudes > frame-time-steps 1`] = `
+[
+  0.016,
+  0.032,
+  0.048,
+  0.064,
+]
+`;
+
+exports[`useGalaxyCamera value characterization > drifts clustered stars on their own sine/cosine speeds > clustered-star-drift 1`] = `
+[
+  {
+    "x": 452.00192,
+    "y": 289.999999,
+  },
+  {
+    "x": 453.783285,
+    "y": 289.392311,
+  },
+  {
+    "x": 453.615862,
+    "y": 287.940066,
+  },
+]
+`;
+
+exports[`useGalaxyCamera value characterization > fits the scene inside the view margin and caps the fit zoom > fit-zoom-by-extent 1`] = `
+{
+  "ext=0": 1,
+  "ext=150": 1.866667,
+  "ext=40": 4,
+  "ext=5": 4,
+  "ext=null": 1,
+}
+`;
+
+exports[`useGalaxyCamera value characterization > orbits principles at the recorded per-index speed and wobble > principle-orbit 1`] = `
+[
+  {
+    "x": 566.999992,
+    "y": 300.027696,
+  },
+  {
+    "x": 560.623829,
+    "y": 338.306899,
+  },
+]
+`;
+
+exports[`useGalaxyCamera value characterization > runs the transition easing when an animation is active > camera-transition-track 1`] = `
+[
+  {
+    "x": 537.3602,
+    "y": 300.004309,
+    "z": 5.00144,
+  },
+  {
+    "x": 540.925904,
+    "y": 300.010747,
+    "z": 5.31104,
+  },
+  {
+    "x": 545.30925,
+    "y": 300.025923,
+    "z": 6.91664,
+  },
+  {
+    "x": 549.775575,
+    "y": 300.049488,
+    "z": 10.89824,
+  },
+  {
+    "x": 554.012592,
+    "y": 300.080272,
+    "z": 18.33584,
+  },
+  {
+    "x": 557.83138,
+    "y": 300.116619,
+    "z": 30.09344,
+  },
+]
+`;
+
+exports[`useGalaxyCamera value characterization > snaps for the first frames then lerps toward the target by a fixed fraction > camera-snap-then-lerp 1`] = `
+[
+  {
+    "x": 400,
+    "y": 300,
+    "z": 1.866667,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 1.866667,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 1.866667,
+  },
+  {
+    "x": 408.22,
+    "y": 300.000316,
+    "z": 2.054667,
+  },
+  {
+    "x": 415.9468,
+    "y": 300.000691,
+    "z": 2.231387,
+  },
+  {
+    "x": 423.209992,
+    "y": 300.001123,
+    "z": 2.397503,
+  },
+  {
+    "x": 430.037392,
+    "y": 300.001608,
+    "z": 2.553653,
+  },
+  {
+    "x": 436.455149,
+    "y": 300.002143,
+    "z": 2.700434,
+  },
+  {
+    "x": 442.48784,
+    "y": 300.002725,
+    "z": 2.838408,
+  },
+]
+`;

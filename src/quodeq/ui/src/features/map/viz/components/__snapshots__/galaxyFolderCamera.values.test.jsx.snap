@@ -1,0 +1,453 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`galaxyFolderCamera advanceCamera > lerps toward the target by a fixed fraction once past the snap window > idle-lerp-track 1`] = `
+[
+  {
+    "x": 32,
+    "y": 24,
+    "z": 1.16,
+  },
+  {
+    "x": 61.44,
+    "y": 46.08,
+    "z": 1.3072,
+  },
+  {
+    "x": 88.5248,
+    "y": 66.3936,
+    "z": 1.442624,
+  },
+  {
+    "x": 113.442816,
+    "y": 85.082112,
+    "z": 1.567214,
+  },
+  {
+    "x": 136.367391,
+    "y": 102.275543,
+    "z": 1.681837,
+  },
+  {
+    "x": 157.457999,
+    "y": 118.0935,
+    "z": 1.78729,
+  },
+]
+`;
+
+exports[`galaxyFolderCamera advanceCamera > runs the transition easing curves to completion and clears the anim > transition-in-track 1`] = `
+[
+  {
+    "x": 4.802672,
+    "y": 3.602004,
+    "z": 1.000064,
+  },
+  {
+    "x": 52.34544,
+    "y": 39.25908,
+    "z": 1.013824,
+  },
+  {
+    "x": 110.790252,
+    "y": 83.092689,
+    "z": 1.085184,
+  },
+  {
+    "x": 170.341687,
+    "y": 127.756266,
+    "z": 1.262144,
+  },
+  {
+    "x": 226.835996,
+    "y": 170.126997,
+    "z": 1.592704,
+  },
+  {
+    "x": 277.754259,
+    "y": 208.315694,
+    "z": 2.115264,
+  },
+  {
+    "x": 321.345649,
+    "y": 241.009237,
+    "z": 2.561024,
+  },
+  {
+    "x": 356.294197,
+    "y": 267.220648,
+    "z": 2.824384,
+  },
+  {
+    "x": 381.559339,
+    "y": 286.169504,
+    "z": 2.953344,
+  },
+  {
+    "x": 396.288418,
+    "y": 297.216313,
+    "z": 2.995904,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+]
+`;
+
+exports[`galaxyFolderCamera advanceCamera > snaps straight to the target for the first frames, then lerps > idle-snap-then-lerp 1`] = `
+[
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+]
+`;
+
+exports[`galaxyFolderCamera advanceCamera > swaps which easing drives position and zoom when zooming out > transition-out-track 1`] = `
+[
+  {
+    "x": 0.0128,
+    "y": 0.0096,
+    "z": 1.024013,
+  },
+  {
+    "x": 2.7648,
+    "y": 2.0736,
+    "z": 1.261727,
+  },
+  {
+    "x": 17.0368,
+    "y": 12.7776,
+    "z": 1.553951,
+  },
+  {
+    "x": 52.4288,
+    "y": 39.3216,
+    "z": 1.851708,
+  },
+  {
+    "x": 118.5408,
+    "y": 88.9056,
+    "z": 2.13418,
+  },
+  {
+    "x": 223.0528,
+    "y": 167.2896,
+    "z": 2.388771,
+  },
+  {
+    "x": 312.2048,
+    "y": 234.1536,
+    "z": 2.606728,
+  },
+  {
+    "x": 364.8768,
+    "y": 273.6576,
+    "z": 2.781471,
+  },
+  {
+    "x": 390.6688,
+    "y": 293.0016,
+    "z": 2.907797,
+  },
+  {
+    "x": 399.1808,
+    "y": 299.3856,
+    "z": 2.981442,
+  },
+  {
+    "x": 400,
+    "y": 300,
+    "z": 3,
+  },
+]
+`;
+
+exports[`galaxyFolderCamera fly transitions > fly-in zooms, swaps the scene at its swap point, then blooms out > fly-in-camera-track 1`] = `
+[
+  [
+    0.011429,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.998187,
+      "x": 100.426489,
+      "y": 100.319867,
+      "z": 2.012795,
+    },
+  ],
+  [
+    0.102857,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.853181,
+      "x": 134.545606,
+      "y": 125.909204,
+      "z": 3.036368,
+    },
+  ],
+  [
+    0.194286,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.486488,
+      "x": 220.826322,
+      "y": 190.619742,
+      "z": 5.62479,
+    },
+  ],
+  [
+    0.285714,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.207351,
+      "x": 286.505623,
+      "y": 239.879217,
+      "z": 7.595169,
+    },
+  ],
+  [
+    0.377143,
+    {
+      "bloomAlpha": 0.252099,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 0.576122,
+    },
+  ],
+  [
+    0.468571,
+    {
+      "bloomAlpha": 0.53547,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 0.926169,
+    },
+  ],
+  [
+    0.56,
+    {
+      "bloomAlpha": 0.736344,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.174308,
+    },
+  ],
+  [
+    0.651429,
+    {
+      "bloomAlpha": 0.868915,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.338071,
+    },
+  ],
+  [
+    0.742857,
+    {
+      "bloomAlpha": 0.947374,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.434991,
+    },
+  ],
+  [
+    0.834286,
+    {
+      "bloomAlpha": 0.985915,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.482601,
+    },
+  ],
+  [
+    0.925714,
+    {
+      "bloomAlpha": 0.998731,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.498433,
+    },
+  ],
+  [
+    1,
+    {
+      "bloomAlpha": 1,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.5,
+    },
+  ],
+]
+`;
+
+exports[`galaxyFolderCamera fly transitions > fly-out shrinks, swaps to the parent scene, then grows the bloom in > fly-out-camera-track 1`] = `
+[
+  [
+    0.011429,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.977143,
+      "x": 100,
+      "y": 100,
+      "z": 5.88,
+    },
+  ],
+  [
+    0.102857,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.794286,
+      "x": 100,
+      "y": 100,
+      "z": 4.92,
+    },
+  ],
+  [
+    0.194286,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.611429,
+      "x": 100,
+      "y": 100,
+      "z": 3.96,
+    },
+  ],
+  [
+    0.285714,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.428571,
+      "x": 100,
+      "y": 100,
+      "z": 3,
+    },
+  ],
+  [
+    0.377143,
+    {
+      "bloomAlpha": 0,
+      "sceneAlpha": 0.245714,
+      "x": 100,
+      "y": 100,
+      "z": 2.04,
+    },
+  ],
+  [
+    0.468571,
+    {
+      "bloomAlpha": 0.372408,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 7.383673,
+    },
+  ],
+  [
+    0.56,
+    {
+      "bloomAlpha": 0.569778,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 5.533333,
+    },
+  ],
+  [
+    0.651429,
+    {
+      "bloomAlpha": 0.729995,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 4.031293,
+    },
+  ],
+  [
+    0.742857,
+    {
+      "bloomAlpha": 0.853061,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 2.877551,
+    },
+  ],
+  [
+    0.834286,
+    {
+      "bloomAlpha": 0.938975,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 2.072109,
+    },
+  ],
+  [
+    0.925714,
+    {
+      "bloomAlpha": 0.987737,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.614966,
+    },
+  ],
+  [
+    1,
+    {
+      "bloomAlpha": 1,
+      "sceneAlpha": 0,
+      "x": 400,
+      "y": 300,
+      "z": 1.5,
+    },
+  ],
+]
+`;
+
+exports[`galaxyFolderCamera fly transitions > the frame time step advances fly.t by the same amount every call > fly-time-step 1`] = `0.011429`;
