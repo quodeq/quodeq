@@ -151,7 +151,11 @@ export const CAMERA = Object.freeze({
 /** A star or cluster outside the focused constellation never fades past this. */
 export const UNFOCUSED_CLUSTER_MIN_ALPHA = 0.08;
 
-/** Zoom units over which a level's decorations fade as the camera leaves it. */
+/**
+ * Zoom units over which the dimension level hands over to the principle
+ * level: both halves of the crossfade run on this one span, the dimension's
+ * decorations fading out across it and the principle planets fading in.
+ */
 export const DIM_FADE_SPAN = 3;
 
 /**
@@ -212,14 +216,14 @@ export const DIM_LABEL = Object.freeze({
 export const PRINCIPLE = Object.freeze({
   scaleFraction: 0.12,
   orbitRingAlpha: 0.1,
-  linkAlpha: 0.04,
+  linkAlpha: 0.04, linkWidthPx: 0.8,
   siblingScaleCap: 0.8,
   siblingReferenceZoom: 5,
   // Guards the divide when the planet scale is still ~0.
   scaleDivisorFloor: 0.01,
   selectedParticleScale: 0.8,
   siblingOrbitScaleMin: 0.5,
-  labelFontPx: 14,
+  labelFontPx: 14, labelOffsetPx: 10,
   scoreFontPx: 12,
   scoreAlpha: 0.7,
   scoreOffsetPx: 16,
@@ -291,5 +295,5 @@ export const FOLDER_LABEL = Object.freeze({
   subFontPx: 9,
   subFontMinPx: 7,
   subOffsetPx: 12,
-  rateAlpha: 0.5,
+  subLineAlpha: 0.6, rateAlpha: 0.5, // the rate reads quieter than the count
 });

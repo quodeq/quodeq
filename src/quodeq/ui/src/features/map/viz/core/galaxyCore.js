@@ -122,9 +122,11 @@ const GLOW_EDGE_ALPHA = 0.6;
 const GLOW_MIN_RADIUS_PX = 0.3;
 const GLOW_MIN_ALPHA = 0.01;
 // The core gradient starts from a lightened copy of the colour, clamped to
-// the top of the 8-bit channel range.
+// the top of the 8-bit channel range. Hoisted to module scope because
+// drawGlow runs once per star per frame.
 const CHANNEL_MAX = 255;
 const GLOW_CORE_LIGHTEN = 60;
+const lightenChannel = (c) => Math.min(CHANNEL_MAX, c + GLOW_CORE_LIGHTEN);
 
 export function drawGlow(ctx, { x, y, r, col, alpha }) {
   if (r < GLOW_MIN_RADIUS_PX || alpha < GLOW_MIN_ALPHA) return;
@@ -134,8 +136,7 @@ export function drawGlow(ctx, { x, y, r, col, alpha }) {
   gl.addColorStop(1, `rgba(${cr},${g},${b},0)`);
   ctx.beginPath(); ctx.arc(x, y, r * GLOW_OUTER_RATIO, 0, TAU); ctx.fillStyle = gl; ctx.fill();
   const co = ctx.createRadialGradient(x, y, 0, x, y, r);
-  const lit = (c) => Math.min(CHANNEL_MAX, c + GLOW_CORE_LIGHTEN);
-  co.addColorStop(0, `rgba(${lit(cr)},${lit(g)},${lit(b)},${GLOW_MID_ALPHA * alpha})`);
+  co.addColorStop(0, `rgba(${lightenChannel(cr)},${lightenChannel(g)},${lightenChannel(b)},${GLOW_MID_ALPHA * alpha})`);
   co.addColorStop(GLOW_EDGE_ALPHA, `rgba(${cr},${g},${b},${GLOW_EDGE_ALPHA * alpha})`);
   co.addColorStop(1, `rgba(${cr},${g},${b},${GLOW_CENTER_ALPHA * alpha})`);
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = co; ctx.fill();

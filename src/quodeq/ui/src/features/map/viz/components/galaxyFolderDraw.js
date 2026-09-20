@@ -269,15 +269,15 @@ export function drawLabels(ctx, pendingLabels, tc) {
     // violations draws no sub-line at all, and building it up here would
     // cost that star a string per frame for nothing.
     const subSize = Math.max(FOLDER_LABEL.subFontMinPx, FOLDER_LABEL.subFontPx * lb.fs);
-    const subOffset = lb.sr + FOLDER_LABEL.subOffsetPx * lb.fs;
+    const subDrop = FOLDER_LABEL.subOffsetPx * lb.fs;
     if (lb.s.violations > 0) {
       ctx.font = `${subSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
-      ctx.fillStyle = rgba(tc.textMuted, LABEL_ALPHA);
-      ctx.fillText(lb.s.violations + ' viol.', lb.sc.x, lb.sc.y + subOffset);
+      ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.subLineAlpha);
+      ctx.fillText(lb.s.violations + ' viol.', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     } else if (lb.s.isFolder) {
       ctx.font = `${subSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
       ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.rateAlpha);
-      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + subOffset);
+      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     }
   });
 }

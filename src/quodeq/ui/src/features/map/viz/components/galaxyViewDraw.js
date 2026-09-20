@@ -221,7 +221,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     ctx.strokeStyle = `rgba(50,55,80,${PRINCIPLE.orbitRingAlpha * pAlpha})`; ctx.lineWidth = 0.5; ctx.stroke();
     // connection line
     ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
-    ctx.strokeStyle = rgba(dim.col, PRINCIPLE.linkAlpha * pAlpha); ctx.lineWidth = CONSTELLATION.lineWidthPx; ctx.stroke();
+    ctx.strokeStyle = rgba(dim.col, PRINCIPLE.linkAlpha * pAlpha); ctx.lineWidth = PRINCIPLE.linkWidthPx; ctx.stroke();
     // Violation/compliance particles — fade out on selected (large orbs take over), shrink on others
     const particleFade = isSelectedPrin ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : 1;
     // Non-selected: smaller particles but keep orbit wide so they don't collide with planet
@@ -239,7 +239,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
       const la = pAlpha * prinLabelAlpha;
       ctx.font = `600 ${PRINCIPLE.labelFontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
       ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * la);
-      ctx.fillText(p.name, sc.x, sc.y - sr - PRINCIPLE.hitPadPx);
+      ctx.fillText(p.name, sc.x, sc.y - sr - PRINCIPLE.labelOffsetPx);
       ctx.font = `${PRINCIPLE.scoreFontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
       ctx.fillStyle = rgba(tc.textMuted, PRINCIPLE.scoreAlpha * la);
       ctx.fillText(p.score.toFixed(1), sc.x, sc.y + sr + PRINCIPLE.scoreOffsetPx);
