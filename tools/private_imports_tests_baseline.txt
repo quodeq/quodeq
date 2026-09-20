@@ -782,7 +782,6 @@ tests/core/test_partial_taxonomy_coverage.py:19:private-module:quodeq.core.scori
 tests/core/test_projector_scoring_custom.py:122:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:142:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:165:private-module:quodeq.data.fs.report_parser._run_info.RunInfo
-tests/core/test_projector_scoring_custom.py:166:private-module:quodeq.services._dashboard_trend.build_accumulated_trend
 tests/core/test_projector_scoring_custom.py:62:private-module:quodeq.data.fs.report_parser._summary.summarize_dimensions
 tests/core/test_projector_scoring_custom.py:63:private-name:quodeq.services.scoring._build_summary_from_dim_dicts
 tests/core/test_projector_scoring_custom.py:99:private-name:quodeq.services.scoring._build_summary_from_dim_dicts
@@ -1087,7 +1086,6 @@ tests/services/test_accumulated_show_all.py:17:private-name:quodeq.services.accu
 tests/services/test_action_provider_fs_dashboard.py:10:private-module:quodeq.services._dashboard_stale.collect_stale_dimensions
 tests/services/test_action_provider_fs_dashboard.py:11:private-name:quodeq.services.dashboard._collect_previous_scores
 tests/services/test_action_provider_fs_dashboard.py:11:private-name:quodeq.services.dashboard._enrich_dimensions_with_trend
-tests/services/test_action_provider_fs_dashboard.py:16:private-module:quodeq.services._dashboard_trend.build_accumulated_trend
 tests/services/test_cache.py:10:private-name:quodeq.services.cache._cache_lookup
 tests/services/test_cache.py:10:private-name:quodeq.services.cache._cache_store
 tests/services/test_cache.py:10:private-name:quodeq.services.cache._fetch_and_store
@@ -1129,7 +1127,6 @@ tests/services/test_dashboard_freshness.py:33:private-name:quodeq.services.dashb
 tests/services/test_dashboard_freshness.py:83:private-name:quodeq.services.dashboard._make_status_aware_fetcher
 tests/services/test_dashboard_rescore.py:10:private-name:quodeq.services.dashboard._rescore_run_dimensions
 tests/services/test_dashboard_trend.py:11:private-module:quodeq.services._dashboard_stale.collect_stale_dimensions
-tests/services/test_dashboard_trend.py:14:private-module:quodeq.services._dashboard_trend.build_accumulated_trend
 tests/services/test_dashboard_trend.py:17:private-name:quodeq.services.dashboard._collect_previous_scores
 tests/services/test_dashboard_trend.py:17:private-name:quodeq.services.dashboard._enrich_dimensions_with_trend
 tests/services/test_deleted.py:163:private-name:quodeq.services.deleted._sweep_dismissed_matching

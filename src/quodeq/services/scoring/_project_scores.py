@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.scoring.params import ScoringParams
-from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services.dashboard_trend import build_accumulated_trend
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs

@@ -220,7 +220,6 @@ src/quodeq/services/scoring/__init__.py:32:private-name:quodeq.services.rescore.
 src/quodeq/services/scoring/_deps.py:11:private-name:quodeq.services.scoring_deps._NO_DEPS
 src/quodeq/services/scoring/_fetchers.py:17:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_fetchers.py:22:private-module:quodeq.shared._env.env_int
-src/quodeq/services/scoring/_project_scores.py:17:private-module:quodeq.services._dashboard_trend.build_accumulated_trend
 src/quodeq/services/scoring/_rescoring.py:18:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_response_builders.py:21:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/_run_scores.py:10:private-module:quodeq.shared._env_resolve.resolve_env

@@ -163,7 +163,7 @@ def test_build_accumulated_trend_uses_custom_thresholds_for_run_grade():
     testing an internal helper."""
     from quodeq.core.types.dimension import DimensionResult
     from quodeq.data.fs.report_parser._run_info import RunInfo
-    from quodeq.services._dashboard_trend import build_accumulated_trend
+    from quodeq.services.dashboard_trend import build_accumulated_trend
 
     params = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=_CUSTOM_THRESHOLDS)
 
