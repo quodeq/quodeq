@@ -49,6 +49,12 @@ class PublishError(Exception):
     """User-facing publish failure."""
 
 
+# git output is included verbatim in PublishError messages (add/commit/push);
+# truncated to this many characters so a noisy git error can't blow up a
+# status payload. Shared with _publish_git.py's commit/push failures.
+GIT_ERROR_SNIPPET_MAX_CHARS = 300
+
+
 @contextmanager
 def _prepare_workspace(
     project_id: str, url: str, evaluations_root: Path, env: dict | None,
@@ -84,7 +90,7 @@ def _commit_and_push(repo: Path, project_id: str, count: int) -> None:
         add_paths.append("evaluations/.gitkeep")
     ok, out = run_git(["add", "--", *add_paths], cwd=repo)
     if not ok:
-        raise PublishError(f"git add failed, {out.strip()[:300]}")
+        raise PublishError(f"git add failed, {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
 
     _commit_staged_changes(repo, project_id, count)
     _push_with_rebase_fallback(repo)

@@ -10,10 +10,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 if TYPE_CHECKING:
     from quodeq.data.fs.evidence_tally import FindingTally
+
+# A dimension's live progress state, computed by _scan_progress_dims._dim_state
+# and threaded through _dim_files_summary/_dim_counts/_dim_elapsed_s. Distinct
+# from the persisted DimState in core.run.dimensions (dimensions.json's
+# RUNNING/DONE/INCOMPLETE/PENDING machinery): this is the derived display
+# state the live-progress UI reads.
+DimProgressState = Literal["done", "running", "pending"]
 
 
 class _DimCounts(NamedTuple):
@@ -50,7 +57,7 @@ class _ProgressContext:
 @dataclass
 class _DimProgress:
     id: str
-    state: str  # "done" | "running" | "pending"
+    state: DimProgressState
     files: dict
     violations: int = 0
     compliance: int = 0

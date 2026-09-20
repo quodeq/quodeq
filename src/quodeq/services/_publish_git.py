@@ -81,7 +81,7 @@ def _commit_staged_changes(repo: Path, project_id: str, count: int) -> None:
     so callers must still fall through to the push after this returns
     rather than treating it as a no-op.
     """
-    from quodeq.services.shared_publish import PublishError
+    from quodeq.services.shared_publish import GIT_ERROR_SNIPPET_MAX_CHARS, PublishError
 
     published_rel = f"evaluations/{project_id}/{PUBLISHED_META_FILENAME}"
     ok_names, names_out = _run_git(["diff", "--cached", "--name-only"], cwd=repo)
@@ -94,7 +94,7 @@ def _commit_staged_changes(repo: Path, project_id: str, count: int) -> None:
         message = f"Publish {project_id} ({count} runs) via quodeq {_app_version()}"
         ok, out = _run_git(["commit", "-m", message], cwd=repo)
         if not ok:
-            raise PublishError(f"git commit failed, {out.strip()[:300]}")
+            raise PublishError(f"git commit failed, {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
 
 
 def _push(repo: Path) -> tuple[bool, str]:
@@ -138,7 +138,7 @@ def _local_branch_name(repo: Path) -> str:
 def _push_with_rebase_fallback(repo: Path) -> None:
     """Push, retrying once via rebase on a rejected push (a race with
     another publisher), and raise PublishError if both attempts fail."""
-    from quodeq.services.shared_publish import PublishError
+    from quodeq.services.shared_publish import GIT_ERROR_SNIPPET_MAX_CHARS, PublishError
 
     ok, out = _push(repo)
     if not ok:
@@ -154,5 +154,5 @@ def _push_with_rebase_fallback(repo: Path) -> None:
             out = out_rebase
     if not ok:
         raise PublishError(
-            f"push to the shared repository failed, try again. {out.strip()[:300]}"
+            f"push to the shared repository failed, try again. {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}"
         )
