@@ -188,8 +188,6 @@ tests/analysis/test_copilot_provider.py:8:private-module:quodeq.analysis._config
 tests/analysis/test_custom_dimension_id_guard.py:3:private-name:quodeq.analysis._analysis_context._load_custom_dimensions
 tests/analysis/test_deterministic_checks_run.py:98:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
 tests/analysis/test_diff_mode_pipeline.py:7:private-name:quodeq.analysis._pipeline._run_dimensions
-tests/analysis/test_diff_resolver.py:9:private-module:quodeq.analysis._diff_resolver.DiffResolveError
-tests/analysis/test_diff_resolver.py:9:private-module:quodeq.analysis._diff_resolver.resolve_diff_files
 tests/analysis/test_dim_estimates.py:108:private-module:quodeq.analysis.cache._key_provenance.build_cache_key_struct
 tests/analysis/test_dim_estimates.py:11:private-module:quodeq.analysis._dim_estimates.DIM_ESTIMATES_FILENAME
 tests/analysis/test_dim_estimates.py:11:private-module:quodeq.analysis._dim_estimates.compute_dim_estimates
@@ -342,7 +340,6 @@ tests/analysis/test_provider_cache.py:7:private-name:quodeq.analysis.provider_ca
 tests/analysis/test_quodeqignore.py:10:private-module:quodeq.analysis._ignore.IGNORE_FILENAME
 tests/analysis/test_quodeqignore.py:10:private-module:quodeq.analysis._ignore.is_ignored
 tests/analysis/test_quodeqignore.py:10:private-module:quodeq.analysis._ignore.load_ignore_patterns
-tests/analysis/test_quodeqignore.py:9:private-module:quodeq.analysis._diff_resolver.resolve_diff_files
 tests/analysis/test_render_dimensions.py:9:private-module:quodeq.analysis.prompts._renderers.render_dimensions
 tests/analysis/test_renderers_overrides.py:10:private-module:quodeq.analysis.prompts._standards_io.render_all_standards
 tests/analysis/test_renderers_overrides.py:6:private-module:quodeq.analysis.prompts._renderers.render_compact_standards

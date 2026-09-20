@@ -7,8 +7,6 @@
 # line-count change above a grandfathered import shifts its entry. Prefer
 # hand-editing the baseline over blind --update-baseline regeneration, which
 # can silently absorb a genuinely new violation introduced in the same change.
-src/quodeq/_cli_evaluate_finalize.py:15:private-module:quodeq.analysis._diff_resolver.DiffResolveError
-src/quodeq/_cli_evaluation.py:49:private-module:quodeq.analysis._diff_resolver.resolve_diff_files
 src/quodeq/_cli_resolution.py:34:private-name:quodeq.analysis.manifest_scope._filter_manifest_by_scope
 src/quodeq/analysis/_api_source_gathering.py:25:private-name:quodeq.llm_bridge._omlx._read_omlx_api_key
 src/quodeq/analysis/_dim_estimates.py:34:private-name:quodeq.analysis.subagents._source_files._list_source_files

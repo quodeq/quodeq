@@ -46,7 +46,7 @@ from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_rep
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # facade patch target
 from quodeq.analysis.runner_markers import emit_marker  # facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
-from quodeq.analysis._diff_resolver import resolve_diff_files  # facade patch target
+from quodeq.analysis.diff_resolver import resolve_diff_files  # facade patch target
 from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
