@@ -1,4 +1,4 @@
-from quodeq.assistant.adapters._capabilities import supports_native_tools
+from quodeq.assistant.adapters.capabilities import supports_native_tools
 
 
 def test_cloud_providers_assumed_native():

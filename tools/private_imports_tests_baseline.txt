@@ -572,7 +572,6 @@ tests/api/test_zip_coverage.py:83:private-name:quodeq.api.zip._build_project_zip
 tests/api/test_zip_coverage.py:97:private-name:quodeq.api.zip._build_project_zip
 tests/assistant/test_api_adapter.py:153:private-name:quodeq.assistant.adapters.api._extra_body
 tests/assistant/test_api_adapter.py:165:private-name:quodeq.assistant.adapters.api._extra_body
-tests/assistant/test_capabilities.py:1:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
 tests/assistant/test_cli_adapter_sandbox.py:14:private-module:quodeq.assistant.adapters._cli_spawn.sb
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.TurnArgvRequest
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.build_turn_argv

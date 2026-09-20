@@ -21,6 +21,7 @@ def supports_native_tools(
     provider_id: str, api_base: str, model: str, *,
     probe: Callable[[str, dict], dict] | None = None,
 ) -> bool:
+    """Report whether the provider/model pair accepts native tool calls."""
     if provider_id in _ASSUME_NATIVE:
         return True
     if provider_id == "ollama":
