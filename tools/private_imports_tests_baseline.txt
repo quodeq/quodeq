@@ -610,7 +610,6 @@ tests/api/test_rate_limit_cross_process_lock.py:162:private-module:quodeq.api._r
 tests/api/test_rate_limit_cross_process_lock.py:176:private-module:quodeq.api._rate_limit_file_store.store_mod
 tests/api/test_rate_limit_cross_process_lock.py:196:private-module:quodeq.api._rate_limit_file_store.store_mod
 tests/api/test_rate_limit_cross_process_lock.py:210:private-module:quodeq.api._rate_limit_file_store.store_mod
-tests/api/test_rate_limit_cross_process_lock.py:218:private-module:quodeq.core.utils._file_lock
 tests/api/test_rate_limit_cross_process_lock.py:83:private-module:quodeq.api._rate_limit_file_store.store_mod
 tests/api/test_rate_limit_hardening.py:13:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
 tests/api/test_rate_limit_hardening.py:14:private-module:quodeq.api._rate_limit_store.InMemoryRateLimitStore
@@ -1091,7 +1090,6 @@ tests/data/test_env_seams_t5.py:12:private-name:quodeq.data.fs.repo_clone._DEFAU
 tests/data/test_env_seams_t5.py:12:private-name:quodeq.data.fs.repo_clone._get_clone_timeout
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._cache_base
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._git_env
-tests/data/test_file_lock.py:17:private-module:quodeq.core.utils._file_lock
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring
 tests/data/test_git_cli.py:216:private-module:quodeq.services._fs_scan.fs_scan
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite._index_sync._is_pid_alive

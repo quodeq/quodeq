@@ -205,7 +205,7 @@ def test_check_and_record_logs_a_warning_when_it_degrades(tmp_path: Path):
 
 
 def test_request_path_lock_timeout_is_short():
-    """60s (the shared _file_lock default, sized for the subagent pool) would
+    """60s (the shared file_lock default, sized for the subagent pool) would
     pin an HTTP worker thread for a minute under contention."""
     import quodeq.api._rate_limit_file_store as store_mod
 
@@ -215,7 +215,7 @@ def test_request_path_lock_timeout_is_short():
 def test_lock_file_default_timeout_is_unchanged():
     """The rate limiter's short budget must be a per-call override, not a
     change to the shared primitive other workloads depend on."""
-    from quodeq.core.utils import _file_lock
+    from quodeq.core.utils import file_lock
 
-    assert _file_lock._UNIX_LOCK_TIMEOUT_S == 60.0
-    assert _file_lock._WIN_LOCK_TIMEOUT_S == 60.0
+    assert file_lock._UNIX_LOCK_TIMEOUT_S == 60.0
+    assert file_lock._WIN_LOCK_TIMEOUT_S == 60.0
