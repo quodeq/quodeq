@@ -7,7 +7,6 @@ helpers, so the historical import path still resolves.
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -22,6 +21,7 @@ from quodeq.services._scoring_deps import ScoringDeps
 from quodeq.services._trend_fetcher import make_trend_fetcher
 from quodeq.services._wiring import RunInfo, calculate_trend, read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
+from quodeq.shared._env_resolve import resolve_env
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 
@@ -47,7 +47,7 @@ _DEFAULT_MAX_HISTORY_RUNS = 100
 
 def _max_history_runs(env: dict[str, str] | None = None) -> int:
     """Return the history-scan ceiling, honouring QUODEQ_MAX_HISTORY_RUNS."""
-    raw = (os.environ if env is None else env).get("QUODEQ_MAX_HISTORY_RUNS")
+    raw = resolve_env(env).get("QUODEQ_MAX_HISTORY_RUNS")
     if not raw:
         return _DEFAULT_MAX_HISTORY_RUNS
     try:

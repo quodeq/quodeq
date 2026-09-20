@@ -9,12 +9,12 @@ import platform as _platform_module
 import shutil
 import sys
 from pathlib import Path
-
 from typing import Any, Callable
 
 from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.data.fs.report_parser import safe_read_dir
 from quodeq.services._wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.utils import get_anthropic_api_key, read_json
 
@@ -57,7 +57,7 @@ def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
     config.  *env* overrides ``os.environ`` when provided, making the
     function testable without environment mutation.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     if "QUODEQ_AI_CLIENTS" in environ:
         return frozenset(environ["QUODEQ_AI_CLIENTS"].split(","))
     # Include API providers from config alongside default CLI tools
@@ -226,7 +226,7 @@ class FsToolingMixin:
         *env* overrides ``os.environ`` when provided, making the method
         testable without environment mutation.
         """
-        environ = env if env is not None else os.environ
+        environ = resolve_env(env)
         clients: list[dict[str, str]] = []
 
         # CLI tools: only include if installed

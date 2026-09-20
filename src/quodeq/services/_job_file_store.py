@@ -20,6 +20,7 @@ from pathlib import Path
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
 from quodeq.services._job_model import Job, JobStore, _MAX_LOG_LINES, _logger
+from quodeq.shared._env_resolve import resolve_env
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
@@ -35,7 +36,7 @@ def _default_persist_dir(env: Mapping[str, str] | None = None) -> Path:
     itself defaults to ``~/.quodeq``. Hardcoding the home fallback here let
     pytest runs write fake jobs into the developer's real dashboard.
     """
-    explicit = (env if env is not None else os.environ).get("QUODEQ_JOB_PERSIST_DIR")
+    explicit = resolve_env(env).get("QUODEQ_JOB_PERSIST_DIR")
     if explicit:
         return Path(explicit)
     from quodeq.shared._env import get_index_db_path

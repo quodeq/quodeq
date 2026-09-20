@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.core.types import PluginDimension, PluginInfo
 from quodeq.config.paths import default_paths
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
@@ -17,20 +18,20 @@ _logger = logging.getLogger(__name__)
 _DEFAULT_PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
 
 
-def _plugin_cache_ttl(env: dict[str, str] | None = None) -> int:
+def _plugin_cache_ttl(env: Mapping[str, str] | None = None) -> int:
     """Cache TTL, resolved per construction so runtime changes are seen."""
-    raw = (env if env is not None else os.environ).get("QUODEQ_PLUGIN_CACHE_TTL", "")
+    raw = resolve_env(env).get("QUODEQ_PLUGIN_CACHE_TTL", "")
     return int(raw) if raw.isdigit() and int(raw) > 0 else _DEFAULT_PLUGIN_CACHE_TTL
 
 
 class _PluginCache:
     """Thread-safe TTL cache for plugin metadata."""
 
-    def __init__(self, ttl: float | None = None) -> None:
+    def __init__(self, ttl: float | None = None, *, env: Mapping[str, str] | None = None) -> None:
         self._lock = threading.Lock()
         self._cache: list[PluginInfo] | None = None
         self._ts: float = 0.0
-        self._ttl = _plugin_cache_ttl() if ttl is None else ttl
+        self._ttl = _plugin_cache_ttl(env) if ttl is None else ttl
 
     def get(self) -> list[PluginInfo] | None:
         with self._lock:

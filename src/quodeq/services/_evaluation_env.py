@@ -8,9 +8,8 @@ for its existing callers/tests) is a thin static-method delegate to it. The
 """
 from __future__ import annotations
 
-import os
-
 from quodeq.services.base import EvaluationOptions
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.provider_env import provider_env_exports
 
 
@@ -42,7 +41,7 @@ def build_eval_env(
     ``get_ai_cmd``/``get_ai_model`` lookups stay patchable at their existing
     call-site module (``evaluation_mixin``).
     """
-    base = env if env is not None else os.environ
+    base = resolve_env(env)
     built_env = {**base, "PYTHONUNBUFFERED": "1"}
     built_env["AI_CMD"] = ai_cmd
     # Validated at the API boundary (_validate_ai_cmd_path); the scan
