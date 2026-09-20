@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.core.evidence.model import Evidence
 
 from tests.analysis._dry_run_fixtures import _make_dims_data

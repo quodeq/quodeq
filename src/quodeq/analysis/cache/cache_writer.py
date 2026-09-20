@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._key_provenance import _content_hash_for
 from quodeq.analysis.cache.dimension_helpers import (
     _SCHEMA_VERSION,

@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from unittest.mock import patch
 
-from quodeq.analysis._types import AnalysisOptions
+from quodeq.analysis.run_types import AnalysisOptions
 
 from tests.analysis._dry_run_fixtures import _make_dims_data
 

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget

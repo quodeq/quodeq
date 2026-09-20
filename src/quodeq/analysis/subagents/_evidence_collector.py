@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import (

@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.entry import quodeq_version
 from quodeq.analysis.cache.key import SCHEMA_VERSION as _SCHEMA_VERSION
 from quodeq.analysis.cache.key import CacheKey, compute_key

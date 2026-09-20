@@ -20,7 +20,7 @@ import pytest
 
 from quodeq.analysis._dim_order import _dimension_deadline, _order_by_backlog
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.shared import cancellation
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from

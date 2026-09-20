@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.dispatch_policy import DispatchPolicy
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.analysis._runner_markers import emit_marker
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.config.analysis_env import non_scout_providers, subagent_model_override

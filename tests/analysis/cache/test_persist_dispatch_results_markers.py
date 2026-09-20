@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult, persist_dispatch_results

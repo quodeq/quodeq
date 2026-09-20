@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
 from quodeq.analysis.dispatch_policy import api_file_size_cap
 from quodeq.analysis.subagents._source_files import _list_source_files

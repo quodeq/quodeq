@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from unittest.mock import MagicMock
 
-from quodeq.analysis._types import _AnalysisContext
+from quodeq.analysis.run_types import _AnalysisContext
 
 
 def _ctx(total: int) -> _AnalysisContext:

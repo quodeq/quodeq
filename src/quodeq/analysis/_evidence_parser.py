@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import (

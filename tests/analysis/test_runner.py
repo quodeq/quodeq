@@ -9,7 +9,7 @@ import pytest
 
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.runner import run, RunConfig, EvaluationError
-from quodeq.analysis._types import AnalysisOptions
+from quodeq.analysis.run_types import AnalysisOptions
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from tests._evidence_helpers import _evidence_line

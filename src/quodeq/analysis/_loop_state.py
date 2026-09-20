@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_CANCELLED_SIGNAL, REASON_CIRCUIT_BREAKER,
     REASON_FAILED_EXCEPTION, REASON_PROVIDER_FATAL,

@@ -22,7 +22,7 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.core.observability import NULL_LOG, LogSink
 
 DimEstimates = dict[str, dict[str, Any]]

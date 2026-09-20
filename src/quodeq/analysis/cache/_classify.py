@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from quodeq.analysis._types import ClassifyStash, RunConfig
+from quodeq.analysis.run_types import ClassifyStash, RunConfig
 from quodeq.analysis.cache._adoption import try_adopt
 from quodeq.analysis.cache._key_provenance import (
     _accumulate_drift,

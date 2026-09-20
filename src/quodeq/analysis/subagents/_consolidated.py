@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.core.evidence.model import Evidence

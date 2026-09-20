@@ -9,7 +9,7 @@ over the file-length threshold -- kept separate rather than grown.
 from __future__ import annotations
 
 from quodeq.analysis._api_runner import _build_cache_writer
-from quodeq.analysis._types import AnalysisOptions, ClassifyStash, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, ClassifyStash, RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend

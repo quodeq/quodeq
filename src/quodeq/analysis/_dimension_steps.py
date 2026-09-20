@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid

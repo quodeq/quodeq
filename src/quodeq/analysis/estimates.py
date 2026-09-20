@@ -12,7 +12,7 @@ from pathlib import Path
 
 from quodeq.analysis._analysis_context import load_analysis_context
 from quodeq.analysis._dim_estimates import compute_dim_estimates
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.dispatch_policy import default_dispatch_policy
 from quodeq.analysis.manifest import build_manifest, detect_language
 from quodeq.analysis.manifest_scope import _filter_manifest_by_scope

@@ -12,7 +12,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 
 
 def _make_config(*, incremental: bool = True, diff_from: str | None = None) -> RunConfig:

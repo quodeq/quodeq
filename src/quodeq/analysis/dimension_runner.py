@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.checks.runner import apply_checks_for_run

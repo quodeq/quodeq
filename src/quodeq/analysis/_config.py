@@ -9,7 +9,7 @@ from quodeq.config.analysis_env import default_max_duration, default_max_turns
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 
 if TYPE_CHECKING:
-    from quodeq.analysis._types import RunConfig
+    from quodeq.analysis.run_types import RunConfig
 
 HeartbeatCallback = Callable[[int, dict], None]
 
@@ -44,7 +44,7 @@ class AnalysisConfig:
     # Optional ``RunConfig`` carrier so the API path can build a per-file
     # cache writer (Task 3.5). ``None`` keeps legacy callers (no cache
     # writes) working. The import stays under TYPE_CHECKING (annotations are
-    # lazy via ``from __future__ import annotations``) so ``_types`` can
+    # lazy via ``from __future__ import annotations``) so ``run_types`` can
     # import this module at runtime without a cycle.
     run_config: RunConfig | None = None
 

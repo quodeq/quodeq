@@ -10,7 +10,7 @@ from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis._runner_markers import emit_marker
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._replay import _jsonl_path, _write_replayed_keys_sidecar
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import (

@@ -31,7 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from quodeq.analysis._evidence_parser import parse_evidence_from_jsonl
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from quodeq.analysis.cache._dimension_context import (
     _CacheContext,
