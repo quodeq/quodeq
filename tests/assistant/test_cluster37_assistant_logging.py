@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.assistant.mcp import _config
+from quodeq.assistant.mcp import mcp_config
 from quodeq.llm_bridge import _ollama
 
 
@@ -17,9 +17,9 @@ def test_unregister_locked_logs_when_cli_is_missing(monkeypatch) -> None:
     def _missing(*_args, **_kwargs):
         raise FileNotFoundError(2, "No such file", "claude")
 
-    monkeypatch.setattr(_config.subprocess, "run", _missing)
-    with patch.object(_config._logger, "debug") as debug:
-        _config._unregister_locked("claude")
+    monkeypatch.setattr(mcp_config.subprocess, "run", _missing)
+    with patch.object(mcp_config._logger, "debug") as debug:
+        mcp_config._unregister_locked("claude")
     assert debug.called
     # The log call is lazy %-style (cmd, exc as separate args, not inlined
     # into the message), so render it before checking for "claude".

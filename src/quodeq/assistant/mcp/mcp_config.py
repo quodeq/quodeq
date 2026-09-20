@@ -25,6 +25,7 @@ def _server_argv(server_args: list[str]) -> list[str]:
 
 
 def write_mcp_config(server_args: list[str], path: Path, *, tools: tuple[str, ...] | None = None) -> None:
+    """Write an MCP config file declaring the assistant server at ``path``."""
     payload = {"mcpServers": {_SERVER_NAME: {
         "command": sys.executable, "args": [*_SERVER_MODULE, *server_args]}}}
     if tools is not None:
@@ -46,6 +47,7 @@ def codex_mcp_config_arg(server_args: list[str]) -> str:
 
 
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:
+    """Register the assistant MCP server with the CLI ``cmd``."""
     key = f"{cmd}:{_SERVER_NAME}"
     with _lock:
         _unregister_locked(cmd)
@@ -72,5 +74,6 @@ def _unregister_locked(cmd: str) -> None:
 
 
 def unregister_cli_mcp(cmd: str) -> None:
+    """Remove the assistant MCP server registration from the CLI ``cmd``."""
     with _lock:
         _unregister_locked(cmd)

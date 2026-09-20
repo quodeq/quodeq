@@ -4,8 +4,8 @@ import sys
 
 import pytest
 
-from quodeq.assistant.mcp import _config
-from quodeq.assistant.mcp._config import register_cli_mcp, write_mcp_config
+from quodeq.assistant.mcp import mcp_config
+from quodeq.assistant.mcp.mcp_config import register_cli_mcp, write_mcp_config
 
 
 def test_write_mcp_config_shape(tmp_path):
@@ -24,7 +24,7 @@ def test_write_mcp_config_shape(tmp_path):
 
 def test_codex_mcp_config_arg_is_valid_toml():
     import tomllib
-    arg = _config.codex_mcp_config_arg(["--db-path", "/x/a.db", "--session-id", "s1"])
+    arg = mcp_config.codex_mcp_config_arg(["--db-path", "/x/a.db", "--session-id", "s1"])
     assert arg.startswith("mcp_servers.quodeq-assistant=")
     server = tomllib.loads(arg)["mcp_servers"]["quodeq-assistant"]
     assert server["command"] == sys.executable
@@ -36,7 +36,7 @@ def test_codex_mcp_config_arg_is_valid_toml():
 def test_codex_mcp_config_arg_escapes_special_chars():
     import tomllib
     # a path with a space and a backslash must survive the TOML round-trip
-    arg = _config.codex_mcp_config_arg(["--db-path", "/x y/a\\b.db"])
+    arg = mcp_config.codex_mcp_config_arg(["--db-path", "/x y/a\\b.db"])
     server = tomllib.loads(arg)["mcp_servers"]["quodeq-assistant"]
     assert "/x y/a\\b.db" in server["args"]
 
@@ -47,16 +47,16 @@ def test_unregister_cli_mcp_acquires_lock_and_clears_key(monkeypatch):
     held = {"during": False}
 
     def _fake_run(*a, **k):
-        held["during"] = _config._lock.locked()
+        held["during"] = mcp_config._lock.locked()
         calls.append(a[0])
 
-    monkeypatch.setattr(_config.subprocess, "run", _fake_run)
-    _config._registered.add("codex:quodeq-assistant")
+    monkeypatch.setattr(mcp_config.subprocess, "run", _fake_run)
+    mcp_config._registered.add("codex:quodeq-assistant")
 
-    _config.unregister_cli_mcp("codex")
+    mcp_config.unregister_cli_mcp("codex")
 
     assert held["during"] is True  # lock held while removing
-    assert "codex:quodeq-assistant" not in _config._registered
+    assert "codex:quodeq-assistant" not in mcp_config._registered
     assert calls == [["codex", "mcp", "remove", "quodeq-assistant"]]
 
 
