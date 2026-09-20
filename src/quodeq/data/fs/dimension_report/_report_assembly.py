@@ -18,7 +18,7 @@ from quodeq.data.fs.dimension_report.report_scoring import (
     extract_scores,
     grade_from_score,
 )
-from quodeq.data.fs.dimension_report._report_findings import build_principle_rows
+from quodeq.data.fs.dimension_report.report_findings import build_principle_rows
 
 
 @dataclass

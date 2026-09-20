@@ -7,7 +7,7 @@ import path keeps working.
 """
 from __future__ import annotations
 
-from quodeq.data.fs.dimension_report._report_findings import (  # noqa: F401
+from quodeq.data.fs.dimension_report.report_findings import (  # noqa: F401
     _build_principle_row,
     _flatten_findings,
     build_principle_rows,

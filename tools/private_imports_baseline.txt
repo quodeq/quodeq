@@ -33,9 +33,8 @@ src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimensio
 src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimension_report._report_constants._GRADE_INSUFFICIENT
 src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimension_report._report_constants._REPORT_SCHEMA_VERSION
 src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimension_report._report_constants._VIOLATION_FIELDS
-src/quodeq/analysis/_report_findings.py:10:private-module:quodeq.data.fs.dimension_report._report_findings.build_principle_rows
-src/quodeq/analysis/_report_findings.py:10:private-name:quodeq.data.fs.dimension_report._report_findings._build_principle_row
-src/quodeq/analysis/_report_findings.py:10:private-name:quodeq.data.fs.dimension_report._report_findings._flatten_findings
+src/quodeq/analysis/_report_findings.py:10:private-name:quodeq.data.fs.dimension_report.report_findings._build_principle_row
+src/quodeq/analysis/_report_findings.py:10:private-name:quodeq.data.fs.dimension_report.report_findings._flatten_findings
 src/quodeq/analysis/_report_io.py:18:private-name:quodeq.data.fs.dimension_report.report_io._persist_json
 src/quodeq/analysis/api_prompt_assembly.py:12:private-module:quodeq.analysis.prompts._template.load_template
 src/quodeq/analysis/cache/_classify.py:14:private-module:quodeq.analysis._types.ClassifyStash
