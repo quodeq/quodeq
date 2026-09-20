@@ -1,10 +1,10 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { advanceFlyTransition, advanceCamera } from './galaxyFolderCamera.js';
 import {
   drawScene, drawNebula, drawStarfield, drawConstellationLines,
   drawStars, drawLabels,
 } from './galaxyFolderDraw.js';
-import { DEFAULT_CANVAS_W, DEFAULT_CANVAS_H } from '../core/galaxyTunables.js';
+import { useCanvasSize } from './galaxyCanvasSize.js';
 import { CAMERA, MIN_VISIBLE_ALPHA } from './galaxyTuning.js';
 
 const TRANS = 0.8;
@@ -116,19 +116,7 @@ function renderFrame(ctx, activeScene, frame, refs, alphas) {
 /** Screen size (via a ResizeObserver on the canvas's parent) + the
  * world<->screen projection and fit-zoom math that depend on it. */
 function useFolderCameraSizing(refs) {
-  const [size, setSize] = useState({ w: DEFAULT_CANVAS_W, h: DEFAULT_CANVAS_H });
-
-  useEffect(() => {
-    const el = refs.canvasRef.current?.parentElement;
-    if (!el) return undefined;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setSize({ w: width, h: height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const size = useCanvasSize(refs.canvasRef);
 
   const w2s = useCallback((wx, wy) => {
     const cam = refs.camRef.current;

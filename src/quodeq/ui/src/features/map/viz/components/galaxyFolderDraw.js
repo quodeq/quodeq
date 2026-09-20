@@ -3,6 +3,7 @@ import {
   drawGlow, drawParticles,
 } from '../core/galaxyCore.js';
 import { newCueBatch, collectSeverityCue, drawCueBatch } from './galaxyFolderCues.js';
+import { CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
 import {
   BACKGROUND, STAR, NEBULA, NEBULA_SCENE_BLOBS, NEBULA_FOLDER_BLOBS,
   VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
@@ -10,6 +11,8 @@ import {
 } from './galaxyTuning.js';
 
 export { starShapeFor } from './galaxyFolderCues.js';
+// Re-exported so the folder canvas's draw surface stays in one module.
+export { drawStarfield } from './galaxyStarfield.js';
 
 /**
  * Draw all scene elements to the canvas context.
@@ -71,19 +74,6 @@ export function drawNebula(ctx, curNode, tc, frame) {
   drawNebulaBlobs(
     ctx, { ...NEBULA_SCENE_BLOBS, t }, { x: W / 2, y: H / 2 }, nbR, nbCol, NEBULA.sceneBlobAlpha,
   );
-}
-
-/**
- * Draw background starfield.
- */
-export function drawStarfield(ctx, bg, tc, frame) {
-  const { W, H, t } = frame;
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
-  bg.forEach(s => {
-    const a = BACKGROUND.starAlphaBase + BACKGROUND.starAlphaAmp * Math.sin(t * s.sp + s.tw);
-    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.sz, 0, TAU);
-    ctx.fillStyle = `rgba(${mr},${mg},${mb},${a})`; ctx.fill();
-  });
 }
 
 /**
@@ -170,7 +160,7 @@ function drawLabeledOrbs(ctx, s, sc, view) {
       if (showLabels && psr > VIOLATION_ORBS.labelMinRadiusPx) {
         const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
         const fontPx = Math.max(VIOLATION_ORBS.labelFontMinPx, Math.min(VIOLATION_ORBS.labelFontMaxPx, psr * VIOLATION_ORBS.labelFontRadiusFraction));
-        ctx.font = `500 ${fontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
+        ctx.font = `500 ${fontPx}px ${CANVAS_FONT_FAMILY}`;
         ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, VIOLATION_ORBS.labelAlpha * vAlpha);
         ctx.fillText(sevName, px, py - psr - VIOLATION_ORBS.labelOffsetPx);
       }
@@ -261,7 +251,7 @@ export function drawLabels(ctx, pendingLabels, tc) {
     });
     if (collides) return;
     placedLabels.push(lb);
-    ctx.font = `500 ${lb.fontSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.font = `500 ${lb.fontSize}px ${CANVAS_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = rgba(tc.text, LABEL_ALPHA);
     ctx.fillText(lb.label, lb.lx, lb.ly);
@@ -271,11 +261,11 @@ export function drawLabels(ctx, pendingLabels, tc) {
     const subSize = Math.max(FOLDER_LABEL.subFontMinPx, FOLDER_LABEL.subFontPx * lb.fs);
     const subDrop = FOLDER_LABEL.subOffsetPx * lb.fs;
     if (lb.s.violations > 0) {
-      ctx.font = `${subSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.font = `${subSize}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.subLineAlpha);
       ctx.fillText(lb.s.violations + ' viol.', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     } else if (lb.s.isFolder) {
-      ctx.font = `${subSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.font = `${subSize}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.rateAlpha);
       ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     }

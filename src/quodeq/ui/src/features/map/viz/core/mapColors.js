@@ -10,38 +10,50 @@ const SEVERITY_STATE_KEYS = {
   minor: 'map.stateMinor',
 };
 
-export function severityColor(severity) {
-  switch (severity) {
-    case 'critical': return 'var(--color-sev-critical-text)';
-    case 'major': return 'var(--color-sev-major-text)';
-    case 'minor': return 'var(--color-sev-minor-text)';
-    default: return 'var(--color-compliance)';
-  }
-}
-
-export function complianceRateColor(rate) {
-  if (rate >= RATE_HIGH) return 'var(--color-compliance)';
-  if (rate >= RATE_MEDIUM) return 'var(--color-sev-minor-text)';
-  if (rate >= RATE_LOW) return 'var(--color-sev-major-text)';
-  return 'var(--color-sev-critical-text)';
-}
-
-const SEV_STYLES = {
+// One entry per colour bucket: the text/fill colour, the cell background and
+// the border. severityColor, severityBorderColor and severityCellStyle are
+// the same lookup read through different fields, and the compliance entry is
+// the no-violations fallback.
+const BUCKETS = {
   critical: { color: 'var(--color-sev-critical-text)', background: 'color-mix(in srgb, var(--color-sev-critical-text) 22%, transparent)', borderColor: 'var(--color-sev-critical-border)' },
   major: { color: 'var(--color-sev-major-text)', background: 'color-mix(in srgb, var(--color-sev-major-text) 22%, transparent)', borderColor: 'var(--color-sev-major-border)' },
   minor: { color: 'var(--color-sev-minor-text)', background: 'color-mix(in srgb, var(--color-sev-minor-text) 22%, transparent)', borderColor: 'var(--color-sev-minor-border)' },
   compliance: { color: 'var(--color-compliance)', background: 'color-mix(in srgb, var(--color-compliance) 22%, transparent)', borderColor: 'var(--color-compliance-border)' },
 };
 
+// The compliance-rate ladder, best first: a rate at or above the threshold
+// takes that bucket, anything below them all is critical.
+const RATE_BUCKETS = [
+  [RATE_HIGH, BUCKETS.compliance],
+  [RATE_MEDIUM, BUCKETS.minor],
+  [RATE_LOW, BUCKETS.major],
+];
+
+function severityBucket(severity) {
+  return BUCKETS[severity] || BUCKETS.compliance;
+}
+
+function rateBucket(rate) {
+  for (const [min, bucket] of RATE_BUCKETS) {
+    if (rate >= min) return bucket;
+  }
+  return BUCKETS.critical;
+}
+
+export function severityColor(severity) {
+  return severityBucket(severity).color;
+}
+
+export function complianceRateColor(rate) {
+  return rateBucket(rate).color;
+}
+
 export function severityCellStyle(sev) {
-  return SEV_STYLES[sev] || null;
+  return BUCKETS[sev] || null;
 }
 
 export function complianceRateCellStyle(rate) {
-  if (rate >= RATE_HIGH) return SEV_STYLES.compliance;
-  if (rate >= RATE_MEDIUM) return SEV_STYLES.minor;
-  if (rate >= RATE_LOW) return SEV_STYLES.major;
-  return SEV_STYLES.critical;
+  return rateBucket(rate);
 }
 
 export function healthColor(complianceRate) {
@@ -57,19 +69,11 @@ export function worstSeverity(severity) {
 }
 
 function severityBorderColor(severity) {
-  switch (severity) {
-    case 'critical': return 'var(--color-sev-critical-border)';
-    case 'major': return 'var(--color-sev-major-border)';
-    case 'minor': return 'var(--color-sev-minor-border)';
-    default: return 'var(--color-compliance-border)';
-  }
+  return severityBucket(severity).borderColor;
 }
 
 function complianceRateBorderColor(rate) {
-  if (rate >= RATE_HIGH) return 'var(--color-compliance-border)';
-  if (rate >= RATE_MEDIUM) return 'var(--color-sev-minor-border)';
-  if (rate >= RATE_LOW) return 'var(--color-sev-major-border)';
-  return 'var(--color-sev-critical-border)';
+  return rateBucket(rate).borderColor;
 }
 
 export function nodeBorderColor(node, viewMode) {

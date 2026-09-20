@@ -1,7 +1,8 @@
 import {
   TAU, getThemeColors, drawGlow, drawParticles, rgba,
 } from '../core/galaxyCore.js';
-import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL } from '../core/galaxyTunables.js';
+import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL, CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
+import { drawStarfield } from './galaxyStarfield.js';
 import {
   BACKGROUND, STAR, VIOLATION_ORBS, MIN_VISIBLE_ALPHA, LABEL_ALPHA,
   FOCUS_RING, FOCUS_RING_DASH, UNFOCUSED_CLUSTER_MIN_ALPHA, DIM_FADE_SPAN,
@@ -54,16 +55,11 @@ export function drawFrame(ctx, scene, cam, nav, opts) {
 
 /** Phase 1: radial gradient background + background star field. */
 function drawBackground(ctx, scene, opts, tc) {
-  const { W, H, t } = opts;
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
+  const { W, H } = opts;
   const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * BACKGROUND.gradientRadiusFraction);
   grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-  scene.bg.forEach(s => {
-    const a = BACKGROUND.starAlphaBase + BACKGROUND.starAlphaAmp * Math.sin(t * s.sp + s.tw);
-    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.sz, 0, TAU);
-    ctx.fillStyle = `rgba(${mr},${mg},${mb},${a})`; ctx.fill();
-  });
+  drawStarfield(ctx, scene.bg, tc, opts);
 }
 
 /** Phase 2: constellation dashed circles, lines, and labels (galaxy level only). */
@@ -97,7 +93,7 @@ function drawConstellations(ctx, scene, view, opts, tc) {
     if (showLabels && con.label) {
       const lx = csc.x;
       const ly = csc.y - circleR - 10;
-      ctx.font = `600 ${CONSTELLATION.labelFontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.font = `600 ${CONSTELLATION.labelFontPx}px ${CANVAS_FONT_FAMILY}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = `rgba(${mr},${mg},${mb},${CONSTELLATION.labelAlpha * conAlpha * conClusterDim})`;
       ctx.fillText(con.label, lx, ly);
@@ -157,10 +153,10 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 2) : dimFade;
   if (showLabels && labelAlpha > MIN_VISIBLE_ALPHA) {
     const fs = Math.min(cam.z, LABEL_SCALE_CAP);
-    ctx.font = `600 ${Math.max(DIM_LABEL.fontMinPx, DIM_LABEL.fontPx * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.font = `600 ${Math.max(DIM_LABEL.fontMinPx, DIM_LABEL.fontPx * fs)}px ${CANVAS_FONT_FAMILY}`;
     ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * labelAlpha);
     ctx.fillText(s.name, sc.x, sc.y - sr - DIM_LABEL.offsetPx * fs);
-    ctx.font = `${Math.max(DIM_LABEL.scoreFontMinPx, DIM_LABEL.scoreFontPx * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.font = `${Math.max(DIM_LABEL.scoreFontMinPx, DIM_LABEL.scoreFontPx * fs)}px ${CANVAS_FONT_FAMILY}`;
     ctx.fillStyle = rgba(tc.textMuted, DIM_LABEL.scoreAlpha * labelAlpha);
     ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + DIM_LABEL.scoreOffsetPx * fs);
   }
@@ -237,10 +233,10 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / SIBLING_LABEL_FADE_SPAN) : 1);
     if (showLabels && prinLabelAlpha > MIN_VISIBLE_ALPHA) {
       const la = pAlpha * prinLabelAlpha;
-      ctx.font = `600 ${PRINCIPLE.labelFontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.font = `600 ${PRINCIPLE.labelFontPx}px ${CANVAS_FONT_FAMILY}`;
       ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * la);
       ctx.fillText(p.name, sc.x, sc.y - sr - PRINCIPLE.labelOffsetPx);
-      ctx.font = `${PRINCIPLE.scoreFontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.font = `${PRINCIPLE.scoreFontPx}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, PRINCIPLE.scoreAlpha * la);
       ctx.fillText(p.score.toFixed(1), sc.x, sc.y + sr + PRINCIPLE.scoreOffsetPx);
     }
@@ -274,7 +270,7 @@ function drawZoomedPrinciple(ctx, scene, cam, opts) {
     if (showLabels && sr > VIOLATION_ORBS.labelMinRadiusPx) {
       const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
       const fontPx = Math.max(VIOLATION_ORBS.labelFontMinPx, Math.min(VIOLATION_ORBS.labelFontMaxPx, sr * VIOLATION_ORBS.labelFontRadiusFraction));
-      ctx.font = `500 ${fontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.font = `500 ${fontPx}px ${CANVAS_FONT_FAMILY}`;
       ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, VIOLATION_ORBS.labelAlpha * vAlpha);
       ctx.fillText(sevName, px, py - sr - VIOLATION_ORBS.labelOffsetPx);
     }
