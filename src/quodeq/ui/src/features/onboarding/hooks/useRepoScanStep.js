@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { getProjectScan as apiGetProjectScan } from '../../../api/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
-import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../constants.js';
+import { LAST_CLONE_ROOT_STORAGE_KEY, HTTP_STATUS } from '../../../constants.js';
 
 const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
+// Lifts the adapter's 30s default so a resume scan (which reads a project
+// that may not have finished its first scan yet) isn't cut short.
+const RESUME_SCAN_TIMEOUT_MS = 120000;
 
 // Map backend error codes (Task A8) to user-facing messages. The switch that
 // used to live here moved into strings/apiErrors.js so every screen resolves
@@ -31,8 +34,8 @@ function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
       // (the adapter rejects on non-2xx too, landing in the same catch).
       // The explicit `timeout` lifts the adapter's 30s default to match.
       const scanData = await getProjectScan(existingProjectId, {
-        signal: AbortSignal.timeout(120000),
-        timeout: 120000,
+        signal: AbortSignal.timeout(RESUME_SCAN_TIMEOUT_MS),
+        timeout: RESUME_SCAN_TIMEOUT_MS,
       });
       actions.succeedScan(existingProjectId, scanData);
       return true;
@@ -65,7 +68,7 @@ export function makeHandleSubmit({ state, actions, createProject, setSubStep, se
       const { projectId, scanData } = await createProject({ repo });
       actions.succeedScan(projectId, scanData);
     } catch (err) {
-      if (err.status === 409 && err.existingProjectId) {
+      if (err.status === HTTP_STATUS.CONFLICT && err.existingProjectId) {
         const resumed = await tryResumeExisting(err.existingProjectId);
         if (resumed) return;
       }
@@ -100,7 +103,7 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
       actions.succeedScan(projectId, scanData);
       setSubStep('input');
     } catch (err) {
-      if (err.status === 409 && err.existingProjectId) {
+      if (err.status === HTTP_STATUS.CONFLICT && err.existingProjectId) {
         const resumed = await tryResumeExisting(err.existingProjectId);
         if (resumed) {
           setSubStep('input');
